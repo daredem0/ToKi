@@ -1,0 +1,15 @@
+[package]
+name = "toki-render"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.99"
+egui = "0.31.1"
+egui-wgpu = "0.31.1"
+egui-winit = "0.31.1"
+pollster = "0.4.0"
+wgpu = "25.0.2"
+winit = "0.30"

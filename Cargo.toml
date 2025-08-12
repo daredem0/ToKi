@@ -1,0 +1,8 @@
+[workspace]
+members = [
+  "crates/toki-core",
+  "crates/toki-render",
+  "crates/toki-runtime",
+  "crates/toki-editor",
+]
+resolver = "2"
