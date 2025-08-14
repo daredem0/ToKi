@@ -3,10 +3,6 @@ name = "toki-editor"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = "1.0.99"
-notify = "8.2.0"
-toki-core = { version = "0.1.0", path = "../toki-core" }
-toki-render = { version = "0.1.0", path = "../toki-render" }
+toki-render = { path = "../toki-render" }
