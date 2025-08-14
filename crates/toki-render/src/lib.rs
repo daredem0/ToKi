@@ -16,22 +16,22 @@ struct App {
 }
 
 impl ApplicationHandler for App {
-fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-    // Initialize default window attributes
-    let window_attributes = WindowAttributes::default();
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        // Initialize default window attributes
+        let window_attributes = WindowAttributes::default();
 
-    // Attempt to create a window with the given attributes
-    self.window = match event_loop.create_window(window_attributes) {
-        // If successful, store the window in self.window
-        Ok(window) => Some(window),
-        // If an error occurs, print the error, exit the event loop, and return
-        Err(err) => {
-            eprintln!("error creating window: {err}");
-            event_loop.exit();
-            return;
-        },
+        // Attempt to create a window with the given attributes
+        self.window = match event_loop.create_window(window_attributes) {
+            // If successful, store the window in self.window
+            Ok(window) => Some(window),
+            // If an error occurs, print the error, exit the event loop, and return
+            Err(err) => {
+                eprintln!("error creating window: {err}");
+                event_loop.exit();
+                return;
+            }
+        }
     }
-}
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         // Print a message describing the event that occurred
@@ -43,7 +43,7 @@ fn resumed(&mut self, event_loop: &ActiveEventLoop) {
             WindowEvent::CloseRequested => {
                 println!("Close was requested; stopping");
                 event_loop.exit();
-            },
+            }
             // If the window was resized, request a redraw
             WindowEvent::Resized(_) => {
                 // Get the window from self.window
@@ -51,7 +51,7 @@ fn resumed(&mut self, event_loop: &ActiveEventLoop) {
 
                 // Request a redraw
                 window.request_redraw();
-            },
+            }
             // If the window needs to be redrawn, redraw it
             WindowEvent::RedrawRequested => {
                 // Redraw the application.
@@ -61,7 +61,10 @@ fn resumed(&mut self, event_loop: &ActiveEventLoop) {
                 // the program to gracefully handle redraws requested by the OS.
 
                 // Get the window from self.window
-                let window = self.window.as_ref().expect("redraw request without a window");
+                let window = self
+                    .window
+                    .as_ref()
+                    .expect("redraw request without a window");
 
                 // Notify that you're about to draw.
                 // This is necessary for some platforms (like X11) to ensure that the window is
@@ -71,11 +74,11 @@ fn resumed(&mut self, event_loop: &ActiveEventLoop) {
                 // Draw.
                 // This function is defined in the fill module and is responsible for drawing
                 // something on the window.
-                fill::fill_window(&window);
+                fill::fill_window(window);
 
                 // For contiguous redraw loop you can request a redraw from here.
                 // window.request_redraw();
-            },
+            }
             // Ignore all other events
             _ => (),
         }
@@ -110,4 +113,3 @@ pub fn run_minimal_window() -> Result<(), RenderError> {
     // Return Ok if the application was closed successfully
     Ok(())
 }
-

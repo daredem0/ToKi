@@ -40,20 +40,18 @@ mod platform {
     /// The graphics context used to draw to a window.
     struct GraphicsContext {
         /// The global softbuffer context.
-        context: RefCell<Context<&'static  Window>>,
+        context: RefCell<Context<&'static Window>>,
 
         /// The hash map of window IDs to surfaces.
-        surfaces: HashMap<WindowId, Surface<&'static  Window, &'static Window>>,
+        surfaces: HashMap<WindowId, Surface<&'static Window, &'static Window>>,
     }
 
     impl GraphicsContext {
         fn new(w: &Window) -> Self {
             Self {
                 context: RefCell::new(
-                    Context::new(unsafe {
-                        mem::transmute::<&'_  Window, &'static  Window>(w)
-                    })
-                    .expect("Failed to create a softbuffer context"),
+                    Context::new(unsafe { mem::transmute::<&'_ Window, &'static Window>(w) })
+                        .expect("Failed to create a softbuffer context"),
                 ),
                 surfaces: HashMap::new(),
             }
@@ -87,16 +85,23 @@ mod platform {
 
             // Either get the last context used or create a new one.
             let mut gc = gc.borrow_mut();
-            let surface =
-                gc.get_or_insert_with(|| GraphicsContext::new(window)).create_surface(window);
+            let surface = gc
+                .get_or_insert_with(|| GraphicsContext::new(window))
+                .create_surface(window);
 
             // Fill a buffer with a solid color
 
-            surface.resize(width, height).expect("Failed to resize the softbuffer surface");
+            surface
+                .resize(width, height)
+                .expect("Failed to resize the softbuffer surface");
 
-            let mut buffer = surface.buffer_mut().expect("Failed to get the softbuffer buffer");
+            let mut buffer = surface
+                .buffer_mut()
+                .expect("Failed to get the softbuffer buffer");
             buffer.fill(color);
-            buffer.present().expect("Failed to present the softbuffer buffer");
+            buffer
+                .present()
+                .expect("Failed to present the softbuffer buffer");
         })
     }
 
