@@ -6,6 +6,7 @@ use winit::event_loop::{ActiveEventLoop, EventLoop}; // ActiveEventLoop is used 
 use winit::window::{Window, WindowAttributes, WindowId}; // Window: window handle; Attributes: window config; ID: unique per window
 
 // wgpu imports
+use wgpu::util::DeviceExt;
 use wgpu::Device; // Abstraction over GPU hardware; used to create GPU resources (buffers, pipelines, etc.)
 use wgpu::Queue; // Used to submit rendering commands to the GPU
 use wgpu::Surface; // Represents the drawing surface (your window's framebuffer)
@@ -19,12 +20,20 @@ mod fill; // fill_window()
 mod errors; // Custom errors
 use crate::errors::RenderError;
 
+mod vertex;
+use crate::texture::GpuTexture;
+use crate::vertex::Vertex;
+mod texture;
+
 #[derive(Debug)]
 struct GpuState {
     surface: Surface<'static>,
     config: SurfaceConfiguration,
     device: Device,
     queue: Queue,
+    vertex_buffer: wgpu::Buffer,
+    render_pipeline: wgpu::RenderPipeline,
+    texture_bind_group: wgpu::BindGroup,
 }
 
 #[derive(Debug)]
@@ -51,7 +60,7 @@ impl GpuState {
         // we dont own the window anymore.
         let size = window.inner_size();
         // Create the surface of the window
-        let surface = unsafe { instance.create_surface(window).unwrap() };
+        let surface = instance.create_surface(window).unwrap();
 
         // Get a GPU Abstraction. Important: This has to be async
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -70,6 +79,61 @@ impl GpuState {
             label: Some("Toki device"),
         }))
         .expect("Failed to create device");
+
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Sprite Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/sprite.wgsl").into()),
+        });
+
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Texture Bind Group Layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
+
+        let slime_texture = GpuTexture::from_file(
+            &device,
+            &queue,
+            "./assets/slime_sprite.png",
+            Some("Slime Texture"),
+        )
+        .map_err(|e| {
+            eprintln!("Failed to load slime texture: {e}");
+            panic!();
+        })
+        .unwrap();
+
+        let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Texture Bind Group"),
+            layout: &texture_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&slime_texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&slime_texture.sampler),
+                },
+            ],
+        });
 
         // Configure surface
         let surface_caps = surface.get_capabilities(&adapter);
@@ -93,11 +157,81 @@ impl GpuState {
 
         surface.configure(&device, &config);
 
+        let vertices: &[Vertex] = &[
+            // Triangle 1
+            Vertex {
+                position: [0.0, 0.0],
+                tex_coords: [0.0, 1.0],
+            },
+            Vertex {
+                position: [1.0, 0.0],
+                tex_coords: [1.0, 1.0],
+            },
+            Vertex {
+                position: [1.0, 1.0],
+                tex_coords: [1.0, 0.0],
+            },
+            // Triangle 2
+            Vertex {
+                position: [0.0, 0.0],
+                tex_coords: [0.0, 1.0],
+            },
+            Vertex {
+                position: [1.0, 1.0],
+                tex_coords: [1.0, 0.0],
+            },
+            Vertex {
+                position: [0.0, 1.0],
+                tex_coords: [0.0, 0.0],
+            },
+        ];
+
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Quad Vertex Buffer"),
+            contents: bytemuck::cast_slice(vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Render Pipeline Layout"),
+            bind_group_layouts: &[&texture_bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            cache: None,
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[Vertex::desc()],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+        });
+
         Self {
             surface,
             config,
             device,
             queue,
+            vertex_buffer,
+            render_pipeline,
+            texture_bind_group,
         }
     }
     fn draw(&mut self) {
@@ -116,7 +250,7 @@ impl GpuState {
             });
 
         {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -131,11 +265,16 @@ impl GpuState {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            // Drawing commands go here...
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.texture_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.draw(0..6, 0..1);
         }
 
         self.queue.submit(Some(encoder.finish()));
-        self.device.poll(wgpu::PollType::Wait); // <-- This is crucial
+        if let Err(e) = self.device.poll(wgpu::PollType::Wait) {
+            eprintln!("Device poll failed: {e:?}");
+        }
         output.present();
     }
 }

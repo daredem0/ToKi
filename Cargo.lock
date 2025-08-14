@@ -2307,6 +2307,7 @@ dependencies = [
 name = "toki-render"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "image",
  "pollster",
  "softbuffer",

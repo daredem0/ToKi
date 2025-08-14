@@ -17,5 +17,6 @@ tracing-subscriber = "0.3.18"
 tracing = { version = "0.1.40", default-features = false }
 thiserror = "2.0"                   # for lib errors
 wgpu = "26.0.1"                     # For hardware-accelerated graphics
-image = "0.25.6"                    # For loading sprite assets
+image = { version = "0.25.6", features = [ "png", "default" ]}                    # For loading sprite assets
 pollster = "0.4.0"                  # For simplifying async GPU init
+bytemuck = { version = "1.14", features = ["derive"] }
