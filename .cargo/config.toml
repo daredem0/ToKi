@@ -1,2 +1,2 @@
-[build]
-rustflags = ["-Dwarnings"]
+#[build]
+#rustflags = ["-Dwarnings"]

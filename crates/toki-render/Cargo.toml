@@ -12,7 +12,10 @@ softbuffer = { version = "0.4.6", default-features = false, features = [
     "x11-dlopen",
     "wayland",
     "wayland-dlopen",
-] }
+] }                                 # For fallback rendering#
 tracing-subscriber = "0.3.18"
 tracing = { version = "0.1.40", default-features = false }
-thiserror = "2.0"
+thiserror = "2.0"                   # for lib errors
+wgpu = "26.0.1"                     # For hardware-accelerated graphics
+image = "0.25.6"                    # For loading sprite assets
+pollster = "0.4.0"                  # For simplifying async GPU init
