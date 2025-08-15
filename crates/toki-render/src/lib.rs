@@ -4,7 +4,7 @@ use winit::application::ApplicationHandler; // Trait that defines app lifecycle 
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent; // Enum of possible window-related events (resize, input, close, etc.)
 use winit::event_loop::{ActiveEventLoop, EventLoop}; // ActiveEventLoop is used inside lifecycle methods; EventLoop creates and runs the app
-use winit::window::{Window, WindowAttributes, WindowId}; // Window: window handle; Attributes: window config; ID: unique per window
+use winit::window::{self, Window, WindowAttributes, WindowId}; // Window: window handle; Attributes: window config; ID: unique per window
 
 // wgpu imports
 use wgpu::util::DeviceExt;
@@ -14,7 +14,6 @@ use wgpu::Surface; // Represents the drawing surface (your window's framebuffer)
 use wgpu::SurfaceConfiguration; // Configuration for how to draw to the surface (format, vsync, etc.)
 
 use bytemuck::{Pod, Zeroable};
-use glam;
 use std::sync::Arc;
 // Local modules
 #[path = "util/fill.rs"]
@@ -50,6 +49,7 @@ struct GpuState {
 struct App {
     window: Option<Arc<Window>>,
     gpu: Option<GpuState>,
+    sprite_position: glam::Vec2,
 }
 
 impl App {
@@ -57,6 +57,7 @@ impl App {
         Self {
             window: None,
             gpu: None,
+            sprite_position: glam::Vec2::new(32.0, 32.0),
         }
     }
 }
@@ -356,6 +357,46 @@ impl ApplicationHandler for App {
         println!("{event:?}");
 
         match event {
+            // Handle keyboard inputs
+            WindowEvent::KeyboardInput { event, .. } => {
+                use winit::keyboard::{KeyCode, PhysicalKey};
+                // Movement speed in pixels per krey press
+                let step = 2.0;
+                let sprite_size = 16.0; // your sprite is 16×16 pixels
+                let screen_width = 160.0;
+                let screen_height = 144.0;
+                if event.state.is_pressed() {
+                    match event.physical_key {
+                        PhysicalKey::Code(KeyCode::KeyW) | PhysicalKey::Code(KeyCode::ArrowUp) => {
+                            println!("Move forward");
+                            self.sprite_position.y = (self.sprite_position.y - step).max(0.0);
+                        }
+                        PhysicalKey::Code(KeyCode::KeyA)
+                        | PhysicalKey::Code(KeyCode::ArrowLeft) => {
+                            println!("Move left");
+                            self.sprite_position.x = (self.sprite_position.x - step).max(0.0);
+                        }
+                        PhysicalKey::Code(KeyCode::KeyS)
+                        | PhysicalKey::Code(KeyCode::ArrowDown) => {
+                            println!("Move backward");
+                            self.sprite_position.y =
+                                (self.sprite_position.y + step).min(screen_height - sprite_size);
+                        }
+                        PhysicalKey::Code(KeyCode::KeyD)
+                        | PhysicalKey::Code(KeyCode::ArrowRight) => {
+                            println!("Move right");
+                            self.sprite_position.x =
+                                (self.sprite_position.x + step).min(screen_width - sprite_size);
+                        }
+                        // Ignore all other events
+                        _ => (),
+                    }
+                    if let Some(window) = &self.window {
+                        window.request_redraw();
+                    }
+                }
+            }
+
             // If the window was closed, stop the event loop
             WindowEvent::CloseRequested => {
                 println!("Close was requested; stopping");
@@ -407,6 +448,35 @@ impl ApplicationHandler for App {
                 // so were just filling it up for now.
                 //fill::fill_window(window);
                 if let Some(gpu) = &mut self.gpu {
+                    let size = self
+                        .window
+                        .as_ref()
+                        .expect("redraw request without a window")
+                        .inner_size();
+                    let aspect = size.width as f32 / size.height as f32;
+                    let desired_aspect = 160.0 / 144.0;
+                    let (view_width, view_height) = if aspect > desired_aspect {
+                        let height = 144.0;
+                        let width = height * aspect;
+                        (width, height)
+                    } else {
+                        let width = 160.0;
+                        let height = width / aspect;
+                        (width, height)
+                    };
+                    let model = glam::Mat4::from_translation(self.sprite_position.extend(0.0));
+                    let projection = glam::Mat4::orthographic_rh_gl(
+                        0.0,
+                        view_width,
+                        view_height,
+                        0.0,
+                        -1.0,
+                        1.0,
+                    );
+                    let mvp = projection * model;
+
+                    gpu.update_projection(mvp);
+                    println!("Redrawing projection");
                     gpu.draw();
                 }
             }
