@@ -4,7 +4,6 @@ use toki_core::graphics::image::{load_image_rgba8, DecodedImage};
 use wgpu;
 
 pub struct GpuTexture {
-    pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
 }
@@ -71,10 +70,6 @@ impl GpuTexture {
             mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
         });
-        Ok(Self {
-            texture,
-            view,
-            sampler,
-        })
+        Ok(Self { view, sampler })
     }
 }

@@ -30,6 +30,7 @@ use crate::texture::GpuTexture;
 struct Uniforms {
     mvp: [[f32; 4]; 4],
 }
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct GpuState {
     surface: Surface<'static>,

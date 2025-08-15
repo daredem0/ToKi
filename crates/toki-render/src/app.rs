@@ -82,32 +82,32 @@ impl App {
         let sprite_size = 16.0; // your sprite is 16×16 pixels
         let screen_width = 160.0;
         let screen_height = 144.0;
-        // Track if we moved at all this tick
-        let mut moved = false;
+        // Track if we _moved at all this tick
+        let mut _moved = false;
 
         for key in &self.keys_held {
             match key {
                 KeyCode::KeyW | KeyCode::ArrowUp => {
                     tracing::debug!("Move forward");
                     self.sprite.position.y = (self.sprite.position.y - step).max(0.0);
-                    moved = true;
+                    _moved = true;
                 }
                 KeyCode::KeyA | KeyCode::ArrowLeft => {
                     tracing::debug!("Move left");
                     self.sprite.position.x = (self.sprite.position.x - step).max(0.0);
-                    moved = true;
+                    _moved = true;
                 }
                 KeyCode::KeyS | KeyCode::ArrowDown => {
                     tracing::debug!("Move backward");
                     self.sprite.position.y =
                         (self.sprite.position.y + step).min(screen_height - sprite_size);
-                    moved = true;
+                    _moved = true;
                 }
                 KeyCode::KeyD | KeyCode::ArrowRight => {
                     tracing::debug!("Move right");
                     self.sprite.position.x =
                         (self.sprite.position.x + step).min(screen_width - sprite_size);
-                    moved = true;
+                    _moved = true;
                 }
                 // Ignore all other events
                 _ => (),
@@ -147,7 +147,7 @@ impl ApplicationHandler for App {
         self.gpu = Some(gpu);
     }
 
-    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         const TIMESTEP: Duration = Duration::from_nanos(16_666_667); // ~16.67ms -> 60fps
         let now = Instant::now();
         let dt = now - self.last_update;
@@ -192,6 +192,8 @@ impl ApplicationHandler for App {
                 // Get the window from self.window
                 let window = self.window.as_ref().expect("resize event without a window");
                 let size = window.inner_size();
+                self.projection_params.height = size.height;
+                self.projection_params.width = size.width;
                 let projection = calculate_projection(self.projection_params);
                 if let Some(gpu) = &mut self.gpu {
                     gpu.update_projection(projection);
@@ -226,6 +228,8 @@ impl ApplicationHandler for App {
                         .as_ref()
                         .expect("redraw request without a window")
                         .inner_size();
+                    self.projection_params.height = size.height;
+                    self.projection_params.width = size.width;
                     let projection = calculate_projection(self.projection_params);
                     let model = glam::Mat4::from_translation(self.sprite.position.extend(0.0));
 
