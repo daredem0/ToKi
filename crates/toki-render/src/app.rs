@@ -12,10 +12,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::errors::RenderError;
-use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
-
-use crate::draw::calculate_projection;
 use crate::gpu::GpuState;
+use toki_core::math::projection::{calculate_projection, ProjectionParameter};
+use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 
 #[derive(Debug)]
 struct App {
@@ -25,6 +24,7 @@ struct App {
     accumulator: Duration,
     keys_held: HashSet<KeyCode>,
     sprite: SpriteInstance,
+    projection_params: ProjectionParameter,
 }
 
 impl App {
@@ -65,6 +65,12 @@ impl App {
             accumulator: Duration::ZERO,
             keys_held: HashSet::new(),
             sprite: sprite_instance,
+            projection_params: ProjectionParameter {
+                width: 160,
+                height: 144,
+                desired_width: 160,
+                desired_height: 144,
+            },
         }
     }
 
@@ -186,7 +192,7 @@ impl ApplicationHandler for App {
                 // Get the window from self.window
                 let window = self.window.as_ref().expect("resize event without a window");
                 let size = window.inner_size();
-                let projection = calculate_projection(size);
+                let projection = calculate_projection(self.projection_params);
                 if let Some(gpu) = &mut self.gpu {
                     gpu.update_projection(projection);
                 }
@@ -220,7 +226,7 @@ impl ApplicationHandler for App {
                         .as_ref()
                         .expect("redraw request without a window")
                         .inner_size();
-                    let projection = calculate_projection(size);
+                    let projection = calculate_projection(self.projection_params);
                     let model = glam::Mat4::from_translation(self.sprite.position.extend(0.0));
 
                     let mvp = projection * model;
