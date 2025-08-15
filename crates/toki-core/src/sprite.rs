@@ -1,3 +1,5 @@
+use glam::Vec2;
+
 /// Data model for a single animation frame.
 #[derive(Debug, Clone)]
 pub struct Frame {
@@ -97,5 +99,33 @@ impl SpriteSheetMeta {
             u1: (fx + 1) as f32 * fw / sw,
             v1: (fy + 1) as f32 * fh / sh,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SpriteInstance {
+    pub position: Vec2,
+    pub animation: Animation,
+    pub animator: Animator,
+    pub sheet: SpriteSheetMeta,
+}
+
+impl SpriteInstance {
+    pub fn new(position: Vec2, animation: Animation, sheet: SpriteSheetMeta) -> Self {
+        Self {
+            position,
+            animation,
+            animator: Animator::new(),
+            sheet,
+        }
+    }
+
+    pub fn tick(&mut self, delta_ms: u32) {
+        self.animator.update(delta_ms, &self.animation);
+    }
+
+    pub fn current_frame(&self) -> SpriteFrame {
+        let index = self.animator.frame_index(&self.animation);
+        self.sheet.uv_rect(index)
     }
 }

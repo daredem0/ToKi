@@ -24,7 +24,7 @@ mod fill; // fill_window()
 
 mod errors;
 use crate::errors::RenderError;
-use toki_core::sprite::{Animation, Animator, Frame, SpriteFrame, SpriteSheetMeta};
+use toki_core::sprite::{Animation, Animator, Frame, SpriteFrame, SpriteInstance, SpriteSheetMeta};
 
 use toki_core::graphics::vertex::QuadVertex;
 mod vertex;
@@ -55,13 +55,10 @@ struct GpuState {
 struct App {
     window: Option<Arc<Window>>,
     gpu: Option<GpuState>,
-    sprite_position: glam::Vec2,
     last_update: Instant,
     accumulator: Duration,
     keys_held: HashSet<KeyCode>,
-    animator: Animator,
-    animation: Animation,
-    sprite_sheet: SpriteSheetMeta,
+    sprite: SpriteInstance,
 }
 
 fn build_quad_vertices(frame: SpriteFrame) -> [QuadVertex; 6] {
@@ -112,6 +109,132 @@ fn calculate_projection(size: winit::dpi::PhysicalSize<u32>) -> glam::Mat4 {
     glam::Mat4::orthographic_rh_gl(0.0, view_width, view_height, 0.0, -1.0, 1.0)
 }
 
+fn create_device_and_surface(
+    window: Arc<Window>,
+) -> (
+    wgpu::Device,
+    wgpu::Queue,
+    Surface<'static>,
+    SurfaceConfiguration,
+) {
+    // Create wgpu instance
+    let instance = wgpu::Instance::default();
+
+    // This has to happen before we set the surface. Once we create the surface,
+    // we dont own the window anymore.
+    let size = window.inner_size();
+
+    // Create the surface of the window
+    let surface = instance.create_surface(window).unwrap();
+    // Get a GPU Abstraction. Important: This has to be async
+    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::HighPerformance,
+        compatible_surface: Some(&surface),
+        force_fallback_adapter: false,
+    }))
+    .expect("No suitable GPU adapters found on the system!");
+
+    // Now that we got the adapter, we can request the actual GPU device and command queue
+    let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+        required_features: wgpu::Features::empty(),
+        required_limits: wgpu::Limits::default(),
+        memory_hints: wgpu::MemoryHints::default(),
+        trace: wgpu::Trace::default(),
+        label: Some("Toki device"),
+    }))
+    .expect("Failed to create device");
+
+    // Configure surface
+    let surface_caps = surface.get_capabilities(&adapter);
+    let surface_format = surface_caps
+        .formats
+        .iter()
+        .copied()
+        .find(|f| f.is_srgb())
+        .unwrap_or(surface_caps.formats[0]);
+
+    let config = wgpu::SurfaceConfiguration {
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        format: surface_format,
+        width: size.width,
+        height: size.height,
+        present_mode: wgpu::PresentMode::Fifo, //vsync
+        alpha_mode: surface_caps.alpha_modes[0],
+        view_formats: vec![],
+        desired_maximum_frame_latency: 1,
+    };
+
+    surface.configure(&device, &config);
+    (device, queue, surface, config)
+}
+
+fn create_shader_module(device: &wgpu::Device) -> wgpu::ShaderModule {
+    device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("Sprite Shader"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/sprite.wgsl").into()),
+    })
+}
+
+fn create_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("Texture Bind Group Layout"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    multisampled: false,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+        ],
+    })
+}
+
+fn create_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    texture: &GpuTexture,
+    uniform_buffer: &wgpu::Buffer,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("Texture Bind Group"),
+        layout: &layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&texture.view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(&texture.sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: uniform_buffer.as_entire_binding(),
+            },
+        ],
+    })
+}
+
 impl App {
     fn new() -> Self {
         let animation = Animation {
@@ -141,16 +264,15 @@ impl App {
             frame_count: 4,
             sheet_size: (64, 16),
         };
+        let sprite_instance =
+            SpriteInstance::new(glam::Vec2::new(32.0, 32.0), animation, sprite_sheet);
         Self {
             window: None,
             gpu: None,
-            sprite_position: glam::Vec2::new(32.0, 32.0),
             last_update: Instant::now(),
             accumulator: Duration::ZERO,
             keys_held: HashSet::new(),
-            animator: Animator::new(),
-            animation: animation,
-            sprite_sheet: sprite_sheet,
+            sprite: sprite_instance,
         }
     }
 
@@ -169,24 +291,24 @@ impl App {
             match key {
                 KeyCode::KeyW | KeyCode::ArrowUp => {
                     tracing::debug!("Move forward");
-                    self.sprite_position.y = (self.sprite_position.y - step).max(0.0);
+                    self.sprite.position.y = (self.sprite.position.y - step).max(0.0);
                     moved = true;
                 }
                 KeyCode::KeyA | KeyCode::ArrowLeft => {
                     tracing::debug!("Move left");
-                    self.sprite_position.x = (self.sprite_position.x - step).max(0.0);
+                    self.sprite.position.x = (self.sprite.position.x - step).max(0.0);
                     moved = true;
                 }
                 KeyCode::KeyS | KeyCode::ArrowDown => {
                     tracing::debug!("Move backward");
-                    self.sprite_position.y =
-                        (self.sprite_position.y + step).min(screen_height - sprite_size);
+                    self.sprite.position.y =
+                        (self.sprite.position.y + step).min(screen_height - sprite_size);
                     moved = true;
                 }
                 KeyCode::KeyD | KeyCode::ArrowRight => {
                     tracing::debug!("Move right");
-                    self.sprite_position.x =
-                        (self.sprite_position.x + step).min(screen_width - sprite_size);
+                    self.sprite.position.x =
+                        (self.sprite.position.x + step).min(screen_width - sprite_size);
                     moved = true;
                 }
                 // Ignore all other events
@@ -196,10 +318,9 @@ impl App {
         if true {
             // this point can be used to differentiate between idle and moving animations later
             // Update animation
-            self.animator.update(17, &self.animation); // 17ms ~ 60fps
-            let frame_index = self.animator.frame_index(&self.animation);
+            self.sprite.tick(17);
             if let Some(gpu) = &mut self.gpu {
-                let frame = self.sprite_sheet.uv_rect(frame_index);
+                let frame = self.sprite.current_frame();
                 gpu.update_vertex_buffer(frame);
             }
         }
@@ -216,38 +337,9 @@ impl GpuState {
             .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&verts));
     }
     fn new(window: Arc<Window>) -> Self {
-        // Create wgpu instance
-        let instance = wgpu::Instance::default();
+        let (device, queue, surface, config) = create_device_and_surface(Arc::clone(&window));
 
-        // This has to happen before we set the surface. Once we create the surface,
-        // we dont own the window anymore.
-        let size = window.inner_size();
-
-        // Create the surface of the window
-        let surface = instance.create_surface(window).unwrap();
-
-        // Get a GPU Abstraction. Important: This has to be async
-        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            compatible_surface: Some(&surface),
-            force_fallback_adapter: false,
-        }))
-        .expect("No suitable GPU adapters found on the system!");
-
-        // Now that we got the adapter, we can request the actual GPU device and command queue
-        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-            required_features: wgpu::Features::empty(),
-            required_limits: wgpu::Limits::default(),
-            memory_hints: wgpu::MemoryHints::default(),
-            trace: wgpu::Trace::default(),
-            label: Some("Toki device"),
-        }))
-        .expect("Failed to create device");
-
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Sprite Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/sprite.wgsl").into()),
-        });
+        let shader = create_shader_module(&device);
 
         // Gen transfomation matrix
         let ortho = glam::Mat4::orthographic_rh_gl(
@@ -268,38 +360,7 @@ impl GpuState {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let texture_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("Texture Bind Group Layout"),
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: wgpu::ShaderStages::VERTEX,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                ],
-            });
+        let texture_bind_group_layout = create_bind_group_layout(&device);
 
         let slime_texture = GpuTexture::from_file(
             &device,
@@ -313,46 +374,13 @@ impl GpuState {
         })
         .unwrap();
 
-        let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Texture Bind Group"),
-            layout: &texture_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&slime_texture.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&slime_texture.sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: uniform_buffer.as_entire_binding(),
-                },
-            ],
-        });
+        let texture_bind_group = create_bind_group(
+            &device,
+            &texture_bind_group_layout,
+            &slime_texture,
+            &uniform_buffer,
+        );
 
-        // Configure surface
-        let surface_caps = surface.get_capabilities(&adapter);
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .copied()
-            .find(|f| f.is_srgb())
-            .unwrap_or(surface_caps.formats[0]);
-
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width: size.width,
-            height: size.height,
-            present_mode: wgpu::PresentMode::Fifo, //vsync
-            alpha_mode: surface_caps.alpha_modes[0],
-            view_formats: vec![],
-            desired_maximum_frame_latency: 1,
-        };
-
-        surface.configure(&device, &config);
         let f0 = SpriteSheetMeta {
             frame_size: (16, 16),
             sheet_size: (64, 16),
@@ -564,7 +592,7 @@ impl ApplicationHandler for App {
                         .expect("redraw request without a window")
                         .inner_size();
                     let projection = calculate_projection(size);
-                    let model = glam::Mat4::from_translation(self.sprite_position.extend(0.0));
+                    let model = glam::Mat4::from_translation(self.sprite.position.extend(0.0));
 
                     let mvp = projection * model;
 
