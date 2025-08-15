@@ -1,0 +1,25 @@
+{
+    "image": "creatures.png",
+    "tile_size": [
+        16,
+        16
+    ],
+    "tiles": {
+        "slime/walk_0": [
+            0,
+            0
+        ],
+        "slime/walk_1": [
+            1,
+            0
+        ],
+        "slime/walk_2": [
+            2,
+            0
+        ],
+        "slime/walk_3": [
+            3,
+            0
+        ]
+    }
+}
