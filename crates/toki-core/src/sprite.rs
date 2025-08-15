@@ -52,10 +52,9 @@ impl Animator {
         }
 
         self.elapsed_ms += delta_ms;
-        let current = &animation.frames[self.current_frame];
 
-        if self.elapsed_ms >= current.duration_ms {
-            self.elapsed_ms -= current.duration_ms;
+        while self.elapsed_ms >= animation.frames[self.current_frame].duration_ms {
+            self.elapsed_ms -= animation.frames[self.current_frame].duration_ms;
             self.current_frame += 1;
 
             if self.current_frame >= animation.frames.len() {

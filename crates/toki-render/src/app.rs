@@ -88,23 +88,23 @@ impl App {
         for key in &self.keys_held {
             match key {
                 KeyCode::KeyW | KeyCode::ArrowUp => {
-                    tracing::debug!("Move forward");
+                    tracing::trace!("Move forward");
                     self.sprite.position.y = (self.sprite.position.y - step).max(0.0);
                     _moved = true;
                 }
                 KeyCode::KeyA | KeyCode::ArrowLeft => {
-                    tracing::debug!("Move left");
+                    tracing::trace!("Move left");
                     self.sprite.position.x = (self.sprite.position.x - step).max(0.0);
                     _moved = true;
                 }
                 KeyCode::KeyS | KeyCode::ArrowDown => {
-                    tracing::debug!("Move backward");
+                    tracing::trace!("Move backward");
                     self.sprite.position.y =
                         (self.sprite.position.y + step).min(screen_height - sprite_size);
                     _moved = true;
                 }
                 KeyCode::KeyD | KeyCode::ArrowRight => {
-                    tracing::debug!("Move right");
+                    tracing::trace!("Move right");
                     self.sprite.position.x =
                         (self.sprite.position.x + step).min(screen_width - sprite_size);
                     _moved = true;

@@ -6,13 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-winit = { version = "0.30.12", features = ["wayland", "wayland-dlopen", "wayland-csd-adwaita"] }
-softbuffer = { version = "0.4.6", default-features = false, features = [
-    "x11",
-    "x11-dlopen",
-    "wayland",
-    "wayland-dlopen",
-] }                                 # For fallback rendering#
+winit = { version = "0.30.12", features = ["wayland", "wayland-dlopen", "wayland-csd-adwaita"] }                              # For fallback rendering#
 
 thiserror = "2.0"                   # for lib errors
 wgpu = "26.0.1"                     # For hardware-accelerated graphics
