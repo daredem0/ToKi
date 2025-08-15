@@ -36,6 +36,14 @@ struct Uniforms {
     mvp: [[f32; 4]; 4],
 }
 
+#[derive(Debug, Clone, Copy)]
+struct SpriteFrame {
+    u0: f32,
+    v0: f32,
+    u1: f32,
+    v1: f32,
+}
+
 #[derive(Debug)]
 struct GpuState {
     surface: Surface<'static>,
@@ -56,7 +64,36 @@ struct App {
     last_update: Instant,
     accumulator: Duration,
     keys_held: HashSet<KeyCode>,
+    frame_index: usize,
+    frame_timer: Duration,
 }
+
+const SLIME_FRAMES: [SpriteFrame; 4] = [
+    SpriteFrame {
+        u0: 0.0,
+        v0: 0.0,
+        u1: 0.25,
+        v1: 1.0,
+    },
+    SpriteFrame {
+        u0: 0.25,
+        v0: 0.0,
+        u1: 0.5,
+        v1: 1.0,
+    },
+    SpriteFrame {
+        u0: 0.5,
+        v0: 0.0,
+        u1: 0.75,
+        v1: 1.0,
+    },
+    SpriteFrame {
+        u0: 0.75,
+        v0: 0.0,
+        u1: 1.0,
+        v1: 1.0,
+    },
+];
 
 impl App {
     fn new() -> Self {
@@ -67,6 +104,8 @@ impl App {
             last_update: Instant::now(),
             accumulator: Duration::ZERO,
             keys_held: HashSet::new(),
+            frame_index: 0,
+            frame_timer: Duration::ZERO,
         }
     }
 
@@ -74,41 +113,94 @@ impl App {
         println!("TICK @ {:?}", Instant::now());
 
         // Movement speed in pixels per krey press
-        let step = 2.0;
+        let step = 0.5;
         let sprite_size = 16.0; // your sprite is 16×16 pixels
         let screen_width = 160.0;
         let screen_height = 144.0;
+        // Track if we moved at all this tick
+        let mut moved = false;
+
         for key in &self.keys_held {
             match key {
                 KeyCode::KeyW | KeyCode::ArrowUp => {
                     println!("Move forward");
                     self.sprite_position.y = (self.sprite_position.y - step).max(0.0);
+                    moved = true;
                 }
                 KeyCode::KeyA | KeyCode::ArrowLeft => {
                     println!("Move left");
                     self.sprite_position.x = (self.sprite_position.x - step).max(0.0);
+                    moved = true;
                 }
                 KeyCode::KeyS | KeyCode::ArrowDown => {
                     println!("Move backward");
                     self.sprite_position.y =
                         (self.sprite_position.y + step).min(screen_height - sprite_size);
+                    moved = true;
                 }
                 KeyCode::KeyD | KeyCode::ArrowRight => {
                     println!("Move right");
                     self.sprite_position.x =
                         (self.sprite_position.x + step).min(screen_width - sprite_size);
+                    moved = true;
                 }
                 // Ignore all other events
                 _ => (),
             }
-            if let Some(window) = &self.window {
-                window.request_redraw();
+        }
+        if true {
+            // this point can be used to differentiate between idle and moving animations later
+            // Update animation
+            const FRAME_DURATION: Duration = Duration::from_millis(150); // ~6fps
+            self.frame_timer += Duration::from_nanos(16_666_667); // one frame per tick
+            if self.frame_timer >= FRAME_DURATION {
+                self.frame_timer = Duration::ZERO;
+                self.frame_index = (self.frame_index + 1) % SLIME_FRAMES.len();
+                if let Some(gpu) = &mut self.gpu {
+                    let frame = SLIME_FRAMES[self.frame_index];
+                    gpu.update_vertex_buffer(frame);
+                }
             }
+        }
+        if let Some(window) = &self.window {
+            window.request_redraw();
         }
     }
 }
 
 impl GpuState {
+    pub fn update_vertex_buffer(&mut self, frame: SpriteFrame) {
+        let verts = [
+            // tri 1
+            Vertex {
+                position: [0.0, 0.0],
+                tex_coords: [frame.u0, frame.v0],
+            },
+            Vertex {
+                position: [16.0, 0.0],
+                tex_coords: [frame.u1, frame.v0],
+            },
+            Vertex {
+                position: [16.0, 16.0],
+                tex_coords: [frame.u1, frame.v1],
+            },
+            // tri 2
+            Vertex {
+                position: [0.0, 0.0],
+                tex_coords: [frame.u0, frame.v0],
+            },
+            Vertex {
+                position: [16.0, 16.0],
+                tex_coords: [frame.u1, frame.v1],
+            },
+            Vertex {
+                position: [0.0, 16.0],
+                tex_coords: [frame.u0, frame.v1],
+            },
+        ];
+        self.queue
+            .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&verts));
+    }
     fn new(window: Arc<Window>) -> Self {
         // Create wgpu instance
         let instance = wgpu::Instance::default();
@@ -198,7 +290,7 @@ impl GpuState {
         let slime_texture = GpuTexture::from_file(
             &device,
             &queue,
-            "./assets/slime_sprite.png",
+            "./assets/slime_sprite_idle_64_16.png",
             Some("Slime Texture"),
         )
         .map_err(|e| {
@@ -247,40 +339,41 @@ impl GpuState {
         };
 
         surface.configure(&device, &config);
+        let f0 = SLIME_FRAMES[0];
 
-        let vertices: &[Vertex] = &[
-            // Triangle 1
+        let vertices: [Vertex; 6] = [
+            // tri 1
             Vertex {
                 position: [0.0, 0.0],
-                tex_coords: [0.0, 0.0],
+                tex_coords: [f0.u0, f0.v0],
             },
             Vertex {
                 position: [16.0, 0.0],
-                tex_coords: [1.0, 0.0],
+                tex_coords: [f0.u1, f0.v0],
             },
             Vertex {
                 position: [16.0, 16.0],
-                tex_coords: [1.0, 1.0],
+                tex_coords: [f0.u1, f0.v1],
             },
-            // Triangle 2
+            // tri 2
             Vertex {
                 position: [0.0, 0.0],
-                tex_coords: [0.0, 0.0],
+                tex_coords: [f0.u0, f0.v0],
             },
             Vertex {
                 position: [16.0, 16.0],
-                tex_coords: [1.0, 1.0],
+                tex_coords: [f0.u1, f0.v1],
             },
             Vertex {
                 position: [0.0, 16.0],
-                tex_coords: [0.0, 1.0],
+                tex_coords: [f0.u0, f0.v1],
             },
         ];
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Quad Vertex Buffer"),
-            contents: bytemuck::cast_slice(vertices),
-            usage: wgpu::BufferUsages::VERTEX,
+            contents: bytemuck::cast_slice(&vertices[..]),
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
