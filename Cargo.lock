@@ -2308,6 +2308,7 @@ name = "toki-render"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "glam",
  "image",
  "pollster",
  "softbuffer",

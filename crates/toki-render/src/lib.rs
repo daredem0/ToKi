@@ -1,6 +1,7 @@
 //! Simple winit window example.
 // winit imports
 use winit::application::ApplicationHandler; // Trait that defines app lifecycle hooks (resumed, event handling, etc.)
+use winit::dpi::LogicalSize;
 use winit::event::WindowEvent; // Enum of possible window-related events (resize, input, close, etc.)
 use winit::event_loop::{ActiveEventLoop, EventLoop}; // ActiveEventLoop is used inside lifecycle methods; EventLoop creates and runs the app
 use winit::window::{Window, WindowAttributes, WindowId}; // Window: window handle; Attributes: window config; ID: unique per window
@@ -12,6 +13,8 @@ use wgpu::Queue; // Used to submit rendering commands to the GPU
 use wgpu::Surface; // Represents the drawing surface (your window's framebuffer)
 use wgpu::SurfaceConfiguration; // Configuration for how to draw to the surface (format, vsync, etc.)
 
+use bytemuck::{Pod, Zeroable};
+use glam;
 use std::sync::Arc;
 // Local modules
 #[path = "util/fill.rs"]
@@ -25,6 +28,12 @@ use crate::texture::GpuTexture;
 use crate::vertex::Vertex;
 mod texture;
 
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct Uniforms {
+    mvp: [[f32; 4]; 4],
+}
+
 #[derive(Debug)]
 struct GpuState {
     surface: Surface<'static>,
@@ -34,6 +43,7 @@ struct GpuState {
     vertex_buffer: wgpu::Buffer,
     render_pipeline: wgpu::RenderPipeline,
     texture_bind_group: wgpu::BindGroup,
+    uniform_buffer: wgpu::Buffer,
 }
 
 #[derive(Debug)]
@@ -59,6 +69,7 @@ impl GpuState {
         // This has to happen before we set the surface. Once we create the surface,
         // we dont own the window anymore.
         let size = window.inner_size();
+
         // Create the surface of the window
         let surface = instance.create_surface(window).unwrap();
 
@@ -85,6 +96,25 @@ impl GpuState {
             source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/sprite.wgsl").into()),
         });
 
+        // Gen transfomation matrix
+        let ortho = glam::Mat4::orthographic_rh_gl(
+            0.0, 160.0, // left to right
+            144.0, 0.0, -1.0, 1.0,
+        );
+
+        // Move sprite to pixel position (e.g. 32, 32)
+        let model = glam::Mat4::from_translation(glam::vec3(32.0, 32.0, 0.0));
+        let mvp = ortho * model;
+        let uniforms = Uniforms {
+            mvp: mvp.to_cols_array_2d(),
+        };
+
+        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Uniform Buffer"),
+            contents: bytemuck::cast_slice(&[uniforms]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("Texture Bind Group Layout"),
@@ -103,6 +133,16 @@ impl GpuState {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
                         count: None,
                     },
                 ],
@@ -131,6 +171,10 @@ impl GpuState {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&slime_texture.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: uniform_buffer.as_entire_binding(),
                 },
             ],
         });
@@ -161,28 +205,28 @@ impl GpuState {
             // Triangle 1
             Vertex {
                 position: [0.0, 0.0],
-                tex_coords: [0.0, 1.0],
+                tex_coords: [0.0, 0.0],
             },
             Vertex {
-                position: [1.0, 0.0],
-                tex_coords: [1.0, 1.0],
-            },
-            Vertex {
-                position: [1.0, 1.0],
+                position: [16.0, 0.0],
                 tex_coords: [1.0, 0.0],
+            },
+            Vertex {
+                position: [16.0, 16.0],
+                tex_coords: [1.0, 1.0],
             },
             // Triangle 2
             Vertex {
                 position: [0.0, 0.0],
-                tex_coords: [0.0, 1.0],
-            },
-            Vertex {
-                position: [1.0, 1.0],
-                tex_coords: [1.0, 0.0],
-            },
-            Vertex {
-                position: [0.0, 1.0],
                 tex_coords: [0.0, 0.0],
+            },
+            Vertex {
+                position: [16.0, 16.0],
+                tex_coords: [1.0, 1.0],
+            },
+            Vertex {
+                position: [0.0, 16.0],
+                tex_coords: [0.0, 1.0],
             },
         ];
 
@@ -232,8 +276,18 @@ impl GpuState {
             vertex_buffer,
             render_pipeline,
             texture_bind_group,
+            uniform_buffer,
         }
     }
+
+    pub fn update_projection(&self, mvp: glam::Mat4) {
+        let uniforms = Uniforms {
+            mvp: mvp.to_cols_array_2d(),
+        };
+        self.queue
+            .write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+    }
+
     fn draw(&mut self) {
         let output = self
             .surface
@@ -282,12 +336,14 @@ impl GpuState {
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         // Initialize default window attributes
-        let window_attributes = WindowAttributes::default();
+        let window_attributes =
+            WindowAttributes::default().with_inner_size(LogicalSize::new(160.0, 144.0));
 
         // Attempt to create a window with the given attributes
         // This has to be done before the GPU state is initialized to ensure
         // its lifetime is longer than that of GPU state
-        let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
+        let raw_window = event_loop.create_window(window_attributes).unwrap();
+        let window = Arc::new(raw_window);
 
         // Now we can safely initialize GPU state
         let gpu = GpuState::new(Arc::clone(&window));
@@ -309,6 +365,23 @@ impl ApplicationHandler for App {
             WindowEvent::Resized(_) => {
                 // Get the window from self.window
                 let window = self.window.as_ref().expect("resize event without a window");
+                let size = window.inner_size();
+                let aspect = size.width as f32 / size.height as f32;
+                let desired_aspect = 160.0 / 144.0;
+                let (view_width, view_height) = if aspect > desired_aspect {
+                    let height = 144.0;
+                    let width = height * aspect;
+                    (width, height)
+                } else {
+                    let width = 160.0;
+                    let height = width / aspect;
+                    (width, height)
+                };
+                let projection =
+                    glam::Mat4::orthographic_rh_gl(0.0, view_width, view_height, 0.0, -1.0, 1.0);
+                if let Some(gpu) = &mut self.gpu {
+                    gpu.update_projection(projection);
+                }
                 window.request_redraw();
             }
             // If the window needs to be redrawn, redraw it

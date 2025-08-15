@@ -1,5 +1,3 @@
-// sprite.wgsl
-
 struct VertexInput {
     @location(0) position: vec2<f32>,
     @location(1) tex_coords: vec2<f32>,
@@ -7,24 +5,32 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
-    @location(0) uv: vec2<f32>,
+    @location(0) tex_coords: vec2<f32>,
 };
+
+struct Uniforms {
+    mvp: mat4x4<f32>,
+};
+
+@group(0) @binding(0)
+var sprite_texture: texture_2d<f32>;
+
+@group(0) @binding(1)
+var sprite_sampler: sampler;
+
+@group(0) @binding(2)
+var<uniform> uniforms: Uniforms;
 
 @vertex
 fn vs_main(input: VertexInput) -> VertexOutput {
-    var out: VertexOutput;
-    out.position = vec4<f32>(input.position * 2.0 - 1.0, 0.0, 1.0);
-    out.uv = input.tex_coords;
-    return out;
+    var output: VertexOutput;
+    let world_pos = vec4<f32>(input.position, 0.0, 1.0);
+    output.position = uniforms.mvp * world_pos;
+    output.tex_coords = input.tex_coords;
+    return output;
 }
-
-@group(0) @binding(0)
-var my_texture: texture_2d<f32>;
-
-@group(0) @binding(1)
-var my_sampler: sampler;
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(my_texture, my_sampler, input.uv);
+    return textureSample(sprite_texture, sprite_sampler, input.tex_coords);
 }

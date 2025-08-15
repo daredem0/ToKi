@@ -20,3 +20,4 @@ wgpu = "26.0.1"                     # For hardware-accelerated graphics
 image = { version = "0.25.6", features = [ "png", "default" ]}                    # For loading sprite assets
 pollster = "0.4.0"                  # For simplifying async GPU init
 bytemuck = { version = "1.14", features = ["derive"] }
+glam = "0.30.5"
