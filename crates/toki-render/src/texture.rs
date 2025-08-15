@@ -1,33 +1,36 @@
-use crate::{errors::RenderError, texture};
-use image::GenericImageView;
-use std::num::NonZeroU32;
-use std::path::{Path, PathBuf};
-use wgpu::{Device, Queue, Sampler, Texture, TextureView};
+use crate::errors::RenderError;
+use std::path::Path;
+use toki_core::graphics::image::{load_image_rgba8, DecodedImage};
+use wgpu;
 
 pub struct GpuTexture {
-    pub texture: Texture,
-    pub view: TextureView,
-    pub sampler: Sampler,
+    pub texture: wgpu::Texture,
+    pub view: wgpu::TextureView,
+    pub sampler: wgpu::Sampler,
 }
 
 impl GpuTexture {
     pub fn from_file(
-        device: &Device,
-        queue: &Queue,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
         path: &str,
         label: Option<&str>,
     ) -> Result<Self, RenderError> {
         // load the img
         let path_obj = Path::new(path);
-        let img = image::open(&path)
-            .map_err(|e| RenderError::FileLoad(path_obj.to_path_buf(), e.to_string()))?
-            .to_rgba8();
-
+        let image = load_image_rgba8(path_obj)?;
+        Self::from_rgba8(device, queue, &image, label)
+    }
+    pub fn from_rgba8(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        image: &DecodedImage,
+        label: Option<&str>,
+    ) -> Result<Self, RenderError> {
         // Get the dimensins
-        let (width, height) = img.dimensions();
         let size = wgpu::Extent3d {
-            width,
-            height,
+            width: image.width,
+            height: image.height,
             depth_or_array_layers: 1,
         };
 
@@ -47,11 +50,11 @@ impl GpuTexture {
         queue.write_texture(
             // format for destination
             texture.as_image_copy(),
-            &img,
+            &image.data,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * width),
-                rows_per_image: Some(height),
+                bytes_per_row: Some(4 * image.width),
+                rows_per_image: Some(image.height),
             },
             size,
         );
@@ -59,7 +62,7 @@ impl GpuTexture {
         // Create view and sampler
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: None,
+            label,
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,

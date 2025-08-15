@@ -22,26 +22,21 @@ use std::time::{Duration, Instant};
 #[path = "util/fill.rs"]
 mod fill; // fill_window()
 
-mod errors; // Custom errors
+mod errors;
 use crate::errors::RenderError;
+use toki_core::sprite::{Animation, Animator, Frame, SpriteFrame, SpriteSheetMeta};
 
+use toki_core::graphics::vertex::QuadVertex;
 mod vertex;
-use crate::texture::GpuTexture;
-use crate::vertex::Vertex;
+use crate::vertex::VertexLayout;
+
 mod texture;
+use crate::texture::GpuTexture;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct Uniforms {
     mvp: [[f32; 4]; 4],
-}
-
-#[derive(Debug, Clone, Copy)]
-struct SpriteFrame {
-    u0: f32,
-    v0: f32,
-    u1: f32,
-    v1: f32,
 }
 
 #[derive(Debug)]
@@ -64,39 +59,88 @@ struct App {
     last_update: Instant,
     accumulator: Duration,
     keys_held: HashSet<KeyCode>,
-    frame_index: usize,
-    frame_timer: Duration,
+    animator: Animator,
+    animation: Animation,
+    sprite_sheet: SpriteSheetMeta,
 }
 
-const SLIME_FRAMES: [SpriteFrame; 4] = [
-    SpriteFrame {
-        u0: 0.0,
-        v0: 0.0,
-        u1: 0.25,
-        v1: 1.0,
-    },
-    SpriteFrame {
-        u0: 0.25,
-        v0: 0.0,
-        u1: 0.5,
-        v1: 1.0,
-    },
-    SpriteFrame {
-        u0: 0.5,
-        v0: 0.0,
-        u1: 0.75,
-        v1: 1.0,
-    },
-    SpriteFrame {
-        u0: 0.75,
-        v0: 0.0,
-        u1: 1.0,
-        v1: 1.0,
-    },
-];
+fn build_quad_vertices(frame: SpriteFrame) -> [QuadVertex; 6] {
+    [
+        // tri 1
+        QuadVertex {
+            position: [0.0, 0.0],
+            tex_coords: [frame.u0, frame.v0],
+        },
+        QuadVertex {
+            position: [16.0, 0.0],
+            tex_coords: [frame.u1, frame.v0],
+        },
+        QuadVertex {
+            position: [16.0, 16.0],
+            tex_coords: [frame.u1, frame.v1],
+        },
+        // tri 2
+        QuadVertex {
+            position: [0.0, 0.0],
+            tex_coords: [frame.u0, frame.v0],
+        },
+        QuadVertex {
+            position: [16.0, 16.0],
+            tex_coords: [frame.u1, frame.v1],
+        },
+        QuadVertex {
+            position: [0.0, 16.0],
+            tex_coords: [frame.u0, frame.v1],
+        },
+    ]
+}
+
+fn calculate_projection(size: winit::dpi::PhysicalSize<u32>) -> glam::Mat4 {
+    let aspect = size.width as f32 / size.height as f32;
+    let desired_aspect = 160.0 / 144.0;
+
+    let (view_width, view_height) = if aspect > desired_aspect {
+        let height = 144.0;
+        let width = height * aspect;
+        (width, height)
+    } else {
+        let width = 160.0;
+        let height = width / aspect;
+        (width, height)
+    };
+
+    glam::Mat4::orthographic_rh_gl(0.0, view_width, view_height, 0.0, -1.0, 1.0)
+}
 
 impl App {
     fn new() -> Self {
+        let animation = Animation {
+            name: "slime_bounce".into(),
+            looped: true,
+            frames: vec![
+                Frame {
+                    index: 0,
+                    duration_ms: 150,
+                },
+                Frame {
+                    index: 1,
+                    duration_ms: 150,
+                },
+                Frame {
+                    index: 2,
+                    duration_ms: 150,
+                },
+                Frame {
+                    index: 3,
+                    duration_ms: 150,
+                },
+            ],
+        };
+        let sprite_sheet = SpriteSheetMeta {
+            frame_size: (16, 16),
+            frame_count: 4,
+            sheet_size: (64, 16),
+        };
         Self {
             window: None,
             gpu: None,
@@ -104,13 +148,14 @@ impl App {
             last_update: Instant::now(),
             accumulator: Duration::ZERO,
             keys_held: HashSet::new(),
-            frame_index: 0,
-            frame_timer: Duration::ZERO,
+            animator: Animator::new(),
+            animation: animation,
+            sprite_sheet: sprite_sheet,
         }
     }
 
     fn tick(&mut self) {
-        println!("TICK @ {:?}", Instant::now());
+        tracing::trace!("TICK @ {:?}", Instant::now());
 
         // Movement speed in pixels per krey press
         let step = 0.5;
@@ -123,23 +168,23 @@ impl App {
         for key in &self.keys_held {
             match key {
                 KeyCode::KeyW | KeyCode::ArrowUp => {
-                    println!("Move forward");
+                    tracing::debug!("Move forward");
                     self.sprite_position.y = (self.sprite_position.y - step).max(0.0);
                     moved = true;
                 }
                 KeyCode::KeyA | KeyCode::ArrowLeft => {
-                    println!("Move left");
+                    tracing::debug!("Move left");
                     self.sprite_position.x = (self.sprite_position.x - step).max(0.0);
                     moved = true;
                 }
                 KeyCode::KeyS | KeyCode::ArrowDown => {
-                    println!("Move backward");
+                    tracing::debug!("Move backward");
                     self.sprite_position.y =
                         (self.sprite_position.y + step).min(screen_height - sprite_size);
                     moved = true;
                 }
                 KeyCode::KeyD | KeyCode::ArrowRight => {
-                    println!("Move right");
+                    tracing::debug!("Move right");
                     self.sprite_position.x =
                         (self.sprite_position.x + step).min(screen_width - sprite_size);
                     moved = true;
@@ -151,15 +196,11 @@ impl App {
         if true {
             // this point can be used to differentiate between idle and moving animations later
             // Update animation
-            const FRAME_DURATION: Duration = Duration::from_millis(150); // ~6fps
-            self.frame_timer += Duration::from_nanos(16_666_667); // one frame per tick
-            if self.frame_timer >= FRAME_DURATION {
-                self.frame_timer = Duration::ZERO;
-                self.frame_index = (self.frame_index + 1) % SLIME_FRAMES.len();
-                if let Some(gpu) = &mut self.gpu {
-                    let frame = SLIME_FRAMES[self.frame_index];
-                    gpu.update_vertex_buffer(frame);
-                }
+            self.animator.update(17, &self.animation); // 17ms ~ 60fps
+            let frame_index = self.animator.frame_index(&self.animation);
+            if let Some(gpu) = &mut self.gpu {
+                let frame = self.sprite_sheet.uv_rect(frame_index);
+                gpu.update_vertex_buffer(frame);
             }
         }
         if let Some(window) = &self.window {
@@ -170,34 +211,7 @@ impl App {
 
 impl GpuState {
     pub fn update_vertex_buffer(&mut self, frame: SpriteFrame) {
-        let verts = [
-            // tri 1
-            Vertex {
-                position: [0.0, 0.0],
-                tex_coords: [frame.u0, frame.v0],
-            },
-            Vertex {
-                position: [16.0, 0.0],
-                tex_coords: [frame.u1, frame.v0],
-            },
-            Vertex {
-                position: [16.0, 16.0],
-                tex_coords: [frame.u1, frame.v1],
-            },
-            // tri 2
-            Vertex {
-                position: [0.0, 0.0],
-                tex_coords: [frame.u0, frame.v0],
-            },
-            Vertex {
-                position: [16.0, 16.0],
-                tex_coords: [frame.u1, frame.v1],
-            },
-            Vertex {
-                position: [0.0, 16.0],
-                tex_coords: [frame.u0, frame.v1],
-            },
-        ];
+        let verts = build_quad_vertices(frame);
         self.queue
             .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&verts));
     }
@@ -294,7 +308,7 @@ impl GpuState {
             Some("Slime Texture"),
         )
         .map_err(|e| {
-            eprintln!("Failed to load slime texture: {e}");
+            tracing::error!("Failed to load slime texture: {e}");
             panic!();
         })
         .unwrap();
@@ -339,36 +353,14 @@ impl GpuState {
         };
 
         surface.configure(&device, &config);
-        let f0 = SLIME_FRAMES[0];
+        let f0 = SpriteSheetMeta {
+            frame_size: (16, 16),
+            sheet_size: (64, 16),
+            frame_count: 4,
+        }
+        .uv_rect(0);
 
-        let vertices: [Vertex; 6] = [
-            // tri 1
-            Vertex {
-                position: [0.0, 0.0],
-                tex_coords: [f0.u0, f0.v0],
-            },
-            Vertex {
-                position: [16.0, 0.0],
-                tex_coords: [f0.u1, f0.v0],
-            },
-            Vertex {
-                position: [16.0, 16.0],
-                tex_coords: [f0.u1, f0.v1],
-            },
-            // tri 2
-            Vertex {
-                position: [0.0, 0.0],
-                tex_coords: [f0.u0, f0.v0],
-            },
-            Vertex {
-                position: [16.0, 16.0],
-                tex_coords: [f0.u1, f0.v1],
-            },
-            Vertex {
-                position: [0.0, 16.0],
-                tex_coords: [f0.u0, f0.v1],
-            },
-        ];
+        let vertices: [QuadVertex; 6] = build_quad_vertices(f0);
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Quad Vertex Buffer"),
@@ -389,7 +381,7 @@ impl GpuState {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[Vertex::desc()],
+                buffers: &[QuadVertex::desc()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -467,7 +459,7 @@ impl GpuState {
 
         self.queue.submit(Some(encoder.finish()));
         if let Err(e) = self.device.poll(wgpu::PollType::Wait) {
-            eprintln!("Device poll failed: {e:?}");
+            tracing::error!("Device poll failed: {e:?}");
         }
         output.present();
     }
@@ -509,7 +501,7 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
-        println!("{event:?}");
+        tracing::trace!("{event:?}");
 
         match event {
             // Handle keyboard inputs
@@ -529,7 +521,7 @@ impl ApplicationHandler for App {
 
             // If the window was closed, stop the event loop
             WindowEvent::CloseRequested => {
-                println!("Close was requested; stopping");
+                tracing::info!("Close was requested; stopping");
                 event_loop.exit();
             }
             // If the window was resized, request a redraw
@@ -537,19 +529,7 @@ impl ApplicationHandler for App {
                 // Get the window from self.window
                 let window = self.window.as_ref().expect("resize event without a window");
                 let size = window.inner_size();
-                let aspect = size.width as f32 / size.height as f32;
-                let desired_aspect = 160.0 / 144.0;
-                let (view_width, view_height) = if aspect > desired_aspect {
-                    let height = 144.0;
-                    let width = height * aspect;
-                    (width, height)
-                } else {
-                    let width = 160.0;
-                    let height = width / aspect;
-                    (width, height)
-                };
-                let projection =
-                    glam::Mat4::orthographic_rh_gl(0.0, view_width, view_height, 0.0, -1.0, 1.0);
+                let projection = calculate_projection(size);
                 if let Some(gpu) = &mut self.gpu {
                     gpu.update_projection(projection);
                 }
@@ -583,30 +563,13 @@ impl ApplicationHandler for App {
                         .as_ref()
                         .expect("redraw request without a window")
                         .inner_size();
-                    let aspect = size.width as f32 / size.height as f32;
-                    let desired_aspect = 160.0 / 144.0;
-                    let (view_width, view_height) = if aspect > desired_aspect {
-                        let height = 144.0;
-                        let width = height * aspect;
-                        (width, height)
-                    } else {
-                        let width = 160.0;
-                        let height = width / aspect;
-                        (width, height)
-                    };
+                    let projection = calculate_projection(size);
                     let model = glam::Mat4::from_translation(self.sprite_position.extend(0.0));
-                    let projection = glam::Mat4::orthographic_rh_gl(
-                        0.0,
-                        view_width,
-                        view_height,
-                        0.0,
-                        -1.0,
-                        1.0,
-                    );
+
                     let mvp = projection * model;
 
                     gpu.update_projection(mvp);
-                    println!("Redrawing projection");
+                    tracing::trace!("Redrawing projection");
                     gpu.draw();
                 }
             }

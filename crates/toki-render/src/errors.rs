@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use thiserror::Error;
+use toki_core::CoreError;
 
 #[derive(Debug, Error)]
 pub enum RenderError {
@@ -9,6 +9,9 @@ pub enum RenderError {
     #[error("failed to create surface: {0}")]
     SurfaceCreation(#[from] wgpu::CreateSurfaceError),
     // Add other variants as needed
-    #[error("Failed to load image at {0}: {1}")]
-    FileLoad(PathBuf, String),
+    #[error("Core error {0}")]
+    Core(#[from] CoreError),
+
+    #[error("Unknown render error")]
+    Unknown,
 }

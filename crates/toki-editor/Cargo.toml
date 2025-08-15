@@ -6,3 +6,5 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.99"
 toki-render = { path = "../toki-render" }
+tracing.workspace = true
+tracing-subscriber.workspace = true
