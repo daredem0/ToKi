@@ -4,7 +4,8 @@ use winit::application::ApplicationHandler; // Trait that defines app lifecycle 
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent; // Enum of possible window-related events (resize, input, close, etc.)
 use winit::event_loop::{ActiveEventLoop, EventLoop}; // ActiveEventLoop is used inside lifecycle methods; EventLoop creates and runs the app
-use winit::window::{self, Window, WindowAttributes, WindowId}; // Window: window handle; Attributes: window config; ID: unique per window
+use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::window::{Window, WindowAttributes, WindowId}; // Window: window handle; Attributes: window config; ID: unique per window
 
 // wgpu imports
 use wgpu::util::DeviceExt;
@@ -14,7 +15,9 @@ use wgpu::Surface; // Represents the drawing surface (your window's framebuffer)
 use wgpu::SurfaceConfiguration; // Configuration for how to draw to the surface (format, vsync, etc.)
 
 use bytemuck::{Pod, Zeroable};
+use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 // Local modules
 #[path = "util/fill.rs"]
 mod fill; // fill_window()
@@ -50,6 +53,9 @@ struct App {
     window: Option<Arc<Window>>,
     gpu: Option<GpuState>,
     sprite_position: glam::Vec2,
+    last_update: Instant,
+    accumulator: Duration,
+    keys_held: HashSet<KeyCode>,
 }
 
 impl App {
@@ -58,6 +64,46 @@ impl App {
             window: None,
             gpu: None,
             sprite_position: glam::Vec2::new(32.0, 32.0),
+            last_update: Instant::now(),
+            accumulator: Duration::ZERO,
+            keys_held: HashSet::new(),
+        }
+    }
+
+    fn tick(&mut self) {
+        println!("TICK @ {:?}", Instant::now());
+
+        // Movement speed in pixels per krey press
+        let step = 2.0;
+        let sprite_size = 16.0; // your sprite is 16×16 pixels
+        let screen_width = 160.0;
+        let screen_height = 144.0;
+        for key in &self.keys_held {
+            match key {
+                KeyCode::KeyW | KeyCode::ArrowUp => {
+                    println!("Move forward");
+                    self.sprite_position.y = (self.sprite_position.y - step).max(0.0);
+                }
+                KeyCode::KeyA | KeyCode::ArrowLeft => {
+                    println!("Move left");
+                    self.sprite_position.x = (self.sprite_position.x - step).max(0.0);
+                }
+                KeyCode::KeyS | KeyCode::ArrowDown => {
+                    println!("Move backward");
+                    self.sprite_position.y =
+                        (self.sprite_position.y + step).min(screen_height - sprite_size);
+                }
+                KeyCode::KeyD | KeyCode::ArrowRight => {
+                    println!("Move right");
+                    self.sprite_position.x =
+                        (self.sprite_position.x + step).min(screen_width - sprite_size);
+                }
+                // Ignore all other events
+                _ => (),
+            }
+            if let Some(window) = &self.window {
+                window.request_redraw();
+            }
         }
     }
 }
@@ -353,46 +399,37 @@ impl ApplicationHandler for App {
         self.gpu = Some(gpu);
     }
 
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        const TIMESTEP: Duration = Duration::from_nanos(16_666_667); // ~16.67ms -> 60fps
+        let now = Instant::now();
+        let dt = now - self.last_update;
+        self.last_update = now;
+
+        self.accumulator += dt;
+        while self.accumulator >= TIMESTEP {
+            self.tick();
+            self.accumulator -= TIMESTEP;
+        }
+        if let Some(window) = &self.window {
+            window.request_redraw();
+        }
+    }
+
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         println!("{event:?}");
 
         match event {
             // Handle keyboard inputs
             WindowEvent::KeyboardInput { event, .. } => {
-                use winit::keyboard::{KeyCode, PhysicalKey};
-                // Movement speed in pixels per krey press
-                let step = 2.0;
-                let sprite_size = 16.0; // your sprite is 16×16 pixels
-                let screen_width = 160.0;
-                let screen_height = 144.0;
-                if event.state.is_pressed() {
-                    match event.physical_key {
-                        PhysicalKey::Code(KeyCode::KeyW) | PhysicalKey::Code(KeyCode::ArrowUp) => {
-                            println!("Move forward");
-                            self.sprite_position.y = (self.sprite_position.y - step).max(0.0);
+                use winit::event::ElementState;
+                if let PhysicalKey::Code(keycode) = event.physical_key {
+                    match event.state {
+                        ElementState::Pressed => {
+                            self.keys_held.insert(keycode);
                         }
-                        PhysicalKey::Code(KeyCode::KeyA)
-                        | PhysicalKey::Code(KeyCode::ArrowLeft) => {
-                            println!("Move left");
-                            self.sprite_position.x = (self.sprite_position.x - step).max(0.0);
+                        ElementState::Released => {
+                            self.keys_held.remove(&keycode);
                         }
-                        PhysicalKey::Code(KeyCode::KeyS)
-                        | PhysicalKey::Code(KeyCode::ArrowDown) => {
-                            println!("Move backward");
-                            self.sprite_position.y =
-                                (self.sprite_position.y + step).min(screen_height - sprite_size);
-                        }
-                        PhysicalKey::Code(KeyCode::KeyD)
-                        | PhysicalKey::Code(KeyCode::ArrowRight) => {
-                            println!("Move right");
-                            self.sprite_position.x =
-                                (self.sprite_position.x + step).min(screen_width - sprite_size);
-                        }
-                        // Ignore all other events
-                        _ => (),
-                    }
-                    if let Some(window) = &self.window {
-                        window.request_redraw();
                     }
                 }
             }
