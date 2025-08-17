@@ -12,6 +12,7 @@ use wgpu::SurfaceConfiguration; // Configuration for how to draw to the surface 
 use bytemuck::{Pod, Zeroable};
 
 use std::sync::Arc;
+use std::task::Context;
 // Local modules
 
 use toki_core::sprite::{SpriteFrame, SpriteSheetMeta};
@@ -41,6 +42,8 @@ pub struct GpuState {
     render_pipeline: wgpu::RenderPipeline,
     texture_bind_group: wgpu::BindGroup,
     uniform_buffer: wgpu::Buffer,
+    tilemap_vertex_buffer: Option<wgpu::Buffer>,
+    tilemap_vertex_count: usize,
 }
 
 impl GpuState {
@@ -150,7 +153,24 @@ impl GpuState {
             render_pipeline,
             texture_bind_group,
             uniform_buffer,
+            tilemap_vertex_buffer: None,
+            tilemap_vertex_count: 0,
         }
+    }
+
+    pub fn update_tilemap_vertex_buffer(&mut self, vertices: &[QuadVertex]) {
+        let vertex_data = bytemuck::cast_slice(vertices);
+
+        let buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Tilemap Vertex Buffer"),
+                contents: vertex_data,
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
+        self.tilemap_vertex_buffer = Some(buffer);
+        self.tilemap_vertex_count = vertices.len();
     }
 
     pub fn update_projection(&self, mvp: glam::Mat4) {
@@ -194,6 +214,13 @@ impl GpuState {
             });
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.texture_bind_group, &[]);
+            // Draw the tilemap if it exists
+            if let Some(buffer) = &self.tilemap_vertex_buffer {
+                render_pass.set_vertex_buffer(0, buffer.slice(..));
+                render_pass.draw(0..self.tilemap_vertex_count as u32, 0..1);
+            }
+
+            // Then draw the sprite on top
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.draw(0..6, 0..1);
         }

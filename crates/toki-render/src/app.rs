@@ -13,8 +13,16 @@ use std::time::{Duration, Instant};
 
 use crate::errors::RenderError;
 use crate::gpu::GpuState;
+use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
 use toki_core::math::projection::{calculate_projection, ProjectionParameter};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
+
+#[derive(Debug)]
+pub struct Assets {
+    pub tilemap: TileMap,
+    pub terrain_atlas: AtlasMeta,
+    pub creature_atlas: AtlasMeta,
+}
 
 #[derive(Debug)]
 struct App {
@@ -25,10 +33,27 @@ struct App {
     keys_held: HashSet<KeyCode>,
     sprite: SpriteInstance,
     projection_params: ProjectionParameter,
+    pub assets: Assets,
+}
+
+impl Assets {
+    pub fn load() -> Result<Self, RenderError> {
+        let terrain_atlas = AtlasMeta::load_from_file("assets/terrain.json")?;
+        let creature_atlas = AtlasMeta::load_from_file("assets/creatures.json")?;
+        let tilemap = TileMap::load_from_file("assets/maps/test_map.json")?;
+        tilemap.validate()?;
+
+        Ok(Self {
+            tilemap,
+            terrain_atlas,
+            creature_atlas,
+        })
+    }
 }
 
 impl App {
     fn new() -> Self {
+        let assets = Assets::load().expect("Failed to load assets");
         let animation = Animation {
             name: "slime_bounce".into(),
             looped: true,
@@ -52,12 +77,27 @@ impl App {
             ],
         };
         let sprite_sheet = SpriteSheetMeta {
-            frame_size: (16, 16),
+            frame_size: (
+                assets.creature_atlas.tile_size.x,
+                assets.creature_atlas.tile_size.y,
+            ),
             frame_count: 4,
-            sheet_size: (64, 16),
+            sheet_size: (
+                assets
+                    .creature_atlas
+                    .image_size()
+                    .expect("Cannot derive image size")
+                    .x,
+                assets
+                    .creature_atlas
+                    .image_size()
+                    .expect("Cannot derive image size")
+                    .y,
+            ),
         };
         let sprite_instance =
             SpriteInstance::new(glam::Vec2::new(32.0, 32.0), animation, sprite_sheet);
+
         Self {
             window: None,
             gpu: None,
@@ -71,6 +111,7 @@ impl App {
                 desired_width: 160,
                 desired_height: 144,
             },
+            assets,
         }
     }
 
@@ -85,6 +126,29 @@ impl App {
         // Track if we _moved at all this tick
         let mut _moved = false;
 
+        self.handle_input(step, sprite_size, screen_width, screen_height, _moved);
+        if true {
+            // this point can be used to differentiate between idle and moving animations later
+            // Update animation
+            self.sprite.tick(17);
+            if let Some(gpu) = &mut self.gpu {
+                let frame = self.sprite.current_frame();
+                gpu.update_vertex_buffer(frame);
+            }
+        }
+        if let Some(window) = &self.window {
+            window.request_redraw();
+        }
+    }
+
+    fn handle_input(
+        &mut self,
+        step: f32,
+        sprite_size: f32,
+        screen_width: f32,
+        screen_height: f32,
+        mut _moved: bool,
+    ) {
         for key in &self.keys_held {
             match key {
                 KeyCode::KeyW | KeyCode::ArrowUp => {
@@ -112,18 +176,6 @@ impl App {
                 // Ignore all other events
                 _ => (),
             }
-        }
-        if true {
-            // this point can be used to differentiate between idle and moving animations later
-            // Update animation
-            self.sprite.tick(17);
-            if let Some(gpu) = &mut self.gpu {
-                let frame = self.sprite.current_frame();
-                gpu.update_vertex_buffer(frame);
-            }
-        }
-        if let Some(window) = &self.window {
-            window.request_redraw();
         }
     }
 }
@@ -237,6 +289,14 @@ impl ApplicationHandler for App {
 
                     gpu.update_projection(mvp);
                     tracing::trace!("Redrawing projection");
+
+                    // Also draw the map
+                    let atlas_size = self.assets.terrain_atlas.image_size().unwrap();
+                    let verts = self
+                        .assets
+                        .tilemap
+                        .generate_vertices(&self.assets.terrain_atlas, atlas_size);
+                    gpu.update_tilemap_vertex_buffer(&verts);
                     gpu.draw();
                 }
             }

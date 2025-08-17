@@ -1,3 +1,5 @@
+use crate::assets::atlas::AtlasMeta;
+use crate::graphics::vertex::QuadVertex;
 use crate::CoreError;
 use glam::UVec2;
 use serde::Deserialize;
@@ -45,5 +47,68 @@ impl TileMap {
             return None;
         }
         Some(tile_pos * self.tile_size)
+    }
+
+    pub fn generate_vertices(&self, atlas: &AtlasMeta, texture_size: UVec2) -> Vec<QuadVertex> {
+        let mut vertices = Vec::new();
+
+        for y in 0..self.size.y {
+            for x in 0..self.size.x {
+                let tile_name = match self.get_tile_name(x, y) {
+                    Some(name) => name,
+                    None => continue,
+                };
+
+                let rect = match atlas.get_tile_rect(tile_name) {
+                    Some(r) => r,
+                    None => continue,
+                };
+
+                let pos = match self.tile_to_world(UVec2::new(x, y)) {
+                    Some(p) => p,
+                    None => continue,
+                };
+
+                let tile_w = rect[2] as f32;
+                let tile_h = rect[3] as f32;
+                let u0 = rect[0] as f32 / texture_size.x as f32;
+                let v0 = rect[1] as f32 / texture_size.y as f32;
+                let u1 = (rect[0] + rect[2]) as f32 / texture_size.x as f32;
+                let v1 = (rect[1] + rect[3]) as f32 / texture_size.y as f32;
+
+                let x = pos.x as f32;
+                let y = pos.y as f32;
+
+                // Triangle 1
+                vertices.push(QuadVertex {
+                    position: [x, y],
+                    tex_coords: [u0, v0],
+                });
+                vertices.push(QuadVertex {
+                    position: [x + tile_w, y],
+                    tex_coords: [u1, v0],
+                });
+                vertices.push(QuadVertex {
+                    position: [x, y + tile_h],
+                    tex_coords: [u0, v1],
+                });
+
+                // Triangle 2
+                vertices.push(QuadVertex {
+                    position: [x + tile_w, y],
+                    tex_coords: [u1, v0],
+                });
+                vertices.push(QuadVertex {
+                    position: [x + tile_w, y + tile_h],
+                    tex_coords: [u1, v1],
+                });
+                vertices.push(QuadVertex {
+                    position: [x, y + tile_h],
+                    tex_coords: [u0, v1],
+                });
+            }
+        }
+
+        vertices
     }
 }
