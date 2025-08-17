@@ -144,10 +144,13 @@ impl App {
         let sprite_size = 16.0; // your sprite is 16×16 pixels
         let screen_width = 160.0;
         let screen_height = 144.0;
+        let world_w = (self.assets.tilemap.size.x * self.assets.tilemap.tile_size.x) as f32;
+        let world_h = (self.assets.tilemap.size.y * self.assets.tilemap.tile_size.y) as f32;
+
         // Track if we _moved at all this tick
         let mut _moved = false;
 
-        self.handle_input(step, sprite_size, screen_width, screen_height, _moved);
+        self.handle_input(step, sprite_size, world_w, world_h, _moved);
         if true {
             // this point can be used to differentiate between idle and moving animations later
             // Update animation
@@ -173,8 +176,8 @@ impl App {
         &mut self,
         step: f32,
         sprite_size: f32,
-        screen_width: f32,
-        screen_height: f32,
+        world_w: f32,
+        world_h: f32,
         mut _moved: bool,
     ) {
         for key in &self.keys_held {
@@ -192,13 +195,13 @@ impl App {
                 KeyCode::KeyS | KeyCode::ArrowDown => {
                     tracing::trace!("Move backward");
                     self.sprite.position.y =
-                        (self.sprite.position.y + step).min(screen_height - sprite_size);
+                        (self.sprite.position.y + step).min(world_h - sprite_size);
                     _moved = true;
                 }
                 KeyCode::KeyD | KeyCode::ArrowRight => {
                     tracing::trace!("Move right");
                     self.sprite.position.x =
-                        (self.sprite.position.x + step).min(screen_width - sprite_size);
+                        (self.sprite.position.x + step).min(world_w - sprite_size);
                     _moved = true;
                 }
                 // Ignore all other events
