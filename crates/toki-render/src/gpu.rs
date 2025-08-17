@@ -10,7 +10,7 @@ use wgpu::Surface; // Represents the drawing surface (your window's framebuffer)
 use wgpu::SurfaceConfiguration; // Configuration for how to draw to the surface (format, vsync, etc.)
 
 use bytemuck::{Pod, Zeroable};
-
+use glam::Vec2;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -20,13 +20,13 @@ use toki_core::sprite::{SpriteFrame, SpriteSheetMeta};
 
 use crate::vertex::VertexLayout;
 use toki_core::graphics::vertex::QuadVertex;
+use toki_core::Camera;
 
 use crate::draw::build_quad_vertices;
 use crate::pipeline::{
-    create_bind_group, create_bind_group_layout, create_device_and_surface, create_shader_module,
+    create_bind_group_layout, create_device_and_surface, create_shader_module,
     create_texture_bindgroup,
 };
-use crate::texture::GpuTexture;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -54,8 +54,8 @@ fn to_absolute_path<P: AsRef<Path>>(relative: P) -> std::io::Result<PathBuf> {
 }
 
 impl GpuState {
-    pub fn update_vertex_buffer(&mut self, frame: SpriteFrame) {
-        let verts = build_quad_vertices(frame);
+    pub fn update_vertex_buffer(&mut self, frame: SpriteFrame, pos: Vec2) {
+        let verts = build_quad_vertices(frame, 16.0, 16.0, pos);
         self.queue
             .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&verts));
     }
@@ -64,22 +64,13 @@ impl GpuState {
 
         let shader = create_shader_module(&device);
 
-        // Gen transfomation matrix
-        let ortho = glam::Mat4::orthographic_rh_gl(
-            0.0, 160.0, // left to right
-            144.0, 0.0, -1.0, 1.0,
-        );
-
-        // Move sprite to pixel position (e.g. 32, 32)
-        let model = glam::Mat4::from_translation(glam::vec3(32.0, 32.0, 0.0));
-        let mvp = ortho * model;
-        let uniforms = Uniforms {
-            mvp: mvp.to_cols_array_2d(),
+        let dummy_uniforms = Uniforms {
+            mvp: glam::Mat4::IDENTITY.to_cols_array_2d(),
         };
 
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[uniforms]),
+            contents: bytemuck::cast_slice(&[dummy_uniforms]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -109,7 +100,7 @@ impl GpuState {
         }
         .uv_rect(0);
 
-        let vertices: [QuadVertex; 6] = build_quad_vertices(f0);
+        let vertices: [QuadVertex; 6] = build_quad_vertices(f0, 16.0, 16.0, Vec2::ZERO);
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Quad Vertex Buffer"),
@@ -187,7 +178,7 @@ impl GpuState {
             .write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
     }
 
-    pub fn draw(&mut self) {
+    pub fn draw(&mut self, camera: &Camera) {
         let output = self
             .surface
             .get_current_texture()
@@ -201,6 +192,8 @@ impl GpuState {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
             });
+
+        self.update_projection(camera.calculate_projection());
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -219,6 +212,14 @@ impl GpuState {
                 occlusion_query_set: None,
             });
             render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_viewport(
+                0.0,
+                0.0,
+                self.config.width as f32,
+                self.config.height as f32,
+                0.0,
+                1.0,
+            );
 
             // Draw tilemap
             if let Some(buffer) = &self.tilemap_vertex_buffer {

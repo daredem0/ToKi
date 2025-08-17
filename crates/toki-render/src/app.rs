@@ -14,8 +14,9 @@ use std::time::{Duration, Instant};
 use crate::errors::RenderError;
 use crate::gpu::GpuState;
 use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
+use toki_core::camera::{Camera, CameraController, CameraMode, Entity, RuntimeState};
 use toki_core::math::projection::{calculate_projection, ProjectionParameter};
-use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
+use toki_core::sprite::{self, Animation, Frame, SpriteInstance, SpriteSheetMeta};
 
 #[derive(Debug)]
 pub struct Assets {
@@ -34,6 +35,8 @@ struct App {
     sprite: SpriteInstance,
     projection_params: ProjectionParameter,
     pub assets: Assets,
+    camera: Camera,
+    cam_controller: CameraController,
 }
 
 impl Assets {
@@ -96,7 +99,23 @@ impl App {
             ),
         };
         let sprite_instance =
-            SpriteInstance::new(glam::Vec2::new(32.0, 32.0), animation, sprite_sheet);
+            SpriteInstance::new(glam::Vec2::new(80.0, 72.0), animation, sprite_sheet);
+        let mut camera = Camera {
+            position: glam::IVec2::ZERO,
+            viewport_size: glam::UVec2::new(160, 144),
+            scale: 1,
+        };
+        camera.center_on(sprite_instance.position.as_ivec2());
+        let slime_entity = Entity {
+            id: 1,
+            position: glam::vec2(80.0, 72.0),
+        };
+        let cam_controller = CameraController {
+            mode: CameraMode::FollowEntity(slime_entity.id),
+        };
+        // let runtime = RuntimeState {
+        //     entities: &[slime_entity],
+        // };
 
         Self {
             window: None,
@@ -112,6 +131,8 @@ impl App {
                 desired_height: 144,
             },
             assets,
+            camera,
+            cam_controller,
         }
     }
 
@@ -131,9 +152,16 @@ impl App {
             // this point can be used to differentiate between idle and moving animations later
             // Update animation
             self.sprite.tick(17);
+            let runtime = RuntimeState {
+                entities: &[Entity {
+                    id: 1,
+                    position: self.sprite.position,
+                }],
+            };
+            self.cam_controller.update(&mut self.camera, &runtime);
             if let Some(gpu) = &mut self.gpu {
                 let frame = self.sprite.current_frame();
-                gpu.update_vertex_buffer(frame);
+                gpu.update_vertex_buffer(frame, self.sprite.position);
             }
         }
         if let Some(window) = &self.window {
@@ -282,13 +310,35 @@ impl ApplicationHandler for App {
                         .inner_size();
                     self.projection_params.height = size.height;
                     self.projection_params.width = size.width;
-                    let projection = calculate_projection(self.projection_params);
-                    let model = glam::Mat4::from_translation(self.sprite.position.extend(0.0));
+                    // let projection = calculate_projection(self.projection_params);
+                    // let model = glam::Mat4::from_translation(self.sprite.position.extend(0.0));
 
-                    let mvp = projection * model;
+                    // let mvp = projection * model;
 
-                    gpu.update_projection(mvp);
+                    // gpu.update_projection(mvp);
+                    let left = self.camera.position.x;
+                    let top = self.camera.position.y;
+                    let right = left + self.camera.viewport_size.x as i32;
+                    let bottom = top + self.camera.viewport_size.y as i32;
+
+                    tracing::debug!(
+                        "Camera Viewport in world space: left={}, right={}, top={}, bottom={}",
+                        left,
+                        right,
+                        top,
+                        bottom
+                    );
                     tracing::trace!("Redrawing projection");
+                    tracing::debug!("Camera position: {:?}", self.camera.position);
+                    tracing::debug!(
+                        "Window size: {:?}",
+                        self.window.as_ref().unwrap().inner_size()
+                    );
+                    tracing::debug!(
+                        "Camera projection: {:?}",
+                        self.camera.calculate_projection()
+                    );
+                    tracing::debug!("Window Scale Factor: {:?}", window.scale_factor());
 
                     // Also draw the map
                     let atlas_size = self.assets.terrain_atlas.image_size().unwrap();
@@ -297,7 +347,7 @@ impl ApplicationHandler for App {
                         .tilemap
                         .generate_vertices(&self.assets.terrain_atlas, atlas_size);
                     gpu.update_tilemap_vertex_buffer(&verts);
-                    gpu.draw();
+                    gpu.draw(&self.camera);
                 }
             }
             // Ignore all other events

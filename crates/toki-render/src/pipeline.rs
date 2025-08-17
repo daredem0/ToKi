@@ -6,7 +6,6 @@ use winit::window::Window; // Window: window handle; Attributes: window config; 
 use wgpu::Surface; // Represents the drawing surface (your window's framebuffer)
 use wgpu::SurfaceConfiguration; // Configuration for how to draw to the surface (format, vsync, etc.)
 
-use std::path::PathBuf;
 use std::sync::Arc;
 // Local modules
 

@@ -15,3 +15,6 @@ pub mod assets {
     pub mod atlas;
     pub mod tilemap;
 }
+
+pub mod camera;
+pub use camera::{Camera, CameraController, CameraMode, Entity};
