@@ -1,0 +1,41 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "atlas.schema.json",
+    "title": "AtlasMeta",
+    "type": "object",
+    "required": [
+        "image",
+        "tile_size",
+        "tiles"
+    ],
+    "properties": {
+        "image": {
+            "type": "string",
+            "description": "Relative path to the image file"
+        },
+        "tile_size": {
+            "type": "array",
+            "description": "Pixel size of each tile: [width, height]",
+            "items": {
+                "type": "integer",
+                "minimum": 1
+            },
+            "minItems": 2,
+            "maxItems": 2
+        },
+        "tiles": {
+            "type": "object",
+            "description": "Map of tile names to tile grid positions (in tile units)",
+            "additionalProperties": {
+                "type": "array",
+                "items": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "minItems": 2,
+                "maxItems": 2
+            }
+        }
+    },
+    "additionalProperties": false
+}

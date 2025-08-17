@@ -1,0 +1,46 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "tilemap.schema.json",
+    "title": "TileMap",
+    "type": "object",
+    "required": [
+        "size",
+        "tile_size",
+        "atlas",
+        "tiles"
+    ],
+    "properties": {
+        "size": {
+            "type": "array",
+            "description": "Dimensions of the tilemap in tiles: [width, height]",
+            "items": {
+                "type": "integer",
+                "minimum": 1
+            },
+            "minItems": 2,
+            "maxItems": 2
+        },
+        "tile_size": {
+            "type": "array",
+            "description": "Pixel size of each tile: [width, height]",
+            "items": {
+                "type": "integer",
+                "minimum": 1
+            },
+            "minItems": 2,
+            "maxItems": 2
+        },
+        "atlas": {
+            "type": "string",
+            "description": "Path to the atlas JSON used by this tilemap"
+        },
+        "tiles": {
+            "type": "array",
+            "description": "Flat row-major list of tile names (strings)",
+            "items": {
+                "type": "string"
+            }
+        }
+    },
+    "additionalProperties": false
+}
