@@ -6,11 +6,30 @@ use winit::window::Window; // Window: window handle; Attributes: window config; 
 use wgpu::Surface; // Represents the drawing surface (your window's framebuffer)
 use wgpu::SurfaceConfiguration; // Configuration for how to draw to the surface (format, vsync, etc.)
 
+use std::path::PathBuf;
 use std::sync::Arc;
 // Local modules
 
 use crate::texture::GpuTexture;
 
+pub fn create_texture_bindgroup(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    texture_bind_group_layout: &wgpu::BindGroupLayout,
+    uniform_buffer: &wgpu::Buffer,
+    texture_file: std::path::PathBuf,
+    texture_label: Option<&str>,
+) -> wgpu::BindGroup {
+    let texture = GpuTexture::from_file(
+        device,
+        queue,
+        texture_file.as_path().to_str().unwrap(),
+        texture_label,
+    )
+    .unwrap();
+
+    create_bind_group(device, texture_bind_group_layout, &texture, uniform_buffer)
+}
 pub fn create_device_and_surface(
     window: Arc<Window>,
 ) -> (

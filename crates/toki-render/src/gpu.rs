@@ -11,8 +11,9 @@ use wgpu::SurfaceConfiguration; // Configuration for how to draw to the surface 
 
 use bytemuck::{Pod, Zeroable};
 
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::task::Context;
 // Local modules
 
 use toki_core::sprite::{SpriteFrame, SpriteSheetMeta};
@@ -23,6 +24,7 @@ use toki_core::graphics::vertex::QuadVertex;
 use crate::draw::build_quad_vertices;
 use crate::pipeline::{
     create_bind_group, create_bind_group_layout, create_device_and_surface, create_shader_module,
+    create_texture_bindgroup,
 };
 use crate::texture::GpuTexture;
 
@@ -40,10 +42,15 @@ pub struct GpuState {
     queue: Queue,
     vertex_buffer: wgpu::Buffer,
     render_pipeline: wgpu::RenderPipeline,
-    texture_bind_group: wgpu::BindGroup,
+    map_bind_group: wgpu::BindGroup,
+    creature_bind_group: wgpu::BindGroup,
     uniform_buffer: wgpu::Buffer,
     tilemap_vertex_buffer: Option<wgpu::Buffer>,
     tilemap_vertex_count: usize,
+}
+
+fn to_absolute_path<P: AsRef<Path>>(relative: P) -> std::io::Result<PathBuf> {
+    fs::canonicalize(relative)
 }
 
 impl GpuState {
@@ -78,23 +85,21 @@ impl GpuState {
 
         let texture_bind_group_layout = create_bind_group_layout(&device);
 
-        let slime_texture = GpuTexture::from_file(
+        let creature_bind_group = create_texture_bindgroup(
             &device,
             &queue,
-            "./assets/slime_sprite_idle_64_16.png",
-            Some("Slime Texture"),
-        )
-        .map_err(|e| {
-            tracing::error!("Failed to load slime texture: {e}");
-            panic!();
-        })
-        .unwrap();
-
-        let texture_bind_group = create_bind_group(
-            &device,
             &texture_bind_group_layout,
-            &slime_texture,
             &uniform_buffer,
+            to_absolute_path("./assets/creatures.png").unwrap(),
+            Some("Creatures Texture"),
+        );
+        let map_bind_group = create_texture_bindgroup(
+            &device,
+            &queue,
+            &texture_bind_group_layout,
+            &uniform_buffer,
+            to_absolute_path("./assets/terrain.png").unwrap(),
+            Some("Terrain Texture"),
         );
 
         let f0 = SpriteSheetMeta {
@@ -151,7 +156,8 @@ impl GpuState {
             queue,
             vertex_buffer,
             render_pipeline,
-            texture_bind_group,
+            creature_bind_group,
+            map_bind_group,
             uniform_buffer,
             tilemap_vertex_buffer: None,
             tilemap_vertex_count: 0,
@@ -213,14 +219,16 @@ impl GpuState {
                 occlusion_query_set: None,
             });
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.texture_bind_group, &[]);
-            // Draw the tilemap if it exists
+
+            // Draw tilemap
             if let Some(buffer) = &self.tilemap_vertex_buffer {
+                render_pass.set_bind_group(0, &self.map_bind_group, &[]);
                 render_pass.set_vertex_buffer(0, buffer.slice(..));
                 render_pass.draw(0..self.tilemap_vertex_count as u32, 0..1);
             }
 
-            // Then draw the sprite on top
+            // Draw sprite
+            render_pass.set_bind_group(0, &self.creature_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.draw(0..6, 0..1);
         }
