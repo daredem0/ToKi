@@ -43,7 +43,9 @@ impl Assets {
     pub fn load() -> Result<Self, RenderError> {
         let terrain_atlas = AtlasMeta::load_from_file("assets/terrain.json")?;
         let creature_atlas = AtlasMeta::load_from_file("assets/creatures.json")?;
-        let tilemap = TileMap::load_from_file("assets/maps/test_map.json")?;
+        // let tilemap = TileMap::load_from_file("assets/maps/test_map.json")?;
+        let tilemap = TileMap::load_from_file("assets/maps/tilemap_64x64_chunk.json")?;
+
         tilemap.validate()?;
 
         Ok(Self {
@@ -162,6 +164,19 @@ impl App {
                 }],
             };
             self.cam_controller.update(&mut self.camera, &runtime);
+            // Clamp camera to world bounds
+            let view_w = (self.camera.viewport_size.x * self.camera.scale) as i32;
+            let view_h = (self.camera.viewport_size.y * self.camera.scale) as i32;
+            let world_w_i = (self.assets.tilemap.size.x * self.assets.tilemap.tile_size.x) as i32;
+            let world_h_i = (self.assets.tilemap.size.y * self.assets.tilemap.tile_size.y) as i32;
+
+            let max_cam_x = (world_w_i - view_w).max(0);
+            let max_cam_y = (world_h_i - view_h).max(0);
+
+            use glam::IVec2;
+            self.camera.position.x = self.camera.position.x.clamp(0, max_cam_x);
+            self.camera.position.y = self.camera.position.y.clamp(0, max_cam_y);
+
             if let Some(gpu) = &mut self.gpu {
                 let frame = self.sprite.current_frame();
                 gpu.update_vertex_buffer(frame, self.sprite.position);
