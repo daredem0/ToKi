@@ -16,7 +16,7 @@ use crate::gpu::GpuState;
 use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
 use toki_core::camera::{Camera, CameraController, CameraMode, Entity, RuntimeState};
 use toki_core::math::projection::{calculate_projection, ProjectionParameter};
-use toki_core::sprite::{self, Animation, Frame, SpriteInstance, SpriteSheetMeta};
+use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 
 #[derive(Debug)]
 pub struct Assets {
@@ -144,8 +144,6 @@ impl App {
         // Movement speed in pixels per krey press
         let step = 0.5;
         let sprite_size = 16.0; // your sprite is 16×16 pixels
-        let screen_width = 160.0;
-        let screen_height = 144.0;
         let world_w = (self.assets.tilemap.size.x * self.assets.tilemap.tile_size.x) as f32;
         let world_h = (self.assets.tilemap.size.y * self.assets.tilemap.tile_size.y) as f32;
 
@@ -173,7 +171,6 @@ impl App {
             let max_cam_x = (world_w_i - view_w).max(0);
             let max_cam_y = (world_h_i - view_h).max(0);
 
-            use glam::IVec2;
             self.camera.position.x = self.camera.position.x.clamp(0, max_cam_x);
             self.camera.position.y = self.camera.position.y.clamp(0, max_cam_y);
 
