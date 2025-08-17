@@ -10,3 +10,8 @@ pub mod errors;
 pub use errors::CoreError;
 
 pub mod sprite;
+
+pub mod assets {
+    pub mod atlas;
+    pub mod tilemap;
+}

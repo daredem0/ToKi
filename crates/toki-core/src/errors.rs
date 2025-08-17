@@ -17,4 +17,7 @@ pub enum CoreError {
 
     #[error("Atlas file not found: {0}")]
     NotFound(PathBuf),
+
+    #[error("Map size mismatch: expected {expected} tiles, found {actual}")]
+    InvalidMapSize { expected: usize, actual: usize },
 }

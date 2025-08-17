@@ -1,0 +1,21 @@
+{
+    "size": [
+        4,
+        2
+    ],
+    "tile_size": [
+        8,
+        8
+    ],
+    "atlas": "terrain.json",
+    "tiles": [
+        "grass",
+        "grass",
+        "stone",
+        "stone",
+        "water",
+        "sand",
+        "dirt",
+        "brick"
+    ]
+}

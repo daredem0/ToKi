@@ -1,5 +1,7 @@
-use glam::Uvec2;
+use crate::CoreError;
+use glam::UVec2;
 use serde::Deserialize;
+use serde_with::{serde_as, DisplayFromStr};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -9,22 +11,22 @@ use std::path::{Path, PathBuf};
 pub struct AtlasMeta {
     #[serde_as(as = "DisplayFromStr")]
     pub image: PathBuf,
-    pub tile_size: [u32; 2],
-    pub tiles: HashMap<String, [u32; 2]>,
+
+    pub tile_size: UVec2,
+    pub tiles: HashMap<String, UVec2>,
 }
 
 impl AtlasMeta {
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self, CoreError> {
         let content = fs::read_to_string(path)?;
-        let meta = serde_json::from_str::<AtlasMeta>(&text)?;
+        let meta = serde_json::from_str::<AtlasMeta>(&content)?;
         Ok(meta)
     }
 
     pub fn get_tile_rect(&self, name: &str) -> Option<[u32; 4]> {
         let tile_pos = self.tiles.get(name)?;
-        let tile_w = self.tile_size[0];
-        let tile_h = self.tile_size[1];
+        let size = self.tile_size;
 
-        Some([tile_pos[0] * tile_w, tile_pos[1] * tile_h, tile_w, tile_h])
+        Some([tile_pos.x * size.x, tile_pos.y * size.y, size.x, size.y])
     }
 }
