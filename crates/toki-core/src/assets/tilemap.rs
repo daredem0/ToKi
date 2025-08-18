@@ -142,17 +142,21 @@ impl TileMap {
         let mut visible = Vec::new();
 
         // Calculate the world bounds of what the camera can see
-        let camera_end = camera_world_pos + viewport_size;
+        // We are actually rendering more than the viewport here ( + viewport_size/2)
+        // This is to have a slight margin for slower systems. There might be edge cases
+        // Where the loading of the chunks is not fast enough. If we preload a bit that helps us
+        // to smoothen that out and the cost is not too high
+        let camera_end = camera_world_pos + viewport_size + viewport_size / 2;
 
         // Check each chunk to see if it overlaps with the camera viewport
         let chunks = self.chunk_count();
         for chunk_y in 0..chunks.y {
             for chunk_x in 0..chunks.x {
                 if let Some((chunk_start, chunk_end)) = self.chunk_bounds(chunk_x, chunk_y) {
-                    let overlaps = !(chunk_end.x <= camera_world_pos.x ||     // Chunk is to the left
-                        chunk_start.x >= camera_end.x ||                        // Chunk is to the right
-                        chunk_end.y <= camera_world_pos.y ||                    // Chunk is above
-                        chunk_start.y >= camera_end.y); // Chunk is below
+                    let overlaps = !(chunk_end.x < camera_world_pos.x ||     // Chunk is to the left
+                        chunk_start.x > camera_end.x ||                        // Chunk is to the right
+                        chunk_end.y < camera_world_pos.y ||                    // Chunk is above
+                        chunk_start.y > camera_end.y); // Chunk is below
                     if overlaps {
                         visible.push((chunk_x, chunk_y));
                     }
