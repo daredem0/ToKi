@@ -17,7 +17,7 @@ use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_render::GpuState;
 use toki_render::RenderError;
 
-use crate::systems::{PerformanceMonitor, ResourceManager};
+use crate::systems::{CameraSystem, PerformanceMonitor, ResourceManager};
 
 #[derive(Debug)]
 struct App {
@@ -29,9 +29,7 @@ struct App {
     sprite: SpriteInstance,
     projection_params: ProjectionParameter,
     resources: ResourceManager,
-    camera: Camera,
-    cam_controller: CameraController,
-    cached_visible_chunks: Vec<(u32, u32)>,
+    camera_system: CameraSystem,
     // Performance monitoring
     performance: PerformanceMonitor,
 }
@@ -94,6 +92,7 @@ impl App {
         let cam_controller = CameraController {
             mode: CameraMode::FollowEntity(slime_entity.id),
         };
+        let camera_system = CameraSystem::new(camera, cam_controller);
         // let runtime = RuntimeState {
         //     entities: &[slime_entity],
         // };
@@ -112,9 +111,7 @@ impl App {
                 desired_height: 144,
             },
             resources,
-            camera,
-            cam_controller,
-            cached_visible_chunks: Vec::new(),
+            camera_system,
             // Performance monitoring
             performance: PerformanceMonitor::new(),
         }
@@ -134,54 +131,34 @@ impl App {
         // this point can be used to differentiate between idle and moving animations later
         // Update animation
         self.sprite.tick(17);
-        let prev_cam_pos = self.camera.position;
         let runtime = RuntimeState {
             entities: &[Entity {
                 id: 1,
                 position: self.sprite.position,
             }],
         };
-        self.cam_controller.update(&mut self.camera, &runtime);
-        // Clamp camera to world bounds
-        let view_w = (self.camera.viewport_size.x * self.camera.scale) as i32;
-        let view_h = (self.camera.viewport_size.y * self.camera.scale) as i32;
-        let world_w_i = (self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x) as i32;
-        let world_h_i = (self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y) as i32;
-
-        let max_cam_x = (world_w_i - view_w).max(0);
-        let max_cam_y = (world_h_i - view_h).max(0);
-
-        self.camera.position.x = self.camera.position.x.clamp(0, max_cam_x);
-        self.camera.position.y = self.camera.position.y.clamp(0, max_cam_y);
-
-        let cam_changed = prev_cam_pos != self.camera.position || moved;
+        let world_size = glam::UVec2::new(
+            self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
+            self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
+        );
+        let cam_changed = self.camera_system.update(&runtime, world_size) || moved;
 
         if let Some(gpu) = &mut self.gpu {
             if cam_changed {
                 let projection = calculate_projection(self.projection_params);
-                let view = glam::Mat4::from_translation(glam::vec3(
-                    -(self.camera.position.x as f32),
-                    -(self.camera.position.y as f32),
-                    0.0,
-                ));
+                let view = self.camera_system.view_matrix();
                 gpu.update_projection(projection * view);
 
                 // Only update tilemap if visible chunks changed
-                let current_chunks = self.resources.get_tilemap().visible_chunks(
-                    glam::UVec2::new(self.camera.position.x as u32, self.camera.position.y as u32),
-                    self.camera.viewport_size,
-                );
-
-                if current_chunks != self.cached_visible_chunks {
+                if self.camera_system.update_chunk_cache(self.resources.get_tilemap()) {
                     let atlas_size = self.resources.terrain_image_size().unwrap();
                     let verts = self.resources.get_tilemap().generate_vertices_for_chunks(
                         self.resources.get_terrain_atlas(),
                         atlas_size,
-                        &current_chunks,
+                        self.camera_system.cached_visible_chunks(),
                     );
 
                     gpu.update_tilemap_vertices(&verts);
-                    self.cached_visible_chunks = current_chunks;
                 }
             }
             let frame = self.sprite.current_frame();
@@ -256,11 +233,7 @@ impl App {
         self.projection_params.height = size.height;
         self.projection_params.width = size.width;
         let projection = calculate_projection(self.projection_params);
-        let view = glam::Mat4::from_translation(glam::vec3(
-            -(self.camera.position.x as f32),
-            -(self.camera.position.y as f32),
-            0.0,
-        ));
+        let view = self.camera_system.view_matrix();
         if let Some(gpu) = &mut self.gpu {
             gpu.resize(new_size);
             gpu.update_projection(projection * view);
@@ -308,10 +281,10 @@ impl App {
             // let mvp = projection * model;
 
             // gpu.update_projection(mvp);
-            let left = self.camera.position.x;
-            let top = self.camera.position.y;
-            let right = left + self.camera.viewport_size.x as i32;
-            let bottom = top + self.camera.viewport_size.y as i32;
+            let left = self.camera_system.position().x;
+            let top = self.camera_system.position().y;
+            let right = left + self.camera_system.viewport_size().x as i32;
+            let bottom = top + self.camera_system.viewport_size().y as i32;
 
             tracing::trace!(
                 "Camera Viewport in world space: left={}, right={}, top={}, bottom={}",
@@ -320,14 +293,14 @@ impl App {
                 top,
                 bottom
             );
-            tracing::trace!("Camera position: {:?}", self.camera.position);
+            tracing::trace!("Camera position: {:?}", self.camera_system.position());
             tracing::trace!(
                 "Window size: {:?}",
                 self.window.as_ref().unwrap().inner_size()
             );
             tracing::trace!(
                 "Camera projection: {:?}",
-                self.camera.calculate_projection()
+                self.camera_system.projection_matrix()
             );
             tracing::trace!("Window Scale Factor: {:?}", window.scale_factor());
 
@@ -378,27 +351,19 @@ impl ApplicationHandler for App {
         self.projection_params.width = size.width;
 
         let projection = calculate_projection(self.projection_params);
-        let view = glam::Mat4::from_translation(glam::vec3(
-            -(self.camera.position.x as f32),
-            -(self.camera.position.y as f32),
-            0.0,
-        ));
+        let view = self.camera_system.view_matrix();
 
         // Load initially visible chunks
         if let Some(gpu) = &mut self.gpu {
             // Generate vertices for chunks visible at startup
-            let initial_chunks = self.resources.get_tilemap().visible_chunks(
-                glam::UVec2::new(self.camera.position.x as u32, self.camera.position.y as u32),
-                self.camera.viewport_size,
-            );
+            self.camera_system.update_chunk_cache(self.resources.get_tilemap());
             let atlas_size = self.resources.terrain_image_size().unwrap();
             let verts = self.resources.get_tilemap().generate_vertices_for_chunks(
                 self.resources.get_terrain_atlas(),
                 atlas_size,
-                &initial_chunks,
+                self.camera_system.cached_visible_chunks(),
             );
             gpu.update_tilemap_vertices(&verts);
-            self.cached_visible_chunks = initial_chunks; // Cache the initial chunks
 
             gpu.update_projection(projection * view);
         }

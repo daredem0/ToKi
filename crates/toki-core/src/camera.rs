@@ -41,6 +41,20 @@ impl Camera {
         // Do the orthographic projection
         glam::Mat4::orthographic_rh_gl(left, right, bottom, top, -1.0, 1.0)
     }
+
+    /// Clamp camera position to stay within world bounds
+    pub fn clamp_to_world_bounds(&mut self, world_size: glam::UVec2) {
+        let view_w = (self.viewport_size.x * self.scale) as i32;
+        let view_h = (self.viewport_size.y * self.scale) as i32;
+        let world_w = world_size.x as i32;
+        let world_h = world_size.y as i32;
+        
+        let max_x = (world_w - view_w).max(0);
+        let max_y = (world_h - view_h).max(0);
+        
+        self.position.x = self.position.x.clamp(0, max_x);
+        self.position.y = self.position.y.clamp(0, max_y);
+    }
 }
 
 pub type EntityId = u32;
