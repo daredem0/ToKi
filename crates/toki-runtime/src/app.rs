@@ -184,7 +184,8 @@ impl App {
                 gpu.update_projection(projection * view);
             }
             let frame = self.sprite.current_frame();
-            gpu.update_vertex_buffer(frame, self.sprite.position);
+            gpu.clear_sprites(); // Clear previous frame's sprites
+            gpu.add_sprite(frame, self.sprite.position, glam::Vec2::new(16.0, 16.0));
         }
 
         if let Some(window) = &self.window {
@@ -365,7 +366,7 @@ impl ApplicationHandler for App {
                 .assets
                 .tilemap
                 .generate_vertices(&self.assets.terrain_atlas, atlas_size);
-            gpu.update_tilemap_vertex_buffer(&verts);
+            gpu.update_tilemap_vertices(&verts);
             gpu.update_projection(projection * view);
             // gpu.update_projection(self.camera.calculate_projection());
         }
