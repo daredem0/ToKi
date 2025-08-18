@@ -221,6 +221,103 @@ impl App {
             }
         }
     }
+
+    fn handle_keyboard_input_event(&mut self, event: winit::event::KeyEvent) {
+        use winit::event::ElementState;
+        if let PhysicalKey::Code(keycode) = event.physical_key {
+            match event.state {
+                ElementState::Pressed => {
+                    self.keys_held.insert(keycode);
+                }
+                ElementState::Released => {
+                    self.keys_held.remove(&keycode);
+                }
+            }
+        }
+    }
+
+    fn handle_resize_event(&mut self) {
+        // Get the window from self.window
+        let window = self.window.as_ref().expect("resize event without a window");
+        let size = window.inner_size();
+        self.projection_params.height = size.height;
+        self.projection_params.width = size.width;
+        let projection = calculate_projection(self.projection_params);
+        if let Some(gpu) = &mut self.gpu {
+            gpu.update_projection(projection);
+        }
+        window.request_redraw();
+    }
+
+    fn handle_redraw_request_event(&mut self) {
+        // Redraw the application.
+        //
+        // It's preferable for applications that do not render continuously to render in
+        // this event rather than in AboutToWait, since rendering in here allows
+        // the program to gracefully handle redraws requested by the OS.
+
+        // Get the window from self.window
+        let window = self
+            .window
+            .as_ref()
+            .expect("redraw request without a window");
+
+        // Notify that you're about to draw.
+        // This is necessary for some platforms (like X11) to ensure that the window is
+        // ready to be drawn to.
+        window.pre_present_notify();
+
+        // Wayland needs something to actually be drawn to even show the window
+        // so were just filling it up for now.
+        //fill::fill_window(window);
+        if let Some(gpu) = &mut self.gpu {
+            let size = self
+                .window
+                .as_ref()
+                .expect("redraw request without a window")
+                .inner_size();
+            self.projection_params.height = size.height;
+            self.projection_params.width = size.width;
+            // let projection = calculate_projection(self.projection_params);
+            // let model = glam::Mat4::from_translation(self.sprite.position.extend(0.0));
+
+            // let mvp = projection * model;
+
+            // gpu.update_projection(mvp);
+            let left = self.camera.position.x;
+            let top = self.camera.position.y;
+            let right = left + self.camera.viewport_size.x as i32;
+            let bottom = top + self.camera.viewport_size.y as i32;
+
+            tracing::debug!(
+                "Camera Viewport in world space: left={}, right={}, top={}, bottom={}",
+                left,
+                right,
+                top,
+                bottom
+            );
+            tracing::trace!("Redrawing projection");
+            tracing::debug!("Camera position: {:?}", self.camera.position);
+            tracing::debug!(
+                "Window size: {:?}",
+                self.window.as_ref().unwrap().inner_size()
+            );
+            tracing::debug!(
+                "Camera projection: {:?}",
+                self.camera.calculate_projection()
+            );
+            tracing::debug!("Window Scale Factor: {:?}", window.scale_factor());
+
+            // Also draw the map
+            // let atlas_size = self.assets.terrain_atlas.image_size().unwrap();
+            // let verts = self
+            //     .assets
+            //     .tilemap
+            //     .generate_vertices(&self.assets.terrain_atlas, atlas_size);
+            // gpu.update_tilemap_vertex_buffer(&verts);
+            gpu.draw(&self.camera);
+        }
+    }
 }
 
 impl ApplicationHandler for App {
@@ -240,6 +337,17 @@ impl ApplicationHandler for App {
         window.request_redraw();
         self.window = Some(window);
         self.gpu = Some(gpu);
+
+        // Upload tilemap vertex buffer once
+        // We should do that only once to save on performance
+        if let Some(gpu) = &mut self.gpu {
+            let atlas_size = self.assets.terrain_atlas.image_size().unwrap();
+            let verts = self
+                .assets
+                .tilemap
+                .generate_vertices(&self.assets.terrain_atlas, atlas_size);
+            gpu.update_tilemap_vertex_buffer(&verts);
+        }
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
@@ -264,17 +372,7 @@ impl ApplicationHandler for App {
         match event {
             // Handle keyboard inputs
             WindowEvent::KeyboardInput { event, .. } => {
-                use winit::event::ElementState;
-                if let PhysicalKey::Code(keycode) = event.physical_key {
-                    match event.state {
-                        ElementState::Pressed => {
-                            self.keys_held.insert(keycode);
-                        }
-                        ElementState::Released => {
-                            self.keys_held.remove(&keycode);
-                        }
-                    }
-                }
+                self.handle_keyboard_input_event(event);
             }
 
             // If the window was closed, stop the event loop
@@ -284,86 +382,11 @@ impl ApplicationHandler for App {
             }
             // If the window was resized, request a redraw
             WindowEvent::Resized(_) => {
-                // Get the window from self.window
-                let window = self.window.as_ref().expect("resize event without a window");
-                let size = window.inner_size();
-                self.projection_params.height = size.height;
-                self.projection_params.width = size.width;
-                let projection = calculate_projection(self.projection_params);
-                if let Some(gpu) = &mut self.gpu {
-                    gpu.update_projection(projection);
-                }
-                window.request_redraw();
+                self.handle_resize_event();
             }
             // If the window needs to be redrawn, redraw it
             WindowEvent::RedrawRequested => {
-                // Redraw the application.
-                //
-                // It's preferable for applications that do not render continuously to render in
-                // this event rather than in AboutToWait, since rendering in here allows
-                // the program to gracefully handle redraws requested by the OS.
-
-                // Get the window from self.window
-                let window = self
-                    .window
-                    .as_ref()
-                    .expect("redraw request without a window");
-
-                // Notify that you're about to draw.
-                // This is necessary for some platforms (like X11) to ensure that the window is
-                // ready to be drawn to.
-                window.pre_present_notify();
-
-                // Wayland needs something to actually be drawn to even show the window
-                // so were just filling it up for now.
-                //fill::fill_window(window);
-                if let Some(gpu) = &mut self.gpu {
-                    let size = self
-                        .window
-                        .as_ref()
-                        .expect("redraw request without a window")
-                        .inner_size();
-                    self.projection_params.height = size.height;
-                    self.projection_params.width = size.width;
-                    // let projection = calculate_projection(self.projection_params);
-                    // let model = glam::Mat4::from_translation(self.sprite.position.extend(0.0));
-
-                    // let mvp = projection * model;
-
-                    // gpu.update_projection(mvp);
-                    let left = self.camera.position.x;
-                    let top = self.camera.position.y;
-                    let right = left + self.camera.viewport_size.x as i32;
-                    let bottom = top + self.camera.viewport_size.y as i32;
-
-                    tracing::debug!(
-                        "Camera Viewport in world space: left={}, right={}, top={}, bottom={}",
-                        left,
-                        right,
-                        top,
-                        bottom
-                    );
-                    tracing::trace!("Redrawing projection");
-                    tracing::debug!("Camera position: {:?}", self.camera.position);
-                    tracing::debug!(
-                        "Window size: {:?}",
-                        self.window.as_ref().unwrap().inner_size()
-                    );
-                    tracing::debug!(
-                        "Camera projection: {:?}",
-                        self.camera.calculate_projection()
-                    );
-                    tracing::debug!("Window Scale Factor: {:?}", window.scale_factor());
-
-                    // Also draw the map
-                    let atlas_size = self.assets.terrain_atlas.image_size().unwrap();
-                    let verts = self
-                        .assets
-                        .tilemap
-                        .generate_vertices(&self.assets.terrain_atlas, atlas_size);
-                    gpu.update_tilemap_vertex_buffer(&verts);
-                    gpu.draw(&self.camera);
-                }
+                self.handle_redraw_request_event();
             }
             // Ignore all other events
             _ => (),
