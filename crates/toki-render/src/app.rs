@@ -15,7 +15,7 @@ use crate::errors::RenderError;
 use crate::gpu::GpuState;
 use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
 use toki_core::camera::{Camera, CameraController, CameraMode, Entity, RuntimeState};
-use toki_core::math::projection::{calculate_projection, ProjectionParameter};
+use toki_core::math::projection::{self, calculate_projection, ProjectionParameter};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 
 #[derive(Debug)]
@@ -175,7 +175,13 @@ impl App {
 
         if let Some(gpu) = &mut self.gpu {
             if cam_changed {
-                gpu.update_projection(self.camera.calculate_projection());
+                let projection = calculate_projection(self.projection_params);
+                let view = glam::Mat4::from_translation(glam::vec3(
+                    -(self.camera.position.x as f32),
+                    -(self.camera.position.y as f32),
+                    0.0,
+                ));
+                gpu.update_projection(projection * view);
             }
             let frame = self.sprite.current_frame();
             gpu.update_vertex_buffer(frame, self.sprite.position);
@@ -240,9 +246,14 @@ impl App {
         self.projection_params.height = size.height;
         self.projection_params.width = size.width;
         let projection = calculate_projection(self.projection_params);
+        let view = glam::Mat4::from_translation(glam::vec3(
+            -(self.camera.position.x as f32),
+            -(self.camera.position.y as f32),
+            0.0,
+        ));
         if let Some(gpu) = &mut self.gpu {
             gpu.resize(new_size);
-            gpu.update_projection(projection);
+            gpu.update_projection(projection * view);
         }
         window.request_redraw();
     }
@@ -335,6 +346,17 @@ impl ApplicationHandler for App {
         self.window = Some(window);
         self.gpu = Some(gpu);
 
+        let size = self.window.as_ref().unwrap().inner_size();
+        self.projection_params.height = size.height;
+        self.projection_params.width = size.width;
+
+        let projection = calculate_projection(self.projection_params);
+        let view = glam::Mat4::from_translation(glam::vec3(
+            -(self.camera.position.x as f32),
+            -(self.camera.position.y as f32),
+            0.0,
+        ));
+
         // Upload tilemap vertex buffer once
         // We should do that only once to save on performance
         if let Some(gpu) = &mut self.gpu {
@@ -344,7 +366,8 @@ impl ApplicationHandler for App {
                 .tilemap
                 .generate_vertices(&self.assets.terrain_atlas, atlas_size);
             gpu.update_tilemap_vertex_buffer(&verts);
-            gpu.update_projection(self.camera.calculate_projection());
+            gpu.update_projection(projection * view);
+            // gpu.update_projection(self.camera.calculate_projection());
         }
     }
 
