@@ -21,3 +21,6 @@ pub use camera::{Camera, CameraController, CameraMode, Entity};
 
 pub mod game;
 pub use game::{GameState, InputKey};
+
+pub mod timing;
+pub use timing::{TimingSystem, TimestepIterator};

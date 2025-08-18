@@ -10,10 +10,10 @@ use std::time::Instant;
 
 use toki_core::camera::{Camera, CameraController, CameraMode, Entity};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
-use toki_core::GameState;
+use toki_core::{GameState, TimingSystem};
 use toki_render::RenderError;
 
-use crate::systems::{CameraSystem, GameSystem, PerformanceMonitor, PlatformSystem, RenderingSystem, ResourceManager, TimingSystem};
+use crate::systems::{CameraSystem, GameSystem, PerformanceMonitor, PlatformSystem, RenderingSystem, ResourceManager};
 
 #[derive(Debug)]
 struct App {
