@@ -18,6 +18,8 @@ use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_render::GpuState;
 use toki_render::RenderError;
 
+use crate::systems::PerformanceMonitor;
+
 #[derive(Debug)]
 pub struct Assets {
     pub tilemap: TileMap,
@@ -38,15 +40,8 @@ struct App {
     camera: Camera,
     cam_controller: CameraController,
     cached_visible_chunks: Vec<(u32, u32)>,
-    // Performance tracking
-    frame_times: Vec<Duration>,
-    tick_times: Vec<Duration>,
-    draw_times: Vec<Duration>,
-    cpu_work_times: Vec<Duration>,
-    total_frame_times: Vec<Duration>,
-    last_fps_print: Instant,
-    last_frame_time: Instant,
-    show_fps_stats: bool,
+    // Performance monitoring
+    performance: PerformanceMonitor,
 }
 
 impl Assets {
@@ -146,15 +141,8 @@ impl App {
             camera,
             cam_controller,
             cached_visible_chunks: Vec::new(),
-            // Performance tracking
-            frame_times: Vec::new(),
-            tick_times: Vec::new(),
-            draw_times: Vec::new(),
-            cpu_work_times: Vec::new(),
-            total_frame_times: Vec::new(),
-            last_fps_print: Instant::now(),
-            last_frame_time: Instant::now(),
-            show_fps_stats: true, // Enable FPS display by default
+            // Performance monitoring
+            performance: PerformanceMonitor::new(),
         }
     }
 
@@ -273,11 +261,7 @@ impl App {
                     // Handle special keys that trigger on press
                     match keycode {
                         KeyCode::F3 => {
-                            self.show_fps_stats = !self.show_fps_stats;
-                            println!(
-                                "FPS stats display: {}",
-                                if self.show_fps_stats { "ON" } else { "OFF" }
-                            );
+                            self.performance.toggle_display();
                         }
                         _ => {
                             self.keys_held.insert(keycode);
@@ -313,10 +297,8 @@ impl App {
     fn handle_redraw_request_event(&mut self) {
         let frame_start = Instant::now();
         
-        // Measure time between actual frame renders
-        let frame_time = frame_start.duration_since(self.last_frame_time);
-        self.last_frame_time = frame_start;
-        self.update_fps_stats(frame_time);
+        // Record frame interval timing
+        self.performance.record_frame_interval(frame_start);
 
         // Redraw the application.
         //
@@ -391,120 +373,10 @@ impl App {
             gpu.draw();
             let draw_time = draw_start.elapsed();
             
-            // Update performance stats
+            // Record performance breakdown
             let total_frame_time = frame_start.elapsed();
-            self.update_performance_stats(cpu_work_time, draw_time, total_frame_time);
+            self.performance.record_performance_breakdown(cpu_work_time, draw_time, total_frame_time);
         }
-    }
-
-    fn update_fps_stats(&mut self, frame_time: Duration) {
-        // Add current frame time to our collection
-        self.frame_times.push(frame_time);
-
-        // Keep only the last 60 frames for a rolling average
-        const MAX_SAMPLES: usize = 60;
-        if self.frame_times.len() > MAX_SAMPLES {
-            self.frame_times.remove(0);
-        }
-
-        // Print FPS stats every second (if enabled)
-        let now = Instant::now();
-        if self.show_fps_stats && now.duration_since(self.last_fps_print) >= Duration::from_secs(1) {
-            self.print_fps_stats();
-            self.last_fps_print = now;
-        }
-    }
-
-    fn update_tick_stats(&mut self, tick_time: Duration) {
-        // Add tick time to our collection
-        self.tick_times.push(tick_time);
-
-        // Keep only the last 60 samples
-        const MAX_SAMPLES: usize = 60;
-        if self.tick_times.len() > MAX_SAMPLES {
-            self.tick_times.remove(0);
-        }
-    }
-
-    fn update_performance_stats(&mut self, cpu_work_time: Duration, draw_time: Duration, total_frame_time: Duration) {
-        // Add performance times to our collections
-        self.cpu_work_times.push(cpu_work_time);
-        self.draw_times.push(draw_time);
-        self.total_frame_times.push(total_frame_time);
-
-        // Keep only the last 60 samples for each
-        const MAX_SAMPLES: usize = 60;
-        
-        if self.cpu_work_times.len() > MAX_SAMPLES {
-            self.cpu_work_times.remove(0);
-        }
-        if self.draw_times.len() > MAX_SAMPLES {
-            self.draw_times.remove(0);
-        }
-        if self.total_frame_times.len() > MAX_SAMPLES {
-            self.total_frame_times.remove(0);
-        }
-    }
-
-    fn print_fps_stats(&self) {
-        if self.frame_times.is_empty() {
-            return;
-        }
-
-        // Calculate FPS from frame intervals
-        let total_time: Duration = self.frame_times.iter().sum();
-        let avg_frame_time = total_time / self.frame_times.len() as u32;
-        let fps = if avg_frame_time.as_nanos() > 0 {
-            1_000_000_000.0 / avg_frame_time.as_nanos() as f64
-        } else {
-            0.0
-        };
-
-        // Calculate average tick time (game logic)
-        let avg_tick_time = if !self.tick_times.is_empty() {
-            let total: Duration = self.tick_times.iter().sum();
-            (total / self.tick_times.len() as u32).as_secs_f64() * 1000.0
-        } else {
-            0.0
-        };
-
-        // Calculate average draw time (GPU rendering)
-        let avg_draw_time = if !self.draw_times.is_empty() {
-            let total: Duration = self.draw_times.iter().sum();
-            (total / self.draw_times.len() as u32).as_secs_f64() * 1000.0
-        } else {
-            0.0
-        };
-
-        // Calculate average CPU work time (frame preparation)
-        let avg_cpu_time = if !self.cpu_work_times.is_empty() {
-            let total: Duration = self.cpu_work_times.iter().sum();
-            (total / self.cpu_work_times.len() as u32).as_secs_f64() * 1000.0
-        } else {
-            0.0
-        };
-
-        // Calculate average total frame time
-        let avg_total_frame = if !self.total_frame_times.is_empty() {
-            let total: Duration = self.total_frame_times.iter().sum();
-            (total / self.total_frame_times.len() as u32).as_secs_f64() * 1000.0
-        } else {
-            0.0
-        };
-
-        // Calculate overhead (total - cpu - draw)
-        let overhead = avg_total_frame - avg_cpu_time - avg_draw_time;
-
-        // Print comprehensive performance breakdown
-        println!(
-            "FPS: {:.1} | Frame: {:.2}ms | Tick: {:.2}ms | Draw: {:.2}ms | CPU: {:.2}ms | Overhead: {:.2}ms",
-            fps,
-            avg_total_frame,
-            avg_tick_time,
-            avg_draw_time,
-            avg_cpu_time,
-            overhead.max(0.0) // Don't show negative overhead
-        );
     }
 
 }
@@ -569,7 +441,7 @@ impl ApplicationHandler for App {
             let tick_start = Instant::now();
             self.tick();
             let tick_time = tick_start.elapsed();
-            self.update_tick_stats(tick_time);
+            self.performance.record_tick_time(tick_time);
             self.accumulator -= TIMESTEP;
         }
         if let Some(window) = &self.window {
