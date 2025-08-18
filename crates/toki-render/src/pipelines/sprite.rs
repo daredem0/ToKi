@@ -1,14 +1,14 @@
 use super::RenderPipeline;
 use crate::draw::build_quad_vertices;
-use crate::pipeline::{create_bind_group_layout, create_shader_module, create_texture_bindgroup};
 use crate::vertex::VertexLayout;
+use crate::wgpu_utils::{create_bind_group_layout, create_shader_module, create_texture_bindgroup};
+use bytemuck::{Pod, Zeroable};
+use glam::Vec2;
+use std::path::PathBuf;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::sprite::SpriteFrame;
 use wgpu::util::DeviceExt;
 use wgpu::{Device, Queue, RenderPass, RenderPipeline as WgpuRenderPipeline};
-use bytemuck::{Pod, Zeroable};
-use glam::Vec2;
-use std::path::PathBuf;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -41,7 +41,7 @@ impl SpritePipeline {
         texture_path: PathBuf,
     ) -> Self {
         let shader = create_shader_module(device);
-        
+
         let dummy_uniforms = SpriteUniforms {
             mvp: glam::Mat4::IDENTITY.to_cols_array_2d(),
         };
@@ -53,7 +53,7 @@ impl SpritePipeline {
         });
 
         let bind_group_layout = create_bind_group_layout(device);
-        
+
         let bind_group = create_texture_bindgroup(
             device,
             queue,
@@ -132,7 +132,7 @@ impl SpritePipeline {
 
     fn update_vertex_buffer(&mut self, queue: &Queue) {
         let mut vertices = Vec::new();
-        
+
         for instance in &self.instances {
             let quad_verts = build_quad_vertices(
                 instance.frame,
@@ -146,7 +146,7 @@ impl SpritePipeline {
         if !vertices.is_empty() {
             queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
         }
-        
+
         self.needs_buffer_update = false;
     }
 }

@@ -1,10 +1,10 @@
 mod draw;
 mod errors;
 mod gpu;
-mod pipeline;
 mod pipelines;
 mod texture;
 mod vertex;
+mod wgpu_utils;
 
 pub use errors::RenderError;
 pub use gpu::GpuState;

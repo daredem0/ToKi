@@ -1,17 +1,17 @@
-use winit::window::Window;
-use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
 use glam::Vec2;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
+use winit::window::Window;
 
-use toki_core::sprite::SpriteFrame;
 use toki_core::graphics::vertex::QuadVertex;
+use toki_core::sprite::SpriteFrame;
 
-use crate::pipeline::create_device_and_surface;
-use crate::pipelines::RenderPipeline;
-use crate::{SpritePipeline, TilemapPipeline};
 use crate::pipelines::sprite::SpriteInstance;
+use crate::pipelines::RenderPipeline;
+use crate::wgpu_utils::create_device_and_surface;
+use crate::{SpritePipeline, TilemapPipeline};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -78,7 +78,8 @@ impl GpuState {
     }
 
     pub fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
-        self.tilemap_pipeline.update_vertices(&self.device, vertices);
+        self.tilemap_pipeline
+            .update_vertices(&self.device, vertices);
     }
 
     pub fn update_projection(&mut self, mvp: glam::Mat4) {

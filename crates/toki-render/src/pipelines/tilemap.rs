@@ -1,11 +1,11 @@
 use super::RenderPipeline;
-use crate::pipeline::{create_bind_group_layout, create_shader_module, create_texture_bindgroup};
 use crate::vertex::VertexLayout;
+use crate::wgpu_utils::{create_bind_group_layout, create_shader_module, create_texture_bindgroup};
+use bytemuck::{Pod, Zeroable};
+use std::path::PathBuf;
 use toki_core::graphics::vertex::QuadVertex;
 use wgpu::util::DeviceExt;
 use wgpu::{Device, Queue, RenderPass, RenderPipeline as WgpuRenderPipeline};
-use bytemuck::{Pod, Zeroable};
-use std::path::PathBuf;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -30,7 +30,7 @@ impl TilemapPipeline {
         texture_path: PathBuf,
     ) -> Self {
         let shader = create_shader_module(device);
-        
+
         let dummy_uniforms = TilemapUniforms {
             mvp: glam::Mat4::IDENTITY.to_cols_array_2d(),
         };
@@ -42,7 +42,7 @@ impl TilemapPipeline {
         });
 
         let bind_group_layout = create_bind_group_layout(device);
-        
+
         let bind_group = create_texture_bindgroup(
             device,
             queue,
