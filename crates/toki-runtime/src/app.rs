@@ -37,6 +37,10 @@ struct App {
     pub assets: Assets,
     camera: Camera,
     cam_controller: CameraController,
+    cached_visible_chunks: Vec<(u32, u32)>,
+    // FPS tracking
+    frame_times: Vec<Duration>,
+    last_fps_print: Instant,
 }
 
 impl Assets {
@@ -135,11 +139,16 @@ impl App {
             assets,
             camera,
             cam_controller,
+            cached_visible_chunks: Vec::new(),
+            // FPS tracking
+            frame_times: Vec::new(),
+            last_fps_print: Instant::now(),
         }
     }
 
     fn tick(&mut self) {
-        tracing::trace!("TICK @ {:?}", Instant::now());
+        let tick_start = std::time::Instant::now();
+        tracing::trace!("TICK @ {:?}", tick_start);
 
         // Movement speed in pixels per key press
         let step = 1.0; // Move exactly 1 pixel per frame
@@ -173,7 +182,9 @@ impl App {
 
         let cam_changed = prev_cam_pos != self.camera.position || moved;
 
+        let movement_time = tick_start.elapsed();
         if let Some(gpu) = &mut self.gpu {
+            let gpu_start = std::time::Instant::now();
             if cam_changed {
                 let projection = calculate_projection(self.projection_params);
                 let view = glam::Mat4::from_translation(glam::vec3(
@@ -182,6 +193,45 @@ impl App {
                     0.0,
                 ));
                 gpu.update_projection(projection * view);
+
+                // Only update tilemap if visible chunks changed
+                let current_chunks = self.assets.tilemap.visible_chunks(
+                    glam::UVec2::new(self.camera.position.x as u32, self.camera.position.y as u32),
+                    self.camera.viewport_size,
+                );
+
+                if current_chunks != self.cached_visible_chunks {
+                    let atlas_size = self.assets.terrain_atlas.image_size().unwrap();
+                    let verts = self.assets.tilemap.generate_vertices_for_chunks(
+                        &self.assets.terrain_atlas,
+                        atlas_size,
+                        &current_chunks,
+                    );
+
+                    gpu.update_tilemap_vertices(&verts);
+                    self.cached_visible_chunks = current_chunks;
+                }
+            }
+            let gpu_time = gpu_start.elapsed();
+
+            // Always print debug info when slime should be idle
+            if self.keys_held.is_empty() {
+                // No keys pressed
+                println!(
+                    "IDLE: moved={}, movement={}μs, gpu={}μs, total={}μs",
+                    moved,
+                    movement_time.as_micros(),
+                    gpu_time.as_micros(),
+                    tick_start.elapsed().as_micros()
+                );
+            } // Only print when idle (no movement)
+            if !moved && movement_time.as_micros() > 100 {
+                println!(
+                    "IDLE TICK: movement={}μs, gpu={}μs, total={}μs",
+                    movement_time.as_micros(),
+                    gpu_time.as_micros(),
+                    tick_start.elapsed().as_micros()
+                );
             }
             let frame = self.sprite.current_frame();
             gpu.clear_sprites(); // Clear previous frame's sprites
@@ -358,17 +408,23 @@ impl ApplicationHandler for App {
             0.0,
         ));
 
-        // Upload tilemap vertex buffer once
-        // We should do that only once to save on performance
+        // Load initially visible chunks
         if let Some(gpu) = &mut self.gpu {
+            // Generate vertices for chunks visible at startup
+            let initial_chunks = self.assets.tilemap.visible_chunks(
+                glam::UVec2::new(self.camera.position.x as u32, self.camera.position.y as u32),
+                self.camera.viewport_size,
+            );
             let atlas_size = self.assets.terrain_atlas.image_size().unwrap();
-            let verts = self
-                .assets
-                .tilemap
-                .generate_vertices(&self.assets.terrain_atlas, atlas_size);
+            let verts = self.assets.tilemap.generate_vertices_for_chunks(
+                &self.assets.terrain_atlas,
+                atlas_size,
+                &initial_chunks,
+            );
             gpu.update_tilemap_vertices(&verts);
+            self.cached_visible_chunks = initial_chunks; // Cache the initial chunks
+
             gpu.update_projection(projection * view);
-            // gpu.update_projection(self.camera.calculate_projection());
         }
     }
 
