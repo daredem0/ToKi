@@ -50,6 +50,7 @@ impl GpuState {
         }
     }
 
+
     pub fn new(window: Arc<Window>) -> Self {
         let (device, queue, surface, config) = create_device_and_surface(Arc::clone(&window));
 

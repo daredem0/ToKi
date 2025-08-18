@@ -41,6 +41,8 @@ struct App {
     // FPS tracking
     frame_times: Vec<Duration>,
     last_fps_print: Instant,
+    last_frame_time: Instant,
+    show_fps_stats: bool,
 }
 
 impl Assets {
@@ -143,6 +145,8 @@ impl App {
             // FPS tracking
             frame_times: Vec::new(),
             last_fps_print: Instant::now(),
+            last_frame_time: Instant::now(),
+            show_fps_stats: true, // Enable FPS display by default
         }
     }
 
@@ -182,9 +186,7 @@ impl App {
 
         let cam_changed = prev_cam_pos != self.camera.position || moved;
 
-        let movement_time = tick_start.elapsed();
         if let Some(gpu) = &mut self.gpu {
-            let gpu_start = std::time::Instant::now();
             if cam_changed {
                 let projection = calculate_projection(self.projection_params);
                 let view = glam::Mat4::from_translation(glam::vec3(
@@ -211,27 +213,6 @@ impl App {
                     gpu.update_tilemap_vertices(&verts);
                     self.cached_visible_chunks = current_chunks;
                 }
-            }
-            let gpu_time = gpu_start.elapsed();
-
-            // Always print debug info when slime should be idle
-            if self.keys_held.is_empty() {
-                // No keys pressed
-                println!(
-                    "IDLE: moved={}, movement={}μs, gpu={}μs, total={}μs",
-                    moved,
-                    movement_time.as_micros(),
-                    gpu_time.as_micros(),
-                    tick_start.elapsed().as_micros()
-                );
-            } // Only print when idle (no movement)
-            if !moved && movement_time.as_micros() > 100 {
-                println!(
-                    "IDLE TICK: movement={}μs, gpu={}μs, total={}μs",
-                    movement_time.as_micros(),
-                    gpu_time.as_micros(),
-                    tick_start.elapsed().as_micros()
-                );
             }
             let frame = self.sprite.current_frame();
             gpu.clear_sprites(); // Clear previous frame's sprites
@@ -281,7 +262,19 @@ impl App {
         if let PhysicalKey::Code(keycode) = event.physical_key {
             match event.state {
                 ElementState::Pressed => {
-                    self.keys_held.insert(keycode);
+                    // Handle special keys that trigger on press
+                    match keycode {
+                        KeyCode::F3 => {
+                            self.show_fps_stats = !self.show_fps_stats;
+                            println!(
+                                "FPS stats display: {}",
+                                if self.show_fps_stats { "ON" } else { "OFF" }
+                            );
+                        }
+                        _ => {
+                            self.keys_held.insert(keycode);
+                        }
+                    }
                 }
                 ElementState::Released => {
                     self.keys_held.remove(&keycode);
@@ -310,6 +303,12 @@ impl App {
     }
 
     fn handle_redraw_request_event(&mut self) {
+        // Measure time between actual frame renders
+        let now = Instant::now();
+        let frame_time = now.duration_since(self.last_frame_time);
+        self.last_frame_time = now;
+        self.update_fps_stats(frame_time);
+
         // Redraw the application.
         //
         // It's preferable for applications that do not render continuously to render in
@@ -377,6 +376,56 @@ impl App {
             gpu.draw();
         }
     }
+
+    fn update_fps_stats(&mut self, frame_time: Duration) {
+        // Add current frame time to our collection
+        self.frame_times.push(frame_time);
+
+        // Keep only the last 60 frames for a rolling average
+        const MAX_SAMPLES: usize = 60;
+        if self.frame_times.len() > MAX_SAMPLES {
+            self.frame_times.remove(0);
+        }
+
+        // Print FPS stats every second (if enabled)
+        let now = Instant::now();
+        if self.show_fps_stats && now.duration_since(self.last_fps_print) >= Duration::from_secs(1) {
+            self.print_fps_stats();
+            self.last_fps_print = now;
+        }
+    }
+
+    fn print_fps_stats(&self) {
+        if self.frame_times.is_empty() {
+            return;
+        }
+
+        // Calculate average frame time over the collected samples
+        let total_time: Duration = self.frame_times.iter().sum();
+        let avg_frame_time = total_time / self.frame_times.len() as u32;
+        
+        // Calculate FPS from average frame time
+        let fps = if avg_frame_time.as_nanos() > 0 {
+            1_000_000_000.0 / avg_frame_time.as_nanos() as f64
+        } else {
+            0.0
+        };
+
+        // Calculate min and max frame times for additional insights
+        let min_frame_time = self.frame_times.iter().min().unwrap_or(&Duration::ZERO);
+        let max_frame_time = self.frame_times.iter().max().unwrap_or(&Duration::ZERO);
+
+        // Print comprehensive frame statistics including the frame times you wanted
+        println!(
+            "FPS: {:.1} | Avg: {:.2}ms | Min: {:.2}ms | Max: {:.2}ms | Samples: {}",
+            fps,
+            avg_frame_time.as_secs_f64() * 1000.0,
+            min_frame_time.as_secs_f64() * 1000.0,
+            max_frame_time.as_secs_f64() * 1000.0,
+            self.frame_times.len()
+        );
+    }
+
 }
 
 impl ApplicationHandler for App {
