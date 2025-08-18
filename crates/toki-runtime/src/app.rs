@@ -11,21 +11,13 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
 use toki_core::camera::{Camera, CameraController, CameraMode, Entity, RuntimeState};
 use toki_core::math::projection::{calculate_projection, ProjectionParameter};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_render::GpuState;
 use toki_render::RenderError;
 
-use crate::systems::PerformanceMonitor;
-
-#[derive(Debug)]
-pub struct Assets {
-    pub tilemap: TileMap,
-    pub terrain_atlas: AtlasMeta,
-    pub creature_atlas: AtlasMeta,
-}
+use crate::systems::{PerformanceMonitor, ResourceManager};
 
 #[derive(Debug)]
 struct App {
@@ -36,7 +28,7 @@ struct App {
     keys_held: HashSet<KeyCode>,
     sprite: SpriteInstance,
     projection_params: ProjectionParameter,
-    pub assets: Assets,
+    resources: ResourceManager,
     camera: Camera,
     cam_controller: CameraController,
     cached_visible_chunks: Vec<(u32, u32)>,
@@ -44,26 +36,10 @@ struct App {
     performance: PerformanceMonitor,
 }
 
-impl Assets {
-    pub fn load() -> Result<Self, RenderError> {
-        let terrain_atlas = AtlasMeta::load_from_file("assets/terrain.json")?;
-        let creature_atlas = AtlasMeta::load_from_file("assets/creatures.json")?;
-        // let tilemap = TileMap::load_from_file("assets/maps/test_map.json")?;
-        let tilemap = TileMap::load_from_file("assets/maps/tilemap_64x64_chunk.json")?;
-
-        tilemap.validate()?;
-
-        Ok(Self {
-            tilemap,
-            terrain_atlas,
-            creature_atlas,
-        })
-    }
-}
 
 impl App {
     fn new() -> Self {
-        let assets = Assets::load().expect("Failed to load assets");
+        let resources = ResourceManager::load_all().expect("Failed to load resources");
         let animation = Animation {
             name: "slime_bounce".into(),
             looped: true,
@@ -88,19 +64,17 @@ impl App {
         };
         let sprite_sheet = SpriteSheetMeta {
             frame_size: (
-                assets.creature_atlas.tile_size.x,
-                assets.creature_atlas.tile_size.y,
+                resources.creature_tile_size().x,
+                resources.creature_tile_size().y,
             ),
             frame_count: 4,
             sheet_size: (
-                assets
-                    .creature_atlas
-                    .image_size()
+                resources
+                    .creature_image_size()
                     .expect("Cannot derive image size")
                     .x,
-                assets
-                    .creature_atlas
-                    .image_size()
+                resources
+                    .creature_image_size()
                     .expect("Cannot derive image size")
                     .y,
             ),
@@ -137,7 +111,7 @@ impl App {
                 desired_width: 160,
                 desired_height: 144,
             },
-            assets,
+            resources,
             camera,
             cam_controller,
             cached_visible_chunks: Vec::new(),
@@ -153,8 +127,8 @@ impl App {
         // Movement speed in pixels per key press
         let step = 1.0; // Move exactly 1 pixel per frame
         let sprite_size = 16.0; // your sprite is 16×16 pixels
-        let world_w = (self.assets.tilemap.size.x * self.assets.tilemap.tile_size.x) as f32;
-        let world_h = (self.assets.tilemap.size.y * self.assets.tilemap.tile_size.y) as f32;
+        let world_w = (self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x) as f32;
+        let world_h = (self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y) as f32;
 
         let moved = self.handle_input(step, sprite_size, world_w, world_h);
         // this point can be used to differentiate between idle and moving animations later
@@ -171,8 +145,8 @@ impl App {
         // Clamp camera to world bounds
         let view_w = (self.camera.viewport_size.x * self.camera.scale) as i32;
         let view_h = (self.camera.viewport_size.y * self.camera.scale) as i32;
-        let world_w_i = (self.assets.tilemap.size.x * self.assets.tilemap.tile_size.x) as i32;
-        let world_h_i = (self.assets.tilemap.size.y * self.assets.tilemap.tile_size.y) as i32;
+        let world_w_i = (self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x) as i32;
+        let world_h_i = (self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y) as i32;
 
         let max_cam_x = (world_w_i - view_w).max(0);
         let max_cam_y = (world_h_i - view_h).max(0);
@@ -193,15 +167,15 @@ impl App {
                 gpu.update_projection(projection * view);
 
                 // Only update tilemap if visible chunks changed
-                let current_chunks = self.assets.tilemap.visible_chunks(
+                let current_chunks = self.resources.get_tilemap().visible_chunks(
                     glam::UVec2::new(self.camera.position.x as u32, self.camera.position.y as u32),
                     self.camera.viewport_size,
                 );
 
                 if current_chunks != self.cached_visible_chunks {
-                    let atlas_size = self.assets.terrain_atlas.image_size().unwrap();
-                    let verts = self.assets.tilemap.generate_vertices_for_chunks(
-                        &self.assets.terrain_atlas,
+                    let atlas_size = self.resources.terrain_image_size().unwrap();
+                    let verts = self.resources.get_tilemap().generate_vertices_for_chunks(
+                        self.resources.get_terrain_atlas(),
                         atlas_size,
                         &current_chunks,
                     );
@@ -413,13 +387,13 @@ impl ApplicationHandler for App {
         // Load initially visible chunks
         if let Some(gpu) = &mut self.gpu {
             // Generate vertices for chunks visible at startup
-            let initial_chunks = self.assets.tilemap.visible_chunks(
+            let initial_chunks = self.resources.get_tilemap().visible_chunks(
                 glam::UVec2::new(self.camera.position.x as u32, self.camera.position.y as u32),
                 self.camera.viewport_size,
             );
-            let atlas_size = self.assets.terrain_atlas.image_size().unwrap();
-            let verts = self.assets.tilemap.generate_vertices_for_chunks(
-                &self.assets.terrain_atlas,
+            let atlas_size = self.resources.terrain_image_size().unwrap();
+            let verts = self.resources.get_tilemap().generate_vertices_for_chunks(
+                self.resources.get_terrain_atlas(),
                 atlas_size,
                 &initial_chunks,
             );
