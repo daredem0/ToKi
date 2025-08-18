@@ -4,6 +4,19 @@ version = "0.1.0"
 edition = "2021"
 license = "GPL-3.0"
 
+[lib]
+name = "toki_runtime"
+path = "src/lib.rs"
+
+[[bin]]
+name = "toki-runtime"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0.99"
 toki-render = { path = "../toki-render" }
+toki-core   = { path = "../toki-core" }
+winit = { version = "0.30.12", features = ["x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita", "rwh_05"] }
+glam  = "0.30.5"
+tracing.workspace = true
+tracing-subscriber.workspace = true

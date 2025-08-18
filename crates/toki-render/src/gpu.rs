@@ -20,7 +20,6 @@ use toki_core::sprite::{SpriteFrame, SpriteSheetMeta};
 
 use crate::vertex::VertexLayout;
 use toki_core::graphics::vertex::QuadVertex;
-use toki_core::Camera;
 
 use crate::draw::build_quad_vertices;
 use crate::pipeline::{
@@ -187,7 +186,7 @@ impl GpuState {
             .write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
     }
 
-    pub fn draw(&mut self, camera: &Camera) {
+    pub fn draw(&mut self) {
         let output = self
             .surface
             .get_current_texture()

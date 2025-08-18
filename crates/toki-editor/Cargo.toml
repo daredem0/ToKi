@@ -6,6 +6,6 @@ license = "GPL-3.0"
 
 [dependencies]
 anyhow = "1.0.99"
-toki-render = { path = "../toki-render" }
+toki-runtime = { path = "../toki-runtime" }
 tracing.workspace = true
 tracing-subscriber.workspace = true

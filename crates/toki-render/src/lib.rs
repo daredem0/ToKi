@@ -1,10 +1,9 @@
-mod errors;
-mod vertex;
-
-mod texture;
-
-mod app;
 mod draw;
+mod errors;
 mod gpu;
 mod pipeline;
-pub use app::run_minimal_window;
+mod texture;
+mod vertex;
+
+pub use errors::RenderError;
+pub use gpu::GpuState;

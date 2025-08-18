@@ -11,12 +11,12 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::errors::RenderError;
-use crate::gpu::GpuState;
 use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
 use toki_core::camera::{Camera, CameraController, CameraMode, Entity, RuntimeState};
-use toki_core::math::projection::{self, calculate_projection, ProjectionParameter};
+use toki_core::math::projection::{calculate_projection, ProjectionParameter};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
+use toki_render::GpuState;
+use toki_render::RenderError;
 
 #[derive(Debug)]
 pub struct Assets {
@@ -323,7 +323,7 @@ impl App {
             //     .tilemap
             //     .generate_vertices(&self.assets.terrain_atlas, atlas_size);
             // gpu.update_tilemap_vertex_buffer(&verts);
-            gpu.draw(&self.camera);
+            gpu.draw();
         }
     }
 }

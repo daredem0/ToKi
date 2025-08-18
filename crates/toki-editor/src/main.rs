@@ -1,5 +1,5 @@
 use anyhow::Result;
-use toki_render::run_minimal_window;
+use toki_runtime::run_minimal_window;
 use tracing_subscriber;
 
 fn main() -> Result<()> {
