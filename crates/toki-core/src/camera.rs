@@ -63,6 +63,7 @@ pub struct RuntimeState<'a> {
     pub entities: &'a [Entity],
 }
 
+#[derive(Debug)]
 pub struct Entity {
     pub id: EntityId,
     pub position: glam::Vec2,

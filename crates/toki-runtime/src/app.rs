@@ -7,17 +7,17 @@ use winit::event_loop::{ActiveEventLoop, EventLoop}; // ActiveEventLoop is used 
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowAttributes, WindowId}; // Window: window handle; Attributes: window config; ID: unique per window
 
-use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use toki_core::camera::{Camera, CameraController, CameraMode, Entity, RuntimeState};
+use toki_core::camera::{Camera, CameraController, CameraMode, Entity};
 use toki_core::math::projection::{calculate_projection, ProjectionParameter};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
+use toki_core::GameState;
 use toki_render::GpuState;
 use toki_render::RenderError;
 
-use crate::systems::{CameraSystem, PerformanceMonitor, ResourceManager};
+use crate::systems::{CameraSystem, GameSystem, PerformanceMonitor, ResourceManager};
 
 #[derive(Debug)]
 struct App {
@@ -25,8 +25,7 @@ struct App {
     gpu: Option<GpuState>,
     last_update: Instant,
     accumulator: Duration,
-    keys_held: HashSet<KeyCode>,
-    sprite: SpriteInstance,
+    game_system: GameSystem,
     projection_params: ProjectionParameter,
     resources: ResourceManager,
     camera_system: CameraSystem,
@@ -79,12 +78,15 @@ impl App {
         };
         let sprite_instance =
             SpriteInstance::new(glam::Vec2::new(80.0, 72.0), animation, sprite_sheet);
+        let game_state = GameState::new(sprite_instance);
+        let game_system = GameSystem::new(game_state);
+        
         let mut camera = Camera {
             position: glam::IVec2::ZERO,
             viewport_size: glam::UVec2::new(160, 144),
             scale: 1,
         };
-        camera.center_on(sprite_instance.position.as_ivec2());
+        camera.center_on(glam::Vec2::new(80.0, 72.0).as_ivec2());
         let slime_entity = Entity {
             id: 1,
             position: glam::vec2(80.0, 72.0),
@@ -102,8 +104,7 @@ impl App {
             gpu: None,
             last_update: Instant::now(),
             accumulator: Duration::ZERO,
-            keys_held: HashSet::new(),
-            sprite: sprite_instance,
+            game_system,
             projection_params: ProjectionParameter {
                 width: 160,
                 height: 144,
@@ -121,27 +122,17 @@ impl App {
         let tick_start = std::time::Instant::now();
         tracing::trace!("TICK @ {:?}", tick_start);
 
-        // Movement speed in pixels per key press
-        let step = 1.0; // Move exactly 1 pixel per frame
-        let sprite_size = 16.0; // your sprite is 16×16 pixels
-        let world_w = (self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x) as f32;
-        let world_h = (self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y) as f32;
-
-        let moved = self.handle_input(step, sprite_size, world_w, world_h);
-        // this point can be used to differentiate between idle and moving animations later
-        // Update animation
-        self.sprite.tick(17);
-        let runtime = RuntimeState {
-            entities: &[Entity {
-                id: 1,
-                position: self.sprite.position,
-            }],
-        };
-        let world_size = glam::UVec2::new(
-            self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
-            self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
+        // Update game state (handles input, animation, etc.)
+        let world_bounds = glam::Vec2::new(
+            (self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x) as f32,
+            (self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y) as f32,
         );
-        let cam_changed = self.camera_system.update(&runtime, world_size) || moved;
+        let player_moved = self.game_system.update(world_bounds);
+        
+        // Update camera based on game state
+        let runtime = self.game_system.create_runtime_state();
+        let world_size = glam::UVec2::new(world_bounds.x as u32, world_bounds.y as u32);
+        let cam_changed = self.camera_system.update(&runtime, world_size) || player_moved;
 
         if let Some(gpu) = &mut self.gpu {
             if cam_changed {
@@ -161,9 +152,9 @@ impl App {
                     gpu.update_tilemap_vertices(&verts);
                 }
             }
-            let frame = self.sprite.current_frame();
+            let frame = self.game_system.current_sprite_frame();
             gpu.clear_sprites(); // Clear previous frame's sprites
-            gpu.add_sprite(frame, self.sprite.position, glam::Vec2::new(16.0, 16.0));
+            gpu.add_sprite(frame, self.game_system.player_position(), glam::Vec2::new(16.0, 16.0));
         }
 
         if let Some(window) = &self.window {
@@ -171,38 +162,6 @@ impl App {
         }
     }
 
-    fn handle_input(&mut self, step: f32, sprite_size: f32, world_w: f32, world_h: f32) -> bool {
-        let mut moved = false;
-        for key in &self.keys_held {
-            match key {
-                KeyCode::KeyW | KeyCode::ArrowUp => {
-                    tracing::trace!("Move forward");
-                    self.sprite.position.y = (self.sprite.position.y - step).max(0.0);
-                    moved = true;
-                }
-                KeyCode::KeyA | KeyCode::ArrowLeft => {
-                    tracing::trace!("Move left");
-                    self.sprite.position.x = (self.sprite.position.x - step).max(0.0);
-                    moved = true;
-                }
-                KeyCode::KeyS | KeyCode::ArrowDown => {
-                    tracing::trace!("Move backward");
-                    self.sprite.position.y =
-                        (self.sprite.position.y + step).min(world_h - sprite_size);
-                    moved = true;
-                }
-                KeyCode::KeyD | KeyCode::ArrowRight => {
-                    tracing::trace!("Move right");
-                    self.sprite.position.x =
-                        (self.sprite.position.x + step).min(world_w - sprite_size);
-                    moved = true;
-                }
-                // Ignore all other events
-                _ => (),
-            }
-        }
-        moved
-    }
 
     fn handle_keyboard_input_event(&mut self, event: winit::event::KeyEvent) {
         use winit::event::ElementState;
@@ -215,12 +174,14 @@ impl App {
                             self.performance.toggle_display();
                         }
                         _ => {
-                            self.keys_held.insert(keycode);
+                            // Delegate game input to GameSystem
+                            self.game_system.handle_keyboard_input(keycode, true);
                         }
                     }
                 }
                 ElementState::Released => {
-                    self.keys_held.remove(&keycode);
+                    // Delegate game input to GameSystem
+                    self.game_system.handle_keyboard_input(keycode, false);
                 }
             }
         }

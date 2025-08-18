@@ -18,3 +18,6 @@ pub mod assets {
 
 pub mod camera;
 pub use camera::{Camera, CameraController, CameraMode, Entity};
+
+pub mod game;
+pub use game::{GameState, InputKey};

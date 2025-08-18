@@ -1,0 +1,68 @@
+use toki_core::{GameState, InputKey, camera::RuntimeState, sprite::SpriteFrame};
+use winit::keyboard::KeyCode;
+
+/// Game system that wraps the core GameState and provides runtime integration.
+/// 
+/// Handles translation between platform-specific events (winit) and core game logic,
+/// providing a clean interface for the App to coordinate game state with other systems.
+#[derive(Debug)]
+pub struct GameSystem {
+    game_state: GameState,
+}
+
+impl GameSystem {
+    /// Create a new GameSystem with the given core GameState
+    pub fn new(game_state: GameState) -> Self {
+        Self { game_state }
+    }
+    
+    /// Update the game state by one tick
+    /// Returns true if the player moved (indicating camera/rendering updates needed)
+    pub fn update(&mut self, world_bounds: glam::Vec2) -> bool {
+        self.game_state.update(world_bounds)
+    }
+    
+    /// Handle winit keyboard input events, translating to core InputKey events
+    pub fn handle_keyboard_input(&mut self, key: KeyCode, pressed: bool) {
+        if let Some(input_key) = self.translate_keycode(key) {
+            if pressed {
+                self.game_state.handle_key_press(input_key);
+            } else {
+                self.game_state.handle_key_release(input_key);
+            }
+        }
+    }
+    
+    /// Translate winit KeyCode to core InputKey
+    fn translate_keycode(&self, key: KeyCode) -> Option<InputKey> {
+        match key {
+            KeyCode::KeyW | KeyCode::ArrowUp => Some(InputKey::Up),
+            KeyCode::KeyA | KeyCode::ArrowLeft => Some(InputKey::Left),
+            KeyCode::KeyS | KeyCode::ArrowDown => Some(InputKey::Down),
+            KeyCode::KeyD | KeyCode::ArrowRight => Some(InputKey::Right),
+            _ => None,
+        }
+    }
+    
+    /// Get the current sprite frame for rendering
+    pub fn current_sprite_frame(&self) -> SpriteFrame {
+        self.game_state.current_sprite_frame()
+    }
+    
+    /// Get player position for rendering
+    pub fn player_position(&self) -> glam::Vec2 {
+        self.game_state.player_position()
+    }
+    
+    /// Get sprite size for rendering calculations
+    pub fn sprite_size(&self) -> f32 {
+        self.game_state.sprite_size()
+    }
+    
+    /// Create RuntimeState for camera system integration
+    pub fn create_runtime_state(&self) -> RuntimeState<'_> {
+        RuntimeState {
+            entities: self.game_state.entities(),
+        }
+    }
+}
