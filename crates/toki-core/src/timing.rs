@@ -11,6 +11,12 @@ pub struct TimingSystem {
     timestep: Duration,
 }
 
+impl Default for TimingSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TimingSystem {
     /// Create a new TimingSystem with 60 FPS timestep
     pub fn new() -> Self {
