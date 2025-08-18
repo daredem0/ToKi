@@ -1,38 +1,33 @@
 //! Simple winit window example.
 // winit imports
 use winit::application::ApplicationHandler; // Trait that defines app lifecycle hooks (resumed, event handling, etc.)
-use winit::dpi::LogicalSize;
 use winit::event::WindowEvent; // Enum of possible window-related events (resize, input, close, etc.)
 use winit::event_loop::{ActiveEventLoop, EventLoop}; // ActiveEventLoop is used inside lifecycle methods; EventLoop creates and runs the app
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::{Window, WindowAttributes, WindowId}; // Window: window handle; Attributes: window config; ID: unique per window
+use winit::window::WindowId;
 
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use toki_core::camera::{Camera, CameraController, CameraMode, Entity};
-use toki_core::math::projection::{calculate_projection, ProjectionParameter};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::GameState;
-use toki_render::GpuState;
 use toki_render::RenderError;
 
-use crate::systems::{CameraSystem, GameSystem, PerformanceMonitor, ResourceManager};
+use crate::systems::{CameraSystem, GameSystem, PerformanceMonitor, PlatformSystem, RenderingSystem, ResourceManager, TimingSystem};
 
 #[derive(Debug)]
 struct App {
-    window: Option<Arc<Window>>,
-    gpu: Option<GpuState>,
-    last_update: Instant,
-    accumulator: Duration,
+    // Core systems
     game_system: GameSystem,
-    projection_params: ProjectionParameter,
-    resources: ResourceManager,
     camera_system: CameraSystem,
-    // Performance monitoring
+    resources: ResourceManager,
     performance: PerformanceMonitor,
+    
+    // Grouped systems
+    platform: PlatformSystem,
+    rendering: RenderingSystem,
+    timing: TimingSystem,
 }
-
 
 impl App {
     fn new() -> Self {
@@ -80,7 +75,7 @@ impl App {
             SpriteInstance::new(glam::Vec2::new(80.0, 72.0), animation, sprite_sheet);
         let game_state = GameState::new(sprite_instance);
         let game_system = GameSystem::new(game_state);
-        
+
         let mut camera = Camera {
             position: glam::IVec2::ZERO,
             viewport_size: glam::UVec2::new(160, 144),
@@ -100,21 +95,16 @@ impl App {
         // };
 
         Self {
-            window: None,
-            gpu: None,
-            last_update: Instant::now(),
-            accumulator: Duration::ZERO,
+            // Core systems
             game_system,
-            projection_params: ProjectionParameter {
-                width: 160,
-                height: 144,
-                desired_width: 160,
-                desired_height: 144,
-            },
-            resources,
             camera_system,
-            // Performance monitoring
+            resources,
             performance: PerformanceMonitor::new(),
+            
+            // Grouped systems
+            platform: PlatformSystem::new(),
+            rendering: RenderingSystem::new(),
+            timing: TimingSystem::new(),
         }
     }
 
@@ -128,20 +118,22 @@ impl App {
             (self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y) as f32,
         );
         let player_moved = self.game_system.update(world_bounds);
-        
+
         // Update camera based on game state
         let runtime = self.game_system.create_runtime_state();
         let world_size = glam::UVec2::new(world_bounds.x as u32, world_bounds.y as u32);
         let cam_changed = self.camera_system.update(&runtime, world_size) || player_moved;
 
-        if let Some(gpu) = &mut self.gpu {
+        if self.rendering.has_gpu() {
             if cam_changed {
-                let projection = calculate_projection(self.projection_params);
                 let view = self.camera_system.view_matrix();
-                gpu.update_projection(projection * view);
+                self.rendering.update_projection(view);
 
                 // Only update tilemap if visible chunks changed
-                if self.camera_system.update_chunk_cache(self.resources.get_tilemap()) {
+                if self
+                    .camera_system
+                    .update_chunk_cache(self.resources.get_tilemap())
+                {
                     let atlas_size = self.resources.terrain_image_size().unwrap();
                     let verts = self.resources.get_tilemap().generate_vertices_for_chunks(
                         self.resources.get_terrain_atlas(),
@@ -149,19 +141,24 @@ impl App {
                         self.camera_system.cached_visible_chunks(),
                     );
 
-                    gpu.update_tilemap_vertices(&verts);
+                    if let Some(gpu) = self.rendering.gpu_mut() {
+                        gpu.update_tilemap_vertices(&verts);
+                    }
                 }
             }
             let frame = self.game_system.current_sprite_frame();
-            gpu.clear_sprites(); // Clear previous frame's sprites
-            gpu.add_sprite(frame, self.game_system.player_position(), glam::Vec2::new(16.0, 16.0));
+            if let Some(gpu) = self.rendering.gpu_mut() {
+                gpu.clear_sprites(); // Clear previous frame's sprites
+                gpu.add_sprite(
+                    frame,
+                    self.game_system.player_position(),
+                    glam::Vec2::new(16.0, 16.0),
+                );
+            }
         }
 
-        if let Some(window) = &self.window {
-            window.request_redraw();
-        }
+        self.platform.request_redraw();
     }
-
 
     fn handle_keyboard_input_event(&mut self, event: winit::event::KeyEvent) {
         use winit::event::ElementState;
@@ -188,23 +185,19 @@ impl App {
     }
 
     fn handle_resize_event(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        // Get the window from self.window
-        let window = self.window.as_ref().expect("resize event without a window");
-        let size = window.inner_size();
-        self.projection_params.height = size.height;
-        self.projection_params.width = size.width;
-        let projection = calculate_projection(self.projection_params);
+        // Update rendering system with new size
+        self.rendering.resize(new_size);
+        
+        // Update projection with current view
         let view = self.camera_system.view_matrix();
-        if let Some(gpu) = &mut self.gpu {
-            gpu.resize(new_size);
-            gpu.update_projection(projection * view);
-        }
-        window.request_redraw();
+        self.rendering.update_projection(view);
+        
+        self.platform.request_redraw();
     }
 
     fn handle_redraw_request_event(&mut self) {
         let frame_start = Instant::now();
-        
+
         // Record frame interval timing
         self.performance.record_frame_interval(frame_start);
 
@@ -214,28 +207,18 @@ impl App {
         // this event rather than in AboutToWait, since rendering in here allows
         // the program to gracefully handle redraws requested by the OS.
 
-        // Get the window from self.window
-        let window = self
-            .window
-            .as_ref()
-            .expect("redraw request without a window");
-
         // Notify that you're about to draw.
         // This is necessary for some platforms (like X11) to ensure that the window is
         // ready to be drawn to.
-        window.pre_present_notify();
+        self.platform.pre_present_notify();
 
         // Wayland needs something to actually be drawn to even show the window
         // so were just filling it up for now.
         //fill::fill_window(window);
-        if let Some(gpu) = &mut self.gpu {
-            let size = self
-                .window
-                .as_ref()
-                .expect("redraw request without a window")
-                .inner_size();
-            self.projection_params.height = size.height;
-            self.projection_params.width = size.width;
+        if self.rendering.has_gpu() {
+            if let Some(size) = self.platform.inner_size() {
+                self.rendering.update_window_size(size);
+            }
             // let projection = calculate_projection(self.projection_params);
             // let model = glam::Mat4::from_translation(self.sprite.position.extend(0.0));
 
@@ -257,96 +240,87 @@ impl App {
             tracing::trace!("Camera position: {:?}", self.camera_system.position());
             tracing::trace!(
                 "Window size: {:?}",
-                self.window.as_ref().unwrap().inner_size()
+                self.platform.inner_size()
             );
             tracing::trace!(
                 "Camera projection: {:?}",
                 self.camera_system.projection_matrix()
             );
-            tracing::trace!("Window Scale Factor: {:?}", window.scale_factor());
+            tracing::trace!("Window Scale Factor: {:?}", self.platform.scale_factor());
 
-            // Also draw the map
-            // let atlas_size = self.assets.terrain_atlas.image_size().unwrap();
-            // let verts = self
-            //     .assets
-            //     .tilemap
-            //     .generate_vertices(&self.assets.terrain_atlas, atlas_size);
-            // gpu.update_tilemap_vertex_buffer(&verts);
-            
             // Measure CPU work time (everything before GPU draw)
             let cpu_work_time = frame_start.elapsed();
-            
+
             // Measure GPU draw time
             let draw_start = Instant::now();
-            gpu.draw();
+            self.rendering.draw();
             let draw_time = draw_start.elapsed();
-            
+
             // Record performance breakdown
             let total_frame_time = frame_start.elapsed();
-            self.performance.record_performance_breakdown(cpu_work_time, draw_time, total_frame_time);
+            self.performance.record_performance_breakdown(
+                cpu_work_time,
+                draw_time,
+                total_frame_time,
+            );
         }
     }
-
 }
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        // Initialize default window attributes
-        let window_attributes =
-            WindowAttributes::default().with_inner_size(LogicalSize::new(160.0, 144.0));
-
-        // Attempt to create a window with the given attributes
-        // This has to be done before the GPU state is initialized to ensure
-        // its lifetime is longer than that of GPU state
-        let raw_window = event_loop.create_window(window_attributes).unwrap();
-        let window = Arc::new(raw_window);
-
-        // Now we can safely initialize GPU state
-        let gpu = GpuState::new(Arc::clone(&window));
-        window.request_redraw();
-        self.window = Some(window);
-        self.gpu = Some(gpu);
-
-        let size = self.window.as_ref().unwrap().inner_size();
-        self.projection_params.height = size.height;
-        self.projection_params.width = size.width;
-
-        let projection = calculate_projection(self.projection_params);
+        // Initialize platform system (window)
+        self.platform.initialize_window(event_loop);
+        
+        // Initialize rendering system (GPU)
+        if let Some(window) = self.platform.window_for_gpu() {
+            self.rendering.initialize_gpu(window);
+        }
+        
+        // Update rendering size
+        if let Some(size) = self.platform.inner_size() {
+            self.rendering.update_window_size(size);
+        }
+        
+        // Set up initial projection
         let view = self.camera_system.view_matrix();
+        self.rendering.update_projection(view);
+        
+        self.platform.request_redraw();
 
         // Load initially visible chunks
-        if let Some(gpu) = &mut self.gpu {
+        if self.rendering.has_gpu() {
             // Generate vertices for chunks visible at startup
-            self.camera_system.update_chunk_cache(self.resources.get_tilemap());
+            self.camera_system
+                .update_chunk_cache(self.resources.get_tilemap());
             let atlas_size = self.resources.terrain_image_size().unwrap();
             let verts = self.resources.get_tilemap().generate_vertices_for_chunks(
                 self.resources.get_terrain_atlas(),
                 atlas_size,
                 self.camera_system.cached_visible_chunks(),
             );
-            gpu.update_tilemap_vertices(&verts);
-
-            gpu.update_projection(projection * view);
+            if let Some(gpu) = self.rendering.gpu_mut() {
+                gpu.update_tilemap_vertices(&verts);
+            }
         }
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
-        const TIMESTEP: Duration = Duration::from_nanos(16_666_667); // ~16.67ms -> 60fps
-        let now = Instant::now();
-        let dt = now - self.last_update;
-        self.last_update = now;
-
-        self.accumulator += dt;
-        while self.accumulator >= TIMESTEP {
+        // Process timing updates manually to avoid borrowing issues
+        let mut tick_count = 0;
+        while self.timing.should_tick() {
             let tick_start = Instant::now();
             self.tick();
             let tick_time = tick_start.elapsed();
             self.performance.record_tick_time(tick_time);
-            self.accumulator -= TIMESTEP;
+            self.timing.consume_timestep();
+            tick_count += 1;
+            // Safety valve to prevent infinite loops
+            if tick_count > 10 {
+                break;
+            }
         }
-        if let Some(window) = &self.window {
-            window.request_redraw();
-        }
+        self.platform.request_redraw();
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
