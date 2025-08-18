@@ -218,3 +218,82 @@ fn camera_bounds_calculations() {
     assert_eq!(right, 420.0); // 100 + 160 * 2
     assert_eq!(bottom, 338.0); // 50 + 144 * 2
 }
+
+#[test]
+fn camera_clamp_to_world_bounds_basic() {
+    let mut camera = Camera::new();
+    camera.position = IVec2::new(-10, -5); // Out of bounds
+    
+    let world_size = UVec2::new(1000, 800);
+    camera.clamp_to_world_bounds(world_size);
+    
+    // Should be clamped to (0, 0)
+    assert_eq!(camera.position, IVec2::new(0, 0));
+}
+
+#[test]
+fn camera_clamp_to_world_bounds_max_boundary() {
+    let mut camera = Camera::new();
+    camera.position = IVec2::new(1000, 800); // Way out of bounds
+    
+    let world_size = UVec2::new(500, 400);
+    camera.clamp_to_world_bounds(world_size);
+    
+    // Should be clamped to max valid position
+    // max_x = (500 - 160 * 1).max(0) = 340
+    // max_y = (400 - 144 * 1).max(0) = 256
+    assert_eq!(camera.position, IVec2::new(340, 256));
+}
+
+#[test]
+fn camera_clamp_to_world_bounds_with_scale() {
+    let mut camera = Camera::new();
+    camera.scale = 2;
+    camera.position = IVec2::new(1000, 800); // Out of bounds
+    
+    let world_size = UVec2::new(500, 400);
+    camera.clamp_to_world_bounds(world_size);
+    
+    // With scale 2, viewport is 320x288
+    // max_x = (500 - 320).max(0) = 180
+    // max_y = (400 - 288).max(0) = 112
+    assert_eq!(camera.position, IVec2::new(180, 112));
+}
+
+#[test]
+fn camera_clamp_to_world_bounds_small_world() {
+    let mut camera = Camera::new();
+    camera.position = IVec2::new(50, 50);
+    
+    // World smaller than viewport
+    let world_size = UVec2::new(100, 80);
+    camera.clamp_to_world_bounds(world_size);
+    
+    // Should be clamped to (0, 0) since world is smaller than viewport
+    assert_eq!(camera.position, IVec2::new(0, 0));
+}
+
+#[test]
+fn camera_clamp_to_world_bounds_exact_fit() {
+    let mut camera = Camera::new();
+    camera.position = IVec2::new(50, 50);
+    
+    // World exactly matches viewport size
+    let world_size = UVec2::new(160, 144);
+    camera.clamp_to_world_bounds(world_size);
+    
+    // Should be clamped to (0, 0) since there's no room to move
+    assert_eq!(camera.position, IVec2::new(0, 0));
+}
+
+#[test]
+fn camera_clamp_to_world_bounds_valid_position_unchanged() {
+    let mut camera = Camera::new();
+    camera.position = IVec2::new(100, 50);
+    
+    let world_size = UVec2::new(1000, 800);
+    camera.clamp_to_world_bounds(world_size);
+    
+    // Position should remain unchanged as it's valid
+    assert_eq!(camera.position, IVec2::new(100, 50));
+}

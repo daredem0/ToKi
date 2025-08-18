@@ -65,42 +65,39 @@ impl GameState {
     }
     
     /// Process input and update player position
-    /// Returns true if the player moved
+    /// Returns true if the player actually moved (position changed)
     fn process_input(&mut self, world_bounds: glam::Vec2) -> bool {
-        let mut moved = false;
+        let initial_position = self.player_sprite.position;
         
         for key in &self.keys_held {
             match key {
                 InputKey::Up => {
                     tracing::trace!("Move forward");
-                    self.player_sprite.position.y = 
-                        (self.player_sprite.position.y - self.movement_step).max(0.0);
-                    moved = true;
+                    let new_y = (self.player_sprite.position.y - self.movement_step).max(0.0);
+                    self.player_sprite.position.y = new_y;
                 }
                 InputKey::Left => {
                     tracing::trace!("Move left");
-                    self.player_sprite.position.x = 
-                        (self.player_sprite.position.x - self.movement_step).max(0.0);
-                    moved = true;
+                    let new_x = (self.player_sprite.position.x - self.movement_step).max(0.0);
+                    self.player_sprite.position.x = new_x;
                 }
                 InputKey::Down => {
                     tracing::trace!("Move backward");
-                    self.player_sprite.position.y = 
-                        (self.player_sprite.position.y + self.movement_step)
+                    let new_y = (self.player_sprite.position.y + self.movement_step)
                         .min(world_bounds.y - self.sprite_size);
-                    moved = true;
+                    self.player_sprite.position.y = new_y;
                 }
                 InputKey::Right => {
                     tracing::trace!("Move right");
-                    self.player_sprite.position.x = 
-                        (self.player_sprite.position.x + self.movement_step)
+                    let new_x = (self.player_sprite.position.x + self.movement_step)
                         .min(world_bounds.x - self.sprite_size);
-                    moved = true;
+                    self.player_sprite.position.x = new_x;
                 }
             }
         }
         
-        moved
+        // Only return true if position actually changed
+        self.player_sprite.position != initial_position
     }
     
     /// Handle key press events
