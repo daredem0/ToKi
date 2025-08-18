@@ -236,7 +236,7 @@ impl App {
         }
     }
 
-    fn handle_resize_event(&mut self) {
+    fn handle_resize_event(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         // Get the window from self.window
         let window = self.window.as_ref().expect("resize event without a window");
         let size = window.inner_size();
@@ -244,6 +244,7 @@ impl App {
         self.projection_params.width = size.width;
         let projection = calculate_projection(self.projection_params);
         if let Some(gpu) = &mut self.gpu {
+            gpu.resize(new_size);
             gpu.update_projection(projection);
         }
         window.request_redraw();
@@ -381,8 +382,8 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             // If the window was resized, request a redraw
-            WindowEvent::Resized(_) => {
-                self.handle_resize_event();
+            WindowEvent::Resized(new_size) => {
+                self.handle_resize_event(new_size);
             }
             // If the window needs to be redrawn, redraw it
             WindowEvent::RedrawRequested => {
