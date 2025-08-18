@@ -201,8 +201,8 @@ impl GpuState {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
             });
-
-        self.update_projection(camera.calculate_projection());
+        // Projection is updated by the app only when the camera/viewport changes
+        //self.update_projection(camera.calculate_projection());
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -244,9 +244,9 @@ impl GpuState {
         }
 
         self.queue.submit(Some(encoder.finish()));
-        if let Err(e) = self.device.poll(wgpu::PollType::Wait) {
-            tracing::error!("Device poll failed: {e:?}");
-        }
+        // if let Err(e) = self.device.poll(wgpu::PollType::Wait) {
+        //     tracing::error!("Device poll failed: {e:?}");
+        // }
         output.present();
     }
 }

@@ -147,79 +147,76 @@ impl App {
         let world_w = (self.assets.tilemap.size.x * self.assets.tilemap.tile_size.x) as f32;
         let world_h = (self.assets.tilemap.size.y * self.assets.tilemap.tile_size.y) as f32;
 
-        // Track if we _moved at all this tick
-        let mut _moved = false;
+        let moved = self.handle_input(step, sprite_size, world_w, world_h);
+        // this point can be used to differentiate between idle and moving animations later
+        // Update animation
+        self.sprite.tick(17);
+        let prev_cam_pos = self.camera.position;
+        let runtime = RuntimeState {
+            entities: &[Entity {
+                id: 1,
+                position: self.sprite.position,
+            }],
+        };
+        self.cam_controller.update(&mut self.camera, &runtime);
+        // Clamp camera to world bounds
+        let view_w = (self.camera.viewport_size.x * self.camera.scale) as i32;
+        let view_h = (self.camera.viewport_size.y * self.camera.scale) as i32;
+        let world_w_i = (self.assets.tilemap.size.x * self.assets.tilemap.tile_size.x) as i32;
+        let world_h_i = (self.assets.tilemap.size.y * self.assets.tilemap.tile_size.y) as i32;
 
-        self.handle_input(step, sprite_size, world_w, world_h, _moved);
-        if true {
-            // this point can be used to differentiate between idle and moving animations later
-            // Update animation
-            self.sprite.tick(17);
-            let runtime = RuntimeState {
-                entities: &[Entity {
-                    id: 1,
-                    position: self.sprite.position,
-                }],
-            };
-            self.cam_controller.update(&mut self.camera, &runtime);
-            // Clamp camera to world bounds
-            let view_w = (self.camera.viewport_size.x * self.camera.scale) as i32;
-            let view_h = (self.camera.viewport_size.y * self.camera.scale) as i32;
-            let world_w_i = (self.assets.tilemap.size.x * self.assets.tilemap.tile_size.x) as i32;
-            let world_h_i = (self.assets.tilemap.size.y * self.assets.tilemap.tile_size.y) as i32;
+        let max_cam_x = (world_w_i - view_w).max(0);
+        let max_cam_y = (world_h_i - view_h).max(0);
 
-            let max_cam_x = (world_w_i - view_w).max(0);
-            let max_cam_y = (world_h_i - view_h).max(0);
+        self.camera.position.x = self.camera.position.x.clamp(0, max_cam_x);
+        self.camera.position.y = self.camera.position.y.clamp(0, max_cam_y);
 
-            self.camera.position.x = self.camera.position.x.clamp(0, max_cam_x);
-            self.camera.position.y = self.camera.position.y.clamp(0, max_cam_y);
+        let cam_changed = prev_cam_pos != self.camera.position || moved;
 
-            if let Some(gpu) = &mut self.gpu {
-                let frame = self.sprite.current_frame();
-                gpu.update_vertex_buffer(frame, self.sprite.position);
+        if let Some(gpu) = &mut self.gpu {
+            if cam_changed {
+                gpu.update_projection(self.camera.calculate_projection());
             }
+            let frame = self.sprite.current_frame();
+            gpu.update_vertex_buffer(frame, self.sprite.position);
         }
+
         if let Some(window) = &self.window {
             window.request_redraw();
         }
     }
 
-    fn handle_input(
-        &mut self,
-        step: f32,
-        sprite_size: f32,
-        world_w: f32,
-        world_h: f32,
-        mut _moved: bool,
-    ) {
+    fn handle_input(&mut self, step: f32, sprite_size: f32, world_w: f32, world_h: f32) -> bool {
+        let mut moved = false;
         for key in &self.keys_held {
             match key {
                 KeyCode::KeyW | KeyCode::ArrowUp => {
                     tracing::trace!("Move forward");
                     self.sprite.position.y = (self.sprite.position.y - step).max(0.0);
-                    _moved = true;
+                    moved = true;
                 }
                 KeyCode::KeyA | KeyCode::ArrowLeft => {
                     tracing::trace!("Move left");
                     self.sprite.position.x = (self.sprite.position.x - step).max(0.0);
-                    _moved = true;
+                    moved = true;
                 }
                 KeyCode::KeyS | KeyCode::ArrowDown => {
                     tracing::trace!("Move backward");
                     self.sprite.position.y =
                         (self.sprite.position.y + step).min(world_h - sprite_size);
-                    _moved = true;
+                    moved = true;
                 }
                 KeyCode::KeyD | KeyCode::ArrowRight => {
                     tracing::trace!("Move right");
                     self.sprite.position.x =
                         (self.sprite.position.x + step).min(world_w - sprite_size);
-                    _moved = true;
+                    moved = true;
                 }
                 // Ignore all other events
                 _ => (),
             }
         }
+        moved
     }
 
     fn handle_keyboard_input_event(&mut self, event: winit::event::KeyEvent) {
@@ -290,24 +287,23 @@ impl App {
             let right = left + self.camera.viewport_size.x as i32;
             let bottom = top + self.camera.viewport_size.y as i32;
 
-            tracing::debug!(
+            tracing::trace!(
                 "Camera Viewport in world space: left={}, right={}, top={}, bottom={}",
                 left,
                 right,
                 top,
                 bottom
             );
-            tracing::trace!("Redrawing projection");
-            tracing::debug!("Camera position: {:?}", self.camera.position);
-            tracing::debug!(
+            tracing::trace!("Camera position: {:?}", self.camera.position);
+            tracing::trace!(
                 "Window size: {:?}",
                 self.window.as_ref().unwrap().inner_size()
             );
-            tracing::debug!(
+            tracing::trace!(
                 "Camera projection: {:?}",
                 self.camera.calculate_projection()
             );
-            tracing::debug!("Window Scale Factor: {:?}", window.scale_factor());
+            tracing::trace!("Window Scale Factor: {:?}", window.scale_factor());
 
             // Also draw the map
             // let atlas_size = self.assets.terrain_atlas.image_size().unwrap();
@@ -348,6 +344,7 @@ impl ApplicationHandler for App {
                 .tilemap
                 .generate_vertices(&self.assets.terrain_atlas, atlas_size);
             gpu.update_tilemap_vertex_buffer(&verts);
+            gpu.update_projection(self.camera.calculate_projection());
         }
     }
 
