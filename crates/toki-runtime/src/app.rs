@@ -141,8 +141,8 @@ impl App {
     fn tick(&mut self) {
         tracing::trace!("TICK @ {:?}", Instant::now());
 
-        // Movement speed in pixels per krey press
-        let step = 0.5;
+        // Movement speed in pixels per key press
+        let step = 1.0; // Move exactly 1 pixel per frame
         let sprite_size = 16.0; // your sprite is 16×16 pixels
         let world_w = (self.assets.tilemap.size.x * self.assets.tilemap.tile_size.x) as f32;
         let world_h = (self.assets.tilemap.size.y * self.assets.tilemap.tile_size.y) as f32;
