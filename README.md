@@ -1,3 +1,5 @@
+[![pipeline](https://github.com/daredem0/ToKi/actions/workflows/rust.yml/badge.svg)](https://github.com/daredem0/ToKi/actions/workflows/rust.yml)
+
 # 🎮 ToKi — Top-down Kit for Game Boy–Style Games
 
 **ToKi** is a lightweight, pixel-perfect 2D game engine and editor inspired by the visual and design constraints of the original Nintendo Game Boy.  
