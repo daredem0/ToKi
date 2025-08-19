@@ -1,8 +1,8 @@
-use toki_core::{GameState, InputKey, camera::RuntimeState, sprite::SpriteFrame};
+use toki_core::{entity::Entity, sprite::SpriteFrame, GameState, InputKey};
 use winit::keyboard::KeyCode;
 
 /// Game system that wraps the core GameState and provides runtime integration.
-/// 
+///
 /// Handles translation between platform-specific events (winit) and core game logic,
 /// providing a clean interface for the App to coordinate game state with other systems.
 #[derive(Debug)]
@@ -15,13 +15,13 @@ impl GameSystem {
     pub fn new(game_state: GameState) -> Self {
         Self { game_state }
     }
-    
+
     /// Update the game state by one tick
     /// Returns true if the player moved (indicating camera/rendering updates needed)
     pub fn update(&mut self, world_bounds: glam::Vec2) -> bool {
         self.game_state.update(world_bounds)
     }
-    
+
     /// Handle winit keyboard input events, translating to core InputKey events
     pub fn handle_keyboard_input(&mut self, key: KeyCode, pressed: bool) {
         if let Some(input_key) = self.translate_keycode(key) {
@@ -32,7 +32,7 @@ impl GameSystem {
             }
         }
     }
-    
+
     /// Translate winit KeyCode to core InputKey
     fn translate_keycode(&self, key: KeyCode) -> Option<InputKey> {
         match key {
@@ -43,26 +43,29 @@ impl GameSystem {
             _ => None,
         }
     }
-    
+
     /// Get the current sprite frame for rendering
     pub fn current_sprite_frame(&self) -> SpriteFrame {
         self.game_state.current_sprite_frame()
     }
-    
+
     /// Get player position for rendering
     pub fn player_position(&self) -> glam::Vec2 {
         self.game_state.player_position()
     }
-    
+
     /// Get sprite size for rendering calculations
     pub fn sprite_size(&self) -> f32 {
         self.game_state.sprite_size()
     }
-    
-    /// Create RuntimeState for camera system integration
-    pub fn create_runtime_state(&self) -> RuntimeState<'_> {
-        RuntimeState {
-            entities: self.game_state.entities(),
-        }
+
+    /// Get the player entity ID
+    pub fn player_id(&self) -> Option<toki_core::entity::EntityId> {
+        self.game_state.player_id()
+    }
+
+    /// Get entities for camera system integration
+    pub fn entities_for_camera(&self) -> Vec<Entity> {
+        self.game_state.entities_owned()
     }
 }

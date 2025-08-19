@@ -8,12 +8,14 @@ use winit::window::WindowId;
 
 use std::time::Instant;
 
-use toki_core::camera::{Camera, CameraController, CameraMode, Entity};
+use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{GameState, TimingSystem};
 use toki_render::RenderError;
 
-use crate::systems::{CameraSystem, GameSystem, PerformanceMonitor, PlatformSystem, RenderingSystem, ResourceManager};
+use crate::systems::{
+    CameraSystem, GameSystem, PerformanceMonitor, PlatformSystem, RenderingSystem, ResourceManager,
+};
 
 #[derive(Debug)]
 struct App {
@@ -22,7 +24,7 @@ struct App {
     camera_system: CameraSystem,
     resources: ResourceManager,
     performance: PerformanceMonitor,
-    
+
     // Grouped systems
     platform: PlatformSystem,
     rendering: RenderingSystem,
@@ -82,12 +84,11 @@ impl App {
             scale: 1,
         };
         camera.center_on(glam::Vec2::new(80.0, 72.0).as_ivec2());
-        let slime_entity = Entity {
-            id: 1,
-            position: glam::vec2(80.0, 72.0),
-        };
+
+        // Use the player entity ID from the GameState for camera following
+        let player_id = game_system.player_id().expect("Player should exist");
         let cam_controller = CameraController {
-            mode: CameraMode::FollowEntity(slime_entity.id),
+            mode: CameraMode::FollowEntity(player_id),
         };
         let camera_system = CameraSystem::new(camera, cam_controller);
         // let runtime = RuntimeState {
@@ -100,7 +101,7 @@ impl App {
             camera_system,
             resources,
             performance: PerformanceMonitor::new(),
-            
+
             // Grouped systems
             platform: PlatformSystem::new(),
             rendering: RenderingSystem::new(),
@@ -120,7 +121,10 @@ impl App {
         let player_moved = self.game_system.update(world_bounds);
 
         // Update camera based on game state
-        let runtime = self.game_system.create_runtime_state();
+        let entities = self.game_system.entities_for_camera();
+        let runtime = RuntimeState {
+            entities: &entities,
+        };
         let world_size = glam::UVec2::new(world_bounds.x as u32, world_bounds.y as u32);
         let cam_changed = self.camera_system.update(&runtime, world_size) || player_moved;
 
@@ -187,11 +191,11 @@ impl App {
     fn handle_resize_event(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         // Update rendering system with new size
         self.rendering.resize(new_size);
-        
+
         // Update projection with current view
         let view = self.camera_system.view_matrix();
         self.rendering.update_projection(view);
-        
+
         self.platform.request_redraw();
     }
 
@@ -238,10 +242,7 @@ impl App {
                 bottom
             );
             tracing::trace!("Camera position: {:?}", self.camera_system.position());
-            tracing::trace!(
-                "Window size: {:?}",
-                self.platform.inner_size()
-            );
+            tracing::trace!("Window size: {:?}", self.platform.inner_size());
             tracing::trace!(
                 "Camera projection: {:?}",
                 self.camera_system.projection_matrix()
@@ -271,21 +272,21 @@ impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         // Initialize platform system (window)
         self.platform.initialize_window(event_loop);
-        
+
         // Initialize rendering system (GPU)
         if let Some(window) = self.platform.window_for_gpu() {
             self.rendering.initialize_gpu(window);
         }
-        
+
         // Update rendering size
         if let Some(size) = self.platform.inner_size() {
             self.rendering.update_window_size(size);
         }
-        
+
         // Set up initial projection
         let view = self.camera_system.view_matrix();
         self.rendering.update_projection(view);
-        
+
         self.platform.request_redraw();
 
         // Load initially visible chunks

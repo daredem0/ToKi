@@ -1,3 +1,4 @@
+use crate::entity::{Entity, EntityId};
 use glam;
 
 #[derive(Debug, Clone, Copy)]
@@ -48,25 +49,17 @@ impl Camera {
         let view_h = (self.viewport_size.y * self.scale) as i32;
         let world_w = world_size.x as i32;
         let world_h = world_size.y as i32;
-        
+
         let max_x = (world_w - view_w).max(0);
         let max_y = (world_h - view_h).max(0);
-        
+
         self.position.x = self.position.x.clamp(0, max_x);
         self.position.y = self.position.y.clamp(0, max_y);
     }
 }
 
-pub type EntityId = u32;
-
 pub struct RuntimeState<'a> {
     pub entities: &'a [Entity],
-}
-
-#[derive(Debug)]
-pub struct Entity {
-    pub id: EntityId,
-    pub position: glam::Vec2,
 }
 
 #[derive(Debug, Clone, Copy)]

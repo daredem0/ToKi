@@ -26,9 +26,11 @@ fn game_state_new_initializes_correctly() {
     let game_state = GameState::new(sprite);
     
     assert_eq!(game_state.player_position(), initial_position);
+    // Test EntityManager integration
     assert_eq!(game_state.entities().len(), 1);
-    assert_eq!(game_state.entities()[0].id, 1);
-    assert_eq!(game_state.entities()[0].position, initial_position);
+    assert_eq!(game_state.player_id(), Some(1));
+    assert!(game_state.player_entity().is_some());
+    assert_eq!(game_state.player_entity().unwrap().position, initial_position);
     assert_eq!(game_state.sprite_size(), 16.0);
 }
 
@@ -290,7 +292,8 @@ fn game_state_entity_position_sync() {
     game_state.update(world_bounds);
     
     // Entity position should match player sprite position
-    assert_eq!(game_state.entities()[0].position, game_state.player_position());
+    let player_entity = game_state.player_entity().unwrap();
+    assert_eq!(player_entity.position, game_state.player_position());
     
     // Move again
     game_state.handle_key_press(InputKey::Down);
@@ -298,7 +301,8 @@ fn game_state_entity_position_sync() {
     game_state.update(world_bounds);
     
     // Should still be synchronized
-    assert_eq!(game_state.entities()[0].position, game_state.player_position());
+    let player_entity = game_state.player_entity().unwrap();
+    assert_eq!(player_entity.position, game_state.player_position());
 }
 
 #[test]
@@ -331,4 +335,42 @@ fn game_state_multiple_key_handling() {
     // Should move up and right now
     assert!(position_after.x > position_before.x); // Right
     assert!(position_after.y < position_before.y); // Up
+}
+
+#[test]
+fn game_state_entity_manager_access() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    
+    // Should be able to access EntityManager
+    let entity_manager = game_state.entity_manager();
+    assert_eq!(entity_manager.active_entities().len(), 1);
+    assert!(entity_manager.get_player().is_some());
+    
+    // Should be able to spawn additional entities
+    let entity_manager = game_state.entity_manager_mut();
+    let npc_id = entity_manager.spawn_npc(Vec2::new(100.0, 100.0), "guard");
+    let item_id = entity_manager.spawn_item(Vec2::new(200.0, 200.0), "coin");
+    
+    assert_eq!(entity_manager.active_entities().len(), 3);
+    assert!(entity_manager.get_entity(npc_id).is_some());
+    assert!(entity_manager.get_entity(item_id).is_some());
+}
+
+#[test]
+fn game_state_player_entity_attributes() {
+    let sprite = create_test_sprite();
+    let game_state = GameState::new(sprite);
+    
+    let player_entity = game_state.player_entity().unwrap();
+    
+    // Check player entity has correct attributes from factory method
+    assert_eq!(player_entity.attributes.health, Some(100));
+    assert_eq!(player_entity.attributes.speed, 2);
+    assert!(player_entity.attributes.active);
+    assert!(player_entity.attributes.can_move);
+    assert!(player_entity.attributes.solid);
+    assert!(player_entity.attributes.visible);
+    assert_eq!(player_entity.attributes.render_layer, 0);
+    assert!(player_entity.attributes.sprite_info.is_some());
 }

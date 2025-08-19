@@ -17,10 +17,12 @@ pub mod assets {
 }
 
 pub mod camera;
-pub use camera::{Camera, CameraController, CameraMode, Entity};
+pub use camera::{Camera, CameraController, CameraMode};
 
 pub mod game;
 pub use game::{GameState, InputKey};
 
 pub mod timing;
-pub use timing::{TimingSystem, TimestepIterator};
+pub use timing::{TimestepIterator, TimingSystem};
+
+pub mod entity;
