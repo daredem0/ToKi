@@ -12,6 +12,7 @@ pub enum InputKey {
     Down,
     Left,
     Right,
+    DebugToggle, // F4 key for toggling debug rendering
     // Can extend with more keys as needed
 }
 
@@ -33,6 +34,9 @@ pub struct GameState {
     /// Game configuration constants
     movement_step: i32,
     sprite_size: u32,
+
+    /// Debug rendering flags
+    debug_collision_rendering: bool,
 }
 
 impl GameState {
@@ -49,6 +53,7 @@ impl GameState {
             keys_held: HashSet::new(),
             movement_step: 1, // Move exactly 1 pixel per frame
             sprite_size: 16,  // Sprite is 16×16 pixels
+            debug_collision_rendering: false,
         }
     }
 
@@ -60,6 +65,7 @@ impl GameState {
             keys_held: HashSet::new(),
             movement_step: 1,
             sprite_size: 16,
+            debug_collision_rendering: false,
         }
     }
 
@@ -174,6 +180,9 @@ impl GameState {
                         player_entity.position.x = new_x;
                     }
                 }
+                InputKey::DebugToggle => {
+                    // Debug toggle is handled in key press event, not as held key
+                }
             }
         }
 
@@ -183,7 +192,15 @@ impl GameState {
 
     /// Handle key press events
     pub fn handle_key_press(&mut self, key: InputKey) {
-        self.keys_held.insert(key);
+        match key {
+            InputKey::DebugToggle => {
+                self.debug_collision_rendering = !self.debug_collision_rendering;
+                tracing::info!("Debug collision rendering: {}", self.debug_collision_rendering);
+            }
+            _ => {
+                self.keys_held.insert(key);
+            }
+        }
     }
 
     /// Handle key release events
@@ -271,5 +288,75 @@ impl GameState {
     /// Get sprite size for rendering calculations
     pub fn sprite_size(&self) -> u32 {
         self.sprite_size
+    }
+
+    /// Check if debug collision rendering is enabled
+    pub fn is_debug_collision_rendering_enabled(&self) -> bool {
+        self.debug_collision_rendering
+    }
+
+    /// Get entity collision boxes for debug rendering
+    /// Returns Vec of (position, size, is_trigger) tuples
+    pub fn get_entity_collision_boxes(&self) -> Vec<(glam::IVec2, glam::UVec2, bool)> {
+        if !self.debug_collision_rendering {
+            return Vec::new();
+        }
+
+        let mut boxes = Vec::new();
+        
+        for entity_id in self.entity_manager.active_entities() {
+            if let Some(entity) = self.entity_manager.get_entity(entity_id) {
+                if let Some(collision_box) = &entity.collision_box {
+                    let (world_pos, size) = collision_box.world_bounds(entity.position);
+                    boxes.push((world_pos, size, collision_box.trigger));
+                }
+            }
+        }
+        
+        boxes
+    }
+
+    /// Get solid tile positions for debug rendering
+    /// Returns Vec of (tile_x, tile_y) coordinates of solid tiles
+    pub fn get_solid_tile_positions(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> Vec<(u32, u32)> {
+        if !self.debug_collision_rendering {
+            return Vec::new();
+        }
+
+        let mut solid_tiles = Vec::new();
+        
+        for y in 0..tilemap.size.y {
+            for x in 0..tilemap.size.x {
+                if let Ok(is_solid) = tilemap.is_tile_solid_at(atlas, x, y) {
+                    if is_solid {
+                        solid_tiles.push((x, y));
+                    }
+                }
+            }
+        }
+        
+        solid_tiles
+    }
+
+    /// Get trigger tile positions for debug rendering  
+    /// Returns Vec of (tile_x, tile_y) coordinates of trigger tiles
+    pub fn get_trigger_tile_positions(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> Vec<(u32, u32)> {
+        if !self.debug_collision_rendering {
+            return Vec::new();
+        }
+
+        let mut trigger_tiles = Vec::new();
+        
+        for y in 0..tilemap.size.y {
+            for x in 0..tilemap.size.x {
+                if let Ok(tile_name) = tilemap.get_tile_name(x, y) {
+                    if atlas.is_tile_trigger(tile_name) {
+                        trigger_tiles.push((x, y));
+                    }
+                }
+            }
+        }
+        
+        trigger_tiles
     }
 }

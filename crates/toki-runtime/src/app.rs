@@ -119,6 +119,68 @@ impl App {
                     self.game_system.player_position(),
                     glam::UVec2::new(16, 16),
                 );
+
+                // Add debug collision rendering
+                gpu.clear_debug_shapes();
+                if self.game_system.is_debug_collision_rendering_enabled() {
+                    // Get debug data from game system
+                    let entity_boxes = self.game_system.get_entity_collision_boxes();
+                    let solid_tiles = self.game_system.get_solid_tile_positions(
+                        self.resources.get_tilemap(),
+                        self.resources.get_terrain_atlas(),
+                    );
+                    let trigger_tiles = self.game_system.get_trigger_tile_positions(
+                        self.resources.get_tilemap(),
+                        self.resources.get_terrain_atlas(),
+                    );
+
+                    // Define colors
+                    let entity_color = [1.0, 0.0, 0.0, 0.8]; // Red for entity collision boxes
+                    let solid_tile_color = [0.0, 0.0, 1.0, 0.6]; // Blue for solid tiles
+                    let trigger_tile_color = [1.0, 1.0, 0.0, 0.6]; // Yellow for trigger tiles
+
+                    // Add entity collision boxes
+                    for (pos, size, is_trigger) in entity_boxes {
+                        let color = if is_trigger { trigger_tile_color } else { entity_color };
+                        gpu.add_debug_rect(
+                            pos.x as f32,
+                            pos.y as f32,
+                            size.x as f32,
+                            size.y as f32,
+                            color,
+                        );
+                    }
+
+                    // Add solid tile debug boxes
+                    let tilemap = self.resources.get_tilemap();
+                    for (tile_x, tile_y) in solid_tiles {
+                        let world_x = tile_x * tilemap.tile_size.x;
+                        let world_y = tile_y * tilemap.tile_size.y;
+                        gpu.add_debug_rect(
+                            world_x as f32,
+                            world_y as f32,
+                            tilemap.tile_size.x as f32,
+                            tilemap.tile_size.y as f32,
+                            solid_tile_color,
+                        );
+                    }
+
+                    // Add trigger tile debug boxes
+                    for (tile_x, tile_y) in trigger_tiles {
+                        let world_x = tile_x * tilemap.tile_size.x;
+                        let world_y = tile_y * tilemap.tile_size.y;
+                        gpu.add_debug_rect(
+                            world_x as f32,
+                            world_y as f32,
+                            tilemap.tile_size.x as f32,
+                            tilemap.tile_size.y as f32,
+                            trigger_tile_color,
+                        );
+                    }
+                }
+                
+                // Finalize debug shapes
+                gpu.finalize_debug_shapes();
             }
         }
 

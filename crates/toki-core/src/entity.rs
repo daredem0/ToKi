@@ -1,5 +1,6 @@
 use glam::{IVec2, UVec2};
 use std::collections::{HashMap, HashSet};
+use crate::collision::CollisionBox;
 
 pub type EntityId = u32;
 
@@ -10,6 +11,7 @@ pub struct Entity {
     pub size: glam::UVec2,
     pub entity_type: EntityType,
     pub attributes: EntityAttributes,
+    pub collision_box: Option<CollisionBox>,
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -113,12 +115,20 @@ impl EntityManager {
     ) -> EntityId {
         let id = self.next_id;
         self.next_id += 1;
+        // Create a default collision box for solid entities
+        let collision_box = if attributes.solid {
+            Some(CollisionBox::solid_box(size))
+        } else {
+            None
+        };
+
         let entity = Entity {
             id,
             position,
             size,
             entity_type: entity_type.clone(),
             attributes,
+            collision_box,
         };
 
         // Insert into main storage

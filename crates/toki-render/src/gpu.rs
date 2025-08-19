@@ -10,7 +10,7 @@ use toki_core::sprite::SpriteFrame;
 use crate::pipelines::sprite::SpriteInstance;
 use crate::pipelines::RenderPipeline;
 use crate::wgpu_utils::create_device_and_surface;
-use crate::{SpritePipeline, TilemapPipeline};
+use crate::{DebugPipeline, SpritePipeline, TilemapPipeline};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -21,6 +21,7 @@ pub struct GpuState {
     queue: Queue,
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
+    debug_pipeline: DebugPipeline,
 }
 
 fn to_absolute_path<P: AsRef<Path>>(relative: P) -> std::io::Result<PathBuf> {
@@ -39,6 +40,21 @@ impl GpuState {
 
     pub fn clear_sprites(&mut self) {
         self.sprite_pipeline.clear_sprites();
+    }
+
+    /// Clear all debug shapes
+    pub fn clear_debug_shapes(&mut self) {
+        self.debug_pipeline.clear();
+    }
+
+    /// Add a debug rectangle
+    pub fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+        self.debug_pipeline.add_rect(x, y, width, height, color);
+    }
+
+    /// Finalize debug shapes for rendering (call after adding all shapes)
+    pub fn finalize_debug_shapes(&mut self) {
+        self.debug_pipeline.update_vertices(&self.device);
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -66,6 +82,8 @@ impl GpuState {
             to_absolute_path("./assets/creatures.png").unwrap(),
         );
 
+        let debug_pipeline = DebugPipeline::new(&device, config.format);
+
         Self {
             surface,
             config,
@@ -73,6 +91,7 @@ impl GpuState {
             queue,
             tilemap_pipeline,
             sprite_pipeline,
+            debug_pipeline,
         }
     }
 
@@ -84,6 +103,7 @@ impl GpuState {
     pub fn update_projection(&mut self, mvp: glam::Mat4) {
         self.tilemap_pipeline.update_projection(&self.queue, mvp);
         self.sprite_pipeline.update_projection(&self.queue, mvp);
+        self.debug_pipeline.update_camera(&self.queue, mvp);
     }
 
     pub fn draw(&mut self) {
@@ -136,6 +156,9 @@ impl GpuState {
 
             // Render sprites on top
             self.sprite_pipeline.render(&mut render_pass);
+
+            // Render debug shapes last (on top of everything)
+            self.debug_pipeline.render(&mut render_pass);
         }
 
         self.queue.submit(Some(encoder.finish()));

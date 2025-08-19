@@ -48,6 +48,7 @@ impl GameSystem {
             KeyCode::KeyA | KeyCode::ArrowLeft => Some(InputKey::Left),
             KeyCode::KeyS | KeyCode::ArrowDown => Some(InputKey::Down),
             KeyCode::KeyD | KeyCode::ArrowRight => Some(InputKey::Right),
+            KeyCode::F4 => Some(InputKey::DebugToggle),
             _ => None,
         }
     }
@@ -75,5 +76,25 @@ impl GameSystem {
     /// Get entities for camera system integration
     pub fn entities_for_camera(&self) -> Vec<Entity> {
         self.game_state.entities_owned()
+    }
+
+    /// Get entity collision boxes for debug rendering
+    pub fn get_entity_collision_boxes(&self) -> Vec<(glam::IVec2, glam::UVec2, bool)> {
+        self.game_state.get_entity_collision_boxes()
+    }
+
+    /// Get solid tile positions for debug rendering
+    pub fn get_solid_tile_positions(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> Vec<(u32, u32)> {
+        self.game_state.get_solid_tile_positions(tilemap, atlas)
+    }
+
+    /// Get trigger tile positions for debug rendering
+    pub fn get_trigger_tile_positions(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> Vec<(u32, u32)> {
+        self.game_state.get_trigger_tile_positions(tilemap, atlas)
+    }
+
+    /// Check if debug collision rendering is enabled
+    pub fn is_debug_collision_rendering_enabled(&self) -> bool {
+        self.game_state.is_debug_collision_rendering_enabled()
     }
 }
