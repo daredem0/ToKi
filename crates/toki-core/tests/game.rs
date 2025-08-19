@@ -1,6 +1,6 @@
 use toki_core::{GameState, InputKey};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
-use glam::Vec2;
+use glam::{IVec2, UVec2};
 
 fn create_test_sprite() -> SpriteInstance {
     let animation = Animation {
@@ -16,7 +16,7 @@ fn create_test_sprite() -> SpriteInstance {
         frame_count: 2,
         sheet_size: (32, 16),
     };
-    SpriteInstance::new(Vec2::new(50.0, 60.0), animation, sprite_sheet)
+    SpriteInstance::new(IVec2::new(50, 60), animation, sprite_sheet)
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn game_state_new_initializes_correctly() {
     assert_eq!(game_state.player_id(), Some(1));
     assert!(game_state.player_entity().is_some());
     assert_eq!(game_state.player_entity().unwrap().position, initial_position);
-    assert_eq!(game_state.sprite_size(), 16.0);
+    assert_eq!(game_state.sprite_size(), 16);
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn game_state_key_press_and_release() {
     assert_eq!(game_state.player_position(), initial_position);
     
     // Update should process the input
-    let world_bounds = Vec2::new(1000.0, 1000.0);
+    let world_bounds = UVec2::new(1000, 1000);
     let moved = game_state.update(world_bounds);
     
     assert!(moved);
@@ -97,13 +97,13 @@ fn game_state_movement_up() {
     let initial_position = game_state.player_position();
     
     game_state.handle_key_press(InputKey::Up);
-    let world_bounds = Vec2::new(1000.0, 1000.0);
+    let world_bounds = UVec2::new(1000, 1000);
     let moved = game_state.update(world_bounds);
     
     assert!(moved);
     assert_eq!(game_state.player_position().x, initial_position.x); // X unchanged
     assert!(game_state.player_position().y < initial_position.y); // Y decreased (up)
-    assert_eq!(game_state.player_position().y, initial_position.y - 1.0); // Moved 1 pixel
+    assert_eq!(game_state.player_position().y, initial_position.y - 1); // Moved 1 pixel
 }
 
 #[test]
@@ -113,13 +113,13 @@ fn game_state_movement_down() {
     let initial_position = game_state.player_position();
     
     game_state.handle_key_press(InputKey::Down);
-    let world_bounds = Vec2::new(1000.0, 1000.0);
+    let world_bounds = UVec2::new(1000, 1000);
     let moved = game_state.update(world_bounds);
     
     assert!(moved);
     assert_eq!(game_state.player_position().x, initial_position.x); // X unchanged
     assert!(game_state.player_position().y > initial_position.y); // Y increased (down)
-    assert_eq!(game_state.player_position().y, initial_position.y + 1.0); // Moved 1 pixel
+    assert_eq!(game_state.player_position().y, initial_position.y + 1); // Moved 1 pixel
 }
 
 #[test]
@@ -129,13 +129,13 @@ fn game_state_movement_left() {
     let initial_position = game_state.player_position();
     
     game_state.handle_key_press(InputKey::Left);
-    let world_bounds = Vec2::new(1000.0, 1000.0);
+    let world_bounds = UVec2::new(1000, 1000);
     let moved = game_state.update(world_bounds);
     
     assert!(moved);
     assert!(game_state.player_position().x < initial_position.x); // X decreased (left)
     assert_eq!(game_state.player_position().y, initial_position.y); // Y unchanged
-    assert_eq!(game_state.player_position().x, initial_position.x - 1.0); // Moved 1 pixel
+    assert_eq!(game_state.player_position().x, initial_position.x - 1); // Moved 1 pixel
 }
 
 #[test]
@@ -145,13 +145,13 @@ fn game_state_movement_right() {
     let initial_position = game_state.player_position();
     
     game_state.handle_key_press(InputKey::Right);
-    let world_bounds = Vec2::new(1000.0, 1000.0);
+    let world_bounds = UVec2::new(1000, 1000);
     let moved = game_state.update(world_bounds);
     
     assert!(moved);
     assert!(game_state.player_position().x > initial_position.x); // X increased (right)
     assert_eq!(game_state.player_position().y, initial_position.y); // Y unchanged
-    assert_eq!(game_state.player_position().x, initial_position.x + 1.0); // Moved 1 pixel
+    assert_eq!(game_state.player_position().x, initial_position.x + 1); // Moved 1 pixel
 }
 
 #[test]
@@ -164,12 +164,12 @@ fn game_state_diagonal_movement() {
     game_state.handle_key_press(InputKey::Up);
     game_state.handle_key_press(InputKey::Right);
     
-    let world_bounds = Vec2::new(1000.0, 1000.0);
+    let world_bounds = UVec2::new(1000, 1000);
     let moved = game_state.update(world_bounds);
     
     assert!(moved);
-    assert_eq!(game_state.player_position().x, initial_position.x + 1.0); // Moved right
-    assert_eq!(game_state.player_position().y, initial_position.y - 1.0); // Moved up
+    assert_eq!(game_state.player_position().x, initial_position.x + 1); // Moved right
+    assert_eq!(game_state.player_position().y, initial_position.y - 1); // Moved up
 }
 
 #[test]
@@ -179,7 +179,7 @@ fn game_state_world_bounds_left_boundary() {
     
     // Move to near left edge
     game_state.handle_key_press(InputKey::Left);
-    let world_bounds = Vec2::new(1000.0, 1000.0);
+    let world_bounds = UVec2::new(1000, 1000);
     
     // Move left repeatedly until at boundary
     for _ in 0..100 {
@@ -187,12 +187,12 @@ fn game_state_world_bounds_left_boundary() {
     }
     
     // Should be clamped at 0
-    assert_eq!(game_state.player_position().x, 0.0);
+    assert_eq!(game_state.player_position().x, 0);
     
     // One more update should not move further
     let moved = game_state.update(world_bounds);
     assert!(!moved); // Should not report movement when clamped
-    assert_eq!(game_state.player_position().x, 0.0);
+    assert_eq!(game_state.player_position().x, 0);
 }
 
 #[test]
@@ -202,7 +202,7 @@ fn game_state_world_bounds_top_boundary() {
     
     // Move to near top edge
     game_state.handle_key_press(InputKey::Up);
-    let world_bounds = Vec2::new(1000.0, 1000.0);
+    let world_bounds = UVec2::new(1000, 1000);
     
     // Move up repeatedly until at boundary
     for _ in 0..100 {
@@ -210,12 +210,12 @@ fn game_state_world_bounds_top_boundary() {
     }
     
     // Should be clamped at 0
-    assert_eq!(game_state.player_position().y, 0.0);
+    assert_eq!(game_state.player_position().y, 0);
     
     // One more update should not move further
     let moved = game_state.update(world_bounds);
     assert!(!moved); // Should not report movement when clamped
-    assert_eq!(game_state.player_position().y, 0.0);
+    assert_eq!(game_state.player_position().y, 0);
 }
 
 #[test]
@@ -224,7 +224,7 @@ fn game_state_world_bounds_right_boundary() {
     let mut game_state = GameState::new(sprite);
     
     game_state.handle_key_press(InputKey::Right);
-    let world_bounds = Vec2::new(100.0, 1000.0); // Small world width
+    let world_bounds = UVec2::new(100, 1000); // Small world width
     
     // Move right repeatedly until at boundary
     for _ in 0..200 {
@@ -232,7 +232,7 @@ fn game_state_world_bounds_right_boundary() {
     }
     
     // Should be clamped at world_width - sprite_size
-    let expected_max_x = world_bounds.x - game_state.sprite_size();
+    let expected_max_x = world_bounds.x as i32 - game_state.sprite_size() as i32;
     assert_eq!(game_state.player_position().x, expected_max_x);
     
     // One more update should not move further
@@ -246,7 +246,7 @@ fn game_state_world_bounds_bottom_boundary() {
     let mut game_state = GameState::new(sprite);
     
     game_state.handle_key_press(InputKey::Down);
-    let world_bounds = Vec2::new(1000.0, 100.0); // Small world height
+    let world_bounds = UVec2::new(1000, 100); // Small world height
     
     // Move down repeatedly until at boundary
     for _ in 0..200 {
@@ -254,7 +254,7 @@ fn game_state_world_bounds_bottom_boundary() {
     }
     
     // Should be clamped at world_height - sprite_size
-    let expected_max_y = world_bounds.y - game_state.sprite_size();
+    let expected_max_y = world_bounds.y as i32 - game_state.sprite_size() as i32;
     assert_eq!(game_state.player_position().y, expected_max_y);
     
     // One more update should not move further
@@ -268,7 +268,7 @@ fn game_state_sprite_animation_updates() {
     let mut game_state = GameState::new(sprite);
     let _initial_frame = game_state.current_sprite_frame();
     
-    let world_bounds = Vec2::new(1000.0, 1000.0);
+    let world_bounds = UVec2::new(1000, 1000);
     
     // Update multiple times to advance animation
     for _ in 0..10 {
@@ -288,7 +288,7 @@ fn game_state_entity_position_sync() {
     
     // Move the player
     game_state.handle_key_press(InputKey::Right);
-    let world_bounds = Vec2::new(1000.0, 1000.0);
+    let world_bounds = UVec2::new(1000, 1000);
     game_state.update(world_bounds);
     
     // Entity position should match player sprite position
@@ -316,7 +316,7 @@ fn game_state_multiple_key_handling() {
     game_state.handle_key_press(InputKey::Down); // Conflicting with Up
     game_state.handle_key_press(InputKey::Left); // Conflicting with Right
     
-    let world_bounds = Vec2::new(1000.0, 1000.0);
+    let world_bounds = UVec2::new(1000, 1000);
     let _initial_position = game_state.player_position();
     game_state.update(world_bounds);
     
@@ -349,8 +349,8 @@ fn game_state_entity_manager_access() {
     
     // Should be able to spawn additional entities
     let entity_manager = game_state.entity_manager_mut();
-    let npc_id = entity_manager.spawn_npc(Vec2::new(100.0, 100.0), "guard");
-    let item_id = entity_manager.spawn_item(Vec2::new(200.0, 200.0), "coin");
+    let npc_id = entity_manager.spawn_npc(IVec2::new(100, 100), "guard");
+    let item_id = entity_manager.spawn_item(IVec2::new(200, 200), "coin");
     
     assert_eq!(entity_manager.active_entities().len(), 3);
     assert!(entity_manager.get_entity(npc_id).is_some());

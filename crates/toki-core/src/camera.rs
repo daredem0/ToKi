@@ -78,7 +78,7 @@ impl CameraController {
         match self.mode {
             CameraMode::FollowEntity(id) => {
                 if let Some(entity) = runtime.entities.iter().find(|e| e.id == id) {
-                    camera.center_on(entity.position.as_ivec2());
+                    camera.center_on(entity.position);
                 }
             }
             CameraMode::FreeScroll => {

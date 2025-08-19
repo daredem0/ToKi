@@ -35,7 +35,7 @@ impl App {
         let resources = ResourceManager::load_all().expect("Failed to load resources");
 
         let mut game_state = GameState::new_empty();
-        let _player_id = game_state.spawn_player_at(glam::Vec2::new(80.0, 72.0));
+        let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
         let game_system = GameSystem::new(game_state);
 
         let mut camera = Camera {
@@ -43,7 +43,7 @@ impl App {
             viewport_size: glam::UVec2::new(160, 144),
             scale: 1,
         };
-        camera.center_on(glam::Vec2::new(80.0, 72.0).as_ivec2());
+        camera.center_on(glam::IVec2::new(80, 72));
 
         // Use the player entity ID from the GameState for camera following
         let player_id = game_system.player_id().expect("Player should exist");
@@ -71,9 +71,9 @@ impl App {
         tracing::trace!("TICK @ {:?}", tick_start);
 
         // Update game state (handles input, animation, etc.)
-        let world_bounds = glam::Vec2::new(
-            (self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x) as f32,
-            (self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y) as f32,
+        let world_bounds = glam::UVec2::new(
+            self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
+            self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
         );
         let player_moved = self.game_system.update(world_bounds);
 
@@ -82,7 +82,7 @@ impl App {
         let runtime = RuntimeState {
             entities: &entities,
         };
-        let world_size = glam::UVec2::new(world_bounds.x as u32, world_bounds.y as u32);
+        let world_size = world_bounds;
         let cam_changed = self.camera_system.update(&runtime, world_size) || player_moved;
 
         if self.rendering.has_gpu() {
@@ -113,7 +113,7 @@ impl App {
                 gpu.add_sprite(
                     frame,
                     self.game_system.player_position(),
-                    glam::Vec2::new(16.0, 16.0),
+                    glam::UVec2::new(16, 16),
                 );
             }
         }

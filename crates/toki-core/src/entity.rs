@@ -1,4 +1,4 @@
-use glam::Vec2;
+use glam::{IVec2, UVec2};
 use std::collections::{HashMap, HashSet};
 
 pub type EntityId = u32;
@@ -6,8 +6,8 @@ pub type EntityId = u32;
 #[derive(Debug, Clone)]
 pub struct Entity {
     pub id: EntityId,
-    pub position: glam::Vec2,
-    pub size: glam::Vec2,
+    pub position: glam::IVec2,
+    pub size: glam::UVec2,
     pub entity_type: EntityType,
     pub attributes: EntityAttributes,
 }
@@ -107,8 +107,8 @@ impl EntityManager {
     pub fn spawn_entity(
         &mut self,
         entity_type: EntityType,
-        position: Vec2,
-        size: Vec2,
+        position: IVec2,
+        size: UVec2,
         attributes: EntityAttributes,
     ) -> EntityId {
         let id = self.next_id;
@@ -218,7 +218,7 @@ impl EntityManager {
     }
 
     // Factory methods
-    pub fn spawn_player(&mut self, position: Vec2) -> EntityId {
+    pub fn spawn_player(&mut self, position: IVec2) -> EntityId {
         let attributes = EntityAttributes {
             health: Some(100),
             speed: 2,
@@ -233,12 +233,12 @@ impl EntityManager {
         self.spawn_entity(
             EntityType::Player,
             position,
-            glam::Vec2::new(16.0, 16.0),
+            glam::UVec2::new(16, 16),
             attributes,
         )
     }
 
-    pub fn spawn_npc(&mut self, position: glam::Vec2, animation_name: &str) -> EntityId {
+    pub fn spawn_npc(&mut self, position: glam::IVec2, animation_name: &str) -> EntityId {
         let attributes = EntityAttributes {
             health: Some(50),
             speed: 1,
@@ -254,12 +254,12 @@ impl EntityManager {
         self.spawn_entity(
             EntityType::Npc,
             position,
-            glam::Vec2::new(16.0, 16.0),
+            glam::UVec2::new(16, 16),
             attributes,
         )
     }
 
-    pub fn spawn_item(&mut self, position: Vec2, item_name: &str) -> EntityId {
+    pub fn spawn_item(&mut self, position: IVec2, item_name: &str) -> EntityId {
         let attributes = EntityAttributes {
             health: None,    // Items don't have health
             solid: false,    // Items can be walked through
@@ -276,12 +276,12 @@ impl EntityManager {
         self.spawn_entity(
             EntityType::Item,
             position,
-            Vec2::new(16.0, 16.0),
+            UVec2::new(16, 16),
             attributes,
         )
     }
 
-    pub fn spawn_decoration(&mut self, position: Vec2, decoration_name: &str) -> EntityId {
+    pub fn spawn_decoration(&mut self, position: IVec2, decoration_name: &str) -> EntityId {
         let attributes = EntityAttributes {
             health: None,
             solid: false, // Decorations don't block movement
@@ -299,7 +299,7 @@ impl EntityManager {
         self.spawn_entity(
             EntityType::Decoration,
             position,
-            Vec2::new(16.0, 16.0),
+            UVec2::new(16, 16),
             attributes,
         )
     }

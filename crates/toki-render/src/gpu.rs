@@ -1,4 +1,4 @@
-use glam::Vec2;
+use glam::{Vec2, IVec2, UVec2};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -29,11 +29,11 @@ fn to_absolute_path<P: AsRef<Path>>(relative: P) -> std::io::Result<PathBuf> {
 }
 
 impl GpuState {
-    pub fn add_sprite(&mut self, frame: SpriteFrame, pos: Vec2, size: Vec2) {
+    pub fn add_sprite(&mut self, frame: SpriteFrame, pos: glam::IVec2, size: glam::UVec2) {
         let instance = SpriteInstance {
             frame,
-            position: pos,
-            size,
+            position: pos.as_vec2(), // Convert to float for GPU
+            size: size.as_vec2(),     // Convert to float for GPU
         };
         self.sprite_pipeline.add_sprite(instance);
     }

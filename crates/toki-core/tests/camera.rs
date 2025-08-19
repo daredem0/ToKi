@@ -1,12 +1,12 @@
-use glam::{IVec2, UVec2, Vec2};
+use glam::{IVec2, UVec2};
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
 use toki_core::entity::{Entity, EntityAttributes, EntityType, EntityId};
 
-fn create_test_entity(id: EntityId, position: Vec2) -> Entity {
+fn create_test_entity(id: EntityId, position: IVec2) -> Entity {
     Entity {
         id,
         position,
-        size: Vec2::new(16.0, 16.0), // Standard sprite size
+        size: UVec2::new(16, 16), // Standard sprite size
         entity_type: EntityType::Player,
         attributes: EntityAttributes::default(),
     }
@@ -142,7 +142,7 @@ fn camera_controller_follow_entity_updates_position() {
     };
     let mut camera = Camera::new();
 
-    let entities = vec![create_test_entity(entity_id, Vec2::new(200.0, 150.0))];
+    let entities = vec![create_test_entity(entity_id, IVec2::new(200, 150))];
     let runtime = RuntimeState {
         entities: &entities,
     };
@@ -164,7 +164,7 @@ fn camera_controller_follow_nonexistent_entity_does_nothing() {
     let initial_position = camera.position;
 
     // No entities with the target ID
-    let entities = vec![create_test_entity(999, Vec2::new(200.0, 150.0))];
+    let entities = vec![create_test_entity(999, IVec2::new(200, 150))];
     let runtime = RuntimeState {
         entities: &entities,
     };
@@ -184,9 +184,9 @@ fn camera_controller_follow_entity_with_multiple_entities() {
     let mut camera = Camera::new();
 
     let entities = vec![
-        create_test_entity(0, Vec2::new(50.0, 60.0)),
-        create_test_entity(1, Vec2::new(300.0, 200.0)),
-        create_test_entity(2, Vec2::new(100.0, 120.0)),
+        create_test_entity(0, IVec2::new(50, 60)),
+        create_test_entity(1, IVec2::new(300, 200)),
+        create_test_entity(2, IVec2::new(100, 120)),
     ];
     let runtime = RuntimeState {
         entities: &entities,
@@ -201,10 +201,10 @@ fn camera_controller_follow_entity_with_multiple_entities() {
 
 #[test]
 fn entity_position_conversion() {
-    let entity = create_test_entity(1, Vec2::new(123.5, 456.7));
+    let entity = create_test_entity(1, IVec2::new(123, 456));
 
-    let as_int = entity.position.as_ivec2();
-    assert_eq!(as_int, IVec2::new(123, 456));
+    // Position is already IVec2, no conversion needed
+    assert_eq!(entity.position, IVec2::new(123, 456));
 }
 
 #[test]

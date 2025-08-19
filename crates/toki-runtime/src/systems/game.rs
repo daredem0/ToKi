@@ -18,7 +18,7 @@ impl GameSystem {
 
     /// Update the game state by one tick
     /// Returns true if the player moved (indicating camera/rendering updates needed)
-    pub fn update(&mut self, world_bounds: glam::Vec2) -> bool {
+    pub fn update(&mut self, world_bounds: glam::UVec2) -> bool {
         self.game_state.update(world_bounds)
     }
 
@@ -50,12 +50,12 @@ impl GameSystem {
     }
 
     /// Get player position for rendering
-    pub fn player_position(&self) -> glam::Vec2 {
+    pub fn player_position(&self) -> glam::IVec2 {
         self.game_state.player_position()
     }
 
     /// Get sprite size for rendering calculations
-    pub fn sprite_size(&self) -> f32 {
+    pub fn sprite_size(&self) -> u32 {
         self.game_state.sprite_size()
     }
 

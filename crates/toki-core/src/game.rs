@@ -29,8 +29,8 @@ pub struct GameState {
     keys_held: HashSet<InputKey>,
 
     /// Game configuration constants
-    movement_step: f32,
-    sprite_size: f32,
+    movement_step: i32,
+    sprite_size: u32,
 }
 
 impl GameState {
@@ -45,8 +45,8 @@ impl GameState {
             entity_manager,
             player_id: Some(player_id),
             keys_held: HashSet::new(),
-            movement_step: 1.0, // Move exactly 1 pixel per frame
-            sprite_size: 16.0,  // Sprite is 16×16 pixels
+            movement_step: 1, // Move exactly 1 pixel per frame
+            sprite_size: 16,  // Sprite is 16×16 pixels
         }
     }
 
@@ -56,20 +56,20 @@ impl GameState {
             entity_manager: EntityManager::new(),
             player_id: None,
             keys_held: HashSet::new(),
-            movement_step: 1.0,
-            sprite_size: 16.0,
+            movement_step: 1,
+            sprite_size: 16,
         }
     }
 
     /// Initialize the game with a player at the specified position
-    pub fn spawn_player_at(&mut self, position: glam::Vec2) -> EntityId {
+    pub fn spawn_player_at(&mut self, position: glam::IVec2) -> EntityId {
         let player_id = self.entity_manager.spawn_player(position);
         self.player_id = Some(player_id);
         player_id
     }
 
     /// Update game state by one tick
-    pub fn update(&mut self, world_bounds: glam::Vec2) -> bool {
+    pub fn update(&mut self, world_bounds: glam::UVec2) -> bool {
         let moved = self.process_input(world_bounds);
 
         // Update entity animation timing
@@ -80,7 +80,7 @@ impl GameState {
 
     /// Process input and update player position
     /// Returns true if the player actually moved (position changed)
-    fn process_input(&mut self, world_bounds: glam::Vec2) -> bool {
+    fn process_input(&mut self, world_bounds: glam::UVec2) -> bool {
         let Some(player_id) = self.player_id else {
             return false; // No player entity to move
         };
@@ -100,24 +100,24 @@ impl GameState {
             match key {
                 InputKey::Up => {
                     tracing::trace!("Move forward");
-                    let new_y = (player_entity.position.y - self.movement_step).max(0.0);
+                    let new_y = (player_entity.position.y - self.movement_step).max(0);
                     player_entity.position.y = new_y;
                 }
                 InputKey::Left => {
                     tracing::trace!("Move left");
-                    let new_x = (player_entity.position.x - self.movement_step).max(0.0);
+                    let new_x = (player_entity.position.x - self.movement_step).max(0);
                     player_entity.position.x = new_x;
                 }
                 InputKey::Down => {
                     tracing::trace!("Move backward");
                     let new_y = (player_entity.position.y + self.movement_step)
-                        .min(world_bounds.y - self.sprite_size);
+                        .min(world_bounds.y as i32 - self.sprite_size as i32);
                     player_entity.position.y = new_y;
                 }
                 InputKey::Right => {
                     tracing::trace!("Move right");
                     let new_x = (player_entity.position.x + self.movement_step)
-                        .min(world_bounds.x - self.sprite_size);
+                        .min(world_bounds.x as i32 - self.sprite_size as i32);
                     player_entity.position.x = new_x;
                 }
             }
@@ -206,16 +206,16 @@ impl GameState {
     }
 
     /// Get player position for rendering
-    pub fn player_position(&self) -> glam::Vec2 {
+    pub fn player_position(&self) -> glam::IVec2 {
         if let Some(player_entity) = self.player_entity() {
             player_entity.position
         } else {
-            glam::Vec2::ZERO // Fallback
+            glam::IVec2::ZERO // Fallback
         }
     }
 
     /// Get sprite size for rendering calculations
-    pub fn sprite_size(&self) -> f32 {
+    pub fn sprite_size(&self) -> u32 {
         self.sprite_size
     }
 }

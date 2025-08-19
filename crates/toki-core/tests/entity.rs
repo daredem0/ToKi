@@ -1,5 +1,5 @@
 use toki_core::entity::*;
-use glam::Vec2;
+use glam::{IVec2, UVec2};
 
 #[test]
 fn test_entity_manager_creation() {
@@ -13,7 +13,7 @@ fn test_entity_manager_creation() {
 #[test]
 fn test_spawn_player() {
     let mut manager = EntityManager::new();
-    let position = Vec2::new(100.0, 50.0);
+    let position = IVec2::new(100, 50);
     
     let player_id = manager.spawn_player(position);
     
@@ -37,9 +37,9 @@ fn test_spawn_player() {
 fn test_spawn_multiple_entities() {
     let mut manager = EntityManager::new();
     
-    let player_id = manager.spawn_player(Vec2::new(0.0, 0.0));
-    let npc_id = manager.spawn_npc(Vec2::new(10.0, 10.0), "guard");
-    let item_id = manager.spawn_item(Vec2::new(20.0, 20.0), "coin");
+    let player_id = manager.spawn_player(IVec2::new(0, 0));
+    let npc_id = manager.spawn_npc(IVec2::new(10, 10), "guard");
+    let item_id = manager.spawn_item(IVec2::new(20, 20), "coin");
     
     // Check all entities exist
     assert!(manager.get_entity(player_id).is_some());
@@ -59,8 +59,8 @@ fn test_spawn_multiple_entities() {
 fn test_despawn_entity() {
     let mut manager = EntityManager::new();
     
-    let player_id = manager.spawn_player(Vec2::new(0.0, 0.0));
-    let npc_id = manager.spawn_npc(Vec2::new(10.0, 10.0), "guard");
+    let player_id = manager.spawn_player(IVec2::new(0, 0));
+    let npc_id = manager.spawn_npc(IVec2::new(10, 10), "guard");
     
     // Despawn the NPC
     assert!(manager.despawn_entity(npc_id));
@@ -81,7 +81,7 @@ fn test_despawn_entity() {
 fn test_despawn_player() {
     let mut manager = EntityManager::new();
     
-    let player_id = manager.spawn_player(Vec2::new(0.0, 0.0));
+    let player_id = manager.spawn_player(IVec2::new(0, 0));
     assert_eq!(manager.get_player_id(), Some(player_id));
     
     // Despawn player
@@ -96,7 +96,7 @@ fn test_despawn_player() {
 fn test_entity_active_status() {
     let mut manager = EntityManager::new();
     
-    let entity_id = manager.spawn_npc(Vec2::new(0.0, 0.0), "test");
+    let entity_id = manager.spawn_npc(IVec2::new(0, 0), "test");
     
     // Entity should be active by default
     assert_eq!(manager.active_entities(), vec![entity_id]);
@@ -116,8 +116,8 @@ fn test_entity_active_status() {
 fn test_visible_entities() {
     let mut manager = EntityManager::new();
     
-    let visible_id = manager.spawn_player(Vec2::new(0.0, 0.0));
-    let invisible_id = manager.spawn_npc(Vec2::new(10.0, 10.0), "hidden");
+    let visible_id = manager.spawn_player(IVec2::new(0, 0));
+    let invisible_id = manager.spawn_npc(IVec2::new(10, 10), "hidden");
     
     // Make NPC invisible
     manager.get_entity_mut(invisible_id).unwrap().attributes.visible = false;
@@ -146,10 +146,10 @@ fn test_entity_attributes_defaults() {
 fn test_factory_method_differences() {
     let mut manager = EntityManager::new();
     
-    let player_id = manager.spawn_player(Vec2::new(0.0, 0.0));
-    let npc_id = manager.spawn_npc(Vec2::new(0.0, 0.0), "guard");
-    let item_id = manager.spawn_item(Vec2::new(0.0, 0.0), "coin");
-    let decoration_id = manager.spawn_decoration(Vec2::new(0.0, 0.0), "tree");
+    let player_id = manager.spawn_player(IVec2::new(0, 0));
+    let npc_id = manager.spawn_npc(IVec2::new(0, 0), "guard");
+    let item_id = manager.spawn_item(IVec2::new(0, 0), "coin");
+    let decoration_id = manager.spawn_decoration(IVec2::new(0, 0), "tree");
     
     let player = manager.get_entity(player_id).unwrap();
     let npc = manager.get_entity(npc_id).unwrap();
@@ -187,9 +187,9 @@ fn test_factory_method_differences() {
 fn test_entity_id_uniqueness() {
     let mut manager = EntityManager::new();
     
-    let id1 = manager.spawn_player(Vec2::new(0.0, 0.0));
-    let id2 = manager.spawn_npc(Vec2::new(10.0, 10.0), "guard");
-    let id3 = manager.spawn_item(Vec2::new(20.0, 20.0), "coin");
+    let id1 = manager.spawn_player(IVec2::new(0, 0));
+    let id2 = manager.spawn_npc(IVec2::new(10, 10), "guard");
+    let id3 = manager.spawn_item(IVec2::new(20, 20), "coin");
     
     // All IDs should be unique
     assert_ne!(id1, id2);
@@ -206,8 +206,8 @@ fn test_entity_id_uniqueness() {
 fn test_multiple_players_not_allowed() {
     let mut manager = EntityManager::new();
     
-    let first_player = manager.spawn_player(Vec2::new(0.0, 0.0));
-    let second_player = manager.spawn_player(Vec2::new(100.0, 100.0));
+    let first_player = manager.spawn_player(IVec2::new(0, 0));
+    let second_player = manager.spawn_player(IVec2::new(100, 100));
     
     // Only the second player should be tracked as THE player
     assert_eq!(manager.get_player_id(), Some(second_player));
@@ -228,17 +228,17 @@ fn test_multiple_players_not_allowed() {
 fn test_entity_position_and_size() {
     let mut manager = EntityManager::new();
     
-    let position = Vec2::new(50.0, 75.0);
+    let position = IVec2::new(50, 75);
     let entity_id = manager.spawn_player(position);
     
     let entity = manager.get_entity(entity_id).unwrap();
     assert_eq!(entity.position, position);
-    assert_eq!(entity.size, Vec2::new(16.0, 16.0)); // Standard Game Boy sprite size
+    assert_eq!(entity.size, UVec2::new(16, 16)); // Standard Game Boy sprite size
     
     // Test mutability
     let entity_mut = manager.get_entity_mut(entity_id).unwrap();
-    entity_mut.position = Vec2::new(100.0, 200.0);
+    entity_mut.position = IVec2::new(100, 200);
     
     let entity = manager.get_entity(entity_id).unwrap();
-    assert_eq!(entity.position, Vec2::new(100.0, 200.0));
+    assert_eq!(entity.position, IVec2::new(100, 200));
 }

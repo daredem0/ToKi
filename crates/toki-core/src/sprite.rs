@@ -1,4 +1,4 @@
-use glam::Vec2;
+use glam::IVec2;
 
 /// Data model for a single animation frame.
 #[derive(Debug, Clone)]
@@ -123,7 +123,7 @@ impl SpriteSheetMeta {
 
 #[derive(Debug, Clone)]
 pub struct SpriteInstance {
-    pub position: Vec2,
+    pub position: IVec2,
     pub animation: Animation,
     pub animator: Animator,
     pub sheet: SpriteSheetMeta,
@@ -132,7 +132,7 @@ pub struct SpriteInstance {
 impl Default for SpriteInstance {
     fn default() -> Self {
         Self {
-            position: Vec2::ZERO,
+            position: IVec2::ZERO,
             animation: Animation::default(),
             animator: Animator::new(),
             sheet: SpriteSheetMeta::default(),
@@ -141,7 +141,7 @@ impl Default for SpriteInstance {
 }
 
 impl SpriteInstance {
-    pub fn new(position: Vec2, animation: Animation, sheet: SpriteSheetMeta) -> Self {
+    pub fn new(position: IVec2, animation: Animation, sheet: SpriteSheetMeta) -> Self {
         Self {
             position,
             animation,
