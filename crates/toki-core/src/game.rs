@@ -91,34 +91,64 @@ impl GameState {
         moved
     }
 
-    /// Check if a position is safe to move to (not solid)
+    /// Check if an entity can move to a position without colliding with solid tiles
     /// Returns true if movement is allowed, false if blocked
-    fn can_move_to_position(tilemap: &TileMap, atlas: &AtlasMeta, position: glam::IVec2) -> bool {
+    fn can_entity_move_to_position(
+        entity: &crate::entity::Entity,
+        new_position: glam::IVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> bool {
+        // If entity has no collision box, allow movement
+        let Some(collision_box) = &entity.collision_box else {
+            return true;
+        };
+
+        // Skip collision for trigger boxes (they don't block movement)
+        if collision_box.trigger {
+            return true;
+        }
+
+        // Get the world bounds of the collision box at the new position
+        let (box_pos, box_size) = collision_box.world_bounds(new_position);
+
         // Handle negative coordinates - treat as blocked
-        if position.x < 0 || position.y < 0 {
-            tracing::debug!("Movement blocked - negative coordinates: ({}, {})", position.x, position.y);
+        if box_pos.x < 0 || box_pos.y < 0 {
+            tracing::debug!("Movement blocked - collision box would be at negative coordinates");
             return false;
         }
 
-        // Convert to unsigned coordinates for tilemap query
-        let world_pos = glam::UVec2::new(position.x as u32, position.y as u32);
-        
-        // Check collision with tilemap
-        match tilemap.is_world_position_solid(atlas, world_pos) {
-            Ok(is_solid) => {
-                if is_solid {
-                    tracing::debug!("Collision blocked movement to ({}, {})", position.x, position.y);
-                    false
-                } else {
-                    tracing::trace!("Movement allowed to ({}, {})", position.x, position.y);
-                    true
+        // Convert collision box bounds to tile coordinates
+        let tile_size = tilemap.tile_size;
+        let min_tile_x = (box_pos.x as u32) / tile_size.x;
+        let min_tile_y = (box_pos.y as u32) / tile_size.y;
+        let max_tile_x = ((box_pos.x + box_size.x as i32 - 1) as u32) / tile_size.x;
+        let max_tile_y = ((box_pos.y + box_size.y as i32 - 1) as u32) / tile_size.y;
+
+        // Check all tiles that the collision box would overlap
+        for tile_y in min_tile_y..=max_tile_y {
+            for tile_x in min_tile_x..=max_tile_x {
+                match tilemap.is_tile_solid_at(atlas, tile_x, tile_y) {
+                    Ok(is_solid) => {
+                        if is_solid {
+                            tracing::debug!(
+                                "Collision blocked movement - solid tile at ({}, {}) would overlap collision box at ({}, {})",
+                                tile_x, tile_y, box_pos.x, box_pos.y
+                            );
+                            return false;
+                        }
+                    }
+                    Err(err) => {
+                        // Out of bounds or other error - treat as blocking
+                        tracing::debug!("Collision check failed for tile ({}, {}): {}", tile_x, tile_y, err);
+                        return false;
+                    }
                 }
             }
-            Err(err) => {
-                tracing::warn!("Collision check failed for ({}, {}): {}", position.x, position.y, err);
-                false // Block movement on error
-            }
         }
+
+        tracing::trace!("Movement allowed - no collision detected");
+        true
     }
 
     /// Process input and update player position
@@ -150,7 +180,7 @@ impl GameState {
                     tracing::trace!("Move forward");
                     let new_y = (player_entity.position.y - self.movement_step).max(0);
                     let new_position = glam::IVec2::new(player_entity.position.x, new_y);
-                    if Self::can_move_to_position(tilemap, atlas, new_position) {
+                    if Self::can_entity_move_to_position(player_entity, new_position, tilemap, atlas) {
                         player_entity.position.y = new_y;
                     }
                 }
@@ -158,7 +188,7 @@ impl GameState {
                     tracing::trace!("Move left");
                     let new_x = (player_entity.position.x - self.movement_step).max(0);
                     let new_position = glam::IVec2::new(new_x, player_entity.position.y);
-                    if Self::can_move_to_position(tilemap, atlas, new_position) {
+                    if Self::can_entity_move_to_position(player_entity, new_position, tilemap, atlas) {
                         player_entity.position.x = new_x;
                     }
                 }
@@ -167,7 +197,7 @@ impl GameState {
                     let new_y = (player_entity.position.y + self.movement_step)
                         .min(world_bounds.y as i32 - self.sprite_size as i32);
                     let new_position = glam::IVec2::new(player_entity.position.x, new_y);
-                    if Self::can_move_to_position(tilemap, atlas, new_position) {
+                    if Self::can_entity_move_to_position(player_entity, new_position, tilemap, atlas) {
                         player_entity.position.y = new_y;
                     }
                 }
@@ -176,7 +206,7 @@ impl GameState {
                     let new_x = (player_entity.position.x + self.movement_step)
                         .min(world_bounds.x as i32 - self.sprite_size as i32);
                     let new_position = glam::IVec2::new(new_x, player_entity.position.y);
-                    if Self::can_move_to_position(tilemap, atlas, new_position) {
+                    if Self::can_entity_move_to_position(player_entity, new_position, tilemap, atlas) {
                         player_entity.position.x = new_x;
                     }
                 }
