@@ -1,4 +1,3 @@
-use glam::{Vec2, IVec2, UVec2};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -33,7 +32,7 @@ impl GpuState {
         let instance = SpriteInstance {
             frame,
             position: pos.as_vec2(), // Convert to float for GPU
-            size: size.as_vec2(),     // Convert to float for GPU
+            size: size.as_vec2(),    // Convert to float for GPU
         };
         self.sprite_pipeline.add_sprite(instance);
     }
@@ -49,7 +48,6 @@ impl GpuState {
             self.surface.configure(&self.device, &self.config);
         }
     }
-
 
     pub fn new(window: Arc<Window>) -> Self {
         let (device, queue, surface, config) = create_device_and_surface(Arc::clone(&window));

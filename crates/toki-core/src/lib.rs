@@ -26,3 +26,6 @@ pub mod timing;
 pub use timing::{TimestepIterator, TimingSystem};
 
 pub mod entity;
+
+pub mod collision;
+pub use collision::{CollisionBox, CollisionResult};

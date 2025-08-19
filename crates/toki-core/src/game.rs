@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use crate::assets::atlas::AtlasMeta;
+use crate::assets::tilemap::TileMap;
 use crate::entity::{Entity, EntityId, EntityManager};
 use crate::sprite::{SpriteFrame, SpriteInstance};
 
@@ -69,8 +71,13 @@ impl GameState {
     }
 
     /// Update game state by one tick
-    pub fn update(&mut self, world_bounds: glam::UVec2) -> bool {
-        let moved = self.process_input(world_bounds);
+    pub fn update(
+        &mut self,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> bool {
+        let moved = self.process_input(world_bounds, tilemap, atlas);
 
         // Update entity animation timing
         self.entity_manager.update_animations(17.0);
@@ -78,9 +85,44 @@ impl GameState {
         moved
     }
 
+    /// Check if a position is safe to move to (not solid)
+    /// Returns true if movement is allowed, false if blocked
+    fn can_move_to_position(tilemap: &TileMap, atlas: &AtlasMeta, position: glam::IVec2) -> bool {
+        // Handle negative coordinates - treat as blocked
+        if position.x < 0 || position.y < 0 {
+            tracing::debug!("Movement blocked - negative coordinates: ({}, {})", position.x, position.y);
+            return false;
+        }
+
+        // Convert to unsigned coordinates for tilemap query
+        let world_pos = glam::UVec2::new(position.x as u32, position.y as u32);
+        
+        // Check collision with tilemap
+        match tilemap.is_world_position_solid(atlas, world_pos) {
+            Ok(is_solid) => {
+                if is_solid {
+                    tracing::debug!("Collision blocked movement to ({}, {})", position.x, position.y);
+                    false
+                } else {
+                    tracing::trace!("Movement allowed to ({}, {})", position.x, position.y);
+                    true
+                }
+            }
+            Err(err) => {
+                tracing::warn!("Collision check failed for ({}, {}): {}", position.x, position.y, err);
+                false // Block movement on error
+            }
+        }
+    }
+
     /// Process input and update player position
     /// Returns true if the player actually moved (position changed)
-    fn process_input(&mut self, world_bounds: glam::UVec2) -> bool {
+    fn process_input(
+        &mut self,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> bool {
         let Some(player_id) = self.player_id else {
             return false; // No player entity to move
         };
@@ -101,24 +143,36 @@ impl GameState {
                 InputKey::Up => {
                     tracing::trace!("Move forward");
                     let new_y = (player_entity.position.y - self.movement_step).max(0);
-                    player_entity.position.y = new_y;
+                    let new_position = glam::IVec2::new(player_entity.position.x, new_y);
+                    if Self::can_move_to_position(tilemap, atlas, new_position) {
+                        player_entity.position.y = new_y;
+                    }
                 }
                 InputKey::Left => {
                     tracing::trace!("Move left");
                     let new_x = (player_entity.position.x - self.movement_step).max(0);
-                    player_entity.position.x = new_x;
+                    let new_position = glam::IVec2::new(new_x, player_entity.position.y);
+                    if Self::can_move_to_position(tilemap, atlas, new_position) {
+                        player_entity.position.x = new_x;
+                    }
                 }
                 InputKey::Down => {
                     tracing::trace!("Move backward");
                     let new_y = (player_entity.position.y + self.movement_step)
                         .min(world_bounds.y as i32 - self.sprite_size as i32);
-                    player_entity.position.y = new_y;
+                    let new_position = glam::IVec2::new(player_entity.position.x, new_y);
+                    if Self::can_move_to_position(tilemap, atlas, new_position) {
+                        player_entity.position.y = new_y;
+                    }
                 }
                 InputKey::Right => {
                     tracing::trace!("Move right");
                     let new_x = (player_entity.position.x + self.movement_step)
                         .min(world_bounds.x as i32 - self.sprite_size as i32);
-                    player_entity.position.x = new_x;
+                    let new_position = glam::IVec2::new(new_x, player_entity.position.y);
+                    if Self::can_move_to_position(tilemap, atlas, new_position) {
+                        player_entity.position.x = new_x;
+                    }
                 }
             }
         }

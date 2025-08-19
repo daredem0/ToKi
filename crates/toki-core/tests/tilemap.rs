@@ -1,7 +1,7 @@
 use glam::UVec2;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
+use toki_core::assets::{atlas::{AtlasMeta, TileInfo, TileProperties}, tilemap::TileMap};
 use toki_core::CoreError;
 
 // Helper function to create a simple test tilemap
@@ -22,10 +22,22 @@ fn create_test_tilemap() -> TileMap {
 // Helper function to create a test atlas
 fn create_test_atlas() -> AtlasMeta {
     let mut tiles = HashMap::new();
-    tiles.insert("grass".to_string(), UVec2::new(0, 0));
-    tiles.insert("stone".to_string(), UVec2::new(1, 0));
-    tiles.insert("water".to_string(), UVec2::new(0, 1));
-    tiles.insert("dirt".to_string(), UVec2::new(1, 1));
+    tiles.insert("grass".to_string(), TileInfo {
+        position: UVec2::new(0, 0),
+        properties: TileProperties::default(),
+    });
+    tiles.insert("stone".to_string(), TileInfo {
+        position: UVec2::new(1, 0),
+        properties: TileProperties { solid: true, trigger: false },
+    });
+    tiles.insert("water".to_string(), TileInfo {
+        position: UVec2::new(0, 1),
+        properties: TileProperties { solid: false, trigger: true },
+    });
+    tiles.insert("dirt".to_string(), TileInfo {
+        position: UVec2::new(1, 1),
+        properties: TileProperties::default(),
+    });
 
     AtlasMeta {
         image: PathBuf::from("test_texture.png"),
@@ -38,20 +50,20 @@ fn create_test_atlas() -> AtlasMeta {
 fn tilemap_get_tile_name_returns_correct_tiles() {
     let tilemap = create_test_tilemap();
 
-    assert_eq!(tilemap.get_tile_name(0, 0), Some("grass"));
-    assert_eq!(tilemap.get_tile_name(1, 0), Some("stone"));
-    assert_eq!(tilemap.get_tile_name(0, 1), Some("water"));
-    assert_eq!(tilemap.get_tile_name(1, 1), Some("dirt"));
+    assert_eq!(tilemap.get_tile_name(0, 0).unwrap(), "grass");
+    assert_eq!(tilemap.get_tile_name(1, 0).unwrap(), "stone");
+    assert_eq!(tilemap.get_tile_name(0, 1).unwrap(), "water");
+    assert_eq!(tilemap.get_tile_name(1, 1).unwrap(), "dirt");
 }
 
 #[test]
 fn tilemap_get_tile_name_out_of_bounds_returns_none() {
     let tilemap = create_test_tilemap();
 
-    assert_eq!(tilemap.get_tile_name(2, 0), None);
-    assert_eq!(tilemap.get_tile_name(0, 2), None);
-    assert_eq!(tilemap.get_tile_name(2, 2), None);
-    assert_eq!(tilemap.get_tile_name(100, 100), None);
+    assert!(tilemap.get_tile_name(2, 0).is_err());
+    assert!(tilemap.get_tile_name(0, 2).is_err());
+    assert!(tilemap.get_tile_name(2, 2).is_err());
+    assert!(tilemap.get_tile_name(100, 100).is_err());
 }
 
 #[test]
@@ -153,10 +165,10 @@ fn tilemap_tile_to_world_with_different_tile_sizes() {
 fn tilemap_tile_to_world_out_of_bounds_returns_none() {
     let tilemap = create_test_tilemap();
 
-    assert_eq!(tilemap.tile_to_world(UVec2::new(2, 0)), None);
-    assert_eq!(tilemap.tile_to_world(UVec2::new(0, 2)), None);
-    assert_eq!(tilemap.tile_to_world(UVec2::new(2, 2)), None);
-    assert_eq!(tilemap.tile_to_world(UVec2::new(100, 100)), None);
+    assert!(tilemap.tile_to_world(UVec2::new(2, 0)).is_none());
+    assert!(tilemap.tile_to_world(UVec2::new(0, 2)).is_none());
+    assert!(tilemap.tile_to_world(UVec2::new(2, 2)).is_none());
+    assert!(tilemap.tile_to_world(UVec2::new(100, 100)).is_none());
 }
 
 #[test]
@@ -278,14 +290,14 @@ fn tilemap_row_major_indexing() {
     };
 
     // First row
-    assert_eq!(tilemap.get_tile_name(0, 0), Some("a"));
-    assert_eq!(tilemap.get_tile_name(1, 0), Some("b"));
-    assert_eq!(tilemap.get_tile_name(2, 0), Some("c"));
+    assert_eq!(tilemap.get_tile_name(0, 0).unwrap(), "a");
+    assert_eq!(tilemap.get_tile_name(1, 0).unwrap(), "b");
+    assert_eq!(tilemap.get_tile_name(2, 0).unwrap(), "c");
 
     // Second row
-    assert_eq!(tilemap.get_tile_name(0, 1), Some("d"));
-    assert_eq!(tilemap.get_tile_name(1, 1), Some("e"));
-    assert_eq!(tilemap.get_tile_name(2, 1), Some("f"));
+    assert_eq!(tilemap.get_tile_name(0, 1).unwrap(), "d");
+    assert_eq!(tilemap.get_tile_name(1, 1).unwrap(), "e");
+    assert_eq!(tilemap.get_tile_name(2, 1).unwrap(), "f");
 }
 
 #[test]
@@ -298,13 +310,13 @@ fn tilemap_single_tile_map() {
     };
 
     assert!(tilemap.validate().is_ok());
-    assert_eq!(tilemap.get_tile_name(0, 0), Some("single"));
-    assert_eq!(tilemap.get_tile_name(1, 0), None);
+    assert_eq!(tilemap.get_tile_name(0, 0).unwrap(), "single");
+    assert!(tilemap.get_tile_name(1, 0).is_err());
     assert_eq!(
         tilemap.tile_to_world(UVec2::new(0, 0)),
         Some(UVec2::new(0, 0))
     );
-    assert_eq!(tilemap.tile_to_world(UVec2::new(1, 0)), None);
+    assert!(tilemap.tile_to_world(UVec2::new(1, 0)).is_none());
 }
 #[test]
 fn tilemap_chunk_calculations() {

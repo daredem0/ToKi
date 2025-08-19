@@ -75,7 +75,11 @@ impl App {
             self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
             self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
         );
-        let player_moved = self.game_system.update(world_bounds);
+        let player_moved = self.game_system.update(
+            world_bounds,
+            self.resources.get_tilemap(),
+            self.resources.get_terrain_atlas(),
+        );
 
         // Update camera based on game state
         let entities = self.game_system.entities_for_camera();

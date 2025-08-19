@@ -1,4 +1,7 @@
-use toki_core::{entity::Entity, sprite::SpriteFrame, GameState, InputKey};
+use toki_core::{
+    assets::atlas::AtlasMeta, assets::tilemap::TileMap, entity::Entity, sprite::SpriteFrame,
+    GameState, InputKey,
+};
 use winit::keyboard::KeyCode;
 
 /// Game system that wraps the core GameState and provides runtime integration.
@@ -18,8 +21,13 @@ impl GameSystem {
 
     /// Update the game state by one tick
     /// Returns true if the player moved (indicating camera/rendering updates needed)
-    pub fn update(&mut self, world_bounds: glam::UVec2) -> bool {
-        self.game_state.update(world_bounds)
+    pub fn update(
+        &mut self,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> bool {
+        self.game_state.update(world_bounds, tilemap, atlas)
     }
 
     /// Handle winit keyboard input events, translating to core InputKey events

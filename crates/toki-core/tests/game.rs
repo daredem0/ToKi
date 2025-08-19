@@ -1,6 +1,9 @@
 use toki_core::{GameState, InputKey};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
+use toki_core::assets::{atlas::{AtlasMeta, TileInfo, TileProperties}, tilemap::TileMap};
 use glam::{IVec2, UVec2};
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 fn create_test_sprite() -> SpriteInstance {
     let animation = Animation {
@@ -17,6 +20,32 @@ fn create_test_sprite() -> SpriteInstance {
         sheet_size: (32, 16),
     };
     SpriteInstance::new(IVec2::new(50, 60), animation, sprite_sheet)
+}
+
+fn create_test_tilemap() -> TileMap {
+    TileMap {
+        size: UVec2::new(10, 10),
+        tile_size: UVec2::new(16, 16),
+        atlas: PathBuf::from("test_atlas.json"),
+        tiles: vec!["floor".to_string(); 100], // 10x10 grid of floor tiles
+    }
+}
+
+fn create_test_atlas() -> AtlasMeta {
+    let mut tiles = HashMap::new();
+    tiles.insert("floor".to_string(), TileInfo {
+        position: UVec2::new(0, 0),
+        properties: TileProperties {
+            solid: false,
+            trigger: false,
+        },
+    });
+    
+    AtlasMeta {
+        image: PathBuf::from("test_atlas.png"),
+        tile_size: UVec2::new(16, 16),
+        tiles,
+    }
 }
 
 #[test]
@@ -74,7 +103,9 @@ fn game_state_key_press_and_release() {
     
     // Update should process the input
     let world_bounds = UVec2::new(1000, 1000);
-    let moved = game_state.update(world_bounds);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+    let moved = game_state.update(world_bounds, &tilemap, &atlas);
     
     assert!(moved);
     assert!(game_state.player_position().x > initial_position.x);
@@ -84,7 +115,7 @@ fn game_state_key_press_and_release() {
     
     // Another update should not move further
     let position_after_release = game_state.player_position();
-    let moved_again = game_state.update(world_bounds);
+    let moved_again = game_state.update(world_bounds, &tilemap, &atlas);
     
     assert!(!moved_again);
     assert_eq!(game_state.player_position(), position_after_release);
@@ -98,7 +129,7 @@ fn game_state_movement_up() {
     
     game_state.handle_key_press(InputKey::Up);
     let world_bounds = UVec2::new(1000, 1000);
-    let moved = game_state.update(world_bounds);
+    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     
     assert!(moved);
     assert_eq!(game_state.player_position().x, initial_position.x); // X unchanged
@@ -114,7 +145,7 @@ fn game_state_movement_down() {
     
     game_state.handle_key_press(InputKey::Down);
     let world_bounds = UVec2::new(1000, 1000);
-    let moved = game_state.update(world_bounds);
+    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     
     assert!(moved);
     assert_eq!(game_state.player_position().x, initial_position.x); // X unchanged
@@ -130,7 +161,7 @@ fn game_state_movement_left() {
     
     game_state.handle_key_press(InputKey::Left);
     let world_bounds = UVec2::new(1000, 1000);
-    let moved = game_state.update(world_bounds);
+    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     
     assert!(moved);
     assert!(game_state.player_position().x < initial_position.x); // X decreased (left)
@@ -146,7 +177,7 @@ fn game_state_movement_right() {
     
     game_state.handle_key_press(InputKey::Right);
     let world_bounds = UVec2::new(1000, 1000);
-    let moved = game_state.update(world_bounds);
+    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     
     assert!(moved);
     assert!(game_state.player_position().x > initial_position.x); // X increased (right)
@@ -165,7 +196,7 @@ fn game_state_diagonal_movement() {
     game_state.handle_key_press(InputKey::Right);
     
     let world_bounds = UVec2::new(1000, 1000);
-    let moved = game_state.update(world_bounds);
+    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     
     assert!(moved);
     assert_eq!(game_state.player_position().x, initial_position.x + 1); // Moved right
@@ -183,14 +214,14 @@ fn game_state_world_bounds_left_boundary() {
     
     // Move left repeatedly until at boundary
     for _ in 0..100 {
-        game_state.update(world_bounds);
+        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
     
     // Should be clamped at 0
     assert_eq!(game_state.player_position().x, 0);
     
     // One more update should not move further
-    let moved = game_state.update(world_bounds);
+    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     assert!(!moved); // Should not report movement when clamped
     assert_eq!(game_state.player_position().x, 0);
 }
@@ -206,14 +237,14 @@ fn game_state_world_bounds_top_boundary() {
     
     // Move up repeatedly until at boundary
     for _ in 0..100 {
-        game_state.update(world_bounds);
+        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
     
     // Should be clamped at 0
     assert_eq!(game_state.player_position().y, 0);
     
     // One more update should not move further
-    let moved = game_state.update(world_bounds);
+    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     assert!(!moved); // Should not report movement when clamped
     assert_eq!(game_state.player_position().y, 0);
 }
@@ -228,7 +259,7 @@ fn game_state_world_bounds_right_boundary() {
     
     // Move right repeatedly until at boundary
     for _ in 0..200 {
-        game_state.update(world_bounds);
+        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
     
     // Should be clamped at world_width - sprite_size
@@ -236,7 +267,7 @@ fn game_state_world_bounds_right_boundary() {
     assert_eq!(game_state.player_position().x, expected_max_x);
     
     // One more update should not move further
-    let moved = game_state.update(world_bounds);
+    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     assert!(!moved); // Should not report movement when clamped
 }
 
@@ -250,7 +281,7 @@ fn game_state_world_bounds_bottom_boundary() {
     
     // Move down repeatedly until at boundary
     for _ in 0..200 {
-        game_state.update(world_bounds);
+        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
     
     // Should be clamped at world_height - sprite_size
@@ -258,7 +289,7 @@ fn game_state_world_bounds_bottom_boundary() {
     assert_eq!(game_state.player_position().y, expected_max_y);
     
     // One more update should not move further
-    let moved = game_state.update(world_bounds);
+    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     assert!(!moved); // Should not report movement when clamped
 }
 
@@ -272,7 +303,7 @@ fn game_state_sprite_animation_updates() {
     
     // Update multiple times to advance animation
     for _ in 0..10 {
-        game_state.update(world_bounds);
+        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
     
     // Animation should have progressed (frame or timing)
@@ -289,7 +320,7 @@ fn game_state_entity_position_sync() {
     // Move the player
     game_state.handle_key_press(InputKey::Right);
     let world_bounds = UVec2::new(1000, 1000);
-    game_state.update(world_bounds);
+    game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     
     // Entity position should match player sprite position
     let player_entity = game_state.player_entity().unwrap();
@@ -298,7 +329,7 @@ fn game_state_entity_position_sync() {
     // Move again
     game_state.handle_key_press(InputKey::Down);
     game_state.handle_key_release(InputKey::Right);
-    game_state.update(world_bounds);
+    game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     
     // Should still be synchronized
     let player_entity = game_state.player_entity().unwrap();
@@ -318,7 +349,7 @@ fn game_state_multiple_key_handling() {
     
     let world_bounds = UVec2::new(1000, 1000);
     let _initial_position = game_state.player_position();
-    game_state.update(world_bounds);
+    game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     
     // All directions should be processed (net effect might cancel out)
     // This tests that multiple keys don't crash the system
@@ -329,7 +360,7 @@ fn game_state_multiple_key_handling() {
     game_state.handle_key_release(InputKey::Left);
     
     let position_before = game_state.player_position();
-    game_state.update(world_bounds);
+    game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     let position_after = game_state.player_position();
     
     // Should move up and right now

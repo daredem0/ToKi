@@ -25,15 +25,40 @@
         },
         "tiles": {
             "type": "object",
-            "description": "Map of tile names to tile grid positions (in tile units)",
+            "description": "Map of tile names to tile information objects",
             "additionalProperties": {
-                "type": "array",
-                "items": {
-                    "type": "integer",
-                    "minimum": 0
+                "type": "object",
+                "required": ["position"],
+                "properties": {
+                    "position": {
+                        "type": "array",
+                        "description": "Tile grid position: [x, y] (in tile units)",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "minItems": 2,
+                        "maxItems": 2
+                    },
+                    "properties": {
+                        "type": "object",
+                        "description": "Tile collision and behavior properties",
+                        "properties": {
+                            "solid": {
+                                "type": "boolean",
+                                "description": "Whether this tile blocks movement",
+                                "default": false
+                            },
+                            "trigger": {
+                                "type": "boolean", 
+                                "description": "Whether this tile triggers events when touched",
+                                "default": false
+                            }
+                        },
+                        "additionalProperties": false
+                    }
                 },
-                "minItems": 2,
-                "maxItems": 2
+                "additionalProperties": false
             }
         }
     },

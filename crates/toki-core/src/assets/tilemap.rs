@@ -24,12 +24,36 @@ impl TileMap {
         Ok(map)
     }
 
-    pub fn get_tile_name(&self, x: u32, y: u32) -> Option<&str> {
+    pub fn is_tile_solid_at(
+        &self,
+        atlas: &AtlasMeta,
+        tile_x: u32,
+        tile_y: u32,
+    ) -> Result<bool, CoreError> {
+        let tile_name = self.get_tile_name(tile_x, tile_y)?;
+        Ok(atlas.is_tile_solid(tile_name))
+    }
+
+    pub fn is_world_position_solid(
+        &self,
+        atlas: &AtlasMeta,
+        world_pos: glam::UVec2,
+    ) -> Result<bool, CoreError> {
+        let tile_x = world_pos.x / self.tile_size.x;
+        let tile_y = world_pos.y / self.tile_size.y;
+        self.is_tile_solid_at(atlas, tile_x, tile_y)
+    }
+    pub fn get_tile_name(&self, x: u32, y: u32) -> Result<&str, CoreError> {
         if x >= self.size.x || y >= self.size.y {
-            return None;
+            return Err(CoreError::TileOutOfBounds {
+                x,
+                y,
+                map_width: self.size.x,
+                map_height: self.size.y,
+            });
         }
         let index = (y * self.size.x + x) as usize;
-        self.tiles.get(index).map(String::as_str)
+        Ok(self.tiles.get(index).map(String::as_str).unwrap())
     }
 
     pub fn validate(&self) -> Result<(), CoreError> {
@@ -57,8 +81,8 @@ impl TileMap {
         for y in 0..self.size.y {
             for x in 0..self.size.x {
                 let tile_name = match self.get_tile_name(x, y) {
-                    Some(name) => name,
-                    None => continue,
+                    Ok(name) => name,
+                    Err(_) => continue,
                 };
 
                 let rect = match atlas.get_tile_rect(tile_name) {
@@ -174,7 +198,7 @@ impl TileMap {
         texture_size: UVec2,
     ) -> Option<Vec<QuadVertex>> {
         // Get the tile name
-        let tile_name = self.get_tile_name(tile_x, tile_y)?;
+        let tile_name = self.get_tile_name(tile_x, tile_y).ok()?;
 
         // Get atlas rectangle
         let rect = atlas.get_tile_rect(tile_name)?;

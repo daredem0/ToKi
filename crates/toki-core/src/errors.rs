@@ -20,4 +20,32 @@ pub enum CoreError {
 
     #[error("Map size mismatch: expected {expected} tiles, found {actual}")]
     InvalidMapSize { expected: usize, actual: usize },
+
+    #[error("Tile coordinates ({x}, {y}) are out of bounds for map size {map_width}x{map_height}")]
+    TileOutOfBounds {
+        x: u32,
+        y: u32,
+        map_width: u32,
+        map_height: u32,
+    },
+
+    #[error(
+        "World position ({x}, {y}) has coordinates that are out of bounds, which are not supported"
+    )]
+    WorldPositionOutOfBounds { x: u32, y: u32 },
+
+    #[error("Entity with ID {entity_id} not found")]
+    EntityNotFound { entity_id: u32 },
+
+    #[error("Entity with ID {entity_id} has no collision box")]
+    NoCollisionBox { entity_id: u32 },
+
+    #[error("Atlas missing tile '{tile_name}' referenced in tilemap")]
+    MissingTileInAtlas { tile_name: String },
+
+    #[error("Collision system not initialized")]
+    CollisionSystemNotInitialized,
+
+    #[error("Invalid entity position: ({x}, {y}) would place entity outside world bounds")]
+    InvalidEntityPosition { x: i32, y: i32 },
 }
