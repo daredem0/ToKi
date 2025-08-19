@@ -37,8 +37,7 @@ jobs:
       run: cargo build --verbose
       
     - name: Run tests with nextest
-      run: cargo nextest run --profile ci --verbose \
-          --junit target/nextest/ci/junit.xml
+      run: cargo nextest run --profile ci --verbose
       continue-on-error: true
       
     - name: Publish test results
@@ -46,7 +45,7 @@ jobs:
       if: always()
       with:
         name: Rust Test Results
-        path: target/nextest/ci/junit.xml
+        path: target/nextest/ci/**/*.xml   # <- glob is safer here
         reporter: java-junit
         fail-on-error: true
         
