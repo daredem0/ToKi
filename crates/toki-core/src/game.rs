@@ -98,37 +98,50 @@ impl GameState {
     /// Process input and update player position
     /// Returns true if the player actually moved (position changed)
     fn process_input(&mut self, world_bounds: glam::Vec2) -> bool {
-        let initial_position = self.player_sprite.position;
+        let Some(player_id) = self.player_id else {
+            return false; // No player entity to move
+        };
+
+        let Some(player_entity) = self.entity_manager.get_entity(player_id) else {
+            return false; // Player entity doesn't exist
+        };
+
+        let initial_position = player_entity.position;
+
+        // Get mutable reference to player entity
+        let Some(player_entity) = self.entity_manager.get_entity_mut(player_id) else {
+            return false;
+        };
 
         for key in &self.keys_held {
             match key {
                 InputKey::Up => {
                     tracing::trace!("Move forward");
-                    let new_y = (self.player_sprite.position.y - self.movement_step).max(0.0);
-                    self.player_sprite.position.y = new_y;
+                    let new_y = (player_entity.position.y - self.movement_step).max(0.0);
+                    player_entity.position.y = new_y;
                 }
                 InputKey::Left => {
                     tracing::trace!("Move left");
-                    let new_x = (self.player_sprite.position.x - self.movement_step).max(0.0);
-                    self.player_sprite.position.x = new_x;
+                    let new_x = (player_entity.position.x - self.movement_step).max(0.0);
+                    player_entity.position.x = new_x;
                 }
                 InputKey::Down => {
                     tracing::trace!("Move backward");
-                    let new_y = (self.player_sprite.position.y + self.movement_step)
+                    let new_y = (player_entity.position.y + self.movement_step)
                         .min(world_bounds.y - self.sprite_size);
-                    self.player_sprite.position.y = new_y;
+                    player_entity.position.y = new_y;
                 }
                 InputKey::Right => {
                     tracing::trace!("Move right");
-                    let new_x = (self.player_sprite.position.x + self.movement_step)
+                    let new_x = (player_entity.position.x + self.movement_step)
                         .min(world_bounds.x - self.sprite_size);
-                    self.player_sprite.position.x = new_x;
+                    player_entity.position.x = new_x;
                 }
             }
         }
 
         // Only return true if position actually changed
-        self.player_sprite.position != initial_position
+        player_entity.position != initial_position
     }
 
     /// Handle key press events
@@ -141,10 +154,6 @@ impl GameState {
         self.keys_held.remove(&key);
     }
 
-    /// Get reference to player sprite
-    pub fn player_sprite(&self) -> &SpriteInstance {
-        &self.player_sprite
-    }
 
     /// Get reference to all entities (legacy method - preserved for compatibility)
     pub fn entities(&self) -> Vec<&Entity> {
