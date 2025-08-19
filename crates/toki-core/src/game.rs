@@ -13,7 +13,7 @@ pub enum InputKey {
     Left,
     Right,
     DebugToggle, // F4 key for toggling debug rendering
-    // Can extend with more keys as needed
+                 // Can extend with more keys as needed
 }
 
 /// Core game state that manages entities, input, and game logic.
@@ -131,7 +131,7 @@ impl GameState {
                 match tilemap.is_tile_solid_at(atlas, tile_x, tile_y) {
                     Ok(is_solid) => {
                         if is_solid {
-                            tracing::debug!(
+                            tracing::trace!(
                                 "Collision blocked movement - solid tile at ({}, {}) would overlap collision box at ({}, {})",
                                 tile_x, tile_y, box_pos.x, box_pos.y
                             );
@@ -140,7 +140,12 @@ impl GameState {
                     }
                     Err(err) => {
                         // Out of bounds or other error - treat as blocking
-                        tracing::debug!("Collision check failed for tile ({}, {}): {}", tile_x, tile_y, err);
+                        tracing::debug!(
+                            "Collision check failed for tile ({}, {}): {}",
+                            tile_x,
+                            tile_y,
+                            err
+                        );
                         return false;
                     }
                 }
@@ -180,7 +185,12 @@ impl GameState {
                     tracing::trace!("Move forward");
                     let new_y = (player_entity.position.y - self.movement_step).max(0);
                     let new_position = glam::IVec2::new(player_entity.position.x, new_y);
-                    if Self::can_entity_move_to_position(player_entity, new_position, tilemap, atlas) {
+                    if Self::can_entity_move_to_position(
+                        player_entity,
+                        new_position,
+                        tilemap,
+                        atlas,
+                    ) {
                         player_entity.position.y = new_y;
                     }
                 }
@@ -188,7 +198,12 @@ impl GameState {
                     tracing::trace!("Move left");
                     let new_x = (player_entity.position.x - self.movement_step).max(0);
                     let new_position = glam::IVec2::new(new_x, player_entity.position.y);
-                    if Self::can_entity_move_to_position(player_entity, new_position, tilemap, atlas) {
+                    if Self::can_entity_move_to_position(
+                        player_entity,
+                        new_position,
+                        tilemap,
+                        atlas,
+                    ) {
                         player_entity.position.x = new_x;
                     }
                 }
@@ -197,7 +212,12 @@ impl GameState {
                     let new_y = (player_entity.position.y + self.movement_step)
                         .min(world_bounds.y as i32 - self.sprite_size as i32);
                     let new_position = glam::IVec2::new(player_entity.position.x, new_y);
-                    if Self::can_entity_move_to_position(player_entity, new_position, tilemap, atlas) {
+                    if Self::can_entity_move_to_position(
+                        player_entity,
+                        new_position,
+                        tilemap,
+                        atlas,
+                    ) {
                         player_entity.position.y = new_y;
                     }
                 }
@@ -206,7 +226,12 @@ impl GameState {
                     let new_x = (player_entity.position.x + self.movement_step)
                         .min(world_bounds.x as i32 - self.sprite_size as i32);
                     let new_position = glam::IVec2::new(new_x, player_entity.position.y);
-                    if Self::can_entity_move_to_position(player_entity, new_position, tilemap, atlas) {
+                    if Self::can_entity_move_to_position(
+                        player_entity,
+                        new_position,
+                        tilemap,
+                        atlas,
+                    ) {
                         player_entity.position.x = new_x;
                     }
                 }
@@ -225,7 +250,10 @@ impl GameState {
         match key {
             InputKey::DebugToggle => {
                 self.debug_collision_rendering = !self.debug_collision_rendering;
-                tracing::info!("Debug collision rendering: {}", self.debug_collision_rendering);
+                tracing::info!(
+                    "Debug collision rendering: {}",
+                    self.debug_collision_rendering
+                );
             }
             _ => {
                 self.keys_held.insert(key);
@@ -333,7 +361,7 @@ impl GameState {
         }
 
         let mut boxes = Vec::new();
-        
+
         for entity_id in self.entity_manager.active_entities() {
             if let Some(entity) = self.entity_manager.get_entity(entity_id) {
                 if let Some(collision_box) = &entity.collision_box {
@@ -342,19 +370,23 @@ impl GameState {
                 }
             }
         }
-        
+
         boxes
     }
 
     /// Get solid tile positions for debug rendering
     /// Returns Vec of (tile_x, tile_y) coordinates of solid tiles
-    pub fn get_solid_tile_positions(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> Vec<(u32, u32)> {
+    pub fn get_solid_tile_positions(
+        &self,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> Vec<(u32, u32)> {
         if !self.debug_collision_rendering {
             return Vec::new();
         }
 
         let mut solid_tiles = Vec::new();
-        
+
         for y in 0..tilemap.size.y {
             for x in 0..tilemap.size.x {
                 if let Ok(is_solid) = tilemap.is_tile_solid_at(atlas, x, y) {
@@ -364,19 +396,23 @@ impl GameState {
                 }
             }
         }
-        
+
         solid_tiles
     }
 
     /// Get trigger tile positions for debug rendering  
     /// Returns Vec of (tile_x, tile_y) coordinates of trigger tiles
-    pub fn get_trigger_tile_positions(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> Vec<(u32, u32)> {
+    pub fn get_trigger_tile_positions(
+        &self,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> Vec<(u32, u32)> {
         if !self.debug_collision_rendering {
             return Vec::new();
         }
 
         let mut trigger_tiles = Vec::new();
-        
+
         for y in 0..tilemap.size.y {
             for x in 0..tilemap.size.x {
                 if let Ok(tile_name) = tilemap.get_tile_name(x, y) {
@@ -386,7 +422,7 @@ impl GameState {
                 }
             }
         }
-        
+
         trigger_tiles
     }
 }

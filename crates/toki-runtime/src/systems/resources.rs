@@ -2,7 +2,7 @@ use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
 use toki_render::RenderError;
 
 /// Resource management system that handles loading and providing access to game assets.
-/// 
+///
 /// Centralizes asset loading and provides clean APIs for accessing resources.
 /// Future-ready for additional asset types like fonts, sounds, and shaders.
 #[derive(Debug)]
@@ -17,7 +17,8 @@ impl ResourceManager {
     pub fn load_all() -> Result<Self, RenderError> {
         let terrain_atlas = AtlasMeta::load_from_file("assets/terrain.json")?;
         let creature_atlas = AtlasMeta::load_from_file("assets/creatures.json")?;
-        let tilemap = TileMap::load_from_file("assets/maps/tilemap_64x64_chunk.json")?;
+        // let tilemap = TileMap::load_from_file("assets/maps/tilemap_64x64_chunk.json")?;
+        let tilemap = TileMap::load_from_file("assets/maps/new_town_map_64x64_crossings.json")?;
 
         // Validate the tilemap
         tilemap.validate()?;
