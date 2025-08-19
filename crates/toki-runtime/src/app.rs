@@ -34,48 +34,50 @@ struct App {
 impl App {
     fn new() -> Self {
         let resources = ResourceManager::load_all().expect("Failed to load resources");
-        let animation = Animation {
-            name: "slime_bounce".into(),
-            looped: true,
-            frames: vec![
-                Frame {
-                    index: 0,
-                    duration_ms: 150,
-                },
-                Frame {
-                    index: 1,
-                    duration_ms: 150,
-                },
-                Frame {
-                    index: 2,
-                    duration_ms: 150,
-                },
-                Frame {
-                    index: 3,
-                    duration_ms: 150,
-                },
-            ],
-        };
-        let sprite_sheet = SpriteSheetMeta {
-            frame_size: (
-                resources.creature_tile_size().x,
-                resources.creature_tile_size().y,
-            ),
-            frame_count: 4,
-            sheet_size: (
-                resources
-                    .creature_image_size()
-                    .expect("Cannot derive image size")
-                    .x,
-                resources
-                    .creature_image_size()
-                    .expect("Cannot derive image size")
-                    .y,
-            ),
-        };
-        let sprite_instance =
-            SpriteInstance::new(glam::Vec2::new(80.0, 72.0), animation, sprite_sheet);
-        let game_state = GameState::new(sprite_instance);
+        // let animation = Animation {
+        //     name: "slime_bounce".into(),
+        //     looped: true,
+        //     frames: vec![
+        //         Frame {
+        //             index: 0,
+        //             duration_ms: 150,
+        //         },
+        //         Frame {
+        //             index: 1,
+        //             duration_ms: 150,
+        //         },
+        //         Frame {
+        //             index: 2,
+        //             duration_ms: 150,
+        //         },
+        //         Frame {
+        //             index: 3,
+        //             duration_ms: 150,
+        //         },
+        //     ],
+        // };
+        // let sprite_sheet = SpriteSheetMeta {
+        //     frame_size: (
+        //         resources.creature_tile_size().x,
+        //         resources.creature_tile_size().y,
+        //     ),
+        //     frame_count: 4,
+        //     sheet_size: (
+        //         resources
+        //             .creature_image_size()
+        //             .expect("Cannot derive image size")
+        //             .x,
+        //         resources
+        //             .creature_image_size()
+        //             .expect("Cannot derive image size")
+        //             .y,
+        //     ),
+        // };
+        // let sprite_instance =
+        //     SpriteInstance::new(glam::Vec2::new(80.0, 72.0), animation, sprite_sheet);
+        // let game_state = GameState::new(sprite_instance);
+        let mut game_state = GameState::new_empty();
+        let _player_id = game_state.spawn_player_at(glam::Vec2::new(80.0, 72.0));
         let game_system = GameSystem::new(game_state);
 
         let mut camera = Camera {

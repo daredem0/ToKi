@@ -40,7 +40,7 @@ impl GameState {
     /// Create a new GameState with the given player sprite
     pub fn new(player_sprite: SpriteInstance) -> Self {
         let mut entity_manager = EntityManager::new();
-        
+
         // Create player entity at the sprite's initial position
         let player_id = entity_manager.spawn_player(player_sprite.position);
 
@@ -54,17 +54,41 @@ impl GameState {
         }
     }
 
+    /// Create a new empty GameState with no entities
+    pub fn new_empty() -> Self {
+        Self {
+            entity_manager: EntityManager::new(),
+            player_sprite: SpriteInstance::default(),
+            player_id: None,
+            keys_held: HashSet::new(),
+            movement_step: 1.0,
+            sprite_size: 16.0,
+        }
+    }
+
+    /// Initialize the game with a player at the specified position
+    pub fn spawn_player_at(&mut self, position: glam::Vec2) -> EntityId {
+        let player_id = self.entity_manager.spawn_player(position);
+        self.player_id = Some(player_id);
+        player_id
+    }
+
     /// Update game state by one tick
     pub fn update(&mut self, world_bounds: glam::Vec2) -> bool {
         let moved = self.process_input(world_bounds);
 
-        // Update sprite animation
-        self.player_sprite.tick(17); // ~60fps timing
-
-        // Keep entity position synchronized with sprite position
+        // Update entity animation timing
         if let Some(player_id) = self.player_id {
             if let Some(player_entity) = self.entity_manager.get_entity_mut(player_id) {
-                player_entity.position = self.player_sprite.position;
+                if let Some(sprite_info) = &mut player_entity.attributes.sprite_info {
+                    sprite_info.frame_timer += 17.0; // Add delta time
+                                                     // Handle frame advancement (simple version for now)
+                    if sprite_info.frame_timer >= 150.0 {
+                        // 150ms per frame
+                        sprite_info.current_frame = (sprite_info.current_frame + 1) % 4; // 4 frames
+                        sprite_info.frame_timer = 0.0;
+                    }
+                }
             }
         }
 
@@ -124,7 +148,8 @@ impl GameState {
 
     /// Get reference to all entities (legacy method - preserved for compatibility)
     pub fn entities(&self) -> Vec<&Entity> {
-        self.entity_manager.active_entities()
+        self.entity_manager
+            .active_entities()
             .iter()
             .filter_map(|&id| self.entity_manager.get_entity(id))
             .collect()
@@ -147,12 +172,14 @@ impl GameState {
 
     /// Get reference to player entity
     pub fn player_entity(&self) -> Option<&Entity> {
-        self.player_id.and_then(|id| self.entity_manager.get_entity(id))
+        self.player_id
+            .and_then(|id| self.entity_manager.get_entity(id))
     }
 
     /// Get entities as owned Vec for camera system compatibility
     pub fn entities_owned(&self) -> Vec<Entity> {
-        self.entity_manager.active_entities()
+        self.entity_manager
+            .active_entities()
             .iter()
             .filter_map(|&id| self.entity_manager.get_entity(id))
             .cloned()
@@ -161,12 +188,39 @@ impl GameState {
 
     /// Get the current sprite frame for rendering
     pub fn current_sprite_frame(&self) -> SpriteFrame {
-        self.player_sprite.current_frame()
+        if let Some(player_entity) = self.player_entity() {
+            if let Some(sprite_info) = &player_entity.attributes.sprite_info {
+                // Create a basic UV frame calculation
+                // For now, assume 4 frames in a horizontal strip
+                let frame_width = 1.0 / 4.0; // 4 frames wide
+                let u0 = sprite_info.current_frame as f32 * frame_width;
+                let u1 = u0 + frame_width;
+
+                return SpriteFrame {
+                    u0,
+                    v0: 0.0,
+                    u1,
+                    v1: 1.0,
+                };
+            }
+        }
+
+        // Fallback to default frame
+        SpriteFrame {
+            u0: 0.0,
+            v0: 0.0,
+            u1: 0.25,
+            v1: 1.0,
+        }
     }
 
     /// Get player position for rendering
     pub fn player_position(&self) -> glam::Vec2 {
-        self.player_sprite.position
+        if let Some(player_entity) = self.player_entity() {
+            player_entity.position
+        } else {
+            glam::Vec2::ZERO // Fallback
+        }
     }
 
     /// Get sprite size for rendering calculations

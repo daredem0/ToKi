@@ -15,12 +15,32 @@ pub struct Animation {
     pub looped: bool,
 }
 
+impl Default for Animation {
+    fn default() -> Self {
+        Self {
+            name: "default".to_string(),
+            frames: vec![Frame { index: 0, duration_ms: 100 }],
+            looped: true,
+        }
+    }
+}
+
 /// Metadata about a sprite sheet (grid layout of frames).
 #[derive(Debug, Clone)]
 pub struct SpriteSheetMeta {
     pub frame_size: (u32, u32),
     pub sheet_size: (u32, u32),
     pub frame_count: u32,
+}
+
+impl Default for SpriteSheetMeta {
+    fn default() -> Self {
+        Self {
+            frame_size: (16, 16),
+            sheet_size: (16, 16),
+            frame_count: 1,
+        }
+    }
 }
 
 /// Tracks and updates animation playback over time.
@@ -107,6 +127,17 @@ pub struct SpriteInstance {
     pub animation: Animation,
     pub animator: Animator,
     pub sheet: SpriteSheetMeta,
+}
+
+impl Default for SpriteInstance {
+    fn default() -> Self {
+        Self {
+            position: Vec2::ZERO,
+            animation: Animation::default(),
+            animator: Animator::new(),
+            sheet: SpriteSheetMeta::default(),
+        }
+    }
 }
 
 impl SpriteInstance {
