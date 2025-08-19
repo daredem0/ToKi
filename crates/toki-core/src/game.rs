@@ -22,9 +22,6 @@ pub struct GameState {
     /// Entity manager for all game objects
     entity_manager: EntityManager,
 
-    /// Player sprite instance (legacy - will be migrated to entity system)
-    player_sprite: SpriteInstance,
-
     /// Player entity ID for quick access
     player_id: Option<EntityId>,
 
@@ -46,7 +43,6 @@ impl GameState {
 
         Self {
             entity_manager,
-            player_sprite,
             player_id: Some(player_id),
             keys_held: HashSet::new(),
             movement_step: 1.0, // Move exactly 1 pixel per frame
@@ -58,7 +54,6 @@ impl GameState {
     pub fn new_empty() -> Self {
         Self {
             entity_manager: EntityManager::new(),
-            player_sprite: SpriteInstance::default(),
             player_id: None,
             keys_held: HashSet::new(),
             movement_step: 1.0,
@@ -78,19 +73,7 @@ impl GameState {
         let moved = self.process_input(world_bounds);
 
         // Update entity animation timing
-        if let Some(player_id) = self.player_id {
-            if let Some(player_entity) = self.entity_manager.get_entity_mut(player_id) {
-                if let Some(sprite_info) = &mut player_entity.attributes.sprite_info {
-                    sprite_info.frame_timer += 17.0; // Add delta time
-                                                     // Handle frame advancement (simple version for now)
-                    if sprite_info.frame_timer >= 150.0 {
-                        // 150ms per frame
-                        sprite_info.current_frame = (sprite_info.current_frame + 1) % 4; // 4 frames
-                        sprite_info.frame_timer = 0.0;
-                    }
-                }
-            }
-        }
+        self.entity_manager.update_animations(17.0);
 
         moved
     }
@@ -153,7 +136,6 @@ impl GameState {
     pub fn handle_key_release(&mut self, key: InputKey) {
         self.keys_held.remove(&key);
     }
-
 
     /// Get reference to all entities (legacy method - preserved for compatibility)
     pub fn entities(&self) -> Vec<&Entity> {

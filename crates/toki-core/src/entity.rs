@@ -85,6 +85,25 @@ impl EntityManager {
         }
     }
 
+    /// Update animations for all entities
+    pub fn update_animations(&mut self, delta_time_ms: f32) {
+        for entity in self.entities.values_mut() {
+            if let Some(sprite_info) = &mut entity.attributes.sprite_info {
+                // Add time to frame timer
+                sprite_info.frame_timer += delta_time_ms;
+
+                // Check if its time to advance frame
+                // TODO: For now use hardcoded 150ms, should be configurable
+                let frame_duration = 150.0;
+                if sprite_info.frame_timer >= frame_duration {
+                    // Advance to next frame (hardcoded 4 frames for now)
+                    sprite_info.current_frame = (sprite_info.current_frame + 1) % 4;
+                    sprite_info.frame_timer = 0.0;
+                }
+            }
+        }
+    }
+
     pub fn spawn_entity(
         &mut self,
         entity_type: EntityType,

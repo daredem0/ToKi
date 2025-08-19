@@ -9,7 +9,6 @@ use winit::window::WindowId;
 use std::time::Instant;
 
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
-use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{GameState, TimingSystem};
 use toki_render::RenderError;
 
@@ -34,48 +33,7 @@ struct App {
 impl App {
     fn new() -> Self {
         let resources = ResourceManager::load_all().expect("Failed to load resources");
-        // let animation = Animation {
-        //     name: "slime_bounce".into(),
-        //     looped: true,
-        //     frames: vec![
-        //         Frame {
-        //             index: 0,
-        //             duration_ms: 150,
-        //         },
-        //         Frame {
-        //             index: 1,
-        //             duration_ms: 150,
-        //         },
-        //         Frame {
-        //             index: 2,
-        //             duration_ms: 150,
-        //         },
-        //         Frame {
-        //             index: 3,
-        //             duration_ms: 150,
-        //         },
-        //     ],
-        // };
-        // let sprite_sheet = SpriteSheetMeta {
-        //     frame_size: (
-        //         resources.creature_tile_size().x,
-        //         resources.creature_tile_size().y,
-        //     ),
-        //     frame_count: 4,
-        //     sheet_size: (
-        //         resources
-        //             .creature_image_size()
-        //             .expect("Cannot derive image size")
-        //             .x,
-        //         resources
-        //             .creature_image_size()
-        //             .expect("Cannot derive image size")
-        //             .y,
-        //     ),
-        // };
-        // let sprite_instance =
-        //     SpriteInstance::new(glam::Vec2::new(80.0, 72.0), animation, sprite_sheet);
-        // let game_state = GameState::new(sprite_instance);
+
         let mut game_state = GameState::new_empty();
         let _player_id = game_state.spawn_player_at(glam::Vec2::new(80.0, 72.0));
         let game_system = GameSystem::new(game_state);
@@ -93,9 +51,6 @@ impl App {
             mode: CameraMode::FollowEntity(player_id),
         };
         let camera_system = CameraSystem::new(camera, cam_controller);
-        // let runtime = RuntimeState {
-        //     entities: &[slime_entity],
-        // };
 
         Self {
             // Core systems
@@ -225,12 +180,6 @@ impl App {
             if let Some(size) = self.platform.inner_size() {
                 self.rendering.update_window_size(size);
             }
-            // let projection = calculate_projection(self.projection_params);
-            // let model = glam::Mat4::from_translation(self.sprite.position.extend(0.0));
-
-            // let mvp = projection * model;
-
-            // gpu.update_projection(mvp);
             let left = self.camera_system.position().x;
             let top = self.camera_system.position().y;
             let right = left + self.camera_system.viewport_size().x as i32;
