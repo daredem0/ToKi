@@ -9,16 +9,53 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: write
+
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
       with: 
         lfs: true
+        
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Install cargo-nextest
+      uses: taiki-e/install-action@nextest
+      
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+      
     - name: Build
       run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      
+    - name: Run tests with nextest
+      run: cargo nextest run --profile ci --verbose \
+          --junit target/nextest/ci/junit.xml
+      continue-on-error: true
+      
+    - name: Publish test results
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: Rust Test Results
+        path: target/nextest/ci/junit.xml
+        reporter: java-junit
+        fail-on-error: true
+        
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          target/nextest/ci/junit.xml
+          target/nextest/ci/
+        retention-days: 30
