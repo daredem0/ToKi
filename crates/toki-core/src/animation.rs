@@ -3,6 +3,12 @@ use serde::{Deserialize, Serialize};
 use crate::errors::CoreError;
 use std::collections::HashMap;
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Eq, Hash)]
+pub enum AnimationState {
+    Idle,
+    Walk,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LoopMode {
     Loop,    // Repeart forever
@@ -12,7 +18,7 @@ pub enum LoopMode {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnimationClip {
-    pub name: String,                  // Name of the animation
+    pub state: AnimationState,
     pub atlas_name: String,            // Reference to the atlas
     pub frame_tile_names: Vec<String>, // Which named tiles from the atlas
     pub frame_duration_ms: f32,        // How long each animation frame lasts
@@ -21,10 +27,10 @@ pub struct AnimationClip {
 
 #[derive(Debug, Clone)]
 pub struct AnimationController {
-    pub clips: HashMap<String, AnimationClip>, // All available animations
-    pub current_clip_name: String,             // Current animation
-    pub current_frame_index: usize,            // Where are we at the current frame
-    pub frame_timer: f32,                      // Counter of the current frame
+    pub clips: HashMap<AnimationState, AnimationClip>, // All available animations
+    pub current_clip_state: AnimationState,
+    pub current_frame_index: usize, // Where are we at the current frame
+    pub frame_timer: f32,           // Counter of the current frame
     pub is_finished: bool,
 }
 
@@ -38,7 +44,7 @@ impl AnimationController {
     pub fn new() -> Self {
         Self {
             clips: HashMap::new(),
-            current_clip_name: String::new(),
+            current_clip_state: AnimationState::Idle,
             current_frame_index: 0,
             frame_timer: 0.0,
             is_finished: false,
@@ -46,13 +52,13 @@ impl AnimationController {
     }
     /// Add an animation clip to this controller
     pub fn add_clip(&mut self, clip: AnimationClip) {
-        self.clips.insert(clip.name.clone(), clip);
+        self.clips.insert(clip.state, clip);
     }
 
     /// Start playing a specific animation
-    pub fn play(&mut self, clip_name: &str) -> bool {
-        if self.clips.contains_key(clip_name) {
-            self.current_clip_name = clip_name.to_string();
+    pub fn play(&mut self, clip_state: AnimationState) -> bool {
+        if self.clips.contains_key(&clip_state) {
+            self.current_clip_state = clip_state;
             self.current_frame_index = 0;
             self.frame_timer = 0.0;
             self.is_finished = false;
@@ -65,7 +71,7 @@ impl AnimationController {
 
     /// Update animation timing (call this every frame)
     pub fn update(&mut self, delta_time_ms: f32) {
-        let current_clip = match self.clips.get(&self.current_clip_name) {
+        let current_clip = match self.clips.get(&self.current_clip_state) {
             Some(clip) => clip,
             None => return, // No current animation
         };
@@ -87,16 +93,16 @@ impl AnimationController {
 
     /// Get the current tile name for rendering
     pub fn current_tile_name(&self) -> Result<String, CoreError> {
-        let current_clip = self.clips.get(&self.current_clip_name).ok_or_else(|| {
+        let current_clip = self.clips.get(&self.current_clip_state).ok_or_else(|| {
             CoreError::AnimationClipNotFound {
-                clip_name: self.current_clip_name.clone(),
+                clip_name: format!("{:?}", self.current_clip_state),
             }
         })?;
 
         if self.current_frame_index >= current_clip.frame_tile_names.len() {
             return Err(CoreError::AnimationFrameOutOfBounds {
                 frame_index: self.current_frame_index,
-                clip_name: current_clip.name.clone(),
+                clip_name: format!("{:?}", current_clip.state),
                 max_frames: current_clip.frame_tile_names.len(),
             });
         }
@@ -106,9 +112,9 @@ impl AnimationController {
 
     /// Get the current atlas name for rendering
     pub fn current_atlas_name(&self) -> Result<String, CoreError> {
-        let current_clip = self.clips.get(&self.current_clip_name).ok_or_else(|| {
+        let current_clip = self.clips.get(&self.current_clip_state).ok_or_else(|| {
             CoreError::AnimationClipNotFound {
-                clip_name: self.current_clip_name.clone(),
+                clip_name: format!("{:?}", self.current_clip_state),
             }
         })?;
 

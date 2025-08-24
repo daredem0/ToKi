@@ -1,4 +1,4 @@
-use crate::animation::{AnimationClip, AnimationController, LoopMode};
+use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use crate::collision::CollisionBox;
 use glam::{IVec2, UVec2};
 use std::collections::{HashMap, HashSet};
@@ -214,7 +214,7 @@ impl EntityManager {
     pub fn spawn_player(&mut self, position: IVec2) -> EntityId {
         let mut controller = AnimationController::new();
         let idle_clip = AnimationClip {
-            name: "player_idle".to_string(),
+            state: AnimationState::Idle,
             atlas_name: "creatures".to_string(),
             frame_tile_names: vec!["slime/idle_0".to_string(), "slime/idle_1".to_string()],
             frame_duration_ms: 300.0,
@@ -222,7 +222,7 @@ impl EntityManager {
         };
         controller.add_clip(idle_clip);
         let walk_clip = AnimationClip {
-            name: "player_walk".to_string(),
+            state: AnimationState::Walk,
             atlas_name: "creatures".to_string(),
             frame_tile_names: vec![
                 "slime/walk_0".to_string(),
@@ -234,7 +234,7 @@ impl EntityManager {
             loop_mode: LoopMode::Loop,
         };
         controller.add_clip(walk_clip);
-        controller.play("player_idle");
+        controller.play(AnimationState::Idle);
         let attributes = EntityAttributes {
             health: Some(100),
             speed: 2,
@@ -252,7 +252,7 @@ impl EntityManager {
     pub fn spawn_npc(&mut self, position: glam::IVec2, animation_name: &str) -> EntityId {
         let mut controller = AnimationController::new();
         let idle_clip = AnimationClip {
-            name: animation_name.to_string(),
+            state: AnimationState::Walk,
             atlas_name: "creatures".to_string(),
             frame_tile_names: vec![
                 format!("{}/walk_0", animation_name),
@@ -264,7 +264,7 @@ impl EntityManager {
             loop_mode: LoopMode::Loop,
         };
         controller.add_clip(idle_clip);
-        controller.play(animation_name);
+        controller.play(AnimationState::Walk);
         let attributes = EntityAttributes {
             health: Some(50),
             speed: 1,
@@ -283,7 +283,7 @@ impl EntityManager {
     pub fn spawn_item(&mut self, position: IVec2, item_name: &str) -> EntityId {
         let mut controller = AnimationController::new();
         let idle_clip = AnimationClip {
-            name: item_name.to_string(),
+            state: AnimationState::Idle,
             atlas_name: "objects".to_string(),
             frame_tile_names: vec![
                 format!("{}_0", item_name),
@@ -295,7 +295,7 @@ impl EntityManager {
             loop_mode: LoopMode::Loop,
         };
         controller.add_clip(idle_clip);
-        controller.play(item_name);
+        controller.play(AnimationState::Idle);
         let attributes = EntityAttributes {
             health: None,    // Items don't have health
             solid: false,    // Items can be walked through
@@ -310,7 +310,7 @@ impl EntityManager {
     pub fn spawn_decoration(&mut self, position: IVec2, decoration_name: &str) -> EntityId {
         let mut controller = AnimationController::new();
         let idle_clip = AnimationClip {
-            name: decoration_name.to_string(),
+            state: AnimationState::Idle,
             atlas_name: "terrain".to_string(),
             frame_tile_names: vec![
                 format!("{}_0", decoration_name),
@@ -322,8 +322,8 @@ impl EntityManager {
             loop_mode: LoopMode::Loop,
         };
         controller.add_clip(idle_clip);
-        controller.play(decoration_name);
-        let attributes = EntityAttributes {
+        controller.play(AnimationState::Idle);
+        let attributes: EntityAttributes = EntityAttributes {
             health: None,
             solid: false, // Decorations don't block movement
             can_move: false,

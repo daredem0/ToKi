@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use crate::animation::AnimationState;
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::entity::{Entity, EntityId, EntityManager};
@@ -88,11 +89,15 @@ impl GameState {
         // Pick moving or idle animation
         if let Some(player_entity) = self.entity_manager.get_player_mut() {
             if let Some(animation_controller) = &mut player_entity.attributes.animation_controller {
-                let desired_player_animation = if moved { "player_walk" } else { "player_idle" };
-                if animation_controller.current_clip_name != desired_player_animation {
+                let desired_player_animation = if moved {
+                    AnimationState::Walk
+                } else {
+                    AnimationState::Idle
+                };
+                if animation_controller.current_clip_state != desired_player_animation {
                     tracing::debug!(
-                        "Changing clip from  {} to {}",
-                        animation_controller.current_clip_name,
+                        "Changing clip from  {:?} to {:?}",
+                        animation_controller.current_clip_state,
                         desired_player_animation
                     );
                     animation_controller.play(desired_player_animation);
