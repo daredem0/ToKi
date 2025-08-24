@@ -19,6 +19,7 @@ impl ResourceManager {
         let creature_atlas = AtlasMeta::load_from_file("assets/creatures.json")?;
         // let tilemap = TileMap::load_from_file("assets/maps/tilemap_64x64_chunk.json")?;
         let tilemap = TileMap::load_from_file("assets/maps/new_town_map_64x64_crossings.json")?;
+        // let tilemap = TileMap::load_from_file("assets/maps/my_new_map.json")?;
 
         // Validate the tilemap
         tilemap.validate()?;

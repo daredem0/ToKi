@@ -309,19 +309,21 @@ impl GameState {
     /// Get the current sprite frame for rendering
     pub fn current_sprite_frame(&self) -> SpriteFrame {
         if let Some(player_entity) = self.player_entity() {
-            if let Some(sprite_info) = &player_entity.attributes.sprite_info {
+            if let Some(animation_controller) = &player_entity.attributes.animation_controller {
                 // Create a basic UV frame calculation
                 // For now, assume 4 frames in a horizontal strip
-                let frame_width = 1.0 / 4.0; // 4 frames wide
-                let u0 = sprite_info.current_frame as f32 * frame_width;
-                let u1 = u0 + frame_width;
+                if let Ok(current_frame) = animation_controller.current_atlas_frame() {
+                    let frame_width = 1.0 / 4.0; // 4 frames wide
+                    let u0 = current_frame as f32 * frame_width;
+                    let u1 = u0 + frame_width;
 
-                return SpriteFrame {
-                    u0,
-                    v0: 0.0,
-                    u1,
-                    v1: 1.0,
-                };
+                    return SpriteFrame {
+                        u0,
+                        v0: 0.0,
+                        u1,
+                        v1: 1.0,
+                    };
+                }
             }
         }
 

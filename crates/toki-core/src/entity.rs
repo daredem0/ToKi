@@ -1,6 +1,7 @@
+use crate::animation::{AnimationClip, AnimationController, LoopMode};
+use crate::collision::CollisionBox;
 use glam::{IVec2, UVec2};
 use std::collections::{HashMap, HashSet};
-use crate::collision::CollisionBox;
 
 pub type EntityId = u32;
 
@@ -32,20 +33,12 @@ pub struct EntityAttributes {
 
     // Rendering
     pub visible: bool, // Can we be seen by the player
-    pub sprite_info: Option<SpriteInfo>,
-    pub render_layer: i32, // lower layers are drawn first
+    pub animation_controller: Option<AnimationController>, // takes care of all animations of the entity
+    pub render_layer: i32,                                 // lower layers are drawn first
 
     // Behavior flags
     pub active: bool,
     pub can_move: bool, // Can we be moved by the player
-}
-
-#[derive(Debug, Clone)]
-pub struct SpriteInfo {
-    pub atlas_name: String,
-    pub animation_name: String,
-    pub current_frame: usize,
-    pub frame_timer: f32,
 }
 
 impl Default for EntityAttributes {
@@ -55,7 +48,7 @@ impl Default for EntityAttributes {
             speed: 2,
             solid: true,
             visible: true,
-            sprite_info: None,
+            animation_controller: None,
             render_layer: 0,
             active: true,
             can_move: true,
@@ -90,18 +83,8 @@ impl EntityManager {
     /// Update animations for all entities
     pub fn update_animations(&mut self, delta_time_ms: f32) {
         for entity in self.entities.values_mut() {
-            if let Some(sprite_info) = &mut entity.attributes.sprite_info {
-                // Add time to frame timer
-                sprite_info.frame_timer += delta_time_ms;
-
-                // Check if its time to advance frame
-                // TODO: For now use hardcoded 150ms, should be configurable
-                let frame_duration = 150.0;
-                if sprite_info.frame_timer >= frame_duration {
-                    // Advance to next frame (hardcoded 4 frames for now)
-                    sprite_info.current_frame = (sprite_info.current_frame + 1) % 4;
-                    sprite_info.frame_timer = 0.0;
-                }
+            if let Some(animation_controller) = &mut entity.attributes.animation_controller {
+                animation_controller.update(delta_time_ms);
             }
         }
     }
@@ -229,15 +212,20 @@ impl EntityManager {
 
     // Factory methods
     pub fn spawn_player(&mut self, position: IVec2) -> EntityId {
+        let mut controller = AnimationController::new();
+        let idle_clip = AnimationClip {
+            name: "player_idle".to_string(),
+            atlas_name: "creatures".to_string(),
+            frame_indices: vec![0, 1, 2, 3],
+            frame_duration_ms: 150.0,
+            loop_mode: LoopMode::Loop,
+        };
+        controller.add_clip(idle_clip);
+        controller.play("player_idle");
         let attributes = EntityAttributes {
             health: Some(100),
             speed: 2,
-            sprite_info: Some(SpriteInfo {
-                atlas_name: "creatures".to_string(),
-                animation_name: "player_idle".to_string(),
-                current_frame: 0,
-                frame_timer: 0.0,
-            }),
+            animation_controller: Some(controller),
             ..Default::default()
         };
         self.spawn_entity(
@@ -249,16 +237,20 @@ impl EntityManager {
     }
 
     pub fn spawn_npc(&mut self, position: glam::IVec2, animation_name: &str) -> EntityId {
+        let mut controller = AnimationController::new();
+        let idle_clip = AnimationClip {
+            name: animation_name.to_string(),
+            atlas_name: "creatures".to_string(),
+            frame_indices: vec![0, 1, 2, 3],
+            frame_duration_ms: 150.0,
+            loop_mode: LoopMode::Loop,
+        };
+        controller.add_clip(idle_clip);
+        controller.play(animation_name);
         let attributes = EntityAttributes {
             health: Some(50),
             speed: 1,
-            can_move: false,
-            sprite_info: Some(SpriteInfo {
-                atlas_name: "creatures".to_string(),
-                animation_name: animation_name.to_string(),
-                current_frame: 0,
-                frame_timer: 0.0,
-            }),
+            animation_controller: Some(controller),
             ..Default::default()
         };
         self.spawn_entity(
@@ -270,38 +262,43 @@ impl EntityManager {
     }
 
     pub fn spawn_item(&mut self, position: IVec2, item_name: &str) -> EntityId {
+        let mut controller = AnimationController::new();
+        let idle_clip = AnimationClip {
+            name: item_name.to_string(),
+            atlas_name: "objects".to_string(),
+            frame_indices: vec![0, 1, 2, 3],
+            frame_duration_ms: 150.0,
+            loop_mode: LoopMode::Loop,
+        };
+        controller.add_clip(idle_clip);
+        controller.play(item_name);
         let attributes = EntityAttributes {
             health: None,    // Items don't have health
             solid: false,    // Items can be walked through
             can_move: false, // Items don't move
-            sprite_info: Some(SpriteInfo {
-                atlas_name: "objects".to_string(),
-                animation_name: item_name.to_string(),
-                current_frame: 0,
-                frame_timer: 0.0,
-            }),
+            animation_controller: Some(controller),
             ..Default::default()
         };
 
-        self.spawn_entity(
-            EntityType::Item,
-            position,
-            UVec2::new(16, 16),
-            attributes,
-        )
+        self.spawn_entity(EntityType::Item, position, UVec2::new(16, 16), attributes)
     }
 
     pub fn spawn_decoration(&mut self, position: IVec2, decoration_name: &str) -> EntityId {
+        let mut controller = AnimationController::new();
+        let idle_clip = AnimationClip {
+            name: decoration_name.to_string(),
+            atlas_name: "terrain".to_string(),
+            frame_indices: vec![0, 1, 2, 3],
+            frame_duration_ms: 150.0,
+            loop_mode: LoopMode::Loop,
+        };
+        controller.add_clip(idle_clip);
+        controller.play(decoration_name);
         let attributes = EntityAttributes {
             health: None,
             solid: false, // Decorations don't block movement
             can_move: false,
-            sprite_info: Some(SpriteInfo {
-                atlas_name: "terrain".to_string(),
-                animation_name: decoration_name.to_string(),
-                current_frame: 0,
-                frame_timer: 0.0,
-            }),
+            animation_controller: Some(controller),
             render_layer: -1, // Decorations render behind other entities
             ..Default::default()
         };

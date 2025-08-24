@@ -11,6 +11,7 @@ pub use errors::CoreError;
 
 pub mod sprite;
 
+pub mod animation;
 pub mod assets {
     pub mod atlas;
     pub mod tilemap;

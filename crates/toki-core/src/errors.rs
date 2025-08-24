@@ -48,4 +48,17 @@ pub enum CoreError {
 
     #[error("Invalid entity position: ({x}, {y}) would place entity outside world bounds")]
     InvalidEntityPosition { x: i32, y: i32 },
+
+    #[error("Animation clip '{clip_name}' not found")]
+    AnimationClipNotFound { clip_name: String },
+
+    #[error(
+        "Animation frame index {frame_index} out of bounds for clip '{clip_name}' (max: 
+  {max_frames})"
+    )]
+    AnimationFrameOutOfBounds {
+        frame_index: usize,
+        clip_name: String,
+        max_frames: usize,
+    },
 }
