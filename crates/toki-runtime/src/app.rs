@@ -12,6 +12,7 @@ use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
 use toki_core::{GameState, TimingSystem};
 use toki_render::RenderError;
 
+use crate::systems::AudioSystem;
 use crate::systems::{
     CameraSystem, GameSystem, PerformanceMonitor, PlatformSystem, RenderingSystem, ResourceManager,
 };
@@ -23,6 +24,7 @@ struct App {
     camera_system: CameraSystem,
     resources: ResourceManager,
     performance: PerformanceMonitor,
+    audio_system: AudioSystem,
 
     // Grouped systems
     platform: PlatformSystem,
@@ -51,6 +53,7 @@ impl App {
             mode: CameraMode::FollowEntity(player_id),
         };
         let camera_system = CameraSystem::new(camera, cam_controller);
+        let audio_system = AudioSystem::new().expect("Failed to initialize audio system");
 
         Self {
             // Core systems
@@ -58,6 +61,7 @@ impl App {
             camera_system,
             resources,
             performance: PerformanceMonitor::new(),
+            audio_system,
 
             // Grouped systems
             platform: PlatformSystem::new(),
@@ -112,8 +116,12 @@ impl App {
                 }
             }
             let creature_atlas = self.resources.get_creature_atlas();
-            let texture_size = creature_atlas.image_size().unwrap_or(glam::UVec2::new(64, 16)); // fallback
-            let frame = self.game_system.current_sprite_frame(creature_atlas, texture_size);
+            let texture_size = creature_atlas
+                .image_size()
+                .unwrap_or(glam::UVec2::new(64, 16)); // fallback
+            let frame = self
+                .game_system
+                .current_sprite_frame(creature_atlas, texture_size);
             if let Some(gpu) = self.rendering.gpu_mut() {
                 gpu.clear_sprites(); // Clear previous frame's sprites
                 gpu.add_sprite(
@@ -143,7 +151,11 @@ impl App {
 
                     // Add entity collision boxes
                     for (pos, size, is_trigger) in entity_boxes {
-                        let color = if is_trigger { trigger_tile_color } else { entity_color };
+                        let color = if is_trigger {
+                            trigger_tile_color
+                        } else {
+                            entity_color
+                        };
                         gpu.add_debug_rect(
                             pos.x as f32,
                             pos.y as f32,
@@ -180,7 +192,7 @@ impl App {
                         );
                     }
                 }
-                
+
                 // Finalize debug shapes
                 gpu.finalize_debug_shapes();
             }
@@ -322,6 +334,11 @@ impl ApplicationHandler for App {
             if let Some(gpu) = self.rendering.gpu_mut() {
                 gpu.update_tilemap_vertices(&verts);
             }
+        }
+
+        self.audio_system.list_available_sounds();
+        if let Err(e) = self.audio_system.play_background_music("lavandia") {
+            tracing::warn!("Failed to start background music: {}", e);
         }
     }
 
