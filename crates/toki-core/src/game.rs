@@ -306,28 +306,25 @@ impl GameState {
             .collect()
     }
 
-    /// Get the current sprite frame for rendering
-    pub fn current_sprite_frame(&self) -> SpriteFrame {
+    /// Get the current sprite frame for rendering with proper atlas lookup
+    pub fn current_sprite_frame(&self, atlas: &AtlasMeta, texture_size: glam::UVec2) -> SpriteFrame {
         if let Some(player_entity) = self.player_entity() {
             if let Some(animation_controller) = &player_entity.attributes.animation_controller {
-                // Create a basic UV frame calculation
-                // For now, assume 4 frames in a horizontal strip
-                if let Ok(current_frame) = animation_controller.current_atlas_frame() {
-                    let frame_width = 1.0 / 4.0; // 4 frames wide
-                    let u0 = current_frame as f32 * frame_width;
-                    let u1 = u0 + frame_width;
-
-                    return SpriteFrame {
-                        u0,
-                        v0: 0.0,
-                        u1,
-                        v1: 1.0,
-                    };
+                if let Ok(tile_name) = animation_controller.current_tile_name() {
+                    // Look up the tile in the atlas to get UV coordinates
+                    if let Some(uvs) = atlas.get_tile_uvs(&tile_name, texture_size) {
+                        return SpriteFrame {
+                            u0: uvs[0],
+                            v0: uvs[1],
+                            u1: uvs[2],
+                            v1: uvs[3],
+                        };
+                    }
                 }
             }
         }
 
-        // Fallback to default frame
+        // Fallback to default frame if animation or atlas lookup fails
         SpriteFrame {
             u0: 0.0,
             v0: 0.0,

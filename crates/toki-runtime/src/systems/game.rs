@@ -54,8 +54,8 @@ impl GameSystem {
     }
 
     /// Get the current sprite frame for rendering
-    pub fn current_sprite_frame(&self) -> SpriteFrame {
-        self.game_state.current_sprite_frame()
+    pub fn current_sprite_frame(&self, atlas: &AtlasMeta, texture_size: glam::UVec2) -> SpriteFrame {
+        self.game_state.current_sprite_frame(atlas, texture_size)
     }
 
     /// Get player position for rendering

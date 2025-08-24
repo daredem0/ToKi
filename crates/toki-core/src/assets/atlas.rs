@@ -65,6 +65,17 @@ impl AtlasMeta {
         ])
     }
 
+    /// Get tile UV coordinates for rendering (0.0 to 1.0 range)
+    pub fn get_tile_uvs(&self, name: &str, texture_size: UVec2) -> Option<[f32; 4]> {
+        let rect = self.get_tile_rect(name)?;
+        let u0 = rect[0] as f32 / texture_size.x as f32;
+        let v0 = rect[1] as f32 / texture_size.y as f32;
+        let u1 = (rect[0] + rect[2]) as f32 / texture_size.x as f32;
+        let v1 = (rect[1] + rect[3]) as f32 / texture_size.y as f32;
+        
+        Some([u0, v0, u1, v1])
+    }
+
     pub fn is_tile_solid(&self, name: &str) -> bool {
         self.tiles.get(name)
             .map(|tile_info| tile_info.properties.solid)

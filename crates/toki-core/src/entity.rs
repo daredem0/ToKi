@@ -216,8 +216,8 @@ impl EntityManager {
         let idle_clip = AnimationClip {
             name: "player_idle".to_string(),
             atlas_name: "creatures".to_string(),
-            frame_indices: vec![0, 1, 2, 3],
-            frame_duration_ms: 150.0,
+            frame_tile_names: vec!["slime/idle_0".to_string(), "slime/idle_1".to_string()],
+            frame_duration_ms: 300.0,
             loop_mode: LoopMode::Loop,
         };
         controller.add_clip(idle_clip);
@@ -241,7 +241,12 @@ impl EntityManager {
         let idle_clip = AnimationClip {
             name: animation_name.to_string(),
             atlas_name: "creatures".to_string(),
-            frame_indices: vec![0, 1, 2, 3],
+            frame_tile_names: vec![
+                format!("{}/walk_0", animation_name),
+                format!("{}/walk_1", animation_name),
+                format!("{}/walk_2", animation_name),
+                format!("{}/walk_3", animation_name),
+            ],
             frame_duration_ms: 150.0,
             loop_mode: LoopMode::Loop,
         };
@@ -266,7 +271,12 @@ impl EntityManager {
         let idle_clip = AnimationClip {
             name: item_name.to_string(),
             atlas_name: "objects".to_string(),
-            frame_indices: vec![0, 1, 2, 3],
+            frame_tile_names: vec![
+                format!("{}_0", item_name),
+                format!("{}_1", item_name),
+                format!("{}_2", item_name),
+                format!("{}_3", item_name),
+            ],
             frame_duration_ms: 150.0,
             loop_mode: LoopMode::Loop,
         };
@@ -288,7 +298,12 @@ impl EntityManager {
         let idle_clip = AnimationClip {
             name: decoration_name.to_string(),
             atlas_name: "terrain".to_string(),
-            frame_indices: vec![0, 1, 2, 3],
+            frame_tile_names: vec![
+                format!("{}_0", decoration_name),
+                format!("{}_1", decoration_name),
+                format!("{}_2", decoration_name),
+                format!("{}_3", decoration_name),
+            ],
             frame_duration_ms: 150.0,
             loop_mode: LoopMode::Loop,
         };

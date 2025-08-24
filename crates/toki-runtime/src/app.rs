@@ -111,7 +111,9 @@ impl App {
                     }
                 }
             }
-            let frame = self.game_system.current_sprite_frame();
+            let creature_atlas = self.resources.get_creature_atlas();
+            let texture_size = creature_atlas.image_size().unwrap_or(glam::UVec2::new(64, 16)); // fallback
+            let frame = self.game_system.current_sprite_frame(creature_atlas, texture_size);
             if let Some(gpu) = self.rendering.gpu_mut() {
                 gpu.clear_sprites(); // Clear previous frame's sprites
                 gpu.add_sprite(

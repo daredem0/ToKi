@@ -14,7 +14,7 @@ pub enum LoopMode {
 pub struct AnimationClip {
     pub name: String,              // Name of the animation
     pub atlas_name: String,        // Reference to the atlas
-    pub frame_indices: Vec<usize>, // Which frame of the frame atlas
+    pub frame_tile_names: Vec<String>, // Which named tiles from the atlas
     pub frame_duration_ms: f32,    // How long each animation frame lasts
     pub loop_mode: LoopMode,       // Repeat?
 }
@@ -74,7 +74,7 @@ impl AnimationController {
 
             self.current_frame_index += 1;
 
-            if self.current_frame_index >= current_clip.frame_indices.len() {
+            if self.current_frame_index >= current_clip.frame_tile_names.len() {
                 match current_clip.loop_mode {
                     LoopMode::Loop => self.current_frame_index = 0,
                     LoopMode::Once => self.is_finished = true,
@@ -84,22 +84,33 @@ impl AnimationController {
         }
     }
 
-    /// Get the current atlas frame number for rendering
-    pub fn current_atlas_frame(&self) -> Result<usize, CoreError> {
+    /// Get the current tile name for rendering
+    pub fn current_tile_name(&self) -> Result<String, CoreError> {
         let current_clip = self.clips.get(&self.current_clip_name).ok_or_else(|| {
             CoreError::AnimationClipNotFound {
                 clip_name: self.current_clip_name.clone(),
             }
         })?;
 
-        if self.current_frame_index >= current_clip.frame_indices.len() {
+        if self.current_frame_index >= current_clip.frame_tile_names.len() {
             return Err(CoreError::AnimationFrameOutOfBounds {
                 frame_index: self.current_frame_index,
                 clip_name: current_clip.name.clone(),
-                max_frames: current_clip.frame_indices.len(),
+                max_frames: current_clip.frame_tile_names.len(),
             });
         }
 
-        Ok(current_clip.frame_indices[self.current_frame_index])
+        Ok(current_clip.frame_tile_names[self.current_frame_index].clone())
+    }
+
+    /// Get the current atlas name for rendering
+    pub fn current_atlas_name(&self) -> Result<String, CoreError> {
+        let current_clip = self.clips.get(&self.current_clip_name).ok_or_else(|| {
+            CoreError::AnimationClipNotFound {
+                clip_name: self.current_clip_name.clone(),
+            }
+        })?;
+
+        Ok(current_clip.atlas_name.clone())
     }
 }

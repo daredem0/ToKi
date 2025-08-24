@@ -297,7 +297,9 @@ fn game_state_world_bounds_bottom_boundary() {
 fn game_state_sprite_animation_updates() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let _initial_frame = game_state.current_sprite_frame();
+    let atlas = create_test_atlas();
+    let texture_size = atlas.image_size().unwrap_or(glam::UVec2::new(64, 16));
+    let _initial_frame = game_state.current_sprite_frame(&atlas, texture_size);
     
     let world_bounds = UVec2::new(1000, 1000);
     
@@ -308,7 +310,7 @@ fn game_state_sprite_animation_updates() {
     
     // Animation should have progressed (frame or timing)
     // Note: Since animation depends on internal timing, we mainly test that it doesn't crash
-    let _current_frame = game_state.current_sprite_frame();
+    let _current_frame = game_state.current_sprite_frame(&atlas, texture_size);
     // The exact frame depends on timing, so we just ensure it's callable
 }
 
@@ -403,5 +405,5 @@ fn game_state_player_entity_attributes() {
     assert!(player_entity.attributes.solid);
     assert!(player_entity.attributes.visible);
     assert_eq!(player_entity.attributes.render_layer, 0);
-    assert!(player_entity.attributes.sprite_info.is_some());
+    assert!(player_entity.attributes.animation_controller.is_some());
 }
