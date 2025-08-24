@@ -9,7 +9,7 @@ use winit::window::WindowId;
 use std::time::Instant;
 
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
-use toki_core::{GameState, TimingSystem};
+use toki_core::{EventHandler, GameState, TimingSystem};
 use toki_render::RenderError;
 
 use crate::systems::AudioSystem;
@@ -79,11 +79,18 @@ impl App {
             self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
             self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
         );
-        let player_moved = self.game_system.update(
+        let game_result = self.game_system.update(
             world_bounds,
             self.resources.get_tilemap(),
             self.resources.get_terrain_atlas(),
         );
+
+        // Process audio events
+        for event in &game_result.events {
+            self.audio_system.handle(event);
+        }
+
+        let player_moved = game_result.player_moved;
 
         // Update camera based on game state
         let entities = self.game_system.entities_for_camera();

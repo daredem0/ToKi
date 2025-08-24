@@ -1,7 +1,8 @@
 use toki_core::{
     assets::atlas::AtlasMeta, assets::tilemap::TileMap, entity::Entity, sprite::SpriteFrame,
-    GameState, InputKey,
+    GameState, GameUpdateResult, InputKey,
 };
+use toki_core::game::AudioEvent;
 use winit::keyboard::KeyCode;
 
 /// Game system that wraps the core GameState and provides runtime integration.
@@ -20,13 +21,13 @@ impl GameSystem {
     }
 
     /// Update the game state by one tick
-    /// Returns true if the player moved (indicating camera/rendering updates needed)
+    /// Returns GameUpdateResult with movement info and audio events
     pub fn update(
         &mut self,
         world_bounds: glam::UVec2,
         tilemap: &TileMap,
         atlas: &AtlasMeta,
-    ) -> bool {
+    ) -> GameUpdateResult<AudioEvent> {
         self.game_state.update(world_bounds, tilemap, atlas)
     }
 

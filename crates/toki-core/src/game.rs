@@ -4,6 +4,7 @@ use crate::animation::AnimationState;
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::entity::{Entity, EntityId, EntityManager};
+use crate::events::{GameEvent, GameUpdateResult};
 use crate::sprite::{SpriteFrame, SpriteInstance};
 
 /// Core input keys abstraction (platform-independent)
@@ -16,6 +17,19 @@ pub enum InputKey {
     DebugToggle, // F4 key for toggling debug rendering
                  // Can extend with more keys as needed
 }
+
+/// Audio events that can be triggered by game logic
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AudioEvent {
+    /// Player started walking
+    PlayerWalk,
+    /// Player collided with something
+    PlayerCollision,
+    /// Start background music
+    BackgroundMusic(String),
+}
+
+impl GameEvent for AudioEvent {}
 
 /// Core game state that manages entities, input, and game logic.
 ///
@@ -83,13 +97,13 @@ impl GameState {
         world_bounds: glam::UVec2,
         tilemap: &TileMap,
         atlas: &AtlasMeta,
-    ) -> bool {
-        let moved = self.process_input(world_bounds, tilemap, atlas);
+    ) -> GameUpdateResult<AudioEvent> {
+        let input_result = self.process_input(world_bounds, tilemap, atlas);
 
         // Pick moving or idle animation
         if let Some(player_entity) = self.entity_manager.get_player_mut() {
             if let Some(animation_controller) = &mut player_entity.attributes.animation_controller {
-                let desired_player_animation = if moved {
+                let desired_player_animation = if input_result.player_moved {
                     AnimationState::Walk
                 } else {
                     AnimationState::Idle
@@ -108,7 +122,7 @@ impl GameState {
         // Update entity animation timing
         self.entity_manager.update_animations(17.0);
 
-        moved
+        input_result
     }
 
     /// Check if an entity can move to a position without colliding with solid tiles
@@ -177,26 +191,27 @@ impl GameState {
     }
 
     /// Process input and update player position
-    /// Returns true if the player actually moved (position changed)
+    /// Returns GameUpdateResult with movement info and audio events
     fn process_input(
         &mut self,
         world_bounds: glam::UVec2,
         tilemap: &TileMap,
         atlas: &AtlasMeta,
-    ) -> bool {
+    ) -> GameUpdateResult<AudioEvent> {
         let Some(player_id) = self.player_id else {
-            return false; // No player entity to move
+            return GameUpdateResult::new(); // No player entity to move
         };
 
         let Some(player_entity) = self.entity_manager.get_entity(player_id) else {
-            return false; // Player entity doesn't exist
+            return GameUpdateResult::new(); // Player entity doesn't exist
         };
 
         let initial_position = player_entity.position;
+        let mut result = GameUpdateResult::new();
 
         // Get mutable reference to player entity
         let Some(player_entity) = self.entity_manager.get_entity_mut(player_id) else {
-            return false;
+            return GameUpdateResult::new();
         };
 
         for key in &self.keys_held {
@@ -212,6 +227,8 @@ impl GameState {
                         atlas,
                     ) {
                         player_entity.position.y = new_y;
+                    } else {
+                        result.add_event(AudioEvent::PlayerCollision);
                     }
                 }
                 InputKey::Left => {
@@ -225,6 +242,8 @@ impl GameState {
                         atlas,
                     ) {
                         player_entity.position.x = new_x;
+                    } else {
+                        result.add_event(AudioEvent::PlayerCollision);
                     }
                 }
                 InputKey::Down => {
@@ -239,6 +258,8 @@ impl GameState {
                         atlas,
                     ) {
                         player_entity.position.y = new_y;
+                    } else {
+                        result.add_event(AudioEvent::PlayerCollision);
                     }
                 }
                 InputKey::Right => {
@@ -253,6 +274,8 @@ impl GameState {
                         atlas,
                     ) {
                         player_entity.position.x = new_x;
+                    } else {
+                        result.add_event(AudioEvent::PlayerCollision);
                     }
                 }
                 InputKey::DebugToggle => {
@@ -261,8 +284,16 @@ impl GameState {
             }
         }
 
-        // Only return true if position actually changed
-        player_entity.position != initial_position
+        // Check if position actually changed
+        let player_moved = player_entity.position != initial_position;
+        result.player_moved = player_moved;
+        
+        // Add walking event if the player moved
+        if player_moved {
+            result.add_event(AudioEvent::PlayerWalk);
+        }
+
+        result
     }
 
     /// Handle key press events

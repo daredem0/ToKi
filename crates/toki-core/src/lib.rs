@@ -20,6 +20,9 @@ pub mod assets {
 pub mod camera;
 pub use camera::{Camera, CameraController, CameraMode};
 
+pub mod events;
+pub use events::{EventHandler, EventQueue, GameEvent, GameUpdateResult};
+
 pub mod game;
 pub use game::{GameState, InputKey};
 

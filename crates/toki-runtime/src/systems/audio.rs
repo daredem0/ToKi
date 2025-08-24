@@ -5,6 +5,7 @@ use kira::{
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use toki_core::{game::AudioEvent, EventHandler};
 
 pub struct AudioSystem {
     manager: AudioManager,
@@ -159,5 +160,27 @@ impl std::fmt::Debug for AudioSystem {
             .field("preloaded_sounds_count", &self.preloaded_sounds.len())
             .field("music_paths_count", &self.music_paths.len())
             .finish()
+    }
+}
+
+impl EventHandler<AudioEvent> for AudioSystem {
+    fn handle(&mut self, event: &AudioEvent) {
+        match event {
+            AudioEvent::PlayerWalk => {
+                if let Err(e) = self.play_sound("sfx_jump") {
+                    tracing::debug!("Failed to play footstep sound: {}", e);
+                }
+            }
+            AudioEvent::PlayerCollision => {
+                if let Err(e) = self.play_sound("sfx_coin") {
+                    tracing::debug!("Failed to play collision sound: {}", e);
+                }
+            }
+            AudioEvent::BackgroundMusic(name) => {
+                if let Err(e) = self.play_background_music(name) {
+                    tracing::warn!("Failed to play background music '{}': {}", name, e);
+                }
+            }
+        }
     }
 }
