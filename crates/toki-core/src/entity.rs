@@ -255,6 +255,7 @@ impl EntityManager {
         let attributes = EntityAttributes {
             health: Some(50),
             speed: 1,
+            can_move: false, // NPCs don't move by themselves
             animation_controller: Some(controller),
             ..Default::default()
         };
