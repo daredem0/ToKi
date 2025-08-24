@@ -221,6 +221,19 @@ impl EntityManager {
             loop_mode: LoopMode::Loop,
         };
         controller.add_clip(idle_clip);
+        let walk_clip = AnimationClip {
+            name: "player_walk".to_string(),
+            atlas_name: "creatures".to_string(),
+            frame_tile_names: vec![
+                "slime/walk_0".to_string(),
+                "slime/walk_1".to_string(),
+                "slime/walk_2".to_string(),
+                "slime/walk_3".to_string(),
+            ],
+            frame_duration_ms: 150.0,
+            loop_mode: LoopMode::Loop,
+        };
+        controller.add_clip(walk_clip);
         controller.play("player_idle");
         let attributes = EntityAttributes {
             health: Some(100),

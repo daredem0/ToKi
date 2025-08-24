@@ -12,11 +12,11 @@ pub enum LoopMode {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnimationClip {
-    pub name: String,              // Name of the animation
-    pub atlas_name: String,        // Reference to the atlas
+    pub name: String,                  // Name of the animation
+    pub atlas_name: String,            // Reference to the atlas
     pub frame_tile_names: Vec<String>, // Which named tiles from the atlas
-    pub frame_duration_ms: f32,    // How long each animation frame lasts
-    pub loop_mode: LoopMode,       // Repeat?
+    pub frame_duration_ms: f32,        // How long each animation frame lasts
+    pub loop_mode: LoopMode,           // Repeat?
 }
 
 #[derive(Debug, Clone)]
@@ -58,6 +58,7 @@ impl AnimationController {
             self.is_finished = false;
             true // Success
         } else {
+            tracing::warn!("Animation doesn't exist.");
             false // Animation doesn't exist
         }
     }

@@ -85,6 +85,21 @@ impl GameState {
     ) -> bool {
         let moved = self.process_input(world_bounds, tilemap, atlas);
 
+        // Pick moving or idle animation
+        if let Some(player_entity) = self.entity_manager.get_player_mut() {
+            if let Some(animation_controller) = &mut player_entity.attributes.animation_controller {
+                let desired_player_animation = if moved { "player_walk" } else { "player_idle" };
+                if animation_controller.current_clip_name != desired_player_animation {
+                    tracing::debug!(
+                        "Changing clip from  {} to {}",
+                        animation_controller.current_clip_name,
+                        desired_player_animation
+                    );
+                    animation_controller.play(desired_player_animation);
+                }
+            }
+        }
+
         // Update entity animation timing
         self.entity_manager.update_animations(17.0);
 
@@ -307,7 +322,11 @@ impl GameState {
     }
 
     /// Get the current sprite frame for rendering with proper atlas lookup
-    pub fn current_sprite_frame(&self, atlas: &AtlasMeta, texture_size: glam::UVec2) -> SpriteFrame {
+    pub fn current_sprite_frame(
+        &self,
+        atlas: &AtlasMeta,
+        texture_size: glam::UVec2,
+    ) -> SpriteFrame {
         if let Some(player_entity) = self.player_entity() {
             if let Some(animation_controller) = &player_entity.attributes.animation_controller {
                 if let Ok(tile_name) = animation_controller.current_tile_name() {
