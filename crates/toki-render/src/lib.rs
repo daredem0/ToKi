@@ -9,3 +9,4 @@ mod wgpu_utils;
 pub use errors::RenderError;
 pub use gpu::GpuState;
 pub use pipelines::{debug::DebugPipeline, sprite::SpritePipeline, tilemap::TilemapPipeline, RenderPipeline};
+pub use vertex::VertexLayout;
