@@ -105,9 +105,9 @@ fn game_state_key_press_and_release() {
     let world_bounds = UVec2::new(1000, 1000);
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
-    let moved = game_state.update(world_bounds, &tilemap, &atlas);
+    let result = game_state.update(world_bounds, &tilemap, &atlas);
     
-    assert!(moved);
+    assert!(result.player_moved);
     assert!(game_state.player_position().x > initial_position.x);
     
     // Release the key
@@ -115,9 +115,9 @@ fn game_state_key_press_and_release() {
     
     // Another update should not move further
     let position_after_release = game_state.player_position();
-    let moved_again = game_state.update(world_bounds, &tilemap, &atlas);
+    let result_again = game_state.update(world_bounds, &tilemap, &atlas);
     
-    assert!(!moved_again);
+    assert!(!result_again.player_moved);
     assert_eq!(game_state.player_position(), position_after_release);
 }
 
@@ -129,9 +129,9 @@ fn game_state_movement_up() {
     
     game_state.handle_key_press(InputKey::Up);
     let world_bounds = UVec2::new(1000, 1000);
-    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     
-    assert!(moved);
+    assert!(result.player_moved);
     assert_eq!(game_state.player_position().x, initial_position.x); // X unchanged
     assert!(game_state.player_position().y < initial_position.y); // Y decreased (up)
     assert_eq!(game_state.player_position().y, initial_position.y - 1); // Moved 1 pixel
@@ -145,9 +145,9 @@ fn game_state_movement_down() {
     
     game_state.handle_key_press(InputKey::Down);
     let world_bounds = UVec2::new(1000, 1000);
-    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     
-    assert!(moved);
+    assert!(result.player_moved);
     assert_eq!(game_state.player_position().x, initial_position.x); // X unchanged
     assert!(game_state.player_position().y > initial_position.y); // Y increased (down)
     assert_eq!(game_state.player_position().y, initial_position.y + 1); // Moved 1 pixel
@@ -161,9 +161,9 @@ fn game_state_movement_left() {
     
     game_state.handle_key_press(InputKey::Left);
     let world_bounds = UVec2::new(1000, 1000);
-    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     
-    assert!(moved);
+    assert!(result.player_moved);
     assert!(game_state.player_position().x < initial_position.x); // X decreased (left)
     assert_eq!(game_state.player_position().y, initial_position.y); // Y unchanged
     assert_eq!(game_state.player_position().x, initial_position.x - 1); // Moved 1 pixel
@@ -177,9 +177,9 @@ fn game_state_movement_right() {
     
     game_state.handle_key_press(InputKey::Right);
     let world_bounds = UVec2::new(1000, 1000);
-    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     
-    assert!(moved);
+    assert!(result.player_moved);
     assert!(game_state.player_position().x > initial_position.x); // X increased (right)
     assert_eq!(game_state.player_position().y, initial_position.y); // Y unchanged
     assert_eq!(game_state.player_position().x, initial_position.x + 1); // Moved 1 pixel
@@ -196,9 +196,9 @@ fn game_state_diagonal_movement() {
     game_state.handle_key_press(InputKey::Right);
     
     let world_bounds = UVec2::new(1000, 1000);
-    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     
-    assert!(moved);
+    assert!(result.player_moved);
     assert_eq!(game_state.player_position().x, initial_position.x + 1); // Moved right
     assert_eq!(game_state.player_position().y, initial_position.y - 1); // Moved up
 }
@@ -221,8 +221,8 @@ fn game_state_world_bounds_left_boundary() {
     assert_eq!(game_state.player_position().x, 0);
     
     // One more update should not move further
-    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
-    assert!(!moved); // Should not report movement when clamped
+    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    assert!(!result.player_moved); // Should not report movement when clamped
     assert_eq!(game_state.player_position().x, 0);
 }
 
@@ -244,8 +244,8 @@ fn game_state_world_bounds_top_boundary() {
     assert_eq!(game_state.player_position().y, 0);
     
     // One more update should not move further
-    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
-    assert!(!moved); // Should not report movement when clamped
+    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    assert!(!result.player_moved); // Should not report movement when clamped
     assert_eq!(game_state.player_position().y, 0);
 }
 
@@ -267,8 +267,8 @@ fn game_state_world_bounds_right_boundary() {
     assert_eq!(game_state.player_position().x, expected_max_x);
     
     // One more update should not move further
-    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
-    assert!(!moved); // Should not report movement when clamped
+    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    assert!(!result.player_moved); // Should not report movement when clamped
 }
 
 #[test]
@@ -289,8 +289,8 @@ fn game_state_world_bounds_bottom_boundary() {
     assert_eq!(game_state.player_position().y, expected_max_y);
     
     // One more update should not move further
-    let moved = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
-    assert!(!moved); // Should not report movement when clamped
+    let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    assert!(!result.player_moved); // Should not report movement when clamped
 }
 
 #[test]
