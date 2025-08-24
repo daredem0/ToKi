@@ -1,0 +1,15 @@
+{
+  "sample_rate": 22050,
+  "bit_depth": 8,
+  "channels": 1,
+  "files": [
+    "sfx_jump.wav",
+    "sfx_coin.wav",
+    "sfx_hit.wav",
+    "sfx_select.wav",
+    "sfx_powerup.wav",
+    "sfx_step.wav",
+    "bgm_city_loop.wav"
+  ],
+  "notes": "Chiptune-style assets generated procedurally. WAV 8-bit unsigned PCM. Convert to OGG Vorbis with oggenc or ffmpeg."
+}
