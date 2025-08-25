@@ -344,7 +344,7 @@ impl ApplicationHandler for App {
         }
 
         self.audio_system.list_available_sounds();
-        if let Err(e) = self.audio_system.play_background_music("lavandia") {
+        if let Err(e) = self.audio_system.play_background_music("lavandia", 0.1) {
             tracing::warn!("Failed to start background music: {}", e);
         }
     }

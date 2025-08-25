@@ -1,6 +1,8 @@
 use kira::{
-    sound::static_sound::StaticSoundData, sound::static_sound::StaticSoundSettings, AudioManager,
-    AudioManagerSettings,
+    sound::static_sound::StaticSoundData,
+    sound::static_sound::StaticSoundSettings,
+    sound::streaming::{StreamingSoundData, StreamingSoundSettings},
+    AudioManager, AudioManagerSettings,
 };
 use std::collections::HashMap;
 use std::fs;
@@ -106,13 +108,21 @@ impl AudioSystem {
         Ok(())
     }
 
-    pub fn play_background_music(&mut self, name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn play_background_music(
+        &mut self,
+        name: &str,
+        volume: f32,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // Try on-demand music loading
         if let Some(path) = self.music_paths.get(name) {
-            let sound_data = StaticSoundData::from_file(path)?
-                .with_settings(StaticSoundSettings::new().loop_region(..));
+            tracing::debug!("Playing theme {} with volume: {:?}", name, volume);
+            let start = std::time::Instant::now();
+            let sound_data = StreamingSoundData::from_file(path)?
+                .with_settings(StreamingSoundSettings::new().loop_region(..).volume(-20.0));
 
             self.manager.play(sound_data)?;
+            let duration = start.elapsed();
+            tracing::debug!("Music loading took: {:?}", duration);
             tracing::debug!("Played music on-demand: {}", name);
             return Ok(());
         }
@@ -167,17 +177,17 @@ impl EventHandler<AudioEvent> for AudioSystem {
     fn handle(&mut self, event: &AudioEvent) {
         match event {
             AudioEvent::PlayerWalk => {
-                if let Err(e) = self.play_sound("sfx_jump") {
+                if let Err(e) = self.play_sound("sfx_slime_bounce") {
                     tracing::debug!("Failed to play footstep sound: {}", e);
                 }
             }
             AudioEvent::PlayerCollision => {
-                if let Err(e) = self.play_sound("sfx_coin") {
+                if let Err(e) = self.play_sound("sfx_hit2") {
                     tracing::debug!("Failed to play collision sound: {}", e);
                 }
             }
             AudioEvent::BackgroundMusic(name) => {
-                if let Err(e) = self.play_background_music(name) {
+                if let Err(e) = self.play_background_music(name, 0.3) {
                     tracing::warn!("Failed to play background music '{}': {}", name, e);
                 }
             }
