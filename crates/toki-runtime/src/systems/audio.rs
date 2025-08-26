@@ -410,22 +410,20 @@ impl EventHandler<AudioEvent> for AudioSystem {
     fn handle(&mut self, event: &AudioEvent) {
         match event {
             AudioEvent::PlayerWalk => {
-                // Only set policy/cooldown once - don't reset every time!
+                // Set policy once - no cooldown needed since game logic now controls frequency
                 if !self.channels.contains_key("movement") {
-                    self.set_channel_policy("movement", PlaybackPolicy::IgnoreIfPlaying);
-                    self.set_channel_cooldown("movement", Duration::from_millis(600));
-                    tracing::trace!("🎵 Initialized movement channel with 600ms cooldown");
+                    self.set_channel_policy("movement", PlaybackPolicy::Overlap);
+                    tracing::trace!("🎵 Initialized movement channel with Overlap policy");
                 }
                 if let Err(e) = self.play_sound_in_channel("movement", "sfx_slime_bounce") {
                     tracing::warn!("Failed to play footstep sound: {}", e);
                 }
             }
             AudioEvent::PlayerCollision => {
-                // Only set policy/cooldown once - don't reset every time!
+                // Set policy once - no cooldown needed since game logic now controls frequency
                 if !self.channels.contains_key("collision") {
                     self.set_channel_policy("collision", PlaybackPolicy::Exclusive);
-                    self.set_channel_cooldown("collision", Duration::from_millis(100)); // Shorter cooldown for collision
-                    tracing::trace!("💥 Initialized collision channel with 100ms cooldown");
+                    tracing::trace!("💥 Initialized collision channel with Exclusive policy");
                 }
                 if let Err(e) = self.play_sound_in_channel("collision", "sfx_hit2") {
                     tracing::warn!("Failed to play collision sound: {}", e);

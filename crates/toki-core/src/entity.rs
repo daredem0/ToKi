@@ -13,6 +13,11 @@ pub struct Entity {
     pub entity_type: EntityType,
     pub attributes: EntityAttributes,
     pub collision_box: Option<CollisionBox>,
+    
+    /// Audio state tracking
+    pub footstep_distance_accumulator: f32,
+    pub footstep_trigger_distance: f32,
+    pub last_collision_state: bool,
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -112,6 +117,9 @@ impl EntityManager {
             entity_type: entity_type.clone(),
             attributes,
             collision_box,
+            footstep_distance_accumulator: 0.0,
+            footstep_trigger_distance: 32.0, // Trigger footstep every 32 pixels
+            last_collision_state: false,
         };
 
         // Insert into main storage

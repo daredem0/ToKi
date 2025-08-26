@@ -227,8 +227,13 @@ impl GameState {
                         atlas,
                     ) {
                         player_entity.position.y = new_y;
+                        player_entity.last_collision_state = false;
                     } else {
-                        result.add_event(AudioEvent::PlayerCollision);
+                        // Only trigger audio on state change
+                        if !player_entity.last_collision_state {
+                            result.add_event(AudioEvent::PlayerCollision);
+                        }
+                        player_entity.last_collision_state = true;
                     }
                 }
                 InputKey::Left => {
@@ -242,8 +247,13 @@ impl GameState {
                         atlas,
                     ) {
                         player_entity.position.x = new_x;
+                        player_entity.last_collision_state = false;
                     } else {
-                        result.add_event(AudioEvent::PlayerCollision);
+                        // Only trigger audio on state change
+                        if !player_entity.last_collision_state {
+                            result.add_event(AudioEvent::PlayerCollision);
+                        }
+                        player_entity.last_collision_state = true;
                     }
                 }
                 InputKey::Down => {
@@ -258,8 +268,13 @@ impl GameState {
                         atlas,
                     ) {
                         player_entity.position.y = new_y;
+                        player_entity.last_collision_state = false;
                     } else {
-                        result.add_event(AudioEvent::PlayerCollision);
+                        // Only trigger audio on state change
+                        if !player_entity.last_collision_state {
+                            result.add_event(AudioEvent::PlayerCollision);
+                        }
+                        player_entity.last_collision_state = true;
                     }
                 }
                 InputKey::Right => {
@@ -274,8 +289,13 @@ impl GameState {
                         atlas,
                     ) {
                         player_entity.position.x = new_x;
+                        player_entity.last_collision_state = false;
                     } else {
-                        result.add_event(AudioEvent::PlayerCollision);
+                        // Only trigger audio on state change
+                        if !player_entity.last_collision_state {
+                            result.add_event(AudioEvent::PlayerCollision);
+                        }
+                        player_entity.last_collision_state = true;
                     }
                 }
                 InputKey::DebugToggle => {
@@ -288,9 +308,19 @@ impl GameState {
         let player_moved = player_entity.position != initial_position;
         result.player_moved = player_moved;
         
-        // Add walking event if the player moved
+        // Distance-based footstep tracking
         if player_moved {
-            result.add_event(AudioEvent::PlayerWalk);
+            // Calculate distance moved
+            let distance_moved = (((player_entity.position.x - initial_position.x).pow(2) + 
+                                 (player_entity.position.y - initial_position.y).pow(2)) as f32).sqrt();
+            
+            player_entity.footstep_distance_accumulator += distance_moved;
+            
+            // Trigger footstep when accumulated distance exceeds threshold
+            if player_entity.footstep_distance_accumulator >= player_entity.footstep_trigger_distance {
+                result.add_event(AudioEvent::PlayerWalk);
+                player_entity.footstep_distance_accumulator -= player_entity.footstep_trigger_distance;
+            }
         }
 
         result
