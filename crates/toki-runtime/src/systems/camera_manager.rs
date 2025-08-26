@@ -1,19 +1,19 @@
 use toki_core::camera::{Camera, CameraController, RuntimeState};
 use toki_core::assets::tilemap::TileMap;
 
-/// Camera system that manages camera state, controller logic, and chunk caching optimization.
+/// Camera manager that handles camera state coordination, controller logic, and chunk caching optimization.
 /// 
-/// Handles the coordination between camera movement, world bounds, and visible chunk caching
+/// Manages the coordination between camera movement, world bounds, and visible chunk caching
 /// for optimal rendering performance.
 #[derive(Debug)]
-pub struct CameraSystem {
+pub struct CameraManager {
     camera: Camera,
     controller: CameraController,
     cached_visible_chunks: Vec<(u32, u32)>,
 }
 
-impl CameraSystem {
-    /// Create a new CameraSystem with the given camera and controller
+impl CameraManager {
+    /// Create a new CameraManager with the given camera and controller
     pub fn new(camera: Camera, controller: CameraController) -> Self {
         Self {
             camera,

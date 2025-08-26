@@ -1,7 +1,7 @@
 use kira::{
     sound::static_sound::{StaticSoundData, StaticSoundHandle},
     sound::streaming::{StreamingSoundData, StreamingSoundHandle, StreamingSoundSettings},
-    AudioManager, AudioManagerSettings, Tween,
+    AudioManager as KiraAudioManager, AudioManagerSettings, Tween,
     sound::FromFileError,
 };
 use std::collections::HashMap;
@@ -29,8 +29,8 @@ struct AudioChannel {
     cooldown_duration: Option<Duration>,
 }
 
-pub struct AudioSystem {
-    manager: AudioManager,
+pub struct AudioManager {
+    manager: KiraAudioManager,
 
     // Preloaded sounds - all SFX loaded at startup
     preloaded_sounds: HashMap<String, StaticSoundData>,
@@ -42,9 +42,9 @@ pub struct AudioSystem {
     channels: HashMap<String, AudioChannel>,
 }
 
-impl AudioSystem {
+impl AudioManager {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let manager = AudioManager::new(AudioManagerSettings::default())?;
+        let manager = KiraAudioManager::new(AudioManagerSettings::default())?;
         let mut system = Self {
             manager,
             preloaded_sounds: HashMap::new(),
@@ -396,9 +396,9 @@ impl AudioSystem {
     }
 }
 
-impl std::fmt::Debug for AudioSystem {
+impl std::fmt::Debug for AudioManager {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AudioSystem")
+        f.debug_struct("AudioManager")
             .field("preloaded_sounds_count", &self.preloaded_sounds.len())
             .field("music_paths_count", &self.music_paths.len())
             .field("channels_count", &self.channels.len())
@@ -406,7 +406,7 @@ impl std::fmt::Debug for AudioSystem {
     }
 }
 
-impl EventHandler<AudioEvent> for AudioSystem {
+impl EventHandler<AudioEvent> for AudioManager {
     fn handle(&mut self, event: &AudioEvent) {
         match event {
             AudioEvent::PlayerWalk => {

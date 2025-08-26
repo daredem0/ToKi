@@ -12,20 +12,20 @@ use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
 use toki_core::{EventHandler, GameState, TimingSystem};
 use toki_render::RenderError;
 
-use crate::systems::AudioSystem;
+use crate::systems::AudioManager;
 use crate::systems::{
-    CameraSystem, GameSystem, PerformanceMonitor, PlatformSystem, RenderingSystem, ResourceManager,
+    CameraManager, GameManager, PerformanceMonitor, PlatformSystem, RenderingSystem, ResourceManager,
 };
 use toki_core::serialization::{load_game, save_game};
 
 #[derive(Debug)]
 struct App {
     // Core systems
-    game_system: GameSystem,
-    camera_system: CameraSystem,
+    game_system: GameManager,
+    camera_system: CameraManager,
     resources: ResourceManager,
     performance: PerformanceMonitor,
-    audio_system: AudioSystem,
+    audio_system: AudioManager,
 
     // Grouped systems
     platform: PlatformSystem,
@@ -39,7 +39,7 @@ impl App {
 
         let mut game_state = GameState::new_empty();
         let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
-        let game_system = GameSystem::new(game_state);
+        let game_system = GameManager::new(game_state);
 
         let mut camera = Camera {
             position: glam::IVec2::ZERO,
@@ -53,8 +53,8 @@ impl App {
         let cam_controller = CameraController {
             mode: CameraMode::FollowEntity(player_id),
         };
-        let camera_system = CameraSystem::new(camera, cam_controller);
-        let audio_system = AudioSystem::new().expect("Failed to initialize audio system");
+        let camera_system = CameraManager::new(camera, cam_controller);
+        let audio_system = AudioManager::new().expect("Failed to initialize audio system");
 
         Self {
             // Core systems

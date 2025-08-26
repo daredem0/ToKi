@@ -5,17 +5,17 @@ use toki_core::{
 };
 use winit::keyboard::KeyCode;
 
-/// Game system that wraps the core GameState and provides runtime integration.
+/// Game manager that wraps the core GameState and provides runtime integration.
 ///
 /// Handles translation between platform-specific events (winit) and core game logic,
 /// providing a clean interface for the App to coordinate game state with other systems.
 #[derive(Debug)]
-pub struct GameSystem {
+pub struct GameManager {
     pub game_state: GameState,
 }
 
-impl GameSystem {
-    /// Create a new GameSystem with the given core GameState
+impl GameManager {
+    /// Create a new GameManager with the given core GameState
     pub fn new(game_state: GameState) -> Self {
         Self { game_state }
     }
