@@ -2890,6 +2890,7 @@ name = "toki-core"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "fastrand",
  "glam",
  "image",
  "serde",

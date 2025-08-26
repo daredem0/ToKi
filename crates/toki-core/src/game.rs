@@ -56,6 +56,10 @@ pub struct GameState {
     /// Debug rendering flags
     #[serde(default)]
     debug_collision_rendering: bool,
+
+    /// Frame counter for NPC AI decisions
+    #[serde(default)]
+    npc_ai_frame_counter: u32,
 }
 
 impl GameState {
@@ -73,6 +77,7 @@ impl GameState {
             movement_step: 1, // Move exactly 1 pixel per frame
             sprite_size: 16,  // Sprite is 16×16 pixels
             debug_collision_rendering: false,
+            npc_ai_frame_counter: 0,
         }
     }
 
@@ -85,6 +90,7 @@ impl GameState {
             movement_step: 1,
             sprite_size: 16,
             debug_collision_rendering: false,
+            npc_ai_frame_counter: 0,
         }
     }
 
@@ -169,10 +175,88 @@ impl GameState {
             }
         }
 
+        // Update NPC AI
+        self.update_npc_ai(world_bounds, tilemap, atlas);
+
         // Update entity animation timing
         self.entity_manager.update_animations(17.0);
 
         input_result
+    }
+
+    /// Update NPC AI - makes NPCs move randomly every few frames
+    fn update_npc_ai(
+        &mut self,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) {
+        self.npc_ai_frame_counter += 1;
+        
+        // Only update NPC AI every 60 frames (roughly once per second at 60fps)
+        if self.npc_ai_frame_counter % 60 != 0 {
+            return;
+        }
+
+        let npc_entity_ids: Vec<_> = self.entity_manager
+            .active_entities()
+            .iter()
+            .filter_map(|&entity_id| {
+                if let Some(entity) = self.entity_manager.get_entity(entity_id) {
+                    // Skip the player entity
+                    if Some(entity_id) == self.player_id {
+                        return None;
+                    }
+                    // Only process NPCs
+                    if matches!(entity.entity_type, crate::entity::EntityType::Npc) {
+                        return Some(entity_id);
+                    }
+                }
+                None
+            })
+            .collect();
+
+        for npc_id in npc_entity_ids {
+            if let Some(npc_entity) = self.entity_manager.get_entity_mut(npc_id) {
+                // Choose random direction: 0=up, 1=down, 2=left, 3=right, 4=stay
+                let random_direction = fastrand::u32(0..5);
+                let current_position = npc_entity.position;
+                
+                let new_position = match random_direction {
+                    0 => glam::IVec2::new(current_position.x, (current_position.y - self.movement_step * 5).max(0)),
+                    1 => glam::IVec2::new(current_position.x, (current_position.y + self.movement_step * 5).min(world_bounds.y as i32 - self.sprite_size as i32)),
+                    2 => glam::IVec2::new((current_position.x - self.movement_step * 5).max(0), current_position.y),
+                    3 => glam::IVec2::new((current_position.x + self.movement_step * 5).min(world_bounds.x as i32 - self.sprite_size as i32), current_position.y),
+                    4 => current_position, // Stay in place
+                    _ => current_position,
+                };
+
+                let npc_moved = if new_position != current_position {
+                    // Check collision before moving
+                    if Self::can_entity_move_to_position(npc_entity, new_position, tilemap, atlas) {
+                        npc_entity.position = new_position;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+
+                // Update NPC animation based on movement
+                if let Some(animation_controller) = &mut npc_entity.attributes.animation_controller {
+                    let desired_animation = if npc_moved {
+                        AnimationState::Walk
+                    } else {
+                        AnimationState::Idle
+                    };
+                    
+                    if animation_controller.current_clip_state != desired_animation {
+                        animation_controller.play(desired_animation);
+                    }
+                }
+            }
+        }
     }
 
     /// Check if an entity can move to a position without colliding with solid tiles
