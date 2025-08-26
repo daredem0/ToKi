@@ -16,6 +16,7 @@ use crate::systems::AudioSystem;
 use crate::systems::{
     CameraSystem, GameSystem, PerformanceMonitor, PlatformSystem, RenderingSystem, ResourceManager,
 };
+use toki_core::serialization::{load_game, save_game};
 
 #[derive(Debug)]
 struct App {
@@ -218,6 +219,21 @@ impl App {
                         KeyCode::F3 => {
                             self.performance.toggle_display();
                         }
+                        KeyCode::F5 => {
+                            if let Err(e) = save_game(&self.game_system.game_state, "savegame.json")
+                            {
+                                tracing::error!("Failed to save game: {}", e);
+                            } else {
+                                tracing::info!("Game saved to savegame.json");
+                            }
+                        }
+                        KeyCode::F6 => match load_game("savegame.json") {
+                            Ok(loaded_state) => {
+                                self.game_system.game_state = loaded_state;
+                                tracing::info!("Game loaded from savegame.json");
+                            }
+                            Err(e) => tracing::error!("Failed to load game: {}", e),
+                        },
                         _ => {
                             // Delegate game input to GameSystem
                             self.game_system.handle_keyboard_input(keycode, true);

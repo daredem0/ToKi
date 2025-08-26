@@ -1,11 +1,12 @@
 use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use crate::collision::CollisionBox;
 use glam::{IVec2, UVec2};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 pub type EntityId = u32;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entity {
     pub id: EntityId,
     pub position: glam::IVec2,
@@ -13,14 +14,14 @@ pub struct Entity {
     pub entity_type: EntityType,
     pub attributes: EntityAttributes,
     pub collision_box: Option<CollisionBox>,
-    
+
     /// Audio state tracking
     pub footstep_distance_accumulator: f32,
     pub footstep_trigger_distance: f32,
     pub last_collision_state: bool,
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum EntityType {
     Player,
     Npc,
@@ -29,7 +30,7 @@ pub enum EntityType {
     Trigger,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityAttributes {
     // Core gameplay
     pub health: Option<u32>,
@@ -61,7 +62,7 @@ impl Default for EntityAttributes {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct EntityManager {
     entities: HashMap<EntityId, Entity>,
     next_id: EntityId,

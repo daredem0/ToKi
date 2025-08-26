@@ -25,7 +25,7 @@ pub struct AnimationClip {
     pub loop_mode: LoopMode,           // Repeat?
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnimationController {
     pub clips: HashMap<AnimationState, AnimationClip>, // All available animations
     pub current_clip_state: AnimationState,

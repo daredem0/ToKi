@@ -33,3 +33,5 @@ pub mod entity;
 
 pub mod collision;
 pub use collision::{CollisionBox, CollisionResult};
+
+pub mod serialization;

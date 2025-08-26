@@ -1,7 +1,8 @@
 use glam::{IVec2, UVec2};
 use crate::entity::EntityId;
+use serde::{Serialize, Deserialize}; 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CollisionBox {
     pub offset: IVec2,    // Offset from entity position
     pub size: UVec2,      // Collision box size (can differ from entity.size)

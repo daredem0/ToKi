@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use serde::{Deserialize, Serialize};
+
 use crate::animation::AnimationState;
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
@@ -8,7 +10,7 @@ use crate::events::{GameEvent, GameUpdateResult};
 use crate::sprite::{SpriteFrame, SpriteInstance};
 
 /// Core input keys abstraction (platform-independent)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum InputKey {
     Up,
     Down,
@@ -35,7 +37,7 @@ impl GameEvent for AudioEvent {}
 ///
 /// This is platform-independent and contains pure game logic without
 /// any runtime or windowing dependencies.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GameState {
     /// Entity manager for all game objects
     entity_manager: EntityManager,
@@ -44,6 +46,7 @@ pub struct GameState {
     player_id: Option<EntityId>,
 
     /// Currently held input keys
+    #[serde(default)]
     keys_held: HashSet<InputKey>,
 
     /// Game configuration constants
@@ -51,6 +54,7 @@ pub struct GameState {
     sprite_size: u32,
 
     /// Debug rendering flags
+    #[serde(default)]
     debug_collision_rendering: bool,
 }
 
@@ -307,19 +311,24 @@ impl GameState {
         // Check if position actually changed
         let player_moved = player_entity.position != initial_position;
         result.player_moved = player_moved;
-        
+
         // Distance-based footstep tracking
         if player_moved {
             // Calculate distance moved
-            let distance_moved = (((player_entity.position.x - initial_position.x).pow(2) + 
-                                 (player_entity.position.y - initial_position.y).pow(2)) as f32).sqrt();
-            
+            let distance_moved = (((player_entity.position.x - initial_position.x).pow(2)
+                + (player_entity.position.y - initial_position.y).pow(2))
+                as f32)
+                .sqrt();
+
             player_entity.footstep_distance_accumulator += distance_moved;
-            
+
             // Trigger footstep when accumulated distance exceeds threshold
-            if player_entity.footstep_distance_accumulator >= player_entity.footstep_trigger_distance {
+            if player_entity.footstep_distance_accumulator
+                >= player_entity.footstep_trigger_distance
+            {
                 result.add_event(AudioEvent::PlayerWalk);
-                player_entity.footstep_distance_accumulator -= player_entity.footstep_trigger_distance;
+                player_entity.footstep_distance_accumulator -=
+                    player_entity.footstep_trigger_distance;
             }
         }
 

@@ -1,8 +1,8 @@
+use toki_core::game::AudioEvent;
 use toki_core::{
     assets::atlas::AtlasMeta, assets::tilemap::TileMap, entity::Entity, sprite::SpriteFrame,
     GameState, GameUpdateResult, InputKey,
 };
-use toki_core::game::AudioEvent;
 use winit::keyboard::KeyCode;
 
 /// Game system that wraps the core GameState and provides runtime integration.
@@ -11,7 +11,7 @@ use winit::keyboard::KeyCode;
 /// providing a clean interface for the App to coordinate game state with other systems.
 #[derive(Debug)]
 pub struct GameSystem {
-    game_state: GameState,
+    pub game_state: GameState,
 }
 
 impl GameSystem {
@@ -55,7 +55,11 @@ impl GameSystem {
     }
 
     /// Get the current sprite frame for rendering
-    pub fn current_sprite_frame(&self, atlas: &AtlasMeta, texture_size: glam::UVec2) -> SpriteFrame {
+    pub fn current_sprite_frame(
+        &self,
+        atlas: &AtlasMeta,
+        texture_size: glam::UVec2,
+    ) -> SpriteFrame {
         self.game_state.current_sprite_frame(atlas, texture_size)
     }
 
@@ -85,12 +89,20 @@ impl GameSystem {
     }
 
     /// Get solid tile positions for debug rendering
-    pub fn get_solid_tile_positions(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> Vec<(u32, u32)> {
+    pub fn get_solid_tile_positions(
+        &self,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> Vec<(u32, u32)> {
         self.game_state.get_solid_tile_positions(tilemap, atlas)
     }
 
     /// Get trigger tile positions for debug rendering
-    pub fn get_trigger_tile_positions(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> Vec<(u32, u32)> {
+    pub fn get_trigger_tile_positions(
+        &self,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> Vec<(u32, u32)> {
         self.game_state.get_trigger_tile_positions(tilemap, atlas)
     }
 
