@@ -54,7 +54,27 @@ impl GameManager {
         }
     }
 
-    /// Get the current sprite frame for rendering
+    /// Get all renderable entities with their sprite data
+    pub fn get_renderable_entities(&self) -> Vec<(toki_core::entity::EntityId, glam::IVec2, glam::UVec2)> {
+        self.game_state.get_renderable_entities()
+    }
+
+    /// Get sprite frame for a specific entity
+    pub fn get_entity_sprite_frame(
+        &self,
+        entity_id: toki_core::entity::EntityId,
+        atlas: &AtlasMeta,
+        texture_size: glam::UVec2,
+    ) -> Option<SpriteFrame> {
+        self.game_state.get_entity_sprite_frame(entity_id, atlas, texture_size)
+    }
+
+    /// Spawn an NPC that looks like the player
+    pub fn spawn_player_like_npc(&mut self, position: glam::IVec2) -> toki_core::entity::EntityId {
+        self.game_state.spawn_player_like_npc(position)
+    }
+
+    /// Get the current sprite frame for rendering (legacy method for backwards compatibility)
     pub fn current_sprite_frame(
         &self,
         atlas: &AtlasMeta,
@@ -63,7 +83,7 @@ impl GameManager {
         self.game_state.current_sprite_frame(atlas, texture_size)
     }
 
-    /// Get player position for rendering
+    /// Get player position for rendering (legacy method for backwards compatibility)
     pub fn player_position(&self) -> glam::IVec2 {
         self.game_state.player_position()
     }

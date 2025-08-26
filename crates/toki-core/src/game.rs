@@ -95,6 +95,52 @@ impl GameState {
         player_id
     }
 
+    /// Spawn an NPC that looks identical to the player
+    pub fn spawn_player_like_npc(&mut self, position: glam::IVec2) -> EntityId {
+        use crate::entity::EntityAttributes;
+        use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
+
+        // Create identical animation controller as player
+        let mut controller = AnimationController::new();
+        let idle_clip = AnimationClip {
+            state: AnimationState::Idle,
+            atlas_name: "creatures".to_string(),
+            frame_tile_names: vec!["slime/idle_0".to_string(), "slime/idle_1".to_string()],
+            frame_duration_ms: 300.0,
+            loop_mode: LoopMode::Loop,
+        };
+        controller.add_clip(idle_clip);
+        let walk_clip = AnimationClip {
+            state: AnimationState::Walk,
+            atlas_name: "creatures".to_string(),
+            frame_tile_names: vec![
+                "slime/walk_0".to_string(),
+                "slime/walk_1".to_string(),
+                "slime/walk_2".to_string(),
+                "slime/walk_3".to_string(),
+            ],
+            frame_duration_ms: 150.0,
+            loop_mode: LoopMode::Loop,
+        };
+        controller.add_clip(walk_clip);
+        controller.play(AnimationState::Idle);
+
+        let attributes = EntityAttributes {
+            health: Some(50), // NPCs have less health than player
+            speed: 1,         // NPCs move slower
+            can_move: false,  // NPCs don't move by themselves
+            animation_controller: Some(controller),
+            ..Default::default()
+        };
+
+        self.entity_manager.spawn_entity(
+            crate::entity::EntityType::Npc,
+            position,
+            glam::UVec2::new(16, 16),
+            attributes,
+        )
+    }
+
     /// Update game state by one tick
     pub fn update(
         &mut self,
@@ -396,25 +442,56 @@ impl GameState {
             .collect()
     }
 
-    /// Get the current sprite frame for rendering with proper atlas lookup
+    /// Get sprite frame for a specific entity
+    pub fn get_entity_sprite_frame(
+        &self,
+        entity_id: EntityId,
+        atlas: &AtlasMeta,
+        texture_size: glam::UVec2,
+    ) -> Option<SpriteFrame> {
+        if let Some(entity) = self.entity_manager.get_entity(entity_id) {
+            if let Some(animation_controller) = &entity.attributes.animation_controller {
+                if let Ok(tile_name) = animation_controller.current_tile_name() {
+                    // Look up the tile in the atlas to get UV coordinates
+                    if let Some(uvs) = atlas.get_tile_uvs(&tile_name, texture_size) {
+                        return Some(SpriteFrame {
+                            u0: uvs[0],
+                            v0: uvs[1],
+                            u1: uvs[2],
+                            v1: uvs[3],
+                        });
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Get all renderable entities (entities that are visible and have animation controllers)
+    pub fn get_renderable_entities(&self) -> Vec<(EntityId, glam::IVec2, glam::UVec2)> {
+        self.entity_manager
+            .active_entities()
+            .iter()
+            .filter_map(|&entity_id| {
+                if let Some(entity) = self.entity_manager.get_entity(entity_id) {
+                    if entity.attributes.visible && entity.attributes.animation_controller.is_some() {
+                        return Some((entity_id, entity.position, entity.size));
+                    }
+                }
+                None
+            })
+            .collect()
+    }
+
+    /// Get the current sprite frame for rendering with proper atlas lookup (legacy method for player)
     pub fn current_sprite_frame(
         &self,
         atlas: &AtlasMeta,
         texture_size: glam::UVec2,
     ) -> SpriteFrame {
-        if let Some(player_entity) = self.player_entity() {
-            if let Some(animation_controller) = &player_entity.attributes.animation_controller {
-                if let Ok(tile_name) = animation_controller.current_tile_name() {
-                    // Look up the tile in the atlas to get UV coordinates
-                    if let Some(uvs) = atlas.get_tile_uvs(&tile_name, texture_size) {
-                        return SpriteFrame {
-                            u0: uvs[0],
-                            v0: uvs[1],
-                            u1: uvs[2],
-                            v1: uvs[3],
-                        };
-                    }
-                }
+        if let Some(player_id) = self.player_id {
+            if let Some(frame) = self.get_entity_sprite_frame(player_id, atlas, texture_size) {
+                return frame;
             }
         }
 

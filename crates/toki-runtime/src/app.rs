@@ -39,6 +39,10 @@ impl App {
 
         let mut game_state = GameState::new_empty();
         let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
+        
+        // Spawn an NPC that looks like the player at a different position
+        let _npc_id = game_state.spawn_player_like_npc(glam::IVec2::new(120, 72));
+        
         let game_system = GameManager::new(game_state);
 
         let mut camera = Camera {
@@ -127,16 +131,17 @@ impl App {
             let texture_size = creature_atlas
                 .image_size()
                 .unwrap_or(glam::UVec2::new(64, 16)); // fallback
-            let frame = self
-                .game_system
-                .current_sprite_frame(creature_atlas, texture_size);
+            
             if let Some(gpu) = self.rendering.gpu_mut() {
                 gpu.clear_sprites(); // Clear previous frame's sprites
-                gpu.add_sprite(
-                    frame,
-                    self.game_system.player_position(),
-                    glam::UVec2::new(16, 16),
-                );
+                
+                // Render all visible entities with animation controllers
+                let renderable_entities = self.game_system.get_renderable_entities();
+                for (entity_id, position, size) in renderable_entities {
+                    if let Some(frame) = self.game_system.get_entity_sprite_frame(entity_id, creature_atlas, texture_size) {
+                        gpu.add_sprite(frame, position, size);
+                    }
+                }
 
                 // Add debug collision rendering
                 gpu.clear_debug_shapes();
