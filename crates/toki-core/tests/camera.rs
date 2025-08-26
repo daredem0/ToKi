@@ -10,6 +10,9 @@ fn create_test_entity(id: EntityId, position: IVec2) -> Entity {
         entity_type: EntityType::Player,
         attributes: EntityAttributes::default(),
         collision_box: None,
+        footstep_distance_accumulator: 0.0,
+        footstep_trigger_distance: 32.0,
+        last_collision_state: false,
     }
 }
 
