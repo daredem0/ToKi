@@ -10,7 +10,7 @@ license = "GPL-3.0"
 winit = { version = "0.30.12", features = ["wayland", "wayland-dlopen", "wayland-csd-adwaita"] }                              # For fallback rendering#
 
 thiserror = "2.0"                   # for lib errors
-wgpu = "26.0.1"                     # For hardware-accelerated graphics
+wgpu = "25.0.2"                     # For hardware-accelerated graphics (matching egui-wgpu)
 image = { version = "0.25.6", features = [ "png", "default" ]}                    # For loading sprite assets
 pollster = "0.4.0"                  # For simplifying async GPU init
 bytemuck = { version = "1.14", features = ["derive"] }
