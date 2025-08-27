@@ -74,7 +74,7 @@ impl EditorRenderer {
     }
     
     /// Render a frame with the given egui output and context
-    pub fn render(&mut self, window: &Window, egui_output: egui::FullOutput, egui_ctx: &egui::Context) -> Result<()> {
+    pub fn render(&mut self, _window: &Window, egui_output: egui::FullOutput, egui_ctx: &egui::Context) -> Result<()> {
         // Get surface texture
         let surface_texture = match self.surface.get_current_texture() {
             Ok(texture) => texture,

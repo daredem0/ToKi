@@ -1,9 +1,7 @@
 use anyhow::Result;
 use egui_winit::winit;
 use std::sync::Arc;
-use std::time::Instant;
-use toki_core::{GameState, TimingSystem};
-use toki_core::entity::EntityId;
+use toki_core::GameState;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
@@ -32,9 +30,6 @@ struct EditorApp {
     // Game state that we're editing
     game_state: Option<GameState>,
     
-    // Timing
-    timing: TimingSystem,
-    last_frame: Instant,
 }
 
 impl EditorApp {
@@ -45,8 +40,6 @@ impl EditorApp {
             ui: EditorUI::new(),
             egui_winit: None,
             game_state: None,
-            timing: TimingSystem::new(),
-            last_frame: Instant::now(),
         }
     }
 }
@@ -58,11 +51,24 @@ impl ApplicationHandler for EditorApp {
             .with_title("ToKi Editor")
             .with_inner_size(winit::dpi::PhysicalSize::new(1200, 800));
             
-        let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
+        let window = match event_loop.create_window(window_attributes) {
+            Ok(window) => Arc::new(window),
+            Err(e) => {
+                tracing::error!("Failed to create window: {e}");
+                event_loop.exit();
+                return;
+            }
+        };
         
         // Initialize renderer (async, but we block here since we're in resumed)
-        let renderer = pollster::block_on(EditorRenderer::new(window.clone()))
-            .expect("Failed to initialize renderer");
+        let renderer = match pollster::block_on(EditorRenderer::new(window.clone())) {
+            Ok(renderer) => renderer,
+            Err(e) => {
+                tracing::error!("Failed to initialize renderer: {e}");
+                event_loop.exit();
+                return;
+            }
+        };
         
         // Initialize egui
         let egui_context = egui::Context::default();
@@ -80,11 +86,8 @@ impl ApplicationHandler for EditorApp {
         self.renderer = Some(renderer);
         self.egui_winit = Some(egui_winit);
         
-        // Initialize game state
-        let mut game_state = GameState::new_empty();
-        let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
-        let _npc_id = game_state.spawn_player_like_npc(glam::IVec2::new(120, 72));
-        self.game_state = Some(game_state);
+        // Initialize with empty game state (entities can be created via UI)
+        self.game_state = Some(GameState::new_empty());
         
         tracing::info!("Editor initialized successfully");
         window.request_redraw();
@@ -135,7 +138,7 @@ impl ApplicationHandler for EditorApp {
             }
             
             WindowEvent::RedrawRequested => {
-                self.render();
+                self.render(event_loop);
             }
             
             _ => {}
@@ -144,7 +147,7 @@ impl ApplicationHandler for EditorApp {
 }
 
 impl EditorApp {
-    fn render(&mut self) {
+    fn render(&mut self, event_loop: &ActiveEventLoop) {
         let (window, renderer) = match (&self.window, &mut self.renderer) {
             (Some(w), Some(r)) => (w, r),
             _ => return, // Not initialized yet
@@ -164,6 +167,21 @@ impl EditorApp {
             // Render all UI components
             self.ui.render(ctx, self.game_state.as_ref());
         });
+        
+        // Handle UI requests
+        if self.ui.should_exit {
+            event_loop.exit();
+            return;
+        }
+        
+        if self.ui.create_test_entities {
+            if let Some(game_state) = &mut self.game_state {
+                let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
+                let _npc_id = game_state.spawn_player_like_npc(glam::IVec2::new(120, 72));
+                tracing::info!("Created test entities");
+            }
+            self.ui.create_test_entities = false;
+        }
         
         // Handle platform output (cursor, clipboard, etc.)
         egui_winit.handle_platform_output(window, full_output.platform_output.clone());

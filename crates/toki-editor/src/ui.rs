@@ -5,6 +5,8 @@ pub struct EditorUI {
     pub selected_entity_id: Option<EntityId>,
     pub show_hierarchy: bool,
     pub show_inspector: bool,
+    pub should_exit: bool,
+    pub create_test_entities: bool,
 }
 
 impl EditorUI {
@@ -13,6 +15,8 @@ impl EditorUI {
             selected_entity_id: None,
             show_hierarchy: true,
             show_inspector: true,
+            should_exit: false,
+            create_test_entities: false,
         }
     }
     
@@ -35,9 +39,14 @@ impl EditorUI {
                         tracing::info!("Open Project clicked");
                     }
                     ui.separator();
+                    if ui.button("Create Test Entities").clicked() {
+                        tracing::info!("Create Test Entities clicked");
+                        self.create_test_entities = true;
+                    }
+                    ui.separator();
                     if ui.button("Exit").clicked() {
                         tracing::info!("Exit clicked");
-                        std::process::exit(0);
+                        self.should_exit = true;
                     }
                 });
                 
