@@ -2,6 +2,9 @@ use anyhow::Result;
 use tracing_subscriber;
 
 mod editor_app;
+mod renderer;
+mod ui;
+
 use editor_app::run_editor;
 
 fn main() -> Result<()> {
