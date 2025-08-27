@@ -98,7 +98,9 @@ impl ApplicationHandler for EditorApp {
     ) {
         // Handle egui events first
         if let Some(egui_winit) = &mut self.egui_winit {
-            let _ = egui_winit.on_window_event(self.window.as_ref().unwrap(), &event);
+            if let Some(window) = &self.window {
+                let _ = egui_winit.on_window_event(window, &event);
+            }
         }
         
         match event {
@@ -148,16 +150,26 @@ impl EditorApp {
             _ => return, // Not initialized yet
         };
         
-        // For now, just render with empty egui output (no UI yet)
-        let empty_output = egui::FullOutput {
-            platform_output: egui::PlatformOutput::default(),
-            textures_delta: egui::TexturesDelta::default(),
-            shapes: Vec::new(),
-            pixels_per_point: window.scale_factor() as f32,
-            viewport_output: std::collections::HashMap::default(),
+        let egui_winit = match &mut self.egui_winit {
+            Some(egui) => egui,
+            None => return,
         };
         
-        if let Err(e) = renderer.render(window, empty_output) {
+        // Prepare egui input
+        let raw_input = egui_winit.take_egui_input(window);
+        
+        // Run egui UI
+        let egui_ctx = egui_winit.egui_ctx().clone();
+        let full_output = egui_ctx.run(raw_input, |ctx| {
+            // Render all UI components
+            self.ui.render(ctx, self.game_state.as_ref());
+        });
+        
+        // Handle platform output (cursor, clipboard, etc.)
+        egui_winit.handle_platform_output(window, full_output.platform_output.clone());
+        
+        // Render frame
+        if let Err(e) = renderer.render(window, full_output, &egui_ctx) {
             tracing::error!("Render error: {e}");
         }
         

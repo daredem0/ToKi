@@ -73,8 +73,8 @@ impl EditorRenderer {
         }
     }
     
-    /// Render a frame with the given egui output
-    pub fn render(&mut self, window: &Window, egui_output: egui::FullOutput) -> Result<()> {
+    /// Render a frame with the given egui output and context
+    pub fn render(&mut self, window: &Window, egui_output: egui::FullOutput, egui_ctx: &egui::Context) -> Result<()> {
         // Get surface texture
         let surface_texture = match self.surface.get_current_texture() {
             Ok(texture) => texture,
@@ -120,29 +120,48 @@ impl EditorRenderer {
         if !egui_output.shapes.is_empty() {
             let screen_descriptor = egui_wgpu::ScreenDescriptor {
                 size_in_pixels: [self.surface_config.width, self.surface_config.height],
-                pixels_per_point: window.scale_factor() as f32,
+                pixels_per_point: egui_output.pixels_per_point,
             };
             
-            // Tessellate egui shapes
-            let clipped_primitives = egui_output.shapes; // TODO: tessellate properly when we add egui back
+            // Tessellate egui shapes using the context
+            let clipped_primitives = egui_ctx.tessellate(egui_output.shapes, egui_output.pixels_per_point);
             
             // Update egui textures
             for (id, image_delta) in &egui_output.textures_delta.set {
                 self.egui_renderer.update_texture(&self.device, &self.queue, *id, image_delta);
             }
             
-            // Note: For now, just clear. We'll add proper egui rendering later
-            // This structure is ready for when we fix the borrowing issues
+            // Update buffers
+            self.egui_renderer.update_buffers(&self.device, &self.queue, &mut encoder, &clipped_primitives, &screen_descriptor);
+            
+            // Create render pass and render egui
+            let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("egui Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &surface_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            
+            let mut render_pass_static = render_pass.forget_lifetime();
+            self.egui_renderer.render(&mut render_pass_static, &clipped_primitives, &screen_descriptor);
         }
-        
-        // Submit and present
-        self.queue.submit(std::iter::once(encoder.finish()));
-        surface_texture.present();
         
         // Free egui textures
         for id in &egui_output.textures_delta.free {
             self.egui_renderer.free_texture(id);
         }
+        
+        // Submit and present
+        self.queue.submit(std::iter::once(encoder.finish()));
+        surface_texture.present();
         
         Ok(())
     }
