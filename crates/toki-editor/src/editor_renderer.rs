@@ -1,0 +1,279 @@
+use anyhow::Result;
+use toki_core::{GameState, Camera};
+
+/// Editor-specific renderer for visualizing game scenes
+/// Unlike the runtime renderer, this focuses on editing rather than gameplay
+pub struct EditorRenderer {
+    // For now, we'll use a simpler approach until we can better integrate with WGPU
+    // Editor-specific state
+    selected_entity_id: Option<u32>,
+    show_collision_boxes: bool,
+    show_entity_centers: bool,
+}
+
+impl EditorRenderer {
+    /// Create a new editor renderer
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            selected_entity_id: None,
+            show_collision_boxes: true,
+            show_entity_centers: true,
+        })
+    }
+    
+    /// Render the game state for editing purposes using egui
+    pub fn render_for_editor(
+        &mut self,
+        ui: &mut egui::Ui,
+        game_state: &GameState,
+        camera: &Camera,
+        viewport_rect: egui::Rect,
+    ) {
+        // Draw background
+        ui.painter().rect_filled(
+            viewport_rect,
+            0.0,
+            egui::Color32::from_rgb(32, 48, 64), // Dark blue-gray background
+        );
+        
+        // Calculate camera transform for rendering
+        let camera_offset = glam::Vec2::new(camera.position.x as f32, camera.position.y as f32);
+        let scale = camera.scale as f32;
+        
+        // Get entity IDs and then get the actual entities
+        let entity_ids = game_state.entity_manager().active_entities();
+        let entities: Vec<&toki_core::entity::Entity> = entity_ids
+            .iter()
+            .filter_map(|id| game_state.entity_manager().get_entity(*id))
+            .collect();
+        
+        // Render all entities
+        for entity in &entities {
+            self.render_entity_egui(ui, entity, camera_offset, scale, viewport_rect);
+        }
+        
+        // Render editor overlays on top
+        for entity in &entities {
+            if self.show_entity_centers {
+                self.render_entity_center_egui(ui, entity, camera_offset, scale, viewport_rect);
+            }
+            
+            if self.show_collision_boxes {
+                self.render_collision_box_egui(ui, entity, camera_offset, scale, viewport_rect);
+            }
+            
+            // Highlight selected entity
+            if Some(entity.id) == self.selected_entity_id {
+                self.render_selection_highlight_egui(ui, entity, camera_offset, scale, viewport_rect);
+            }
+        }
+    }
+    
+    /// Render a single entity using egui
+    fn render_entity_egui(
+        &self,
+        ui: &mut egui::Ui,
+        entity: &toki_core::entity::Entity,
+        camera_offset: glam::Vec2,
+        scale: f32,
+        viewport_rect: egui::Rect,
+    ) {
+        let entity_pos = entity.position;
+        let screen_pos = self.world_to_screen(entity_pos.as_vec2(), camera_offset, scale, viewport_rect);
+        
+        // For now, render entities as simple colored rectangles
+        let entity_size = if let Some(collision_box) = &entity.collision_box {
+            collision_box.size.as_vec2() * scale
+        } else {
+            glam::Vec2::new(16.0, 16.0) * scale // default size
+        };
+        
+        let entity_rect = egui::Rect::from_center_size(
+            egui::pos2(screen_pos.x, screen_pos.y),
+            egui::vec2(entity_size.x, entity_size.y),
+        );
+        
+        // Color entities differently based on type or ID
+        let color = match entity.id % 6 {
+            0 => egui::Color32::from_rgb(255, 100, 100), // Red
+            1 => egui::Color32::from_rgb(100, 255, 100), // Green  
+            2 => egui::Color32::from_rgb(100, 100, 255), // Blue
+            3 => egui::Color32::from_rgb(255, 255, 100), // Yellow
+            4 => egui::Color32::from_rgb(255, 100, 255), // Magenta
+            5 => egui::Color32::from_rgb(100, 255, 255), // Cyan
+            _ => egui::Color32::WHITE,
+        };
+        
+        ui.painter().rect_filled(entity_rect, 2.0, color);
+        
+        // Draw entity ID
+        ui.painter().text(
+            entity_rect.center(),
+            egui::Align2::CENTER_CENTER,
+            entity.id.to_string(),
+            egui::FontId::monospace(10.0),
+            egui::Color32::BLACK,
+        );
+    }
+    
+    /// Render entity center dot using egui
+    fn render_entity_center_egui(
+        &self,
+        ui: &mut egui::Ui,
+        entity: &toki_core::entity::Entity,
+        camera_offset: glam::Vec2,
+        scale: f32,
+        viewport_rect: egui::Rect,
+    ) {
+        let entity_pos = entity.position;
+        let screen_pos = self.world_to_screen(entity_pos.as_vec2(), camera_offset, scale, viewport_rect);
+        
+        ui.painter().circle_filled(
+            egui::pos2(screen_pos.x, screen_pos.y),
+            2.0,
+            egui::Color32::YELLOW,
+        );
+    }
+    
+    /// Render collision box outline using egui
+    fn render_collision_box_egui(
+        &self,
+        ui: &mut egui::Ui,
+        entity: &toki_core::entity::Entity,
+        camera_offset: glam::Vec2,
+        scale: f32,
+        viewport_rect: egui::Rect,
+    ) {
+        if let Some(collision_box) = &entity.collision_box {
+            let entity_pos = entity.position;
+            let screen_pos = self.world_to_screen(entity_pos.as_vec2(), camera_offset, scale, viewport_rect);
+            let size = collision_box.size.as_vec2() * scale;
+            
+            let rect = egui::Rect::from_center_size(
+                egui::pos2(screen_pos.x, screen_pos.y),
+                egui::vec2(size.x, size.y),
+            );
+            
+            // Draw collision box outline (simplified for now)
+            ui.painter().rect_filled(rect, 0.0, egui::Color32::from_rgba_premultiplied(0, 255, 0, 50));
+        }
+    }
+    
+    /// Render selection highlight using egui
+    fn render_selection_highlight_egui(
+        &self,
+        ui: &mut egui::Ui,
+        entity: &toki_core::entity::Entity,
+        camera_offset: glam::Vec2,
+        scale: f32,
+        viewport_rect: egui::Rect,
+    ) {
+        let entity_pos = entity.position;
+        let screen_pos = self.world_to_screen(entity_pos.as_vec2(), camera_offset, scale, viewport_rect);
+        
+        let size = if let Some(collision_box) = &entity.collision_box {
+            collision_box.size.as_vec2() * scale
+        } else {
+            glam::Vec2::new(16.0, 16.0) * scale
+        };
+        
+        let rect = egui::Rect::from_center_size(
+            egui::pos2(screen_pos.x, screen_pos.y),
+            egui::vec2(size.x + 8.0, size.y + 8.0), // slightly larger
+        );
+        
+        // Draw selection highlight (simplified for now)  
+        ui.painter().rect_filled(rect, 2.0, egui::Color32::from_rgba_premultiplied(255, 255, 255, 80));
+    }
+    
+    /// Convert world coordinates to screen coordinates
+    fn world_to_screen(
+        &self,
+        world_pos: glam::Vec2,
+        camera_offset: glam::Vec2,
+        scale: f32,
+        viewport_rect: egui::Rect,
+    ) -> glam::Vec2 {
+        let relative_pos = world_pos - camera_offset;
+        let scaled_pos = relative_pos * scale;
+        
+        glam::Vec2::new(
+            viewport_rect.center().x + scaled_pos.x,
+            viewport_rect.center().y + scaled_pos.y,
+        )
+    }
+    
+    /// Select entity by ID
+    pub fn select_entity(&mut self, entity_id: Option<u32>) {
+        self.selected_entity_id = entity_id;
+    }
+    
+    /// Get currently selected entity
+    pub fn selected_entity(&self) -> Option<u32> {
+        self.selected_entity_id
+    }
+    
+    /// Toggle collision box visibility
+    pub fn toggle_collision_boxes(&mut self) {
+        self.show_collision_boxes = !self.show_collision_boxes;
+    }
+    
+    /// Toggle entity center visibility
+    pub fn toggle_entity_centers(&mut self) {
+        self.show_entity_centers = !self.show_entity_centers;
+    }
+    
+    /// Test if a screen position hits an entity (for selection)
+    pub fn entity_at_position(
+        &self,
+        game_state: &GameState,
+        camera: &Camera,
+        screen_pos: glam::Vec2,
+        viewport_rect: egui::Rect,
+    ) -> Option<u32> {
+        // Convert screen coordinates to world coordinates
+        let camera_offset = glam::Vec2::new(camera.position.x as f32, camera.position.y as f32);
+        let scale = camera.scale as f32;
+        let world_pos = self.screen_to_world(screen_pos, camera_offset, scale, viewport_rect);
+        
+        // Get entity IDs and then get the actual entities, test in reverse order (top to bottom)
+        let entity_ids = game_state.entity_manager().active_entities();
+        for entity_id in entity_ids.iter().rev() {
+            if let Some(entity) = game_state.entity_manager().get_entity(*entity_id) {
+                let entity_pos = entity.position.as_vec2();
+                
+                let size = if let Some(collision_box) = &entity.collision_box {
+                    collision_box.size.as_vec2()
+                } else {
+                    glam::Vec2::new(16.0, 16.0) // default size
+                };
+                
+                // Check if click is within entity bounds
+                if world_pos.x >= entity_pos.x - size.x / 2.0 && 
+                   world_pos.x <= entity_pos.x + size.x / 2.0 &&
+                   world_pos.y >= entity_pos.y - size.y / 2.0 && 
+                   world_pos.y <= entity_pos.y + size.y / 2.0 {
+                    return Some(entity.id);
+                }
+            }
+        }
+        None
+    }
+    
+    /// Convert screen coordinates to world coordinates
+    fn screen_to_world(
+        &self,
+        screen_pos: glam::Vec2,
+        camera_offset: glam::Vec2,
+        scale: f32,
+        viewport_rect: egui::Rect,
+    ) -> glam::Vec2 {
+        let relative_screen_pos = glam::Vec2::new(
+            screen_pos.x - viewport_rect.center().x,
+            screen_pos.y - viewport_rect.center().y,
+        );
+        
+        let scaled_pos = relative_screen_pos / scale;
+        camera_offset + scaled_pos
+    }
+}

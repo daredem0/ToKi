@@ -73,6 +73,21 @@ impl EditorRenderer {
         }
     }
     
+    /// Get reference to WGPU device (for viewport initialization)
+    pub fn device(&self) -> &wgpu::Device {
+        &self.device
+    }
+    
+    /// Get reference to WGPU queue (for viewport initialization)
+    pub fn queue(&self) -> &wgpu::Queue {
+        &self.queue
+    }
+    
+    /// Get current surface format (for viewport initialization)
+    pub fn surface_format(&self) -> wgpu::TextureFormat {
+        self.surface_config.format
+    }
+    
     /// Render a frame with the given egui output and context
     pub fn render(&mut self, _window: &Window, egui_output: egui::FullOutput, egui_ctx: &egui::Context) -> Result<()> {
         // Get surface texture

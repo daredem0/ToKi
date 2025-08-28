@@ -10,6 +10,7 @@ use winit::window::{Window, WindowId};
 
 use crate::renderer::EditorRenderer;
 use crate::ui::EditorUI;
+use crate::game_viewport::GameViewport;
 
 pub fn run_editor() -> Result<()> {
     let event_loop = EventLoop::new()?;
@@ -27,8 +28,8 @@ struct EditorApp {
     // egui integration
     egui_winit: Option<egui_winit::State>,
     
-    // Game state that we're editing
-    game_state: Option<GameState>,
+    // Game viewport integration
+    game_viewport: Option<GameViewport>,
     
 }
 
@@ -39,7 +40,7 @@ impl EditorApp {
             renderer: None,
             ui: EditorUI::new(),
             egui_winit: None,
-            game_state: None,
+            game_viewport: None,
         }
     }
 }
@@ -86,8 +87,24 @@ impl ApplicationHandler for EditorApp {
         self.renderer = Some(renderer);
         self.egui_winit = Some(egui_winit);
         
-        // Initialize with empty game state (entities can be created via UI)
-        self.game_state = Some(GameState::new_empty());
+        // Initialize game viewport with empty game state
+        let game_state = GameState::new_empty();
+        match GameViewport::new(game_state) {
+            Ok(mut viewport) => {
+                // Initialize the editor viewport
+                if let Some(renderer) = &self.renderer {
+                    let device = renderer.device();
+                    let queue = renderer.queue();
+                    let format = renderer.surface_format();
+                    viewport.initialize_wgpu(device, queue, format);
+                }
+                self.game_viewport = Some(viewport);
+                tracing::info!("Editor viewport initialized");
+            }
+            Err(e) => {
+                tracing::error!("Failed to initialize game viewport: {e}");
+            }
+        }
         
         tracing::info!("Editor initialized successfully");
         window.request_redraw();
@@ -164,8 +181,8 @@ impl EditorApp {
         // Run egui UI
         let egui_ctx = egui_winit.egui_ctx().clone();
         let full_output = egui_ctx.run(raw_input, |ctx| {
-            // Render all UI components
-            self.ui.render(ctx, self.game_state.as_ref());
+            // Render all UI components - we'll handle game state inside UI render method
+            self.ui.render(ctx, None, self.game_viewport.as_mut());
         });
         
         // Handle UI requests
@@ -175,7 +192,8 @@ impl EditorApp {
         }
         
         if self.ui.create_test_entities {
-            if let Some(game_state) = &mut self.game_state {
+            if let Some(viewport) = &mut self.game_viewport {
+                let game_state = viewport.game_state_mut();
                 let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
                 let _npc_id = game_state.spawn_player_like_npc(glam::IVec2::new(120, 72));
                 tracing::info!("Created test entities");

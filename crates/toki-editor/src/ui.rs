@@ -1,4 +1,5 @@
 use toki_core::{GameState, entity::EntityId};
+use crate::game_viewport::GameViewport;
 
 /// Manages the editor's UI state and rendering
 pub struct EditorUI {
@@ -21,11 +22,21 @@ impl EditorUI {
     }
     
     /// Render the entire UI
-    pub fn render(&mut self, ctx: &egui::Context, game_state: Option<&GameState>) {
+    pub fn render(&mut self, ctx: &egui::Context, _game_state: Option<&GameState>, game_viewport: Option<&mut GameViewport>) {
         self.render_top_menu(ctx);
-        self.render_hierarchy(ctx, game_state);
-        self.render_inspector(ctx, game_state);
-        self.render_viewport(ctx, game_state);
+        
+        // Render hierarchy and inspector first (immutable access)
+        if let Some(ref viewport) = game_viewport {
+            let game_state = Some(viewport.game_state());
+            self.render_hierarchy(ctx, game_state);
+            self.render_inspector(ctx, game_state);
+        } else {
+            self.render_hierarchy(ctx, None);
+            self.render_inspector(ctx, None);
+        }
+        
+        // Render viewport last (mutable access)
+        self.render_viewport(ctx, game_viewport);
     }
     
     fn render_top_menu(&mut self, ctx: &egui::Context) {
@@ -134,20 +145,39 @@ impl EditorUI {
             });
     }
     
-    fn render_viewport(&mut self, ctx: &egui::Context, game_state: Option<&GameState>) {
+    fn render_viewport(&mut self, ctx: &egui::Context, game_viewport: Option<&mut GameViewport>) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Game Viewport");
             ui.separator();
             
-            let available_size = ui.available_size();
-            ui.allocate_response(available_size, egui::Sense::click())
-                .on_hover_text("Game will render here");
+            // Get entity count and update viewport systems 
+            let entity_count = if let Some(viewport) = game_viewport.as_ref() {
+                viewport.game_state().entity_manager().active_entities().len()
+            } else {
+                0
+            };
+            
+            // Update and render the actual game viewport or placeholder
+            if let Some(viewport) = game_viewport {
+                // Update the viewport systems
+                if let Err(e) = viewport.update() {
+                    tracing::error!("GameViewport update error: {e}");
+                }
+                
+                // Render the game content
+                viewport.render_viewport(ui);
+            } else {
+                // Show placeholder when no viewport
+                let available_size = ui.available_size();
+                ui.allocate_response(available_size, egui::Sense::click())
+                    .on_hover_text("Game viewport not initialized");
+            }
                 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 ui.horizontal(|ui| {
                     ui.label("📊 Stats:");
-                    if let Some(game_state) = game_state {
-                        ui.label(format!("Entities: {}", game_state.entity_manager().active_entities().len()));
+                    if entity_count > 0 {
+                        ui.label(format!("Entities: {}", entity_count));
                     }
                     ui.label("Press F1/F2 to toggle panels");
                 });

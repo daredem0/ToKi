@@ -4,6 +4,8 @@ use tracing_subscriber;
 mod editor_app;
 mod renderer;
 mod ui;
+mod game_viewport;
+mod editor_renderer;
 
 use editor_app::run_editor;
 

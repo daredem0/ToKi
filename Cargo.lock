@@ -3309,6 +3309,7 @@ dependencies = [
  "glam",
  "pollster",
  "toki-core",
+ "toki-render",
  "toki-runtime",
  "tracing",
  "tracing-subscriber",
