@@ -2,10 +2,9 @@ use anyhow::Result;
 use tracing_subscriber;
 
 mod editor_app;
-mod renderer;
+mod rendering;
 mod ui;
-mod game_viewport;
-mod editor_renderer;
+mod scene;
 
 use editor_app::run_editor;
 

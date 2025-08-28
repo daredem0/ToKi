@@ -8,9 +8,9 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
 
-use crate::renderer::EditorRenderer;
+use crate::rendering::WindowRenderer;
 use crate::ui::EditorUI;
-use crate::game_viewport::GameViewport;
+use crate::scene::SceneViewport;
 
 pub fn run_editor() -> Result<()> {
     let event_loop = EventLoop::new()?;
@@ -22,14 +22,14 @@ pub fn run_editor() -> Result<()> {
 struct EditorApp {
     // Core components
     window: Option<Arc<Window>>,
-    renderer: Option<EditorRenderer>,
+    renderer: Option<WindowRenderer>,
     ui: EditorUI,
     
     // egui integration
     egui_winit: Option<egui_winit::State>,
     
-    // Game viewport integration
-    game_viewport: Option<GameViewport>,
+    // Scene viewport integration
+    scene_viewport: Option<SceneViewport>,
     
 }
 
@@ -40,7 +40,7 @@ impl EditorApp {
             renderer: None,
             ui: EditorUI::new(),
             egui_winit: None,
-            game_viewport: None,
+            scene_viewport: None,
         }
     }
 }
@@ -62,7 +62,7 @@ impl ApplicationHandler for EditorApp {
         };
         
         // Initialize renderer (async, but we block here since we're in resumed)
-        let renderer = match pollster::block_on(EditorRenderer::new(window.clone())) {
+        let renderer = match pollster::block_on(WindowRenderer::new(window.clone())) {
             Ok(renderer) => renderer,
             Err(e) => {
                 tracing::error!("Failed to initialize renderer: {e}");
@@ -87,22 +87,17 @@ impl ApplicationHandler for EditorApp {
         self.renderer = Some(renderer);
         self.egui_winit = Some(egui_winit);
         
-        // Initialize game viewport with empty game state
+        // Initialize scene viewport with empty game state
         let game_state = GameState::new_empty();
-        match GameViewport::new(game_state) {
+        match SceneViewport::with_game_state(game_state) {
             Ok(mut viewport) => {
-                // Initialize the editor viewport
-                if let Some(renderer) = &self.renderer {
-                    let device = renderer.device();
-                    let queue = renderer.queue();
-                    let format = renderer.surface_format();
-                    viewport.initialize_wgpu(device, queue, format);
-                }
-                self.game_viewport = Some(viewport);
-                tracing::info!("Editor viewport initialized");
+                // Initialize the scene viewport
+                viewport.initialize();
+                self.scene_viewport = Some(viewport);
+                tracing::info!("Scene viewport initialized");
             }
             Err(e) => {
-                tracing::error!("Failed to initialize game viewport: {e}");
+                tracing::error!("Failed to initialize scene viewport: {e}");
             }
         }
         
@@ -182,7 +177,7 @@ impl EditorApp {
         let egui_ctx = egui_winit.egui_ctx().clone();
         let full_output = egui_ctx.run(raw_input, |ctx| {
             // Render all UI components - we'll handle game state inside UI render method
-            self.ui.render(ctx, None, self.game_viewport.as_mut());
+            self.ui.render(ctx, self.scene_viewport.as_mut());
         });
         
         // Handle UI requests
@@ -192,8 +187,8 @@ impl EditorApp {
         }
         
         if self.ui.create_test_entities {
-            if let Some(viewport) = &mut self.game_viewport {
-                let game_state = viewport.game_state_mut();
+            if let Some(viewport) = &mut self.scene_viewport {
+                let game_state = viewport.scene_manager_mut().game_state_mut();
                 let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
                 let _npc_id = game_state.spawn_player_like_npc(glam::IVec2::new(120, 72));
                 tracing::info!("Created test entities");

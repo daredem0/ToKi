@@ -1,9 +1,9 @@
 use anyhow::Result;
 use toki_core::{GameState, Camera};
 
-/// Editor-specific renderer for visualizing game scenes
-/// Unlike the runtime renderer, this focuses on editing rather than gameplay
-pub struct EditorRenderer {
+/// Handles scene visualization for editing purposes
+/// Renders game entities, collision boxes, and selection highlights
+pub struct SceneRenderer {
     // For now, we'll use a simpler approach until we can better integrate with WGPU
     // Editor-specific state
     selected_entity_id: Option<u32>,
@@ -11,7 +11,7 @@ pub struct EditorRenderer {
     show_entity_centers: bool,
 }
 
-impl EditorRenderer {
+impl SceneRenderer {
     /// Create a new editor renderer
     pub fn new() -> Result<Self> {
         Ok(Self {
@@ -213,15 +213,7 @@ impl EditorRenderer {
         self.selected_entity_id
     }
     
-    /// Toggle collision box visibility
-    pub fn toggle_collision_boxes(&mut self) {
-        self.show_collision_boxes = !self.show_collision_boxes;
-    }
-    
-    /// Toggle entity center visibility
-    pub fn toggle_entity_centers(&mut self) {
-        self.show_entity_centers = !self.show_entity_centers;
-    }
+    // Note: Toggle methods can be added back when UI controls for them are implemented
     
     /// Test if a screen position hits an entity (for selection)
     pub fn entity_at_position(

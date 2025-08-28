@@ -2,8 +2,8 @@ use anyhow::Result;
 use std::sync::Arc;
 use winit::window::Window;
 
-/// Handles all wgpu rendering for the editor
-pub struct EditorRenderer {
+/// Handles WGPU window rendering and egui integration
+pub struct WindowRenderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface: wgpu::Surface<'static>,
@@ -11,7 +11,7 @@ pub struct EditorRenderer {
     egui_renderer: egui_wgpu::Renderer,
 }
 
-impl EditorRenderer {
+impl WindowRenderer {
     /// Initialize the renderer with a window
     pub async fn new(window: Arc<Window>) -> Result<Self> {
         // Initialize wgpu
@@ -74,16 +74,19 @@ impl EditorRenderer {
     }
     
     /// Get reference to WGPU device (for viewport initialization)
+    #[allow(dead_code)] // Will be used for advanced WGPU integration
     pub fn device(&self) -> &wgpu::Device {
         &self.device
     }
     
     /// Get reference to WGPU queue (for viewport initialization)
+    #[allow(dead_code)] // Will be used for advanced WGPU integration
     pub fn queue(&self) -> &wgpu::Queue {
         &self.queue
     }
     
     /// Get current surface format (for viewport initialization)
+    #[allow(dead_code)] // Will be used for advanced WGPU integration
     pub fn surface_format(&self) -> wgpu::TextureFormat {
         self.surface_config.format
     }
