@@ -1,0 +1,15 @@
+{
+  "entity_manager": {
+    "entities": {},
+    "next_id": 1,
+    "player_id": null,
+    "entities_by_type": {},
+    "active_entities": []
+  },
+  "player_id": null,
+  "keys_held": [],
+  "movement_step": 1,
+  "sprite_size": 16,
+  "debug_collision_rendering": false,
+  "npc_ai_frame_counter": 0
+}

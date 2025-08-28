@@ -131,9 +131,13 @@ impl ApplicationHandler for EditorApp {
         event: WindowEvent,
     ) {
         // Handle egui events first
+        let mut needs_repaint = false;
         if let Some(egui_winit) = &mut self.egui_winit {
             if let Some(window) = &self.window {
-                let _ = egui_winit.on_window_event(window, &event);
+                let event_response = egui_winit.on_window_event(window, &event);
+                if event_response.repaint {
+                    needs_repaint = true;
+                }
             }
         }
         
@@ -151,10 +155,16 @@ impl ApplicationHandler for EditorApp {
                             KeyCode::F1 => {
                                 self.ui.show_hierarchy = !self.ui.show_hierarchy;
                                 tracing::info!("Toggled hierarchy panel: {}", self.ui.show_hierarchy);
+                                if let Some(window) = &self.window {
+                                    window.request_redraw();
+                                }
                             }
                             KeyCode::F2 => {
                                 self.ui.show_inspector = !self.ui.show_inspector;
                                 tracing::info!("Toggled inspector panel: {}", self.ui.show_inspector);
+                                if let Some(window) = &self.window {
+                                    window.request_redraw();
+                                }
                             }
                             _ => {}
                         }
@@ -166,6 +176,9 @@ impl ApplicationHandler for EditorApp {
                 if let Some(renderer) = &mut self.renderer {
                     renderer.resize(new_size);
                 }
+                if let Some(window) = &self.window {
+                    window.request_redraw();
+                }
             }
             
             WindowEvent::RedrawRequested => {
@@ -173,6 +186,13 @@ impl ApplicationHandler for EditorApp {
             }
             
             _ => {}
+        }
+        
+        // Request repaint if egui or our events need it
+        if needs_repaint {
+            if let Some(window) = &self.window {
+                window.request_redraw();
+            }
         }
     }
 }
@@ -223,8 +243,10 @@ impl EditorApp {
             tracing::error!("Render error: {e}");
         }
         
-        // Request next frame
-        window.request_redraw();
+        // Request redraw if egui wants a repaint
+        if egui_ctx.has_requested_repaint() {
+            window.request_redraw();
+        }
         
         // Handle project management requests after rendering is done
         self.handle_project_requests(event_loop);
