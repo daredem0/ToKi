@@ -5,6 +5,8 @@ mod editor_app;
 mod rendering;
 mod ui;
 mod scene;
+mod project;
+mod config;
 
 use editor_app::run_editor;
 

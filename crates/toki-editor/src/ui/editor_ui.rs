@@ -9,6 +9,13 @@ pub struct EditorUI {
     pub show_inspector: bool,
     pub should_exit: bool,
     pub create_test_entities: bool,
+    
+    // Project management flags
+    pub new_project_requested: bool,
+    pub open_project_requested: bool,
+    pub save_project_requested: bool,
+    pub save_as_project_requested: bool,
+    pub init_config_requested: bool,
 }
 
 impl EditorUI {
@@ -19,6 +26,13 @@ impl EditorUI {
             show_inspector: true,
             should_exit: false,
             create_test_entities: false,
+            
+            // Project management flags
+            new_project_requested: false,
+            open_project_requested: false,
+            save_project_requested: false,
+            save_as_project_requested: false,
+            init_config_requested: false,
         }
     }
     
@@ -41,20 +55,42 @@ impl EditorUI {
         self.render_viewport(ctx, scene_viewport);
     }
     
+    /// Apply config settings to UI state
+    pub fn apply_config(&mut self, config: &crate::config::EditorConfig) {
+        self.show_hierarchy = config.editor_settings.panels.hierarchy_visible;
+        self.show_inspector = config.editor_settings.panels.inspector_visible;
+    }
+    
     fn render_top_menu(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    if ui.button("New Project").clicked() {
+                    if ui.button("New Project...").clicked() {
                         tracing::info!("New Project clicked");
+                        self.new_project_requested = true;
                     }
-                    if ui.button("Open Project").clicked() {
+                    if ui.button("Open Project...").clicked() {
                         tracing::info!("Open Project clicked");
+                        self.open_project_requested = true;
+                    }
+                    ui.separator();
+                    if ui.button("Save Project").clicked() {
+                        tracing::info!("Save Project clicked");
+                        self.save_project_requested = true;
+                    }
+                    if ui.button("Save As...").clicked() {
+                        tracing::info!("Save As clicked");
+                        self.save_as_project_requested = true;
                     }
                     ui.separator();
                     if ui.button("Create Test Entities").clicked() {
                         tracing::info!("Create Test Entities clicked");
                         self.create_test_entities = true;
+                    }
+                    ui.separator();
+                    if ui.button("Init Config").clicked() {
+                        tracing::info!("Init Config clicked");
+                        self.init_config_requested = true;
                     }
                     ui.separator();
                     if ui.button("Exit").clicked() {
