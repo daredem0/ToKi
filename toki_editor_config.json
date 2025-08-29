@@ -1,5 +1,5 @@
 {
-  "project_path": null,
+  "project_path": "/home/florian/git/toki/example_project/NewProject",
   "editor_settings": {
     "window_size": [
       1200,
@@ -8,7 +8,7 @@
     "panels": {
       "hierarchy_visible": true,
       "inspector_visible": true,
-      "console_visible": false
+      "console_visible": true
     },
     "grid": {
       "show_grid": true,

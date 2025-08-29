@@ -30,7 +30,7 @@ impl EditorUI {
             show_hierarchy: true,
             show_inspector: true,
             should_exit: false,
-            show_console: false,
+            show_console: true,
             create_test_entities: false,
 
             // Project management flags
@@ -55,6 +55,11 @@ impl EditorUI {
     ) {
         self.render_top_menu(ctx, config);
 
+        // Render log panel first to claim full width at bottom
+        if self.show_console {
+            self.render_log_panel(ctx, log_capture);
+        }
+
         // Render hierarchy and inspector panels
         let game_state = scene_viewport
             .as_ref()
@@ -66,11 +71,6 @@ impl EditorUI {
 
         if self.show_inspector {
             panels::render_inspector(ctx, game_state, self.selected_entity_id);
-        }
-
-        if self.show_console {
-            /// TODO: This should be implemented in panels
-            self.render_log_panel(ctx, log_capture);
         }
 
         // Render viewport last (mutable access)
@@ -271,17 +271,19 @@ impl EditorUI {
 
                 if let Some(capture) = log_capture {
                     let logs = capture.get_logs();
-                    egui::ScrollArea::vertical()
+                    let scroll_area = egui::ScrollArea::vertical()
                         .auto_shrink([false, false])
-                        .show(ui, |ui| {
-                            for log_entry in &logs {
-                                ui.horizontal(|ui| {
-                                    ui.label(&log_entry.timestamp);
-                                    ui.label(&log_entry.level);
-                                    ui.label(&log_entry.message);
-                                });
-                            }
-                        });
+                        .stick_to_bottom(true);
+
+                    scroll_area.show(ui, |ui| {
+                        for log_entry in &logs {
+                            ui.horizontal(|ui| {
+                                ui.label(&log_entry.timestamp);
+                                ui.label(&log_entry.level);
+                                ui.label(&log_entry.message);
+                            });
+                        }
+                    });
                 } else {
                     ui.label("Logs are being sent to terminal (check log_to_terminal config)");
                 }
