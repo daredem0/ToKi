@@ -1,0 +1,10 @@
+{
+  "sample_rate": 22050,
+  "bit_depth": 8,
+  "channels": 1,
+  "files": [
+    "sfx_bump_soft.wav",
+    "sfx_slime_bounce.wav"
+  ],
+  "notes": "Soft 8\u2011bit aesthetic SFX for wall bump and slime bounce. Unsigned PCM WAV @ 22.05 kHz."
+}
