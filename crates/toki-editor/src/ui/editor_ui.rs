@@ -1,7 +1,7 @@
-use toki_core::entity::EntityId;
 use crate::scene::SceneViewport;
 use crate::ui::panels;
 use std::path::PathBuf;
+use toki_core::entity::EntityId;
 
 /// Manages the editor's UI state and rendering
 pub struct EditorUI {
@@ -9,8 +9,9 @@ pub struct EditorUI {
     pub show_hierarchy: bool,
     pub show_inspector: bool,
     pub should_exit: bool,
+    pub show_console: bool,
     pub create_test_entities: bool,
-    
+
     // Project management flags
     pub new_project_requested: bool,
     pub open_project_requested: bool,
@@ -29,8 +30,9 @@ impl EditorUI {
             show_hierarchy: true,
             show_inspector: true,
             should_exit: false,
+            show_console: false,
             create_test_entities: false,
-            
+
             // Project management flags
             new_project_requested: false,
             open_project_requested: false,
@@ -42,33 +44,51 @@ impl EditorUI {
             open_last_project_requested: false,
         }
     }
-    
+
     /// Render the entire UI
-    pub fn render(&mut self, ctx: &egui::Context, scene_viewport: Option<&mut SceneViewport>, config: Option<&crate::config::EditorConfig>) {
+    pub fn render(
+        &mut self,
+        ctx: &egui::Context,
+        scene_viewport: Option<&mut SceneViewport>,
+        config: Option<&crate::config::EditorConfig>,
+        log_capture: Option<&crate::logging::LogCapture>,
+    ) {
         self.render_top_menu(ctx, config);
-        
+
         // Render hierarchy and inspector panels
-        let game_state = scene_viewport.as_ref().map(|v| v.scene_manager().game_state());
-        
+        let game_state = scene_viewport
+            .as_ref()
+            .map(|v| v.scene_manager().game_state());
+
         if self.show_hierarchy {
             panels::render_hierarchy(ctx, game_state, &mut self.selected_entity_id);
         }
-        
+
         if self.show_inspector {
             panels::render_inspector(ctx, game_state, self.selected_entity_id);
         }
-        
+
+        if self.show_console {
+            /// TODO: This should be implemented in panels
+            self.render_log_panel(ctx, log_capture);
+        }
+
         // Render viewport last (mutable access)
         self.render_viewport(ctx, scene_viewport);
     }
-    
+
     /// Apply config settings to UI state
     pub fn apply_config(&mut self, config: &crate::config::EditorConfig) {
         self.show_hierarchy = config.editor_settings.panels.hierarchy_visible;
         self.show_inspector = config.editor_settings.panels.inspector_visible;
+        self.show_console = config.editor_settings.panels.console_visible;
     }
-    
-    fn render_top_menu(&mut self, ctx: &egui::Context, config: Option<&crate::config::EditorConfig>) {
+
+    fn render_top_menu(
+        &mut self,
+        ctx: &egui::Context,
+        config: Option<&crate::config::EditorConfig>,
+    ) {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
@@ -85,12 +105,14 @@ impl EditorUI {
                             }
                         }
                     }
-                    
+
                     // Auto-open the project from config
                     if let Some(config) = config {
                         if config.has_project_path() {
                             if ui.button("Open Project").clicked() {
-                                tracing::info!("Open Project clicked - opening project from config");
+                                tracing::info!(
+                                    "Open Project clicked - opening project from config"
+                                );
                                 self.open_project_requested = true;
                             }
                             if ui.button("Browse for Project...").clicked() {
@@ -99,7 +121,9 @@ impl EditorUI {
                             }
                         } else {
                             if ui.button("Open Project...").clicked() {
-                                tracing::info!("Open Project... clicked - no project path in config");
+                                tracing::info!(
+                                    "Open Project... clicked - no project path in config"
+                                );
                                 self.browse_for_project_requested = true;
                             }
                         }
@@ -109,7 +133,7 @@ impl EditorUI {
                             self.browse_for_project_requested = true;
                         }
                     }
-                    
+
                     // Recent projects submenu
                     if let Some(config) = config {
                         if !config.recent_projects.is_empty() {
@@ -119,16 +143,20 @@ impl EditorUI {
                                         .file_name()
                                         .and_then(|n| n.to_str())
                                         .unwrap_or("Unknown Project");
-                                    
+
                                     if ui.button(project_name).clicked() {
-                                        tracing::info!("Opening recent project: {:?}", project_path);
-                                        self.open_recent_project_requested = Some(project_path.clone());
+                                        tracing::info!(
+                                            "Opening recent project: {:?}",
+                                            project_path
+                                        );
+                                        self.open_recent_project_requested =
+                                            Some(project_path.clone());
                                     }
                                 }
                             });
                         }
                     }
-                    
+
                     ui.separator();
                     if ui.button("Save Project").clicked() {
                         tracing::info!("Save Project clicked");
@@ -154,39 +182,46 @@ impl EditorUI {
                         self.should_exit = true;
                     }
                 });
-                
+
                 ui.menu_button("View", |ui| {
                     ui.checkbox(&mut self.show_hierarchy, "Hierarchy");
                     ui.checkbox(&mut self.show_inspector, "Inspector");
+                    ui.checkbox(&mut self.show_console, "Console");
                 });
             });
         });
     }
-    
+
     fn render_viewport(&mut self, ctx: &egui::Context, scene_viewport: Option<&mut SceneViewport>) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Scene Viewport");
             ui.separator();
-            
+
             // Collect stats before updating viewport to avoid borrowing conflicts
             let (entity_count, selected_entity) = if let Some(ref viewport) = scene_viewport {
-                let count = viewport.scene_manager().game_state().entity_manager().active_entities().len();
+                let count = viewport
+                    .scene_manager()
+                    .game_state()
+                    .entity_manager()
+                    .active_entities()
+                    .len();
                 let selected = viewport.selected_entity();
                 (count, selected)
             } else {
                 (0, None)
             };
-            
+
             // Update and render the scene viewport
             if let Some(viewport) = scene_viewport {
                 // Update the viewport systems
                 if let Err(e) = viewport.update() {
                     tracing::error!("Scene viewport update error: {e}");
                 }
-                
+
                 // Handle viewport interactions
                 let available_size = ui.available_size();
-                let (rect, response) = ui.allocate_exact_size(available_size, egui::Sense::click_and_drag());
+                let (rect, response) =
+                    ui.allocate_exact_size(available_size, egui::Sense::click_and_drag());
 
                 // Handle click events for entity selection
                 if response.clicked() {
@@ -199,7 +234,7 @@ impl EditorUI {
                         }
                     }
                 }
-                
+
                 // Render the scene content
                 viewport.render(ui, rect);
             } else {
@@ -208,14 +243,48 @@ impl EditorUI {
                 ui.allocate_response(available_size, egui::Sense::click())
                     .on_hover_text("Scene viewport not initialized");
             }
-                
+
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 ui.horizontal(|ui| {
                     ui.label("📊 Stats:");
-                    ui.label(format!("Entities: {} | Selected: {:?}", entity_count, selected_entity));
+                    ui.label(format!(
+                        "Entities: {} | Selected: {:?}",
+                        entity_count, selected_entity
+                    ));
                     ui.label("Press F1/F2 to toggle panels");
                 });
             });
         });
+    }
+
+    fn render_log_panel(
+        &mut self,
+        ctx: &egui::Context,
+        log_capture: Option<&crate::logging::LogCapture>,
+    ) {
+        egui::TopBottomPanel::bottom("log_panel")
+            .resizable(true)
+            .default_height(200.0)
+            .show(ctx, |ui| {
+                ui.heading("📝 Console");
+                ui.separator();
+
+                if let Some(capture) = log_capture {
+                    let logs = capture.get_logs();
+                    egui::ScrollArea::vertical()
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            for log_entry in &logs {
+                                ui.horizontal(|ui| {
+                                    ui.label(&log_entry.timestamp);
+                                    ui.label(&log_entry.level);
+                                    ui.label(&log_entry.message);
+                                });
+                            }
+                        });
+                } else {
+                    ui.label("Logs are being sent to terminal (check log_to_terminal config)");
+                }
+            });
     }
 }

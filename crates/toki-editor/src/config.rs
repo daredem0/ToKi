@@ -18,6 +18,10 @@ pub struct EditorConfig {
     
     /// Rendering and viewport settings
     pub rendering: RenderingSettings,
+
+    /// Logging Setup
+    pub log_to_terminal: bool,
+    pub log_level: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,6 +65,8 @@ impl Default for EditorConfig {
             editor_settings: EditorSettings::default(),
             recent_projects: Vec::new(),
             rendering: RenderingSettings::default(),
+            log_to_terminal: true,
+            log_level: "INFO".to_string(),
         }
     }
 }
