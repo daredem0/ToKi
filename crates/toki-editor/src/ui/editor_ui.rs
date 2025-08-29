@@ -1,5 +1,4 @@
 use crate::scene::SceneViewport;
-use crate::ui::panels;
 use std::path::PathBuf;
 use toki_core::entity::EntityId;
 
@@ -8,9 +7,13 @@ pub struct EditorUI {
     pub selected_entity_id: Option<EntityId>,
     pub show_hierarchy: bool,
     pub show_inspector: bool,
+    pub show_maps: bool,
     pub should_exit: bool,
     pub show_console: bool,
     pub create_test_entities: bool,
+    
+    // Map selection state
+    pub selected_map: Option<String>,
 
     // Project management flags
     pub new_project_requested: bool,
@@ -29,9 +32,13 @@ impl EditorUI {
             selected_entity_id: None,
             show_hierarchy: true,
             show_inspector: true,
+            show_maps: true,
             should_exit: false,
             show_console: true,
             create_test_entities: false,
+            
+            // Map selection state
+            selected_map: None,
 
             // Project management flags
             new_project_requested: false,
@@ -66,11 +73,11 @@ impl EditorUI {
             .map(|v| v.scene_manager().game_state());
 
         if self.show_hierarchy {
-            panels::render_hierarchy(ctx, game_state, &mut self.selected_entity_id);
+            self.render_hierarchy_and_maps_panel(ctx, game_state, config);
         }
 
         if self.show_inspector {
-            panels::render_inspector(ctx, game_state, self.selected_entity_id);
+            self.render_inspector_panel(ctx, game_state, config);
         }
 
         // Render viewport last (mutable access)
@@ -186,6 +193,7 @@ impl EditorUI {
                 ui.menu_button("View", |ui| {
                     ui.checkbox(&mut self.show_hierarchy, "Hierarchy");
                     ui.checkbox(&mut self.show_inspector, "Inspector");
+                    ui.checkbox(&mut self.show_maps, "Maps");
                     ui.checkbox(&mut self.show_console, "Console");
                 });
             });
@@ -286,6 +294,290 @@ impl EditorUI {
                     });
                 } else {
                     ui.label("Logs are being sent to terminal (check log_to_terminal config)");
+                }
+            });
+    }
+
+    fn render_hierarchy_and_maps_panel(&mut self, ctx: &egui::Context, game_state: Option<&toki_core::GameState>, config: Option<&crate::config::EditorConfig>) {
+        egui::SidePanel::left("hierarchy_panel")
+            .resizable(true)
+            .default_width(250.0)
+            .show(ctx, |ui| {
+                // Hierarchy section
+                ui.heading("📋 Hierarchy");
+                ui.separator();
+
+                if let Some(game_state) = game_state {
+                    let entity_ids = game_state.entity_manager().active_entities();
+                    
+                    if entity_ids.is_empty() {
+                        ui.label("No entities in scene");
+                    } else {
+                        egui::ScrollArea::vertical()
+                            .max_height(200.0)  // Limit height to make room for Maps section
+                            .show(ui, |ui| {
+                                for entity_id in &entity_ids {
+                                    if let Some(entity) = game_state.entity_manager().get_entity(*entity_id) {
+                                        let is_selected = self.selected_entity_id == Some(*entity_id);
+                                        
+                                        ui.horizontal(|ui| {
+                                            let response = ui.selectable_label(
+                                                is_selected,
+                                                format!("Entity {}", entity_id)
+                                            );
+                                            
+                                            if response.clicked() {
+                                                self.selected_entity_id = Some(*entity_id);
+                                            }
+                                            
+                                            // Show entity type or position as subtitle
+                                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                ui.label(format!("({}, {})", entity.position.x, entity.position.y));
+                                            });
+                                        });
+                                    }
+                                }
+                            });
+                    }
+                } else {
+                    ui.label("No scene loaded");
+                }
+
+                // Maps section (only show if Maps toggle is enabled)
+                if self.show_maps {
+                    ui.add_space(10.0);  // Add some spacing
+                    ui.heading("🗺️ Maps");
+                    ui.separator();
+
+                    if let Some(config) = config {
+                        if let Some(project_path) = config.current_project_path() {
+                            let tilemaps_path = project_path.join("assets").join("tilemaps");
+                            
+                            if tilemaps_path.exists() {
+                                // Discover tilemap files
+                                if let Ok(entries) = std::fs::read_dir(&tilemaps_path) {
+                                    let mut found_maps = false;
+                                    
+                                    egui::ScrollArea::vertical()
+                                        .max_height(150.0)  // Limit height for Maps section
+                                        .show(ui, |ui| {
+                                            for entry in entries.flatten() {
+                                                if let Some(name) = entry.file_name().to_str() {
+                                                    if name.ends_with(".json") {
+                                                        let map_name = name.trim_end_matches(".json").to_string();
+                                                        found_maps = true;
+                                                        
+                                                        let is_selected = self.selected_map.as_ref() == Some(&map_name);
+                                                        
+                                                        if ui.selectable_label(is_selected, &map_name).clicked() {
+                                                            tracing::info!("Map selected: {}", map_name);
+                                                            self.selected_map = Some(map_name);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        });
+                                    
+                                    if !found_maps {
+                                        tracing::info!("No tilemap (.json) files found in assets/tilemaps/");
+                                    }
+                                } else {
+                                    tracing::warn!("Could not read tilemaps directory");
+                                }
+                            } else {
+                                tracing::info!("No tilemaps directory found, expected: assets/tilemaps/");
+                            }
+                        } else {
+                            tracing::info!("No project loaded for Maps panel");
+                        }
+                    } else {
+                        tracing::warn!("No project configuration available for Maps panel");
+                    }
+                }
+            });
+    }
+
+    fn render_inspector_panel(&mut self, ctx: &egui::Context, game_state: Option<&toki_core::GameState>, config: Option<&crate::config::EditorConfig>) {
+        egui::SidePanel::right("inspector_panel")
+            .resizable(true)
+            .default_width(300.0)
+            .show(ctx, |ui| {
+                ui.heading("🔍 Inspector");
+                ui.separator();
+
+                // Show map details if a map is selected
+                if let Some(ref selected_map) = self.selected_map {
+                    ui.label(format!("Map: {}", selected_map));
+                    ui.separator();
+                    
+                    // Try to load and show map details
+                    if let Some(config) = config {
+                        if let Some(project_path) = config.current_project_path() {
+                            let map_file = project_path
+                                .join("assets")
+                                .join("tilemaps")
+                                .join(format!("{}.json", selected_map));
+                            
+                            if map_file.exists() {
+                                // Try to read the tilemap file
+                                match std::fs::read_to_string(&map_file) {
+                                    Ok(content) => {
+                                        // Try to parse as JSON to show basic info
+                                        match serde_json::from_str::<serde_json::Value>(&content) {
+                                            Ok(json) => {
+                                                // Show file info
+                                                ui.horizontal(|ui| {
+                                                    ui.label("File:");
+                                                    ui.label(format!("{}.json", selected_map));
+                                                });
+                                                
+                                                // Show file size
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Size:");
+                                                    ui.label(format!("{} bytes", content.len()));
+                                                });
+                                                
+                                                // Show JSON properties and values
+                                                if let Some(obj) = json.as_object() {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label("Properties:");
+                                                        ui.label(format!("{}", obj.keys().count()));
+                                                    });
+                                                    
+                                                    ui.separator();
+                                                    ui.label("Map Properties:");
+                                                    
+                                                    egui::ScrollArea::vertical()
+                                                        .max_height(200.0)
+                                                        .show(ui, |ui| {
+                                                            for (key, value) in obj {
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label(format!("{}:", key));
+                                                                    
+                                                                    // Format value based on type
+                                                                    let value_str = match value {
+                                                                        serde_json::Value::String(s) => format!("\"{}\"", s),
+                                                                        serde_json::Value::Number(n) => n.to_string(),
+                                                                        serde_json::Value::Bool(b) => b.to_string(),
+                                                                        serde_json::Value::Array(arr) => {
+                                                                            if arr.len() <= 5 {
+                                                                                // Show actual values for small arrays
+                                                                                let items: Vec<String> = arr.iter().map(|v| match v {
+                                                                                    serde_json::Value::String(s) => format!("\"{}\"", s),
+                                                                                    serde_json::Value::Number(n) => n.to_string(),
+                                                                                    serde_json::Value::Bool(b) => b.to_string(),
+                                                                                    serde_json::Value::Null => "null".to_string(),
+                                                                                    _ => format!("{{ complex }}"),
+                                                                                }).collect();
+                                                                                format!("[{}]", items.join(", "))
+                                                                            } else {
+                                                                                // Show count for large arrays
+                                                                                format!("[{} items]", arr.len())
+                                                                            }
+                                                                        },
+                                                                        serde_json::Value::Object(obj) => format!("{{ {} properties }}", obj.len()),
+                                                                        serde_json::Value::Null => "null".to_string(),
+                                                                    };
+                                                                    
+                                                                    ui.label(value_str);
+                                                                });
+                                                            }
+                                                        });
+                                                }
+                                                
+                                                ui.separator();
+                                                if ui.button("🎮 Load Map").clicked() {
+                                                    tracing::info!("Load Map button clicked for: {}", selected_map);
+                                                    // TODO: Implement map loading
+                                                }
+                                            }
+                                            Err(e) => {
+                                                ui.label("❌ Invalid JSON file");
+                                                ui.label(format!("Error: {}", e));
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        ui.label("❌ Could not read map file");
+                                        ui.label(format!("Error: {}", e));
+                                    }
+                                }
+                            } else {
+                                ui.label("❌ Map file not found");
+                            }
+                        }
+                    }
+                }
+                // Show entity details if an entity is selected and no map is selected
+                else if let (Some(game_state), Some(entity_id)) = (game_state, self.selected_entity_id) {
+                    if let Some(entity) = game_state.entity_manager().get_entity(entity_id) {
+                        ui.label(format!("Entity ID: {}", entity_id));
+                        ui.separator();
+                        
+                        // Position
+                        ui.horizontal(|ui| {
+                            ui.label("Position:");
+                            ui.label(format!("({}, {})", entity.position.x, entity.position.y));
+                        });
+                        
+                        // Size
+                        ui.horizontal(|ui| {
+                            ui.label("Size:");
+                            ui.label(format!("({}, {})", entity.size.x, entity.size.y));
+                        });
+                        
+                        // Entity type
+                        ui.horizontal(|ui| {
+                            ui.label("Type:");
+                            ui.label(format!("{:?}", entity.entity_type));
+                        });
+                        
+                        ui.separator();
+                        
+                        // Attributes
+                        ui.heading("Attributes");
+                        if let Some(health) = entity.attributes.health {
+                            ui.horizontal(|ui| {
+                                ui.label("Health:");
+                                ui.label(health.to_string());
+                            });
+                        }
+                        
+                        ui.horizontal(|ui| {
+                            ui.label("Speed:");
+                            ui.label(entity.attributes.speed.to_string());
+                        });
+                        
+                        ui.horizontal(|ui| {
+                            ui.label("Solid:");
+                            ui.label(entity.attributes.solid.to_string());
+                        });
+                        
+                        ui.horizontal(|ui| {
+                            ui.label("Visible:");
+                            ui.label(entity.attributes.visible.to_string());
+                        });
+                        
+                        // Collision box
+                        if let Some(collision_box) = &entity.collision_box {
+                            ui.separator();
+                            ui.heading("Collision Box");
+                            ui.horizontal(|ui| {
+                                ui.label("Offset:");
+                                ui.label(format!("({}, {})", collision_box.offset.x, collision_box.offset.y));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Size:");
+                                ui.label(format!("({}, {})", collision_box.size.x, collision_box.size.y));
+                            });
+                        }
+                    } else {
+                        ui.label("Entity not found");
+                    }
+                } else {
+                    ui.label("No selection");
+                    ui.separator();
+                    ui.label("Select an entity from the hierarchy or a map to see details.");
                 }
             });
     }
