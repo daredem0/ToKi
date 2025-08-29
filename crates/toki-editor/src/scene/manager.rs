@@ -89,11 +89,4 @@ impl SceneManager {
         self.tilemap.as_ref()
     }
     
-    /// Clear the current tilemap
-    pub fn clear_tilemap(&mut self) {
-        if self.tilemap.is_some() {
-            self.tilemap = None;
-            tracing::info!("Cleared tilemap");
-        }
-    }
 }

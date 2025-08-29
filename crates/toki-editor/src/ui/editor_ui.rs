@@ -33,9 +33,8 @@ pub struct EditorUI {
     pub scenes: Vec<Scene>,
     pub selection: Option<Selection>,
     
-    // Legacy entity selection (keep for now during transition)
+    // Legacy entity selection (keep for backward compatibility)
     pub selected_entity_id: Option<EntityId>,
-    pub selected_map: Option<String>,
 
     // UI Panel visibility
     pub show_hierarchy: bool,
@@ -66,9 +65,8 @@ impl EditorUI {
             scenes: vec![Scene::new("Main Scene".to_string())], // Start with default scene
             selection: None,
             
-            // Legacy fields (keep during transition)
+            // Legacy fields (keep for backward compatibility)
             selected_entity_id: None,
-            selected_map: None,
 
             // UI Panel visibility
             show_hierarchy: true,
@@ -103,19 +101,6 @@ impl EditorUI {
         self.scenes.iter().find(|s| s.name == name)
     }
 
-    pub fn get_scene_mut(&mut self, name: &str) -> Option<&mut Scene> {
-        self.scenes.iter_mut().find(|s| s.name == name)
-    }
-
-    pub fn add_map_to_scene(&mut self, scene_name: &str, map_name: String) -> bool {
-        if let Some(scene) = self.get_scene_mut(scene_name) {
-            if !scene.maps.contains(&map_name) {
-                scene.maps.push(map_name);
-                return true;
-            }
-        }
-        false
-    }
 
     pub fn set_selection(&mut self, selection: Selection) {
         self.selection = Some(selection);
@@ -524,7 +509,10 @@ impl EditorUI {
                                                         let map_name = name.trim_end_matches(".json").to_string();
                                                         found_maps = true;
                                                         
-                                                        let is_selected = self.selected_map.as_ref() == Some(&map_name);
+                                                        let is_selected = matches!(
+                                                            &self.selection,
+                                                            Some(Selection::StandaloneMap(name)) if name == &map_name
+                                                        );
                                                         
                                                         let response = ui.selectable_label(is_selected, &map_name);
                                                         
@@ -565,7 +553,6 @@ impl EditorUI {
                                     
                                     // Apply collected actions
                                     for map_name in map_selections {
-                                        self.selected_map = Some(map_name.clone());
                                         self.set_selection(Selection::StandaloneMap(map_name));
                                     }
                                     
