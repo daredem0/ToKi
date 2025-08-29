@@ -216,7 +216,7 @@ impl EditorApp {
         let egui_ctx = egui_winit.egui_ctx().clone();
         let full_output = egui_ctx.run(raw_input, |ctx| {
             // Render all UI components - we'll handle game state inside UI render method
-            self.ui.render(ctx, self.scene_viewport.as_mut());
+            self.ui.render(ctx, self.scene_viewport.as_mut(), Some(&self.config));
         });
         
         // Handle UI requests
@@ -259,7 +259,7 @@ impl EditorApp {
             
             // Use project_path from config if available, otherwise ask user
             let folder_path = if let Some(config_path) = &self.config.project_path {
-                tracing::info!("Using project path from config: {:?}", config_path);
+                tracing::info!("Using project path from config as parent: {:?}", config_path);
                 Some(config_path.clone())
             } else {
                 tracing::info!("No project path in config, asking user to select folder");
@@ -268,16 +268,32 @@ impl EditorApp {
                     .pick_folder()
             };
             
-            if let Some(folder_path) = folder_path {
-                // For now, use a default project name. In the future, we can add a proper input dialog
-                let project_name = "NewProject".to_string();
-                match self.project_manager.create_new_project(project_name.clone(), folder_path) {
+            if let Some(parent_path) = folder_path {
+                // Generate a unique project name
+                let mut project_name = "NewProject".to_string();
+                let mut counter = 1;
+                
+                while parent_path.join(&project_name).exists() {
+                    project_name = format!("NewProject{}", counter);
+                    counter += 1;
+                }
+                
+                tracing::info!("Creating project '{}' in {:?}", project_name, parent_path);
+                match self.project_manager.create_new_project(project_name.clone(), parent_path.clone()) {
                     Ok(game_state) => {
                         // Update scene viewport with new game state
                         match SceneViewport::with_game_state(game_state) {
                             Ok(mut viewport) => {
                                 viewport.initialize();
                                 self.scene_viewport = Some(viewport);
+                                
+                                // Update config with new project path
+                                let project_path = parent_path.join(&project_name);
+                                self.config.set_project_path(project_path);
+                                if let Err(e) = self.config.save() {
+                                    tracing::warn!("Failed to save config after creating project: {}", e);
+                                }
+                                
                                 tracing::info!("Created new project '{}' successfully", project_name);
                             }
                             Err(e) => {
@@ -292,22 +308,101 @@ impl EditorApp {
             }
         }
         
-        // Handle Open Project request
-        if self.ui.open_project_requested {
-            self.ui.open_project_requested = false;
+        // Handle Open Last Project request
+        if self.ui.open_last_project_requested {
+            self.ui.open_last_project_requested = false;
             
-            if let Some(project_path) = rfd::FileDialog::new()
-                .set_title("Open ToKi Project")
-                .add_filter("ToKi Project", &["toki"])
-                .pick_folder()
-            {
-                match self.project_manager.open_project(project_path) {
+            if let Some(last_project) = self.config.recent_projects.first().cloned() {
+                match self.project_manager.open_project(last_project.clone()) {
                     Ok(game_state) => {
                         // Update scene viewport with loaded game state
                         match SceneViewport::with_game_state(game_state) {
                             Ok(mut viewport) => {
                                 viewport.initialize();
                                 self.scene_viewport = Some(viewport);
+                                
+                                // Update config with opened project path (moves to front of recent list)
+                                self.config.set_project_path(last_project);
+                                if let Err(e) = self.config.save() {
+                                    tracing::warn!("Failed to save config after opening last project: {}", e);
+                                }
+                                
+                                tracing::info!("Opened last project successfully");
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to initialize scene viewport for last project: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to open last project: {}", e);
+                    }
+                }
+            } else {
+                tracing::warn!("No recent projects available to open");
+            }
+        }
+        
+        // Handle Open Recent Project request
+        if let Some(project_path) = self.ui.open_recent_project_requested.take() {
+            match self.project_manager.open_project(project_path.clone()) {
+                Ok(game_state) => {
+                    // Update scene viewport with loaded game state
+                    match SceneViewport::with_game_state(game_state) {
+                        Ok(mut viewport) => {
+                            viewport.initialize();
+                            self.scene_viewport = Some(viewport);
+                            
+                            // Update config with opened project path
+                            self.config.set_project_path(project_path);
+                            if let Err(e) = self.config.save() {
+                                tracing::warn!("Failed to save config after opening project: {}", e);
+                            }
+                            
+                            tracing::info!("Opened recent project successfully");
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to initialize scene viewport for opened project: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to open recent project: {}", e);
+                }
+            }
+        }
+        
+        // Handle Open Project request
+        if self.ui.open_project_requested {
+            self.ui.open_project_requested = false;
+            
+            // Try to open project from config first
+            let project_path = if let Some(config_path) = &self.config.project_path {
+                tracing::info!("Opening project from config: {:?}", config_path);
+                Some(config_path.clone())
+            } else {
+                tracing::info!("No project path in config, asking user to select folder");
+                rfd::FileDialog::new()
+                    .set_title("Open ToKi Project")
+                    .add_filter("ToKi Project", &["toki"])
+                    .pick_folder()
+            };
+            
+            if let Some(project_path) = project_path {
+                match self.project_manager.open_project(project_path.clone()) {
+                    Ok(game_state) => {
+                        // Update scene viewport with loaded game state
+                        match SceneViewport::with_game_state(game_state) {
+                            Ok(mut viewport) => {
+                                viewport.initialize();
+                                self.scene_viewport = Some(viewport);
+                                
+                                // Update config with opened project path
+                                self.config.set_project_path(project_path);
+                                if let Err(e) = self.config.save() {
+                                    tracing::warn!("Failed to save config after opening project: {}", e);
+                                }
+                                
                                 tracing::info!("Opened project successfully");
                             }
                             Err(e) => {
@@ -317,6 +412,43 @@ impl EditorApp {
                     }
                     Err(e) => {
                         tracing::error!("Failed to open project: {}", e);
+                    }
+                }
+            }
+        }
+        
+        // Handle Browse for Project request (file dialog)
+        if self.ui.browse_for_project_requested {
+            self.ui.browse_for_project_requested = false;
+            
+            if let Some(project_path) = rfd::FileDialog::new()
+                .set_title("Browse for ToKi Project")
+                .add_filter("ToKi Project", &["toki"])
+                .pick_folder()
+            {
+                match self.project_manager.open_project(project_path.clone()) {
+                    Ok(game_state) => {
+                        // Update scene viewport with loaded game state
+                        match SceneViewport::with_game_state(game_state) {
+                            Ok(mut viewport) => {
+                                viewport.initialize();
+                                self.scene_viewport = Some(viewport);
+                                
+                                // Update config with opened project path
+                                self.config.set_project_path(project_path);
+                                if let Err(e) = self.config.save() {
+                                    tracing::warn!("Failed to save config after browsing for project: {}", e);
+                                }
+                                
+                                tracing::info!("Opened browsed project successfully");
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to initialize scene viewport for browsed project: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to open browsed project: {}", e);
                     }
                 }
             }

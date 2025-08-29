@@ -1,5 +1,5 @@
 {
-  "project_path": "/home/florian/git/toki/example_project",
+  "project_path": "/home/florian/git/toki/example_project/NewProject",
   "editor_settings": {
     "window_size": [
       1200,
@@ -16,7 +16,9 @@
       "snap_to_grid": true
     }
   },
-  "recent_projects": [],
+  "recent_projects": [
+    "/home/florian/git/toki/example_project/NewProject"
+  ],
   "rendering": {
     "vsync": true,
     "target_fps": 60,

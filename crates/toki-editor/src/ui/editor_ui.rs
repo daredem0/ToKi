@@ -1,6 +1,7 @@
 use toki_core::entity::EntityId;
 use crate::scene::SceneViewport;
 use crate::ui::panels;
+use std::path::PathBuf;
 
 /// Manages the editor's UI state and rendering
 pub struct EditorUI {
@@ -13,9 +14,12 @@ pub struct EditorUI {
     // Project management flags
     pub new_project_requested: bool,
     pub open_project_requested: bool,
+    pub browse_for_project_requested: bool,
     pub save_project_requested: bool,
     pub save_as_project_requested: bool,
     pub init_config_requested: bool,
+    pub open_recent_project_requested: Option<PathBuf>,
+    pub open_last_project_requested: bool,
 }
 
 impl EditorUI {
@@ -30,15 +34,18 @@ impl EditorUI {
             // Project management flags
             new_project_requested: false,
             open_project_requested: false,
+            browse_for_project_requested: false,
             save_project_requested: false,
             save_as_project_requested: false,
             init_config_requested: false,
+            open_recent_project_requested: None,
+            open_last_project_requested: false,
         }
     }
     
     /// Render the entire UI
-    pub fn render(&mut self, ctx: &egui::Context, scene_viewport: Option<&mut SceneViewport>) {
-        self.render_top_menu(ctx);
+    pub fn render(&mut self, ctx: &egui::Context, scene_viewport: Option<&mut SceneViewport>, config: Option<&crate::config::EditorConfig>) {
+        self.render_top_menu(ctx, config);
         
         // Render hierarchy and inspector panels
         let game_state = scene_viewport.as_ref().map(|v| v.scene_manager().game_state());
@@ -61,7 +68,7 @@ impl EditorUI {
         self.show_inspector = config.editor_settings.panels.inspector_visible;
     }
     
-    fn render_top_menu(&mut self, ctx: &egui::Context) {
+    fn render_top_menu(&mut self, ctx: &egui::Context, config: Option<&crate::config::EditorConfig>) {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
@@ -69,10 +76,59 @@ impl EditorUI {
                         tracing::info!("New Project clicked");
                         self.new_project_requested = true;
                     }
-                    if ui.button("Open Project...").clicked() {
-                        tracing::info!("Open Project clicked");
-                        self.open_project_requested = true;
+                    // Smart open project - try recent first
+                    if let Some(config) = config {
+                        if !config.recent_projects.is_empty() {
+                            if ui.button("Open Last Project").clicked() {
+                                tracing::info!("Open Last Project clicked");
+                                self.open_last_project_requested = true;
+                            }
+                        }
                     }
+                    
+                    // Auto-open the project from config
+                    if let Some(config) = config {
+                        if config.has_project_path() {
+                            if ui.button("Open Project").clicked() {
+                                tracing::info!("Open Project clicked - opening project from config");
+                                self.open_project_requested = true;
+                            }
+                            if ui.button("Browse for Project...").clicked() {
+                                tracing::info!("Browse for Project clicked");
+                                self.browse_for_project_requested = true;
+                            }
+                        } else {
+                            if ui.button("Open Project...").clicked() {
+                                tracing::info!("Open Project... clicked - no project path in config");
+                                self.browse_for_project_requested = true;
+                            }
+                        }
+                    } else {
+                        if ui.button("Open Project...").clicked() {
+                            tracing::info!("Open Project... clicked - no config available");
+                            self.browse_for_project_requested = true;
+                        }
+                    }
+                    
+                    // Recent projects submenu
+                    if let Some(config) = config {
+                        if !config.recent_projects.is_empty() {
+                            ui.menu_button("Open Recent", |ui| {
+                                for project_path in &config.recent_projects {
+                                    let project_name = project_path
+                                        .file_name()
+                                        .and_then(|n| n.to_str())
+                                        .unwrap_or("Unknown Project");
+                                    
+                                    if ui.button(project_name).clicked() {
+                                        tracing::info!("Opening recent project: {:?}", project_path);
+                                        self.open_recent_project_requested = Some(project_path.clone());
+                                    }
+                                }
+                            });
+                        }
+                    }
+                    
                     ui.separator();
                     if ui.button("Save Project").clicked() {
                         tracing::info!("Save Project clicked");
