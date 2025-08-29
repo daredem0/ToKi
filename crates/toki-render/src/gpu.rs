@@ -95,6 +95,76 @@ impl GpuState {
         }
     }
 
+    /// Load a new tilemap texture at runtime
+    pub fn load_tilemap_texture(&mut self, texture_path: PathBuf) -> Result<(), crate::RenderError> {
+        // Create new tilemap pipeline with the specified texture
+        let new_pipeline = TilemapPipeline::new(
+            &self.device,
+            &self.queue,
+            self.config.format,
+            texture_path,
+        );
+        self.tilemap_pipeline = new_pipeline;
+        Ok(())
+    }
+    
+    /// Load a new sprite texture at runtime
+    pub fn load_sprite_texture(&mut self, texture_path: PathBuf) -> Result<(), crate::RenderError> {
+        // Create new sprite pipeline with the specified texture
+        let new_pipeline = SpritePipeline::new(
+            &self.device,
+            &self.queue,
+            self.config.format,
+            texture_path,
+        );
+        self.sprite_pipeline = new_pipeline;
+        Ok(())
+    }
+    
+    /// Create GpuState and immediately load specific textures (for editor use)
+    pub fn new_with_textures(
+        window: Arc<Window>, 
+        tilemap_texture: Option<PathBuf>, 
+        sprite_texture: Option<PathBuf>
+    ) -> Result<Self, crate::RenderError> {
+        let (device, queue, surface, config) = create_device_and_surface(Arc::clone(&window));
+
+        // Use provided textures or fall back to defaults
+        let tilemap_path = tilemap_texture.unwrap_or_else(|| 
+            to_absolute_path("./assets/terrain.png").unwrap_or_else(|_| PathBuf::from("./assets/terrain.png"))
+        );
+        
+        let sprite_path = sprite_texture.unwrap_or_else(|| 
+            to_absolute_path("./assets/creatures.png").unwrap_or_else(|_| PathBuf::from("./assets/creatures.png"))
+        );
+
+        let tilemap_pipeline = TilemapPipeline::new(
+            &device,
+            &queue,
+            config.format,
+            tilemap_path,
+        );
+
+        let sprite_pipeline = SpritePipeline::new(
+            &device,
+            &queue,
+            config.format,
+            sprite_path,
+        );
+
+        let debug_pipeline = DebugPipeline::new(&device, config.format);
+
+        Ok(Self {
+            surface,
+            config,
+            device,
+            queue,
+            tilemap_pipeline,
+            sprite_pipeline,
+            debug_pipeline,
+        })
+    }
+
     pub fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
         self.tilemap_pipeline
             .update_vertices(&self.device, vertices);
