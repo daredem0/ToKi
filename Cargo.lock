@@ -3772,6 +3772,8 @@ name = "toki-render"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "egui",
+ "egui-wgpu",
  "glam",
  "image",
  "pollster",

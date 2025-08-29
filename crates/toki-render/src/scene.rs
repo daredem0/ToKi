@@ -1,0 +1,232 @@
+use crate::{RenderError, TilemapPipeline, SpritePipeline, DebugPipeline, RenderPipeline};
+use crate::targets::RenderTarget;
+use crate::pipelines::sprite::SpriteInstance as SpriteRenderInstance;
+use toki_core::sprite::SpriteFrame;
+use toki_core::assets::atlas::AtlasMeta;
+use toki_core::assets::tilemap::TileMap;
+
+/// Data needed to render a scene
+#[derive(Debug)]
+pub struct SceneData {
+    pub tilemap: Option<TileMap>,
+    pub atlas: Option<AtlasMeta>,
+    pub texture_size: glam::UVec2,
+    pub visible_chunks: Vec<(u32, u32)>,
+    pub sprites: Vec<SpriteInstance>,
+    pub debug_shapes: Vec<DebugShape>,
+}
+
+/// Sprite instance for rendering
+#[derive(Debug, Clone)]
+pub struct SpriteInstance {
+    pub frame: SpriteFrame,
+    pub position: glam::IVec2,
+    pub size: glam::UVec2,
+}
+
+/// Debug shape for rendering
+#[derive(Debug, Clone)]
+pub struct DebugShape {
+    pub shape_type: DebugShapeType,
+    pub position: glam::Vec2,
+    pub size: glam::Vec2,
+    pub color: [f32; 4],
+}
+
+#[derive(Debug, Clone)]
+pub enum DebugShapeType {
+    Rectangle,
+    Circle,
+    Line { end: glam::Vec2 },
+}
+
+impl Default for SceneData {
+    fn default() -> Self {
+        Self {
+            tilemap: None,
+            atlas: None,
+            texture_size: glam::UVec2::new(256, 256),
+            visible_chunks: Vec::new(),
+            sprites: Vec::new(),
+            debug_shapes: Vec::new(),
+        }
+    }
+}
+
+/// Unified scene renderer that works with any render target
+pub struct SceneRenderer {
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    tilemap_pipeline: TilemapPipeline,
+    sprite_pipeline: SpritePipeline,
+    debug_pipeline: DebugPipeline,
+}
+
+impl SceneRenderer {
+    pub fn new(
+        device: wgpu::Device,
+        queue: wgpu::Queue,
+        surface_format: wgpu::TextureFormat,
+        tilemap_texture: Option<std::path::PathBuf>,
+        sprite_texture: Option<std::path::PathBuf>,
+    ) -> Result<Self, RenderError> {
+        let tilemap_pipeline = if let Some(texture_path) = tilemap_texture {
+            TilemapPipeline::new(&device, &queue, surface_format, texture_path)
+        } else {
+            // Create with default/placeholder texture
+            TilemapPipeline::new(&device, &queue, surface_format, std::path::PathBuf::from(""))
+        };
+        
+        let sprite_pipeline = if let Some(texture_path) = sprite_texture {
+            SpritePipeline::new(&device, &queue, surface_format, texture_path)
+        } else {
+            // Create with default/placeholder texture  
+            SpritePipeline::new(&device, &queue, surface_format, std::path::PathBuf::from(""))
+        };
+        
+        let debug_pipeline = DebugPipeline::new(&device, surface_format);
+        
+        Ok(Self {
+            device,
+            queue,
+            tilemap_pipeline,
+            sprite_pipeline,
+            debug_pipeline,
+        })
+    }
+    
+    /// Load new tilemap texture
+    pub fn load_tilemap_texture(&mut self, texture_path: std::path::PathBuf) -> Result<(), RenderError> {
+        self.tilemap_pipeline = TilemapPipeline::new(
+            &self.device,
+            &self.queue,
+            wgpu::TextureFormat::Bgra8UnormSrgb, // TODO: Get from render target
+            texture_path,
+        );
+        Ok(())
+    }
+    
+    /// Load new sprite texture
+    pub fn load_sprite_texture(&mut self, texture_path: std::path::PathBuf) -> Result<(), RenderError> {
+        self.sprite_pipeline = SpritePipeline::new(
+            &self.device,
+            &self.queue,
+            wgpu::TextureFormat::Bgra8UnormSrgb, // TODO: Get from render target
+            texture_path,
+        );
+        Ok(())
+    }
+    
+    /// Render scene to any render target
+    pub fn render_scene<T: RenderTarget>(&mut self, target: &mut T, scene_data: &SceneData) -> Result<(), RenderError> {
+        target.begin_frame()?;
+        
+        // Update projection matrix based on target size
+        let (width, height) = target.size();
+        let projection = self.calculate_projection_for_size(width, height);
+        self.update_projection(projection);
+        
+        // Generate and upload tilemap vertices (same logic as runtime)
+        if let (Some(tilemap), Some(atlas)) = (&scene_data.tilemap, &scene_data.atlas) {
+            let vertices = if scene_data.visible_chunks.is_empty() {
+                // Render all tiles (for editor or small maps)
+                tilemap.generate_vertices(atlas, scene_data.texture_size)
+            } else {
+                // Render only visible chunks (for runtime performance)
+                tilemap.generate_vertices_for_chunks(atlas, scene_data.texture_size, &scene_data.visible_chunks)
+            };
+            self.tilemap_pipeline.update_vertices(&self.device, &vertices);
+        }
+        
+        // Add sprites (same logic as runtime)
+        self.sprite_pipeline.clear_sprites();
+        for sprite in &scene_data.sprites {
+            let render_instance = SpriteRenderInstance {
+                frame: sprite.frame,
+                position: sprite.position.as_vec2(),
+                size: sprite.size.as_vec2(),
+            };
+            self.sprite_pipeline.add_sprite(render_instance);
+        }
+        
+        // Add debug shapes
+        self.debug_pipeline.clear();
+        for debug_shape in &scene_data.debug_shapes {
+            match debug_shape.shape_type {
+                DebugShapeType::Rectangle => {
+                    self.debug_pipeline.add_rect(
+                        debug_shape.position.x,
+                        debug_shape.position.y,
+                        debug_shape.size.x,
+                        debug_shape.size.y,
+                        debug_shape.color,
+                    );
+                }
+                DebugShapeType::Circle => {
+                    // TODO: Add circle support to debug pipeline
+                }
+                DebugShapeType::Line { end: _ } => {
+                    // TODO: Add line support to debug pipeline
+                }
+            }
+        }
+        
+        // Finalize debug shapes
+        self.debug_pipeline.update_vertices(&self.device);
+        
+        // Render using WGPU pipelines
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Scene Render Encoder"),
+        });
+        
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Scene Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target.get_render_view()?,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.1,
+                            g: 0.1, 
+                            b: 0.12,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            
+            // Same pipeline calls for both runtime and editor!
+            self.tilemap_pipeline.render(&mut render_pass);
+            self.sprite_pipeline.render(&mut render_pass);
+            self.debug_pipeline.render(&mut render_pass);
+        }
+        
+        self.queue.submit(std::iter::once(encoder.finish()));
+        target.end_frame()?;
+        
+        Ok(())
+    }
+    
+    fn calculate_projection_for_size(&self, width: u32, height: u32) -> glam::Mat4 {
+        // Use toki-core's projection calculation
+        toki_core::math::projection::calculate_projection(
+            toki_core::math::projection::ProjectionParameter {
+                width,
+                height,
+                desired_width: width,
+                desired_height: height,
+            }
+        )
+    }
+    
+    fn update_projection(&mut self, projection: glam::Mat4) {
+        self.tilemap_pipeline.update_projection(&self.queue, projection);
+        self.sprite_pipeline.update_projection(&self.queue, projection);
+        self.debug_pipeline.update_camera(&self.queue, projection);
+    }
+}

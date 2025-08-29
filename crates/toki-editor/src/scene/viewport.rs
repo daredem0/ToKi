@@ -40,7 +40,7 @@ impl SceneViewport {
     }
     
     /// Render the viewport using egui
-    pub fn render(&mut self, ui: &mut egui::Ui, rect: egui::Rect) {
+    pub fn render(&mut self, ui: &mut egui::Ui, rect: egui::Rect, project_path: Option<&std::path::Path>) {
         if !self.is_initialized {
             // Show placeholder when not initialized
             ui.painter().rect_filled(
@@ -65,6 +65,7 @@ impl SceneViewport {
             self.scene_manager.camera(),
             rect,
             self.scene_manager.tilemap(),
+            project_path,
         );
     }
     

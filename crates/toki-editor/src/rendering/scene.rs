@@ -1,15 +1,18 @@
 use anyhow::Result;
 use toki_core::{GameState, Camera};
 use toki_core::assets::tilemap::TileMap;
+use toki_core::assets::atlas::AtlasMeta;
+use std::path::PathBuf;
 
 /// Handles scene visualization for editing purposes
 /// Renders game entities, collision boxes, and selection highlights
 pub struct SceneRenderer {
-    // For now, we'll use a simpler approach until we can better integrate with WGPU
     // Editor-specific state
     selected_entity_id: Option<u32>,
     show_collision_boxes: bool,
     show_entity_centers: bool,
+    // Atlas cache for tilemap rendering
+    loaded_atlas: Option<(PathBuf, AtlasMeta)>, // (atlas_path, atlas_data)
 }
 
 impl SceneRenderer {
@@ -19,6 +22,7 @@ impl SceneRenderer {
             selected_entity_id: None,
             show_collision_boxes: true,
             show_entity_centers: true,
+            loaded_atlas: None,
         })
     }
     
@@ -30,6 +34,7 @@ impl SceneRenderer {
         camera: &Camera,
         viewport_rect: egui::Rect,
         tilemap: Option<&TileMap>,
+        project_path: Option<&std::path::Path>,
     ) {
         // Draw background
         ui.painter().rect_filled(
@@ -44,7 +49,13 @@ impl SceneRenderer {
         
         // Render tilemap if present (render first so it appears behind entities)
         if let Some(tilemap) = tilemap {
-            self.render_tilemap_egui(ui, tilemap, camera_offset, scale, viewport_rect);
+            tracing::debug!("Rendering tilemap: {}x{}, tile_size: {}x{}, atlas: {}", 
+                           tilemap.size.x, tilemap.size.y, 
+                           tilemap.tile_size.x, tilemap.tile_size.y,
+                           tilemap.atlas.display());
+            self.render_tilemap_egui(ui, tilemap, camera_offset, scale, viewport_rect, project_path);
+        } else {
+            tracing::debug!("No tilemap to render");
         }
         
         // Get entity IDs and then get the actual entities
@@ -276,24 +287,32 @@ impl SceneRenderer {
         camera_offset + scaled_pos
     }
     
-    /// Render tilemap using egui (simplified visualization)
+    /// Render tilemap using egui (improved with proper atlas support)
     fn render_tilemap_egui(
-        &self,
+        &mut self,
         ui: &mut egui::Ui,
         tilemap: &TileMap,
         camera_offset: glam::Vec2,
         scale: f32,
         viewport_rect: egui::Rect,
+        project_path: Option<&std::path::Path>,
     ) {
-        // For now, render a simplified grid-based version of the tilemap
-        // In a real implementation, this would use proper texture atlases
+        // Load atlas data for proper tile mapping
+        if let Err(e) = self.ensure_atlas_loaded(tilemap, project_path) {
+            tracing::warn!("Failed to load atlas for tilemap: {}. Using fallback rendering.", e);
+            self.render_tilemap_fallback(ui, tilemap, camera_offset, scale, viewport_rect);
+            return;
+        }
         
+        // Get the cached atlas (we know it's loaded now)
+        let atlas = self.loaded_atlas.as_ref().unwrap().1.clone();
+
+        // For now, still use the simplified egui rendering, but with proper atlas-based colors
         let tile_size = glam::Vec2::new(
             tilemap.tile_size.x as f32 * scale,
             tilemap.tile_size.y as f32 * scale
         );
         
-        // Only render tiles that are visible in the viewport
         // Calculate visible tile range based on camera and viewport
         let viewport_world_start = glam::Vec2::new(
             camera_offset.x - viewport_rect.width() / (2.0 * scale),
@@ -309,7 +328,9 @@ impl SceneRenderer {
         let end_tile_x = (viewport_world_end.x / tilemap.tile_size.x as f32).ceil().min(tilemap.size.x as f32) as u32;
         let end_tile_y = (viewport_world_end.y / tilemap.tile_size.y as f32).ceil().min(tilemap.size.y as f32) as u32;
         
-        // Render visible tiles
+        tracing::debug!("Rendering tiles from ({}, {}) to ({}, {})", start_tile_x, start_tile_y, end_tile_x, end_tile_y);
+        
+        // Render visible tiles using atlas information
         for tile_y in start_tile_y..end_tile_y.min(tilemap.size.y) {
             for tile_x in start_tile_x..end_tile_x.min(tilemap.size.x) {
                 if let Ok(tile_name) = tilemap.get_tile_name(tile_x, tile_y) {
@@ -325,33 +346,129 @@ impl SceneRenderer {
                         egui::vec2(tile_size.x, tile_size.y),
                     );
                     
-                    // Color tiles based on their name hash for now (placeholder)
-                    let hash = tile_name.chars().map(|c| c as u32).sum::<u32>();
-                    let color = match hash % 6 {
-                        0 => egui::Color32::from_rgb(160, 82, 45),  // Brown
-                        1 => egui::Color32::from_rgb(34, 139, 34),  // Forest Green  
-                        2 => egui::Color32::from_rgb(70, 130, 180), // Steel Blue
-                        3 => egui::Color32::from_rgb(210, 180, 140), // Tan
-                        4 => egui::Color32::from_rgb(128, 128, 128), // Gray
-                        _ => egui::Color32::from_rgb(139, 69, 19),   // Saddle Brown
-                    };
+                    // Get tile-specific color based on atlas position or properties
+                    let color = Self::get_tile_color_from_atlas_static(tile_name, &atlas);
                     
-                    // Render tile with slight transparency to show it's a background
-                    ui.painter().rect_filled(tile_rect, 1.0, color.gamma_multiply(0.7));
+                    // Render tile
+                    ui.painter().rect_filled(tile_rect, 1.0, color);
                     
                     // Optionally draw tile name for debugging
-                    if scale > 2.0 { // Only draw text when zoomed in enough
+                    if scale > 2.0 {
                         let font_size = (scale * 4.0).min(12.0);
                         ui.painter().text(
                             tile_rect.center(),
                             egui::Align2::CENTER_CENTER,
                             tile_name,
                             egui::FontId::monospace(font_size),
-                            egui::Color32::BLACK,
+                            egui::Color32::WHITE,
                         );
                     }
                 }
             }
         }
+    }
+
+    /// Fallback tilemap rendering when atlas loading fails
+    fn render_tilemap_fallback(
+        &self,
+        ui: &mut egui::Ui,
+        tilemap: &TileMap,
+        camera_offset: glam::Vec2,
+        scale: f32,
+        viewport_rect: egui::Rect,
+    ) {
+        // Use the old hash-based coloring as fallback
+        let tile_size = glam::Vec2::new(
+            tilemap.tile_size.x as f32 * scale,
+            tilemap.tile_size.y as f32 * scale
+        );
+        
+        for tile_y in 0..tilemap.size.y.min(50) { // Limit for performance
+            for tile_x in 0..tilemap.size.x.min(50) {
+                if let Ok(tile_name) = tilemap.get_tile_name(tile_x, tile_y) {
+                    let world_pos = glam::Vec2::new(
+                        tile_x as f32 * tilemap.tile_size.x as f32,
+                        tile_y as f32 * tilemap.tile_size.y as f32
+                    );
+                    
+                    let screen_pos = self.world_to_screen(world_pos, camera_offset, scale, viewport_rect);
+                    let tile_rect = egui::Rect::from_min_size(
+                        egui::pos2(screen_pos.x, screen_pos.y),
+                        egui::vec2(tile_size.x, tile_size.y),
+                    );
+                    
+                    // Hash-based color fallback
+                    let hash = tile_name.chars().map(|c| c as u32).sum::<u32>();
+                    let color = match hash % 6 {
+                        0 => egui::Color32::from_rgb(160, 82, 45),
+                        1 => egui::Color32::from_rgb(34, 139, 34),
+                        2 => egui::Color32::from_rgb(70, 130, 180),
+                        3 => egui::Color32::from_rgb(210, 180, 140),
+                        4 => egui::Color32::from_rgb(128, 128, 128),
+                        _ => egui::Color32::from_rgb(139, 69, 19),
+                    };
+                    
+                    ui.painter().rect_filled(tile_rect, 1.0, color.gamma_multiply(0.7));
+                }
+            }
+        }
+    }
+
+    /// Get tile color based on atlas information (static version)
+    fn get_tile_color_from_atlas_static(tile_name: &str, atlas: &AtlasMeta) -> egui::Color32 {
+        // Use atlas position to determine color, or tile properties
+        if let Some(tile_rect) = atlas.get_tile_rect(tile_name) {
+            // tile_rect format: [x, y, width, height]
+            // Create distinct colors based on tile position in atlas
+            let pos_hash = (tile_rect[0] * 7 + tile_rect[1] * 13) as u32;
+            match pos_hash % 8 {
+                0 => egui::Color32::from_rgb(34, 139, 34),   // Grass green
+                1 => egui::Color32::from_rgb(139, 69, 19),   // Dirt brown
+                2 => egui::Color32::from_rgb(128, 128, 128), // Stone gray
+                3 => egui::Color32::from_rgb(30, 144, 255),  // Water blue  
+                4 => egui::Color32::from_rgb(238, 203, 173), // Sand beige
+                5 => egui::Color32::from_rgb(160, 82, 45),   // Wood brown
+                6 => egui::Color32::from_rgb(205, 92, 92),   // Brick red
+                _ => egui::Color32::from_rgb(75, 0, 130),    // Roof purple
+            }
+        } else {
+            // Fallback for unknown tiles
+            egui::Color32::from_rgb(255, 0, 255) // Magenta for missing tiles
+        }
+    }
+
+    /// Load atlas for tilemap rendering (with caching)
+    fn ensure_atlas_loaded(&mut self, tilemap: &TileMap, project_path: Option<&std::path::Path>) -> Result<()> {
+        // Extract atlas filename from tilemap
+        let atlas_filename = &tilemap.atlas;
+        
+        // Determine atlas path - try tilemaps directory first, then sprites directory
+        let atlas_path = if let Some(project_path) = project_path {
+            let tilemaps_path = project_path.join("assets").join("tilemaps").join(atlas_filename);
+            if tilemaps_path.exists() {
+                tilemaps_path
+            } else {
+                project_path.join("assets").join("sprites").join(atlas_filename)
+            }
+        } else {
+            return Err(anyhow::anyhow!("No project path available for atlas loading"));
+        };
+
+        // Check if we already have this atlas loaded
+        if let Some((cached_path, _)) = &self.loaded_atlas {
+            if cached_path == &atlas_path {
+                // Atlas already loaded
+                return Ok(());
+            }
+        }
+
+        // Load new atlas
+        tracing::info!("Loading atlas from: {}", atlas_path.display());
+        let atlas = AtlasMeta::load_from_file(&atlas_path)
+            .map_err(|e| anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e))?;
+        
+        // Cache the loaded atlas
+        self.loaded_atlas = Some((atlas_path, atlas));
+        Ok(())
     }
 }

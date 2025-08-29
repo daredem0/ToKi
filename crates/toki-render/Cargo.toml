@@ -16,7 +16,15 @@ pollster = "0.4.0"                  # For simplifying async GPU init
 bytemuck = { version = "1.14", features = ["derive"] }
 glam = "0.30.5"
 
+# Optional dependencies for editor integration
+egui = { version = "0.32", optional = true }
+egui-wgpu = { version = "0.32", optional = true }
+
 toki-core = { path = "../toki-core" }
 
 tracing.workspace = true
+
+[features]
+default = []
+editor = ["egui", "egui-wgpu"]
 

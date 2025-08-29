@@ -42,6 +42,9 @@ struct EditorApp {
 
     /// Logging
     log_capture: Option<LogCapture>,
+    
+    /// Track last loaded active scene to avoid unnecessary reloading
+    last_loaded_active_scene: Option<String>,
 }
 
 impl EditorApp {
@@ -64,6 +67,7 @@ impl EditorApp {
             project_manager: ProjectManager::new(),
             config,
             log_capture,
+            last_loaded_active_scene: None,
         }
     }
 }
@@ -266,6 +270,7 @@ impl EditorApp {
 
         // Handle project management requests and other actions after rendering is done
         self.handle_project_requests(event_loop);
+        self.handle_active_scene_map_loading();
         self.handle_map_requests();
     }
 
@@ -581,6 +586,56 @@ impl EditorApp {
                 Err(e) => {
                     tracing::error!("Failed to initialize config: {}", e);
                 }
+            }
+        }
+    }
+
+    fn handle_active_scene_map_loading(&mut self) {
+        // Load if active scene has changed OR if scene content has changed
+        let current_active_scene = self.ui.active_scene.clone();
+        
+        if current_active_scene != self.last_loaded_active_scene || self.ui.scene_content_changed {
+            self.last_loaded_active_scene = current_active_scene.clone();
+            self.ui.scene_content_changed = false; // Clear the flag
+            tracing::info!("Active scene or content changed, reloading map for scene: {:?}", current_active_scene);
+            
+            if let Some(active_scene_name) = &current_active_scene {
+                // Find the active scene
+                if let Some(active_scene) = self.ui.scenes.iter().find(|s| &s.name == active_scene_name) {
+                    tracing::info!("Found active scene '{}' with {} maps: {:?}", 
+                                  active_scene_name, active_scene.maps.len(), active_scene.maps);
+                    // If the scene has at least one map, load it
+                    if let Some(map_name) = active_scene.maps.first() {
+                        if let Some(config) = self.config.current_project_path() {
+                            let map_file = config
+                                .join("assets")
+                                .join("tilemaps")
+                                .join(format!("{}.json", map_name));
+                            if let Some(viewport) = &mut self.scene_viewport {
+                                match viewport.scene_manager_mut().load_tilemap(&map_file) {
+                                    Ok(()) => {
+                                        tracing::info!("Loaded active scene '{}' map '{}' into viewport", active_scene_name, map_name);
+                                    }
+                                    Err(e) => {
+                                        tracing::error!("Failed to load active scene '{}' map '{}': {}", active_scene_name, map_name, e);
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // No maps in active scene - clear viewport  
+                        if let Some(viewport) = &mut self.scene_viewport {
+                            viewport.scene_manager_mut().clear_tilemap();
+                        }
+                        tracing::debug!("Active scene '{}' has no maps, cleared viewport", active_scene_name);
+                    }
+                }
+            } else {
+                // No active scene - clear viewport
+                if let Some(viewport) = &mut self.scene_viewport {
+                    viewport.scene_manager_mut().clear_tilemap();
+                }
+                tracing::debug!("No active scene set, cleared viewport");
             }
         }
     }

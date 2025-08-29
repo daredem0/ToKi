@@ -32,6 +32,8 @@ pub struct EditorUI {
     // Scene management
     pub scenes: Vec<Scene>,
     pub selection: Option<Selection>,
+    pub active_scene: Option<String>, // Name of currently active scene
+    pub scene_content_changed: bool, // Flag to signal that scene content changed
     
     // Legacy entity selection (keep for backward compatibility)
     pub selected_entity_id: Option<EntityId>,
@@ -64,6 +66,8 @@ impl EditorUI {
             // Scene management
             scenes: vec![Scene::new("Main Scene".to_string())], // Start with default scene
             selection: None,
+            active_scene: Some("Main Scene".to_string()), // Default scene starts active
+            scene_content_changed: false,
             
             // Legacy fields (keep for backward compatibility)
             selected_entity_id: None,
@@ -139,7 +143,7 @@ impl EditorUI {
         }
 
         // Render viewport last (mutable access)
-        self.render_viewport(ctx, scene_viewport);
+        self.render_viewport(ctx, scene_viewport, config);
     }
 
     /// Apply config settings to UI state
@@ -258,7 +262,7 @@ impl EditorUI {
         });
     }
 
-    fn render_viewport(&mut self, ctx: &egui::Context, scene_viewport: Option<&mut SceneViewport>) {
+    fn render_viewport(&mut self, ctx: &egui::Context, scene_viewport: Option<&mut SceneViewport>, config: Option<&crate::config::EditorConfig>) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Scene Viewport");
             ui.separator();
@@ -302,7 +306,8 @@ impl EditorUI {
                 }
 
                 // Render the scene content
-                viewport.render(ui, rect);
+                let project_path = config.and_then(|c| c.current_project_path());
+                viewport.render(ui, rect, project_path.as_deref().map(|p| p.as_path()));
             } else {
                 // Show placeholder when no viewport
                 let available_size = ui.available_size();
@@ -370,9 +375,17 @@ impl EditorUI {
                     // Collect actions to perform after UI iteration
                     let mut map_removals: Vec<(usize, usize)> = Vec::new();
                     let mut selection_changes: Vec<Selection> = Vec::new();
+                    let mut active_scene_change: Option<String> = None;
                     
                     for (scene_index, scene) in self.scenes.iter().enumerate() {
-                        let scene_header_response = ui.collapsing(&format!("🎬 {}", scene.name), |ui| {
+                        let is_active_scene = self.active_scene.as_ref() == Some(&scene.name);
+                        let scene_header_text = if is_active_scene {
+                            format!("🎬 {} ⭐", scene.name) // Active scene gets a star
+                        } else {
+                            format!("🎬 {}", scene.name)
+                        };
+                        
+                        let scene_header_response = ui.collapsing(&scene_header_text, |ui| {
                             
                             // Maps section within the scene - only show configured maps
                             if !scene.maps.is_empty() {
@@ -449,6 +462,23 @@ impl EditorUI {
                             selection_changes.push(Selection::Scene(scene.name.clone()));
                             tracing::info!("Selected scene: {}", scene.name);
                         }
+
+                        // Right-click context menu for scene
+                        scene_header_response.header_response.context_menu(|ui| {
+                            let is_active = self.active_scene.as_ref() == Some(&scene.name);
+                            
+                            ui.horizontal(|ui| {
+                                if is_active {
+                                    ui.label("✅ Active Scene");
+                                } else {
+                                    if ui.button("🎯 Set as Active Scene").clicked() {
+                                        active_scene_change = Some(scene.name.clone());
+                                        tracing::info!("Setting {} as active scene", scene.name);
+                                        ui.close();
+                                    }
+                                }
+                            });
+                        });
                     }
                     
                     // Process removals in reverse order to maintain correct indices
@@ -468,6 +498,11 @@ impl EditorUI {
                     // Apply selection changes (only apply the last one)
                     if let Some(selection) = selection_changes.last() {
                         self.set_selection(selection.clone());
+                    }
+                    
+                    // Apply active scene change
+                    if let Some(new_active_scene) = active_scene_change {
+                        self.active_scene = Some(new_active_scene);
                     }
                 });
 
@@ -560,6 +595,8 @@ impl EditorUI {
                                         if let Some(target_scene) = self.scenes.iter_mut().find(|s| s.name == scene_name) {
                                             target_scene.maps.push(map_name.clone());
                                             tracing::info!("Added map '{}' to scene '{}'", map_name, scene_name);
+                                            // Signal that scene content changed by setting a flag
+                                            self.scene_content_changed = true;
                                         }
                                     }
                                     
