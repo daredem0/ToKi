@@ -1,6 +1,8 @@
 use anyhow::Result;
 use toki_core::{GameState, Camera};
 use toki_runtime::systems::ResourceManager;
+use toki_core::assets::tilemap::TileMap;
+use std::path::Path;
 
 /// Manages the game scene data and state for editing
 pub struct SceneManager {
@@ -8,6 +10,8 @@ pub struct SceneManager {
     camera: Camera,
     #[allow(dead_code)] // Will be used for tilemap/sprite rendering
     resources: ResourceManager,
+    /// Current loaded tilemap (if any)
+    tilemap: Option<TileMap>,
 }
 
 impl SceneManager {
@@ -34,6 +38,7 @@ impl SceneManager {
             game_state,
             camera,
             resources,
+            tilemap: None,
         })
     }
     
@@ -63,5 +68,32 @@ impl SceneManager {
     #[allow(dead_code)] // Will be used for tilemap/sprite rendering
     pub fn resources(&self) -> &ResourceManager {
         &self.resources
+    }
+
+    /// Load a tilemap from file
+    pub fn load_tilemap<P: AsRef<Path>>(&mut self, map_path: P) -> Result<()> {
+        let tilemap = TileMap::load_from_file(&map_path)
+            .map_err(|e| anyhow::anyhow!("Failed to load tilemap: {}", e))?;
+        
+        // Validate the tilemap
+        tilemap.validate()
+            .map_err(|e| anyhow::anyhow!("Invalid tilemap: {}", e))?;
+        
+        self.tilemap = Some(tilemap);
+        tracing::info!("Loaded tilemap from: {}", map_path.as_ref().display());
+        Ok(())
+    }
+    
+    /// Get reference to current tilemap
+    pub fn tilemap(&self) -> Option<&TileMap> {
+        self.tilemap.as_ref()
+    }
+    
+    /// Clear the current tilemap
+    pub fn clear_tilemap(&mut self) {
+        if self.tilemap.is_some() {
+            self.tilemap = None;
+            tracing::info!("Cleared tilemap");
+        }
     }
 }

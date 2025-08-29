@@ -64,6 +64,7 @@ impl SceneViewport {
             self.scene_manager.game_state(),
             self.scene_manager.camera(),
             rect,
+            self.scene_manager.tilemap(),
         );
     }
     

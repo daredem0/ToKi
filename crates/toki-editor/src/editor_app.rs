@@ -264,8 +264,9 @@ impl EditorApp {
             window.request_redraw();
         }
 
-        // Handle project management requests after rendering is done
+        // Handle project management requests and other actions after rendering is done
         self.handle_project_requests(event_loop);
+        self.handle_map_requests();
     }
 
     fn handle_project_requests(&mut self, _event_loop: &ActiveEventLoop) {
@@ -580,6 +581,33 @@ impl EditorApp {
                 Err(e) => {
                     tracing::error!("Failed to initialize config: {}", e);
                 }
+            }
+        }
+    }
+
+    fn handle_map_requests(&mut self) {
+        // Handle Map Loading request
+        if let Some((scene_name, map_name)) = self.ui.map_load_requested.take() {
+            if let Some(config) = self.config.current_project_path() {
+                let map_file = config
+                    .join("assets")
+                    .join("tilemaps")
+                    .join(format!("{}.json", map_name));
+
+                if let Some(viewport) = &mut self.scene_viewport {
+                    match viewport.scene_manager_mut().load_tilemap(&map_file) {
+                        Ok(()) => {
+                            tracing::info!("Successfully loaded map '{}' from scene '{}' into viewport", map_name, scene_name);
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to load map '{}' from scene '{}': {}", map_name, scene_name, e);
+                        }
+                    }
+                } else {
+                    tracing::warn!("No scene viewport available for loading map '{}' from scene '{}'", map_name, scene_name);
+                }
+            } else {
+                tracing::warn!("No project loaded for map loading request: '{}' from scene '{}'", map_name, scene_name);
             }
         }
     }

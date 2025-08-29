@@ -1,5 +1,6 @@
 use anyhow::Result;
 use toki_core::{GameState, Camera};
+use toki_core::assets::tilemap::TileMap;
 
 /// Handles scene visualization for editing purposes
 /// Renders game entities, collision boxes, and selection highlights
@@ -28,6 +29,7 @@ impl SceneRenderer {
         game_state: &GameState,
         camera: &Camera,
         viewport_rect: egui::Rect,
+        tilemap: Option<&TileMap>,
     ) {
         // Draw background
         ui.painter().rect_filled(
@@ -39,6 +41,11 @@ impl SceneRenderer {
         // Calculate camera transform for rendering
         let camera_offset = glam::Vec2::new(camera.position.x as f32, camera.position.y as f32);
         let scale = camera.scale as f32;
+        
+        // Render tilemap if present (render first so it appears behind entities)
+        if let Some(tilemap) = tilemap {
+            self.render_tilemap_egui(ui, tilemap, camera_offset, scale, viewport_rect);
+        }
         
         // Get entity IDs and then get the actual entities
         let entity_ids = game_state.entity_manager().active_entities();
@@ -267,5 +274,84 @@ impl SceneRenderer {
         
         let scaled_pos = relative_screen_pos / scale;
         camera_offset + scaled_pos
+    }
+    
+    /// Render tilemap using egui (simplified visualization)
+    fn render_tilemap_egui(
+        &self,
+        ui: &mut egui::Ui,
+        tilemap: &TileMap,
+        camera_offset: glam::Vec2,
+        scale: f32,
+        viewport_rect: egui::Rect,
+    ) {
+        // For now, render a simplified grid-based version of the tilemap
+        // In a real implementation, this would use proper texture atlases
+        
+        let tile_size = glam::Vec2::new(
+            tilemap.tile_size.x as f32 * scale,
+            tilemap.tile_size.y as f32 * scale
+        );
+        
+        // Only render tiles that are visible in the viewport
+        // Calculate visible tile range based on camera and viewport
+        let viewport_world_start = glam::Vec2::new(
+            camera_offset.x - viewport_rect.width() / (2.0 * scale),
+            camera_offset.y - viewport_rect.height() / (2.0 * scale),
+        );
+        let viewport_world_end = glam::Vec2::new(
+            camera_offset.x + viewport_rect.width() / (2.0 * scale),
+            camera_offset.y + viewport_rect.height() / (2.0 * scale),
+        );
+        
+        let start_tile_x = (viewport_world_start.x / tilemap.tile_size.x as f32).floor().max(0.0) as u32;
+        let start_tile_y = (viewport_world_start.y / tilemap.tile_size.y as f32).floor().max(0.0) as u32;
+        let end_tile_x = (viewport_world_end.x / tilemap.tile_size.x as f32).ceil().min(tilemap.size.x as f32) as u32;
+        let end_tile_y = (viewport_world_end.y / tilemap.tile_size.y as f32).ceil().min(tilemap.size.y as f32) as u32;
+        
+        // Render visible tiles
+        for tile_y in start_tile_y..end_tile_y.min(tilemap.size.y) {
+            for tile_x in start_tile_x..end_tile_x.min(tilemap.size.x) {
+                if let Ok(tile_name) = tilemap.get_tile_name(tile_x, tile_y) {
+                    let world_pos = glam::Vec2::new(
+                        tile_x as f32 * tilemap.tile_size.x as f32,
+                        tile_y as f32 * tilemap.tile_size.y as f32
+                    );
+                    
+                    let screen_pos = self.world_to_screen(world_pos, camera_offset, scale, viewport_rect);
+                    
+                    let tile_rect = egui::Rect::from_min_size(
+                        egui::pos2(screen_pos.x, screen_pos.y),
+                        egui::vec2(tile_size.x, tile_size.y),
+                    );
+                    
+                    // Color tiles based on their name hash for now (placeholder)
+                    let hash = tile_name.chars().map(|c| c as u32).sum::<u32>();
+                    let color = match hash % 6 {
+                        0 => egui::Color32::from_rgb(160, 82, 45),  // Brown
+                        1 => egui::Color32::from_rgb(34, 139, 34),  // Forest Green  
+                        2 => egui::Color32::from_rgb(70, 130, 180), // Steel Blue
+                        3 => egui::Color32::from_rgb(210, 180, 140), // Tan
+                        4 => egui::Color32::from_rgb(128, 128, 128), // Gray
+                        _ => egui::Color32::from_rgb(139, 69, 19),   // Saddle Brown
+                    };
+                    
+                    // Render tile with slight transparency to show it's a background
+                    ui.painter().rect_filled(tile_rect, 1.0, color.gamma_multiply(0.7));
+                    
+                    // Optionally draw tile name for debugging
+                    if scale > 2.0 { // Only draw text when zoomed in enough
+                        let font_size = (scale * 4.0).min(12.0);
+                        ui.painter().text(
+                            tile_rect.center(),
+                            egui::Align2::CENTER_CENTER,
+                            tile_name,
+                            egui::FontId::monospace(font_size),
+                            egui::Color32::BLACK,
+                        );
+                    }
+                }
+            }
+        }
     }
 }
