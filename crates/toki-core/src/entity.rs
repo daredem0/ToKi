@@ -19,6 +19,10 @@ pub struct Entity {
     pub footstep_distance_accumulator: f32,
     pub footstep_trigger_distance: f32,
     pub last_collision_state: bool,
+    
+    /// Audio configuration from entity definition
+    #[serde(default)]
+    pub movement_sound: Option<String>, // Sound to play when moving
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
@@ -45,6 +49,10 @@ pub struct EntityAttributes {
     // Behavior flags
     pub active: bool,
     pub can_move: bool, // Can we be moved by the player
+    
+    // Extended attributes for entity definitions
+    #[serde(default)]
+    pub has_inventory: bool, // Can this entity carry items
 }
 
 impl Default for EntityAttributes {
@@ -58,6 +66,7 @@ impl Default for EntityAttributes {
             render_layer: 0,
             active: true,
             can_move: true,
+            has_inventory: false,
         }
     }
 }
@@ -121,6 +130,7 @@ impl EntityManager {
             footstep_distance_accumulator: 0.0,
             footstep_trigger_distance: 32.0, // Trigger footstep every 32 pixels
             last_collision_state: false,
+            movement_sound: None, // Default to no sound for existing entities
         };
 
         // Insert into main storage
@@ -353,5 +363,156 @@ impl EntityManager {
 impl Default for EntityManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// Entity Definition JSON format structures
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityDefinition {
+    pub name: String,
+    pub display_name: String,
+    pub description: String,
+    pub entity_type: String, // "player", "npc", "item", "decoration", "trigger"
+    pub rendering: RenderingDef,
+    pub attributes: AttributesDef,
+    pub collision: CollisionDef,
+    pub audio: AudioDef,
+    pub animations: AnimationsDef,
+    pub category: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RenderingDef {
+    pub size: [u32; 2],
+    pub render_layer: i32,
+    pub visible: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttributesDef {
+    pub health: Option<u32>,
+    pub speed: u32,
+    pub solid: bool,
+    pub active: bool,
+    pub can_move: bool,
+    pub has_inventory: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollisionDef {
+    pub enabled: bool,
+    pub offset: [i32; 2],
+    pub size: [u32; 2],
+    pub trigger: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioDef {
+    pub footstep_trigger_distance: f32,
+    pub movement_sound: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnimationsDef {
+    pub atlas_name: String,
+    pub clips: Vec<AnimationClipDef>,
+    pub default_state: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnimationClipDef {
+    pub state: String,
+    pub frame_tiles: Vec<String>,
+    pub frame_duration_ms: f32,
+    pub loop_mode: String, // "loop", "once", "ping_pong"
+}
+
+// Conversion implementations
+impl EntityDefinition {
+    /// Create an Entity instance from this definition at the given position
+    pub fn create_entity(&self, position: IVec2, entity_id: EntityId) -> Result<Entity, String> {
+        // Parse entity type
+        let entity_type = match self.entity_type.to_lowercase().as_str() {
+            "player" => EntityType::Player,
+            "npc" => EntityType::Npc,
+            "item" => EntityType::Item,
+            "decoration" => EntityType::Decoration,
+            "trigger" => EntityType::Trigger,
+            _ => return Err(format!("Unknown entity type: {}", self.entity_type)),
+        };
+
+        // Build animation controller
+        let mut animation_controller = AnimationController::new();
+        for clip_def in &self.animations.clips {
+            let state = match clip_def.state.to_lowercase().as_str() {
+                "idle" => AnimationState::Idle,
+                "walk" => AnimationState::Walk,
+                _ => return Err(format!("Unknown animation state: {}", clip_def.state)),
+            };
+
+            let loop_mode = match clip_def.loop_mode.to_lowercase().as_str() {
+                "loop" => LoopMode::Loop,
+                "once" => LoopMode::Once,
+                "ping_pong" => LoopMode::PingPog,
+                _ => return Err(format!("Unknown loop mode: {}", clip_def.loop_mode)),
+            };
+
+            let clip = AnimationClip {
+                state,
+                atlas_name: self.animations.atlas_name.clone(),
+                frame_tile_names: clip_def.frame_tiles.clone(),
+                frame_duration_ms: clip_def.frame_duration_ms,
+                loop_mode,
+            };
+            animation_controller.add_clip(clip);
+        }
+
+        // Set default animation state
+        let default_state = match self.animations.default_state.to_lowercase().as_str() {
+            "idle" => AnimationState::Idle,
+            "walk" => AnimationState::Walk,
+            _ => return Err(format!("Unknown default animation state: {}", self.animations.default_state)),
+        };
+        animation_controller.play(default_state);
+
+        // Build attributes
+        let attributes = EntityAttributes {
+            health: self.attributes.health,
+            speed: self.attributes.speed,
+            solid: self.attributes.solid,
+            visible: self.rendering.visible,
+            animation_controller: Some(animation_controller),
+            render_layer: self.rendering.render_layer,
+            active: self.attributes.active,
+            can_move: self.attributes.can_move,
+            has_inventory: self.attributes.has_inventory,
+        };
+
+        // Build collision box if enabled
+        let collision_box = if self.collision.enabled {
+            Some(CollisionBox::new(
+                IVec2::new(self.collision.offset[0], self.collision.offset[1]),
+                UVec2::new(self.collision.size[0], self.collision.size[1]),
+                self.collision.trigger,
+            ))
+        } else {
+            None
+        };
+
+        // Create entity
+        Ok(Entity {
+            id: entity_id,
+            position,
+            size: UVec2::new(self.rendering.size[0], self.rendering.size[1]),
+            entity_type,
+            attributes,
+            collision_box,
+            footstep_distance_accumulator: 0.0,
+            footstep_trigger_distance: self.audio.footstep_trigger_distance,
+            last_collision_state: false,
+            movement_sound: Some(self.audio.movement_sound.clone()),
+        })
     }
 }

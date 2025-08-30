@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::fs;
-use toki_core::Scene;
+use toki_core::{Scene, entity::EntityDefinition};
 
 /// Asset discovery and management for project
 #[derive(Debug, Clone)]
@@ -19,6 +19,8 @@ pub struct ProjectAssets {
     pub music: HashMap<String, AudioAsset>,
     /// Discovered sound effects
     pub sfx: HashMap<String, AudioAsset>,
+    /// Discovered entity definitions
+    pub entities: HashMap<String, EntityAsset>,
 }
 
 /// Scene asset information
@@ -70,6 +72,17 @@ pub enum AudioFormat {
     Unknown,
 }
 
+/// Entity definition asset information
+#[derive(Debug, Clone)]
+pub struct EntityAsset {
+    /// Entity name (from filename)
+    pub name: String,
+    /// Full path to entity definition file
+    pub path: PathBuf,
+    /// Entity definition data (loaded lazily)
+    pub definition: Option<EntityDefinition>,
+}
+
 impl ProjectAssets {
     /// Create new project assets manager
     pub fn new(project_path: PathBuf) -> Self {
@@ -80,6 +93,7 @@ impl ProjectAssets {
             sprite_atlases: HashMap::new(),
             music: HashMap::new(),
             sfx: HashMap::new(),
+            entities: HashMap::new(),
         }
     }
 
@@ -89,14 +103,16 @@ impl ProjectAssets {
         self.scan_tilemaps()?;
         self.scan_sprite_atlases()?;
         self.scan_audio()?;
+        self.scan_entities()?;
         
         tracing::info!(
-            "Scanned project assets: {} scenes, {} tilemaps, {} atlases, {} music, {} sfx",
+            "Scanned project assets: {} scenes, {} tilemaps, {} atlases, {} music, {} sfx, {} entities",
             self.scenes.len(),
             self.tilemaps.len(),
             self.sprite_atlases.len(),
             self.music.len(),
-            self.sfx.len()
+            self.sfx.len(),
+            self.entities.len()
         );
         
         Ok(())
@@ -251,6 +267,37 @@ impl ProjectAssets {
         Ok(())
     }
 
+    /// Scan for entity definition files
+    fn scan_entities(&mut self) -> Result<()> {
+        let entities_dir = self.project_path.join("entities");
+        if !entities_dir.exists() {
+            tracing::debug!("Entities directory does not exist: {:?}", entities_dir);
+            return Ok(());
+        }
+
+        tracing::info!("🔍 Scanning for entity definitions in {:?}", entities_dir);
+
+        for entry in fs::read_dir(&entities_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            
+            if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    let entity_asset = EntityAsset {
+                        name: stem.to_string(),
+                        path: path.clone(),
+                        definition: None, // Loaded lazily
+                    };
+                    
+                    self.entities.insert(stem.to_string(), entity_asset);
+                    tracing::info!("🧙 Found entity definition: '{}' at {:?}", stem, path);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Load a scene by name
     pub fn load_scene(&mut self, scene_name: &str) -> Result<Option<Scene>> {
         if let Some(scene_asset) = self.scenes.get_mut(scene_name) {
@@ -329,5 +376,46 @@ impl ProjectAssets {
     /// Get all SFX names
     pub fn get_sfx_names(&self) -> Vec<String> {
         self.sfx.keys().cloned().collect()
+    }
+
+    /// Load an entity definition by name
+    pub fn load_entity_definition(&mut self, entity_name: &str) -> Result<Option<EntityDefinition>> {
+        if let Some(entity_asset) = self.entities.get_mut(entity_name) {
+            if entity_asset.definition.is_none() {
+                // Load entity definition from file
+                let json_data = fs::read_to_string(&entity_asset.path)?;
+                let definition: EntityDefinition = serde_json::from_str(&json_data)
+                    .map_err(|e| anyhow::anyhow!("Failed to parse entity definition '{}': {}", entity_name, e))?;
+                
+                entity_asset.definition = Some(definition.clone());
+                tracing::info!("📖 Loaded entity definition '{}' from {:?}", entity_name, entity_asset.path);
+                Ok(Some(definition))
+            } else {
+                Ok(entity_asset.definition.clone())
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Get all entity definition names
+    pub fn get_entity_names(&self) -> Vec<String> {
+        self.entities.keys().cloned().collect()
+    }
+
+    /// Get entities by category for organization in the editor
+    pub fn get_entities_by_category(&mut self) -> Result<HashMap<String, Vec<String>>> {
+        let mut categories = HashMap::new();
+        
+        for entity_name in self.get_entity_names() {
+            if let Some(definition) = self.load_entity_definition(&entity_name)? {
+                categories
+                    .entry(definition.category)
+                    .or_insert_with(Vec::new)
+                    .push(entity_name);
+            }
+        }
+        
+        Ok(categories)
     }
 }
