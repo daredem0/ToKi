@@ -96,7 +96,8 @@ impl EditorApp {
             if let Some(project_path) = self.config.current_project_path() {
                 match scene_viewport.render_to_texture(project_path.as_path(), renderer.egui_renderer_mut()) {
                     Ok(()) => {
-                        tracing::debug!("Scene rendered to offscreen texture successfully");
+                        // Reduce log spam - render_to_texture already handles its own logging
+                        // tracing::debug!("Scene rendered to offscreen texture successfully");
                     }
                     Err(e) => {
                         tracing::error!("Failed to render scene to texture: {}", e);
@@ -281,7 +282,8 @@ impl EditorApp {
             if let Some(project_path) = &project_path {
                 match scene_viewport.render_to_texture(project_path.as_path(), renderer.egui_renderer_mut()) {
                     Ok(()) => {
-                        tracing::debug!("Scene rendered to offscreen texture successfully");
+                        // Reduce log spam - render_to_texture already handles its own logging
+                        // tracing::debug!("Scene rendered to offscreen texture successfully");
                     }
                     Err(e) => {
                         tracing::error!("Failed to render scene to texture: {}", e);
@@ -658,6 +660,11 @@ impl EditorApp {
             self.ui.scene_content_changed = false; // Clear the flag
             tracing::info!("Active scene or content changed, reloading map for scene: {:?}", current_active_scene);
             
+            // Mark viewport as needing re-render since scene changed
+            if let Some(viewport) = &mut self.scene_viewport {
+                viewport.mark_dirty();
+            }
+            
             if let Some(active_scene_name) = &current_active_scene {
                 // Find the active scene
                 if let Some(active_scene) = self.ui.scenes.iter().find(|s| &s.name == active_scene_name) {
@@ -674,6 +681,8 @@ impl EditorApp {
                                 match viewport.scene_manager_mut().load_tilemap(&map_file) {
                                     Ok(()) => {
                                         tracing::info!("Loaded active scene '{}' map '{}' into viewport", active_scene_name, map_name);
+                                        // Mark viewport as needing re-render
+                                        viewport.mark_dirty();
                                     }
                                     Err(e) => {
                                         tracing::error!("Failed to load active scene '{}' map '{}': {}", active_scene_name, map_name, e);
@@ -712,6 +721,8 @@ impl EditorApp {
                     match viewport.scene_manager_mut().load_tilemap(&map_file) {
                         Ok(()) => {
                             tracing::info!("Successfully loaded map '{}' from scene '{}' into viewport", map_name, scene_name);
+                            // Mark viewport as needing re-render
+                            viewport.mark_dirty();
                         }
                         Err(e) => {
                             tracing::error!("Failed to load map '{}' from scene '{}': {}", map_name, scene_name, e);

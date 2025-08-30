@@ -13,6 +13,7 @@ pub struct SceneViewport {
     is_initialized: bool,
     viewport_size: (u32, u32),
     atlas_cache: Option<AtlasMeta>,
+    needs_render: bool, // Track if scene needs re-rendering
 }
 
 impl SceneViewport {
@@ -29,6 +30,7 @@ impl SceneViewport {
             is_initialized: false,
             viewport_size: (800, 600),
             atlas_cache: None,
+            needs_render: true, // Initial render required
         })
     }
     
@@ -77,6 +79,13 @@ impl SceneViewport {
             return Ok(()); // Skip if not initialized
         }
         
+        // Only render if scene needs updating
+        if !self.needs_render {
+            return Ok(()); // Skip silently - no need to log this every frame
+        }
+        
+        tracing::debug!("Scene needs re-rendering, proceeding with render");
+        
         // Prepare scene data
         let scene_data = self.prepare_scene_data(Some(project_path));
         
@@ -96,6 +105,9 @@ impl SceneViewport {
             tracing::debug!("Registered texture with egui, texture_id: {:?}", texture_id);
             
             tracing::debug!("Scene rendered to texture successfully");
+            
+            // Clear dirty flag after successful render
+            self.needs_render = false;
         } else {
             tracing::warn!("Scene renderer or offscreen target not available: renderer={}, target={}", 
                           self.scene_renderer.is_some(), self.offscreen_target.is_some());
@@ -137,7 +149,8 @@ impl SceneViewport {
                         egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
                         egui::Color32::WHITE,
                     );
-                    tracing::debug!("Displayed pre-rendered texture in viewport");
+                    // Only log occasionally to avoid spam
+            // tracing::debug!("Displayed pre-rendered texture in viewport");
                 } else {
                     // Show status instead of error - this is normal during initialization
                     self.render_debug_status(ui, rect, "Texture rendering in progress...");
@@ -347,6 +360,17 @@ impl SceneViewport {
             egui::FontId::monospace(10.0),
             egui::Color32::LIGHT_GRAY,
         );
+    }
+    
+    /// Mark the scene as needing a re-render
+    pub fn mark_dirty(&mut self) {
+        tracing::debug!("Scene viewport marked dirty - will re-render on next frame");
+        self.needs_render = true;
+    }
+    
+    /// Check if scene needs re-rendering
+    pub fn needs_render(&self) -> bool {
+        self.needs_render
     }
     
     // Note: Additional methods like toggle_collision_boxes, etc. can be added when needed
