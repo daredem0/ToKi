@@ -6,6 +6,8 @@ use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::event::Modifiers;
+use winit::keyboard::ModifiersState;
 use winit::window::{Window, WindowId};
 
 use crate::config::EditorConfig;
@@ -43,6 +45,9 @@ struct EditorApp {
     /// Logging
     log_capture: Option<LogCapture>,
     
+    /// Keyboard modifiers state
+    modifiers: ModifiersState,
+    
     /// Track last loaded active scene to avoid unnecessary reloading
     last_loaded_active_scene: Option<String>,
 }
@@ -67,6 +72,7 @@ impl EditorApp {
             project_manager: ProjectManager::new(),
             config,
             log_capture,
+            modifiers: ModifiersState::default(),
             last_loaded_active_scene: None,
         }
     }
@@ -186,9 +192,25 @@ impl ApplicationHandler for EditorApp {
                 event_loop.exit();
             }
 
+            WindowEvent::ModifiersChanged(new_modifiers) => {
+                self.modifiers = new_modifiers.state();
+            }
+
             WindowEvent::KeyboardInput { event, .. } => {
                 if event.state.is_pressed() {
                     if let PhysicalKey::Code(key_code) = event.physical_key {
+                        // Try viewport keyboard input first (for zoom controls)
+                        if let Some(viewport) = &mut self.scene_viewport {
+                            if viewport.handle_keyboard_input(key_code, Modifiers::from(self.modifiers), true) {
+                                // Viewport handled the input, request redraw
+                                if let Some(window) = &self.window {
+                                    window.request_redraw();
+                                }
+                                return; // Input consumed by viewport
+                            }
+                        }
+                        
+                        // Handle other editor keyboard shortcuts
                         match key_code {
                             KeyCode::Escape => event_loop.exit(),
                             KeyCode::F1 => {

@@ -2,6 +2,7 @@ use anyhow::Result;
 use crate::scene::SceneManager;
 use toki_render::{SceneRenderer, SceneData, OffscreenTarget, RenderTarget};
 use toki_core::assets::atlas::AtlasMeta;
+use toki_core::Camera;
 
 /// Handles the scene viewport - integration between scene data and rendering
 pub struct SceneViewport {
@@ -14,12 +15,19 @@ pub struct SceneViewport {
     viewport_size: (u32, u32),
     atlas_cache: Option<AtlasMeta>,
     needs_render: bool, // Track if scene needs re-rendering
+    camera: Camera, // Camera for zoom and pan
 }
 
 impl SceneViewport {
     /// Create viewport with existing game state
     pub fn with_game_state(game_state: toki_core::GameState) -> Result<Self> {
         let scene_manager = SceneManager::with_game_state(game_state)?;
+        
+        // Initialize camera with default toki-runtime settings
+        let mut camera = Camera::new();
+        camera.viewport_size = glam::UVec2::new(800, 600);
+        camera.scale = 1; // Default zoom same as toki-runtime
+        camera.center_on(glam::IVec2::new(400, 300)); // Center on viewport
         
         Ok(Self {
             scene_manager,
@@ -31,6 +39,7 @@ impl SceneViewport {
             viewport_size: (800, 600),
             atlas_cache: None,
             needs_render: true, // Initial render required
+            camera,
         })
     }
     
@@ -97,8 +106,11 @@ impl SceneViewport {
                            scene_data.sprites.len(),
                            scene_data.debug_shapes.len());
                            
-            // Render scene to texture
-            scene_renderer.render_scene(target, &scene_data)?;
+            // Calculate projection matrix using camera
+            let projection = self.camera.calculate_projection();
+            
+            // Render scene to texture with camera projection
+            scene_renderer.render_scene_with_projection(target, &scene_data, projection)?;
             
             // Register texture with egui for later use
             let texture_id = target.register_with_egui(renderer);
@@ -127,6 +139,11 @@ impl SceneViewport {
         let new_size = (rect.width() as u32, rect.height() as u32);
         if new_size != self.viewport_size && new_size.0 > 0 && new_size.1 > 0 {
             self.viewport_size = new_size;
+            
+            // Update camera viewport size
+            self.camera.viewport_size = glam::UVec2::new(new_size.0, new_size.1);
+            self.mark_dirty();
+            
             if let (Some(target), Some(_device)) = (&mut self.offscreen_target, &self.device) {
                 if let Err(e) = target.resize(new_size) {
                     tracing::error!("Failed to resize offscreen target: {}", e);
@@ -356,6 +373,50 @@ impl SceneViewport {
         self.needs_render = true;
     }
     
+    /// Zoom in (increase scale)
+    pub fn zoom_in(&mut self) {
+        if self.camera.scale < 8 { // Max zoom level
+            self.camera.scale += 1;
+            self.mark_dirty();
+            tracing::info!("Zoomed in to scale {}", self.camera.scale);
+        }
+    }
+    
+    /// Zoom out (decrease scale)  
+    pub fn zoom_out(&mut self) {
+        if self.camera.scale > 1 { // Min zoom level
+            self.camera.scale -= 1;
+            self.mark_dirty();
+            tracing::info!("Zoomed out to scale {}", self.camera.scale);
+        }
+    }
+    
+    /// Get current zoom level
+    pub fn zoom_level(&self) -> u32 {
+        self.camera.scale
+    }
+    
+    /// Handle keyboard input for zoom controls
+    pub fn handle_keyboard_input(&mut self, key_code: winit::keyboard::KeyCode, modifiers: winit::event::Modifiers, pressed: bool) -> bool {
+        if pressed {
+            match key_code {
+                winit::keyboard::KeyCode::Equal | winit::keyboard::KeyCode::NumpadAdd => {
+                    if modifiers.state().control_key() {
+                        self.zoom_in();
+                        return true;
+                    }
+                }
+                winit::keyboard::KeyCode::Minus | winit::keyboard::KeyCode::NumpadSubtract => {
+                    if modifiers.state().control_key() {
+                        self.zoom_out();
+                        return true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        false // Event not handled
+    }
     
     // Note: Additional methods like toggle_collision_boxes, etc. can be added when needed
 }

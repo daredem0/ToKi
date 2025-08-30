@@ -127,6 +127,119 @@ impl SceneRenderer {
         Ok(())
     }
     
+    /// Render scene to any render target with custom projection matrix
+    pub fn render_scene_with_projection<T: RenderTarget>(&mut self, target: &mut T, scene_data: &SceneData, projection: glam::Mat4) -> Result<(), RenderError> {
+        tracing::debug!("Starting scene render with custom projection");
+        tracing::debug!("Scene data - tilemap: {}, sprites: {}, debug_shapes: {}", 
+            scene_data.tilemap.is_some(), 
+            scene_data.sprites.len(), 
+            scene_data.debug_shapes.len()
+        );
+        
+        target.begin_frame()?;
+        
+        // Use provided projection matrix
+        self.update_projection(projection);
+        
+        // Generate and upload tilemap vertices (same logic as runtime)
+        if let (Some(tilemap), Some(atlas)) = (&scene_data.tilemap, &scene_data.atlas) {
+            let vertices = if scene_data.visible_chunks.is_empty() {
+                // Render all tiles (for editor or small maps)
+                tracing::debug!("Generating vertices for all tiles ({}x{})", tilemap.size.x, tilemap.size.y);
+                tilemap.generate_vertices(atlas, scene_data.texture_size)
+            } else {
+                // Render only visible chunks (for runtime performance)
+                tracing::debug!("Generating vertices for {} visible chunks", scene_data.visible_chunks.len());
+                tilemap.generate_vertices_for_chunks(atlas, scene_data.texture_size, &scene_data.visible_chunks)
+            };
+            tracing::debug!("Updating tilemap pipeline with {} vertices", vertices.len());
+            self.tilemap_pipeline.update_vertices(&self.device, &vertices);
+        } else {
+            tracing::debug!("No tilemap or atlas to render");
+        }
+        
+        // Add sprites (same logic as runtime)
+        tracing::debug!("Adding {} sprites to pipeline", scene_data.sprites.len());
+        self.sprite_pipeline.clear_sprites();
+        for sprite in &scene_data.sprites {
+            let render_instance = SpriteRenderInstance {
+                frame: sprite.frame,
+                position: sprite.position.as_vec2(),
+                size: sprite.size.as_vec2(),
+            };
+            self.sprite_pipeline.add_sprite(render_instance);
+        }
+        
+        // Add debug shapes
+        tracing::debug!("Adding {} debug shapes to pipeline", scene_data.debug_shapes.len());
+        self.debug_pipeline.clear();
+        for debug_shape in &scene_data.debug_shapes {
+            match debug_shape.shape_type {
+                DebugShapeType::Rectangle => {
+                    self.debug_pipeline.add_rect(
+                        debug_shape.position.x,
+                        debug_shape.position.y,
+                        debug_shape.size.x,
+                        debug_shape.size.y,
+                        debug_shape.color,
+                    );
+                }
+                DebugShapeType::Circle => {
+                    // TODO: Add circle support to debug pipeline
+                }
+                DebugShapeType::Line { end: _ } => {
+                    // TODO: Add line support to debug pipeline
+                }
+            }
+        }
+        
+        // Finalize debug shapes
+        tracing::debug!("Finalizing debug shapes");
+        self.debug_pipeline.update_vertices(&self.device);
+        
+        // Render using WGPU pipelines
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Scene Render Encoder"),
+        });
+        
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Scene Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target.get_render_view()?,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.1,
+                            g: 0.1, 
+                            b: 0.12,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            
+            // Same pipeline calls for both runtime and editor!
+            tracing::debug!("Rendering tilemap pipeline");
+            self.tilemap_pipeline.render(&mut render_pass);
+            tracing::debug!("Rendering sprite pipeline");
+            self.sprite_pipeline.render(&mut render_pass);
+            tracing::debug!("Rendering debug pipeline");
+            self.debug_pipeline.render(&mut render_pass);
+        }
+        
+        tracing::debug!("Submitting render commands to GPU");
+        self.queue.submit(std::iter::once(encoder.finish()));
+        target.end_frame()?;
+        
+        tracing::debug!("Scene render complete");
+        Ok(())
+    }
+
     /// Render scene to any render target
     pub fn render_scene<T: RenderTarget>(&mut self, target: &mut T, scene_data: &SceneData) -> Result<(), RenderError> {
         tracing::debug!("Starting scene render");
