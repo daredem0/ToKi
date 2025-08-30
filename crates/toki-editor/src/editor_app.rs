@@ -16,6 +16,7 @@ use crate::project::ProjectManager;
 use crate::rendering::WindowRenderer;
 use crate::scene::SceneViewport;
 use crate::ui::EditorUI;
+use crate::validation::AssetValidator;
 
 pub fn run_editor(log_capture: Option<LogCapture>) -> Result<()> {
     let event_loop = EventLoop::new()?;
@@ -594,6 +595,10 @@ impl EditorApp {
         if self.ui.init_config_requested {
             self.handle_init_project_request();
         }
+
+        if self.ui.validate_assets_requested {
+            self.handle_validate_assets_request();
+        }
     }
 
     fn handle_active_scene_map_loading(&mut self) {
@@ -717,6 +722,27 @@ impl EditorApp {
                     scene_name
                 );
             }
+        }
+    }
+
+    fn handle_validate_assets_request(&mut self) {
+        self.ui.validate_assets_requested = false;
+        
+        if let Some(project_assets) = self.project_manager.get_project_assets() {
+            tracing::info!("Starting asset validation");
+            
+            match AssetValidator::new() {
+                Ok(validator) => {
+                    if let Err(e) = validator.validate_project_assets(project_assets) {
+                        tracing::error!("Asset validation failed: {}", e);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to create asset validator: {}", e);
+                }
+            }
+        } else {
+            tracing::warn!("No project loaded - cannot validate assets");
         }
     }
 }

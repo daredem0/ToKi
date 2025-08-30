@@ -40,6 +40,9 @@ pub struct EditorUI {
     
     // Map loading request
     pub map_load_requested: Option<(String, String)>, // (scene_name, map_name)
+    
+    // Asset validation
+    pub validate_assets_requested: bool,
 }
 
 impl EditorUI {
@@ -72,6 +75,9 @@ impl EditorUI {
             
             // Map loading request
             map_load_requested: None,
+            
+            // Asset validation  
+            validate_assets_requested: false,
         }
     }
 
@@ -202,6 +208,13 @@ impl EditorUI {
                     if ui.button("Exit").clicked() {
                         tracing::info!("Exit clicked");
                         self.should_exit = true;
+                    }
+                });
+
+                ui.menu_button("Edit", |ui| {
+                    if ui.button("Validate Project Assets").clicked() {
+                        tracing::info!("Validate Project Assets clicked");
+                        self.validate_assets_requested = true;
                     }
                 });
 

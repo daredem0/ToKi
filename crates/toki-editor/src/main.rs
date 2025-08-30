@@ -7,6 +7,7 @@ mod project;
 mod rendering;
 mod scene;
 mod ui;
+mod validation;
 use tracing_subscriber::prelude::*;
 
 use editor_app::run_editor;
