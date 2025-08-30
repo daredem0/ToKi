@@ -375,20 +375,22 @@ impl SceneViewport {
     
     /// Zoom in (increase scale)
     pub fn zoom_in(&mut self) {
-        if self.camera.scale < 8 { // Max zoom level
-            self.camera.scale += 1;
+        if self.camera.scale > 1 { // Min zoom level
+            self.camera.scale -= 1;
             self.mark_dirty();
             tracing::info!("Zoomed in to scale {}", self.camera.scale);
         }
+        tracing::info!("Min zoomlevel reached at {}", self.camera.scale);
     }
     
     /// Zoom out (decrease scale)  
     pub fn zoom_out(&mut self) {
-        if self.camera.scale > 1 { // Min zoom level
-            self.camera.scale -= 1;
+        if self.camera.scale < 8 { // Max zoom level
+            self.camera.scale += 1;
             self.mark_dirty();
             tracing::info!("Zoomed out to scale {}", self.camera.scale);
         }
+        tracing::info!("Max zoomlevel reached at {}", self.camera.scale);
     }
     
     /// Get current zoom level
@@ -396,23 +398,43 @@ impl SceneViewport {
         self.camera.scale
     }
     
-    /// Handle keyboard input for zoom controls
-    pub fn handle_keyboard_input(&mut self, key_code: winit::keyboard::KeyCode, modifiers: winit::event::Modifiers, pressed: bool) -> bool {
+    /// Handle keyboard input for zoom controls using logical keys (respects keyboard layout)
+    pub fn handle_keyboard_input(&mut self, logical_key: &winit::keyboard::Key, _modifiers: winit::event::Modifiers, pressed: bool) -> bool {
+        tracing::debug!("Viewport keyboard input: {:?}, pressed: {}", logical_key, pressed);
         if pressed {
-            match key_code {
-                winit::keyboard::KeyCode::Equal | winit::keyboard::KeyCode::NumpadAdd => {
-                    if modifiers.state().control_key() {
-                        self.zoom_in();
-                        return true;
+            match logical_key {
+                winit::keyboard::Key::Character(ch) => {
+                    let ch_str = ch.as_str();
+                    match ch_str {
+                        "+" => {
+                            tracing::info!("Zoom in key pressed (+)");
+                            self.zoom_in();
+                            return true;
+                        }
+                        "-" => {
+                            tracing::info!("Zoom out key pressed (-)");
+                            self.zoom_out();
+                            return true;
+                        }
+                        _ => {
+                            tracing::debug!("Viewport: Unhandled character key '{}'", ch_str);
+                        }
                     }
                 }
-                winit::keyboard::KeyCode::Minus | winit::keyboard::KeyCode::NumpadSubtract => {
-                    if modifiers.state().control_key() {
-                        self.zoom_out();
-                        return true;
+                winit::keyboard::Key::Named(named_key) => {
+                    match named_key {
+                        winit::keyboard::NamedKey::ArrowUp => {
+                            // Could add camera panning here in the future
+                            tracing::debug!("Viewport: Arrow key up (not handled)");
+                        }
+                        _ => {
+                            tracing::debug!("Viewport: Unhandled named key {:?}", named_key);
+                        }
                     }
                 }
-                _ => {}
+                _ => {
+                    tracing::debug!("Viewport: Unhandled key type {:?}", logical_key);
+                }
             }
         }
         false // Event not handled

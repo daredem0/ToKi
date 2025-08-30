@@ -5,7 +5,7 @@ use toki_core::GameState;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::keyboard::{KeyCode, PhysicalKey, Key};
 use winit::event::Modifiers;
 use winit::keyboard::ModifiersState;
 use winit::window::{Window, WindowId};
@@ -198,17 +198,21 @@ impl ApplicationHandler for EditorApp {
 
             WindowEvent::KeyboardInput { event, .. } => {
                 if event.state.is_pressed() {
-                    if let PhysicalKey::Code(key_code) = event.physical_key {
-                        // Try viewport keyboard input first (for zoom controls)
-                        if let Some(viewport) = &mut self.scene_viewport {
-                            if viewport.handle_keyboard_input(key_code, Modifiers::from(self.modifiers), true) {
-                                // Viewport handled the input, request redraw
-                                if let Some(window) = &self.window {
-                                    window.request_redraw();
-                                }
-                                return; // Input consumed by viewport
+                    // Try viewport keyboard input first (for zoom controls) using logical keys
+                    if let Some(viewport) = &mut self.scene_viewport {
+                        tracing::debug!("Passing logical key {:?} to viewport", event.logical_key);
+                        if viewport.handle_keyboard_input(&event.logical_key, Modifiers::from(self.modifiers), true) {
+                            // Viewport handled the input, request redraw
+                            tracing::debug!("Viewport consumed key {:?}, requesting redraw", event.logical_key);
+                            if let Some(window) = &self.window {
+                                window.request_redraw();
                             }
+                            return; // Input consumed by viewport
                         }
+                    }
+                    
+                    // Fallback: try physical key for other editor shortcuts
+                    if let PhysicalKey::Code(key_code) = event.physical_key {
                         
                         // Handle other editor keyboard shortcuts
                         match key_code {
