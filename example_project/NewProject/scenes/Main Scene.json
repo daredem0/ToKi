@@ -1,0 +1,10 @@
+{
+  "name": "Main Scene",
+  "description": null,
+  "maps": [
+    "new_town_map_64x64_crossings"
+  ],
+  "entities": [],
+  "camera_position": null,
+  "camera_scale": null
+}

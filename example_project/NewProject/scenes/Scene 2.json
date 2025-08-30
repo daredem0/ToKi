@@ -1,0 +1,10 @@
+{
+  "name": "Scene 2",
+  "description": null,
+  "maps": [
+    "my_new_map"
+  ],
+  "entities": [],
+  "camera_position": null,
+  "camera_scale": null
+}

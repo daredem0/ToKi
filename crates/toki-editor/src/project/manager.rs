@@ -1,4 +1,4 @@
-use crate::project::Project;
+use crate::project::{Project, ProjectAssets};
 use anyhow::Result;
 use std::fs;
 use std::path::PathBuf;
@@ -9,6 +9,8 @@ use toki_core::{GameState, Scene};
 pub struct ProjectManager {
     /// Currently active project
     pub current_project: Option<Project>,
+    /// Asset manager for current project
+    pub project_assets: Option<ProjectAssets>,
     /// List of recently opened projects
     recent_projects: Vec<PathBuf>,
     /// Maximum number of recent projects to track
@@ -26,6 +28,7 @@ impl ProjectManager {
     pub fn new() -> Self {
         Self {
             current_project: None,
+            project_assets: None,
             recent_projects: Vec::new(),
             max_recent: 10,
         }
@@ -56,10 +59,17 @@ impl ProjectManager {
         // Set as current project first
         self.current_project = Some(project);
 
-        // Create default scene
+        // Initialize asset manager
+        let project_path = self.current_project.as_ref().unwrap().path.clone();
+        let mut project_assets = ProjectAssets::new(project_path);
+        
+        // Create default scene and save it through asset manager
         let default_scene = Scene::new("main".to_string());
-        self.ensure_scene_file_path_exists("main")?;
-        self.write_scene_to_file(&default_scene)?;
+        project_assets.save_scene(&default_scene)?;
+        
+        // Scan for any existing assets
+        project_assets.scan_assets()?;
+        self.project_assets = Some(project_assets);
         let game_state = GameState::new_empty();
 
         // Add to recent projects
@@ -97,23 +107,21 @@ impl ProjectManager {
         // Update project name from metadata
         project.name = project.metadata.project.name.clone();
 
-        // Load the last opened scene or default scene
-        let scene_name = project
-            .metadata
-            .editor
-            .last_scene
-            .clone()
-            .unwrap_or_else(|| "main".to_string());
+        // Set as current project
+        self.current_project = Some(project);
 
-        let _scene = self.load_scene(&project, &scene_name)?;
+        // Initialize asset manager and scan for assets
+        let project_path = self.current_project.as_ref().unwrap().path.clone();
+        let mut project_assets = ProjectAssets::new(project_path.clone());
+        project_assets.scan_assets()?;
+        self.project_assets = Some(project_assets);
+
+        // Load the last opened scene or default scene (for now return empty game state)
         // TODO: Convert scene to game state for now, until we fully refactor the editor
         let game_state = GameState::new_empty();
 
         // Add to recent projects
         self.add_to_recent(project_path);
-
-        // Set as current project
-        self.current_project = Some(project);
 
         tracing::info!(
             "Successfully opened project: {}",
@@ -133,10 +141,13 @@ impl ProjectManager {
 
         tracing::info!("Saving project '{}'", project_name);
 
-        // Save all scenes and update metadata
-        for scene in scenes {
-            self.ensure_scene_file_path_exists(&scene.name)?;
-            self.write_scene_to_file(scene)?;
+        // Save all scenes through asset manager
+        if let Some(project_assets) = &mut self.project_assets {
+            for scene in scenes {
+                project_assets.save_scene(scene)?;
+            }
+        } else {
+            tracing::warn!("No project assets manager available for saving scenes");
         }
 
         // Save project metadata and mark as clean
@@ -149,10 +160,35 @@ impl ProjectManager {
     }
     
     /// Legacy method for backward compatibility
-    pub fn save_current_project_legacy(&mut self, game_state: &GameState) -> Result<()> {
+    pub fn save_current_project_legacy(&mut self, _game_state: &GameState) -> Result<()> {
         // For now, create a scene from the game state
         let scene = Scene::new("main".to_string()); // TODO: Extract proper scene data
         self.save_current_project(&[scene])
+    }
+    
+    /// Get asset manager for current project
+    pub fn get_project_assets(&self) -> Option<&ProjectAssets> {
+        self.project_assets.as_ref()
+    }
+    
+    /// Get mutable asset manager for current project
+    pub fn get_project_assets_mut(&mut self) -> Option<&mut ProjectAssets> {
+        self.project_assets.as_mut()
+    }
+    
+    /// Load scenes from the asset manager
+    pub fn load_scenes(&mut self) -> Result<Vec<Scene>> {
+        if let Some(project_assets) = &mut self.project_assets {
+            let mut scenes = Vec::new();
+            for scene_name in project_assets.get_scene_names() {
+                if let Some(scene) = project_assets.load_scene(&scene_name)? {
+                    scenes.push(scene);
+                }
+            }
+            Ok(scenes)
+        } else {
+            Ok(Vec::new())
+        }
     }
 
     /// Create the project folder structure
@@ -171,81 +207,6 @@ impl ProjectManager {
         Ok(())
     }
 
-    /// Ensure a scene has a file path mapping, create one if needed
-    fn ensure_scene_file_path_exists(&mut self, scene_name: &str) -> Result<()> {
-        let project = self.current_project.as_mut().unwrap();
-        
-        if project.scene_file_path(scene_name).is_none() {
-            // Create a new scene file path mapping
-            let sanitized_name = scene_name
-                .chars()
-                .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
-                .collect::<String>()
-                .to_lowercase();
-            let relative_path = format!("scenes/{}.json", sanitized_name);
-            
-            // Add to project metadata
-            project.metadata.scenes.insert(scene_name.to_string(), relative_path.clone());
-            project.is_dirty = true; // Mark project as needing metadata save
-            
-            tracing::info!("Created new scene file mapping: '{}' -> {}", scene_name, relative_path);
-        }
-        Ok(())
-    }
-
-    /// Write a scene to its file
-    fn write_scene_to_file(&self, scene: &Scene) -> Result<()> {
-        let project = self.current_project.as_ref().unwrap();
-        let scene_path = project
-            .scene_file_path(&scene.name)
-            .ok_or_else(|| anyhow::anyhow!("Scene '{}' not found in project", scene.name))?;
-
-        // Ensure scenes directory exists
-        if let Some(parent) = scene_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
-        // Serialize and save scene data
-        let json_data = serde_json::to_string_pretty(scene)
-            .map_err(|e| anyhow::anyhow!("Failed to serialize scene: {}", e))?;
-
-        fs::write(&scene_path, json_data)
-            .map_err(|e| anyhow::anyhow!("Failed to write scene file {:?}: {}", scene_path, e))?;
-
-        tracing::debug!("Saved scene '{}' to {:?}", scene.name, scene_path);
-        Ok(())
-    }
-
-    /// Load a scene from file
-    fn load_scene(&self, project: &Project, scene_name: &str) -> Result<Scene> {
-        let scene_path = project
-            .scene_file_path(scene_name)
-            .ok_or_else(|| anyhow::anyhow!("Scene '{}' not found in project", scene_name))?;
-
-        if !scene_path.exists() {
-            tracing::warn!(
-                "Scene file {:?} does not exist, creating empty scene",
-                scene_path
-            );
-            return Ok(Scene::new(scene_name.to_string()));
-        }
-
-        let json_data = fs::read_to_string(&scene_path)
-            .map_err(|e| anyhow::anyhow!("Failed to read scene file {:?}: {}", scene_path, e))?;
-
-        // Try to load as Scene first, fall back to GameState for legacy files
-        let scene: Scene = match serde_json::from_str(&json_data) {
-            Ok(scene) => scene,
-            Err(_) => {
-                tracing::warn!("Scene file {:?} appears to be legacy GameState format, converting to Scene", scene_path);
-                // If it's a legacy GameState file, create a basic Scene
-                Scene::new(scene_name.to_string())
-            }
-        };
-
-        tracing::debug!("Loaded scene '{}' from {:?}", scene_name, scene_path);
-        Ok(scene)
-    }
 
     /// Add a project path to recent projects list
     fn add_to_recent(&mut self, project_path: PathBuf) {
