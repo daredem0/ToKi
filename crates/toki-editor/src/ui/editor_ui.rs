@@ -1,13 +1,5 @@
 use crate::scene::SceneViewport;
-use std::path::PathBuf;
-use toki_core::{entity::EntityId, TimestepIterator};
-
-#[derive(Debug, Clone)]
-pub struct Scene {
-    pub name: String,
-    pub maps: Vec<String>,
-    pub entities: Vec<EntityId>,
-}
+use toki_core::{entity::EntityId, Scene};
 
 #[derive(Debug, Clone)]
 pub enum Selection {
@@ -17,15 +9,6 @@ pub enum Selection {
     StandaloneMap(String), // Map selected from Maps panel (not in scene context)
 }
 
-impl Scene {
-    pub fn new(name: String) -> Self {
-        Self {
-            name,
-            maps: Vec::new(),
-            entities: Vec::new(),
-        }
-    }
-}
 
 /// Manages the editor's UI state and rendering
 pub struct EditorUI {

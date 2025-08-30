@@ -31,6 +31,7 @@ pub use timing::{TimestepIterator, TimingSystem};
 
 pub mod entity;
 pub mod scene;
+pub use scene::Scene;
 
 pub mod collision;
 pub use collision::{CollisionBox, CollisionResult};
