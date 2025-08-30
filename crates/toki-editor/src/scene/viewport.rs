@@ -521,7 +521,8 @@ impl SceneViewport {
         } else if response.dragged() {
             // Continue ongoing drag
             if self.is_dragging_camera {
-                self.update_camera_drag(mouse_vec2);
+                // NOTE: This is now handled in editor_ui.rs
+                // self.update_camera_drag(mouse_vec2, 1.0);
             }
             // TODO: Handle entity dragging
         } else if response.drag_stopped() {
@@ -563,14 +564,14 @@ impl SceneViewport {
     }
     
     /// Update camera position during drag
-    pub fn update_camera_drag(&mut self, mouse_pos: glam::Vec2) {
+    pub fn update_camera_drag(&mut self, mouse_pos: glam::Vec2, pan_speed: f32) {
         if let Some(last_pos) = self.last_mouse_pos {
             // Calculate mouse movement in screen space
             let screen_delta = mouse_pos - last_pos;
             
-            // Convert screen delta to world delta (account for camera scale and aspect ratio)
-            let world_delta_x = -screen_delta.x * self.camera.scale as f32;
-            let world_delta_y = -screen_delta.y * self.camera.scale as f32;
+            // Convert screen delta to world delta (account for camera scale, aspect ratio, and pan speed)
+            let world_delta_x = -screen_delta.x * self.camera.scale as f32 * pan_speed;
+            let world_delta_y = -screen_delta.y * self.camera.scale as f32 * pan_speed;
             
             // Apply camera movement (negative for natural drag feel)
             self.camera.move_by(glam::IVec2::new(world_delta_x as i32, world_delta_y as i32));
@@ -578,8 +579,8 @@ impl SceneViewport {
             // Mark for re-render
             self.mark_dirty();
             
-            tracing::info!("Camera dragged by screen delta: {:?}, world delta: ({}, {})", 
-                          screen_delta, world_delta_x, world_delta_y);
+            tracing::trace!("Camera dragged by screen delta: {:?}, world delta: ({}, {}) [pan_speed: {}]", 
+                          screen_delta, world_delta_x, world_delta_y, pan_speed);
         }
         
         self.last_mouse_pos = Some(mouse_pos);

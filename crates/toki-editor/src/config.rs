@@ -34,6 +34,9 @@ pub struct EditorSettings {
 
     /// Grid settings for the viewport
     pub grid: GridSettings,
+
+    /// Camera settings for viewport navigation
+    pub camera: CameraSettings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,6 +51,14 @@ pub struct GridSettings {
     pub show_grid: bool,
     pub grid_size: u32,
     pub snap_to_grid: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CameraSettings {
+    /// Camera panning speed multiplier (1.0 = normal speed)
+    pub pan_speed: f32,
+    /// Camera zoom speed multiplier (1.0 = normal speed) 
+    pub zoom_speed: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,6 +88,7 @@ impl Default for EditorSettings {
             window_size: [1200, 800],
             panels: PanelSettings::default(),
             grid: GridSettings::default(),
+            camera: CameraSettings::default(),
         }
     }
 }
@@ -97,6 +109,15 @@ impl Default for GridSettings {
             show_grid: true,
             grid_size: 16,
             snap_to_grid: true,
+        }
+    }
+}
+
+impl Default for CameraSettings {
+    fn default() -> Self {
+        Self {
+            pan_speed: 1.0,
+            zoom_speed: 1.0,
         }
     }
 }

@@ -305,7 +305,8 @@ impl EditorUI {
                     if let Some(drag_pos) = response.interact_pointer_pos() {
                         tracing::debug!("Camera dragging to {:?}", drag_pos);
                         let drag_vec = glam::Vec2::new(drag_pos.x, drag_pos.y);
-                        viewport.update_camera_drag(drag_vec);
+                        let pan_speed = config.map(|c| c.editor_settings.camera.pan_speed).unwrap_or(1.0);
+                        viewport.update_camera_drag(drag_vec, pan_speed);
                     }
                 } else if response.drag_stopped() {
                     tracing::info!("Camera drag stopped");
