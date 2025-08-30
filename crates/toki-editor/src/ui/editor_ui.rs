@@ -294,17 +294,35 @@ impl EditorUI {
                 let (rect, response) =
                     ui.allocate_exact_size(available_size, egui::Sense::click_and_drag());
 
-                // Handle click events for entity selection
-                if response.clicked() {
-                    if let Some(click_pos) = response.interact_pointer_pos() {
-                        let screen_pos = glam::Vec2::new(click_pos.x, click_pos.y);
-                        if let Some(entity_id) = viewport.handle_click(screen_pos, rect) {
-                            self.selected_entity_id = Some(entity_id);
-                        } else {
-                            self.selected_entity_id = None;
-                        }
+                // Handle camera panning with drag
+                if response.drag_started() {
+                    if let Some(start_pos) = response.interact_pointer_pos() {
+                        tracing::info!("Camera drag started at {:?}", start_pos);
+                        let start_vec = glam::Vec2::new(start_pos.x, start_pos.y);
+                        viewport.start_camera_drag(start_vec);
                     }
+                } else if response.dragged() {
+                    if let Some(drag_pos) = response.interact_pointer_pos() {
+                        tracing::debug!("Camera dragging to {:?}", drag_pos);
+                        let drag_vec = glam::Vec2::new(drag_pos.x, drag_pos.y);
+                        viewport.update_camera_drag(drag_vec);
+                    }
+                } else if response.drag_stopped() {
+                    tracing::info!("Camera drag stopped");
+                    viewport.stop_camera_drag();
                 }
+                
+                // TODO: Entity click system - commented out for now
+                // if response.clicked() {
+                //     if let Some(click_pos) = response.interact_pointer_pos() {
+                //         let screen_pos = glam::Vec2::new(click_pos.x, click_pos.y);
+                //         if let Some(entity_id) = viewport.handle_click(screen_pos, rect) {
+                //             self.selected_entity_id = Some(entity_id);
+                //         } else {
+                //             self.selected_entity_id = None;
+                //         }
+                //     }
+                // }
 
                 // Render the scene content
                 let project_path = config.and_then(|c| c.current_project_path());

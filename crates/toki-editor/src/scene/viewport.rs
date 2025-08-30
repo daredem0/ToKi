@@ -16,6 +16,9 @@ pub struct SceneViewport {
     atlas_cache: Option<AtlasMeta>,
     needs_render: bool, // Track if scene needs re-rendering
     camera: Camera, // Camera for zoom and pan
+    // Mouse interaction state
+    last_mouse_pos: Option<glam::Vec2>, // For camera panning
+    is_dragging_camera: bool,
 }
 
 impl SceneViewport {
@@ -40,6 +43,8 @@ impl SceneViewport {
             atlas_cache: None,
             needs_render: true, // Initial render required
             camera,
+            last_mouse_pos: None,
+            is_dragging_camera: false,
         })
     }
     
@@ -161,7 +166,16 @@ impl SceneViewport {
                     let offset = (available_size - display_size) * 0.5;
                     let display_rect = egui::Rect::from_min_size(rect.min + offset, display_size);
                     
-                    let _response = ui.allocate_response(rect.size(), egui::Sense::hover());
+                    // Handle mouse interaction for camera panning and future entity selection
+                    let response = ui.allocate_response(rect.size(), egui::Sense::click_and_drag());
+                    
+                    // Log once when UI response is created (only if mouse is interacting)
+                    if response.hovered() || response.clicked() || response.dragged() {
+                        tracing::debug!("UI response - rect size: {:?}, hovered: {}, clicked: {}, dragged: {}", 
+                                      rect.size(), response.hovered(), response.clicked(), response.dragged());
+                    }
+                    
+                    // Mouse interaction now handled in editor_ui.rs
                     
                     // Fill background with dark color for letterbox areas
                     ui.painter().rect_filled(rect, 0.0, egui::Color32::from_rgb(20, 20, 25));
@@ -443,6 +457,141 @@ impl SceneViewport {
             }
         }
         false // Event not handled
+    }
+    
+    /// Handle mouse interaction for camera panning and entity selection
+    fn handle_mouse_interaction(&mut self, response: &egui::Response, display_rect: egui::Rect) {
+        // Debug: Log mouse interaction state (less spammy)
+        if response.clicked() {
+            tracing::info!("Mouse clicked! Response: hovered={}, clicked={}, dragged={}", 
+                          response.hovered(), response.clicked(), response.dragged());
+        }
+        
+        if response.drag_started() {
+            tracing::info!("Drag started!");
+        }
+        
+        if response.dragged() {
+            tracing::info!("Dragging...");
+        }
+        
+        if response.drag_stopped() {
+            tracing::info!("Drag stopped!");
+        }
+        
+        // Try multiple mouse position detection methods in order of preference
+        let mouse_pos_opt = response.interact_pointer_pos()
+            .or_else(|| response.hover_pos()) 
+            .or_else(|| response.ctx.pointer_hover_pos());
+            
+        if let Some(mouse_pos) = mouse_pos_opt {
+            if display_rect.contains(mouse_pos) {
+                tracing::debug!("Mouse at {:?} within display rect, handling interaction", mouse_pos);
+                self.handle_viewport_mouse_interaction(response, mouse_pos, display_rect);
+            } else {
+                // Mouse is in letterbox area - stop any ongoing camera drag
+                if self.is_dragging_camera {
+                    tracing::debug!("Mouse in letterbox area at {:?}, stopping camera drag", mouse_pos);
+                    self.stop_camera_drag();
+                }
+            }
+        } else if self.is_dragging_camera {
+            // Mouse left the viewport area - only log if we're actually dragging
+            tracing::debug!("Mouse left viewport area while dragging, stopping camera drag");
+            self.stop_camera_drag();
+        }
+    }
+    
+    /// Handle mouse interaction within the actual viewport area
+    fn handle_viewport_mouse_interaction(&mut self, response: &egui::Response, mouse_pos: egui::Pos2, display_rect: egui::Rect) {
+        let mouse_vec2 = glam::Vec2::new(mouse_pos.x, mouse_pos.y);
+        
+        if response.drag_started() {
+            // Start drag - could be camera pan or entity selection/movement
+            let _world_pos = self.screen_to_world_pos(mouse_pos, display_rect);
+            
+            // TODO: Check if we clicked on an entity first
+            // let clicked_entity = self.get_entity_at_world_pos(_world_pos);
+            // if let Some(entity_id) = clicked_entity {
+            //     self.start_entity_drag(entity_id, _world_pos);
+            // } else {
+                // No entity clicked - start camera panning
+                self.start_camera_drag(mouse_vec2);
+            // }
+        } else if response.dragged() {
+            // Continue ongoing drag
+            if self.is_dragging_camera {
+                self.update_camera_drag(mouse_vec2);
+            }
+            // TODO: Handle entity dragging
+        } else if response.drag_stopped() {
+            // End any ongoing drag
+            self.stop_camera_drag();
+            // TODO: Stop entity drag
+        }
+        
+        // Handle single clicks for selection (when not dragging)
+        if response.clicked() && !response.dragged() {
+            let world_pos = self.screen_to_world_pos(mouse_pos, display_rect);
+            tracing::debug!("Viewport clicked at world position: {:?}", world_pos);
+            // TODO: Handle entity selection
+        }
+    }
+    
+    /// Convert screen position to world position
+    fn screen_to_world_pos(&self, screen_pos: egui::Pos2, display_rect: egui::Rect) -> glam::Vec2 {
+        // Convert screen position relative to display rect to 0-1 normalized coordinates
+        let normalized_x = (screen_pos.x - display_rect.min.x) / display_rect.width();
+        let normalized_y = (screen_pos.y - display_rect.min.y) / display_rect.height();
+        
+        // Convert to viewport coordinates (160x144)
+        let viewport_x = normalized_x * self.viewport_size.0 as f32;
+        let viewport_y = normalized_y * self.viewport_size.1 as f32;
+        
+        // Convert to world coordinates using camera
+        let world_x = self.camera.position.x as f32 + viewport_x * self.camera.scale as f32;
+        let world_y = self.camera.position.y as f32 + viewport_y * self.camera.scale as f32;
+        
+        glam::Vec2::new(world_x, world_y)
+    }
+    
+    /// Start camera panning drag
+    pub fn start_camera_drag(&mut self, mouse_pos: glam::Vec2) {
+        self.is_dragging_camera = true;
+        self.last_mouse_pos = Some(mouse_pos);
+        tracing::info!("Started camera drag at: {:?}", mouse_pos);
+    }
+    
+    /// Update camera position during drag
+    pub fn update_camera_drag(&mut self, mouse_pos: glam::Vec2) {
+        if let Some(last_pos) = self.last_mouse_pos {
+            // Calculate mouse movement in screen space
+            let screen_delta = mouse_pos - last_pos;
+            
+            // Convert screen delta to world delta (account for camera scale and aspect ratio)
+            let world_delta_x = -screen_delta.x * self.camera.scale as f32;
+            let world_delta_y = -screen_delta.y * self.camera.scale as f32;
+            
+            // Apply camera movement (negative for natural drag feel)
+            self.camera.move_by(glam::IVec2::new(world_delta_x as i32, world_delta_y as i32));
+            
+            // Mark for re-render
+            self.mark_dirty();
+            
+            tracing::info!("Camera dragged by screen delta: {:?}, world delta: ({}, {})", 
+                          screen_delta, world_delta_x, world_delta_y);
+        }
+        
+        self.last_mouse_pos = Some(mouse_pos);
+    }
+    
+    /// Stop camera panning drag
+    pub fn stop_camera_drag(&mut self) {
+        if self.is_dragging_camera {
+            tracing::info!("Stopped camera drag");
+            self.is_dragging_camera = false;
+            self.last_mouse_pos = None;
+        }
     }
     
     // Note: Additional methods like toggle_collision_boxes, etc. can be added when needed
