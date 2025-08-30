@@ -30,11 +30,12 @@ pub mod timing;
 pub use timing::{TimestepIterator, TimingSystem};
 
 pub mod entity;
+pub mod scene;
 
 pub mod collision;
 pub use collision::{CollisionBox, CollisionResult};
 
 pub mod resources;
-pub use resources::{ResourceManager, ResourceError};
+pub use resources::{ResourceError, ResourceManager};
 
 pub mod serialization;

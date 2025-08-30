@@ -3,11 +3,11 @@ use egui_winit::winit;
 use std::sync::Arc;
 use toki_core::GameState;
 use winit::application::ApplicationHandler;
+use winit::event::Modifiers;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::event::Modifiers;
 use winit::keyboard::ModifiersState;
+use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
 
 use crate::config::EditorConfig;
@@ -44,10 +44,10 @@ struct EditorApp {
 
     /// Logging
     log_capture: Option<LogCapture>,
-    
+
     /// Keyboard modifiers state
     modifiers: ModifiersState,
-    
+
     /// Track last loaded active scene to avoid unnecessary reloading
     last_loaded_active_scene: Option<String>,
 }
@@ -76,11 +76,13 @@ impl EditorApp {
             last_loaded_active_scene: None,
         }
     }
-    
+
     /// Helper method to initialize a viewport with WGPU context
     fn initialize_viewport(&self, mut viewport: SceneViewport) -> Option<SceneViewport> {
         if let Some(renderer) = &self.renderer {
-            match pollster::block_on(viewport.initialize(renderer.device().clone(), renderer.queue().clone())) {
+            match pollster::block_on(
+                viewport.initialize(renderer.device().clone(), renderer.queue().clone()),
+            ) {
                 Ok(()) => {
                     tracing::info!("Scene viewport initialized with unified rendering");
                     Some(viewport)
@@ -95,7 +97,6 @@ impl EditorApp {
             None
         }
     }
-    
 }
 
 impl ApplicationHandler for EditorApp {
@@ -147,7 +148,9 @@ impl ApplicationHandler for EditorApp {
             Ok(mut viewport) => {
                 // Initialize the scene viewport with WGPU context from renderer
                 if let Some(renderer) = &self.renderer {
-                    match pollster::block_on(viewport.initialize(renderer.device().clone(), renderer.queue().clone())) {
+                    match pollster::block_on(
+                        viewport.initialize(renderer.device().clone(), renderer.queue().clone()),
+                    ) {
                         Ok(()) => {
                             self.scene_viewport = Some(viewport);
                             tracing::info!("Scene viewport initialized with unified rendering");
@@ -201,19 +204,25 @@ impl ApplicationHandler for EditorApp {
                     // Try viewport keyboard input first (for zoom controls) using logical keys
                     if let Some(viewport) = &mut self.scene_viewport {
                         tracing::debug!("Passing logical key {:?} to viewport", event.logical_key);
-                        if viewport.handle_keyboard_input(&event.logical_key, Modifiers::from(self.modifiers), true) {
+                        if viewport.handle_keyboard_input(
+                            &event.logical_key,
+                            Modifiers::from(self.modifiers),
+                            true,
+                        ) {
                             // Viewport handled the input, request redraw
-                            tracing::debug!("Viewport consumed key {:?}, requesting redraw", event.logical_key);
+                            tracing::debug!(
+                                "Viewport consumed key {:?}, requesting redraw",
+                                event.logical_key
+                            );
                             if let Some(window) = &self.window {
                                 window.request_redraw();
                             }
                             return; // Input consumed by viewport
                         }
                     }
-                    
+
                     // Fallback: try physical key for other editor shortcuts
                     if let PhysicalKey::Code(key_code) = event.physical_key {
-                        
                         // Handle other editor keyboard shortcuts
                         match key_code {
                             KeyCode::Escape => event_loop.exit(),
@@ -283,12 +292,13 @@ impl EditorApp {
         // Prepare egui input
         let raw_input = egui_winit.take_egui_input(window);
 
-        
         // Pre-render scene to texture before egui UI
         let project_path = self.config.current_project_path();
         if let Some(scene_viewport) = &mut self.scene_viewport {
             if let Some(project_path) = &project_path {
-                match scene_viewport.render_to_texture(project_path.as_path(), renderer.egui_renderer_mut()) {
+                match scene_viewport
+                    .render_to_texture(project_path.as_path(), renderer.egui_renderer_mut())
+                {
                     Ok(()) => {
                         // Reduce log spam - render_to_texture already handles its own logging
                         // tracing::debug!("Scene rendered to offscreen texture successfully");
@@ -299,7 +309,7 @@ impl EditorApp {
                 }
             }
         }
-        
+
         // Run egui UI
         let egui_ctx = egui_winit.egui_ctx().clone();
         let full_output = egui_ctx.run(raw_input, |ctx| {
@@ -348,118 +358,87 @@ impl EditorApp {
         self.handle_map_requests();
     }
 
-    fn handle_project_requests(&mut self, _event_loop: &ActiveEventLoop) {
-        // Handle New Project request
-        if self.ui.new_project_requested {
-            self.ui.new_project_requested = false;
+    fn handle_new_project_requested(&mut self) {
+        self.ui.new_project_requested = false;
 
-            // Use project_path from config if available, otherwise ask user
-            let folder_path = if let Some(config_path) = &self.config.project_path {
-                tracing::info!(
-                    "Using project path from config as parent: {:?}",
-                    config_path
-                );
-                Some(config_path.clone())
-            } else {
-                tracing::info!("No project path in config, asking user to select folder");
-                rfd::FileDialog::new()
-                    .set_title("Select folder for new project")
-                    .pick_folder()
-            };
+        // Use project_path from config if available, otherwise ask user
+        let folder_path = if let Some(config_path) = &self.config.project_path {
+            tracing::info!(
+                "Using project path from config as parent: {:?}",
+                config_path
+            );
+            Some(config_path.clone())
+        } else {
+            tracing::info!("No project path in config, asking user to select folder");
+            rfd::FileDialog::new()
+                .set_title("Select folder for new project")
+                .pick_folder()
+        };
 
-            if let Some(parent_path) = folder_path {
-                // Generate a unique project name
-                let mut project_name = "NewProject".to_string();
-                let mut counter = 1;
+        if let Some(parent_path) = folder_path {
+            // Generate a unique project name
+            let mut project_name = "NewProject".to_string();
+            let mut counter = 1;
 
-                while parent_path.join(&project_name).exists() {
-                    project_name = format!("NewProject{}", counter);
-                    counter += 1;
-                }
+            while parent_path.join(&project_name).exists() {
+                project_name = format!("NewProject{}", counter);
+                counter += 1;
+            }
 
-                tracing::info!("Creating project '{}' in {:?}", project_name, parent_path);
-                match self
-                    .project_manager
-                    .create_new_project(project_name.clone(), parent_path.clone())
-                {
-                    Ok(game_state) => {
-                        // Update scene viewport with new game state
-                        match SceneViewport::with_game_state(game_state) {
-                            Ok(viewport) => {
-                                self.scene_viewport = self.initialize_viewport(viewport);
+            tracing::info!("Creating project '{}' in {:?}", project_name, parent_path);
+            match self
+                .project_manager
+                .create_new_project(project_name.clone(), parent_path.clone())
+            {
+                Ok(game_state) => {
+                    // Update scene viewport with new game state
+                    match SceneViewport::with_game_state(game_state) {
+                        Ok(viewport) => {
+                            self.scene_viewport = self.initialize_viewport(viewport);
 
-                                // Update config with new project path
-                                let project_path = parent_path.join(&project_name);
-                                self.config.set_project_path(project_path);
-                                if let Err(e) = self.config.save() {
-                                    tracing::warn!(
-                                        "Failed to save config after creating project: {}",
-                                        e
-                                    );
-                                }
-
-                                tracing::info!(
-                                    "Created new project '{}' successfully",
-                                    project_name
-                                );
-                            }
-                            Err(e) => {
-                                tracing::error!(
-                                    "Failed to initialize scene viewport for new project: {}",
+                            // Update config with new project path
+                            let project_path = parent_path.join(&project_name);
+                            self.config.set_project_path(project_path);
+                            if let Err(e) = self.config.save() {
+                                tracing::warn!(
+                                    "Failed to save config after creating project: {}",
                                     e
                                 );
                             }
+
+                            tracing::info!("Created new project '{}' successfully", project_name);
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to initialize scene viewport for new project: {}",
+                                e
+                            );
                         }
                     }
-                    Err(e) => {
-                        tracing::error!("Failed to create new project: {}", e);
-                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to create new project: {}", e);
                 }
             }
         }
+    }
 
-        // Handle Open Last Project request
-        if self.ui.open_last_project_requested {
-            self.ui.open_last_project_requested = false;
+    fn handle_open_project_request(&mut self) {
+        self.ui.open_project_requested = false;
 
-            if let Some(last_project) = self.config.recent_projects.first().cloned() {
-                match self.project_manager.open_project(last_project.clone()) {
-                    Ok(game_state) => {
-                        // Update scene viewport with loaded game state
-                        match SceneViewport::with_game_state(game_state) {
-                            Ok(viewport) => {
-                                self.scene_viewport = self.initialize_viewport(viewport);
+        // Try to open project from config first
+        let project_path = if let Some(config_path) = &self.config.project_path {
+            tracing::info!("Opening project from config: {:?}", config_path);
+            Some(config_path.clone())
+        } else {
+            tracing::info!("No project path in config, asking user to select folder");
+            rfd::FileDialog::new()
+                .set_title("Open ToKi Project")
+                .add_filter("ToKi Project", &["toki"])
+                .pick_folder()
+        };
 
-                                // Update config with opened project path (moves to front of recent list)
-                                self.config.set_project_path(last_project);
-                                if let Err(e) = self.config.save() {
-                                    tracing::warn!(
-                                        "Failed to save config after opening last project: {}",
-                                        e
-                                    );
-                                }
-
-                                tracing::info!("Opened last project successfully");
-                            }
-                            Err(e) => {
-                                tracing::error!(
-                                    "Failed to initialize scene viewport for last project: {}",
-                                    e
-                                );
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to open last project: {}", e);
-                    }
-                }
-            } else {
-                tracing::warn!("No recent projects available to open");
-            }
-        }
-
-        // Handle Open Recent Project request
-        if let Some(project_path) = self.ui.open_recent_project_requested.take() {
+        if let Some(project_path) = project_path {
             match self.project_manager.open_project(project_path.clone()) {
                 Ok(game_state) => {
                     // Update scene viewport with loaded game state
@@ -475,8 +454,17 @@ impl EditorApp {
                                     e
                                 );
                             }
+                            self.ui.set_title(
+                                &self
+                                    .project_manager
+                                    .current_project
+                                    .as_ref()
+                                    .unwrap()
+                                    .name
+                                    .to_string(),
+                            );
 
-                            tracing::info!("Opened recent project successfully");
+                            tracing::info!("Opened project successfully");
                         }
                         Err(e) => {
                             tracing::error!(
@@ -487,197 +475,136 @@ impl EditorApp {
                     }
                 }
                 Err(e) => {
-                    tracing::error!("Failed to open recent project: {}", e);
+                    tracing::error!("Failed to open project: {}", e);
                 }
             }
         }
+    }
 
-        // Handle Open Project request
-        if self.ui.open_project_requested {
-            self.ui.open_project_requested = false;
+    fn handle_browse_for_project_request(&mut self) {
+        self.ui.browse_for_project_requested = false;
 
-            // Try to open project from config first
-            let project_path = if let Some(config_path) = &self.config.project_path {
-                tracing::info!("Opening project from config: {:?}", config_path);
-                Some(config_path.clone())
-            } else {
-                tracing::info!("No project path in config, asking user to select folder");
-                rfd::FileDialog::new()
-                    .set_title("Open ToKi Project")
-                    .add_filter("ToKi Project", &["toki"])
-                    .pick_folder()
-            };
+        if let Some(project_path) = rfd::FileDialog::new()
+            .set_title("Browse for ToKi Project")
+            .add_filter("ToKi Project", &["toki"])
+            .pick_folder()
+        {
+            match self.project_manager.open_project(project_path.clone()) {
+                Ok(game_state) => {
+                    // Update scene viewport with loaded game state
+                    match SceneViewport::with_game_state(game_state) {
+                        Ok(viewport) => {
+                            self.scene_viewport = self.initialize_viewport(viewport);
 
-            if let Some(project_path) = project_path {
-                match self.project_manager.open_project(project_path.clone()) {
-                    Ok(game_state) => {
-                        // Update scene viewport with loaded game state
-                        match SceneViewport::with_game_state(game_state) {
-                            Ok(viewport) => {
-                                self.scene_viewport = self.initialize_viewport(viewport);
-
-                                // Update config with opened project path
-                                self.config.set_project_path(project_path);
-                                if let Err(e) = self.config.save() {
-                                    tracing::warn!(
-                                        "Failed to save config after opening project: {}",
-                                        e
-                                    );
-                                }
-
-                                tracing::info!("Opened project successfully");
-                            }
-                            Err(e) => {
-                                tracing::error!(
-                                    "Failed to initialize scene viewport for opened project: {}",
+                            // Update config with opened project path
+                            self.config.set_project_path(project_path);
+                            if let Err(e) = self.config.save() {
+                                tracing::warn!(
+                                    "Failed to save config after browsing for project: {}",
                                     e
                                 );
                             }
+
+                            tracing::info!("Opened browsed project successfully");
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to initialize scene viewport for browsed project: {}",
+                                e
+                            );
                         }
                     }
-                    Err(e) => {
-                        tracing::error!("Failed to open project: {}", e);
-                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to open browsed project: {}", e);
                 }
             }
+        }
+    }
+
+    fn handle_save_project_request(&mut self) {
+        self.ui.save_project_requested = false;
+
+        if let Some(viewport) = &self.scene_viewport {
+            let game_state = viewport.scene_manager().game_state();
+            match self.project_manager.save_current_project(game_state) {
+                Ok(_) => {
+                    tracing::info!("Project saved successfully");
+                }
+                Err(e) => {
+                    tracing::error!("Failed to save project: {}", e);
+                }
+            }
+        } else {
+            tracing::warn!("No scene viewport available for saving");
+        }
+    }
+
+    fn handle_init_project_request(&mut self) {
+        self.ui.init_config_requested = false;
+
+        match EditorConfig::init_default_config() {
+            Ok(new_config) => {
+                self.config = new_config;
+                tracing::info!("Config initialized successfully");
+            }
+            Err(e) => {
+                tracing::error!("Failed to initialize config: {}", e);
+            }
+        }
+    }
+
+    fn handle_project_requests(&mut self, _event_loop: &ActiveEventLoop) {
+        if self.ui.new_project_requested {
+            self.handle_new_project_requested();
+        }
+
+        if self.ui.open_project_requested {
+            self.handle_open_project_request();
         }
 
         // Handle Browse for Project request (file dialog)
         if self.ui.browse_for_project_requested {
-            self.ui.browse_for_project_requested = false;
-
-            if let Some(project_path) = rfd::FileDialog::new()
-                .set_title("Browse for ToKi Project")
-                .add_filter("ToKi Project", &["toki"])
-                .pick_folder()
-            {
-                match self.project_manager.open_project(project_path.clone()) {
-                    Ok(game_state) => {
-                        // Update scene viewport with loaded game state
-                        match SceneViewport::with_game_state(game_state) {
-                            Ok(viewport) => {
-                                self.scene_viewport = self.initialize_viewport(viewport);
-
-                                // Update config with opened project path
-                                self.config.set_project_path(project_path);
-                                if let Err(e) = self.config.save() {
-                                    tracing::warn!(
-                                        "Failed to save config after browsing for project: {}",
-                                        e
-                                    );
-                                }
-
-                                tracing::info!("Opened browsed project successfully");
-                            }
-                            Err(e) => {
-                                tracing::error!(
-                                    "Failed to initialize scene viewport for browsed project: {}",
-                                    e
-                                );
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to open browsed project: {}", e);
-                    }
-                }
-            }
+            self.handle_browse_for_project_request();
         }
 
-        // Handle Save Project request
         if self.ui.save_project_requested {
-            self.ui.save_project_requested = false;
-
-            if let Some(viewport) = &self.scene_viewport {
-                let game_state = viewport.scene_manager().game_state();
-                match self.project_manager.save_current_project(game_state) {
-                    Ok(_) => {
-                        tracing::info!("Project saved successfully");
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to save project: {}", e);
-                    }
-                }
-            } else {
-                tracing::warn!("No scene viewport available for saving");
-            }
+            self.handle_save_project_request();
         }
 
-        // Handle Save As Project request
-        if self.ui.save_as_project_requested {
-            self.ui.save_as_project_requested = false;
-
-            if let Some(folder_path) = rfd::FileDialog::new()
-                .set_title("Save project as...")
-                .pick_folder()
-            {
-                // For now, use a default project name. In the future, we can add a proper input dialog
-                let project_name = "SavedProject".to_string();
-                if let Some(viewport) = &self.scene_viewport {
-                    let game_state = viewport.scene_manager().game_state();
-                    match self
-                        .project_manager
-                        .create_new_project(project_name.clone(), folder_path)
-                    {
-                        Ok(_) => {
-                            // Save the current scene to the new project
-                            match self.project_manager.save_current_project(game_state) {
-                                Ok(_) => {
-                                    tracing::info!(
-                                        "Project saved as '{}' successfully",
-                                        project_name
-                                    );
-                                }
-                                Err(e) => {
-                                    tracing::error!("Failed to save project data: {}", e);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to create project for Save As: {}", e);
-                        }
-                    }
-                } else {
-                    tracing::warn!("No scene viewport available for Save As");
-                }
-            }
-        }
-
-        // Handle Init Config request
         if self.ui.init_config_requested {
-            self.ui.init_config_requested = false;
-
-            match EditorConfig::init_default_config() {
-                Ok(new_config) => {
-                    self.config = new_config;
-                    tracing::info!("Config initialized successfully");
-                }
-                Err(e) => {
-                    tracing::error!("Failed to initialize config: {}", e);
-                }
-            }
+            self.handle_init_project_request();
         }
     }
 
     fn handle_active_scene_map_loading(&mut self) {
         // Load if active scene has changed OR if scene content has changed
         let current_active_scene = self.ui.active_scene.clone();
-        
+
         if current_active_scene != self.last_loaded_active_scene || self.ui.scene_content_changed {
             self.last_loaded_active_scene = current_active_scene.clone();
             self.ui.scene_content_changed = false; // Clear the flag
-            tracing::info!("Active scene or content changed, reloading map for scene: {:?}", current_active_scene);
-            
+            tracing::info!(
+                "Active scene or content changed, reloading map for scene: {:?}",
+                current_active_scene
+            );
+
             // Mark viewport as needing re-render since scene changed
             if let Some(viewport) = &mut self.scene_viewport {
                 viewport.mark_dirty();
             }
-            
+
             if let Some(active_scene_name) = &current_active_scene {
                 // Find the active scene
-                if let Some(active_scene) = self.ui.scenes.iter().find(|s| &s.name == active_scene_name) {
-                    tracing::info!("Found active scene '{}' with {} maps: {:?}", 
-                                  active_scene_name, active_scene.maps.len(), active_scene.maps);
+                if let Some(active_scene) =
+                    self.ui.scenes.iter().find(|s| &s.name == active_scene_name)
+                {
+                    tracing::info!(
+                        "Found active scene '{}' with {} maps: {:?}",
+                        active_scene_name,
+                        active_scene.maps.len(),
+                        active_scene.maps
+                    );
                     // If the scene has at least one map, load it
                     if let Some(map_name) = active_scene.maps.first() {
                         if let Some(config) = self.config.current_project_path() {
@@ -688,22 +615,34 @@ impl EditorApp {
                             if let Some(viewport) = &mut self.scene_viewport {
                                 match viewport.scene_manager_mut().load_tilemap(&map_file) {
                                     Ok(()) => {
-                                        tracing::info!("Loaded active scene '{}' map '{}' into viewport", active_scene_name, map_name);
+                                        tracing::info!(
+                                            "Loaded active scene '{}' map '{}' into viewport",
+                                            active_scene_name,
+                                            map_name
+                                        );
                                         // Mark viewport as needing re-render
                                         viewport.mark_dirty();
                                     }
                                     Err(e) => {
-                                        tracing::error!("Failed to load active scene '{}' map '{}': {}", active_scene_name, map_name, e);
+                                        tracing::error!(
+                                            "Failed to load active scene '{}' map '{}': {}",
+                                            active_scene_name,
+                                            map_name,
+                                            e
+                                        );
                                     }
                                 }
                             }
                         }
                     } else {
-                        // No maps in active scene - clear viewport  
+                        // No maps in active scene - clear viewport
                         if let Some(viewport) = &mut self.scene_viewport {
                             viewport.scene_manager_mut().clear_tilemap();
                         }
-                        tracing::debug!("Active scene '{}' has no maps, cleared viewport", active_scene_name);
+                        tracing::debug!(
+                            "Active scene '{}' has no maps, cleared viewport",
+                            active_scene_name
+                        );
                     }
                 }
             } else {
@@ -728,19 +667,36 @@ impl EditorApp {
                 if let Some(viewport) = &mut self.scene_viewport {
                     match viewport.scene_manager_mut().load_tilemap(&map_file) {
                         Ok(()) => {
-                            tracing::info!("Successfully loaded map '{}' from scene '{}' into viewport", map_name, scene_name);
+                            tracing::info!(
+                                "Successfully loaded map '{}' from scene '{}' into viewport",
+                                map_name,
+                                scene_name
+                            );
                             // Mark viewport as needing re-render
                             viewport.mark_dirty();
                         }
                         Err(e) => {
-                            tracing::error!("Failed to load map '{}' from scene '{}': {}", map_name, scene_name, e);
+                            tracing::error!(
+                                "Failed to load map '{}' from scene '{}': {}",
+                                map_name,
+                                scene_name,
+                                e
+                            );
                         }
                     }
                 } else {
-                    tracing::warn!("No scene viewport available for loading map '{}' from scene '{}'", map_name, scene_name);
+                    tracing::warn!(
+                        "No scene viewport available for loading map '{}' from scene '{}'",
+                        map_name,
+                        scene_name
+                    );
                 }
             } else {
-                tracing::warn!("No project loaded for map loading request: '{}' from scene '{}'", map_name, scene_name);
+                tracing::warn!(
+                    "No project loaded for map loading request: '{}' from scene '{}'",
+                    map_name,
+                    scene_name
+                );
             }
         }
     }

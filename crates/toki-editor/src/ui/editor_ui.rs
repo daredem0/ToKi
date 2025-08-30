@@ -1,6 +1,6 @@
 use crate::scene::SceneViewport;
 use std::path::PathBuf;
-use toki_core::entity::EntityId;
+use toki_core::{entity::EntityId, TimestepIterator};
 
 #[derive(Debug, Clone)]
 pub struct Scene {
@@ -51,10 +51,8 @@ pub struct EditorUI {
     pub open_project_requested: bool,
     pub browse_for_project_requested: bool,
     pub save_project_requested: bool,
-    pub save_as_project_requested: bool,
     pub init_config_requested: bool,
-    pub open_recent_project_requested: Option<PathBuf>,
-    pub open_last_project_requested: bool,
+    pub window_title: Option<String>,
     
     // Map loading request
     pub map_load_requested: Option<(String, String)>, // (scene_name, map_name)
@@ -85,10 +83,8 @@ impl EditorUI {
             open_project_requested: false,
             browse_for_project_requested: false,
             save_project_requested: false,
-            save_as_project_requested: false,
             init_config_requested: false,
-            open_recent_project_requested: None,
-            open_last_project_requested: false,
+            window_title: Some("No project open".to_string()),
             
             // Map loading request
             map_load_requested: None,
@@ -166,15 +162,6 @@ impl EditorUI {
                         tracing::info!("New Project clicked");
                         self.new_project_requested = true;
                     }
-                    // Smart open project - try recent first
-                    if let Some(config) = config {
-                        if !config.recent_projects.is_empty() {
-                            if ui.button("Open Last Project").clicked() {
-                                tracing::info!("Open Last Project clicked");
-                                self.open_last_project_requested = true;
-                            }
-                        }
-                    }
 
                     // Auto-open the project from config
                     if let Some(config) = config {
@@ -189,52 +176,23 @@ impl EditorUI {
                                 tracing::info!("Browse for Project clicked");
                                 self.browse_for_project_requested = true;
                             }
-                        } else {
-                            if ui.button("Open Project...").clicked() {
+                        } else if ui.button("Open Project...").clicked() {
                                 tracing::info!(
                                     "Open Project... clicked - no project path in config"
                                 );
                                 self.browse_for_project_requested = true;
-                            }
+                            
                         }
-                    } else {
-                        if ui.button("Open Project...").clicked() {
+                    } else if ui.button("Open Project...").clicked() {
                             tracing::info!("Open Project... clicked - no config available");
                             self.browse_for_project_requested = true;
-                        }
-                    }
-
-                    // Recent projects submenu
-                    if let Some(config) = config {
-                        if !config.recent_projects.is_empty() {
-                            ui.menu_button("Open Recent", |ui| {
-                                for project_path in &config.recent_projects {
-                                    let project_name = project_path
-                                        .file_name()
-                                        .and_then(|n| n.to_str())
-                                        .unwrap_or("Unknown Project");
-
-                                    if ui.button(project_name).clicked() {
-                                        tracing::info!(
-                                            "Opening recent project: {:?}",
-                                            project_path
-                                        );
-                                        self.open_recent_project_requested =
-                                            Some(project_path.clone());
-                                    }
-                                }
-                            });
-                        }
+                        
                     }
 
                     ui.separator();
                     if ui.button("Save Project").clicked() {
                         tracing::info!("Save Project clicked");
                         self.save_project_requested = true;
-                    }
-                    if ui.button("Save As...").clicked() {
-                        tracing::info!("Save As clicked");
-                        self.save_as_project_requested = true;
                     }
                     ui.separator();
                     if ui.button("Create Test Entities").clicked() {
@@ -259,8 +217,15 @@ impl EditorUI {
                     ui.checkbox(&mut self.show_maps, "Maps");
                     ui.checkbox(&mut self.show_console, "Console");
                 });
+                ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
+                        ui.label(self.window_title.as_ref().unwrap());
+        });
             });
         });
+    }
+
+    pub fn set_title(&mut self, title: &str){
+        self.window_title = Some(title.to_string());
     }
 
     fn render_viewport(&mut self, ctx: &egui::Context, scene_viewport: Option<&mut SceneViewport>, config: Option<&crate::config::EditorConfig>, renderer: Option<&mut egui_wgpu::Renderer>) {
@@ -490,12 +455,11 @@ impl EditorUI {
                             ui.horizontal(|ui| {
                                 if is_active {
                                     ui.label("✅ Active Scene");
-                                } else {
-                                    if ui.button("🎯 Set as Active Scene").clicked() {
+                                } else if ui.button("🎯 Set as Active Scene").clicked() {
                                         active_scene_change = Some(scene.name.clone());
                                         tracing::info!("Setting {} as active scene", scene.name);
                                         ui.close();
-                                    }
+                                    
                                 }
                             });
                         });
