@@ -1,6 +1,6 @@
 use anyhow::Result;
 use crate::scene::SceneManager;
-use toki_render::{SceneRenderer, SceneData, OffscreenTarget, RenderTarget};
+use toki_render::{SceneRenderer, SceneData, OffscreenTarget};
 use toki_core::assets::atlas::AtlasMeta;
 use toki_core::Camera;
 
@@ -386,8 +386,9 @@ impl SceneViewport {
             self.camera.scale -= 1;
             self.mark_dirty();
             tracing::info!("Zoomed in to scale {}", self.camera.scale);
+        } else {
+            tracing::debug!("Already at minimum zoom level: {}", self.camera.scale);
         }
-        tracing::info!("Min zoomlevel reached at {}", self.camera.scale);
     }
     
     /// Zoom out (decrease scale)  
@@ -396,14 +397,11 @@ impl SceneViewport {
             self.camera.scale += 1;
             self.mark_dirty();
             tracing::info!("Zoomed out to scale {}", self.camera.scale);
+        } else {
+            tracing::debug!("Already at maximum zoom level: {}", self.camera.scale);
         }
-        tracing::info!("Max zoomlevel reached at {}", self.camera.scale);
     }
     
-    /// Get current zoom level
-    pub fn zoom_level(&self) -> u32 {
-        self.camera.scale
-    }
     
     /// Handle keyboard input for zoom controls using logical keys (respects keyboard layout)
     pub fn handle_keyboard_input(&mut self, logical_key: &winit::keyboard::Key, _modifiers: winit::event::Modifiers, pressed: bool) -> bool {

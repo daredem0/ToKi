@@ -5,7 +5,7 @@ use toki_core::GameState;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::keyboard::{KeyCode, PhysicalKey, Key};
+use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::event::Modifiers;
 use winit::keyboard::ModifiersState;
 use winit::window::{Window, WindowId};
