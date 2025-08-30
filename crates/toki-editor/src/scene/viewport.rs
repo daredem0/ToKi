@@ -25,9 +25,9 @@ impl SceneViewport {
         
         // Initialize camera with default toki-runtime settings
         let mut camera = Camera::new();
-        camera.viewport_size = glam::UVec2::new(800, 600);
+        camera.viewport_size = glam::UVec2::new(160, 144); // Match toki-runtime native resolution
         camera.scale = 1; // Default zoom same as toki-runtime
-        camera.center_on(glam::IVec2::new(400, 300)); // Center on viewport
+        camera.center_on(glam::IVec2::new(80, 72)); // Center on viewport
         
         Ok(Self {
             scene_manager,
@@ -36,7 +36,7 @@ impl SceneViewport {
             device: None,
             queue: None,
             is_initialized: false,
-            viewport_size: (800, 600),
+            viewport_size: (160, 144), // Native runtime resolution
             atlas_cache: None,
             needs_render: true, // Initial render required
             camera,
@@ -135,22 +135,8 @@ impl SceneViewport {
             return;
         }
         
-        // Update viewport size if it changed
-        let new_size = (rect.width() as u32, rect.height() as u32);
-        if new_size != self.viewport_size && new_size.0 > 0 && new_size.1 > 0 {
-            self.viewport_size = new_size;
-            
-            // Update camera viewport size
-            self.camera.viewport_size = glam::UVec2::new(new_size.0, new_size.1);
-            self.mark_dirty();
-            
-            if let (Some(target), Some(_device)) = (&mut self.offscreen_target, &self.device) {
-                if let Err(e) = target.resize(new_size) {
-                    tracing::error!("Failed to resize offscreen target: {}", e);
-                    return;
-                }
-            }
-        }
+        // Keep native resolution - don't resize offscreen target based on UI size
+        // The texture will be stretched by egui to fit the UI rect
         
         // Display the pre-rendered texture or show fallback message
         if let Some(_target) = &self.offscreen_target {

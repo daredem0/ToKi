@@ -183,7 +183,7 @@ impl OffscreenTarget {
         let texture_id = renderer.register_native_texture(
             &self.device,
             &self.view,
-            wgpu::FilterMode::Linear,
+            wgpu::FilterMode::Nearest, // Use nearest neighbor for sharp pixel art
         );
         self.egui_texture_id = Some(texture_id);
         texture_id
