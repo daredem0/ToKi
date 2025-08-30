@@ -132,7 +132,7 @@ impl ProjectAssets {
             let entry = entry?;
             let path = entry.path();
             
-            if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
+            if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     let scene_asset = SceneAsset {
                         name: stem.to_string(),
@@ -163,7 +163,7 @@ impl ProjectAssets {
             let entry = entry?;
             let path = entry.path();
             
-            if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
+            if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     let tilemap_asset = TilemapAsset {
                         name: stem.to_string(),
@@ -193,7 +193,7 @@ impl ProjectAssets {
             let entry = entry?;
             let path = entry.path();
             
-            if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
+            if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     let atlas_asset = SpriteAtlasAsset {
                         name: stem.to_string(),
@@ -281,7 +281,7 @@ impl ProjectAssets {
             let entry = entry?;
             let path = entry.path();
             
-            if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
+            if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     let entity_asset = EntityAsset {
                         name: stem.to_string(),

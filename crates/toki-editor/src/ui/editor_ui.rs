@@ -378,7 +378,7 @@ impl EditorUI {
                                         );
                                         
                                         ui.horizontal(|ui| {
-                                            let response = ui.selectable_label(is_selected, &format!("🗺️ {}", map_name));
+                                            let response = ui.selectable_label(is_selected, format!("🗺️ {}", map_name));
                                             if response.clicked() {
                                                 selection_changes.push(Selection::Map(scene.name.clone(), map_name.clone()));
                                                 tracing::info!("Selected map {} in scene {}", map_name, scene.name);
@@ -663,7 +663,7 @@ impl EditorUI {
                 
                 if let Some(config) = config {
                     if let Some(project_path) = config.current_project_path() {
-                        let (selected_entity, entity_additions) = self.render_entity_palette(ui, &project_path);
+                        let (selected_entity, entity_additions) = self.render_entity_palette(ui, project_path);
                         
                         // Handle entity selection
                         if let Some(selected_entity) = selected_entity {
@@ -731,7 +731,7 @@ impl EditorUI {
             });
     }
 
-    fn render_entity_palette(&self, ui: &mut egui::Ui, project_path: &std::path::PathBuf) -> (Option<String>, Vec<(String, String)>) {
+    fn render_entity_palette(&self, ui: &mut egui::Ui, project_path: &std::path::Path) -> (Option<String>, Vec<(String, String)>) {
         let entities_path = project_path.join("entities");
         
         if entities_path.exists() {
@@ -757,14 +757,14 @@ impl EditorUI {
                                         .unwrap_or("uncategorized")
                                         .to_string();
                                     
-                                    categories.entry(category).or_insert_with(Vec::new).push(entity_name);
+                                    categories.entry(category).or_default().push(entity_name);
                                 } else {
                                     // If we can't parse JSON, put in uncategorized
-                                    categories.entry("uncategorized".to_string()).or_insert_with(Vec::new).push(entity_name);
+                                    categories.entry("uncategorized".to_string()).or_default().push(entity_name);
                                 }
                             } else {
                                 // If we can't read file, put in uncategorized
-                                categories.entry("uncategorized".to_string()).or_insert_with(Vec::new).push(entity_name);
+                                categories.entry("uncategorized".to_string()).or_default().push(entity_name);
                             }
                         }
                     }
@@ -866,7 +866,7 @@ impl EditorUI {
                     .show(ui, |ui| {
                         match &self.selection {
                             Some(Selection::Scene(scene_name)) => {
-                                ui.heading(&format!("🎬 {}", scene_name));
+                                ui.heading(format!("🎬 {}", scene_name));
                                 ui.separator();
                         
                         if let Some(scene) = self.get_scene(scene_name) {
@@ -982,7 +982,7 @@ impl EditorUI {
                     },
                     
                     Some(Selection::EntityDefinition(entity_name)) => {
-                        ui.heading(&format!("🧙 {}", entity_name));
+                        ui.heading(format!("🧙 {}", entity_name));
                         ui.separator();
                         
                         Self::render_entity_definition_details(ui, entity_name, config);
@@ -1301,7 +1301,7 @@ impl EditorUI {
                                                 });
                                                 
                                                 ui.indent("animation_clips", |ui| {
-                                                    for (_i, clip) in clips.iter().enumerate() {
+                                                    for clip in clips.iter() {
                                                         if let Some(clip_obj) = clip.as_object() {
                                                             let state = clip_obj.get("state").and_then(|v| v.as_str()).unwrap_or("unknown");
                                                             let frame_count = clip_obj.get("frame_tiles").and_then(|v| v.as_array()).map(|arr| arr.len()).unwrap_or(0);
