@@ -6,20 +6,11 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Default)]
 pub struct TileProperties {
     pub solid: bool,
     #[serde(default)]
     pub trigger: bool,
-}
-
-impl Default for TileProperties {
-    fn default() -> Self {
-        Self {
-            solid: false,
-            trigger: false,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Deserialize)]

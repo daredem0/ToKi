@@ -26,6 +26,7 @@ fn create_test_entity() -> Entity {
         render_layer: 2,
         active: true,
         can_move: true,
+        has_inventory: true,
     };
 
     Entity {
@@ -38,6 +39,7 @@ fn create_test_entity() -> Entity {
         footstep_distance_accumulator: 15.5,
         footstep_trigger_distance: 32.0,
         last_collision_state: true,
+        movement_sound: Some("test_sound".to_string()),
     }
 }
 
@@ -91,6 +93,7 @@ fn test_entity_minimal_fields() {
         footstep_distance_accumulator: 0.0,
         footstep_trigger_distance: 32.0,
         last_collision_state: false,
+        movement_sound: None,
     };
 
     let json = serde_json::to_string_pretty(&entity).unwrap();

@@ -94,11 +94,9 @@ impl Scene {
     
     /// Convert this scene to a GameState for runtime execution
     pub fn to_game_state(&self) -> crate::game::GameState {
-        let game_state = crate::game::GameState::new_empty();
-        
         // TODO: Add entities from scene to game state
         // This requires implementing entity conversion from Scene entities to GameState entities
         
-        game_state
+        crate::game::GameState::new_empty()
     }
 }

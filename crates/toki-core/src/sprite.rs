@@ -58,6 +58,12 @@ pub struct SpriteFrame {
     pub v1: f32,
 }
 
+impl Default for Animator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Animator {
     pub fn new() -> Self {
         Self {

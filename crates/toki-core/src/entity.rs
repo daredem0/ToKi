@@ -143,7 +143,7 @@ impl EntityManager {
 
         self.entities_by_type
             .entry(entity_type)
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(id);
 
         if self.entities.get(&id).unwrap().attributes.active {
