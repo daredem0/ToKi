@@ -121,6 +121,7 @@ impl EditorUI {
         scene_viewport: Option<&mut SceneViewport>,
         config: Option<&crate::config::EditorConfig>,
         log_capture: Option<&crate::logging::LogCapture>,
+        renderer: Option<&mut egui_wgpu::Renderer>,
     ) {
         self.render_top_menu(ctx, config);
 
@@ -143,7 +144,7 @@ impl EditorUI {
         }
 
         // Render viewport last (mutable access)
-        self.render_viewport(ctx, scene_viewport, config);
+        self.render_viewport(ctx, scene_viewport, config, renderer);
     }
 
     /// Apply config settings to UI state
@@ -262,7 +263,7 @@ impl EditorUI {
         });
     }
 
-    fn render_viewport(&mut self, ctx: &egui::Context, scene_viewport: Option<&mut SceneViewport>, config: Option<&crate::config::EditorConfig>) {
+    fn render_viewport(&mut self, ctx: &egui::Context, scene_viewport: Option<&mut SceneViewport>, config: Option<&crate::config::EditorConfig>, renderer: Option<&mut egui_wgpu::Renderer>) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Scene Viewport");
             ui.separator();
@@ -307,7 +308,7 @@ impl EditorUI {
 
                 // Render the scene content
                 let project_path = config.and_then(|c| c.current_project_path());
-                viewport.render(ui, rect, project_path.as_deref().map(|p| p.as_path()));
+                viewport.render(ui, rect, project_path.as_deref().map(|p| p.as_path()), renderer);
             } else {
                 // Show placeholder when no viewport
                 let available_size = ui.available_size();

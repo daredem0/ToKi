@@ -4,11 +4,15 @@ version = "0.1.0"
 edition = "2021"
 license = "GPL-3.0"
 
+[features]
+default = ["editor"]
+editor = []
+
 [dependencies]
 anyhow = "1.0.99"
 toki-runtime = { path = "../toki-runtime" }
 toki-core = { path = "../toki-core" }
-toki-render = { path = "../toki-render" }
+toki-render = { path = "../toki-render", features = ["editor"] }
 glam = "0.30.5"
 pollster = "0.4.0"
 wgpu = "25.0.2"

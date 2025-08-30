@@ -19,15 +19,42 @@ pub fn create_texture_bindgroup(
     texture_file: std::path::PathBuf,
     texture_label: Option<&str>,
 ) -> wgpu::BindGroup {
+    // Convert path to string with proper error handling
+    let texture_path_str = texture_file.as_path().to_str()
+        .unwrap_or_else(|| {
+            tracing::error!("Failed to convert texture path to string: {:?}", texture_file);
+            panic!("Invalid texture path encoding: {:?}", texture_file);
+        });
+    
+    if texture_path_str.is_empty() {
+        tracing::debug!("Loading default texture (no path provided) for label: {:?}", texture_label);
+    } else {
+        tracing::debug!("Loading texture from: {}", texture_path_str);
+    }
+    
     let texture = GpuTexture::from_file(
         device,
         queue,
-        texture_file.as_path().to_str().unwrap(),
+        texture_path_str,
         texture_label,
     )
-    .unwrap();
+    .unwrap_or_else(|e| {
+        tracing::error!("Failed to load texture from '{}': {}", texture_path_str, e);
+        tracing::error!("Texture label: {:?}", texture_label);
+        tracing::error!("Make sure the texture file exists and is a valid image format");
+        panic!("Texture loading failed for '{}': {}", texture_path_str, e);
+    });
 
-    create_bind_group(device, texture_bind_group_layout, &texture, uniform_buffer)
+    tracing::debug!("Creating bind group for texture: {:?}", texture_label);
+    let bind_group = create_bind_group(device, texture_bind_group_layout, &texture, uniform_buffer);
+    
+    if texture_path_str.is_empty() {
+        tracing::debug!("Successfully created texture bind group with default texture for: {:?}", texture_label);
+    } else {
+        tracing::debug!("Successfully created texture bind group for: {}", texture_path_str);
+    }
+    
+    bind_group
 }
 pub fn create_device_and_surface(
     window: Arc<Window>,

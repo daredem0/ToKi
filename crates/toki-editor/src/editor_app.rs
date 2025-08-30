@@ -70,6 +70,43 @@ impl EditorApp {
             last_loaded_active_scene: None,
         }
     }
+    
+    /// Helper method to initialize a viewport with WGPU context
+    fn initialize_viewport(&self, mut viewport: SceneViewport) -> Option<SceneViewport> {
+        if let Some(renderer) = &self.renderer {
+            match pollster::block_on(viewport.initialize(renderer.device().clone(), renderer.queue().clone())) {
+                Ok(()) => {
+                    tracing::info!("Scene viewport initialized with unified rendering");
+                    Some(viewport)
+                }
+                Err(e) => {
+                    tracing::error!("Failed to initialize scene viewport with WGPU: {e}");
+                    None
+                }
+            }
+        } else {
+            tracing::error!("Cannot initialize scene viewport: renderer not available");
+            None
+        }
+    }
+    
+    /// Render scene to offscreen texture before egui UI construction
+    fn render_scene_to_offscreen_texture(&mut self, renderer: &mut crate::rendering::WindowRenderer) {
+        if let Some(scene_viewport) = &mut self.scene_viewport {
+            if let Some(project_path) = self.config.current_project_path() {
+                match scene_viewport.render_to_texture(project_path.as_path(), renderer.egui_renderer_mut()) {
+                    Ok(()) => {
+                        tracing::debug!("Scene rendered to offscreen texture successfully");
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to render scene to texture: {}", e);
+                    }
+                }
+            } else {
+                tracing::debug!("No project loaded, skipping scene rendering");
+            }
+        }
+    }
 }
 
 impl ApplicationHandler for EditorApp {
@@ -115,17 +152,27 @@ impl ApplicationHandler for EditorApp {
         self.renderer = Some(renderer);
         self.egui_winit = Some(egui_winit);
 
-        // Initialize scene viewport with empty game state
+        // Initialize scene viewport with empty game state and WGPU context
         let game_state = GameState::new_empty();
         match SceneViewport::with_game_state(game_state) {
             Ok(mut viewport) => {
-                // Initialize the scene viewport
-                viewport.initialize();
-                self.scene_viewport = Some(viewport);
-                tracing::info!("Scene viewport initialized");
+                // Initialize the scene viewport with WGPU context from renderer
+                if let Some(renderer) = &self.renderer {
+                    match pollster::block_on(viewport.initialize(renderer.device().clone(), renderer.queue().clone())) {
+                        Ok(()) => {
+                            self.scene_viewport = Some(viewport);
+                            tracing::info!("Scene viewport initialized with unified rendering");
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to initialize scene viewport with WGPU: {e}");
+                        }
+                    }
+                } else {
+                    tracing::error!("Cannot initialize scene viewport: renderer not available");
+                }
             }
             Err(e) => {
-                tracing::error!("Failed to initialize scene viewport: {e}");
+                tracing::error!("Failed to create scene viewport: {e}");
             }
         }
 
@@ -227,15 +274,32 @@ impl EditorApp {
         // Prepare egui input
         let raw_input = egui_winit.take_egui_input(window);
 
+        
+        // Pre-render scene to texture before egui UI
+        let project_path = self.config.current_project_path();
+        if let Some(scene_viewport) = &mut self.scene_viewport {
+            if let Some(project_path) = &project_path {
+                match scene_viewport.render_to_texture(project_path.as_path(), renderer.egui_renderer_mut()) {
+                    Ok(()) => {
+                        tracing::debug!("Scene rendered to offscreen texture successfully");
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to render scene to texture: {}", e);
+                    }
+                }
+            }
+        }
+        
         // Run egui UI
         let egui_ctx = egui_winit.egui_ctx().clone();
         let full_output = egui_ctx.run(raw_input, |ctx| {
-            // Render all UI components - we'll handle game state inside UI render method
+            // Render UI - viewport will use the pre-rendered texture
             self.ui.render(
                 ctx,
                 self.scene_viewport.as_mut(),
                 Some(&self.config),
                 self.log_capture.as_ref(),
+                None, // Can't pass renderer due to borrow issues
             );
         });
 
@@ -311,9 +375,8 @@ impl EditorApp {
                     Ok(game_state) => {
                         // Update scene viewport with new game state
                         match SceneViewport::with_game_state(game_state) {
-                            Ok(mut viewport) => {
-                                viewport.initialize();
-                                self.scene_viewport = Some(viewport);
+                            Ok(viewport) => {
+                                self.scene_viewport = self.initialize_viewport(viewport);
 
                                 // Update config with new project path
                                 let project_path = parent_path.join(&project_name);
@@ -354,9 +417,8 @@ impl EditorApp {
                     Ok(game_state) => {
                         // Update scene viewport with loaded game state
                         match SceneViewport::with_game_state(game_state) {
-                            Ok(mut viewport) => {
-                                viewport.initialize();
-                                self.scene_viewport = Some(viewport);
+                            Ok(viewport) => {
+                                self.scene_viewport = self.initialize_viewport(viewport);
 
                                 // Update config with opened project path (moves to front of recent list)
                                 self.config.set_project_path(last_project);
@@ -392,9 +454,8 @@ impl EditorApp {
                 Ok(game_state) => {
                     // Update scene viewport with loaded game state
                     match SceneViewport::with_game_state(game_state) {
-                        Ok(mut viewport) => {
-                            viewport.initialize();
-                            self.scene_viewport = Some(viewport);
+                        Ok(viewport) => {
+                            self.scene_viewport = self.initialize_viewport(viewport);
 
                             // Update config with opened project path
                             self.config.set_project_path(project_path);
@@ -442,9 +503,8 @@ impl EditorApp {
                     Ok(game_state) => {
                         // Update scene viewport with loaded game state
                         match SceneViewport::with_game_state(game_state) {
-                            Ok(mut viewport) => {
-                                viewport.initialize();
-                                self.scene_viewport = Some(viewport);
+                            Ok(viewport) => {
+                                self.scene_viewport = self.initialize_viewport(viewport);
 
                                 // Update config with opened project path
                                 self.config.set_project_path(project_path);
@@ -485,9 +545,8 @@ impl EditorApp {
                     Ok(game_state) => {
                         // Update scene viewport with loaded game state
                         match SceneViewport::with_game_state(game_state) {
-                            Ok(mut viewport) => {
-                                viewport.initialize();
-                                self.scene_viewport = Some(viewport);
+                            Ok(viewport) => {
+                                self.scene_viewport = self.initialize_viewport(viewport);
 
                                 // Update config with opened project path
                                 self.config.set_project_path(project_path);

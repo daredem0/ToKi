@@ -15,9 +15,31 @@ impl GpuTexture {
         path: &str,
         label: Option<&str>,
     ) -> Result<Self, RenderError> {
+        // Check for empty path and create default texture
+        if path.is_empty() {
+            tracing::debug!("Creating default white texture for label: {:?}", label);
+            return Self::create_default_white_texture(device, queue, label);
+        }
+        
         // load the img
         let path_obj = Path::new(path);
         let image = load_image_rgba8(path_obj)?;
+        Self::from_rgba8(device, queue, &image, label)
+    }
+    
+    /// Create a default 1x1 white texture for when no texture path is provided
+    pub fn create_default_white_texture(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        label: Option<&str>,
+    ) -> Result<Self, RenderError> {
+        // Create a 1x1 white pixel
+        let image = DecodedImage {
+            width: 1,
+            height: 1,
+            data: vec![255, 255, 255, 255], // RGBA white
+        };
+        
         Self::from_rgba8(device, queue, &image, label)
     }
     pub fn from_rgba8(

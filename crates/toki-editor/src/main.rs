@@ -25,7 +25,9 @@ fn main() -> Result<()> {
         
         tracing_subscriber::fmt()
             .with_max_level(level)
-            .with_target(false)
+            .with_target(true)
+            .with_file(false)
+            .with_line_number(true)
             .init();
         None
     } else {

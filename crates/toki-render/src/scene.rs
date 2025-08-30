@@ -70,6 +70,10 @@ impl SceneRenderer {
         tilemap_texture: Option<std::path::PathBuf>,
         sprite_texture: Option<std::path::PathBuf>,
     ) -> Result<Self, RenderError> {
+        tracing::info!("Creating new SceneRenderer");
+        tracing::info!("Surface format: {:?}", surface_format);
+        tracing::info!("Tilemap texture: {:?}", tilemap_texture);
+        tracing::info!("Sprite texture: {:?}", sprite_texture);
         let tilemap_pipeline = if let Some(texture_path) = tilemap_texture {
             TilemapPipeline::new(&device, &queue, surface_format, texture_path)
         } else {
@@ -86,6 +90,8 @@ impl SceneRenderer {
         
         let debug_pipeline = DebugPipeline::new(&device, surface_format);
         
+        tracing::info!("SceneRenderer created successfully");
+        
         Ok(Self {
             device,
             queue,
@@ -97,32 +103,44 @@ impl SceneRenderer {
     
     /// Load new tilemap texture
     pub fn load_tilemap_texture(&mut self, texture_path: std::path::PathBuf) -> Result<(), RenderError> {
+        tracing::info!("Loading tilemap texture: {:?}", texture_path);
         self.tilemap_pipeline = TilemapPipeline::new(
             &self.device,
             &self.queue,
             wgpu::TextureFormat::Bgra8UnormSrgb, // TODO: Get from render target
-            texture_path,
+            texture_path.clone(),
         );
+        tracing::info!("Tilemap texture loaded successfully");
         Ok(())
     }
     
     /// Load new sprite texture
     pub fn load_sprite_texture(&mut self, texture_path: std::path::PathBuf) -> Result<(), RenderError> {
+        tracing::info!("Loading sprite texture: {:?}", texture_path);
         self.sprite_pipeline = SpritePipeline::new(
             &self.device,
             &self.queue,
             wgpu::TextureFormat::Bgra8UnormSrgb, // TODO: Get from render target
-            texture_path,
+            texture_path.clone(),
         );
+        tracing::info!("Sprite texture loaded successfully");
         Ok(())
     }
     
     /// Render scene to any render target
     pub fn render_scene<T: RenderTarget>(&mut self, target: &mut T, scene_data: &SceneData) -> Result<(), RenderError> {
+        tracing::debug!("Starting scene render");
+        tracing::debug!("Scene data - tilemap: {}, sprites: {}, debug_shapes: {}", 
+            scene_data.tilemap.is_some(), 
+            scene_data.sprites.len(), 
+            scene_data.debug_shapes.len()
+        );
+        
         target.begin_frame()?;
         
         // Update projection matrix based on target size
         let (width, height) = target.size();
+        tracing::debug!("Render target size: {}x{}", width, height);
         let projection = self.calculate_projection_for_size(width, height);
         self.update_projection(projection);
         
@@ -130,15 +148,21 @@ impl SceneRenderer {
         if let (Some(tilemap), Some(atlas)) = (&scene_data.tilemap, &scene_data.atlas) {
             let vertices = if scene_data.visible_chunks.is_empty() {
                 // Render all tiles (for editor or small maps)
+                tracing::debug!("Generating vertices for all tiles ({}x{})", tilemap.size.x, tilemap.size.y);
                 tilemap.generate_vertices(atlas, scene_data.texture_size)
             } else {
                 // Render only visible chunks (for runtime performance)
+                tracing::debug!("Generating vertices for {} visible chunks", scene_data.visible_chunks.len());
                 tilemap.generate_vertices_for_chunks(atlas, scene_data.texture_size, &scene_data.visible_chunks)
             };
+            tracing::debug!("Updating tilemap pipeline with {} vertices", vertices.len());
             self.tilemap_pipeline.update_vertices(&self.device, &vertices);
+        } else {
+            tracing::debug!("No tilemap or atlas to render");
         }
         
         // Add sprites (same logic as runtime)
+        tracing::debug!("Adding {} sprites to pipeline", scene_data.sprites.len());
         self.sprite_pipeline.clear_sprites();
         for sprite in &scene_data.sprites {
             let render_instance = SpriteRenderInstance {
@@ -150,6 +174,7 @@ impl SceneRenderer {
         }
         
         // Add debug shapes
+        tracing::debug!("Adding {} debug shapes to pipeline", scene_data.debug_shapes.len());
         self.debug_pipeline.clear();
         for debug_shape in &scene_data.debug_shapes {
             match debug_shape.shape_type {
@@ -172,6 +197,7 @@ impl SceneRenderer {
         }
         
         // Finalize debug shapes
+        tracing::debug!("Finalizing debug shapes");
         self.debug_pipeline.update_vertices(&self.device);
         
         // Render using WGPU pipelines
@@ -201,14 +227,19 @@ impl SceneRenderer {
             });
             
             // Same pipeline calls for both runtime and editor!
+            tracing::debug!("Rendering tilemap pipeline");
             self.tilemap_pipeline.render(&mut render_pass);
+            tracing::debug!("Rendering sprite pipeline");
             self.sprite_pipeline.render(&mut render_pass);
+            tracing::debug!("Rendering debug pipeline");
             self.debug_pipeline.render(&mut render_pass);
         }
         
+        tracing::debug!("Submitting render commands to GPU");
         self.queue.submit(std::iter::once(encoder.finish()));
         target.end_frame()?;
         
+        tracing::debug!("Scene render complete");
         Ok(())
     }
     

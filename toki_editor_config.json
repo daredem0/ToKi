@@ -23,6 +23,6 @@
     "show_collision_boxes": true,
     "show_debug_info": false
   },
-  "log_to_terminal": false,
+  "log_to_terminal": true,
   "log_level": "INFO"
 }

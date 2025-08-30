@@ -91,6 +91,11 @@ impl WindowRenderer {
         self.surface_config.format
     }
     
+    /// Get mutable reference to egui renderer (for viewport texture registration)
+    pub fn egui_renderer_mut(&mut self) -> &mut egui_wgpu::Renderer {
+        &mut self.egui_renderer
+    }
+    
     /// Render a frame with the given egui output and context
     pub fn render(&mut self, _window: &Window, egui_output: egui::FullOutput, egui_ctx: &egui::Context) -> Result<()> {
         // Get surface texture
