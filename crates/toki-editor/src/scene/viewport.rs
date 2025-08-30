@@ -144,16 +144,37 @@ impl SceneViewport {
             #[cfg(feature = "editor")]
             {
                 if let Some(texture_id) = _target.egui_texture_id {
-                    let texture_rect = egui::Rect::from_min_size(rect.min, rect.size());
+                    // Calculate aspect ratio preserving viewport size
+                    let viewport_aspect = 160.0 / 144.0; // Native aspect ratio (10:9)
+                    let available_size = rect.size();
+                    let available_aspect = available_size.x / available_size.y;
+                    
+                    let display_size = if available_aspect > viewport_aspect {
+                        // Available space is wider than viewport - letterbox horizontally
+                        egui::Vec2::new(available_size.y * viewport_aspect, available_size.y)
+                    } else {
+                        // Available space is taller than viewport - letterbox vertically  
+                        egui::Vec2::new(available_size.x, available_size.x / viewport_aspect)
+                    };
+                    
+                    // Center the viewport within the available rect
+                    let offset = (available_size - display_size) * 0.5;
+                    let display_rect = egui::Rect::from_min_size(rect.min + offset, display_size);
+                    
                     let _response = ui.allocate_response(rect.size(), egui::Sense::hover());
+                    
+                    // Fill background with dark color for letterbox areas
+                    ui.painter().rect_filled(rect, 0.0, egui::Color32::from_rgb(20, 20, 25));
+                    
+                    // Draw the viewport texture with preserved aspect ratio
                     ui.painter().image(
                         texture_id,
-                        texture_rect,
+                        display_rect,
                         egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
                         egui::Color32::WHITE,
                     );
                     // Only log occasionally to avoid spam
-            // tracing::debug!("Displayed pre-rendered texture in viewport");
+            // tracing::debug!("Displayed pre-rendered texture in viewport with aspect ratio preservation");
                 } else {
                     // Show status instead of error - this is normal during initialization
                     self.render_debug_status(ui, rect, "Texture rendering in progress...");
