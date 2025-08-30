@@ -64,51 +64,78 @@ pub fn create_device_and_surface(
     Surface<'static>,
     SurfaceConfiguration,
 ) {
-    // Create wgpu instance
-    let instance = wgpu::Instance::default();
+    pollster::block_on(create_device_and_surface_async(window))
+}
 
-    // This has to happen before we set the surface. Once we create the surface,
-    // we dont own the window anymore.
+/// Async version of WGPU setup for better integration with modern async runtimes
+pub async fn create_device_and_surface_async(
+    window: Arc<Window>,
+) -> (
+    wgpu::Device,
+    wgpu::Queue,
+    Surface<'static>,
+    SurfaceConfiguration,
+) {
+    // Create wgpu instance with better defaults
+    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::PRIMARY,
+        flags: wgpu::InstanceFlags::default(),
+        ..Default::default()
+    });
+
+    // Get window size before creating surface
     let size = window.inner_size();
 
     // Create the surface of the window
-    let surface = instance.create_surface(window).unwrap();
-    // Get a GPU Abstraction. Important: This has to be async
-    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::HighPerformance,
+    let surface = instance.create_surface(window)
+        .expect("Failed to create surface");
+        
+    // Get a GPU adapter with proper error handling
+    let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::default(),
         compatible_surface: Some(&surface),
         force_fallback_adapter: false,
-    }))
+    }).await
     .expect("No suitable GPU adapters found on the system!");
 
-    // Now that we got the adapter, we can request the actual GPU device and command queue
-    let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-        required_features: wgpu::Features::empty(),
-        required_limits: wgpu::Limits::default(),
-        memory_hints: wgpu::MemoryHints::default(),
-        trace: wgpu::Trace::default(),
-        label: Some("Toki device"),
-    }))
+    // Request GPU device and command queue with proper features
+    let (device, queue) = adapter.request_device(
+        &wgpu::DeviceDescriptor {
+            required_features: wgpu::Features::empty(),
+            required_limits: wgpu::Limits::default(),
+            memory_hints: wgpu::MemoryHints::default(),
+            trace: wgpu::Trace::default(),
+            label: Some("Toki Device"),
+        }
+    ).await
     .expect("Failed to create device");
 
-    // Configure surface
+    // Configure surface with VSync and proper format selection
     let surface_caps = surface.get_capabilities(&adapter);
-    let surface_format = surface_caps
-        .formats
-        .iter()
-        .copied()
+    let surface_format = surface_caps.formats.iter()
         .find(|f| f.is_srgb())
+        .copied()
         .unwrap_or(surface_caps.formats[0]);
+        
+    // Choose VSync for frame rate limiting and lower CPU usage
+    let present_mode = surface_caps.present_modes.iter()
+        .find(|&&mode| mode == wgpu::PresentMode::Fifo) // VSync (60 FPS cap)
+        .or_else(|| surface_caps.present_modes.iter()
+            .find(|&&mode| mode == wgpu::PresentMode::FifoRelaxed)) // Adaptive VSync
+        .copied()
+        .unwrap_or(surface_caps.present_modes[0]); // Fallback to first available
+        
+    tracing::info!("Using present mode: {:?} (available: {:?})", present_mode, surface_caps.present_modes);
 
     let config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format: surface_format,
-        width: size.width,
-        height: size.height,
-        present_mode: wgpu::PresentMode::Fifo, //vsync
+        width: size.width.max(1),
+        height: size.height.max(1),
+        present_mode,
         alpha_mode: surface_caps.alpha_modes[0],
         view_formats: vec![],
-        desired_maximum_frame_latency: 1,
+        desired_maximum_frame_latency: 2,
     };
 
     surface.configure(&device, &config);

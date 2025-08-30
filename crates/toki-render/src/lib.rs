@@ -6,7 +6,7 @@ mod scene;
 mod targets;
 mod texture;
 mod vertex;
-mod wgpu_utils;
+pub mod wgpu_utils;
 
 pub use errors::RenderError;
 pub use gpu::GpuState;

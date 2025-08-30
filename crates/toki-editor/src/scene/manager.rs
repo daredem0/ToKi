@@ -1,6 +1,5 @@
 use anyhow::Result;
-use toki_core::GameState;
-use toki_runtime::systems::ResourceManager;
+use toki_core::{GameState, ResourceManager};
 use toki_core::assets::tilemap::TileMap;
 use std::path::Path;
 

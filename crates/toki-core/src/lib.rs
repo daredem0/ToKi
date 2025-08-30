@@ -34,4 +34,7 @@ pub mod entity;
 pub mod collision;
 pub use collision::{CollisionBox, CollisionResult};
 
+pub mod resources;
+pub use resources::{ResourceManager, ResourceError};
+
 pub mod serialization;

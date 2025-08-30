@@ -1,6 +1,7 @@
 use anyhow::Result;
 use std::sync::Arc;
 use winit::window::Window;
+use toki_render::wgpu_utils;
 
 /// Handles WGPU window rendering and egui integration
 pub struct WindowRenderer {
@@ -14,56 +15,11 @@ pub struct WindowRenderer {
 impl WindowRenderer {
     /// Initialize the renderer with a window
     pub async fn new(window: Arc<Window>) -> Result<Self> {
-        // Initialize wgpu
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::PRIMARY,
-            flags: wgpu::InstanceFlags::default(),
-            ..Default::default()
-        });
-        
-        let surface = instance.create_surface(Arc::clone(&window))?;
-        
-        let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::default(),
-            force_fallback_adapter: false,
-            compatible_surface: Some(&surface),
-        }).await?;
-        
-        let (device, queue) = adapter.request_device(
-            &wgpu::DeviceDescriptor::default(),
-        ).await?;
-        
-        let surface_caps = surface.get_capabilities(&adapter);
-        let surface_format = surface_caps.formats.iter()
-            .find(|f| f.is_srgb())
-            .copied()
-            .unwrap_or(surface_caps.formats[0]);
-        
-        let size = window.inner_size();
-        // Choose VSync for frame rate limiting and lower CPU usage
-        let present_mode = surface_caps.present_modes.iter()
-            .find(|&&mode| mode == wgpu::PresentMode::Fifo) // VSync (60 FPS cap)
-            .or_else(|| surface_caps.present_modes.iter()
-                .find(|&&mode| mode == wgpu::PresentMode::FifoRelaxed)) // Adaptive VSync
-            .copied()
-            .unwrap_or(surface_caps.present_modes[0]); // Fallback to first available
-            
-        tracing::info!("Using present mode: {:?} (available: {:?})", present_mode, surface_caps.present_modes);
-        
-        let surface_config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width: size.width.max(1),
-            height: size.height.max(1),
-            present_mode,
-            alpha_mode: surface_caps.alpha_modes[0],
-            view_formats: vec![],
-            desired_maximum_frame_latency: 2,
-        };
-        surface.configure(&device, &surface_config);
+        // Use consolidated WGPU setup from toki-render
+        let (device, queue, surface, surface_config) = wgpu_utils::create_device_and_surface_async(window).await;
         
         // Initialize egui renderer
-        let egui_renderer = egui_wgpu::Renderer::new(&device, surface_format, None, 1, false);
+        let egui_renderer = egui_wgpu::Renderer::new(&device, surface_config.format, None, 1, false);
         
         Ok(Self {
             device,
