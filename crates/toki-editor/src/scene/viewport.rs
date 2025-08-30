@@ -40,7 +40,7 @@ impl SceneViewport {
         let scene_renderer = SceneRenderer::new(
             device.clone(),
             queue.clone(),
-            wgpu::TextureFormat::Rgba8UnormSrgb, // Standard format for offscreen rendering
+            wgpu::TextureFormat::Bgra8UnormSrgb, // Match pipeline format
             None, // No default tilemap texture
             None, // No default sprite texture
         ).map_err(|e| anyhow::anyhow!("Failed to create scene renderer: {}", e))?;
@@ -49,7 +49,7 @@ impl SceneViewport {
         let offscreen_target = OffscreenTarget::new(
             device.clone(),
             self.viewport_size,
-            wgpu::TextureFormat::Rgba8UnormSrgb,
+            wgpu::TextureFormat::Bgra8UnormSrgb, // Match pipeline format
         ).map_err(|e| anyhow::anyhow!("Failed to create offscreen target: {}", e))?;
         
         self.scene_renderer = Some(scene_renderer);
@@ -193,40 +193,6 @@ impl SceneViewport {
         None
     }
     
-    /// Render without WGPU renderer (shows message to user)
-    pub fn render_fallback_egui(&mut self, ui: &mut egui::Ui, rect: egui::Rect, _project_path: Option<&std::path::Path>) {
-        if !self.is_initialized {
-            self.render_placeholder(ui, rect);
-            return;
-        }
-        
-        // Show that we're working with the unified renderer but need proper integration
-        ui.painter().rect_filled(rect, 4.0, egui::Color32::from_rgb(40, 40, 50));
-        ui.painter().text(
-            rect.center(),
-            egui::Align2::CENTER_CENTER,
-            "Unified WGPU Renderer Initialized\n\nRenderer integration in progress...\nScene data will be displayed here once\nthe render-to-texture pipeline is complete.",
-            egui::FontId::default(),
-            egui::Color32::WHITE,
-        );
-        
-        // Show some debug info about the initialized renderer
-        let debug_y = rect.min.y + 20.0;
-        let debug_text = format!(
-            "✓ SceneRenderer: {}\n✓ OffscreenTarget: {}\n✓ Atlas Cache: {}",
-            if self.scene_renderer.is_some() { "Ready" } else { "Not Ready" },
-            if self.offscreen_target.is_some() { "Ready" } else { "Not Ready" },
-            if self.atlas_cache.is_some() { "Loaded" } else { "Empty" }
-        );
-        
-        ui.painter().text(
-            egui::pos2(rect.min.x + 10.0, debug_y),
-            egui::Align2::LEFT_TOP,
-            debug_text,
-            egui::FontId::monospace(10.0),
-            egui::Color32::LIGHT_GRAY,
-        );
-    }
     
     /// Prepare scene data for rendering
     fn prepare_scene_data(&mut self, project_path: Option<&std::path::Path>) -> SceneData {
@@ -247,8 +213,11 @@ impl SceneViewport {
                 match self.load_atlas_for_tilemap(&tilemap.atlas.to_string_lossy(), project_path) {
                     Ok(atlas) => {
                         tracing::debug!("Successfully loaded atlas with {} tiles", atlas.tiles.len());
+                        // Calculate texture size from atlas: tile_size * grid_dimensions
+                        let texture_size = atlas.image_size().unwrap_or(glam::UVec2::new(64, 8));
+                        tracing::debug!("Calculated atlas texture size: {}x{}", texture_size.x, texture_size.y);
                         scene_data.atlas = Some(atlas);
-                        scene_data.texture_size = glam::UVec2::new(256, 256); // TODO: Get from atlas
+                        scene_data.texture_size = texture_size;
                     }
                     Err(e) => {
                         tracing::error!("Failed to load atlas: {}", e);
@@ -289,6 +258,25 @@ impl SceneViewport {
         
         let atlas = AtlasMeta::load_from_file(&atlas_path)
             .map_err(|e| anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e))?;
+        
+        // Load the corresponding texture image into the renderer
+        tracing::debug!("Atlas image field contains: {:?}", atlas.image);
+        if let Some(scene_renderer) = &mut self.scene_renderer {
+            tracing::debug!("Scene renderer available, proceeding with texture load");
+            // Construct the texture path relative to the atlas file
+            let texture_path = atlas_path.parent()
+                .unwrap_or_else(|| std::path::Path::new("."))
+                .join(&atlas.image);
+            
+            if texture_path.exists() {
+                tracing::info!("Loading tilemap texture: {}", texture_path.display());
+                scene_renderer.load_tilemap_texture(texture_path)
+                    .map_err(|e| anyhow::anyhow!("Failed to load tilemap texture: {}", e))?;
+                tracing::info!("Successfully loaded tilemap texture");
+            } else {
+                tracing::warn!("Tilemap texture not found: {}", texture_path.display());
+            }
+        }
         
         // Cache the loaded atlas
         self.atlas_cache = Some(atlas.clone());
