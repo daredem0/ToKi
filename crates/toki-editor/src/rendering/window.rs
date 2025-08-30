@@ -40,12 +40,22 @@ impl WindowRenderer {
             .unwrap_or(surface_caps.formats[0]);
         
         let size = window.inner_size();
+        // Choose VSync for frame rate limiting and lower CPU usage
+        let present_mode = surface_caps.present_modes.iter()
+            .find(|&&mode| mode == wgpu::PresentMode::Fifo) // VSync (60 FPS cap)
+            .or_else(|| surface_caps.present_modes.iter()
+                .find(|&&mode| mode == wgpu::PresentMode::FifoRelaxed)) // Adaptive VSync
+            .copied()
+            .unwrap_or(surface_caps.present_modes[0]); // Fallback to first available
+            
+        tracing::info!("Using present mode: {:?} (available: {:?})", present_mode, surface_caps.present_modes);
+        
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
             width: size.width.max(1),
             height: size.height.max(1),
-            present_mode: surface_caps.present_modes[0],
+            present_mode,
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
