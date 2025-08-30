@@ -1,0 +1,197 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/tokkiclient/toki/schemas/entity.json",
+  "title": "ToKi Entity Definition",
+  "description": "A reusable entity definition template for the ToKi game engine",
+  "type": "object",
+  "required": ["name", "display_name", "entity_type", "rendering", "attributes", "collision", "audio", "animations"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Internal name/ID for the entity"
+    },
+    "display_name": {
+      "type": "string",
+      "description": "Human-readable name for the entity"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the entity"
+    },
+    "entity_type": {
+      "type": "string",
+      "enum": ["player", "npc", "item", "decoration", "trigger"],
+      "description": "Type category of the entity"
+    },
+    "rendering": {
+      "$ref": "#/definitions/rendering"
+    },
+    "attributes": {
+      "$ref": "#/definitions/attributes"
+    },
+    "collision": {
+      "$ref": "#/definitions/collision"
+    },
+    "audio": {
+      "$ref": "#/definitions/audio"
+    },
+    "animations": {
+      "$ref": "#/definitions/animations"
+    },
+    "category": {
+      "type": "string",
+      "description": "Category for organization (character, item, etc.)"
+    },
+    "tags": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Tags for filtering and searching"
+    }
+  },
+  "definitions": {
+    "rendering": {
+      "type": "object",
+      "required": ["size", "render_layer", "visible"],
+      "properties": {
+        "size": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 1},
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Rendering size [width, height] in pixels"
+        },
+        "render_layer": {
+          "type": "integer",
+          "description": "Rendering layer (higher values render on top)"
+        },
+        "visible": {
+          "type": "boolean",
+          "description": "Whether entity is visible by default"
+        }
+      }
+    },
+    "attributes": {
+      "type": "object",
+      "required": ["health", "speed", "solid", "active", "can_move", "has_inventory"],
+      "properties": {
+        "health": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Health points"
+        },
+        "speed": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Movement speed"
+        },
+        "solid": {
+          "type": "boolean",
+          "description": "Whether entity blocks movement"
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Whether entity is active by default"
+        },
+        "can_move": {
+          "type": "boolean",
+          "description": "Whether entity can move"
+        },
+        "has_inventory": {
+          "type": "boolean",
+          "description": "Whether entity has inventory system"
+        }
+      }
+    },
+    "collision": {
+      "type": "object",
+      "required": ["enabled", "offset", "size", "trigger"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether collision detection is enabled"
+        },
+        "offset": {
+          "type": "array",
+          "items": {"type": "integer"},
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Collision box offset from entity center [x, y]"
+        },
+        "size": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 1},
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Collision box size [width, height]"
+        },
+        "trigger": {
+          "type": "boolean",
+          "description": "Whether this is a trigger collision (doesn't block movement)"
+        }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "required": ["footstep_trigger_distance"],
+      "properties": {
+        "footstep_trigger_distance": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Distance entity must move to trigger footstep sound"
+        },
+        "movement_sound": {
+          "type": ["string", "null"],
+          "description": "Sound ID to play when entity moves"
+        }
+      }
+    },
+    "animations": {
+      "type": "object",
+      "required": ["atlas_name", "clips", "default_state"],
+      "properties": {
+        "atlas_name": {
+          "type": "string",
+          "description": "Name of the atlas containing animation frames"
+        },
+        "clips": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/animationClip"
+          },
+          "minItems": 1,
+          "description": "Array of animation clips"
+        },
+        "default_state": {
+          "type": "string",
+          "description": "Default animation state to start with"
+        }
+      }
+    },
+    "animationClip": {
+      "type": "object",
+      "required": ["state", "frame_tiles", "frame_duration_ms", "loop_mode"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "description": "Animation state name"
+        },
+        "frame_tiles": {
+          "type": "array",
+          "items": {"type": "string"},
+          "minItems": 1,
+          "description": "Array of tile names for animation frames"
+        },
+        "frame_duration_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Duration of each frame in milliseconds"
+        },
+        "loop_mode": {
+          "type": "string",
+          "enum": ["loop", "once", "ping_pong"],
+          "description": "How the animation should loop"
+        }
+      }
+    }
+  }
+}

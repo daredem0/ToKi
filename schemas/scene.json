@@ -1,0 +1,233 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/tokkiclient/toki/schemas/scene.json",
+  "title": "ToKi Scene",
+  "description": "A scene containing entities, maps, and camera settings for the ToKi game engine",
+  "type": "object",
+  "required": ["name", "maps", "entities"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The name of the scene"
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "Optional description of the scene"
+    },
+    "maps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of map names to load in this scene"
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/sceneEntity"
+      },
+      "description": "Array of entities present in the scene"
+    },
+    "camera_position": {
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "array",
+          "items": {"type": "number"},
+          "minItems": 2,
+          "maxItems": 2
+        }
+      ],
+      "description": "Optional camera position [x, y]"
+    },
+    "camera_scale": {
+      "type": ["number", "null"],
+      "description": "Optional camera scale factor"
+    }
+  },
+  "definitions": {
+    "sceneEntity": {
+      "type": "object",
+      "required": ["id", "position", "size", "entity_type", "attributes", "collision_box"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Unique identifier for the entity"
+        },
+        "position": {
+          "type": "array",
+          "items": {"type": "integer"},
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Entity position [x, y]"
+        },
+        "size": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 1},
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Entity size [width, height]"
+        },
+        "entity_type": {
+          "type": "string",
+          "description": "Type of entity (Player, NPC, Item, etc.)"
+        },
+        "attributes": {
+          "$ref": "#/definitions/entityAttributes"
+        },
+        "collision_box": {
+          "$ref": "#/definitions/collisionBox"
+        },
+        "footstep_distance_accumulator": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Current footstep distance accumulator"
+        },
+        "footstep_trigger_distance": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Distance required to trigger footstep sound"
+        },
+        "last_collision_state": {
+          "type": "boolean",
+          "description": "Last collision state of the entity"
+        },
+        "movement_sound": {
+          "type": ["string", "null"],
+          "description": "Sound ID to play when entity moves"
+        }
+      }
+    },
+    "entityAttributes": {
+      "type": "object",
+      "required": ["health", "speed", "solid", "visible", "render_layer", "active", "can_move", "has_inventory"],
+      "properties": {
+        "health": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Entity health points"
+        },
+        "speed": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Entity movement speed"
+        },
+        "solid": {
+          "type": "boolean",
+          "description": "Whether entity blocks movement"
+        },
+        "visible": {
+          "type": "boolean",
+          "description": "Whether entity is rendered"
+        },
+        "animation_controller": {
+          "$ref": "#/definitions/animationController"
+        },
+        "render_layer": {
+          "type": "integer",
+          "description": "Rendering layer (higher values render on top)"
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Whether entity is active in the scene"
+        },
+        "can_move": {
+          "type": "boolean",
+          "description": "Whether entity can move"
+        },
+        "has_inventory": {
+          "type": "boolean",
+          "description": "Whether entity has an inventory system"
+        }
+      }
+    },
+    "animationController": {
+      "type": "object",
+      "required": ["clips", "current_clip_state", "current_frame_index", "frame_timer", "is_finished"],
+      "properties": {
+        "clips": {
+          "type": "object",
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/definitions/animationClip"
+            }
+          },
+          "description": "Animation clips keyed by name"
+        },
+        "current_clip_state": {
+          "type": "string",
+          "description": "Currently active animation state"
+        },
+        "current_frame_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Current frame index in animation"
+        },
+        "frame_timer": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Timer for current frame"
+        },
+        "is_finished": {
+          "type": "boolean",
+          "description": "Whether current animation has finished"
+        }
+      }
+    },
+    "animationClip": {
+      "type": "object",
+      "required": ["state", "atlas_name", "frame_tile_names", "frame_duration_ms", "loop_mode"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "description": "Animation state name"
+        },
+        "atlas_name": {
+          "type": "string",
+          "description": "Name of atlas containing animation frames"
+        },
+        "frame_tile_names": {
+          "type": "array",
+          "items": {"type": "string"},
+          "minItems": 1,
+          "description": "Array of tile names for animation frames"
+        },
+        "frame_duration_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Duration of each frame in milliseconds"
+        },
+        "loop_mode": {
+          "type": "string",
+          "enum": ["Loop", "Once", "PingPong"],
+          "description": "How the animation should loop"
+        }
+      }
+    },
+    "collisionBox": {
+      "type": "object",
+      "required": ["offset", "size", "trigger"],
+      "properties": {
+        "offset": {
+          "type": "array",
+          "items": {"type": "integer"},
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Collision box offset from entity position [x, y]"
+        },
+        "size": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 1},
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Collision box size [width, height]"
+        },
+        "trigger": {
+          "type": "boolean",
+          "description": "Whether this is a trigger collision (doesn't block movement)"
+        }
+      }
+    }
+  }
+}

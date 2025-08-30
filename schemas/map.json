@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/tokkiclient/toki/schemas/map.json",
+  "title": "ToKi Tilemap",
+  "description": "A tilemap definition containing tile layout and metadata for the ToKi game engine",
+  "type": "object",
+  "required": ["size", "tile_size", "atlas", "tiles"],
+  "properties": {
+    "size": {
+      "type": "array",
+      "items": {"type": "integer", "minimum": 1},
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "Size of the map in tiles [width, height]"
+    },
+    "tile_size": {
+      "type": "array",
+      "items": {"type": "integer", "minimum": 1},
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "Size of each tile [width, height] in pixels"
+    },
+    "atlas": {
+      "type": "string",
+      "description": "Name of the atlas file containing the tiles (without extension)"
+    },
+    "tiles": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Flat array of tile names arranged row by row from top-left to bottom-right"
+    }
+  }
+}

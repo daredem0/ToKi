@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/tokkiclient/toki/schemas/atlas.json",
+  "title": "ToKi Atlas Definition",
+  "description": "A sprite atlas definition containing tile definitions and metadata for the ToKi game engine",
+  "type": "object",
+  "required": ["image", "tile_size", "tiles"],
+  "properties": {
+    "image": {
+      "type": "string",
+      "description": "Filename of the associated image file (PNG, JPG, etc.)"
+    },
+    "tile_size": {
+      "type": "array",
+      "items": {"type": "integer", "minimum": 1},
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "Size of each tile [width, height] in pixels"
+    },
+    "tiles": {
+      "type": "object",
+      "patternProperties": {
+        ".*": {
+          "$ref": "#/definitions/tile"
+        }
+      },
+      "description": "Dictionary of tiles keyed by tile name"
+    }
+  },
+  "definitions": {
+    "tile": {
+      "type": "object",
+      "required": ["position", "properties"],
+      "properties": {
+        "position": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0},
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Position of tile in atlas grid [column, row] (0-indexed)"
+        },
+        "properties": {
+          "$ref": "#/definitions/tileProperties"
+        }
+      }
+    },
+    "tileProperties": {
+      "type": "object",
+      "required": ["solid", "trigger"],
+      "properties": {
+        "solid": {
+          "type": "boolean",
+          "description": "Whether this tile blocks movement"
+        },
+        "trigger": {
+          "type": "boolean",
+          "description": "Whether this tile acts as a trigger zone"
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}
