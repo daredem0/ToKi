@@ -84,6 +84,16 @@ impl EditorUI {
         self.scenes.iter().find(|s| s.name == name)
     }
 
+    pub fn load_scenes_from_project(&mut self, loaded_scenes: Vec<Scene>) {
+        tracing::info!("Loading {} scenes into UI hierarchy", loaded_scenes.len());
+        self.scenes = loaded_scenes;
+        
+        // Set the first scene as active if we have scenes and no active scene is set
+        if !self.scenes.is_empty() && self.active_scene.is_none() {
+            self.active_scene = Some(self.scenes[0].name.clone());
+            tracing::info!("Set '{}' as active scene", self.scenes[0].name);
+        }
+    }
 
     pub fn set_selection(&mut self, selection: Selection) {
         self.selection = Some(selection);

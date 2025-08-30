@@ -464,6 +464,17 @@ impl EditorApp {
                                     .to_string(),
                             );
 
+                            // Load scenes from project into UI
+                            match self.project_manager.load_scenes() {
+                                Ok(loaded_scenes) => {
+                                    self.ui.load_scenes_from_project(loaded_scenes);
+                                    tracing::info!("Loaded scenes into UI hierarchy");
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to load scenes into UI: {}", e);
+                                }
+                            }
+
                             tracing::info!("Opened project successfully");
                         }
                         Err(e) => {
@@ -503,6 +514,17 @@ impl EditorApp {
                                     "Failed to save config after browsing for project: {}",
                                     e
                                 );
+                            }
+
+                            // Load scenes from project into UI
+                            match self.project_manager.load_scenes() {
+                                Ok(loaded_scenes) => {
+                                    self.ui.load_scenes_from_project(loaded_scenes);
+                                    tracing::info!("Loaded scenes into UI hierarchy from browsed project");
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to load scenes into UI from browsed project: {}", e);
+                                }
                             }
 
                             tracing::info!("Opened browsed project successfully");
