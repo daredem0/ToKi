@@ -90,24 +90,6 @@ impl EditorApp {
         }
     }
     
-    /// Render scene to offscreen texture before egui UI construction
-    fn render_scene_to_offscreen_texture(&mut self, renderer: &mut crate::rendering::WindowRenderer) {
-        if let Some(scene_viewport) = &mut self.scene_viewport {
-            if let Some(project_path) = self.config.current_project_path() {
-                match scene_viewport.render_to_texture(project_path.as_path(), renderer.egui_renderer_mut()) {
-                    Ok(()) => {
-                        // Reduce log spam - render_to_texture already handles its own logging
-                        // tracing::debug!("Scene rendered to offscreen texture successfully");
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to render scene to texture: {}", e);
-                    }
-                }
-            } else {
-                tracing::debug!("No project loaded, skipping scene rendering");
-            }
-        }
-    }
 }
 
 impl ApplicationHandler for EditorApp {

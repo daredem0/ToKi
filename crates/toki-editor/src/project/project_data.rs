@@ -149,26 +149,6 @@ impl Project {
             .map(|relative_path| self.path.join(relative_path))
     }
     
-    /// Get the assets directory path
-    pub fn assets_path(&self) -> PathBuf {
-        self.path.join("assets")
-    }
-    
-    /// Get the scenes directory path
-    pub fn scenes_path(&self) -> PathBuf {
-        self.path.join("scenes")
-    }
-    
-    /// Get the settings directory path  
-    pub fn settings_path(&self) -> PathBuf {
-        self.path.join("settings")
-    }
-    
-    /// Mark the project as having unsaved changes
-    pub fn mark_dirty(&mut self) {
-        self.is_dirty = true;
-        self.metadata.project.modified = Utc::now();
-    }
     
     /// Mark the project as saved
     pub fn mark_clean(&mut self) {

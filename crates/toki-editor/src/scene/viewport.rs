@@ -356,10 +356,6 @@ impl SceneViewport {
         self.needs_render = true;
     }
     
-    /// Check if scene needs re-rendering
-    pub fn needs_render(&self) -> bool {
-        self.needs_render
-    }
     
     // Note: Additional methods like toggle_collision_boxes, etc. can be added when needed
 }

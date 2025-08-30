@@ -1,5 +1,5 @@
 use anyhow::Result;
-use toki_core::{GameState, Camera};
+use toki_core::GameState;
 use toki_runtime::systems::ResourceManager;
 use toki_core::assets::tilemap::TileMap;
 use std::path::Path;
@@ -7,7 +7,6 @@ use std::path::Path;
 /// Manages the game scene data and state for editing
 pub struct SceneManager {
     game_state: GameState,
-    camera: Camera,
     #[allow(dead_code)] // Will be used for tilemap/sprite rendering
     resources: ResourceManager,
     /// Current loaded tilemap (if any)
@@ -21,22 +20,11 @@ impl SceneManager {
         let resources = ResourceManager::load_all()
             .map_err(|e| anyhow::anyhow!("Failed to load resources: {e}"))?;
         
-        // Set up camera for editing
-        let mut camera = Camera {
-            position: glam::IVec2::ZERO,
-            viewport_size: glam::UVec2::new(800, 600),
-            scale: 2, // Good zoom level for editing
-        };
-        camera.center_on(glam::IVec2::new(400, 300)); // Center on viewport
-        
-        // Note: Editor doesn't need camera controller - we control camera directly
-        
         let game_state = GameState::new_empty();
         
         tracing::info!("Scene manager created successfully");
         Ok(Self {
             game_state,
-            camera,
             resources,
             tilemap: None,
         })
@@ -59,10 +47,6 @@ impl SceneManager {
         &mut self.game_state
     }
     
-    /// Get reference to camera
-    pub fn camera(&self) -> &Camera {
-        &self.camera
-    }
     
     /// Get reference to resources
     #[allow(dead_code)] // Will be used for tilemap/sprite rendering

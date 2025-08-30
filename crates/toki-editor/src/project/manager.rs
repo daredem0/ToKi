@@ -31,25 +31,6 @@ impl ProjectManager {
         }
     }
     
-    /// Get reference to current project
-    pub fn current_project(&self) -> Option<&Project> {
-        self.current_project.as_ref()
-    }
-    
-    /// Get mutable reference to current project
-    pub fn current_project_mut(&mut self) -> Option<&mut Project> {
-        self.current_project.as_mut()
-    }
-    
-    /// Check if there's a project currently loaded
-    pub fn has_project(&self) -> bool {
-        self.current_project.is_some()
-    }
-    
-    /// Get recent projects list
-    pub fn recent_projects(&self) -> &[PathBuf] {
-        &self.recent_projects
-    }
     
     /// Create a new project at the specified location
     pub fn create_new_project(&mut self, name: String, parent_path: PathBuf) -> Result<GameState> {
@@ -147,13 +128,6 @@ impl ProjectManager {
         Ok(())
     }
     
-    /// Close the current project
-    pub fn close_project(&mut self) {
-        if let Some(project) = &self.current_project {
-            tracing::info!("Closing project '{}'", project.name);
-        }
-        self.current_project = None;
-    }
     
     /// Create the project folder structure
     fn create_project_structure(&self, project_path: &PathBuf) -> Result<()> {
@@ -224,22 +198,4 @@ impl ProjectManager {
         self.recent_projects.truncate(self.max_recent);
     }
     
-    /// Mark current project as having unsaved changes
-    pub fn mark_dirty(&mut self) {
-        if let Some(project) = &mut self.current_project {
-            project.mark_dirty();
-        }
-    }
-    
-    /// Check if current project has unsaved changes
-    pub fn is_dirty(&self) -> bool {
-        self.current_project.as_ref()
-            .map(|p| p.is_dirty)
-            .unwrap_or(false)
-    }
-    
-    /// Get current project name for display
-    pub fn current_project_name(&self) -> Option<String> {
-        self.current_project.as_ref().map(|p| p.name.clone())
-    }
 }
