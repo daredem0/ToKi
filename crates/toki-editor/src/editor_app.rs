@@ -525,18 +525,15 @@ impl EditorApp {
     fn handle_save_project_request(&mut self) {
         self.ui.save_project_requested = false;
 
-        if let Some(viewport) = &self.scene_viewport {
-            let game_state = viewport.scene_manager().game_state();
-            match self.project_manager.save_current_project(game_state) {
-                Ok(_) => {
-                    tracing::info!("Project saved successfully");
-                }
-                Err(e) => {
-                    tracing::error!("Failed to save project: {}", e);
-                }
+        // Get scenes from UI
+        let scenes = &self.ui.scenes;
+        match self.project_manager.save_current_project(scenes) {
+            Ok(_) => {
+                tracing::info!("Project saved successfully");
             }
-        } else {
-            tracing::warn!("No scene viewport available for saving");
+            Err(e) => {
+                tracing::error!("Failed to save project: {}", e);
+            }
         }
     }
 
