@@ -50,6 +50,6 @@
     "default_state": "walk"
   },
   
-  "category": "enemy",
+  "category": "npc",
   "tags": ["creature", "monster", "small"]
 }

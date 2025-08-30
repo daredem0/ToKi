@@ -7,6 +7,7 @@ pub enum Selection {
     Map(String, String), // (scene_name, map_name)
     Entity(EntityId),
     StandaloneMap(String), // Map selected from Maps panel (not in scene context)
+    EntityDefinition(String), // Entity definition from palette
 }
 
 
@@ -593,7 +594,125 @@ impl EditorUI {
                         tracing::warn!("No project configuration available for Maps panel");
                     }
                 }
+                
+                // Add Entity Palette section
+                ui.add_space(10.0);
+                ui.heading("🧙 Entities");
+                ui.separator();
+                
+                if let Some(config) = config {
+                    if let Some(project_path) = config.current_project_path() {
+                        if let Some(selected_entity) = self.render_entity_palette(ui, &project_path) {
+                            self.set_selection(Selection::EntityDefinition(selected_entity));
+                        }
+                    } else {
+                        ui.label("No project loaded for Entity palette");
+                    }
+                } else {
+                    ui.label("No project configuration available for Entity palette");
+                }
             });
+    }
+
+    fn render_entity_palette(&self, ui: &mut egui::Ui, project_path: &std::path::PathBuf) -> Option<String> {
+        let entities_path = project_path.join("entities");
+        
+        if entities_path.exists() {
+            // Try to read entity definition files
+            if let Ok(entries) = std::fs::read_dir(&entities_path) {
+                let mut found_entities = false;
+                let mut categories: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+                
+                // First pass: collect entities and group by category
+                for entry in entries.flatten() {
+                    if let Some(name) = entry.file_name().to_str() {
+                        if name.ends_with(".json") {
+                            let entity_name = name.trim_end_matches(".json").to_string();
+                            found_entities = true;
+                            
+                            // Try to read the entity file to get its category
+                            let entity_path = entry.path();
+                            if let Ok(content) = std::fs::read_to_string(&entity_path) {
+                                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&content) {
+                                    let category = json_value
+                                        .get("category")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("uncategorized")
+                                        .to_string();
+                                    
+                                    categories.entry(category).or_insert_with(Vec::new).push(entity_name);
+                                } else {
+                                    // If we can't parse JSON, put in uncategorized
+                                    categories.entry("uncategorized".to_string()).or_insert_with(Vec::new).push(entity_name);
+                                }
+                            } else {
+                                // If we can't read file, put in uncategorized
+                                categories.entry("uncategorized".to_string()).or_insert_with(Vec::new).push(entity_name);
+                            }
+                        }
+                    }
+                }
+                
+                if found_entities {
+                    let mut selected_entity = None;
+                    
+                    egui::ScrollArea::vertical()
+                        .id_salt("entities_scroll")
+                        .max_height(150.0)
+                        .show(ui, |ui| {
+                            // Sort categories for consistent display
+                            let mut sorted_categories: Vec<_> = categories.into_iter().collect();
+                            sorted_categories.sort_by(|a, b| a.0.cmp(&b.0));
+                            
+                            for (category, mut entity_names) in sorted_categories {
+                                // Show category header
+                                ui.label(format!("📂 {}", category));
+                                ui.indent(format!("category_{}", category), |ui| {
+                                    // Sort entity names
+                                    entity_names.sort();
+                                    
+                                    for entity_name in entity_names {
+                                        // Show entity button with selection capability
+                                        let is_selected = matches!(
+                                            &self.selection,
+                                            Some(Selection::EntityDefinition(name)) if name == &entity_name
+                                        );
+                                        
+                                        let button = ui.selectable_label(is_selected, format!("🧙 {}", entity_name));
+                                        
+                                        if button.clicked() {
+                                            tracing::info!("Entity '{}' selected", entity_name);
+                                            selected_entity = Some(entity_name.clone());
+                                        }
+                                        
+                                        // Right-click context menu for entity info
+                                        button.context_menu(|ui| {
+                                            ui.label(format!("Entity: {}", entity_name));
+                                            ui.separator();
+                                            ui.label("Actions:");
+                                            if ui.button("📖 View Definition").clicked() {
+                                                tracing::info!("View definition for entity: {}", entity_name);
+                                                ui.close();
+                                            }
+                                        });
+                                    }
+                                });
+                                ui.add_space(5.0);
+                            }
+                        });
+                    
+                    return selected_entity;
+                } else {
+                    ui.label("No entity definition files found in entities/");
+                }
+            } else {
+                ui.label("Could not read entities directory");
+            }
+        } else {
+            ui.label("No entities directory found, expected: entities/");
+        }
+        
+        None
     }
 
     fn render_inspector_panel(&mut self, ctx: &egui::Context, game_state: Option<&toki_core::GameState>, config: Option<&crate::config::EditorConfig>) {
@@ -604,10 +723,14 @@ impl EditorUI {
                 ui.heading("🔍 Inspector");
                 ui.separator();
 
-                match &self.selection {
-                    Some(Selection::Scene(scene_name)) => {
-                        ui.heading(&format!("🎬 {}", scene_name));
-                        ui.separator();
+                // Wrap all inspector content in a scrollable area
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| {
+                        match &self.selection {
+                            Some(Selection::Scene(scene_name)) => {
+                                ui.heading(&format!("🎬 {}", scene_name));
+                                ui.separator();
                         
                         if let Some(scene) = self.get_scene(scene_name) {
                             ui.horizontal(|ui| {
@@ -721,12 +844,20 @@ impl EditorUI {
                         }
                     },
                     
-                    None => {
-                        ui.label("No selection");
+                    Some(Selection::EntityDefinition(entity_name)) => {
+                        ui.heading(&format!("🧙 {}", entity_name));
                         ui.separator();
-                        ui.label("Select a scene, map, or entity from the hierarchy to see details.");
-                    }
-                }
+                        
+                        Self::render_entity_definition_details(ui, entity_name, config);
+                    },
+                    
+                            None => {
+                                ui.label("No selection");
+                                ui.separator();
+                                ui.label("Select a scene, map, entity, or entity definition from the hierarchy to see details.");
+                            }
+                        }
+                    });
             });
     }
 
@@ -828,6 +959,298 @@ impl EditorUI {
                     }
                 } else {
                     ui.label("❌ Map file not found");
+                }
+            }
+        }
+    }
+
+    fn render_entity_definition_details(ui: &mut egui::Ui, entity_name: &str, config: Option<&crate::config::EditorConfig>) {
+        // Try to load and show entity definition details
+        if let Some(config) = config {
+            if let Some(project_path) = config.current_project_path() {
+                let entity_file = project_path
+                    .join("entities")
+                    .join(format!("{}.json", entity_name));
+                
+                if entity_file.exists() {
+                    // Try to read the entity definition file
+                    match std::fs::read_to_string(&entity_file) {
+                        Ok(content) => {
+                            // Try to parse as JSON to show detailed info
+                            match serde_json::from_str::<serde_json::Value>(&content) {
+                                Ok(json) => {
+                                    // Show file info
+                                    ui.horizontal(|ui| {
+                                        ui.label("File:");
+                                        ui.label(format!("{}.json", entity_name));
+                                    });
+                                    
+                                    if let Some(obj) = json.as_object() {
+                                        // Show basic entity information
+                                        if let Some(display_name) = obj.get("display_name").and_then(|v| v.as_str()) {
+                                            ui.horizontal(|ui| {
+                                                ui.label("Display Name:");
+                                                ui.label(display_name);
+                                            });
+                                        }
+                                        
+                                        if let Some(description) = obj.get("description").and_then(|v| v.as_str()) {
+                                            ui.horizontal(|ui| {
+                                                ui.label("Description:");
+                                                ui.label(description);
+                                            });
+                                        }
+                                        
+                                        if let Some(entity_type) = obj.get("entity_type").and_then(|v| v.as_str()) {
+                                            ui.horizontal(|ui| {
+                                                ui.label("Type:");
+                                                ui.label(entity_type);
+                                            });
+                                        }
+                                        
+                                        if let Some(category) = obj.get("category").and_then(|v| v.as_str()) {
+                                            ui.horizontal(|ui| {
+                                                ui.label("Category:");
+                                                ui.label(category);
+                                            });
+                                        }
+                                        
+                                        ui.separator();
+                                        
+                                        // Show attributes if present
+                                        if let Some(attributes) = obj.get("attributes").and_then(|v| v.as_object()) {
+                                            ui.heading("Attributes");
+                                            
+                                            if let Some(health) = attributes.get("health") {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Health:");
+                                                    if health.is_null() {
+                                                        ui.label("None");
+                                                    } else if let Some(h) = health.as_u64() {
+                                                        ui.label(h.to_string());
+                                                    } else {
+                                                        ui.label("Invalid");
+                                                    }
+                                                });
+                                            }
+                                            
+                                            if let Some(speed) = attributes.get("speed").and_then(|v| v.as_u64()) {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Speed:");
+                                                    ui.label(speed.to_string());
+                                                });
+                                            }
+                                            
+                                            if let Some(solid) = attributes.get("solid").and_then(|v| v.as_bool()) {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Solid:");
+                                                    ui.label(solid.to_string());
+                                                });
+                                            }
+                                            
+                                            if let Some(active) = attributes.get("active").and_then(|v| v.as_bool()) {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Active:");
+                                                    ui.label(active.to_string());
+                                                });
+                                            }
+                                            
+                                            if let Some(can_move) = attributes.get("can_move").and_then(|v| v.as_bool()) {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Can Move:");
+                                                    ui.label(can_move.to_string());
+                                                });
+                                            }
+                                            
+                                            if let Some(has_inventory) = attributes.get("has_inventory").and_then(|v| v.as_bool()) {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Has Inventory:");
+                                                    ui.label(has_inventory.to_string());
+                                                });
+                                            }
+                                        }
+                                        
+                                        ui.separator();
+                                        
+                                        // Show collision info if present
+                                        if let Some(collision) = obj.get("collision").and_then(|v| v.as_object()) {
+                                            ui.heading("Collision");
+                                            
+                                            if let Some(enabled) = collision.get("enabled").and_then(|v| v.as_bool()) {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Enabled:");
+                                                    ui.label(enabled.to_string());
+                                                });
+                                            }
+                                            
+                                            if let Some(offset) = collision.get("offset").and_then(|v| v.as_array()) {
+                                                if offset.len() == 2 {
+                                                    if let (Some(x), Some(y)) = (offset[0].as_i64(), offset[1].as_i64()) {
+                                                        ui.horizontal(|ui| {
+                                                            ui.label("Offset:");
+                                                            ui.label(format!("({}, {})", x, y));
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                            
+                                            if let Some(size) = collision.get("size").and_then(|v| v.as_array()) {
+                                                if size.len() == 2 {
+                                                    if let (Some(w), Some(h)) = (size[0].as_u64(), size[1].as_u64()) {
+                                                        ui.horizontal(|ui| {
+                                                            ui.label("Size:");
+                                                            ui.label(format!("{}x{}", w, h));
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                            
+                                            if let Some(trigger) = collision.get("trigger").and_then(|v| v.as_bool()) {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Trigger:");
+                                                    ui.label(trigger.to_string());
+                                                });
+                                            }
+                                            
+                                            ui.separator();
+                                        }
+                                        
+                                        // Show rendering info if present
+                                        if let Some(rendering) = obj.get("rendering").and_then(|v| v.as_object()) {
+                                            ui.heading("Rendering");
+                                            
+                                            if let Some(size) = rendering.get("size").and_then(|v| v.as_array()) {
+                                                if size.len() == 2 {
+                                                    if let (Some(w), Some(h)) = (size[0].as_u64(), size[1].as_u64()) {
+                                                        ui.horizontal(|ui| {
+                                                            ui.label("Size:");
+                                                            ui.label(format!("{}x{}", w, h));
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                            
+                                            if let Some(render_layer) = rendering.get("render_layer").and_then(|v| v.as_i64()) {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Render Layer:");
+                                                    ui.label(render_layer.to_string());
+                                                });
+                                            }
+                                        }
+                                        
+                                        // Show animation info if present
+                                        if let Some(animations) = obj.get("animations").and_then(|v| v.as_object()) {
+                                            ui.separator();
+                                            ui.heading("Animations");
+                                            
+                                            if let Some(atlas_name) = animations.get("atlas_name").and_then(|v| v.as_str()) {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Atlas:");
+                                                    ui.label(atlas_name);
+                                                });
+                                            }
+                                            
+                                            if let Some(default_state) = animations.get("default_state").and_then(|v| v.as_str()) {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Default State:");
+                                                    ui.label(default_state);
+                                                });
+                                            }
+                                            
+                                            if let Some(clips) = animations.get("clips").and_then(|v| v.as_array()) {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Available Clips:");
+                                                    ui.label(format!("{}", clips.len()));
+                                                });
+                                                
+                                                ui.indent("animation_clips", |ui| {
+                                                    for (_i, clip) in clips.iter().enumerate() {
+                                                        if let Some(clip_obj) = clip.as_object() {
+                                                            let state = clip_obj.get("state").and_then(|v| v.as_str()).unwrap_or("unknown");
+                                                            let frame_count = clip_obj.get("frame_tiles").and_then(|v| v.as_array()).map(|arr| arr.len()).unwrap_or(0);
+                                                            let duration = clip_obj.get("frame_duration_ms").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                                                            let loop_mode = clip_obj.get("loop_mode").and_then(|v| v.as_str()).unwrap_or("unknown");
+                                                            
+                                                            ui.collapsing(&format!("🎬 {} ({} frames)", state, frame_count), |ui| {
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label("Frame Duration:");
+                                                                    ui.label(format!("{} ms", duration));
+                                                                });
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label("Loop Mode:");
+                                                                    ui.label(loop_mode);
+                                                                });
+                                                                
+                                                                if let Some(frame_tiles) = clip_obj.get("frame_tiles").and_then(|v| v.as_array()) {
+                                                                    ui.label("Frame Tiles:");
+                                                                    ui.indent("frame_tiles", |ui| {
+                                                                        for (j, tile) in frame_tiles.iter().enumerate() {
+                                                                            if let Some(tile_name) = tile.as_str() {
+                                                                                ui.label(format!("{}. {}", j + 1, tile_name));
+                                                                            }
+                                                                        }
+                                                                    });
+                                                                }
+                                                            });
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        }
+                                        
+                                        // Show audio info if present
+                                        if let Some(audio) = obj.get("audio").and_then(|v| v.as_object()) {
+                                            ui.separator();
+                                            ui.heading("Audio");
+                                            
+                                            if let Some(footstep_distance) = audio.get("footstep_trigger_distance").and_then(|v| v.as_f64()) {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Footstep Distance:");
+                                                    ui.label(format!("{} pixels", footstep_distance));
+                                                });
+                                            }
+                                            
+                                            if let Some(movement_sound) = audio.get("movement_sound").and_then(|v| v.as_str()) {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Movement Sound:");
+                                                    ui.label(movement_sound);
+                                                });
+                                            }
+                                        }
+                                        
+                                        // Show tags if present
+                                        if let Some(tags) = obj.get("tags").and_then(|v| v.as_array()) {
+                                            ui.separator();
+                                            ui.horizontal(|ui| {
+                                                ui.label("Tags:");
+                                                let tag_strings: Vec<String> = tags
+                                                    .iter()
+                                                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                                    .collect();
+                                                ui.label(tag_strings.join(", "));
+                                            });
+                                        }
+                                        
+                                        ui.separator();
+                                        if ui.button("🎮 Place in Scene").clicked() {
+                                            tracing::info!("Place entity '{}' button clicked", entity_name);
+                                            // TODO: Implement entity placement functionality
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    ui.label("❌ Invalid JSON file");
+                                    ui.label(format!("Error: {}", e));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            ui.label("❌ Could not read entity definition file");
+                            ui.label(format!("Error: {}", e));
+                        }
+                    }
+                } else {
+                    ui.label("❌ Entity definition file not found");
                 }
             }
         }
