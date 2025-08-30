@@ -353,6 +353,7 @@ impl EditorUI {
                     .show(ui, |ui| {
                     // Collect actions to perform after UI iteration
                     let mut map_removals: Vec<(usize, usize)> = Vec::new();
+                    let mut entity_removals: Vec<(String, u32)> = Vec::new(); // (scene_name, entity_id)
                     let mut selection_changes: Vec<Selection> = Vec::new();
                     let mut active_scene_change: Option<String> = None;
                     
@@ -394,14 +395,58 @@ impl EditorUI {
                                 ui.add_space(5.0);
                             }
                             
-                            // Entities section within the scene
-                            ui.label("Entities:");
-                            ui.indent("scene_entities", |ui| {
+                            // Scene entities section (design-time entities in scene definition)
+                            if !scene.entities.is_empty() {
+                                ui.label("Scene Entities:");
+                                ui.indent("scene_design_entities", |ui| {
+                                    for entity in &scene.entities {
+                                        let is_selected = matches!(
+                                            &self.selection,
+                                            Some(Selection::Entity(id)) if id == &entity.id
+                                        );
+                                        
+                                        ui.horizontal(|ui| {
+                                            let entity_display = match entity.entity_type {
+                                                toki_core::entity::EntityType::Player => format!("👤 Player (ID: {})", entity.id),
+                                                toki_core::entity::EntityType::Npc => format!("🧙 NPC (ID: {})", entity.id),
+                                                toki_core::entity::EntityType::Item => format!("📦 Item (ID: {})", entity.id),
+                                                toki_core::entity::EntityType::Decoration => format!("🎨 Decoration (ID: {})", entity.id),
+                                                toki_core::entity::EntityType::Trigger => format!("⚡ Trigger (ID: {})", entity.id),
+                                            };
+                                            
+                                            let response = ui.selectable_label(is_selected, entity_display);
+                                            
+                                            if response.clicked() {
+                                                selection_changes.push(Selection::Entity(entity.id));
+                                                tracing::info!("Selected scene entity ID: {}", entity.id);
+                                            }
+                                            
+                                            // Show entity position
+                                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                ui.label(format!("({}, {})", entity.position.x, entity.position.y));
+                                            });
+                                        });
+                                        
+                                        // Right-click context menu for entity actions
+                                        ui.horizontal(|ui| {
+                                            ui.add_space(20.0); // Indent for context options
+                                            if ui.small_button("🗑️").on_hover_text("Remove from scene").clicked() {
+                                                // Add to removal list - will be processed after UI rendering
+                                                entity_removals.push((scene.name.clone(), entity.id));
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                            
+                            // Runtime entities section (entities from game state)
+                            ui.label("Runtime Entities:");
+                            ui.indent("scene_runtime_entities", |ui| {
                                 if let Some(game_state) = game_state {
                                     let entity_ids = game_state.entity_manager().active_entities();
                                     
                                     if entity_ids.is_empty() {
-                                        ui.label("No entities in scene");
+                                        ui.label("No runtime entities");
                                     } else {
                                         for entity_id in &entity_ids {
                                             if let Some(entity) = game_state.entity_manager().get_entity(*entity_id) {
@@ -413,12 +458,11 @@ impl EditorUI {
                                                 ui.horizontal(|ui| {
                                                     let response = ui.selectable_label(
                                                         is_selected,
-                                                        format!("👤 Entity {}", entity_id)
+                                                        format!("⚙️ Runtime Entity {}", entity_id)
                                                     );
                                                     
                                                     if response.clicked() {
                                                         selection_changes.push(Selection::Entity(*entity_id));
-                                                        // Keep legacy selection for backward compatibility
                                                         self.selected_entity_id = Some(*entity_id);
                                                     }
                                                     
@@ -469,6 +513,23 @@ impl EditorUI {
                                 if matches!(&self.selection, Some(Selection::Map(s, m)) if s == &scene.name && m == &removed_map) {
                                     self.clear_selection();
                                 }
+                            }
+                        }
+                    }
+                    
+                    // Process entity removals
+                    for (scene_name, entity_id) in entity_removals {
+                        if let Some(scene) = self.scenes.iter_mut().find(|s| s.name == scene_name) {
+                            if let Some(index) = scene.entities.iter().position(|e| e.id == entity_id) {
+                                scene.entities.remove(index);
+                                tracing::info!("Removed entity {} from scene {}", entity_id, scene_name);
+                                
+                                // Clear selection if it was the removed entity
+                                if matches!(&self.selection, Some(Selection::Entity(id)) if id == &entity_id) {
+                                    self.clear_selection();
+                                }
+                                
+                                self.scene_content_changed = true;
                             }
                         }
                     }
@@ -602,8 +663,64 @@ impl EditorUI {
                 
                 if let Some(config) = config {
                     if let Some(project_path) = config.current_project_path() {
-                        if let Some(selected_entity) = self.render_entity_palette(ui, &project_path) {
+                        let (selected_entity, entity_additions) = self.render_entity_palette(ui, &project_path);
+                        
+                        // Handle entity selection
+                        if let Some(selected_entity) = selected_entity {
                             self.set_selection(Selection::EntityDefinition(selected_entity));
+                        }
+                        
+                        // Process entity additions to scenes
+                        for (scene_name, entity_name) in entity_additions {
+                            if let Some(target_scene) = self.scenes.iter_mut().find(|s| s.name == scene_name) {
+                                // Try to load and create entity from definition
+                                if let Some(project_path) = config.current_project_path() {
+                                    let entity_file = project_path
+                                        .join("entities")
+                                        .join(format!("{}.json", entity_name));
+                                    
+                                    if entity_file.exists() {
+                                        match std::fs::read_to_string(&entity_file) {
+                                            Ok(content) => {
+                                                match serde_json::from_str::<toki_core::entity::EntityDefinition>(&content) {
+                                                    Ok(entity_def) => {
+                                                        // Generate a new entity ID (simple increment from existing entities)
+                                                        let new_id = target_scene.entities.iter()
+                                                            .map(|e| e.id)
+                                                            .max()
+                                                            .unwrap_or(0) + 1;
+                                                        
+                                                        // Default position at (100, 100) - user can move it later
+                                                        let default_position = glam::IVec2::new(100, 100);
+                                                        
+                                                        match entity_def.create_entity(default_position, new_id) {
+                                                            Ok(entity) => {
+                                                                target_scene.entities.push(entity);
+                                                                tracing::info!("Successfully added entity '{}' (ID: {}) to scene '{}' at position ({}, {})", 
+                                                                    entity_name, new_id, scene_name, default_position.x, default_position.y);
+                                                                self.scene_content_changed = true;
+                                                            }
+                                                            Err(e) => {
+                                                                tracing::error!("Failed to create entity '{}': {}", entity_name, e);
+                                                            }
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        tracing::error!("Failed to parse entity definition '{}': {}", entity_name, e);
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                tracing::error!("Failed to read entity file '{}': {}", entity_name, e);
+                                            }
+                                        }
+                                    } else {
+                                        tracing::error!("Entity definition file not found: {:?}", entity_file);
+                                    }
+                                } else {
+                                    tracing::error!("No project path available for entity creation");
+                                }
+                            }
                         }
                     } else {
                         ui.label("No project loaded for Entity palette");
@@ -614,7 +731,7 @@ impl EditorUI {
             });
     }
 
-    fn render_entity_palette(&self, ui: &mut egui::Ui, project_path: &std::path::PathBuf) -> Option<String> {
+    fn render_entity_palette(&self, ui: &mut egui::Ui, project_path: &std::path::PathBuf) -> (Option<String>, Vec<(String, String)>) {
         let entities_path = project_path.join("entities");
         
         if entities_path.exists() {
@@ -655,6 +772,7 @@ impl EditorUI {
                 
                 if found_entities {
                     let mut selected_entity = None;
+                    let mut scene_entity_additions: Vec<(String, String)> = Vec::new(); // (scene_name, entity_name)
                     
                     egui::ScrollArea::vertical()
                         .id_salt("entities_scroll")
@@ -685,9 +803,28 @@ impl EditorUI {
                                             selected_entity = Some(entity_name.clone());
                                         }
                                         
-                                        // Right-click context menu for entity info
+                                        // Right-click context menu for entity actions
                                         button.context_menu(|ui| {
                                             ui.label(format!("Entity: {}", entity_name));
+                                            ui.separator();
+                                            
+                                            // Add to Scene section
+                                            ui.label("Add to Scene:");
+                                            ui.separator();
+                                            
+                                            // Show available scenes
+                                            let scene_names: Vec<String> = self.scenes.iter()
+                                                .map(|s| s.name.clone())
+                                                .collect();
+                                            
+                                            for scene_name in scene_names {
+                                                if ui.button(&scene_name).clicked() {
+                                                    tracing::info!("Adding entity '{}' to scene '{}'", entity_name, scene_name);
+                                                    scene_entity_additions.push((scene_name.clone(), entity_name.clone()));
+                                                    ui.close();
+                                                }
+                                            }
+                                            
                                             ui.separator();
                                             ui.label("Actions:");
                                             if ui.button("📖 View Definition").clicked() {
@@ -701,7 +838,7 @@ impl EditorUI {
                             }
                         });
                     
-                    return selected_entity;
+                    return (selected_entity, scene_entity_additions);
                 } else {
                     ui.label("No entity definition files found in entities/");
                 }
@@ -712,7 +849,7 @@ impl EditorUI {
             ui.label("No entities directory found, expected: entities/");
         }
         
-        None
+        (None, Vec::new())
     }
 
     fn render_inspector_panel(&mut self, ctx: &egui::Context, game_state: Option<&toki_core::GameState>, config: Option<&crate::config::EditorConfig>) {
