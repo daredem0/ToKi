@@ -13,10 +13,14 @@ It provides a modular toolkit for making retro-style games with clean pixel grap
 -  Animation system with frame timing + loop control
 -  Pixel-perfect camera & scaling (integer nearest-neighbor)
 -  Modular architecture: core, render, editor, runtime
-- CLI-free, GUI-focused editor planned
+- CLI-free, GUI-focused editor with interactive viewport
 - Tilemap + chunked rendering engine
-- Visual rules editor (no-code logic)
-- One-click export to native binary
+- Entity system with JSON-based definitions
+- Asset management with automatic project scanning
+- JSON schema validation for all asset types
+- Scene management with serialization support
+- Visual rules editor (no-code logic) - planned
+- One-click export to native binary - planned
 
 ---
 
@@ -25,10 +29,12 @@ It provides a modular toolkit for making retro-style games with clean pixel grap
 ```bash
 toki/
 ├── crates/
-│   ├── toki-core     # Data models, math, animation, image parsing
-│   ├── toki-render   # WGPU-based renderer
+│   ├── toki-core     # Data models, math, animation, entity system, scene management
+│   ├── toki-render   # WGPU-based renderer with scene rendering support  
 │   ├── toki-runtime  # Game loop & logic runtime
-│   └── toki-editor   # Editor UI (egui/winit/ImGui)
+│   └── toki-editor   # Editor UI with interactive viewport and asset management
+├── schemas/          # JSON schemas for asset validation
+├── example_project/  # Sample project demonstrating asset structure
 └── assets/           # Sprites, atlases, maps (JSON/PNG)
 ```
 
@@ -38,6 +44,14 @@ toki/
 cargo build
 cargo run -p toki-editor
 ```
+
+### 🎮 Editor Features
+- **Interactive Viewport**: Mouse drag camera controls with configurable speed
+- **Asset Management**: Automatic discovery of scenes, entities, atlases, and maps
+- **Entity Palette**: Drag-and-drop entity placement from definitions
+- **Scene Hierarchy**: Visual scene management with entity organization
+- **Asset Validation**: Edit → "Validate Project Assets" for schema compliance checking
+
 ### ☑️  Run Tests
 ```bash
 cargo test --workspace
@@ -47,7 +61,6 @@ cargo test --workspace
 ```bash
 cargo install cargo-llvm-cov
 cargo llvm-cov -p toki-core --open
-
 ```
 ## License
 
