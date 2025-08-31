@@ -358,10 +358,6 @@ impl SceneViewport {
         let Some(atlas_asset) = project_assets.sprite_atlases.get(atlas_name_clean) else {
             tracing::error!("Sprite atlas '{}' not found in ProjectAssets (cleaned name: '{}')", 
                            atlas_name, atlas_name_clean);
-            tracing::debug!("This may indicate:");
-            tracing::debug!("  - Atlas file missing from assets/atlases/");
-            tracing::debug!("  - Mismatch between entity animation_controller atlas reference and asset filename");
-            tracing::debug!("  - Project assets not properly loaded");
             return;
         };
         
