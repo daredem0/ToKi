@@ -446,6 +446,8 @@ impl EditorApp {
                     match SceneViewport::with_game_state(game_state) {
                         Ok(viewport) => {
                             self.scene_viewport = self.initialize_viewport(viewport);
+                            // Reset last loaded scene to force map loading for active scene
+                            self.last_loaded_active_scene = None;
 
                             // Update config with opened project path
                             self.config.set_project_path(project_path);
@@ -507,6 +509,8 @@ impl EditorApp {
                     match SceneViewport::with_game_state(game_state) {
                         Ok(viewport) => {
                             self.scene_viewport = self.initialize_viewport(viewport);
+                            // Reset last loaded scene to force map loading for active scene
+                            self.last_loaded_active_scene = None;
 
                             // Update config with opened project path
                             self.config.set_project_path(project_path);
