@@ -250,7 +250,10 @@ impl ApplicationHandler for EditorApp {
                             KeyCode::F4 => {
                                 // Toggle debug collision rendering (same as toki-runtime)
                                 if let Some(viewport) = &mut self.scene_viewport {
-                                    viewport.scene_manager_mut().game_state_mut().handle_key_press(toki_core::InputKey::DebugToggle);
+                                    viewport
+                                        .scene_manager_mut()
+                                        .game_state_mut()
+                                        .handle_key_press(toki_core::InputKey::DebugToggle);
                                     tracing::info!("Toggled debug collision rendering via F4");
                                     if let Some(window) = &self.window {
                                         window.request_redraw();
@@ -308,9 +311,11 @@ impl EditorApp {
         if let Some(scene_viewport) = &mut self.scene_viewport {
             if let Some(project_path) = &project_path {
                 if let Some(project_assets) = self.project_manager.get_project_assets() {
-                    match scene_viewport
-                        .render_to_texture(project_path.as_path(), project_assets, renderer.egui_renderer_mut())
-                    {
+                    match scene_viewport.render_to_texture(
+                        project_path.as_path(),
+                        project_assets,
+                        renderer.egui_renderer_mut(),
+                    ) {
                         Ok(()) => {
                             // Reduce log spam - render_to_texture already handles its own logging
                             // tracing::debug!("Scene rendered to offscreen texture successfully");
@@ -319,8 +324,11 @@ impl EditorApp {
                             tracing::error!("Failed to render scene to texture: {}", e);
                         }
                     }
-                } else {
-                    tracing::warn!("No project assets available for scene rendering");
+                } else if self.project_manager.current_project.is_some() {
+                    tracing::warn!(
+                        "No project assets available for scene rendering {:?}",
+                        self.project_manager.current_project
+                    );
                 }
             }
         }
@@ -539,10 +547,15 @@ impl EditorApp {
                             match self.project_manager.load_scenes() {
                                 Ok(loaded_scenes) => {
                                     self.ui.load_scenes_from_project(loaded_scenes);
-                                    tracing::info!("Loaded scenes into UI hierarchy from browsed project");
+                                    tracing::info!(
+                                        "Loaded scenes into UI hierarchy from browsed project"
+                                    );
                                 }
                                 Err(e) => {
-                                    tracing::error!("Failed to load scenes into UI from browsed project: {}", e);
+                                    tracing::error!(
+                                        "Failed to load scenes into UI from browsed project: {}",
+                                        e
+                                    );
                                 }
                             }
 
@@ -650,20 +663,33 @@ impl EditorApp {
                     // Load the scene into GameState (with entities) and then load the tilemap
                     if let Some(viewport) = &mut self.scene_viewport {
                         // First, add the scene to the GameState's SceneManager
-                        viewport.scene_manager_mut().game_state_mut().add_scene(active_scene.clone());
-                        
+                        viewport
+                            .scene_manager_mut()
+                            .game_state_mut()
+                            .add_scene(active_scene.clone());
+
                         // Then load the scene to make it active (this transfers entities to GameState)
-                        match viewport.scene_manager_mut().game_state_mut().load_scene(active_scene_name) {
+                        match viewport
+                            .scene_manager_mut()
+                            .game_state_mut()
+                            .load_scene(active_scene_name)
+                        {
                             Ok(()) => {
-                                tracing::info!("Loaded active scene '{}' with {} entities into GameState", 
-                                              active_scene_name, active_scene.entities.len());
+                                tracing::info!(
+                                    "Loaded active scene '{}' with {} entities into GameState",
+                                    active_scene_name,
+                                    active_scene.entities.len()
+                                );
                             }
                             Err(e) => {
-                                tracing::error!("Failed to load active scene '{}' into GameState: {}", 
-                                               active_scene_name, e);
+                                tracing::error!(
+                                    "Failed to load active scene '{}' into GameState: {}",
+                                    active_scene_name,
+                                    e
+                                );
                             }
                         }
-                        
+
                         // If the scene has at least one map, load it
                         if let Some(map_name) = active_scene.maps.first() {
                             if let Some(config) = self.config.current_project_path() {
@@ -697,8 +723,11 @@ impl EditorApp {
                         }
                     }
                 } else {
-                    // No active scene found  
-                    tracing::warn!("Active scene '{}' not found in scenes list", active_scene_name);
+                    // No active scene found
+                    tracing::warn!(
+                        "Active scene '{}' not found in scenes list",
+                        active_scene_name
+                    );
                 }
             } else {
                 // No active scene - clear viewport
@@ -758,10 +787,10 @@ impl EditorApp {
 
     fn handle_validate_assets_request(&mut self) {
         self.ui.validate_assets_requested = false;
-        
+
         if let Some(project_assets) = self.project_manager.get_project_assets() {
             tracing::info!("Starting asset validation");
-            
+
             match AssetValidator::new() {
                 Ok(validator) => {
                     if let Err(e) = validator.validate_project_assets(project_assets) {
