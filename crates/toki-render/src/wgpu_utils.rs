@@ -20,40 +20,46 @@ pub fn create_texture_bindgroup(
     texture_label: Option<&str>,
 ) -> wgpu::BindGroup {
     // Convert path to string with proper error handling
-    let texture_path_str = texture_file.as_path().to_str()
-        .unwrap_or_else(|| {
-            tracing::error!("Failed to convert texture path to string: {:?}", texture_file);
-            panic!("Invalid texture path encoding: {:?}", texture_file);
-        });
-    
+    let texture_path_str = texture_file.as_path().to_str().unwrap_or_else(|| {
+        tracing::error!(
+            "Failed to convert texture path to string: {:?}",
+            texture_file
+        );
+        panic!("Invalid texture path encoding: {:?}", texture_file);
+    });
+
     if texture_path_str.is_empty() {
-        tracing::debug!("Loading default texture (no path provided) for label: {:?}", texture_label);
+        tracing::debug!(
+            "Loading default texture (no path provided) for label: {:?}",
+            texture_label
+        );
     } else {
         tracing::debug!("Loading texture from: {}", texture_path_str);
     }
-    
-    let texture = GpuTexture::from_file(
-        device,
-        queue,
-        texture_path_str,
-        texture_label,
-    )
-    .unwrap_or_else(|e| {
-        tracing::error!("Failed to load texture from '{}': {}", texture_path_str, e);
-        tracing::error!("Texture label: {:?}", texture_label);
-        tracing::error!("Make sure the texture file exists and is a valid image format");
-        panic!("Texture loading failed for '{}': {}", texture_path_str, e);
-    });
+
+    let texture = GpuTexture::from_file(device, queue, texture_path_str, texture_label)
+        .unwrap_or_else(|e| {
+            tracing::error!("Failed to load texture from '{}': {}", texture_path_str, e);
+            tracing::error!("Texture label: {:?}", texture_label);
+            tracing::error!("Make sure the texture file exists and is a valid image format");
+            panic!("Texture loading failed for '{}': {}", texture_path_str, e);
+        });
 
     tracing::debug!("Creating bind group for texture: {:?}", texture_label);
     let bind_group = create_bind_group(device, texture_bind_group_layout, &texture, uniform_buffer);
-    
+
     if texture_path_str.is_empty() {
-        tracing::debug!("Successfully created texture bind group with default texture for: {:?}", texture_label);
+        tracing::debug!(
+            "Successfully created texture bind group with default texture for: {:?}",
+            texture_label
+        );
     } else {
-        tracing::debug!("Successfully created texture bind group for: {}", texture_path_str);
+        tracing::debug!(
+            "Successfully created texture bind group for: {}",
+            texture_path_str
+        );
     }
-    
+
     bind_group
 }
 pub fn create_device_and_surface(
@@ -87,45 +93,60 @@ pub async fn create_device_and_surface_async(
     let size = window.inner_size();
 
     // Create the surface of the window
-    let surface = instance.create_surface(window)
+    let surface = instance
+        .create_surface(window)
         .expect("Failed to create surface");
-        
+
     // Get a GPU adapter with proper error handling
-    let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::default(),
-        compatible_surface: Some(&surface),
-        force_fallback_adapter: false,
-    }).await
-    .expect("No suitable GPU adapters found on the system!");
+    let adapter = instance
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::default(),
+            compatible_surface: Some(&surface),
+            force_fallback_adapter: false,
+        })
+        .await
+        .expect("No suitable GPU adapters found on the system!");
 
     // Request GPU device and command queue with proper features
-    let (device, queue) = adapter.request_device(
-        &wgpu::DeviceDescriptor {
+    let (device, queue) = adapter
+        .request_device(&wgpu::DeviceDescriptor {
             required_features: wgpu::Features::empty(),
             required_limits: wgpu::Limits::default(),
             memory_hints: wgpu::MemoryHints::default(),
             trace: wgpu::Trace::default(),
             label: Some("Toki Device"),
-        }
-    ).await
-    .expect("Failed to create device");
+        })
+        .await
+        .expect("Failed to create device");
 
     // Configure surface with VSync and proper format selection
     let surface_caps = surface.get_capabilities(&adapter);
-    let surface_format = surface_caps.formats.iter()
+    let surface_format = surface_caps
+        .formats
+        .iter()
         .find(|f| f.is_srgb())
         .copied()
         .unwrap_or(surface_caps.formats[0]);
-        
+
     // Choose VSync for frame rate limiting and lower CPU usage
-    let present_mode = surface_caps.present_modes.iter()
+    let present_mode = surface_caps
+        .present_modes
+        .iter()
         .find(|&&mode| mode == wgpu::PresentMode::Fifo) // VSync (60 FPS cap)
-        .or_else(|| surface_caps.present_modes.iter()
-            .find(|&&mode| mode == wgpu::PresentMode::FifoRelaxed)) // Adaptive VSync
+        .or_else(|| {
+            surface_caps
+                .present_modes
+                .iter()
+                .find(|&&mode| mode == wgpu::PresentMode::FifoRelaxed)
+        }) // Adaptive VSync
         .copied()
         .unwrap_or(surface_caps.present_modes[0]); // Fallback to first available
-        
-    tracing::info!("Using present mode: {:?} (available: {:?})", present_mode, surface_caps.present_modes);
+
+    tracing::info!(
+        "Using present mode: {:?} (available: {:?})",
+        present_mode,
+        surface_caps.present_modes
+    );
 
     let config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -191,7 +212,7 @@ pub fn create_bind_group(
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Texture Bind Group"),
-        layout: &layout,
+        layout,
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,

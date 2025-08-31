@@ -1,7 +1,6 @@
 use crate::errors::RenderError;
 use std::path::Path;
 use toki_core::graphics::image::{load_image_rgba8, DecodedImage};
-use wgpu;
 
 pub struct GpuTexture {
     pub view: wgpu::TextureView,
@@ -20,13 +19,13 @@ impl GpuTexture {
             tracing::debug!("Creating default white texture for label: {:?}", label);
             return Self::create_default_white_texture(device, queue, label);
         }
-        
+
         // load the img
         let path_obj = Path::new(path);
         let image = load_image_rgba8(path_obj)?;
         Self::from_rgba8(device, queue, &image, label)
     }
-    
+
     /// Create a default 1x1 white texture for when no texture path is provided
     pub fn create_default_white_texture(
         device: &wgpu::Device,
@@ -39,7 +38,7 @@ impl GpuTexture {
             height: 1,
             data: vec![255, 255, 255, 255], // RGBA white
         };
-        
+
         Self::from_rgba8(device, queue, &image, label)
     }
     pub fn from_rgba8(
