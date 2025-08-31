@@ -170,13 +170,13 @@ impl AudioManager {
             
             // Stop all static sound handles
             for handle in &mut channel_data.active_handles {
-                let _ = handle.stop(Tween::default());
+                handle.stop(Tween::default());
             }
             channel_data.active_handles.clear();
 
             // Stop all streaming handles
             for handle in &mut channel_data.active_streaming_handles {
-                let _ = handle.stop(Tween::default());
+                handle.stop(Tween::default());
             }
             channel_data.active_streaming_handles.clear();
         } else {
@@ -253,11 +253,11 @@ impl AudioManager {
                     channel, active_count, name);
                 // Stop all existing sounds in this channel
                 for handle in &mut channel_data.active_handles {
-                    let _ = handle.stop(Tween::default());
+                    handle.stop(Tween::default());
                 }
                 channel_data.active_handles.clear();
                 for handle in &mut channel_data.active_streaming_handles {
-                    let _ = handle.stop(Tween::default());
+                    handle.stop(Tween::default());
                 }
                 channel_data.active_streaming_handles.clear();
             }
@@ -328,11 +328,11 @@ impl AudioManager {
                     channel, active_count, name);
                 // Stop all existing sounds in this channel
                 for handle in &mut channel_data.active_handles {
-                    let _ = handle.stop(Tween::default());
+                    handle.stop(Tween::default());
                 }
                 channel_data.active_handles.clear();
                 for handle in &mut channel_data.active_streaming_handles {
-                    let _ = handle.stop(Tween::default());
+                    handle.stop(Tween::default());
                 }
                 channel_data.active_streaming_handles.clear();
             }

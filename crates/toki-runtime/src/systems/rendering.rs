@@ -13,6 +13,12 @@ pub struct RenderingSystem {
     projection_params: ProjectionParameter,
 }
 
+impl Default for RenderingSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RenderingSystem {
     /// Create a new RenderingSystem with default projection parameters
     pub fn new() -> Self {

@@ -12,6 +12,12 @@ pub struct PlatformSystem {
     window: Option<Arc<Window>>,
 }
 
+impl Default for PlatformSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PlatformSystem {
     /// Create a new PlatformSystem with no window initially
     pub fn new() -> Self {
