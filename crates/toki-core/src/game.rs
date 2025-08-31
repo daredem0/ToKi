@@ -7,6 +7,7 @@ use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::entity::{Entity, EntityId, EntityManager};
 use crate::events::{GameEvent, GameUpdateResult};
+use crate::scene_manager::SceneManager;
 use crate::sprite::{SpriteFrame, SpriteInstance};
 
 /// Core input keys abstraction (platform-independent)
@@ -33,13 +34,16 @@ pub enum AudioEvent {
 
 impl GameEvent for AudioEvent {}
 
-/// Core game state that manages entities, input, and game logic.
+/// Core game state that manages entities, scenes, input, and game logic.
 ///
 /// This is platform-independent and contains pure game logic without
 /// any runtime or windowing dependencies.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GameState {
-    /// Entity manager for all game objects
+    /// Scene manager holding all scenes
+    scene_manager: SceneManager,
+
+    /// Entity manager for all game objects in the current scene
     entity_manager: EntityManager,
 
     /// Player entity ID for quick access
@@ -71,6 +75,7 @@ impl GameState {
         let player_id = entity_manager.spawn_player(player_sprite.position);
 
         Self {
+            scene_manager: SceneManager::new(),
             entity_manager,
             player_id: Some(player_id),
             keys_held: HashSet::new(),
@@ -84,6 +89,7 @@ impl GameState {
     /// Create a new empty GameState with no entities
     pub fn new_empty() -> Self {
         Self {
+            scene_manager: SceneManager::new(),
             entity_manager: EntityManager::new(),
             player_id: None,
             keys_held: HashSet::new(),
@@ -503,6 +509,69 @@ impl GameState {
     /// Get mutable access to the entity manager
     pub fn entity_manager_mut(&mut self) -> &mut EntityManager {
         &mut self.entity_manager
+    }
+
+    /// Get access to the scene manager
+    pub fn scene_manager(&self) -> &SceneManager {
+        &self.scene_manager
+    }
+
+    /// Get mutable access to the scene manager
+    pub fn scene_manager_mut(&mut self) -> &mut SceneManager {
+        &mut self.scene_manager
+    }
+
+    /// Load a scene and make it the active scene
+    /// This will clear current entities and load entities from the scene
+    pub fn load_scene(&mut self, scene_name: &str) -> Result<(), String> {
+        // Get the scene first
+        let scene = self.scene_manager.get_scene(scene_name)
+            .ok_or_else(|| format!("Scene '{}' not found", scene_name))?
+            .clone();
+
+        // Set as active scene
+        self.scene_manager.set_active_scene(scene_name)?;
+
+        // Clear current entities
+        self.entity_manager = EntityManager::new();
+        self.player_id = None;
+
+        // Load entities from scene
+        for entity in scene.entities {
+            let entity_id = self.entity_manager.add_existing_entity(entity.clone());
+            
+            // Track player entity
+            if matches!(entity.entity_type, crate::entity::EntityType::Player) {
+                self.player_id = Some(entity_id);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Add a scene to the scene manager
+    pub fn add_scene(&mut self, scene: crate::scene::Scene) {
+        self.scene_manager.add_scene(scene);
+    }
+
+    /// Get reference to the current active scene
+    pub fn active_scene(&self) -> Option<&crate::scene::Scene> {
+        self.scene_manager.active_scene()
+    }
+
+    /// Sync current entities back to the active scene
+    /// Useful for saving changes made during runtime back to scene data
+    pub fn sync_entities_to_active_scene(&mut self) {
+        if let Some(active_scene) = self.scene_manager.active_scene_mut() {
+            // Clear scene entities and reload from current entity manager
+            active_scene.entities.clear();
+            
+            for entity_id in self.entity_manager.active_entities() {
+                if let Some(entity) = self.entity_manager.get_entity(entity_id) {
+                    active_scene.entities.push(entity.clone());
+                }
+            }
+        }
     }
 
     /// Get the player entity ID

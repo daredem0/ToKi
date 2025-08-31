@@ -91,12 +91,4 @@ impl Scene {
     pub fn has_map(&self, map_name: &str) -> bool {
         self.maps.contains(&map_name.to_string())
     }
-    
-    /// Convert this scene to a GameState for runtime execution
-    pub fn to_game_state(&self) -> crate::game::GameState {
-        // TODO: Add entities from scene to game state
-        // This requires implementing entity conversion from Scene entities to GameState entities
-        
-        crate::game::GameState::new_empty()
-    }
 }

@@ -152,6 +152,36 @@ impl EntityManager {
 
         id
     }
+    
+    /// Add an existing entity to the manager (used for scene-to-gamestate conversion)
+    pub fn add_existing_entity(&mut self, entity: Entity) -> EntityId {
+        let id = entity.id;
+        let entity_type = entity.entity_type.clone();
+        
+        // Update next_id if needed to avoid conflicts
+        if id >= self.next_id {
+            self.next_id = id + 1;
+        }
+        
+        // Track player entity
+        if matches!(entity_type, EntityType::Player) && self.player_id.is_none() {
+            self.player_id = Some(id);
+        }
+        
+        // Update lookups
+        self.entities_by_type
+            .entry(entity_type)
+            .or_default()
+            .insert(id);
+            
+        self.active_entities.insert(id);
+        
+        // Store the entity
+        self.entities.insert(id, entity);
+        
+        tracing::debug!("Added existing entity {} to EntityManager", id);
+        id
+    }
 
     pub fn despawn_entity(&mut self, id: EntityId) -> bool {
         let Some(entity) = self.entities.remove(&id) else {

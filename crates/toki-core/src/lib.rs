@@ -33,6 +33,9 @@ pub mod entity;
 pub mod scene;
 pub use scene::Scene;
 
+pub mod scene_manager;
+pub use scene_manager::SceneManager;
+
 pub mod collision;
 pub use collision::{CollisionBox, CollisionResult};
 

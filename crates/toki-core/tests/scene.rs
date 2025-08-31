@@ -207,18 +207,6 @@ fn test_scene_has_map() {
     assert!(!scene.has_map("nonexistent"));
 }
 
-#[test]
-fn test_scene_to_game_state() {
-    let mut scene = Scene::new("test_scene".to_string());
-    let entity = create_test_entity(1, IVec2::new(100, 200));
-    scene.add_entity(entity);
-    
-    let _game_state = scene.to_game_state();
-    
-    // Currently returns empty game state as per TODO comment
-    // This test ensures the method works and doesn't panic
-    assert!(true);
-}
 
 #[test]
 fn test_scene_serialization() {
