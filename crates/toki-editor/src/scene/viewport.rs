@@ -1,5 +1,7 @@
 use anyhow::Result;
 use crate::scene::SceneManager;
+use crate::project::ProjectAssets;
+use crate::project::assets::SpriteAtlasAsset;
 use toki_render::{SceneRenderer, SceneData, OffscreenTarget};
 use toki_core::assets::atlas::AtlasMeta;
 use toki_core::Camera;
@@ -88,7 +90,7 @@ impl SceneViewport {
     }
     
     /// Render scene to offscreen texture (called before egui UI construction)
-    pub fn render_to_texture(&mut self, project_path: &std::path::Path, renderer: &mut egui_wgpu::Renderer) -> Result<()> {
+    pub fn render_to_texture(&mut self, project_path: &std::path::Path, project_assets: &ProjectAssets, renderer: &mut egui_wgpu::Renderer) -> Result<()> {
         if !self.is_initialized {
             return Ok(()); // Skip if not initialized
         }
@@ -101,7 +103,7 @@ impl SceneViewport {
         tracing::debug!("Scene needs re-rendering, proceeding with render");
         
         // Prepare scene data
-        let scene_data = self.prepare_scene_data(Some(project_path));
+        let scene_data = self.prepare_scene_data(Some(project_path), project_assets);
         
         // Render to offscreen target
         if let (Some(scene_renderer), Some(target)) = (&mut self.scene_renderer, &mut self.offscreen_target) {
@@ -234,7 +236,7 @@ impl SceneViewport {
     
     
     /// Prepare scene data for rendering
-    fn prepare_scene_data(&mut self, project_path: Option<&std::path::Path>) -> SceneData {
+    fn prepare_scene_data(&mut self, project_path: Option<&std::path::Path>, project_assets: &ProjectAssets) -> SceneData {
         let mut scene_data = SceneData::default();
         
         tracing::debug!("Preparing scene data for rendering...");
@@ -280,12 +282,13 @@ impl SceneViewport {
                     if let Ok(atlas_name) = animation_controller.current_atlas_name() {
                         tracing::debug!("Processing entity {} with atlas '{}'", entity_id, atlas_name);
                         
-                        // Load sprite atlas if needed (similar to runtime's creature_atlas loading)
-                        if let Some(project_path) = project_path {
-                            match self.load_sprite_atlas_for_entity(&atlas_name, project_path) {
+                        // Load sprite atlas using ProjectAssets (similar to runtime's creature_atlas loading)
+                        let atlas_name_clean = atlas_name.strip_suffix(".json").unwrap_or(&atlas_name);
+                        if let Some(atlas_asset) = project_assets.sprite_atlases.get(atlas_name_clean) {
+                            match self.load_sprite_atlas_from_asset(atlas_asset, project_path) {
                                 Ok(sprite_atlas) => {
                                     let sprite_texture_size = sprite_atlas.image_size().unwrap_or(glam::UVec2::new(64, 16));
-                                    tracing::debug!("Loaded sprite atlas '{}' with texture size {}x{}", atlas_name, sprite_texture_size.x, sprite_texture_size.y);
+                                    tracing::debug!("Loaded sprite atlas '{}' from ProjectAssets with texture size {}x{}", atlas_name, sprite_texture_size.x, sprite_texture_size.y);
                                     
                                     if let Some(frame) = self.scene_manager.game_state().get_entity_sprite_frame(entity_id, &sprite_atlas, sprite_texture_size) {
                                         let sprite_instance = toki_render::SpriteInstance {
@@ -302,6 +305,8 @@ impl SceneViewport {
                                     tracing::error!("Failed to load sprite atlas '{}': {}", atlas_name, e);
                                 }
                             }
+                        } else {
+                            tracing::warn!("Sprite atlas '{}' not found in ProjectAssets", atlas_name_clean);
                         }
                     }
                 }
@@ -438,26 +443,12 @@ impl SceneViewport {
         Ok(atlas)
     }
     
-    /// Load atlas for sprite entities (similar to tilemap loading)
-    fn load_sprite_atlas_for_entity(&mut self, atlas_name: &str, project_path: &std::path::Path) -> Result<AtlasMeta> {
-        // Try sprites directory first, then tilemaps directory
-        let atlas_path = {
-            let sprites_path = project_path.join("assets").join("sprites").join(format!("{}.json", atlas_name));
-            if sprites_path.exists() {
-                sprites_path
-            } else {
-                let tilemaps_path = project_path.join("assets").join("tilemaps").join(format!("{}.json", atlas_name));
-                if tilemaps_path.exists() {
-                    tilemaps_path
-                } else {
-                    // Fallback to original name without .json extension
-                    project_path.join("assets").join("sprites").join(atlas_name)
-                }
-            }
-        };
+    /// Load atlas from ProjectAssets (replaces hardcoded path lookup)
+    fn load_sprite_atlas_from_asset(&mut self, atlas_asset: &SpriteAtlasAsset, _project_path: Option<&std::path::Path>) -> Result<AtlasMeta> {
+        let atlas_path = &atlas_asset.path;
         
-        let atlas = AtlasMeta::load_from_file(&atlas_path)
-            .map_err(|e| anyhow::anyhow!("Failed to load sprite atlas '{}' from '{}': {}", atlas_name, atlas_path.display(), e))?;
+        let atlas = AtlasMeta::load_from_file(atlas_path)
+            .map_err(|e| anyhow::anyhow!("Failed to load sprite atlas from '{}': {}", atlas_path.display(), e))?;
         
         // Load the corresponding sprite texture into the renderer
         tracing::debug!("Sprite atlas image field contains: {:?}", atlas.image);
@@ -472,7 +463,7 @@ impl SceneViewport {
                 tracing::info!("Loading sprite texture: {}", texture_path.display());
                 scene_renderer.load_sprite_texture(texture_path)
                     .map_err(|e| anyhow::anyhow!("Failed to load sprite texture: {}", e))?;
-                tracing::info!("Successfully loaded sprite texture");
+                tracing::info!("Successfully loaded sprite texture from ProjectAssets");
             } else {
                 tracing::warn!("Sprite texture not found: {}", texture_path.display());
             }

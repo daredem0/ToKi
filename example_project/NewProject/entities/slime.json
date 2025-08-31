@@ -3,13 +3,14 @@
   "display_name": "Green Slime",
   "description": "A bouncy green slime that wanders around",
   "entity_type": "npc",
-  
   "rendering": {
-    "size": [16, 16],
+    "size": [
+      16,
+      16
+    ],
     "render_layer": 0,
     "visible": true
   },
-  
   "attributes": {
     "health": 50,
     "speed": 1,
@@ -18,38 +19,52 @@
     "can_move": false,
     "has_inventory": false
   },
-  
   "collision": {
     "enabled": true,
-    "offset": [0, 0],
-    "size": [16, 16],
+    "offset": [
+      0,
+      0
+    ],
+    "size": [
+      16,
+      16
+    ],
     "trigger": false
   },
-  
   "audio": {
     "footstep_trigger_distance": 16.0,
     "movement_sound": "sfx_slime_bounce"
   },
-  
   "animations": {
-    "atlas_name": "creatures",
+    "atlas_name": "creatures.json",
     "clips": [
       {
         "state": "idle",
-        "frame_tiles": ["slime/idle_0", "slime/idle_1"],
+        "frame_tiles": [
+          "slime/idle_0",
+          "slime/idle_1"
+        ],
         "frame_duration_ms": 300.0,
         "loop_mode": "loop"
       },
       {
-        "state": "walk", 
-        "frame_tiles": ["slime/walk_0", "slime/walk_1", "slime/walk_2", "slime/walk_3"],
+        "state": "walk",
+        "frame_tiles": [
+          "slime/walk_0",
+          "slime/walk_1",
+          "slime/walk_2",
+          "slime/walk_3"
+        ],
         "frame_duration_ms": 150.0,
         "loop_mode": "loop"
       }
     ],
     "default_state": "walk"
   },
-  
   "category": "npc",
-  "tags": ["creature", "monster", "small"]
+  "tags": [
+    "creature",
+    "monster",
+    "small"
+  ]
 }

@@ -3,13 +3,14 @@
   "display_name": "Player Character",
   "description": "The main character controlled by the player",
   "entity_type": "player",
-  
   "rendering": {
-    "size": [16, 16],
+    "size": [
+      16,
+      16
+    ],
     "render_layer": 1,
     "visible": true
   },
-  
   "attributes": {
     "health": 100,
     "speed": 2,
@@ -18,38 +19,52 @@
     "can_move": true,
     "has_inventory": true
   },
-  
   "collision": {
     "enabled": true,
-    "offset": [0, 0],
-    "size": [16, 16],
+    "offset": [
+      0,
+      0
+    ],
+    "size": [
+      16,
+      16
+    ],
     "trigger": false
   },
-  
   "audio": {
     "footstep_trigger_distance": 16.0,
     "movement_sound": "sfx_player_step"
   },
-  
   "animations": {
-    "atlas_name": "creatures",
+    "atlas_name": "creatures.json",
     "clips": [
       {
         "state": "idle",
-        "frame_tiles": ["slime/idle_0", "slime/idle_1"],
+        "frame_tiles": [
+          "slime/idle_0",
+          "slime/idle_1"
+        ],
         "frame_duration_ms": 300.0,
         "loop_mode": "loop"
       },
       {
         "state": "walk",
-        "frame_tiles": ["slime/walk_0", "slime/walk_1", "slime/walk_2", "slime/walk_3"],
+        "frame_tiles": [
+          "slime/walk_0",
+          "slime/walk_1",
+          "slime/walk_2",
+          "slime/walk_3"
+        ],
         "frame_duration_ms": 150.0,
         "loop_mode": "loop"
       }
     ],
     "default_state": "idle"
   },
-  
   "category": "character",
-  "tags": ["player", "hero", "controllable"]
+  "tags": [
+    "player",
+    "hero",
+    "controllable"
+  ]
 }

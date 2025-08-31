@@ -307,16 +307,20 @@ impl EditorApp {
         let project_path = self.config.current_project_path();
         if let Some(scene_viewport) = &mut self.scene_viewport {
             if let Some(project_path) = &project_path {
-                match scene_viewport
-                    .render_to_texture(project_path.as_path(), renderer.egui_renderer_mut())
-                {
-                    Ok(()) => {
-                        // Reduce log spam - render_to_texture already handles its own logging
-                        // tracing::debug!("Scene rendered to offscreen texture successfully");
+                if let Some(project_assets) = self.project_manager.get_project_assets() {
+                    match scene_viewport
+                        .render_to_texture(project_path.as_path(), project_assets, renderer.egui_renderer_mut())
+                    {
+                        Ok(()) => {
+                            // Reduce log spam - render_to_texture already handles its own logging
+                            // tracing::debug!("Scene rendered to offscreen texture successfully");
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to render scene to texture: {}", e);
+                        }
                     }
-                    Err(e) => {
-                        tracing::error!("Failed to render scene to texture: {}", e);
-                    }
+                } else {
+                    tracing::warn!("No project assets available for scene rendering");
                 }
             }
         }
