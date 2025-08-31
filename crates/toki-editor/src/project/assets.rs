@@ -1,10 +1,12 @@
+/// TODO: #[allow(dead_code)] is broadly used here and needs to be removed later on
 use anyhow::Result;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use std::fs;
-use toki_core::{Scene, entity::EntityDefinition};
+use std::path::{Path, PathBuf};
+use toki_core::{entity::EntityDefinition, Scene};
 
 /// Asset discovery and management for project
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ProjectAssets {
     /// Project root path
@@ -25,6 +27,7 @@ pub struct ProjectAssets {
 
 /// Scene asset information
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct SceneAsset {
     /// Scene name (from filename)
     pub name: String,
@@ -36,6 +39,7 @@ pub struct SceneAsset {
 
 /// Tilemap asset information
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct TilemapAsset {
     /// Tilemap name (from filename)
     pub name: String,
@@ -45,6 +49,7 @@ pub struct TilemapAsset {
 
 /// Sprite atlas asset information
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct SpriteAtlasAsset {
     /// Atlas name (from filename)
     pub name: String,
@@ -54,6 +59,7 @@ pub struct SpriteAtlasAsset {
 
 /// Audio asset information
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct AudioAsset {
     /// Audio name (from filename)
     pub name: String,
@@ -74,6 +80,7 @@ pub enum AudioFormat {
 
 /// Entity definition asset information
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct EntityAsset {
     /// Entity name (from filename)
     pub name: String,
@@ -104,7 +111,7 @@ impl ProjectAssets {
         self.scan_sprite_atlases()?;
         self.scan_audio()?;
         self.scan_entities()?;
-        
+
         tracing::info!(
             "Scanned project assets: {} scenes, {} tilemaps, {} atlases, {} music, {} sfx, {} entities",
             self.scenes.len(),
@@ -114,7 +121,7 @@ impl ProjectAssets {
             self.sfx.len(),
             self.entities.len()
         );
-        
+
         Ok(())
     }
 
@@ -131,7 +138,7 @@ impl ProjectAssets {
         for entry in fs::read_dir(&scenes_dir)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     let scene_asset = SceneAsset {
@@ -139,7 +146,7 @@ impl ProjectAssets {
                         path: path.clone(),
                         scene: None, // Loaded lazily
                     };
-                    
+
                     self.scenes.insert(stem.to_string(), scene_asset);
                     tracing::info!("📄 Found scene file: '{}' at {:?}", stem, path);
                 }
@@ -162,14 +169,14 @@ impl ProjectAssets {
         for entry in fs::read_dir(&tilemaps_dir)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     let tilemap_asset = TilemapAsset {
                         name: stem.to_string(),
                         path: path.clone(),
                     };
-                    
+
                     self.tilemaps.insert(stem.to_string(), tilemap_asset);
                     tracing::info!("🗺️ Found tilemap file: '{}' at {:?}", stem, path);
                 }
@@ -192,14 +199,14 @@ impl ProjectAssets {
         for entry in fs::read_dir(&sprites_dir)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     let atlas_asset = SpriteAtlasAsset {
                         name: stem.to_string(),
                         path: path.clone(),
                     };
-                    
+
                     self.sprite_atlases.insert(stem.to_string(), atlas_asset);
                     tracing::info!("🎨 Found sprite atlas file: '{}' at {:?}", stem, path);
                 }
@@ -233,15 +240,19 @@ impl ProjectAssets {
     }
 
     /// Scan a specific audio directory
-    fn scan_audio_directory(&self, dir: &Path, audio_map: &mut HashMap<String, AudioAsset>) -> Result<()> {
+    fn scan_audio_directory(
+        &self,
+        dir: &Path,
+        audio_map: &mut HashMap<String, AudioAsset>,
+    ) -> Result<()> {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_file() {
                 if let (Some(stem), Some(ext)) = (
                     path.file_stem().and_then(|s| s.to_str()),
-                    path.extension().and_then(|s| s.to_str())
+                    path.extension().and_then(|s| s.to_str()),
                 ) {
                     let format = match ext.to_lowercase().as_str() {
                         "ogg" => AudioFormat::Ogg,
@@ -256,7 +267,7 @@ impl ProjectAssets {
                             path: path.clone(),
                             format,
                         };
-                        
+
                         audio_map.insert(stem.to_string(), audio_asset);
                         tracing::info!("🎵 Found audio file: '{}' at {:?}", stem, path);
                     }
@@ -280,7 +291,7 @@ impl ProjectAssets {
         for entry in fs::read_dir(&entities_dir)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     let entity_asset = EntityAsset {
@@ -288,7 +299,7 @@ impl ProjectAssets {
                         path: path.clone(),
                         definition: None, // Loaded lazily
                     };
-                    
+
                     self.entities.insert(stem.to_string(), entity_asset);
                     tracing::info!("🧙 Found entity definition: '{}' at {:?}", stem, path);
                 }
@@ -304,11 +315,16 @@ impl ProjectAssets {
             if scene_asset.scene.is_none() {
                 // Load scene from file
                 let json_data = fs::read_to_string(&scene_asset.path)?;
-                let scene: Scene = serde_json::from_str(&json_data)
-                    .map_err(|e| anyhow::anyhow!("Failed to parse scene '{}': {}", scene_name, e))?;
-                
+                let scene: Scene = serde_json::from_str(&json_data).map_err(|e| {
+                    anyhow::anyhow!("Failed to parse scene '{}': {}", scene_name, e)
+                })?;
+
                 scene_asset.scene = Some(scene.clone());
-                tracing::info!("📖 Loaded scene '{}' from {:?}", scene_name, scene_asset.path);
+                tracing::info!(
+                    "📖 Loaded scene '{}' from {:?}",
+                    scene_name,
+                    scene_asset.path
+                );
                 Ok(Some(scene))
             } else {
                 Ok(scene_asset.scene.clone())
@@ -322,8 +338,15 @@ impl ProjectAssets {
     pub fn save_scene(&mut self, scene: &Scene) -> Result<()> {
         // Ensure scene asset exists
         if !self.scenes.contains_key(&scene.name) {
-            let scene_path = self.project_path.join("scenes").join(format!("{}.json", scene.name));
-            tracing::info!("📝 Creating new scene asset for '{}' at {:?}", scene.name, scene_path);
+            let scene_path = self
+                .project_path
+                .join("scenes")
+                .join(format!("{}.json", scene.name));
+            tracing::info!(
+                "📝 Creating new scene asset for '{}' at {:?}",
+                scene.name,
+                scene_path
+            );
             let scene_asset = SceneAsset {
                 name: scene.name.clone(),
                 path: scene_path,
@@ -342,14 +365,17 @@ impl ProjectAssets {
             // Serialize and save
             let json_data = serde_json::to_string_pretty(scene)?;
             fs::write(&scene_asset.path, json_data)?;
-            
+
             // Update cached scene
             scene_asset.scene = Some(scene.clone());
-            
+
             tracing::info!("💾 Saved scene '{}' to {:?}", scene.name, scene_asset.path);
             Ok(())
         } else {
-            Err(anyhow::anyhow!("Failed to create scene asset for '{}'", scene.name))
+            Err(anyhow::anyhow!(
+                "Failed to create scene asset for '{}'",
+                scene.name
+            ))
         }
     }
 
@@ -359,36 +385,54 @@ impl ProjectAssets {
     }
 
     /// Get all tilemap names
+    #[allow(dead_code)]
     pub fn get_tilemap_names(&self) -> Vec<String> {
         self.tilemaps.keys().cloned().collect()
     }
 
     /// Get all sprite atlas names
+    #[allow(dead_code)]
     pub fn get_sprite_atlas_names(&self) -> Vec<String> {
         self.sprite_atlases.keys().cloned().collect()
     }
 
     /// Get all music names
+    #[allow(dead_code)]
     pub fn get_music_names(&self) -> Vec<String> {
         self.music.keys().cloned().collect()
     }
 
     /// Get all SFX names
+    #[allow(dead_code)]
     pub fn get_sfx_names(&self) -> Vec<String> {
         self.sfx.keys().cloned().collect()
     }
 
     /// Load an entity definition by name
-    pub fn load_entity_definition(&mut self, entity_name: &str) -> Result<Option<EntityDefinition>> {
+    #[allow(dead_code)]
+    pub fn load_entity_definition(
+        &mut self,
+        entity_name: &str,
+    ) -> Result<Option<EntityDefinition>> {
         if let Some(entity_asset) = self.entities.get_mut(entity_name) {
             if entity_asset.definition.is_none() {
                 // Load entity definition from file
                 let json_data = fs::read_to_string(&entity_asset.path)?;
-                let definition: EntityDefinition = serde_json::from_str(&json_data)
-                    .map_err(|e| anyhow::anyhow!("Failed to parse entity definition '{}': {}", entity_name, e))?;
-                
+                let definition: EntityDefinition =
+                    serde_json::from_str(&json_data).map_err(|e| {
+                        anyhow::anyhow!(
+                            "Failed to parse entity definition '{}': {}",
+                            entity_name,
+                            e
+                        )
+                    })?;
+
                 entity_asset.definition = Some(definition.clone());
-                tracing::info!("📖 Loaded entity definition '{}' from {:?}", entity_name, entity_asset.path);
+                tracing::info!(
+                    "📖 Loaded entity definition '{}' from {:?}",
+                    entity_name,
+                    entity_asset.path
+                );
                 Ok(Some(definition))
             } else {
                 Ok(entity_asset.definition.clone())
@@ -399,14 +443,16 @@ impl ProjectAssets {
     }
 
     /// Get all entity definition names
+    #[allow(dead_code)]
     pub fn get_entity_names(&self) -> Vec<String> {
         self.entities.keys().cloned().collect()
     }
 
     /// Get entities by category for organization in the editor
+    #[allow(dead_code)]
     pub fn get_entities_by_category(&mut self) -> Result<HashMap<String, Vec<String>>> {
         let mut categories = HashMap::new();
-        
+
         for entity_name in self.get_entity_names() {
             if let Some(definition) = self.load_entity_definition(&entity_name)? {
                 categories
@@ -415,7 +461,7 @@ impl ProjectAssets {
                     .push(entity_name);
             }
         }
-        
+
         Ok(categories)
     }
 }

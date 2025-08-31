@@ -1,10 +1,11 @@
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use chrono::{DateTime, Utc};
 
 /// Main project data structure
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Project {
     /// Project name
@@ -110,7 +111,7 @@ impl Project {
     /// Create a new project with default settings
     pub fn new(name: String, path: PathBuf) -> Self {
         let now = Utc::now();
-        
+
         let metadata = ProjectMetadata {
             project: ProjectConfig {
                 name: name.clone(),
@@ -128,7 +129,7 @@ impl Project {
             assets: AssetConfig::default(),
             editor: EditorSettings::default(),
         };
-        
+
         Self {
             name,
             path,
@@ -137,45 +138,49 @@ impl Project {
             is_dirty: false,
         }
     }
-    
+
     /// Get the project.toml file path
     pub fn project_file_path(&self) -> PathBuf {
         self.path.join("project.toml")
     }
-    
+
     /// Get the path to a specific scene file
+    #[allow(dead_code)]
     pub fn scene_file_path(&self, scene_name: &str) -> Option<PathBuf> {
-        self.metadata.scenes.get(scene_name)
+        self.metadata
+            .scenes
+            .get(scene_name)
             .map(|relative_path| self.path.join(relative_path))
     }
-    
-    
+
     /// Mark the project as saved
     pub fn mark_clean(&mut self) {
         self.is_dirty = false;
     }
-    
+
     /// Load project metadata from project.toml
     pub fn load_metadata(&mut self) -> Result<()> {
         let project_file = self.project_file_path();
-        let toml_content = std::fs::read_to_string(&project_file)
-            .map_err(|e| anyhow::anyhow!("Failed to read project file {:?}: {}", project_file, e))?;
-        
+        let toml_content = std::fs::read_to_string(&project_file).map_err(|e| {
+            anyhow::anyhow!("Failed to read project file {:?}: {}", project_file, e)
+        })?;
+
         self.metadata = toml::from_str(&toml_content)
             .map_err(|e| anyhow::anyhow!("Failed to parse project file: {}", e))?;
-        
+
         Ok(())
     }
-    
+
     /// Save project metadata to project.toml
     pub fn save_metadata(&self) -> Result<()> {
         let project_file = self.project_file_path();
         let toml_content = toml::to_string_pretty(&self.metadata)
             .map_err(|e| anyhow::anyhow!("Failed to serialize project metadata: {}", e))?;
-        
-        std::fs::write(&project_file, toml_content)
-            .map_err(|e| anyhow::anyhow!("Failed to write project file {:?}: {}", project_file, e))?;
-        
+
+        std::fs::write(&project_file, toml_content).map_err(|e| {
+            anyhow::anyhow!("Failed to write project file {:?}: {}", project_file, e)
+        })?;
+
         Ok(())
     }
 }

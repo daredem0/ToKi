@@ -203,7 +203,8 @@ impl SceneViewport {
         }
     }
     
-    /// Handle click events for entity selection  
+    /// Handle click events for entity selection
+    #[allow(dead_code)]
     pub fn handle_click(&mut self, screen_pos: glam::Vec2, _viewport_rect: egui::Rect) -> Option<u32> {
         if !self.is_initialized {
             return None;
@@ -460,6 +461,7 @@ impl SceneViewport {
     }
     
     /// Handle mouse interaction for camera panning and entity selection
+    #[allow(dead_code)]
     fn handle_mouse_interaction(&mut self, response: &egui::Response, display_rect: egui::Rect) {
         // Debug: Log mouse interaction state (less spammy)
         if response.clicked() {

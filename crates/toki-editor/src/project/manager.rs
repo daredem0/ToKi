@@ -62,11 +62,11 @@ impl ProjectManager {
         // Initialize asset manager
         let project_path = self.current_project.as_ref().unwrap().path.clone();
         let mut project_assets = ProjectAssets::new(project_path);
-        
+
         // Create default scene and save it through asset manager
         let default_scene = Scene::new("main".to_string());
         project_assets.save_scene(&default_scene)?;
-        
+
         // Scan for any existing assets
         project_assets.scan_assets()?;
         self.project_assets = Some(project_assets);
@@ -158,24 +158,26 @@ impl ProjectManager {
         tracing::info!("Successfully saved project with {} scenes", scenes.len());
         Ok(())
     }
-    
+
     /// Legacy method for backward compatibility
+    #[allow(dead_code)]
     pub fn save_current_project_legacy(&mut self, _game_state: &GameState) -> Result<()> {
         // For now, create a scene from the game state
         let scene = Scene::new("main".to_string()); // TODO: Extract proper scene data
         self.save_current_project(&[scene])
     }
-    
+
     /// Get asset manager for current project
     pub fn get_project_assets(&self) -> Option<&ProjectAssets> {
         self.project_assets.as_ref()
     }
-    
+
     /// Get mutable asset manager for current project
+    #[allow(dead_code)]
     pub fn get_project_assets_mut(&mut self) -> Option<&mut ProjectAssets> {
         self.project_assets.as_mut()
     }
-    
+
     /// Load scenes from the asset manager
     pub fn load_scenes(&mut self) -> Result<Vec<Scene>> {
         if let Some(project_assets) = &mut self.project_assets {
@@ -206,7 +208,6 @@ impl ProjectManager {
         tracing::debug!("Created project folder structure at {:?}", project_path);
         Ok(())
     }
-
 
     /// Add a project path to recent projects list
     fn add_to_recent(&mut self, project_path: PathBuf) {
