@@ -239,12 +239,12 @@ impl SceneViewport {
         
         tracing::debug!("Preparing scene data for rendering...");
         
-        // Add tilemap if present
+        // Re-enable tilemap to test sprite render order
         if let Some(tilemap) = self.scene_manager.tilemap() {
-            let tilemap = tilemap.clone(); // Clone to avoid borrow issues
-            tracing::debug!("Found tilemap: size={}x{}, atlas={}", 
-                           tilemap.size.x, tilemap.size.y, tilemap.atlas.display());
-            scene_data.tilemap = Some(tilemap.clone());
+                let tilemap = tilemap.clone(); // Clone to avoid borrow issues
+                tracing::debug!("Found tilemap: size={}x{}, atlas={}", 
+                               tilemap.size.x, tilemap.size.y, tilemap.atlas.display());
+                scene_data.tilemap = Some(tilemap.clone());
             
             // Load atlas for the tilemap
             if let Some(project_path) = project_path {

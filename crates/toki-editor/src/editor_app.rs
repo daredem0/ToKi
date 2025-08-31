@@ -643,14 +643,30 @@ impl EditorApp {
                         active_scene.maps.len(),
                         active_scene.maps
                     );
-                    // If the scene has at least one map, load it
-                    if let Some(map_name) = active_scene.maps.first() {
-                        if let Some(config) = self.config.current_project_path() {
-                            let map_file = config
-                                .join("assets")
-                                .join("tilemaps")
-                                .join(format!("{}.json", map_name));
-                            if let Some(viewport) = &mut self.scene_viewport {
+                    // Load the scene into GameState (with entities) and then load the tilemap
+                    if let Some(viewport) = &mut self.scene_viewport {
+                        // First, add the scene to the GameState's SceneManager
+                        viewport.scene_manager_mut().game_state_mut().add_scene(active_scene.clone());
+                        
+                        // Then load the scene to make it active (this transfers entities to GameState)
+                        match viewport.scene_manager_mut().game_state_mut().load_scene(active_scene_name) {
+                            Ok(()) => {
+                                tracing::info!("Loaded active scene '{}' with {} entities into GameState", 
+                                              active_scene_name, active_scene.entities.len());
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to load active scene '{}' into GameState: {}", 
+                                               active_scene_name, e);
+                            }
+                        }
+                        
+                        // If the scene has at least one map, load it
+                        if let Some(map_name) = active_scene.maps.first() {
+                            if let Some(config) = self.config.current_project_path() {
+                                let map_file = config
+                                    .join("assets")
+                                    .join("tilemaps")
+                                    .join(format!("{}.json", map_name));
                                 match viewport.scene_manager_mut().load_tilemap(&map_file) {
                                     Ok(()) => {
                                         tracing::info!(
@@ -671,17 +687,14 @@ impl EditorApp {
                                     }
                                 }
                             }
+                        } else {
+                            // Even if there's no map, mark dirty to show entities
+                            viewport.mark_dirty();
                         }
-                    } else {
-                        // No maps in active scene - clear viewport
-                        if let Some(viewport) = &mut self.scene_viewport {
-                            viewport.scene_manager_mut().clear_tilemap();
-                        }
-                        tracing::debug!(
-                            "Active scene '{}' has no maps, cleared viewport",
-                            active_scene_name
-                        );
                     }
+                } else {
+                    // No active scene found  
+                    tracing::warn!("Active scene '{}' not found in scenes list", active_scene_name);
                 }
             } else {
                 // No active scene - clear viewport

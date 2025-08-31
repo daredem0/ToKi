@@ -170,6 +170,10 @@ impl SceneRenderer {
             self.sprite_pipeline.add_sprite(render_instance);
         }
         
+        // CRITICAL FIX: Update sprite vertex buffer on GPU (this was missing!)
+        self.sprite_pipeline.update_with_queue(&self.queue);
+        tracing::debug!("Updated sprite vertex buffer on GPU");
+        
         // Add debug shapes
         tracing::debug!("Adding {} debug shapes to pipeline", scene_data.debug_shapes.len());
         self.debug_pipeline.clear();
@@ -285,6 +289,10 @@ impl SceneRenderer {
             };
             self.sprite_pipeline.add_sprite(render_instance);
         }
+        
+        // CRITICAL FIX: Update sprite vertex buffer on GPU (this was missing!)
+        self.sprite_pipeline.update_with_queue(&self.queue);
+        tracing::debug!("Updated sprite vertex buffer on GPU");
         
         // Add debug shapes
         tracing::debug!("Adding {} debug shapes to pipeline", scene_data.debug_shapes.len());
