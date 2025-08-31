@@ -633,110 +633,108 @@ impl EditorApp {
     }
 
     fn handle_active_scene_map_loading(&mut self) {
-        // Load if active scene has changed OR if scene content has changed
         let current_active_scene = self.ui.active_scene.clone();
-
-        if current_active_scene != self.last_loaded_active_scene || self.ui.scene_content_changed {
-            self.last_loaded_active_scene = current_active_scene.clone();
-            self.ui.scene_content_changed = false; // Clear the flag
-            tracing::info!(
-                "Active scene or content changed, reloading map for scene: {:?}",
-                current_active_scene
-            );
-
-            // Mark viewport as needing re-render since scene changed
-            if let Some(viewport) = &mut self.scene_viewport {
-                viewport.mark_dirty();
+        
+        if !self.should_reload_scene(&current_active_scene) {
+            return;
+        }
+        
+        self.update_scene_state(&current_active_scene);
+        
+        match &current_active_scene {
+            Some(scene_name) => self.load_active_scene(scene_name),
+            None => self.clear_viewport_scene(),
+        }
+    }
+    
+    fn should_reload_scene(&self, current_scene: &Option<String>) -> bool {
+        *current_scene != self.last_loaded_active_scene || self.ui.scene_content_changed
+    }
+    
+    fn update_scene_state(&mut self, current_scene: &Option<String>) {
+        self.last_loaded_active_scene = current_scene.clone();
+        self.ui.scene_content_changed = false;
+        
+        tracing::info!("Active scene or content changed, reloading map for scene: {:?}", current_scene);
+        
+        if let Some(viewport) = &mut self.scene_viewport {
+            viewport.mark_dirty();
+        }
+    }
+    
+    fn load_active_scene(&mut self, scene_name: &str) {
+        let Some(active_scene) = self.find_scene_by_name(scene_name).cloned() else {
+            tracing::warn!("Active scene '{}' not found in scenes list", scene_name);
+            return;
+        };
+        
+        tracing::info!("Found active scene '{}' with {} maps: {:?}",
+                      scene_name, active_scene.maps.len(), active_scene.maps);
+        
+        let Some(viewport) = &mut self.scene_viewport else {
+            return;
+        };
+        
+        let project_path = self.config.current_project_path().cloned();
+        
+        Self::load_scene_into_gamestate(viewport, &active_scene, scene_name);
+        Self::load_scene_tilemap(viewport, &active_scene, scene_name, project_path.as_deref());
+    }
+    
+    fn find_scene_by_name(&self, scene_name: &str) -> Option<&toki_core::Scene> {
+        self.ui.scenes.iter().find(|s| s.name == scene_name)
+    }
+    
+    fn load_scene_into_gamestate(viewport: &mut crate::scene::SceneViewport, scene: &toki_core::Scene, scene_name: &str) {
+        viewport.scene_manager_mut().game_state_mut().add_scene(scene.clone());
+        
+        match viewport.scene_manager_mut().game_state_mut().load_scene(scene_name) {
+            Ok(()) => {
+                tracing::info!("Loaded active scene '{}' with {} entities into GameState",
+                              scene_name, scene.entities.len());
             }
-
-            if let Some(active_scene_name) = &current_active_scene {
-                // Find the active scene
-                if let Some(active_scene) =
-                    self.ui.scenes.iter().find(|s| &s.name == active_scene_name)
-                {
-                    tracing::info!(
-                        "Found active scene '{}' with {} maps: {:?}",
-                        active_scene_name,
-                        active_scene.maps.len(),
-                        active_scene.maps
-                    );
-                    // Load the scene into GameState (with entities) and then load the tilemap
-                    if let Some(viewport) = &mut self.scene_viewport {
-                        // First, add the scene to the GameState's SceneManager
-                        viewport
-                            .scene_manager_mut()
-                            .game_state_mut()
-                            .add_scene(active_scene.clone());
-
-                        // Then load the scene to make it active (this transfers entities to GameState)
-                        match viewport
-                            .scene_manager_mut()
-                            .game_state_mut()
-                            .load_scene(active_scene_name)
-                        {
-                            Ok(()) => {
-                                tracing::info!(
-                                    "Loaded active scene '{}' with {} entities into GameState",
-                                    active_scene_name,
-                                    active_scene.entities.len()
-                                );
-                            }
-                            Err(e) => {
-                                tracing::error!(
-                                    "Failed to load active scene '{}' into GameState: {}",
-                                    active_scene_name,
-                                    e
-                                );
-                            }
-                        }
-
-                        // If the scene has at least one map, load it
-                        if let Some(map_name) = active_scene.maps.first() {
-                            if let Some(config) = self.config.current_project_path() {
-                                let map_file = config
-                                    .join("assets")
-                                    .join("tilemaps")
-                                    .join(format!("{}.json", map_name));
-                                match viewport.scene_manager_mut().load_tilemap(&map_file) {
-                                    Ok(()) => {
-                                        tracing::info!(
-                                            "Loaded active scene '{}' map '{}' into viewport",
-                                            active_scene_name,
-                                            map_name
-                                        );
-                                        // Mark viewport as needing re-render
-                                        viewport.mark_dirty();
-                                    }
-                                    Err(e) => {
-                                        tracing::error!(
-                                            "Failed to load active scene '{}' map '{}': {}",
-                                            active_scene_name,
-                                            map_name,
-                                            e
-                                        );
-                                    }
-                                }
-                            }
-                        } else {
-                            // Even if there's no map, mark dirty to show entities
-                            viewport.mark_dirty();
-                        }
-                    }
-                } else {
-                    // No active scene found
-                    tracing::warn!(
-                        "Active scene '{}' not found in scenes list",
-                        active_scene_name
-                    );
-                }
-            } else {
-                // No active scene - clear viewport
-                if let Some(viewport) = &mut self.scene_viewport {
-                    viewport.scene_manager_mut().clear_tilemap();
-                }
-                tracing::debug!("No active scene set, cleared viewport");
+            Err(e) => {
+                tracing::error!("Failed to load active scene '{}' into GameState: {}",
+                               scene_name, e);
             }
         }
+    }
+    
+    fn load_scene_tilemap(viewport: &mut crate::scene::SceneViewport, scene: &toki_core::Scene, scene_name: &str, project_path: Option<&std::path::Path>) {
+        let Some(map_name) = scene.maps.first() else {
+            // Even if there's no map, mark dirty to show entities
+            viewport.mark_dirty();
+            return;
+        };
+        
+        let Some(project_path) = project_path else {
+            tracing::warn!("No project path available for loading tilemap");
+            return;
+        };
+        
+        let map_file = project_path
+            .join("assets")
+            .join("tilemaps")
+            .join(format!("{}.json", map_name));
+            
+        match viewport.scene_manager_mut().load_tilemap(&map_file) {
+            Ok(()) => {
+                tracing::info!("Loaded active scene '{}' map '{}' into viewport",
+                              scene_name, map_name);
+                viewport.mark_dirty();
+            }
+            Err(e) => {
+                tracing::error!("Failed to load active scene '{}' map '{}': {}",
+                               scene_name, map_name, e);
+            }
+        }
+    }
+    
+    fn clear_viewport_scene(&mut self) {
+        if let Some(viewport) = &mut self.scene_viewport {
+            viewport.scene_manager_mut().clear_tilemap();
+        }
+        tracing::debug!("No active scene set, cleared viewport");
     }
 
     fn handle_map_requests(&mut self) {
