@@ -299,7 +299,7 @@ impl EditorUI {
 
                 // Render the scene content
                 let project_path = config.and_then(|c| c.current_project_path());
-                viewport.render(ui, rect, project_path.as_deref().map(|p| p.as_path()), renderer);
+                viewport.render(ui, rect, project_path.map(|p| p.as_path()), renderer);
             } else {
                 // Show placeholder when no viewport
                 let available_size = ui.available_size();
@@ -625,7 +625,7 @@ impl EditorUI {
                                                                         ui.close();
                                                                     }
                                                                 } else {
-                                                                    ui.add_enabled(false, egui::Button::new(&format!("{} (already added)", scene_name)));
+                                                                    ui.add_enabled(false, egui::Button::new(format!("{} (already added)", scene_name)));
                                                                 }
                                                             }
                                                             
@@ -909,15 +909,15 @@ impl EditorUI {
                     },
                     
                     Some(Selection::Map(scene_name, map_name)) => {
-                        ui.heading(&format!("🗺️ {}", map_name));
-                        ui.label(&format!("Scene: {}", scene_name));
+                        ui.heading(format!("🗺️ {}", map_name));
+                        ui.label(format!("Scene: {}", scene_name));
                         ui.separator();
                         
                         Self::render_map_details(ui, map_name, config, Some(scene_name), &mut self.map_load_requested);
                     },
                     
                     Some(Selection::StandaloneMap(map_name)) => {
-                        ui.heading(&format!("🗺️ {}", map_name));
+                        ui.heading(format!("🗺️ {}", map_name));
                         ui.separator();
                         
                         Self::render_map_details(ui, map_name, config, None, &mut self.map_load_requested);
@@ -926,7 +926,7 @@ impl EditorUI {
                     Some(Selection::Entity(entity_id)) => {
                         if let Some(game_state) = game_state {
                             if let Some(entity) = game_state.entity_manager().get_entity(*entity_id) {
-                                ui.heading(&format!("👤 Entity {}", entity_id));
+                                ui.heading(format!("👤 Entity {}", entity_id));
                                 ui.separator();
                                 
                                 // Position
@@ -1070,7 +1070,7 @@ impl EditorUI {
                                                                         serde_json::Value::Number(n) => n.to_string(),
                                                                         serde_json::Value::Bool(b) => b.to_string(),
                                                                         serde_json::Value::Null => "null".to_string(),
-                                                                        _ => format!("{{ complex }}"),
+                                                                        _ => "{ complex }".to_string(),
                                                                     }).collect();
                                                                     format!("[{}]", items.join(", "))
                                                                 } else {
@@ -1321,7 +1321,7 @@ impl EditorUI {
                                                             let duration = clip_obj.get("frame_duration_ms").and_then(|v| v.as_f64()).unwrap_or(0.0);
                                                             let loop_mode = clip_obj.get("loop_mode").and_then(|v| v.as_str()).unwrap_or("unknown");
                                                             
-                                                            ui.collapsing(&format!("🎬 {} ({} frames)", state, frame_count), |ui| {
+                                                            ui.collapsing(format!("🎬 {} ({} frames)", state, frame_count), |ui| {
                                                                 ui.horizontal(|ui| {
                                                                     ui.label("Frame Duration:");
                                                                     ui.label(format!("{} ms", duration));
