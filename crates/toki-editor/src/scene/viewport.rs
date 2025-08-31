@@ -269,11 +269,125 @@ impl SceneViewport {
             tracing::debug!("No tilemap found in scene manager");
         }
         
-        // TODO: Add sprites from game state
-        // TODO: Add debug shapes for selected entities, collision boxes, etc.
+        // Add sprites from game state (same logic as toki-runtime)
+        let renderable_entities = self.scene_manager.game_state().get_renderable_entities();
+        tracing::debug!("Found {} renderable entities", renderable_entities.len());
         
-        tracing::debug!("Scene data prepared: tilemap={}, atlas={}", 
-                       scene_data.tilemap.is_some(), scene_data.atlas.is_some());
+        for (entity_id, position, size) in renderable_entities {
+            // Get the entity to find its atlas
+            if let Some(entity) = self.scene_manager.game_state().entity_manager().get_entity(entity_id) {
+                if let Some(animation_controller) = &entity.attributes.animation_controller {
+                    if let Ok(atlas_name) = animation_controller.current_atlas_name() {
+                        tracing::debug!("Processing entity {} with atlas '{}'", entity_id, atlas_name);
+                        
+                        // Load sprite atlas if needed (similar to runtime's creature_atlas loading)
+                        if let Some(project_path) = project_path {
+                            match self.load_sprite_atlas_for_entity(&atlas_name, project_path) {
+                                Ok(sprite_atlas) => {
+                                    let sprite_texture_size = sprite_atlas.image_size().unwrap_or(glam::UVec2::new(64, 16));
+                                    tracing::debug!("Loaded sprite atlas '{}' with texture size {}x{}", atlas_name, sprite_texture_size.x, sprite_texture_size.y);
+                                    
+                                    if let Some(frame) = self.scene_manager.game_state().get_entity_sprite_frame(entity_id, &sprite_atlas, sprite_texture_size) {
+                                        let sprite_instance = toki_render::SpriteInstance {
+                                            frame,
+                                            position,
+                                            size,
+                                        };
+                                        scene_data.sprites.push(sprite_instance);
+                                        tracing::debug!("Added sprite for entity {} at ({}, {}) with size {}x{}", 
+                                                       entity_id, position.x, position.y, size.x, size.y);
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to load sprite atlas '{}': {}", atlas_name, e);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Add debug shapes for collision boxes (same logic as toki-runtime)
+        if self.scene_manager.game_state().is_debug_collision_rendering_enabled() {
+            tracing::debug!("Debug collision rendering enabled - adding debug shapes");
+            
+            // Define colors (same as runtime)
+            let entity_color = [1.0, 0.0, 0.0, 0.8]; // Red for entity collision boxes
+            let solid_tile_color = [0.0, 0.0, 1.0, 0.6]; // Blue for solid tiles  
+            let trigger_tile_color = [1.0, 1.0, 0.0, 0.6]; // Yellow for trigger tiles
+            
+            // Add entity position/size rectangles (to visualize where entities are)
+            let renderable_entities = self.scene_manager.game_state().get_renderable_entities();
+            for (entity_id, position, size) in renderable_entities {
+                let debug_shape = toki_render::DebugShape {
+                    shape_type: toki_render::DebugShapeType::Rectangle,
+                    position: position.as_vec2(),
+                    size: size.as_vec2(),
+                    color: [0.0, 1.0, 0.0, 0.5], // Green for entity bounds
+                };
+                scene_data.debug_shapes.push(debug_shape);
+                tracing::debug!("Added entity bounds for entity {} at ({}, {}) with size {}x{}", 
+                               entity_id, position.x, position.y, size.x, size.y);
+            }
+            
+            // Add entity collision boxes
+            let entity_boxes = self.scene_manager.game_state().get_entity_collision_boxes();
+            for (pos, size, is_trigger) in entity_boxes {
+                let color = if is_trigger {
+                    trigger_tile_color
+                } else {
+                    entity_color
+                };
+                
+                let debug_shape = toki_render::DebugShape {
+                    shape_type: toki_render::DebugShapeType::Rectangle,
+                    position: pos.as_vec2(),
+                    size: size.as_vec2(), 
+                    color,
+                };
+                scene_data.debug_shapes.push(debug_shape);
+                tracing::debug!("Added entity collision box at ({}, {}) with size {}x{}", 
+                               pos.x, pos.y, size.x, size.y);
+            }
+            
+            // Add solid tile debug boxes (if tilemap and atlas are available)
+            if let (Some(tilemap), Some(atlas)) = (&scene_data.tilemap, &scene_data.atlas) {
+                let solid_tiles = self.scene_manager.game_state().get_solid_tile_positions(tilemap, atlas);
+                for (tile_x, tile_y) in solid_tiles {
+                    let world_x = tile_x * tilemap.tile_size.x;
+                    let world_y = tile_y * tilemap.tile_size.y;
+                    
+                    let debug_shape = toki_render::DebugShape {
+                        shape_type: toki_render::DebugShapeType::Rectangle,
+                        position: glam::Vec2::new(world_x as f32, world_y as f32),
+                        size: tilemap.tile_size.as_vec2(),
+                        color: solid_tile_color,
+                    };
+                    scene_data.debug_shapes.push(debug_shape);
+                }
+                
+                // Add trigger tile debug boxes
+                let trigger_tiles = self.scene_manager.game_state().get_trigger_tile_positions(tilemap, atlas);
+                for (tile_x, tile_y) in trigger_tiles {
+                    let world_x = tile_x * tilemap.tile_size.x;
+                    let world_y = tile_y * tilemap.tile_size.y;
+                    
+                    let debug_shape = toki_render::DebugShape {
+                        shape_type: toki_render::DebugShapeType::Rectangle,
+                        position: glam::Vec2::new(world_x as f32, world_y as f32),
+                        size: tilemap.tile_size.as_vec2(),
+                        color: trigger_tile_color,
+                    };
+                    scene_data.debug_shapes.push(debug_shape);
+                }
+            }
+            
+            tracing::debug!("Added {} debug shapes total", scene_data.debug_shapes.len());
+        }
+        
+        tracing::debug!("Scene data prepared: tilemap={}, atlas={}, sprites={}, debug_shapes={}", 
+                       scene_data.tilemap.is_some(), scene_data.atlas.is_some(), scene_data.sprites.len(), scene_data.debug_shapes.len());
         scene_data
     }
     
@@ -320,6 +434,49 @@ impl SceneViewport {
         // Cache the loaded atlas
         self.atlas_cache = Some(atlas.clone());
         tracing::info!("Loaded and cached atlas: {}", atlas_path.display());
+        
+        Ok(atlas)
+    }
+    
+    /// Load atlas for sprite entities (similar to tilemap loading)
+    fn load_sprite_atlas_for_entity(&mut self, atlas_name: &str, project_path: &std::path::Path) -> Result<AtlasMeta> {
+        // Try sprites directory first, then tilemaps directory
+        let atlas_path = {
+            let sprites_path = project_path.join("assets").join("sprites").join(format!("{}.json", atlas_name));
+            if sprites_path.exists() {
+                sprites_path
+            } else {
+                let tilemaps_path = project_path.join("assets").join("tilemaps").join(format!("{}.json", atlas_name));
+                if tilemaps_path.exists() {
+                    tilemaps_path
+                } else {
+                    // Fallback to original name without .json extension
+                    project_path.join("assets").join("sprites").join(atlas_name)
+                }
+            }
+        };
+        
+        let atlas = AtlasMeta::load_from_file(&atlas_path)
+            .map_err(|e| anyhow::anyhow!("Failed to load sprite atlas '{}' from '{}': {}", atlas_name, atlas_path.display(), e))?;
+        
+        // Load the corresponding sprite texture into the renderer
+        tracing::debug!("Sprite atlas image field contains: {:?}", atlas.image);
+        if let Some(scene_renderer) = &mut self.scene_renderer {
+            tracing::debug!("Scene renderer available, proceeding with sprite texture load");
+            // Construct the texture path relative to the atlas file
+            let texture_path = atlas_path.parent()
+                .unwrap_or_else(|| std::path::Path::new("."))
+                .join(&atlas.image);
+            
+            if texture_path.exists() {
+                tracing::info!("Loading sprite texture: {}", texture_path.display());
+                scene_renderer.load_sprite_texture(texture_path)
+                    .map_err(|e| anyhow::anyhow!("Failed to load sprite texture: {}", e))?;
+                tracing::info!("Successfully loaded sprite texture");
+            } else {
+                tracing::warn!("Sprite texture not found: {}", texture_path.display());
+            }
+        }
         
         Ok(atlas)
     }

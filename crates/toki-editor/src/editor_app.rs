@@ -247,6 +247,16 @@ impl ApplicationHandler for EditorApp {
                                     window.request_redraw();
                                 }
                             }
+                            KeyCode::F4 => {
+                                // Toggle debug collision rendering (same as toki-runtime)
+                                if let Some(viewport) = &mut self.scene_viewport {
+                                    viewport.scene_manager_mut().game_state_mut().handle_key_press(toki_core::InputKey::DebugToggle);
+                                    tracing::info!("Toggled debug collision rendering via F4");
+                                    if let Some(window) = &self.window {
+                                        window.request_redraw();
+                                    }
+                                }
+                            }
                             _ => {}
                         }
                     }
