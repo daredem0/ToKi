@@ -509,11 +509,16 @@ impl EditorUI {
                 
                 if let Some(config) = config {
                     if let Some(project_path) = config.current_project_path() {
-                        let (selected_entity, entity_additions) = super::hierarchy::HierarchySystem::render_entity_palette(ui, project_path, &self.selection, &self.scenes);
+                        let (selected_entity, entity_additions, placement_request) = super::hierarchy::HierarchySystem::render_entity_palette(ui, project_path, &self.selection, &self.scenes);
                         
                         // Handle entity selection
                         if let Some(selected_entity) = selected_entity {
                             self.set_selection(Selection::EntityDefinition(selected_entity));
+                        }
+                        
+                        // Handle placement mode request
+                        if let Some(entity_definition) = placement_request {
+                            self.enter_placement_mode(entity_definition);
                         }
                         
                         // Process entity additions to scenes

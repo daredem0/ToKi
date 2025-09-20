@@ -11,7 +11,7 @@ impl HierarchySystem {
         project_path: &std::path::Path,
         selection: &Option<Selection>,
         scenes: &[Scene],
-    ) -> (Option<String>, Vec<(String, String)>) {
+    ) -> (Option<String>, Vec<(String, String)>, Option<String>) {
         let entities_path = project_path.join("entities");
         
         if entities_path.exists() {
@@ -53,6 +53,7 @@ impl HierarchySystem {
                 if found_entities {
                     let mut selected_entity = None;
                     let mut scene_entity_additions: Vec<(String, String)> = Vec::new(); // (scene_name, entity_name)
+                    let mut placement_mode_request: Option<String> = None;
                     
                     egui::ScrollArea::vertical()
                         .id_salt("entities_scroll")
@@ -79,7 +80,8 @@ impl HierarchySystem {
                                         let button = ui.selectable_label(is_selected, format!("🧙 {}", entity_name));
                                         
                                         if button.clicked() {
-                                            tracing::info!("Entity '{}' selected", entity_name);
+                                            tracing::info!("Entity '{}' clicked - entering placement mode", entity_name);
+                                            placement_mode_request = Some(entity_name.clone());
                                             selected_entity = Some(entity_name.clone());
                                         }
                                         
@@ -118,7 +120,7 @@ impl HierarchySystem {
                             }
                         });
                     
-                    return (selected_entity, scene_entity_additions);
+                    return (selected_entity, scene_entity_additions, placement_mode_request);
                 } else {
                     ui.label("No entity definition files found in entities/");
                 }
@@ -129,7 +131,7 @@ impl HierarchySystem {
             ui.label("No entities directory found, expected: entities/");
         }
         
-        (None, Vec::new())
+        (None, Vec::new(), None)
     }
 
     /// Renders the main hierarchy and maps panel (delegates to EditorUI for now)
