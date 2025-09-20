@@ -7,7 +7,7 @@ pub struct PanelSystem;
 impl PanelSystem {
     /// Renders the main scene viewport panel in the center of the screen
     pub fn render_viewport(
-        _ui_state: &mut super::EditorUI,
+        ui_state: &mut super::EditorUI,
         ctx: &egui::Context,
         scene_viewport: Option<&mut SceneViewport>,
         config: Option<&EditorConfig>,
@@ -62,17 +62,33 @@ impl PanelSystem {
                     viewport.stop_camera_drag();
                 }
                 
-                // TODO: Entity click system - commented out for now
-                // if response.clicked() {
-                //     if let Some(click_pos) = response.interact_pointer_pos() {
-                //         let screen_pos = glam::Vec2::new(click_pos.x, click_pos.y);
-                //         if let Some(entity_id) = viewport.handle_click(screen_pos, rect) {
-                //             ui_state.selected_entity_id = Some(entity_id);
-                //         } else {
-                //             ui_state.selected_entity_id = None;
-                //         }
-                //     }
-                // }
+                // Handle viewport clicks (entity placement or selection)
+                if response.clicked() {
+                    if let Some(click_pos) = response.interact_pointer_pos() {
+                        let screen_pos = glam::Vec2::new(click_pos.x, click_pos.y);
+                        
+                        // Check if we're in placement mode
+                        if ui_state.is_in_placement_mode() {
+                            tracing::info!("Placement click detected at screen pos: {:?}", click_pos);
+                            if let Some(entity_def) = &ui_state.placement_entity_definition {
+                                tracing::info!("Would place entity '{}' at screen coordinates ({}, {})", 
+                                    entity_def, click_pos.x, click_pos.y);
+                                // TODO: Convert to world coordinates and create entity
+                                // For now, just exit placement mode
+                                ui_state.exit_placement_mode();
+                            }
+                        } else {
+                            // Normal entity selection (original TODO logic)
+                            tracing::info!("Regular click detected at screen pos: {:?}", click_pos);
+                            // TODO: Implement entity selection when viewport.handle_click exists
+                            // if let Some(entity_id) = viewport.handle_click(screen_pos, rect) {
+                            //     ui_state.selected_entity_id = Some(entity_id);
+                            // } else {
+                            //     ui_state.selected_entity_id = None;
+                            // }
+                        }
+                    }
+                }
 
                 // Render the scene content
                 let project_path = config.and_then(|c| c.current_project_path());
