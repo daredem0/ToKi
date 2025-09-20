@@ -41,7 +41,7 @@ impl PanelSystem {
                 // Handle viewport interactions
                 let available_size = ui.available_size();
                 let (rect, response) =
-                    ui.allocate_exact_size(available_size, egui::Sense::click_and_drag());
+                    ui.allocate_exact_size(available_size, egui::Sense::click_and_drag().union(egui::Sense::hover()));
 
                 // Handle camera panning with drag
                 if response.drag_started() {
@@ -61,7 +61,22 @@ impl PanelSystem {
                     tracing::info!("Camera drag stopped");
                     viewport.stop_camera_drag();
                 }
-                
+
+                // Track mouse position for placement preview
+                if ui_state.is_in_placement_mode() {
+                    if let Some(hover_pos) = response.hover_pos() {
+                        // Use raw world position conversion for preview (without placement offsets)
+                        let world_pos = viewport.screen_to_world_pos_raw(hover_pos, rect);
+                        ui_state.placement_preview_position = Some(world_pos);
+                        // Mark viewport as needing re-render to show preview
+                        viewport.mark_dirty();
+                    } else {
+                        ui_state.placement_preview_position = None;
+                        // Mark viewport as needing re-render to hide preview
+                        viewport.mark_dirty();
+                    }
+                }
+
                 // Handle viewport clicks (entity placement or selection)
                 if response.clicked() {
                     if let Some(click_pos) = response.hover_pos() {

@@ -306,15 +306,37 @@ impl EditorApp {
         // Prepare egui input
         let raw_input = egui_winit.take_egui_input(window);
 
-        // Pre-render scene to texture before egui UI
+        // Load sprite frame cache if needed (before render loop to avoid borrowing issues)
         let project_path = self.config.current_project_path();
+        if self.ui.is_in_placement_mode() && self.ui.placement_preview_cached_frame.is_none() {
+            if let (Some(entity_def), Some(project_path), Some(project_assets)) =
+                (&self.ui.placement_entity_definition, &project_path, self.project_manager.get_project_assets()) {
+                let cached_frame = EditorApp::load_preview_sprite_frame_static(entity_def, project_path.as_path(), project_assets);
+                self.ui.placement_preview_cached_frame = cached_frame;
+            }
+        }
+
+        // Pre-render scene to texture before egui UI
         if let Some(scene_viewport) = &mut self.scene_viewport {
             if let Some(project_path) = &project_path {
                 if let Some(project_assets) = self.project_manager.get_project_assets() {
+                    // Prepare preview data for entity placement
+                    let preview_data = if self.ui.is_in_placement_mode() {
+                        if let (Some(entity_def), Some(position), Some(cached_frame)) =
+                            (&self.ui.placement_entity_definition, &self.ui.placement_preview_position, &self.ui.placement_preview_cached_frame) {
+                            Some((entity_def.as_str(), *position, cached_frame.clone()))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
                     match scene_viewport.render_to_texture(
                         project_path.as_path(),
                         project_assets,
                         renderer.egui_renderer_mut(),
+                        preview_data,
                     ) {
                         Ok(()) => {
                             // Reduce log spam - render_to_texture already handles its own logging
@@ -802,5 +824,68 @@ impl EditorApp {
         } else {
             tracing::warn!("No project loaded - cannot validate assets");
         }
+    }
+
+    /// Load sprite frame for preview (cached) - static version
+    fn load_preview_sprite_frame_static(entity_def_name: &str, project_path: &std::path::Path, project_assets: &crate::project::ProjectAssets) -> Option<toki_core::sprite::SpriteFrame> {
+        tracing::info!("Loading preview sprite frame for entity '{}' (one-time cache)", entity_def_name);
+
+        // Load entity definition
+        let entity_file = project_path.join("entities").join(format!("{}.json", entity_def_name));
+        if !entity_file.exists() {
+            tracing::warn!("Entity definition file not found for preview: {:?}", entity_file);
+            return None;
+        }
+
+        let entity_def = match std::fs::read_to_string(&entity_file)
+            .and_then(|content| serde_json::from_str::<toki_core::entity::EntityDefinition>(&content).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+        {
+            Ok(def) => def,
+            Err(e) => {
+                tracing::warn!("Failed to load entity definition for preview: {}", e);
+                return None;
+            }
+        };
+
+        // Get atlas name from entity definition
+        let atlas_name = &entity_def.animations.atlas_name;
+        let atlas_name_clean = atlas_name.strip_suffix(".json").unwrap_or(atlas_name);
+
+        // Find the atlas in project assets
+        let atlas_asset = project_assets.sprite_atlases.get(atlas_name_clean)?;
+
+        // Load the sprite atlas
+        let sprite_atlas = match toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_asset.path) {
+            Ok(atlas) => atlas,
+            Err(e) => {
+                tracing::warn!("Failed to load sprite atlas for preview: {}", e);
+                return None;
+            }
+        };
+
+        let sprite_texture_size = sprite_atlas.image_size().unwrap_or(glam::UVec2::new(64, 16));
+
+        // Get the default animation frame (usually idle state, first frame)
+        if let Some(clip_def) = entity_def.animations.clips.first() {
+            if let Some(first_tile_name) = clip_def.frame_tiles.first() {
+                // Look up the tile in the atlas to get UV coordinates
+                if let Some(uvs) = sprite_atlas.get_tile_uvs(first_tile_name, sprite_texture_size) {
+                    return Some(toki_core::sprite::SpriteFrame {
+                        u0: uvs[0],
+                        v0: uvs[1],
+                        u1: uvs[2],
+                        v1: uvs[3],
+                    });
+                } else {
+                    tracing::warn!("Failed to get UV coordinates for tile '{}' in preview", first_tile_name);
+                }
+            } else {
+                tracing::warn!("No frame tiles found in first animation clip for preview");
+            }
+        } else {
+            tracing::warn!("No animation clips found for preview");
+        }
+
+        None
     }
 }

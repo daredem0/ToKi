@@ -50,6 +50,8 @@ pub struct EditorUI {
     // Entity placement system
     pub placement_mode: bool,
     pub placement_entity_definition: Option<String>,
+    pub placement_preview_position: Option<glam::Vec2>, // World coordinates for preview
+    pub placement_preview_cached_frame: Option<toki_core::sprite::SpriteFrame>, // Cached sprite frame for preview
 }
 
 impl EditorUI {
@@ -89,6 +91,8 @@ impl EditorUI {
             // Entity placement system
             placement_mode: false,
             placement_entity_definition: None,
+            placement_preview_position: None,
+            placement_preview_cached_frame: None,
         }
     }
 
@@ -134,6 +138,8 @@ impl EditorUI {
         }
         self.placement_mode = false;
         self.placement_entity_definition = None;
+        self.placement_preview_position = None;
+        self.placement_preview_cached_frame = None;
     }
 
     pub fn is_in_placement_mode(&self) -> bool {

@@ -60,6 +60,7 @@ pub struct SceneRenderer {
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
     debug_pipeline: DebugPipeline,
+    current_sprite_texture_path: Option<std::path::PathBuf>, // Cache current sprite texture
 }
 
 impl SceneRenderer {
@@ -80,11 +81,13 @@ impl SceneRenderer {
             // Create with default/placeholder texture
             TilemapPipeline::new(&device, &queue, surface_format, std::path::PathBuf::from(""))
         };
-        
+
+        // Clone sprite_texture for caching before moving it
+        let sprite_texture_cache = sprite_texture.clone();
         let sprite_pipeline = if let Some(texture_path) = sprite_texture {
             SpritePipeline::new(&device, &queue, surface_format, texture_path)
         } else {
-            // Create with default/placeholder texture  
+            // Create with default/placeholder texture
             SpritePipeline::new(&device, &queue, surface_format, std::path::PathBuf::from(""))
         };
         
@@ -98,6 +101,7 @@ impl SceneRenderer {
             tilemap_pipeline,
             sprite_pipeline,
             debug_pipeline,
+            current_sprite_texture_path: sprite_texture_cache,
         })
     }
     
@@ -114,8 +118,16 @@ impl SceneRenderer {
         Ok(())
     }
     
-    /// Load new sprite texture
+    /// Load new sprite texture (with caching to avoid redundant loads)
     pub fn load_sprite_texture(&mut self, texture_path: std::path::PathBuf) -> Result<(), RenderError> {
+        // Check if this texture is already loaded
+        if let Some(current_path) = &self.current_sprite_texture_path {
+            if current_path == &texture_path {
+                tracing::trace!("Sprite texture already loaded: {:?}", texture_path);
+                return Ok(());
+            }
+        }
+
         tracing::info!("Loading sprite texture: {:?}", texture_path);
         self.sprite_pipeline = SpritePipeline::new(
             &self.device,
@@ -123,6 +135,7 @@ impl SceneRenderer {
             wgpu::TextureFormat::Bgra8UnormSrgb, // TODO: Get from render target
             texture_path.clone(),
         );
+        self.current_sprite_texture_path = Some(texture_path);
         tracing::info!("Sprite texture loaded successfully");
         Ok(())
     }

@@ -21,6 +21,8 @@ pub struct SceneViewport {
     // Mouse interaction state
     last_mouse_pos: Option<glam::Vec2>, // For camera panning
     is_dragging_camera: bool,
+    // Sprite atlas caching to prevent redundant loads
+    loaded_sprite_atlases: std::collections::HashMap<String, toki_core::assets::atlas::AtlasMeta>,
 }
 
 impl SceneViewport {
@@ -47,6 +49,7 @@ impl SceneViewport {
             camera,
             last_mouse_pos: None,
             is_dragging_camera: false,
+            loaded_sprite_atlases: std::collections::HashMap::new(),
         })
     }
     
@@ -90,7 +93,7 @@ impl SceneViewport {
     }
     
     /// Render scene to offscreen texture (called before egui UI construction)
-    pub fn render_to_texture(&mut self, project_path: &std::path::Path, project_assets: &ProjectAssets, renderer: &mut egui_wgpu::Renderer) -> Result<()> {
+    pub fn render_to_texture(&mut self, project_path: &std::path::Path, project_assets: &ProjectAssets, renderer: &mut egui_wgpu::Renderer, preview_data: Option<(&str, glam::Vec2, toki_core::sprite::SpriteFrame)>) -> Result<()> {
         if !self.is_initialized {
             return Ok(()); // Skip if not initialized
         }
@@ -103,7 +106,7 @@ impl SceneViewport {
         tracing::trace!("Scene needs re-rendering, proceeding with render");
         
         // Prepare scene data
-        let scene_data = self.prepare_scene_data(Some(project_path), project_assets);
+        let scene_data = self.prepare_scene_data(Some(project_path), project_assets, preview_data);
         
         // Render to offscreen target
         if let (Some(scene_renderer), Some(target)) = (&mut self.scene_renderer, &mut self.offscreen_target) {
@@ -236,13 +239,14 @@ impl SceneViewport {
     
     
     /// Prepare scene data for rendering
-    fn prepare_scene_data(&mut self, project_path: Option<&std::path::Path>, project_assets: &ProjectAssets) -> SceneData {
+    fn prepare_scene_data(&mut self, project_path: Option<&std::path::Path>, project_assets: &ProjectAssets, preview_data: Option<(&str, glam::Vec2, toki_core::sprite::SpriteFrame)>) -> SceneData {
         tracing::trace!("Preparing scene data for rendering...");
         
         let mut scene_data = SceneData::default();
         
         self.prepare_tilemap_data(&mut scene_data, project_path);
         self.prepare_sprite_data(&mut scene_data, project_path, project_assets);
+        self.prepare_preview_sprite_data(&mut scene_data, project_path, project_assets, preview_data);
         self.prepare_debug_shapes(&mut scene_data);
         
         tracing::trace!("Scene data prepared: tilemap={}, atlas={}, sprites={}, debug_shapes={}", 
@@ -286,7 +290,7 @@ impl SceneViewport {
     /// Prepare sprite data from renderable entities
     fn prepare_sprite_data(&mut self, scene_data: &mut SceneData, project_path: Option<&std::path::Path>, project_assets: &ProjectAssets) {
         let renderable_entities = self.scene_manager.game_state().get_renderable_entities();
-        tracing::info!("Starting sprite rendering for {} renderable entities", renderable_entities.len());
+        tracing::trace!("Starting sprite rendering for {} renderable entities", renderable_entities.len());
         
         if renderable_entities.is_empty() {
             tracing::warn!("No renderable entities found - no sprites will be rendered");
@@ -334,7 +338,7 @@ impl SceneViewport {
             }
         };
         
-        tracing::info!("Entity {} requesting atlas: '{}'", entity_id, atlas_name);
+        tracing::trace!("Entity {} requesting atlas: '{}'", entity_id, atlas_name);
         
         self.load_and_create_sprite_instance(scene_data, entity_id, position, size, &atlas_name, (project_assets, project_path));
     }
@@ -361,8 +365,8 @@ impl SceneViewport {
             return;
         };
         
-        tracing::info!("Found atlas asset for '{}' at path: {}", 
-                      atlas_name_clean, atlas_asset.path.display());
+        tracing::trace!("Found atlas asset for '{}' at path: {}",
+                       atlas_name_clean, atlas_asset.path.display());
         
         let sprite_atlas = match self.load_sprite_atlas_from_asset(atlas_asset, project_path) {
             Ok(atlas) => atlas,
@@ -373,8 +377,8 @@ impl SceneViewport {
         };
         
         let sprite_texture_size = sprite_atlas.image_size().unwrap_or(glam::UVec2::new(64, 16));
-        tracing::info!("Successfully loaded sprite atlas '{}' with texture size {}x{}", 
-                      atlas_name, sprite_texture_size.x, sprite_texture_size.y);
+        tracing::trace!("Using sprite atlas '{}' with texture size {}x{} (cache hit: {})",
+                       atlas_name, sprite_texture_size.x, sprite_texture_size.y, self.loaded_sprite_atlases.contains_key(&atlas_asset.path.to_string_lossy().to_string()));
         tracing::trace!("Atlas contains {} tiles", sprite_atlas.tiles.len());
         
         let Some(frame) = self.scene_manager.game_state().get_entity_sprite_frame(entity_id, &sprite_atlas, sprite_texture_size) else {
@@ -398,12 +402,69 @@ impl SceneViewport {
         let viewport_x = (position.x - self.camera.position.x) as f32 / self.camera.scale as f32;
         let viewport_y = (position.y - self.camera.position.y) as f32 / self.camera.scale as f32;
 
-        tracing::info!("Added sprite instance for entity {} - entity center: ({}, {}), viewport coords: ({:.1}, {:.1}), render position: ({:.1}, {:.1}), size: {}x{}",
-                      entity_id, position.x, position.y, viewport_x, viewport_y, render_position.x, render_position.y, size.x, size.y);
-        tracing::trace!("Sprite frame UVs: u0={:.3}, v0={:.3}, u1={:.3}, v1={:.3}", 
+        tracing::trace!("Added sprite instance for entity {} - entity center: ({}, {}), viewport coords: ({:.1}, {:.1}), render position: ({:.1}, {:.1}), size: {}x{}",
+                       entity_id, position.x, position.y, viewport_x, viewport_y, render_position.x, render_position.y, size.x, size.y);
+        tracing::trace!("Sprite frame UVs: u0={:.3}, v0={:.3}, u1={:.3}, v1={:.3}",
                        frame.u0, frame.v0, frame.u1, frame.v1);
     }
-    
+
+    /// Prepare preview sprite data for entity placement (using cached frame)
+    fn prepare_preview_sprite_data(
+        &mut self,
+        scene_data: &mut SceneData,
+        project_path: Option<&std::path::Path>,
+        _project_assets: &ProjectAssets,
+        preview_data: Option<(&str, glam::Vec2, toki_core::sprite::SpriteFrame)>
+    ) {
+        let Some((entity_def_name, preview_position, cached_frame)) = preview_data else {
+            return; // No preview to render
+        };
+
+        tracing::trace!("Preparing preview sprite for entity '{}' at position ({:.1}, {:.1}) using cached frame",
+                       entity_def_name, preview_position.x, preview_position.y);
+
+        // Load entity definition to get size information
+        let Some(project_path) = project_path else {
+            tracing::warn!("No project path provided for preview sprite");
+            return;
+        };
+
+        let entity_file = project_path.join("entities").join(format!("{}.json", entity_def_name));
+        if !entity_file.exists() {
+            tracing::warn!("Entity definition file not found for preview: {:?}", entity_file);
+            return;
+        }
+
+        let entity_def = match std::fs::read_to_string(&entity_file)
+            .and_then(|content| serde_json::from_str::<toki_core::entity::EntityDefinition>(&content).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+        {
+            Ok(def) => def,
+            Err(e) => {
+                tracing::warn!("Failed to load entity definition for preview: {}", e);
+                return;
+            }
+        };
+
+        // Create sprite instance for preview using cached frame
+        let entity_size = glam::UVec2::new(entity_def.rendering.size[0], entity_def.rendering.size[1]);
+
+        // Convert world position to render position (subtract half size for center-based positioning)
+        let half_size = glam::Vec2::new(entity_size.x as f32 / 2.0, entity_size.y as f32 / 2.0);
+        let render_position = preview_position - half_size;
+        let render_position_i32 = glam::IVec2::new(render_position.x as i32, render_position.y as i32);
+
+        let preview_sprite = toki_render::SpriteInstance {
+            frame: cached_frame,
+            position: render_position_i32,
+            size: entity_size,
+        };
+
+        scene_data.sprites.push(preview_sprite);
+
+        tracing::trace!("Added preview sprite for '{}' at render position ({}, {}) with size {}x{} using cached frame",
+                       entity_def_name, render_position_i32.x, render_position_i32.y, entity_size.x, entity_size.y);
+    }
+
     /// Prepare debug shapes for collision visualization
     fn prepare_debug_shapes(&mut self, scene_data: &mut SceneData) {
         if !self.scene_manager.game_state().is_debug_collision_rendering_enabled() {
@@ -548,12 +609,19 @@ impl SceneViewport {
     /// Load atlas from ProjectAssets (replaces hardcoded path lookup)
     fn load_sprite_atlas_from_asset(&mut self, atlas_asset: &SpriteAtlasAsset, _project_path: Option<&std::path::Path>) -> Result<AtlasMeta> {
         let atlas_path = &atlas_asset.path;
-        
+        let atlas_key = atlas_path.to_string_lossy().to_string();
+
+        // Check cache first to avoid redundant file loads
+        if let Some(cached_atlas) = self.loaded_sprite_atlases.get(&atlas_key) {
+            tracing::trace!("Using cached sprite atlas for: {}", atlas_path.display());
+            return Ok(cached_atlas.clone());
+        }
+
         tracing::info!("Loading sprite atlas from file: {}", atlas_path.display());
-        
+
         let atlas = AtlasMeta::load_from_file(atlas_path)
             .map_err(|e| anyhow::anyhow!("Failed to load sprite atlas from '{}': {}", atlas_path.display(), e))?;
-        
+
         tracing::trace!("Successfully loaded atlas metadata with {} tiles", atlas.tiles.len());
         
         // Load the corresponding sprite texture into the renderer
@@ -580,7 +648,11 @@ impl SceneViewport {
         } else {
             tracing::error!("Scene renderer not available - cannot load sprite texture");
         }
-        
+
+        // Cache the loaded atlas for future use
+        self.loaded_sprite_atlases.insert(atlas_key, atlas.clone());
+        tracing::trace!("Cached sprite atlas: {}", atlas_path.display());
+
         Ok(atlas)
     }
     
@@ -801,7 +873,45 @@ impl SceneViewport {
         }
     }
     
-    /// Convert screen position to world position
+    /// Convert screen position to world position (raw, without placement offsets)
+    pub fn screen_to_world_pos_raw(&self, screen_pos: egui::Pos2, display_rect: egui::Rect) -> glam::Vec2 {
+        // Convert screen position relative to display rect to 0-1 normalized coordinates
+        let normalized_x = (screen_pos.x - display_rect.min.x) / display_rect.width();
+        let normalized_y = (screen_pos.y - display_rect.min.y) / display_rect.height();
+
+        // The scene is rendered to a fixed 160x144 offscreen target, then stretched to fit the display rect.
+        // We need to account for aspect ratio differences between the display rect and the logical viewport.
+        let display_aspect = display_rect.width() / display_rect.height();
+        let viewport_aspect = self.viewport_size.0 as f32 / self.viewport_size.1 as f32;
+
+        let (viewport_x, viewport_y) = if display_aspect > viewport_aspect {
+            // Display rect is wider than viewport - letterboxing on sides
+            let effective_width = display_rect.height() * viewport_aspect;
+            let x_offset = (display_rect.width() - effective_width) * 0.5;
+            let adjusted_x = (screen_pos.x - display_rect.min.x - x_offset) / effective_width;
+            let adjusted_y = normalized_y;
+
+            (adjusted_x.clamp(0.0, 1.0) * self.viewport_size.0 as f32,
+             adjusted_y * self.viewport_size.1 as f32)
+        } else {
+            // Display rect is taller than viewport - letterboxing on top/bottom
+            let effective_height = display_rect.width() / viewport_aspect;
+            let y_offset = (display_rect.height() - effective_height) * 0.5;
+            let adjusted_x = normalized_x;
+            let adjusted_y = (screen_pos.y - display_rect.min.y - y_offset) / effective_height;
+
+            (adjusted_x * self.viewport_size.0 as f32,
+             adjusted_y.clamp(0.0, 1.0) * self.viewport_size.1 as f32)
+        };
+
+        // Convert to world coordinates using camera
+        let world_x = self.camera.position.x as f32 + viewport_x * self.camera.scale as f32;
+        let world_y = self.camera.position.y as f32 + viewport_y * self.camera.scale as f32;
+
+        glam::Vec2::new(world_x, world_y)
+    }
+
+    /// Convert screen position to world position (with placement offsets for entity placement)
     pub fn screen_to_world_pos(&self, screen_pos: egui::Pos2, display_rect: egui::Rect) -> glam::Vec2 {
         // Convert screen position relative to display rect to 0-1 normalized coordinates
         let normalized_x = (screen_pos.x - display_rect.min.x) / display_rect.width();
