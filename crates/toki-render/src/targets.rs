@@ -85,11 +85,11 @@ impl RenderTarget for WindowTarget {
     }
     
     fn begin_frame(&mut self) -> Result<(), RenderError> {
-        tracing::debug!("WindowTarget: Beginning frame");
+        tracing::trace!("WindowTarget: Beginning frame");
         let surface_texture = match self.surface.get_current_texture() {
             Ok(texture) => texture,
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                tracing::warn!("WindowTarget: Surface lost/outdated, reconfiguring");
+                tracing::debug!("WindowTarget: Surface lost/outdated, reconfiguring");
                 // Recreate surface on error
                 self.surface.configure(&self.device, &self.config);
                 return Err(RenderError::Other("Surface lost, reconfigured".to_string()));
@@ -107,7 +107,7 @@ impl RenderTarget for WindowTarget {
     
     fn end_frame(&mut self) -> Result<(), RenderError> {
         if let Some(texture) = self.current_texture.take() {
-            tracing::debug!("WindowTarget: Presenting frame to window");
+            tracing::trace!("WindowTarget: Presenting frame to window");
             texture.present();
         }
         self.current_view = None;
@@ -200,12 +200,12 @@ impl RenderTarget for OffscreenTarget {
     }
     
     fn begin_frame(&mut self) -> Result<(), RenderError> {
-        tracing::debug!("OffscreenTarget: Beginning frame ({}x{})", self.size.0, self.size.1);
+        tracing::trace!("OffscreenTarget: Beginning frame ({}x{})", self.size.0, self.size.1);
         Ok(())
     }
     
     fn end_frame(&mut self) -> Result<(), RenderError> {
-        tracing::debug!("OffscreenTarget: Frame complete");
+        tracing::trace!("OffscreenTarget: Frame complete");
         Ok(())
     }
     

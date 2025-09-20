@@ -129,10 +129,10 @@ impl SceneRenderer {
     
     /// Render scene to any render target with custom projection matrix
     pub fn render_scene_with_projection<T: RenderTarget>(&mut self, target: &mut T, scene_data: &SceneData, projection: glam::Mat4) -> Result<(), RenderError> {
-        tracing::debug!("Starting scene render with custom projection");
-        tracing::debug!("Scene data - tilemap: {}, sprites: {}, debug_shapes: {}", 
-            scene_data.tilemap.is_some(), 
-            scene_data.sprites.len(), 
+        tracing::trace!("Starting scene render with custom projection");
+        tracing::trace!("Scene data - tilemap: {}, sprites: {}, debug_shapes: {}",
+            scene_data.tilemap.is_some(),
+            scene_data.sprites.len(),
             scene_data.debug_shapes.len()
         );
         
@@ -145,21 +145,21 @@ impl SceneRenderer {
         if let (Some(tilemap), Some(atlas)) = (&scene_data.tilemap, &scene_data.atlas) {
             let vertices = if scene_data.visible_chunks.is_empty() {
                 // Render all tiles (for editor or small maps)
-                tracing::debug!("Generating vertices for all tiles ({}x{})", tilemap.size.x, tilemap.size.y);
+                tracing::trace!("Generating vertices for all tiles ({}x{})", tilemap.size.x, tilemap.size.y);
                 tilemap.generate_vertices(atlas, scene_data.texture_size)
             } else {
                 // Render only visible chunks (for runtime performance)
-                tracing::debug!("Generating vertices for {} visible chunks", scene_data.visible_chunks.len());
+                tracing::trace!("Generating vertices for {} visible chunks", scene_data.visible_chunks.len());
                 tilemap.generate_vertices_for_chunks(atlas, scene_data.texture_size, &scene_data.visible_chunks)
             };
-            tracing::debug!("Updating tilemap pipeline with {} vertices", vertices.len());
+            tracing::trace!("Updating tilemap pipeline with {} vertices", vertices.len());
             self.tilemap_pipeline.update_vertices(&self.device, &vertices);
         } else {
-            tracing::debug!("No tilemap or atlas to render");
+            tracing::trace!("No tilemap or atlas to render");
         }
         
         // Add sprites (same logic as runtime)
-        tracing::debug!("Adding {} sprites to pipeline", scene_data.sprites.len());
+        tracing::trace!("Adding {} sprites to pipeline", scene_data.sprites.len());
         self.sprite_pipeline.clear_sprites();
         for sprite in &scene_data.sprites {
             let render_instance = SpriteRenderInstance {
@@ -172,10 +172,10 @@ impl SceneRenderer {
         
         // CRITICAL FIX: Update sprite vertex buffer on GPU (this was missing!)
         self.sprite_pipeline.update_with_queue(&self.queue);
-        tracing::debug!("Updated sprite vertex buffer on GPU");
+        tracing::trace!("Updated sprite vertex buffer on GPU");
         
         // Add debug shapes
-        tracing::debug!("Adding {} debug shapes to pipeline", scene_data.debug_shapes.len());
+        tracing::trace!("Adding {} debug shapes to pipeline", scene_data.debug_shapes.len());
         self.debug_pipeline.clear();
         for debug_shape in &scene_data.debug_shapes {
             match debug_shape.shape_type {
@@ -198,7 +198,7 @@ impl SceneRenderer {
         }
         
         // Finalize debug shapes
-        tracing::debug!("Finalizing debug shapes");
+        tracing::trace!("Finalizing debug shapes");
         self.debug_pipeline.update_vertices(&self.device);
         
         // Render using WGPU pipelines
@@ -228,28 +228,28 @@ impl SceneRenderer {
             });
             
             // Same pipeline calls for both runtime and editor!
-            tracing::debug!("Rendering tilemap pipeline");
+            tracing::trace!("Rendering tilemap pipeline");
             self.tilemap_pipeline.render(&mut render_pass);
-            tracing::debug!("Rendering sprite pipeline");
+            tracing::trace!("Rendering sprite pipeline");
             self.sprite_pipeline.render(&mut render_pass);
-            tracing::debug!("Rendering debug pipeline");
+            tracing::trace!("Rendering debug pipeline");
             self.debug_pipeline.render(&mut render_pass);
         }
         
-        tracing::debug!("Submitting render commands to GPU");
+        tracing::trace!("Submitting render commands to GPU");
         self.queue.submit(std::iter::once(encoder.finish()));
         target.end_frame()?;
         
-        tracing::debug!("Scene render complete");
+        tracing::trace!("Scene render complete");
         Ok(())
     }
 
     /// Render scene to any render target
     pub fn render_scene<T: RenderTarget>(&mut self, target: &mut T, scene_data: &SceneData) -> Result<(), RenderError> {
-        tracing::debug!("Starting scene render");
-        tracing::debug!("Scene data - tilemap: {}, sprites: {}, debug_shapes: {}", 
-            scene_data.tilemap.is_some(), 
-            scene_data.sprites.len(), 
+        tracing::trace!("Starting scene render");
+        tracing::trace!("Scene data - tilemap: {}, sprites: {}, debug_shapes: {}",
+            scene_data.tilemap.is_some(),
+            scene_data.sprites.len(),
             scene_data.debug_shapes.len()
         );
         
@@ -257,7 +257,7 @@ impl SceneRenderer {
         
         // Update projection matrix based on target size
         let (width, height) = target.size();
-        tracing::debug!("Render target size: {}x{}", width, height);
+        tracing::trace!("Render target size: {}x{}", width, height);
         let projection = self.calculate_projection_for_size(width, height);
         self.update_projection(projection);
         
@@ -265,21 +265,21 @@ impl SceneRenderer {
         if let (Some(tilemap), Some(atlas)) = (&scene_data.tilemap, &scene_data.atlas) {
             let vertices = if scene_data.visible_chunks.is_empty() {
                 // Render all tiles (for editor or small maps)
-                tracing::debug!("Generating vertices for all tiles ({}x{})", tilemap.size.x, tilemap.size.y);
+                tracing::trace!("Generating vertices for all tiles ({}x{})", tilemap.size.x, tilemap.size.y);
                 tilemap.generate_vertices(atlas, scene_data.texture_size)
             } else {
                 // Render only visible chunks (for runtime performance)
-                tracing::debug!("Generating vertices for {} visible chunks", scene_data.visible_chunks.len());
+                tracing::trace!("Generating vertices for {} visible chunks", scene_data.visible_chunks.len());
                 tilemap.generate_vertices_for_chunks(atlas, scene_data.texture_size, &scene_data.visible_chunks)
             };
-            tracing::debug!("Updating tilemap pipeline with {} vertices", vertices.len());
+            tracing::trace!("Updating tilemap pipeline with {} vertices", vertices.len());
             self.tilemap_pipeline.update_vertices(&self.device, &vertices);
         } else {
-            tracing::debug!("No tilemap or atlas to render");
+            tracing::trace!("No tilemap or atlas to render");
         }
         
         // Add sprites (same logic as runtime)
-        tracing::debug!("Adding {} sprites to pipeline", scene_data.sprites.len());
+        tracing::trace!("Adding {} sprites to pipeline", scene_data.sprites.len());
         self.sprite_pipeline.clear_sprites();
         for sprite in &scene_data.sprites {
             let render_instance = SpriteRenderInstance {
@@ -292,10 +292,10 @@ impl SceneRenderer {
         
         // CRITICAL FIX: Update sprite vertex buffer on GPU (this was missing!)
         self.sprite_pipeline.update_with_queue(&self.queue);
-        tracing::debug!("Updated sprite vertex buffer on GPU");
+        tracing::trace!("Updated sprite vertex buffer on GPU");
         
         // Add debug shapes
-        tracing::debug!("Adding {} debug shapes to pipeline", scene_data.debug_shapes.len());
+        tracing::trace!("Adding {} debug shapes to pipeline", scene_data.debug_shapes.len());
         self.debug_pipeline.clear();
         for debug_shape in &scene_data.debug_shapes {
             match debug_shape.shape_type {
@@ -318,7 +318,7 @@ impl SceneRenderer {
         }
         
         // Finalize debug shapes
-        tracing::debug!("Finalizing debug shapes");
+        tracing::trace!("Finalizing debug shapes");
         self.debug_pipeline.update_vertices(&self.device);
         
         // Render using WGPU pipelines
@@ -348,19 +348,19 @@ impl SceneRenderer {
             });
             
             // Same pipeline calls for both runtime and editor!
-            tracing::debug!("Rendering tilemap pipeline");
+            tracing::trace!("Rendering tilemap pipeline");
             self.tilemap_pipeline.render(&mut render_pass);
-            tracing::debug!("Rendering sprite pipeline");
+            tracing::trace!("Rendering sprite pipeline");
             self.sprite_pipeline.render(&mut render_pass);
-            tracing::debug!("Rendering debug pipeline");
+            tracing::trace!("Rendering debug pipeline");
             self.debug_pipeline.render(&mut render_pass);
         }
         
-        tracing::debug!("Submitting render commands to GPU");
+        tracing::trace!("Submitting render commands to GPU");
         self.queue.submit(std::iter::once(encoder.finish()));
         target.end_frame()?;
         
-        tracing::debug!("Scene render complete");
+        tracing::trace!("Scene render complete");
         Ok(())
     }
     

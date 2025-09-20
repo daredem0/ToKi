@@ -602,20 +602,20 @@ impl GameState {
         atlas: &AtlasMeta,
         texture_size: glam::UVec2,
     ) -> Option<SpriteFrame> {
-        tracing::debug!("Getting sprite frame for entity {} with texture size {}x{}", entity_id, texture_size.x, texture_size.y);
+        tracing::trace!("Getting sprite frame for entity {} with texture size {}x{}", entity_id, texture_size.x, texture_size.y);
         
         if let Some(entity) = self.entity_manager.get_entity(entity_id) {
-            tracing::debug!("Found entity {} for sprite frame lookup", entity_id);
+            tracing::trace!("Found entity {} for sprite frame lookup", entity_id);
             
             if let Some(animation_controller) = &entity.attributes.animation_controller {
-                tracing::debug!("Entity {} has animation controller", entity_id);
+                tracing::trace!("Entity {} has animation controller", entity_id);
                 
                 if let Ok(tile_name) = animation_controller.current_tile_name() {
-                    tracing::debug!("Entity {} requesting tile: '{}'", entity_id, tile_name);
+                    tracing::trace!("Entity {} requesting tile: '{}'", entity_id, tile_name);
                     
                     // Look up the tile in the atlas to get UV coordinates
                     if let Some(uvs) = atlas.get_tile_uvs(&tile_name, texture_size) {
-                        tracing::debug!("Found UVs for tile '{}': [{:.3}, {:.3}, {:.3}, {:.3}]", tile_name, uvs[0], uvs[1], uvs[2], uvs[3]);
+                        tracing::trace!("Found UVs for tile '{}': [{:.3}, {:.3}, {:.3}, {:.3}]", tile_name, uvs[0], uvs[1], uvs[2], uvs[3]);
                         return Some(SpriteFrame {
                             u0: uvs[0],
                             v0: uvs[1],
@@ -624,13 +624,13 @@ impl GameState {
                         });
                     } else {
                         tracing::warn!("Tile '{}' not found in atlas for entity {}", tile_name, entity_id);
-                        tracing::debug!("Atlas contains tiles: {:?}", atlas.tiles.keys().collect::<Vec<_>>());
+                        tracing::trace!("Atlas contains tiles: {:?}", atlas.tiles.keys().collect::<Vec<_>>());
                     }
                 } else {
-                    tracing::debug!("Entity {} animation controller failed to provide tile name", entity_id);
+                    tracing::trace!("Entity {} animation controller failed to provide tile name", entity_id);
                 }
             } else {
-                tracing::debug!("Entity {} has no animation controller", entity_id);
+                tracing::trace!("Entity {} has no animation controller", entity_id);
             }
         } else {
             tracing::warn!("Entity {} not found when getting sprite frame", entity_id);
@@ -641,7 +641,7 @@ impl GameState {
     /// Get all renderable entities (entities that are visible and have animation controllers)
     pub fn get_renderable_entities(&self) -> Vec<(EntityId, glam::IVec2, glam::UVec2)> {
         let active_entities = self.entity_manager.active_entities();
-        tracing::debug!("Checking {} active entities for renderability", active_entities.len());
+        tracing::trace!("Checking {} active entities for renderability", active_entities.len());
         
         let renderable: Vec<_> = self.entity_manager
             .active_entities()
@@ -651,10 +651,10 @@ impl GameState {
                     let is_visible = entity.attributes.visible;
                     let has_animation = entity.attributes.animation_controller.is_some();
                     
-                    tracing::debug!("Entity {}: visible={}, has_animation={}", entity_id, is_visible, has_animation);
+                    tracing::trace!("Entity {}: visible={}, has_animation={}", entity_id, is_visible, has_animation);
                     
                     if is_visible && has_animation {
-                        tracing::debug!("Entity {} is renderable at ({}, {}) with size {}x{}", 
+                        tracing::trace!("Entity {} is renderable at ({}, {}) with size {}x{}", 
                                        entity_id, entity.position.x, entity.position.y, entity.size.x, entity.size.y);
                         return Some((entity_id, entity.position, entity.size));
                     }
@@ -663,7 +663,7 @@ impl GameState {
             })
             .collect();
             
-        tracing::debug!("Found {} renderable entities out of {} active entities", renderable.len(), active_entities.len());
+        tracing::trace!("Found {} renderable entities out of {} active entities", renderable.len(), active_entities.len());
         renderable
     }
 

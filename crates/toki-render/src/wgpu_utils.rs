@@ -29,7 +29,7 @@ pub fn create_texture_bindgroup(
     });
 
     if texture_path_str.is_empty() {
-        tracing::debug!(
+        tracing::trace!(
             "Loading default texture (no path provided) for label: {:?}",
             texture_label
         );
@@ -45,16 +45,16 @@ pub fn create_texture_bindgroup(
             panic!("Texture loading failed for '{}': {}", texture_path_str, e);
         });
 
-    tracing::debug!("Creating bind group for texture: {:?}", texture_label);
+    tracing::trace!("Creating bind group for texture: {:?}", texture_label);
     let bind_group = create_bind_group(device, texture_bind_group_layout, &texture, uniform_buffer);
 
     if texture_path_str.is_empty() {
-        tracing::debug!(
+        tracing::trace!(
             "Successfully created texture bind group with default texture for: {:?}",
             texture_label
         );
     } else {
-        tracing::debug!(
+        tracing::trace!(
             "Successfully created texture bind group for: {}",
             texture_path_str
         );

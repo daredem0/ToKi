@@ -179,7 +179,7 @@ impl EntityManager {
         // Store the entity
         self.entities.insert(id, entity);
         
-        tracing::debug!("Added existing entity {} to EntityManager", id);
+        tracing::trace!("Added existing entity {} to EntityManager", id);
         id
     }
 

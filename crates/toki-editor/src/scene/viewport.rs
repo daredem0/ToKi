@@ -100,14 +100,14 @@ impl SceneViewport {
             return Ok(()); // Skip silently - no need to log this every frame
         }
         
-        tracing::debug!("Scene needs re-rendering, proceeding with render");
+        tracing::trace!("Scene needs re-rendering, proceeding with render");
         
         // Prepare scene data
         let scene_data = self.prepare_scene_data(Some(project_path), project_assets);
         
         // Render to offscreen target
         if let (Some(scene_renderer), Some(target)) = (&mut self.scene_renderer, &mut self.offscreen_target) {
-            tracing::debug!("About to render scene with data: tilemap={}, atlas={}, sprites={}, debug_shapes={}", 
+            tracing::trace!("About to render scene with data: tilemap={}, atlas={}, sprites={}, debug_shapes={}", 
                            scene_data.tilemap.is_some(),
                            scene_data.atlas.is_some(), 
                            scene_data.sprites.len(),
@@ -121,9 +121,9 @@ impl SceneViewport {
             
             // Register texture with egui for later use
             let texture_id = target.register_with_egui(renderer);
-            tracing::debug!("Registered texture with egui, texture_id: {:?}", texture_id);
+            tracing::trace!("Registered texture with egui, texture_id: {:?}", texture_id);
             
-            tracing::debug!("Scene rendered to texture successfully");
+            tracing::trace!("Scene rendered to texture successfully");
             
             // Clear dirty flag after successful render
             self.needs_render = false;
@@ -173,7 +173,7 @@ impl SceneViewport {
                     
                     // Log once when UI response is created (only if mouse is interacting)
                     if response.hovered() || response.clicked() || response.dragged() {
-                        tracing::debug!("UI response - rect size: {:?}, hovered: {}, clicked: {}, dragged: {}", 
+                        tracing::trace!("UI response - rect size: {:?}, hovered: {}, clicked: {}, dragged: {}", 
                                       rect.size(), response.hovered(), response.clicked(), response.dragged());
                     }
                     
@@ -237,7 +237,7 @@ impl SceneViewport {
     
     /// Prepare scene data for rendering
     fn prepare_scene_data(&mut self, project_path: Option<&std::path::Path>, project_assets: &ProjectAssets) -> SceneData {
-        tracing::debug!("Preparing scene data for rendering...");
+        tracing::trace!("Preparing scene data for rendering...");
         
         let mut scene_data = SceneData::default();
         
@@ -245,7 +245,7 @@ impl SceneViewport {
         self.prepare_sprite_data(&mut scene_data, project_path, project_assets);
         self.prepare_debug_shapes(&mut scene_data);
         
-        tracing::debug!("Scene data prepared: tilemap={}, atlas={}, sprites={}, debug_shapes={}", 
+        tracing::trace!("Scene data prepared: tilemap={}, atlas={}, sprites={}, debug_shapes={}", 
                        scene_data.tilemap.is_some(), scene_data.atlas.is_some(), 
                        scene_data.sprites.len(), scene_data.debug_shapes.len());
         
@@ -255,7 +255,7 @@ impl SceneViewport {
     /// Prepare tilemap data and load associated atlas
     fn prepare_tilemap_data(&mut self, scene_data: &mut SceneData, project_path: Option<&std::path::Path>) {
         let Some(tilemap) = self.scene_manager.tilemap().cloned() else {
-            tracing::debug!("No tilemap found in scene manager");
+            tracing::trace!("No tilemap found in scene manager");
             return;
         };
         
@@ -271,9 +271,9 @@ impl SceneViewport {
         tracing::debug!("Loading atlas for tilemap from project path: {}", project_path.display());
         match self.load_atlas_for_tilemap(&tilemap.atlas.to_string_lossy(), project_path) {
             Ok(atlas) => {
-                tracing::debug!("Successfully loaded atlas with {} tiles", atlas.tiles.len());
+                tracing::trace!("Successfully loaded atlas with {} tiles", atlas.tiles.len());
                 let texture_size = atlas.image_size().unwrap_or(glam::UVec2::new(64, 8));
-                tracing::debug!("Calculated atlas texture size: {}x{}", texture_size.x, texture_size.y);
+                tracing::trace!("Calculated atlas texture size: {}x{}", texture_size.x, texture_size.y);
                 scene_data.atlas = Some(atlas);
                 scene_data.texture_size = texture_size;
             }
@@ -308,7 +308,7 @@ impl SceneViewport {
         project_path: Option<&std::path::Path>,
         project_assets: &ProjectAssets
     ) {
-        tracing::debug!("Processing entity {} at ({}, {}) with size {}x{}", 
+        tracing::trace!("Processing entity {} at ({}, {}) with size {}x{}", 
                        entity_id, position.x, position.y, size.x, size.y);
         
         let Some(entity) = self.scene_manager.game_state().entity_manager().get_entity(entity_id) else {
@@ -316,20 +316,20 @@ impl SceneViewport {
             return;
         };
         
-        tracing::debug!("Found entity {} (type: {:?}, visible: {})", 
+        tracing::trace!("Found entity {} (type: {:?}, visible: {})", 
                        entity_id, entity.entity_type, entity.attributes.visible);
         
         let Some(animation_controller) = &entity.attributes.animation_controller else {
-            tracing::debug!("Entity {} has no animation controller - skipping sprite rendering", entity_id);
+            tracing::trace!("Entity {} has no animation controller - skipping sprite rendering", entity_id);
             return;
         };
         
-        tracing::debug!("Entity {} has animation controller", entity_id);
+        tracing::trace!("Entity {} has animation controller", entity_id);
         
         let atlas_name = match animation_controller.current_atlas_name() {
             Ok(name) => name,
             Err(_) => {
-                tracing::debug!("Entity {} animation controller failed to provide atlas name", entity_id);
+                tracing::trace!("Entity {} animation controller failed to provide atlas name", entity_id);
                 return;
             }
         };
@@ -351,8 +351,8 @@ impl SceneViewport {
     ) {
         let (project_assets, project_path) = project_context;
         let atlas_name_clean = atlas_name.strip_suffix(".json").unwrap_or(atlas_name);
-        tracing::debug!("Cleaned atlas name: '{}' -> '{}'", atlas_name, atlas_name_clean);
-        tracing::debug!("Available sprite atlases in ProjectAssets: {:?}", 
+        tracing::trace!("Cleaned atlas name: '{}' -> '{}'", atlas_name, atlas_name_clean);
+        tracing::trace!("Available sprite atlases in ProjectAssets: {:?}", 
                        project_assets.sprite_atlases.keys().collect::<Vec<_>>());
         
         let Some(atlas_asset) = project_assets.sprite_atlases.get(atlas_name_clean) else {
@@ -375,7 +375,7 @@ impl SceneViewport {
         let sprite_texture_size = sprite_atlas.image_size().unwrap_or(glam::UVec2::new(64, 16));
         tracing::info!("Successfully loaded sprite atlas '{}' with texture size {}x{}", 
                       atlas_name, sprite_texture_size.x, sprite_texture_size.y);
-        tracing::debug!("Atlas contains {} tiles", sprite_atlas.tiles.len());
+        tracing::trace!("Atlas contains {} tiles", sprite_atlas.tiles.len());
         
         let Some(frame) = self.scene_manager.game_state().get_entity_sprite_frame(entity_id, &sprite_atlas, sprite_texture_size) else {
             tracing::warn!("Failed to get sprite frame for entity {} - entity will not be rendered", entity_id);
@@ -400,7 +400,7 @@ impl SceneViewport {
 
         tracing::info!("Added sprite instance for entity {} - entity center: ({}, {}), viewport coords: ({:.1}, {:.1}), render position: ({:.1}, {:.1}), size: {}x{}",
                       entity_id, position.x, position.y, viewport_x, viewport_y, render_position.x, render_position.y, size.x, size.y);
-        tracing::debug!("Sprite frame UVs: u0={:.3}, v0={:.3}, u1={:.3}, v1={:.3}", 
+        tracing::trace!("Sprite frame UVs: u0={:.3}, v0={:.3}, u1={:.3}, v1={:.3}", 
                        frame.u0, frame.v0, frame.u1, frame.v1);
     }
     
@@ -410,12 +410,12 @@ impl SceneViewport {
             return;
         }
         
-        tracing::debug!("Debug collision rendering enabled - adding debug shapes");
+        tracing::trace!("Debug collision rendering enabled - adding debug shapes");
         
         self.add_entity_debug_shapes(scene_data);
         self.add_tile_debug_shapes(scene_data);
         
-        tracing::debug!("Added {} debug shapes total", scene_data.debug_shapes.len());
+        tracing::trace!("Added {} debug shapes total", scene_data.debug_shapes.len());
     }
     
     /// Add debug shapes for entities
@@ -433,7 +433,7 @@ impl SceneViewport {
                 color: [0.0, 1.0, 0.0, 0.5], // Green for entity bounds
             };
             scene_data.debug_shapes.push(debug_shape);
-            tracing::debug!("Added entity bounds for entity {} at ({}, {}) with size {}x{}", 
+            tracing::trace!("Added entity bounds for entity {} at ({}, {}) with size {}x{}", 
                            entity_id, position.x, position.y, size.x, size.y);
         }
         
@@ -449,7 +449,7 @@ impl SceneViewport {
                 color,
             };
             scene_data.debug_shapes.push(debug_shape);
-            tracing::debug!("Added entity collision box at ({}, {}) with size {}x{}", 
+            tracing::trace!("Added entity collision box at ({}, {}) with size {}x{}", 
                            pos.x, pos.y, size.x, size.y);
         }
     }
@@ -520,9 +520,9 @@ impl SceneViewport {
             .map_err(|e| anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e))?;
         
         // Load the corresponding texture image into the renderer
-        tracing::debug!("Atlas image field contains: {:?}", atlas.image);
+        tracing::trace!("Atlas image field contains: {:?}", atlas.image);
         if let Some(scene_renderer) = &mut self.scene_renderer {
-            tracing::debug!("Scene renderer available, proceeding with texture load");
+            tracing::trace!("Scene renderer available, proceeding with texture load");
             // Construct the texture path relative to the atlas file
             let texture_path = atlas_path.parent()
                 .unwrap_or_else(|| std::path::Path::new("."))
@@ -554,10 +554,10 @@ impl SceneViewport {
         let atlas = AtlasMeta::load_from_file(atlas_path)
             .map_err(|e| anyhow::anyhow!("Failed to load sprite atlas from '{}': {}", atlas_path.display(), e))?;
         
-        tracing::debug!("Successfully loaded atlas metadata with {} tiles", atlas.tiles.len());
+        tracing::trace!("Successfully loaded atlas metadata with {} tiles", atlas.tiles.len());
         
         // Load the corresponding sprite texture into the renderer
-        tracing::debug!("Sprite atlas image field contains: {:?}", atlas.image);
+        tracing::trace!("Sprite atlas image field contains: {:?}", atlas.image);
         if let Some(scene_renderer) = &mut self.scene_renderer {
             tracing::debug!("Scene renderer available, proceeding with sprite texture load");
             // Construct the texture path relative to the atlas file
@@ -565,7 +565,7 @@ impl SceneViewport {
                 .unwrap_or_else(|| std::path::Path::new("."))
                 .join(&atlas.image);
             
-            tracing::debug!("Constructed texture path: {}", texture_path.display());
+            tracing::trace!("Constructed texture path: {}", texture_path.display());
             
             if texture_path.exists() {
                 tracing::info!("Loading sprite texture: {}", texture_path.display());
@@ -574,8 +574,8 @@ impl SceneViewport {
                 tracing::info!("Successfully loaded sprite texture from ProjectAssets");
             } else {
                 tracing::error!("Sprite texture file not found: {}", texture_path.display());
-                tracing::debug!("Atlas path parent: {:?}", atlas_path.parent());
-                tracing::debug!("Atlas image field: {:?}", atlas.image);
+                tracing::trace!("Atlas path parent: {:?}", atlas_path.parent());
+                tracing::trace!("Atlas image field: {:?}", atlas.image);
             }
         } else {
             tracing::error!("Scene renderer not available - cannot load sprite texture");
@@ -651,7 +651,7 @@ impl SceneViewport {
     
     /// Mark the scene as needing a re-render
     pub fn mark_dirty(&mut self) {
-        tracing::debug!("Scene viewport marked dirty - will re-render on next frame");
+        tracing::trace!("Scene viewport marked dirty - will re-render on next frame");
         self.needs_render = true;
     }
     
@@ -662,7 +662,7 @@ impl SceneViewport {
             self.mark_dirty();
             tracing::info!("Zoomed in to scale {}", self.camera.scale);
         } else {
-            tracing::debug!("Already at minimum zoom level: {}", self.camera.scale);
+            tracing::trace!("Already at minimum zoom level: {}", self.camera.scale);
         }
     }
     
@@ -673,14 +673,14 @@ impl SceneViewport {
             self.mark_dirty();
             tracing::info!("Zoomed out to scale {}", self.camera.scale);
         } else {
-            tracing::debug!("Already at maximum zoom level: {}", self.camera.scale);
+            tracing::trace!("Already at maximum zoom level: {}", self.camera.scale);
         }
     }
     
     
     /// Handle keyboard input for zoom controls using logical keys (respects keyboard layout)
     pub fn handle_keyboard_input(&mut self, logical_key: &winit::keyboard::Key, _modifiers: winit::event::Modifiers, pressed: bool) -> bool {
-        tracing::debug!("Viewport keyboard input: {:?}, pressed: {}", logical_key, pressed);
+        tracing::trace!("Viewport keyboard input: {:?}, pressed: {}", logical_key, pressed);
         if pressed {
             match logical_key {
                 winit::keyboard::Key::Character(ch) => {
@@ -697,7 +697,7 @@ impl SceneViewport {
                             return true;
                         }
                         _ => {
-                            tracing::debug!("Viewport: Unhandled character key '{}'", ch_str);
+                            tracing::trace!("Viewport: Unhandled character key '{}'", ch_str);
                         }
                     }
                 }
@@ -705,15 +705,15 @@ impl SceneViewport {
                     match named_key {
                         winit::keyboard::NamedKey::ArrowUp => {
                             // Could add camera panning here in the future
-                            tracing::debug!("Viewport: Arrow key up (not handled)");
+                            tracing::trace!("Viewport: Arrow key up (not handled)");
                         }
                         _ => {
-                            tracing::debug!("Viewport: Unhandled named key {:?}", named_key);
+                            tracing::trace!("Viewport: Unhandled named key {:?}", named_key);
                         }
                     }
                 }
                 _ => {
-                    tracing::debug!("Viewport: Unhandled key type {:?}", logical_key);
+                    tracing::trace!("Viewport: Unhandled key type {:?}", logical_key);
                 }
             }
         }
@@ -748,18 +748,18 @@ impl SceneViewport {
             
         if let Some(mouse_pos) = mouse_pos_opt {
             if display_rect.contains(mouse_pos) {
-                tracing::debug!("Mouse at {:?} within display rect, handling interaction", mouse_pos);
+                tracing::trace!("Mouse at {:?} within display rect, handling interaction", mouse_pos);
                 self.handle_viewport_mouse_interaction(response, mouse_pos, display_rect);
             } else {
                 // Mouse is in letterbox area - stop any ongoing camera drag
                 if self.is_dragging_camera {
-                    tracing::debug!("Mouse in letterbox area at {:?}, stopping camera drag", mouse_pos);
+                    tracing::trace!("Mouse in letterbox area at {:?}, stopping camera drag", mouse_pos);
                     self.stop_camera_drag();
                 }
             }
         } else if self.is_dragging_camera {
             // Mouse left the viewport area - only log if we're actually dragging
-            tracing::debug!("Mouse left viewport area while dragging, stopping camera drag");
+            tracing::trace!("Mouse left viewport area while dragging, stopping camera drag");
             self.stop_camera_drag();
         }
     }
@@ -796,7 +796,7 @@ impl SceneViewport {
         // Handle single clicks for selection (when not dragging)
         if response.clicked() && !response.dragged() {
             let world_pos = self.screen_to_world_pos(mouse_pos, display_rect);
-            tracing::debug!("Viewport clicked at world position: {:?}", world_pos);
+            tracing::trace!("Viewport clicked at world position: {:?}", world_pos);
             // TODO: Handle entity selection
         }
     }
@@ -846,8 +846,14 @@ impl SceneViewport {
         let world_x = world_x + TILE_SIZE;
         let world_y = world_y + TILE_SIZE;
 
-        tracing::debug!("screen_to_world: screen({:.1}, {:.1}) -> normalized({:.3}, {:.3}) -> viewport({:.1}, {:.1}) -> world({:.1}, {:.1}) [camera: pos({}, {}), scale: {}, aspects: display={:.3}, viewport={:.3}]",
-            screen_pos.x, screen_pos.y, normalized_x, normalized_y, viewport_x, viewport_y, world_x, world_y,
+        // Additional debug info to understand coordinate systems
+        let tile_x = (world_x - TILE_SIZE) / TILE_SIZE;
+        let tile_y = (world_y - TILE_SIZE) / TILE_SIZE;
+        let world_before_offset_x = world_x - TILE_SIZE;
+        let world_before_offset_y = world_y - TILE_SIZE;
+
+        tracing::trace!("screen_to_world: screen({:.1}, {:.1}) -> normalized({:.3}, {:.3}) -> viewport({:.1}, {:.1}) -> world_before_offset({:.1}, {:.1}) -> world_final({:.1}, {:.1}) -> tile({:.2}, {:.2}) [camera: pos({}, {}), scale: {}, aspects: display={:.3}, viewport={:.3}]",
+            screen_pos.x, screen_pos.y, normalized_x, normalized_y, viewport_x, viewport_y, world_before_offset_x, world_before_offset_y, world_x, world_y, tile_x, tile_y,
             self.camera.position.x, self.camera.position.y, self.camera.scale, display_aspect, viewport_aspect);
         
         glam::Vec2::new(world_x, world_y)
