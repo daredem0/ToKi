@@ -13,7 +13,7 @@ pub enum AnimationState {
 pub enum LoopMode {
     Loop,    // Repeart forever
     Once,    // Play once
-    PingPog, //Forward then backward
+    PingPong, //Forward then backward
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,7 +85,7 @@ impl AnimationController {
                 match current_clip.loop_mode {
                     LoopMode::Loop => self.current_frame_index = 0,
                     LoopMode::Once => self.is_finished = true,
-                    LoopMode::PingPog => self.current_frame_index = 0, //TODO we still have to implement that one
+                    LoopMode::PingPong => self.current_frame_index = 0, //TODO we still have to implement that one
                 }
             }
         }

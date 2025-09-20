@@ -485,7 +485,7 @@ impl EntityDefinition {
             let loop_mode = match clip_def.loop_mode.to_lowercase().as_str() {
                 "loop" => LoopMode::Loop,
                 "once" => LoopMode::Once,
-                "ping_pong" => LoopMode::PingPog,
+                "ping_pong" => LoopMode::PingPong,
                 _ => return Err(format!("Unknown loop mode: {}", clip_def.loop_mode)),
             };
 
