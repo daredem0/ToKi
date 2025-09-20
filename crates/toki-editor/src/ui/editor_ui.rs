@@ -135,7 +135,7 @@ impl EditorUI {
             .map(|v| v.scene_manager().game_state());
 
         if self.show_hierarchy {
-            self.render_hierarchy_and_maps_combined_panel(ctx, game_state, config);
+            super::hierarchy::HierarchySystem::render_hierarchy_and_maps_combined_panel(self, ctx, game_state, config);
         }
 
         if self.show_inspector {
@@ -159,7 +159,7 @@ impl EditorUI {
     }
 
 
-    fn render_hierarchy_and_maps_combined_panel(&mut self, ctx: &egui::Context, game_state: Option<&toki_core::GameState>, config: Option<&crate::config::EditorConfig>) {
+    pub fn render_hierarchy_and_maps_combined_panel(&mut self, ctx: &egui::Context, game_state: Option<&toki_core::GameState>, config: Option<&crate::config::EditorConfig>) {
         egui::SidePanel::left("hierarchy_panel")
             .resizable(true)
             .default_width(250.0)

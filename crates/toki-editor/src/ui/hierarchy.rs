@@ -1,4 +1,4 @@
-use crate::ui::editor_ui::Selection;
+use crate::ui::editor_ui::{Selection, EditorUI};
 use toki_core::Scene;
 
 /// Handles hierarchy and entity management for the editor
@@ -130,5 +130,15 @@ impl HierarchySystem {
         }
         
         (None, Vec::new())
+    }
+
+    /// Renders the main hierarchy and maps panel (delegates to EditorUI for now)
+    pub fn render_hierarchy_and_maps_combined_panel(
+        editor_ui: &mut EditorUI,
+        ctx: &egui::Context,
+        game_state: Option<&toki_core::GameState>,
+        config: Option<&crate::config::EditorConfig>,
+    ) {
+        editor_ui.render_hierarchy_and_maps_combined_panel(ctx, game_state, config);
     }
 }
