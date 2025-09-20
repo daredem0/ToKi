@@ -382,15 +382,24 @@ impl SceneViewport {
             return;
         };
         
+        // Convert entity center position to top-left corner position for rendering
+        let half_size = glam::Vec2::new(size.x as f32 / 2.0, size.y as f32 / 2.0);
+        let render_position = glam::Vec2::new(position.x as f32, position.y as f32) - half_size;
+        let render_position_i32 = glam::IVec2::new(render_position.x as i32, render_position.y as i32);
+
         let sprite_instance = toki_render::SpriteInstance {
             frame,
-            position,
+            position: render_position_i32,
             size,
         };
         
         scene_data.sprites.push(sprite_instance);
-        tracing::info!("Added sprite instance for entity {} at ({}, {}) with size {}x{}", 
-                      entity_id, position.x, position.y, size.x, size.y);
+        // Calculate viewport coordinates for debugging
+        let viewport_x = (position.x - self.camera.position.x) as f32 / self.camera.scale as f32;
+        let viewport_y = (position.y - self.camera.position.y) as f32 / self.camera.scale as f32;
+
+        tracing::info!("Added sprite instance for entity {} - entity center: ({}, {}), viewport coords: ({:.1}, {:.1}), render position: ({:.1}, {:.1}), size: {}x{}",
+                      entity_id, position.x, position.y, viewport_x, viewport_y, render_position.x, render_position.y, size.x, size.y);
         tracing::debug!("Sprite frame UVs: u0={:.3}, v0={:.3}, u1={:.3}, v1={:.3}", 
                        frame.u0, frame.v0, frame.u1, frame.v1);
     }
@@ -797,14 +806,49 @@ impl SceneViewport {
         // Convert screen position relative to display rect to 0-1 normalized coordinates
         let normalized_x = (screen_pos.x - display_rect.min.x) / display_rect.width();
         let normalized_y = (screen_pos.y - display_rect.min.y) / display_rect.height();
-        
-        // Convert to viewport coordinates (160x144)
-        let viewport_x = normalized_x * self.viewport_size.0 as f32;
-        let viewport_y = normalized_y * self.viewport_size.1 as f32;
-        
+
+        // The scene is rendered to a fixed 160x144 offscreen target, then stretched to fit the display rect.
+        // We need to account for aspect ratio differences between the display rect and the logical viewport.
+        let display_aspect = display_rect.width() / display_rect.height();
+        let viewport_aspect = self.viewport_size.0 as f32 / self.viewport_size.1 as f32;
+
+        let (viewport_x, viewport_y) = if display_aspect > viewport_aspect {
+            // Display rect is wider than viewport - letterboxing on sides
+            let effective_width = display_rect.height() * viewport_aspect;
+            let x_offset = (display_rect.width() - effective_width) * 0.5;
+            let adjusted_x = (screen_pos.x - display_rect.min.x - x_offset) / effective_width;
+            let adjusted_y = normalized_y;
+
+            (adjusted_x.clamp(0.0, 1.0) * self.viewport_size.0 as f32,
+             adjusted_y * self.viewport_size.1 as f32)
+        } else {
+            // Display rect is taller than viewport - letterboxing on top/bottom
+            let effective_height = display_rect.width() / viewport_aspect;
+            let y_offset = (display_rect.height() - effective_height) * 0.5;
+            let adjusted_x = normalized_x;
+            let adjusted_y = (screen_pos.y - display_rect.min.y - y_offset) / effective_height;
+
+            (adjusted_x * self.viewport_size.0 as f32,
+             adjusted_y.clamp(0.0, 1.0) * self.viewport_size.1 as f32)
+        };
+
         // Convert to world coordinates using camera
         let world_x = self.camera.position.x as f32 + viewport_x * self.camera.scale as f32;
         let world_y = self.camera.position.y as f32 + viewport_y * self.camera.scale as f32;
+
+        // COORDINATE SYSTEM FIX:
+        // There are two sources of offset that need to be corrected:
+        // 1. Tile vs Entity positioning: Tiles use top-left corner, entities use center (half tile offset)
+        // 2. Additional coordinate system offset: Related to camera/viewport origin (half tile offset)
+        // Total offset needed: 1 full tile size to make entities appear where clicked
+        // This is currently hard-coded for 8x8 tiles, but should ideally be dynamic
+        const TILE_SIZE: f32 = 8.0; // TODO: Get this from the actual tilemap
+        let world_x = world_x + TILE_SIZE;
+        let world_y = world_y + TILE_SIZE;
+
+        tracing::debug!("screen_to_world: screen({:.1}, {:.1}) -> normalized({:.3}, {:.3}) -> viewport({:.1}, {:.1}) -> world({:.1}, {:.1}) [camera: pos({}, {}), scale: {}, aspects: display={:.3}, viewport={:.3}]",
+            screen_pos.x, screen_pos.y, normalized_x, normalized_y, viewport_x, viewport_y, world_x, world_y,
+            self.camera.position.x, self.camera.position.y, self.camera.scale, display_aspect, viewport_aspect);
         
         glam::Vec2::new(world_x, world_y)
     }

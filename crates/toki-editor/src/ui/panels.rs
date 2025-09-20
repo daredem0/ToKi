@@ -64,19 +64,19 @@ impl PanelSystem {
                 
                 // Handle viewport clicks (entity placement or selection)
                 if response.clicked() {
-                    if let Some(click_pos) = response.interact_pointer_pos() {
-                        let screen_pos = glam::Vec2::new(click_pos.x, click_pos.y);
+                    if let Some(click_pos) = response.hover_pos() {
                         
                         // Check if we're in placement mode
                         if ui_state.is_in_placement_mode() {
                             tracing::info!("Placement click detected at screen pos: {:?}", click_pos);
                             if let Some(entity_def_name) = &ui_state.placement_entity_definition {
                                 // Convert screen coordinates to world coordinates
+                                tracing::debug!("Click at screen pos: {:?}, rect: {:?}", click_pos, rect);
+                                tracing::debug!("Rect dimensions: width={:.1}, height={:.1}", rect.width(), rect.height());
                                 let world_pos = viewport.screen_to_world_pos(click_pos, rect);
-                                let world_pos_i32 = glam::IVec2::new(world_pos.x as i32, world_pos.y as i32);
-                                
-                                tracing::info!("Placing entity '{}' at world coordinates ({}, {})", 
-                                    entity_def_name, world_pos_i32.x, world_pos_i32.y);
+
+                                tracing::info!("Placing entity '{}' at world coordinates ({}, {}) [converted from screen ({}, {})]",
+                                    entity_def_name, world_pos.x, world_pos.y, click_pos.x, click_pos.y);
                                 
                                 // Create entity from definition
                                 if let Some(config) = config {
@@ -84,12 +84,21 @@ impl PanelSystem {
                                         let entity_file = project_path
                                             .join("entities")
                                             .join(format!("{}.json", entity_def_name));
-                                        
+
                                         if entity_file.exists() {
                                             match std::fs::read_to_string(&entity_file) {
                                                 Ok(content) => {
                                                     match serde_json::from_str::<toki_core::entity::EntityDefinition>(&content) {
                                                         Ok(entity_def) => {
+                                                            // Calculate center-based position by offsetting with half the sprite size
+                                                            let sprite_size = glam::UVec2::new(entity_def.rendering.size[0], entity_def.rendering.size[1]);
+                                                            let half_size = glam::Vec2::new(sprite_size.x as f32 / 2.0, sprite_size.y as f32 / 2.0);
+                                                            let centered_world_pos = world_pos - half_size;
+                                                            let world_pos_i32 = glam::IVec2::new(centered_world_pos.x as i32, centered_world_pos.y as i32);
+
+                                                            tracing::debug!("Sprite size: {}x{}, offset: ({:.1}, {:.1}), final position: ({}, {})",
+                                                                sprite_size.x, sprite_size.y, half_size.x, half_size.y, world_pos_i32.x, world_pos_i32.y);
+
                                                             // Find active scene
                                                             if let Some(active_scene_name) = &ui_state.active_scene {
                                                                 if let Some(target_scene) = ui_state.scenes.iter_mut().find(|s| s.name == *active_scene_name) {
@@ -98,8 +107,8 @@ impl PanelSystem {
                                                                         .map(|e| e.id)
                                                                         .max()
                                                                         .unwrap_or(0) + 1;
-                                                                    
-                                                                    // Create entity at click position
+
+                                                                    // Create entity at corrected position (center-based)
                                                                     match entity_def.create_entity(world_pos_i32, new_id) {
                                                                         Ok(entity) => {
                                                                             target_scene.entities.push(entity);
