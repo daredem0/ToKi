@@ -1,4 +1,5 @@
 use crate::scene::SceneViewport;
+use super::menus::MenuSystem;
 use toki_core::{entity::EntityId, Scene};
 
 #[derive(Debug, Clone)]
@@ -119,7 +120,7 @@ impl EditorUI {
         log_capture: Option<&crate::logging::LogCapture>,
         renderer: Option<&mut egui_wgpu::Renderer>,
     ) {
-        self.render_top_menu(ctx, config);
+        MenuSystem::render_top_menu(self, ctx, config);
 
         // Render log panel first to claim full width at bottom
         if self.show_console {
@@ -150,86 +151,6 @@ impl EditorUI {
         self.show_console = config.editor_settings.panels.console_visible;
     }
 
-    fn render_top_menu(
-        &mut self,
-        ctx: &egui::Context,
-        config: Option<&crate::config::EditorConfig>,
-    ) {
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            egui::MenuBar::new().ui(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("New Project...").clicked() {
-                        tracing::info!("New Project clicked");
-                        self.new_project_requested = true;
-                    }
-
-                    // Auto-open the project from config
-                    if let Some(config) = config {
-                        if config.has_project_path() {
-                            if ui.button("Open Project").clicked() {
-                                tracing::info!(
-                                    "Open Project clicked - opening project from config"
-                                );
-                                self.open_project_requested = true;
-                            }
-                            if ui.button("Browse for Project...").clicked() {
-                                tracing::info!("Browse for Project clicked");
-                                self.browse_for_project_requested = true;
-                            }
-                        } else if ui.button("Open Project...").clicked() {
-                                tracing::info!(
-                                    "Open Project... clicked - no project path in config"
-                                );
-                                self.browse_for_project_requested = true;
-                            
-                        }
-                    } else if ui.button("Open Project...").clicked() {
-                            tracing::info!("Open Project... clicked - no config available");
-                            self.browse_for_project_requested = true;
-                        
-                    }
-
-                    ui.separator();
-                    if ui.button("Save Project").clicked() {
-                        tracing::info!("Save Project clicked");
-                        self.save_project_requested = true;
-                    }
-                    ui.separator();
-                    if ui.button("Create Test Entities").clicked() {
-                        tracing::info!("Create Test Entities clicked");
-                        self.create_test_entities = true;
-                    }
-                    ui.separator();
-                    if ui.button("Init Config").clicked() {
-                        tracing::info!("Init Config clicked");
-                        self.init_config_requested = true;
-                    }
-                    ui.separator();
-                    if ui.button("Exit").clicked() {
-                        tracing::info!("Exit clicked");
-                        self.should_exit = true;
-                    }
-                });
-
-                ui.menu_button("Edit", |ui| {
-                    if ui.button("Validate Project Assets").clicked() {
-                        tracing::info!("Validate Project Assets clicked");
-                        self.validate_assets_requested = true;
-                    }
-                });
-
-                ui.menu_button("View", |ui| {
-                    ui.checkbox(&mut self.show_hierarchy, "Hierarchy");
-                    ui.checkbox(&mut self.show_inspector, "Inspector");
-                    ui.checkbox(&mut self.show_maps, "Maps");
-                    ui.checkbox(&mut self.show_console, "Console");
-                });
-                ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
-                        ui.label(self.window_title.as_ref().unwrap());
-        });
-            });
-        });
-    }
 
     pub fn set_title(&mut self, title: &str){
         self.window_title = Some(title.to_string());
