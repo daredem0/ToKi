@@ -793,7 +793,7 @@ impl SceneViewport {
     }
     
     /// Convert screen position to world position
-    fn screen_to_world_pos(&self, screen_pos: egui::Pos2, display_rect: egui::Rect) -> glam::Vec2 {
+    pub fn screen_to_world_pos(&self, screen_pos: egui::Pos2, display_rect: egui::Rect) -> glam::Vec2 {
         // Convert screen position relative to display rect to 0-1 normalized coordinates
         let normalized_x = (screen_pos.x - display_rect.min.x) / display_rect.width();
         let normalized_y = (screen_pos.y - display_rect.min.y) / display_rect.height();

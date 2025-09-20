@@ -70,11 +70,74 @@ impl PanelSystem {
                         // Check if we're in placement mode
                         if ui_state.is_in_placement_mode() {
                             tracing::info!("Placement click detected at screen pos: {:?}", click_pos);
-                            if let Some(entity_def) = &ui_state.placement_entity_definition {
-                                tracing::info!("Would place entity '{}' at screen coordinates ({}, {})", 
-                                    entity_def, click_pos.x, click_pos.y);
-                                // TODO: Convert to world coordinates and create entity
-                                // For now, just exit placement mode
+                            if let Some(entity_def_name) = &ui_state.placement_entity_definition {
+                                // Convert screen coordinates to world coordinates
+                                let world_pos = viewport.screen_to_world_pos(click_pos, rect);
+                                let world_pos_i32 = glam::IVec2::new(world_pos.x as i32, world_pos.y as i32);
+                                
+                                tracing::info!("Placing entity '{}' at world coordinates ({}, {})", 
+                                    entity_def_name, world_pos_i32.x, world_pos_i32.y);
+                                
+                                // Create entity from definition
+                                if let Some(config) = config {
+                                    if let Some(project_path) = config.current_project_path() {
+                                        let entity_file = project_path
+                                            .join("entities")
+                                            .join(format!("{}.json", entity_def_name));
+                                        
+                                        if entity_file.exists() {
+                                            match std::fs::read_to_string(&entity_file) {
+                                                Ok(content) => {
+                                                    match serde_json::from_str::<toki_core::entity::EntityDefinition>(&content) {
+                                                        Ok(entity_def) => {
+                                                            // Find active scene
+                                                            if let Some(active_scene_name) = &ui_state.active_scene {
+                                                                if let Some(target_scene) = ui_state.scenes.iter_mut().find(|s| s.name == *active_scene_name) {
+                                                                    // Generate new entity ID
+                                                                    let new_id = target_scene.entities.iter()
+                                                                        .map(|e| e.id)
+                                                                        .max()
+                                                                        .unwrap_or(0) + 1;
+                                                                    
+                                                                    // Create entity at click position
+                                                                    match entity_def.create_entity(world_pos_i32, new_id) {
+                                                                        Ok(entity) => {
+                                                                            target_scene.entities.push(entity);
+                                                                            tracing::info!("Successfully placed entity '{}' (ID: {}) in scene '{}' at world position ({}, {})", 
+                                                                                entity_def_name, new_id, active_scene_name, world_pos_i32.x, world_pos_i32.y);
+                                                                            ui_state.scene_content_changed = true;
+                                                                        }
+                                                                        Err(e) => {
+                                                                            tracing::error!("Failed to create entity '{}': {}", entity_def_name, e);
+                                                                        }
+                                                                    }
+                                                                } else {
+                                                                    tracing::error!("Active scene '{}' not found", active_scene_name);
+                                                                }
+                                                            } else {
+                                                                tracing::error!("No active scene for entity placement");
+                                                            }
+                                                        }
+                                                        Err(e) => {
+                                                            tracing::error!("Failed to parse entity definition '{}': {}", entity_def_name, e);
+                                                        }
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    tracing::error!("Failed to read entity file '{}': {}", entity_def_name, e);
+                                                }
+                                            }
+                                        } else {
+                                            tracing::error!("Entity definition file not found: {:?}", entity_file);
+                                        }
+                                    } else {
+                                        tracing::error!("No project path available for entity creation");
+                                    }
+                                } else {
+                                    tracing::error!("No config available for entity creation");
+                                }
+                                
+                                // Always exit placement mode after attempting placement
                                 ui_state.exit_placement_mode();
                             }
                         } else {
