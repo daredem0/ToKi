@@ -16,7 +16,7 @@ impl GpuTexture {
     ) -> Result<Self, RenderError> {
         // Check for empty path and create default texture
         if path.is_empty() {
-            tracing::debug!("Creating default white texture for label: {:?}", label);
+            tracing::trace!("Creating default white texture for label: {:?}", label);
             return Self::create_default_white_texture(device, queue, label);
         }
 
