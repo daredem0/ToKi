@@ -46,6 +46,10 @@ pub struct EditorUI {
     
     // Asset validation
     pub validate_assets_requested: bool,
+    
+    // Entity placement system
+    pub placement_mode: bool,
+    pub placement_entity_definition: Option<String>,
 }
 
 impl EditorUI {
@@ -81,6 +85,10 @@ impl EditorUI {
             
             // Asset validation  
             validate_assets_requested: false,
+            
+            // Entity placement system
+            placement_mode: false,
+            placement_entity_definition: None,
         }
     }
 
@@ -111,6 +119,25 @@ impl EditorUI {
 
     pub fn clear_selection(&mut self) {
         self.selection = None;
+    }
+
+    // Entity placement mode management
+    pub fn enter_placement_mode(&mut self, entity_definition: String) {
+        self.placement_mode = true;
+        self.placement_entity_definition = Some(entity_definition);
+        tracing::info!("Entered placement mode for entity: {}", self.placement_entity_definition.as_ref().unwrap());
+    }
+
+    pub fn exit_placement_mode(&mut self) {
+        if self.placement_mode {
+            tracing::info!("Exited placement mode");
+        }
+        self.placement_mode = false;
+        self.placement_entity_definition = None;
+    }
+
+    pub fn is_in_placement_mode(&self) -> bool {
+        self.placement_mode
     }
 
     /// Render the entire UI
