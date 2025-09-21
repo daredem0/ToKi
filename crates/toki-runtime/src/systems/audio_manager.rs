@@ -3,6 +3,7 @@ use kira::{
     sound::streaming::{StreamingSoundData, StreamingSoundHandle, StreamingSoundSettings},
     AudioManager as KiraAudioManager, AudioManagerSettings, Tween,
     sound::FromFileError,
+    Capacities, track::TrackBuilder,
 };
 use std::collections::HashMap;
 use std::fs;

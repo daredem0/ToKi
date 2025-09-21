@@ -52,6 +52,7 @@ pub struct EditorUI {
     pub placement_entity_definition: Option<String>,
     pub placement_preview_position: Option<glam::Vec2>, // World coordinates for preview
     pub placement_preview_cached_frame: Option<toki_core::sprite::SpriteFrame>, // Cached sprite frame for preview
+    pub placement_preview_valid: Option<bool>, // Whether the current preview position is valid for placement
 }
 
 impl EditorUI {
@@ -93,6 +94,7 @@ impl EditorUI {
             placement_entity_definition: None,
             placement_preview_position: None,
             placement_preview_cached_frame: None,
+            placement_preview_valid: None,
         }
     }
 
@@ -140,6 +142,7 @@ impl EditorUI {
         self.placement_entity_definition = None;
         self.placement_preview_position = None;
         self.placement_preview_cached_frame = None;
+        self.placement_preview_valid = None;
     }
 
     pub fn is_in_placement_mode(&self) -> bool {

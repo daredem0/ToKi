@@ -68,10 +68,62 @@ impl PanelSystem {
                         // Use raw world position conversion for preview (without placement offsets)
                         let world_pos = viewport.screen_to_world_pos_raw(hover_pos, rect);
                         ui_state.placement_preview_position = Some(world_pos);
+
+                        // Check collision validity for visual feedback
+                        let is_valid = if let Some(entity_def_name) = &ui_state.placement_entity_definition {
+                            // Load entity definition and check collision
+                            if let Some(config) = config {
+                                if let Some(project_path) = config.current_project_path() {
+                                    let entity_file = project_path.join("entities").join(format!("{}.json", entity_def_name));
+                                    if entity_file.exists() {
+                                        match std::fs::read_to_string(&entity_file) {
+                                            Ok(content) => {
+                                                match serde_json::from_str::<toki_core::entity::EntityDefinition>(&content) {
+                                                    Ok(entity_def) => {
+                                                        // Calculate placement position (same logic as click)
+                                                        let sprite_size = glam::UVec2::new(entity_def.rendering.size[0], entity_def.rendering.size[1]);
+                                                        let half_size = glam::Vec2::new(sprite_size.x as f32 / 2.0, sprite_size.y as f32 / 2.0);
+                                                        let centered_world_pos = world_pos - half_size;
+                                                        let world_pos_i32 = glam::IVec2::new(centered_world_pos.x as i32, centered_world_pos.y as i32);
+
+                                                        // Get collision box and check directly (no entity creation needed!)
+                                                        let collision_box = entity_def.get_collision_box();
+                                                        if let Some(tilemap) = viewport.scene_manager().tilemap() {
+                                                            let terrain_atlas = viewport.scene_manager().resources().get_terrain_atlas();
+                                                            toki_core::collision::can_place_collision_box_at_position(
+                                                                collision_box.as_ref(),
+                                                                world_pos_i32,
+                                                                tilemap,
+                                                                terrain_atlas
+                                                            )
+                                                        } else {
+                                                            true // No tilemap, allow placement
+                                                        }
+                                                    }
+                                                    Err(_) => false, // Entity definition parsing failed
+                                                }
+                                            }
+                                            Err(_) => false, // File read failed
+                                        }
+                                    } else {
+                                        false // Entity file doesn't exist
+                                    }
+                                } else {
+                                    false // No project path
+                                }
+                            } else {
+                                false // No config
+                            }
+                        } else {
+                            false // No entity definition
+                        };
+
+                        ui_state.placement_preview_valid = Some(is_valid);
                         // Mark viewport as needing re-render to show preview
                         viewport.mark_dirty();
                     } else {
                         ui_state.placement_preview_position = None;
+                        ui_state.placement_preview_valid = None;
                         // Mark viewport as needing re-render to hide preview
                         viewport.mark_dirty();
                     }
@@ -126,10 +178,24 @@ impl PanelSystem {
                                                                     // Create entity at corrected position (center-based)
                                                                     match entity_def.create_entity(world_pos_i32, new_id) {
                                                                         Ok(entity) => {
-                                                                            target_scene.entities.push(entity);
-                                                                            tracing::info!("Successfully placed entity '{}' (ID: {}) in scene '{}' at world position ({}, {})", 
-                                                                                entity_def_name, new_id, active_scene_name, world_pos_i32.x, world_pos_i32.y);
-                                                                            ui_state.scene_content_changed = true;
+                                                                            // Check collision before placing the entity
+                                                                            let can_place = if let Some(tilemap) = viewport.scene_manager().tilemap() {
+                                                                                let terrain_atlas = viewport.scene_manager().resources().get_terrain_atlas();
+                                                                                toki_core::collision::can_entity_move_to_position(&entity, world_pos_i32, tilemap, terrain_atlas)
+                                                                            } else {
+                                                                                // No tilemap loaded, allow placement
+                                                                                true
+                                                                            };
+
+                                                                            if can_place {
+                                                                                target_scene.entities.push(entity);
+                                                                                tracing::info!("Successfully placed entity '{}' (ID: {}) in scene '{}' at world position ({}, {})",
+                                                                                    entity_def_name, new_id, active_scene_name, world_pos_i32.x, world_pos_i32.y);
+                                                                                ui_state.scene_content_changed = true;
+                                                                            } else {
+                                                                                tracing::warn!("Cannot place entity '{}' at position ({}, {}) - collision detected with solid terrain",
+                                                                                    entity_def_name, world_pos_i32.x, world_pos_i32.y);
+                                                                            }
                                                                         }
                                                                         Err(e) => {
                                                                             tracing::error!("Failed to create entity '{}': {}", entity_def_name, e);

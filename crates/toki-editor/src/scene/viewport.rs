@@ -93,7 +93,7 @@ impl SceneViewport {
     }
     
     /// Render scene to offscreen texture (called before egui UI construction)
-    pub fn render_to_texture(&mut self, project_path: &std::path::Path, project_assets: &ProjectAssets, renderer: &mut egui_wgpu::Renderer, preview_data: Option<(&str, glam::Vec2, toki_core::sprite::SpriteFrame)>) -> Result<()> {
+    pub fn render_to_texture(&mut self, project_path: &std::path::Path, project_assets: &ProjectAssets, renderer: &mut egui_wgpu::Renderer, preview_data: Option<(&str, glam::Vec2, toki_core::sprite::SpriteFrame, bool)>) -> Result<()> {
         if !self.is_initialized {
             return Ok(()); // Skip if not initialized
         }
@@ -239,7 +239,7 @@ impl SceneViewport {
     
     
     /// Prepare scene data for rendering
-    fn prepare_scene_data(&mut self, project_path: Option<&std::path::Path>, project_assets: &ProjectAssets, preview_data: Option<(&str, glam::Vec2, toki_core::sprite::SpriteFrame)>) -> SceneData {
+    fn prepare_scene_data(&mut self, project_path: Option<&std::path::Path>, project_assets: &ProjectAssets, preview_data: Option<(&str, glam::Vec2, toki_core::sprite::SpriteFrame, bool)>) -> SceneData {
         tracing::trace!("Preparing scene data for rendering...");
         
         let mut scene_data = SceneData::default();
@@ -414,9 +414,9 @@ impl SceneViewport {
         scene_data: &mut SceneData,
         project_path: Option<&std::path::Path>,
         _project_assets: &ProjectAssets,
-        preview_data: Option<(&str, glam::Vec2, toki_core::sprite::SpriteFrame)>
+        preview_data: Option<(&str, glam::Vec2, toki_core::sprite::SpriteFrame, bool)>
     ) {
-        let Some((entity_def_name, preview_position, cached_frame)) = preview_data else {
+        let Some((entity_def_name, preview_position, cached_frame, is_valid)) = preview_data else {
             return; // No preview to render
         };
 
@@ -461,8 +461,25 @@ impl SceneViewport {
 
         scene_data.sprites.push(preview_sprite);
 
-        tracing::trace!("Added preview sprite for '{}' at render position ({}, {}) with size {}x{} using cached frame",
-                       entity_def_name, render_position_i32.x, render_position_i32.y, entity_size.x, entity_size.y);
+        // Add colored outline to indicate placement validity
+        let outline_color = if is_valid {
+            [0.0, 1.0, 0.0, 1.0] // Green for valid placement (RGBA)
+        } else {
+            [1.0, 0.0, 0.0, 1.0] // Red for invalid placement (RGBA)
+        };
+
+        // Create outline around the sprite
+        let outline_shape = toki_render::DebugShape {
+            shape_type: toki_render::DebugShapeType::Rectangle,
+            position: glam::Vec2::new(render_position_i32.x as f32, render_position_i32.y as f32),
+            size: glam::Vec2::new(entity_size.x as f32, entity_size.y as f32),
+            color: outline_color,
+        };
+        scene_data.debug_shapes.push(outline_shape);
+
+        tracing::trace!("Added preview sprite for '{}' at render position ({}, {}) with size {}x{} and {} outline",
+                       entity_def_name, render_position_i32.x, render_position_i32.y, entity_size.x, entity_size.y,
+                       if is_valid { "green" } else { "red" });
     }
 
     /// Prepare debug shapes for collision visualization

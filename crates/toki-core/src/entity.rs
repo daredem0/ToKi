@@ -545,4 +545,18 @@ impl EntityDefinition {
             movement_sound: Some(self.audio.movement_sound.clone()),
         })
     }
+
+    /// Get collision box from entity definition without creating full entity.
+    /// Useful for placement validation.
+    pub fn get_collision_box(&self) -> Option<CollisionBox> {
+        if self.collision.enabled {
+            Some(CollisionBox::new(
+                IVec2::new(self.collision.offset[0], self.collision.offset[1]),
+                UVec2::new(self.collision.size[0], self.collision.size[1]),
+                self.collision.trigger,
+            ))
+        } else {
+            None
+        }
+    }
 }

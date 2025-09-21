@@ -324,7 +324,8 @@ impl EditorApp {
                     let preview_data = if self.ui.is_in_placement_mode() {
                         if let (Some(entity_def), Some(position), Some(cached_frame)) =
                             (&self.ui.placement_entity_definition, &self.ui.placement_preview_position, &self.ui.placement_preview_cached_frame) {
-                            Some((entity_def.as_str(), *position, cached_frame.clone()))
+                            let is_valid = self.ui.placement_preview_valid.unwrap_or(true);
+                            Some((entity_def.as_str(), *position, cached_frame.clone(), is_valid))
                         } else {
                             None
                         }
