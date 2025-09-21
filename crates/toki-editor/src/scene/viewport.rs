@@ -236,6 +236,37 @@ impl SceneViewport {
         // TODO: Implement with unified renderer
         None
     }
+
+    /// Find entity at world position for hit detection
+    pub fn get_entity_at_world_pos(&self, world_pos: glam::Vec2) -> Option<toki_core::entity::EntityId> {
+        // Get entity IDs from the active scene
+        let entity_ids = self.scene_manager.game_state().entity_manager().active_entities();
+
+        // Convert world position to integer coordinates for comparison
+        let world_pos_i32 = glam::IVec2::new(world_pos.x as i32, world_pos.y as i32);
+
+        // Iterate through entity IDs in reverse order (top layer first)
+        // This ensures we select the topmost entity if they overlap
+        for &entity_id in entity_ids.iter().rev() {
+            if let Some(entity) = self.scene_manager.game_state().entity_manager().get_entity(entity_id) {
+                // Calculate entity bounds (entities are positioned by their top-left corner)
+                let entity_min = entity.position;
+                let entity_max = entity.position + glam::IVec2::new(entity.size.x as i32, entity.size.y as i32);
+
+                // Check if click point is within entity bounds
+                if world_pos_i32.x >= entity_min.x && world_pos_i32.x < entity_max.x &&
+                   world_pos_i32.y >= entity_min.y && world_pos_i32.y < entity_max.y {
+                    tracing::debug!("Entity hit detected: ID={}, position=({}, {}), size={}x{}, click=({}, {})",
+                        entity.id, entity.position.x, entity.position.y,
+                        entity.size.x, entity.size.y, world_pos_i32.x, world_pos_i32.y);
+                    return Some(entity.id);
+                }
+            }
+        }
+
+        tracing::trace!("No entity hit at world position ({}, {})", world_pos_i32.x, world_pos_i32.y);
+        None
+    }
     
     
     /// Prepare scene data for rendering
@@ -886,7 +917,15 @@ impl SceneViewport {
         if response.clicked() && !response.dragged() {
             let world_pos = self.screen_to_world_pos(mouse_pos, display_rect);
             tracing::trace!("Viewport clicked at world position: {:?}", world_pos);
-            // TODO: Handle entity selection
+
+            // Check if we clicked on an entity
+            if let Some(entity_id) = self.get_entity_at_world_pos(world_pos) {
+                tracing::info!("Entity {} clicked at world position ({:.1}, {:.1})", entity_id, world_pos.x, world_pos.y);
+                // TODO: Handle entity selection (Step 2)
+            } else {
+                tracing::trace!("No entity clicked at world position ({:.1}, {:.1})", world_pos.x, world_pos.y);
+                // TODO: Clear entity selection (Step 2)
+            }
         }
     }
     

@@ -827,6 +827,7 @@ impl EditorApp {
         }
     }
 
+
     /// Load sprite frame for preview (cached) - static version
     fn load_preview_sprite_frame_static(entity_def_name: &str, project_path: &std::path::Path, project_assets: &crate::project::ProjectAssets) -> Option<toki_core::sprite::SpriteFrame> {
         tracing::info!("Loading preview sprite frame for entity '{}' (one-time cache)", entity_def_name);

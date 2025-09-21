@@ -231,14 +231,30 @@ impl PanelSystem {
                                 ui_state.exit_placement_mode();
                             }
                         } else {
-                            // Normal entity selection (original TODO logic)
+                            // Normal entity selection - use new hit detection
                             tracing::info!("Regular click detected at screen pos: {:?}", click_pos);
-                            // TODO: Implement entity selection when viewport.handle_click exists
-                            // if let Some(entity_id) = viewport.handle_click(screen_pos, rect) {
-                            //     ui_state.selected_entity_id = Some(entity_id);
-                            // } else {
-                            //     ui_state.selected_entity_id = None;
-                            // }
+                            let world_pos = viewport.screen_to_world_pos(click_pos, rect);
+
+                            if let Some(entity_id) = viewport.get_entity_at_world_pos(world_pos) {
+                                tracing::info!("Entity {} clicked - entering placement mode", entity_id);
+
+                                // Get the entity to determine its type
+                                if let Some(entity) = viewport.scene_manager().game_state().entity_manager().get_entity(entity_id) {
+                                    // Map entity type to definition name (simple mapping for now)
+                                    let entity_def_name = match entity.entity_type {
+                                        toki_core::entity::EntityType::Player => "player",
+                                        toki_core::entity::EntityType::Npc => "slime", // Use slime for NPCs
+                                        _ => "slime", // Default fallback
+                                    };
+
+                                    tracing::info!("Entering placement mode with entity type: '{}'", entity_def_name);
+                                    ui_state.enter_placement_mode(entity_def_name.to_string());
+                                } else {
+                                    tracing::warn!("Could not find entity {} for placement mode", entity_id);
+                                }
+                            } else {
+                                tracing::info!("No entity clicked at world position ({:.1}, {:.1})", world_pos.x, world_pos.y);
+                            }
                         }
                     }
                 }
