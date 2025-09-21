@@ -236,9 +236,9 @@ impl PanelSystem {
                             let world_pos = viewport.screen_to_world_pos(click_pos, rect);
 
                             if let Some(entity_id) = viewport.get_entity_at_world_pos(world_pos) {
-                                tracing::info!("Entity {} clicked - entering placement mode", entity_id);
+                                tracing::info!("Entity {} clicked - starting drag operation", entity_id);
 
-                                // Get the entity to determine its type
+                                // Get the entity to determine its type before removing it
                                 if let Some(entity) = viewport.scene_manager().game_state().entity_manager().get_entity(entity_id) {
                                     // Map entity type to definition name (simple mapping for now)
                                     let entity_def_name = match entity.entity_type {
@@ -247,10 +247,21 @@ impl PanelSystem {
                                         _ => "slime", // Default fallback
                                     };
 
-                                    tracing::info!("Entering placement mode with entity type: '{}'", entity_def_name);
+                                    tracing::info!("Removing entity {} and entering placement mode with type: '{}'", entity_id, entity_def_name);
+
+                                    // Remove the entity from the scene (this makes it a move/drag operation)
+                                    if let Some(active_scene_name) = &ui_state.active_scene {
+                                        if let Some(scene) = ui_state.scenes.iter_mut().find(|s| s.name == *active_scene_name) {
+                                            scene.entities.retain(|e| e.id != entity_id);
+                                            ui_state.scene_content_changed = true;
+                                            tracing::info!("Removed entity {} from scene '{}'", entity_id, active_scene_name);
+                                        }
+                                    }
+
+                                    // Enter placement mode to "place" the entity at a new location
                                     ui_state.enter_placement_mode(entity_def_name.to_string());
                                 } else {
-                                    tracing::warn!("Could not find entity {} for placement mode", entity_id);
+                                    tracing::warn!("Could not find entity {} for drag operation", entity_id);
                                 }
                             } else {
                                 tracing::info!("No entity clicked at world position ({:.1}, {:.1})", world_pos.x, world_pos.y);
