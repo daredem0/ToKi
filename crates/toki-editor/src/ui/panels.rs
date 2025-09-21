@@ -192,43 +192,60 @@ impl PanelSystem {
                                                                                 tracing::info!("Successfully placed entity '{}' (ID: {}) in scene '{}' at world position ({}, {})",
                                                                                     entity_def_name, new_id, active_scene_name, world_pos_i32.x, world_pos_i32.y);
                                                                                 ui_state.scene_content_changed = true;
+
+                                                                                // Only exit placement mode on successful placement
+                                                                                ui_state.exit_placement_mode();
                                                                             } else {
-                                                                                tracing::warn!("Cannot place entity '{}' at position ({}, {}) - collision detected with solid terrain",
+                                                                                tracing::warn!("Cannot place entity '{}' at position ({}, {}) - collision detected with solid terrain (staying in placement mode)",
                                                                                     entity_def_name, world_pos_i32.x, world_pos_i32.y);
+                                                                                // Don't exit placement mode - let user try again
                                                                             }
                                                                         }
                                                                         Err(e) => {
                                                                             tracing::error!("Failed to create entity '{}': {}", entity_def_name, e);
+                                                                            // Exit placement mode on entity creation error
+                                                                            ui_state.exit_placement_mode();
                                                                         }
                                                                     }
                                                                 } else {
                                                                     tracing::error!("Active scene '{}' not found", active_scene_name);
+                                                                    // Exit placement mode on scene error
+                                                                    ui_state.exit_placement_mode();
                                                                 }
                                                             } else {
                                                                 tracing::error!("No active scene for entity placement");
+                                                                // Exit placement mode on scene error
+                                                                ui_state.exit_placement_mode();
                                                             }
                                                         }
                                                         Err(e) => {
                                                             tracing::error!("Failed to parse entity definition '{}': {}", entity_def_name, e);
+                                                            // Exit placement mode on JSON parsing error
+                                                            ui_state.exit_placement_mode();
                                                         }
                                                     }
                                                 }
                                                 Err(e) => {
                                                     tracing::error!("Failed to read entity file '{}': {}", entity_def_name, e);
+                                                    // Exit placement mode on file reading error
+                                                    ui_state.exit_placement_mode();
                                                 }
                                             }
                                         } else {
                                             tracing::error!("Entity definition file not found: {:?}", entity_file);
+                                            // Exit placement mode on file not found error
+                                            ui_state.exit_placement_mode();
                                         }
                                     } else {
                                         tracing::error!("No project path available for entity creation");
+                                        // Exit placement mode on missing project path
+                                        ui_state.exit_placement_mode();
                                     }
                                 } else {
                                     tracing::error!("No config available for entity creation");
+                                    // Exit placement mode if config is missing (error condition)
+                                    ui_state.exit_placement_mode();
                                 }
-                                
-                                // Always exit placement mode after attempting placement
-                                ui_state.exit_placement_mode();
                             }
                         } else {
                             // Normal entity selection - use new hit detection
