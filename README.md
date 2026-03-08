@@ -75,15 +75,15 @@ just quality-licenses-generate
 ### 🚀 Release Workflow (`cargo release`)
 ```bash
 just install-cargo-release
-just release-dry-run 0.1.1
-just release-execute 0.1.1
+just release-dry-run 0.0.12
+just release-execute 0.0.12
 git push origin main --follow-tags
 ```
 
 Release behavior:
 - Uses a shared workspace version for all crates.
 - Restricts releases to the `main` branch.
-- Creates numeric tags like `0.1.1` (matching existing repository tags).
+- Creates numeric tags like `0.0.12` (matching existing repository tags).
 - Auto-creates a new `CHANGELOG.md` section from `[Unreleased]`.
 - Does not publish crates or push automatically; push is explicit.
 
@@ -100,8 +100,8 @@ cargo deny check licenses
 cargo install cargo-about
 cargo about generate --locked about.hbs > THIRD_PARTY_LICENSES.md
 cargo install cargo-release
-cargo release 0.1.1 --workspace --no-publish
-cargo release 0.1.1 --workspace --no-publish --execute
+cargo release 0.0.12 --workspace --no-publish
+cargo release 0.0.12 --workspace --no-publish --execute
 ```
 
 ### 🎮 Editor Features

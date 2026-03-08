@@ -8,7 +8,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.0.11"
 edition = "2021"
 repository = "https://github.com/daredem0/ToKi"
 homepage = "https://github.com/daredem0/ToKi"
@@ -17,15 +17,18 @@ readme = "README.md"
 [workspace.metadata.release]
 shared-version = true
 consolidate-commits = true
-allow-branch = ["main"]
+allow-branch = ["main", "develop"]
 tag-name = "{{version}}"
 tag-message = "Release {{version}}"
 pre-release-commit-message = "chore: release {{version}}"
 push = false
 publish = false
 pre-release-replacements = [
-  { file = "CHANGELOG.md", search = "## \\[Unreleased\\]", replace = "## [Unreleased]\\n\\n## [{{version}}] - {{date}}" },
-  { file = "CHANGELOG.md", search = "\\[Unreleased\\]: https://github.com/daredem0/ToKi/compare/[0-9]+\\.[0-9]+\\.[0-9]+\\.\\.\\.HEAD", replace = "[Unreleased]: https://github.com/daredem0/ToKi/compare/{{version}}...HEAD\\n[{{version}}]: https://github.com/daredem0/ToKi/compare/{{prev_version}}...{{version}}" },
+  { file = "../../CHANGELOG.md", search = "## \\[Unreleased\\]", replace = """## [Unreleased]
+
+## [{{version}}] - {{date}}""" },
+  { file = "../../CHANGELOG.md", search = "\\[Unreleased\\]: https://github.com/daredem0/ToKi/compare/[0-9]+\\.[0-9]+\\.[0-9]+\\.\\.\\.HEAD", replace = """[Unreleased]: https://github.com/daredem0/ToKi/compare/{{version}}...HEAD
+[{{version}}]: https://github.com/daredem0/ToKi/compare/{{prev_version}}...{{version}}""" },
 ]
 
 [workspace.dependencies]
