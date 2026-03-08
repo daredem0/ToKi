@@ -52,6 +52,8 @@ just test
 ```bash
 just fmt-check
 just clippy
+just quality-licenses-check
+just quality-licenses-generate
 just important
 just llm
 ```
@@ -60,6 +62,14 @@ just llm
 ```bash
 just install-llvm-cov
 just coverage-open
+```
+
+### 📜 Dependency License Hygiene
+```bash
+just install-cargo-deny
+just install-cargo-about
+just quality-licenses-check
+just quality-licenses-generate
 ```
 
 ### 🚀 Release Workflow (`cargo release`)
@@ -85,6 +95,10 @@ cargo run -p toki-runtime
 cargo test --workspace
 cargo install cargo-llvm-cov
 cargo llvm-cov -p toki-core --open
+cargo install cargo-deny
+cargo deny check licenses
+cargo install cargo-about
+cargo about generate --locked about.hbs > THIRD_PARTY_LICENSES.md
 cargo install cargo-release
 cargo release 0.1.1 --workspace --no-publish
 cargo release 0.1.1 --workspace --no-publish --execute

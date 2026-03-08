@@ -2,7 +2,8 @@
 name = "toki-runtime"
 version.workspace = true
 edition.workspace = true
-license = "GPL-3.0"
+build = "../../build.rs"
+license = "GPL-3.0-or-later"
 description = "Runtime executable and game loop integration for ToKi projects."
 repository.workspace = true
 homepage.workspace = true

@@ -43,6 +43,14 @@ install-llvm-cov:
 install-cargo-release:
     cargo install cargo-release
 
+# Install cargo-deny.
+install-cargo-deny:
+    cargo install cargo-deny
+
+# Install cargo-about.
+install-cargo-about:
+    cargo install cargo-about
+
 # Dry-run a workspace release (no publish, no push).
 release-dry-run version:
     cargo release {{version}} --workspace --no-publish
@@ -62,6 +70,14 @@ coverage-summary:
 # Print workspace coverage summary with all features enabled.
 coverage:
     cargo llvm-cov --workspace --all-features --summary-only
+
+# Verify third-party dependency licenses against deny policy.
+quality-licenses-check:
+    ./scripts/check-licenses.sh
+
+# Generate third-party license inventory from dependency metadata.
+quality-licenses-generate:
+    ./scripts/generate-third-party-licenses.sh
 
 # Important local checks before pushing.
 important: build fmt-check clippy test

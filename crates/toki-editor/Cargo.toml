@@ -2,7 +2,8 @@
 name = "toki-editor"
 version.workspace = true
 edition.workspace = true
-license = "GPL-3.0"
+build = "../../build.rs"
+license = "GPL-3.0-or-later"
 description = "GUI editor for authoring ToKi scenes, entities, and assets."
 repository.workspace = true
 homepage.workspace = true
