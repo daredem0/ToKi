@@ -7,6 +7,19 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+## [0.0.13] - 2026-03-08
+
+### Added
+- Added a current-state combined software design and architecture document in `docs/SDD_SAD.md`.
+- Added a dedicated `docs/legal/` location for auxiliary legal guidance such as the editor plugin compatibility notice.
+
+### Changed
+- Integrated the project `README.md` and `docs/SDD_SAD.md` into workspace rustdoc so generated docs expose both the product overview and architecture guidance.
+- Updated the local docs workflow and CI docs job to build Mermaid-enabled workspace rustdoc output.
+- Switched future release tags to the `v0.0.x` style to align ToKi's release flow with `git-sync`.
+- Simplified repository licensing layout by consolidating application-layer terms into `LICENSE.md` and updating crate metadata to match the mixed MPL/community-commercial model.
+- Reclassified `toki-render` and `toki-schemas` as `MPL-2.0` crates to match the intended product-vs-library license split.
+
 ## [0.0.12] - 2026-03-08
 
 ### Added
@@ -190,7 +203,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Fixed camera/map-bound movement and projection distortion on resize.
 - Improved tilemap upload strategy and window/surface resize handling.
 
-[Unreleased]: https://github.com/daredem0/ToKi/compare/0.0.12...HEAD
+[Unreleased]: https://github.com/daredem0/ToKi/compare/v0.0.13...HEAD
+[0.0.13]: https://github.com/daredem0/ToKi/compare/0.0.12...v0.0.13
 [0.0.12]: https://github.com/daredem0/ToKi/compare/0.0.11...0.0.12
 [0.0.11]: https://github.com/daredem0/ToKi/compare/0.0.10...0.0.11
 [0.0.10]: https://github.com/daredem0/ToKi/compare/0.0.9...0.0.10
