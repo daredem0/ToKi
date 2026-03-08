@@ -89,3 +89,69 @@ impl SelectionInteraction {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::SelectionInteraction;
+    use crate::ui::EditorUI;
+    use glam::{IVec2, UVec2};
+    use toki_core::entity::{EntityAttributes, EntityManager, EntityType};
+
+    #[test]
+    fn map_entity_type_to_definition_uses_expected_mappings() {
+        assert_eq!(
+            SelectionInteraction::map_entity_type_to_definition(&EntityType::Player),
+            "player"
+        );
+        assert_eq!(
+            SelectionInteraction::map_entity_type_to_definition(&EntityType::Npc),
+            "slime"
+        );
+        assert_eq!(
+            SelectionInteraction::map_entity_type_to_definition(&EntityType::Item),
+            "slime"
+        );
+    }
+
+    #[test]
+    fn remove_entity_from_scene_deletes_entity_and_marks_scene_dirty() {
+        let mut ui_state = EditorUI::new();
+        let mut manager = EntityManager::new();
+        let entity_id = manager.spawn_entity(
+            EntityType::Npc,
+            IVec2::new(10, 20),
+            UVec2::new(16, 16),
+            EntityAttributes::default(),
+        );
+        let entity = manager
+            .get_entity(entity_id)
+            .expect("missing spawned entity")
+            .clone();
+
+        let scene = ui_state
+            .scenes
+            .iter_mut()
+            .find(|s| s.name == "Main Scene")
+            .expect("missing default scene");
+        scene.entities.push(entity);
+        assert_eq!(scene.entities.len(), 1);
+
+        SelectionInteraction::remove_entity_from_scene(&mut ui_state, entity_id);
+
+        let scene = ui_state
+            .scenes
+            .iter()
+            .find(|s| s.name == "Main Scene")
+            .expect("missing default scene");
+        assert_eq!(scene.entities.len(), 0);
+        assert!(ui_state.scene_content_changed);
+    }
+
+    #[test]
+    fn remove_entity_from_scene_is_noop_without_active_scene() {
+        let mut ui_state = EditorUI::new();
+        ui_state.active_scene = None;
+        SelectionInteraction::remove_entity_from_scene(&mut ui_state, 999);
+        assert!(!ui_state.scene_content_changed);
+    }
+}

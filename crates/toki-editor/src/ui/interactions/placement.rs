@@ -1,6 +1,9 @@
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
 use crate::ui::EditorUI;
+use std::path::{Path, PathBuf};
+use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
+use toki_core::entity::{Entity, EntityDefinition};
 
 /// Handles entity placement interactions
 pub struct PlacementInteraction;
@@ -81,32 +84,13 @@ impl PlacementInteraction {
             return false;
         };
 
-        let entity_file = project_path
-            .join("entities")
-            .join(format!("{}.json", entity_def_name));
-        if !entity_file.exists() {
-            tracing::error!("Entity definition file not found: {:?}", entity_file);
-            ui_state.exit_placement_mode();
-            return false;
-        }
-
-        let content = match std::fs::read_to_string(&entity_file) {
-            Ok(content) => content,
-            Err(e) => {
-                tracing::error!("Failed to read entity file '{}': {}", entity_def_name, e);
-                ui_state.exit_placement_mode();
-                return false;
-            }
-        };
-
-        let entity_def = match serde_json::from_str::<toki_core::entity::EntityDefinition>(&content)
-        {
+        let entity_def = match Self::load_entity_definition(project_path, entity_def_name) {
             Ok(entity_def) => entity_def,
-            Err(e) => {
+            Err(msg) => {
                 tracing::error!(
-                    "Failed to parse entity definition '{}': {}",
+                    "Failed to load entity definition '{}': {}",
                     entity_def_name,
-                    e
+                    msg
                 );
                 ui_state.exit_placement_mode();
                 return false;
@@ -115,10 +99,8 @@ impl PlacementInteraction {
 
         let sprite_size =
             glam::UVec2::new(entity_def.rendering.size[0], entity_def.rendering.size[1]);
-        let half_size = glam::Vec2::new(sprite_size.x as f32 / 2.0, sprite_size.y as f32 / 2.0);
-        let centered_world_pos = world_pos - half_size;
         let world_pos_i32 =
-            glam::IVec2::new(centered_world_pos.x as i32, centered_world_pos.y as i32);
+            Self::centered_world_position_from_sprite_center(world_pos, sprite_size);
 
         Self::create_entity_in_scene(
             ui_state,
@@ -132,10 +114,31 @@ impl PlacementInteraction {
     /// Create entity in the active scene, returns true if successful
     fn create_entity_in_scene(
         ui_state: &mut EditorUI,
-        entity_def: toki_core::entity::EntityDefinition,
+        entity_def: EntityDefinition,
         entity_def_name: &str,
         world_pos_i32: glam::IVec2,
         viewport: &SceneViewport,
+    ) -> bool {
+        let tilemap = viewport.scene_manager().tilemap();
+        let terrain_atlas =
+            tilemap.map(|_| viewport.scene_manager().resources().get_terrain_atlas());
+        Self::create_entity_in_scene_with_collision_context(
+            ui_state,
+            entity_def,
+            entity_def_name,
+            world_pos_i32,
+            tilemap,
+            terrain_atlas,
+        )
+    }
+
+    fn create_entity_in_scene_with_collision_context(
+        ui_state: &mut EditorUI,
+        entity_def: EntityDefinition,
+        entity_def_name: &str,
+        world_pos_i32: glam::IVec2,
+        tilemap: Option<&TileMap>,
+        terrain_atlas: Option<&AtlasMeta>,
     ) -> bool {
         let Some(active_scene_name) = &ui_state.active_scene else {
             tracing::error!("No active scene for entity placement");
@@ -153,13 +156,7 @@ impl PlacementInteraction {
             return false;
         };
 
-        let new_id = target_scene
-            .entities
-            .iter()
-            .map(|e| e.id)
-            .max()
-            .unwrap_or(0)
-            + 1;
+        let new_id = Self::next_entity_id(&target_scene.entities);
 
         let entity = match entity_def.create_entity(world_pos_i32, new_id) {
             Ok(entity) => entity,
@@ -170,17 +167,7 @@ impl PlacementInteraction {
             }
         };
 
-        let can_place = if let Some(tilemap) = viewport.scene_manager().tilemap() {
-            let terrain_atlas = viewport.scene_manager().resources().get_terrain_atlas();
-            toki_core::collision::can_entity_move_to_position(
-                &entity,
-                world_pos_i32,
-                tilemap,
-                terrain_atlas,
-            )
-        } else {
-            true
-        };
+        let can_place = Self::can_place_entity(&entity, world_pos_i32, tilemap, terrain_atlas);
 
         if can_place {
             target_scene.entities.push(entity);
@@ -220,30 +207,15 @@ impl PlacementInteraction {
             return false;
         };
 
-        let entity_file = project_path
-            .join("entities")
-            .join(format!("{}.json", entity_def_name));
-        if !entity_file.exists() {
-            return false;
-        }
-
-        let content = match std::fs::read_to_string(&entity_file) {
-            Ok(content) => content,
-            Err(_) => return false,
-        };
-
-        let entity_def = match serde_json::from_str::<toki_core::entity::EntityDefinition>(&content)
-        {
+        let entity_def = match Self::load_entity_definition(project_path, entity_def_name) {
             Ok(entity_def) => entity_def,
             Err(_) => return false,
         };
 
         let sprite_size =
             glam::UVec2::new(entity_def.rendering.size[0], entity_def.rendering.size[1]);
-        let half_size = glam::Vec2::new(sprite_size.x as f32 / 2.0, sprite_size.y as f32 / 2.0);
-        let centered_world_pos = world_pos - half_size;
         let world_pos_i32 =
-            glam::IVec2::new(centered_world_pos.x as i32, centered_world_pos.y as i32);
+            Self::centered_world_position_from_sprite_center(world_pos, sprite_size);
 
         let collision_box = entity_def.get_collision_box();
         if let Some(tilemap) = viewport.scene_manager().tilemap() {
@@ -257,5 +229,358 @@ impl PlacementInteraction {
         } else {
             true
         }
+    }
+
+    fn centered_world_position_from_sprite_center(
+        world_pos: glam::Vec2,
+        sprite_size: glam::UVec2,
+    ) -> glam::IVec2 {
+        let half_size = glam::Vec2::new(sprite_size.x as f32 / 2.0, sprite_size.y as f32 / 2.0);
+        let centered_world_pos = world_pos - half_size;
+        glam::IVec2::new(centered_world_pos.x as i32, centered_world_pos.y as i32)
+    }
+
+    fn next_entity_id(entities: &[Entity]) -> toki_core::entity::EntityId {
+        entities.iter().map(|e| e.id).max().unwrap_or(0) + 1
+    }
+
+    fn can_place_entity(
+        entity: &Entity,
+        world_pos_i32: glam::IVec2,
+        tilemap: Option<&TileMap>,
+        terrain_atlas: Option<&AtlasMeta>,
+    ) -> bool {
+        match (tilemap, terrain_atlas) {
+            (Some(tilemap), Some(terrain_atlas)) => {
+                toki_core::collision::can_entity_move_to_position(
+                    entity,
+                    world_pos_i32,
+                    tilemap,
+                    terrain_atlas,
+                )
+            }
+            _ => true,
+        }
+    }
+
+    fn entity_definition_path(project_path: &Path, entity_def_name: &str) -> PathBuf {
+        project_path
+            .join("entities")
+            .join(format!("{}.json", entity_def_name))
+    }
+
+    fn load_entity_definition(
+        project_path: &Path,
+        entity_def_name: &str,
+    ) -> Result<EntityDefinition, String> {
+        let entity_file = Self::entity_definition_path(project_path, entity_def_name);
+        if !entity_file.exists() {
+            return Err(format!(
+                "Entity definition file not found: {}",
+                entity_file.display()
+            ));
+        }
+
+        let content = std::fs::read_to_string(&entity_file)
+            .map_err(|e| format!("Failed to read entity file '{}': {}", entity_def_name, e))?;
+
+        serde_json::from_str::<EntityDefinition>(&content).map_err(|e| {
+            format!(
+                "Failed to parse entity definition '{}': {}",
+                entity_def_name, e
+            )
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PlacementInteraction;
+    use crate::ui::EditorUI;
+    use glam::{IVec2, UVec2, Vec2};
+    use std::collections::HashMap;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
+    use toki_core::assets::tilemap::TileMap;
+    use toki_core::entity::{
+        AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
+        EntityType, RenderingDef,
+    };
+
+    fn sample_entity_definition(name: &str) -> EntityDefinition {
+        EntityDefinition {
+            name: name.to_string(),
+            display_name: "Sample Entity".to_string(),
+            description: "Entity used for placement tests".to_string(),
+            entity_type: "npc".to_string(),
+            rendering: RenderingDef {
+                size: [16, 16],
+                render_layer: 0,
+                visible: true,
+            },
+            attributes: AttributesDef {
+                health: Some(10),
+                speed: 1,
+                solid: true,
+                active: true,
+                can_move: false,
+                has_inventory: false,
+            },
+            collision: CollisionDef {
+                enabled: true,
+                offset: [0, 0],
+                size: [16, 16],
+                trigger: false,
+            },
+            audio: AudioDef {
+                footstep_trigger_distance: 32.0,
+                movement_sound: "sfx_step".to_string(),
+            },
+            animations: AnimationsDef {
+                atlas_name: "creatures".to_string(),
+                clips: vec![AnimationClipDef {
+                    state: "idle".to_string(),
+                    frame_tiles: vec!["slime/idle_0".to_string()],
+                    frame_duration_ms: 120.0,
+                    loop_mode: "loop".to_string(),
+                }],
+                default_state: "idle".to_string(),
+            },
+            category: "test".to_string(),
+            tags: vec!["placement".to_string()],
+        }
+    }
+
+    fn unique_temp_project_dir() -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock is before UNIX_EPOCH")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "toki-placement-tests-{}-{}",
+            std::process::id(),
+            nanos
+        ));
+        fs::create_dir_all(dir.join("entities")).expect("failed to create temp entities directory");
+        dir
+    }
+
+    fn write_entity_definition_file(project_dir: &Path, entity_def: &EntityDefinition) {
+        let file_path = project_dir
+            .join("entities")
+            .join(format!("{}.json", entity_def.name));
+        let json = serde_json::to_string_pretty(entity_def)
+            .expect("failed to serialize entity definition");
+        fs::write(&file_path, json).expect("failed to write entity definition file");
+    }
+
+    fn placement_collision_assets() -> (TileMap, AtlasMeta) {
+        let mut tiles = HashMap::new();
+        tiles.insert(
+            "solid".to_string(),
+            TileInfo {
+                position: UVec2::new(0, 0),
+                properties: TileProperties {
+                    solid: true,
+                    trigger: false,
+                },
+            },
+        );
+        tiles.insert(
+            "floor".to_string(),
+            TileInfo {
+                position: UVec2::new(1, 0),
+                properties: TileProperties {
+                    solid: false,
+                    trigger: false,
+                },
+            },
+        );
+
+        let atlas = AtlasMeta {
+            image: PathBuf::from("test.png"),
+            tile_size: UVec2::new(16, 16),
+            tiles,
+        };
+
+        let tilemap = TileMap {
+            size: UVec2::new(2, 2),
+            tile_size: UVec2::new(16, 16),
+            atlas: PathBuf::from("test_atlas.json"),
+            // top-left is solid, others are floor
+            tiles: vec![
+                "solid".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+            ],
+        };
+
+        (tilemap, atlas)
+    }
+
+    #[test]
+    fn centered_world_position_from_sprite_center_offsets_to_top_left() {
+        let centered = PlacementInteraction::centered_world_position_from_sprite_center(
+            Vec2::new(64.0, 48.0),
+            UVec2::new(16, 16),
+        );
+        assert_eq!(centered, IVec2::new(56, 40));
+    }
+
+    #[test]
+    fn next_entity_id_returns_one_for_empty_scene() {
+        let next = PlacementInteraction::next_entity_id(&[]);
+        assert_eq!(next, 1);
+    }
+
+    #[test]
+    fn next_entity_id_uses_max_id_plus_one() {
+        let entity_def = sample_entity_definition("entity_a");
+        let a = entity_def
+            .create_entity(IVec2::new(0, 0), 7)
+            .expect("failed to create entity a");
+        let b = entity_def
+            .create_entity(IVec2::new(0, 0), 42)
+            .expect("failed to create entity b");
+        let next = PlacementInteraction::next_entity_id(&[a, b]);
+        assert_eq!(next, 43);
+    }
+
+    #[test]
+    fn load_entity_definition_succeeds_for_valid_file() {
+        let project_dir = unique_temp_project_dir();
+        let entity_def = sample_entity_definition("valid_entity");
+        write_entity_definition_file(&project_dir, &entity_def);
+
+        let loaded = PlacementInteraction::load_entity_definition(&project_dir, "valid_entity")
+            .expect("expected valid entity definition to load");
+        assert_eq!(loaded.name, "valid_entity");
+        assert_eq!(loaded.entity_type, "npc");
+    }
+
+    #[test]
+    fn load_entity_definition_fails_for_missing_file() {
+        let project_dir = unique_temp_project_dir();
+        let err = PlacementInteraction::load_entity_definition(&project_dir, "does_not_exist")
+            .expect_err("expected missing definition to fail");
+        assert!(err.contains("not found"));
+    }
+
+    #[test]
+    fn load_entity_definition_fails_for_invalid_json() {
+        let project_dir = unique_temp_project_dir();
+        let file_path = project_dir.join("entities").join("broken.json");
+        fs::write(&file_path, "{ this is not valid json").expect("failed to write broken json");
+
+        let err = PlacementInteraction::load_entity_definition(&project_dir, "broken")
+            .expect_err("expected invalid json to fail");
+        assert!(err.contains("Failed to parse entity definition"));
+    }
+
+    #[test]
+    fn create_entity_in_scene_adds_entity_and_marks_scene_changed() {
+        let mut ui_state = EditorUI::new();
+        ui_state.enter_placement_mode("sample".to_string());
+        let entity_def = sample_entity_definition("sample");
+
+        let placed = PlacementInteraction::create_entity_in_scene_with_collision_context(
+            &mut ui_state,
+            entity_def,
+            "sample",
+            IVec2::new(32, 48),
+            None,
+            None,
+        );
+        assert!(placed);
+
+        let scene = ui_state
+            .scenes
+            .iter()
+            .find(|s| s.name == "Main Scene")
+            .expect("missing default scene");
+        assert_eq!(scene.entities.len(), 1);
+        assert_eq!(scene.entities[0].position, IVec2::new(32, 48));
+        assert_eq!(scene.entities[0].entity_type, EntityType::Npc);
+        assert!(ui_state.scene_content_changed);
+        // Placement mode exits at a higher level after successful click.
+        assert!(ui_state.is_in_placement_mode());
+    }
+
+    #[test]
+    fn create_entity_in_scene_exits_placement_mode_when_no_active_scene() {
+        let mut ui_state = EditorUI::new();
+        ui_state.active_scene = None;
+        ui_state.enter_placement_mode("sample".to_string());
+
+        let placed = PlacementInteraction::create_entity_in_scene_with_collision_context(
+            &mut ui_state,
+            sample_entity_definition("sample"),
+            "sample",
+            IVec2::new(0, 0),
+            None,
+            None,
+        );
+        assert!(!placed);
+        assert!(!ui_state.is_in_placement_mode());
+    }
+
+    #[test]
+    fn create_entity_in_scene_exits_placement_mode_when_active_scene_missing() {
+        let mut ui_state = EditorUI::new();
+        ui_state.active_scene = Some("Missing Scene".to_string());
+        ui_state.enter_placement_mode("sample".to_string());
+
+        let placed = PlacementInteraction::create_entity_in_scene_with_collision_context(
+            &mut ui_state,
+            sample_entity_definition("sample"),
+            "sample",
+            IVec2::new(0, 0),
+            None,
+            None,
+        );
+        assert!(!placed);
+        assert!(!ui_state.is_in_placement_mode());
+    }
+
+    #[test]
+    fn create_entity_in_scene_blocks_on_solid_terrain_and_keeps_placement_mode() {
+        let mut ui_state = EditorUI::new();
+        ui_state.enter_placement_mode("sample".to_string());
+        let (tilemap, atlas) = placement_collision_assets();
+
+        let placed = PlacementInteraction::create_entity_in_scene_with_collision_context(
+            &mut ui_state,
+            sample_entity_definition("sample"),
+            "sample",
+            IVec2::new(0, 0), // top-left tile is solid in test map
+            Some(&tilemap),
+            Some(&atlas),
+        );
+
+        assert!(!placed);
+        let scene = ui_state
+            .scenes
+            .iter()
+            .find(|s| s.name == "Main Scene")
+            .expect("missing default scene");
+        assert_eq!(scene.entities.len(), 0);
+        assert!(!ui_state.scene_content_changed);
+        assert!(ui_state.is_in_placement_mode());
+    }
+
+    #[test]
+    fn can_place_entity_returns_true_without_collision_context() {
+        let entity = sample_entity_definition("sample")
+            .create_entity(IVec2::new(0, 0), 1)
+            .expect("failed to create entity");
+        assert!(PlacementInteraction::can_place_entity(
+            &entity,
+            IVec2::new(0, 0),
+            None,
+            None
+        ));
     }
 }

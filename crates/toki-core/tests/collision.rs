@@ -5,7 +5,7 @@ use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
     tilemap::TileMap,
 };
-use toki_core::collision::CollisionBox;
+use toki_core::collision::{can_place_collision_box_at_position, CollisionBox};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{GameState, InputKey};
 
@@ -419,4 +419,96 @@ fn collision_entity_larger_than_tiles() {
 
     // Should not move because large collision box overlaps solid tiles
     assert_eq!(initial_pos, final_pos);
+}
+
+#[test]
+fn placement_collision_without_collision_box_is_valid() {
+    let tilemap = create_collision_test_tilemap();
+    let atlas = create_collision_test_atlas();
+
+    assert!(can_place_collision_box_at_position(
+        None,
+        IVec2::new(16, 16),
+        &tilemap,
+        &atlas
+    ));
+}
+
+#[test]
+fn placement_collision_trigger_box_is_valid() {
+    let tilemap = create_collision_test_tilemap();
+    let atlas = create_collision_test_atlas();
+    let trigger_box = CollisionBox::trigger_box(UVec2::new(16, 16));
+
+    assert!(can_place_collision_box_at_position(
+        Some(&trigger_box),
+        IVec2::new(0, 0),
+        &tilemap,
+        &atlas
+    ));
+}
+
+#[test]
+fn placement_collision_detects_solid_tile_overlap() {
+    let tilemap = create_collision_test_tilemap();
+    let atlas = create_collision_test_atlas();
+    let solid_box = CollisionBox::solid_box(UVec2::new(16, 16));
+
+    // (16, 0) is a solid tile in create_collision_test_tilemap()
+    assert!(!can_place_collision_box_at_position(
+        Some(&solid_box),
+        IVec2::new(16, 0),
+        &tilemap,
+        &atlas
+    ));
+}
+
+#[test]
+fn placement_collision_allows_non_solid_tile_overlap() {
+    let tilemap = create_collision_test_tilemap();
+    let atlas = create_collision_test_atlas();
+    let solid_box = CollisionBox::solid_box(UVec2::new(16, 16));
+
+    // (0, 32) is a floor tile in create_collision_test_tilemap()
+    assert!(can_place_collision_box_at_position(
+        Some(&solid_box),
+        IVec2::new(0, 32),
+        &tilemap,
+        &atlas
+    ));
+}
+
+#[test]
+fn placement_collision_rejects_negative_position() {
+    let tilemap = create_collision_test_tilemap();
+    let atlas = create_collision_test_atlas();
+    let solid_box = CollisionBox::solid_box(UVec2::new(16, 16));
+
+    assert!(!can_place_collision_box_at_position(
+        Some(&solid_box),
+        IVec2::new(-1, 0),
+        &tilemap,
+        &atlas
+    ));
+    assert!(!can_place_collision_box_at_position(
+        Some(&solid_box),
+        IVec2::new(0, -1),
+        &tilemap,
+        &atlas
+    ));
+}
+
+#[test]
+fn placement_collision_rejects_out_of_bounds_tiles() {
+    let tilemap = create_collision_test_tilemap();
+    let atlas = create_collision_test_atlas();
+    let solid_box = CollisionBox::solid_box(UVec2::new(16, 16));
+
+    // 4x4 map with 16px tiles => valid x range [0..63]
+    assert!(!can_place_collision_box_at_position(
+        Some(&solid_box),
+        IVec2::new(64, 0),
+        &tilemap,
+        &atlas
+    ));
 }
