@@ -82,9 +82,9 @@ git push origin main --follow-tags
 
 Release behavior:
 - Uses a shared workspace version for all crates.
-- Restricts releases to the `main` branch.
+- Allows releases from `main` and `develop`.
 - Creates numeric tags like `0.0.12` (matching existing repository tags).
-- Auto-creates a new `CHANGELOG.md` section from `[Unreleased]`.
+- Expects `CHANGELOG.md` to be prepared before running release commands.
 - Does not publish crates or push automatically; push is explicit.
 
 ### ▶️ Direct Cargo Commands (equivalent)
