@@ -49,7 +49,7 @@ jobs:
           if-no-files-found: error
 
   build-release:
-    name: Build (release, ubuntu-24.04)
+    name: Build (release)
     runs-on: ubuntu-24.04
 
     steps:
@@ -241,11 +241,7 @@ jobs:
         run: ./scripts/verify-tag-version.sh
 
       - name: Build crate packages
-        run: |
-          cargo package --locked -p toki-core
-          cargo package --locked -p toki-render
-          cargo package --locked -p toki-runtime
-          cargo package --locked -p toki-editor
+        run: cargo package --locked --workspace
 
       - name: Upload crate package artifact
         uses: actions/upload-artifact@v4
