@@ -15,14 +15,7 @@ impl AssetValidator {
     pub fn new() -> Result<Self> {
         let mut schemas = HashMap::new();
 
-        let schema_files = [
-            ("scene", include_str!("../../../schemas/scene.json")),
-            ("entity", include_str!("../../../schemas/entity.json")),
-            ("atlas", include_str!("../../../schemas/atlas.json")),
-            ("map", include_str!("../../../schemas/map.json")),
-        ];
-
-        for (schema_type, schema_content) in schema_files {
+        for (schema_type, schema_content) in toki_schemas::SCHEMA_FILES {
             let schema_value: Value = serde_json::from_str(schema_content)
                 .map_err(|e| anyhow::anyhow!("Failed to parse {} schema: {}", schema_type, e))?;
 

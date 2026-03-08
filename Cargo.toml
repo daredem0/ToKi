@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "crates/toki-core",
+  "crates/toki-schemas",
   "crates/toki-render",
   "crates/toki-runtime",
   "crates/toki-editor",

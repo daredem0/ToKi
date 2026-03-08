@@ -30,10 +30,10 @@ It provides a modular toolkit for making retro-style games with clean pixel grap
 toki/
 ├── crates/
 │   ├── toki-core     # Data models, math, animation, entity system, scene management
+│   ├── toki-schemas  # Canonical JSON schemas for asset validation
 │   ├── toki-render   # WGPU-based renderer with scene rendering support  
 │   ├── toki-runtime  # Game loop & logic runtime
 │   └── toki-editor   # Editor UI with interactive viewport and asset management
-├── schemas/          # JSON schemas for asset validation
 ├── example_project/  # Sample project demonstrating asset structure
 └── assets/           # Sprites, atlases, maps (JSON/PNG)
 ```

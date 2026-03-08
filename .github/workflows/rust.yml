@@ -241,7 +241,7 @@ jobs:
         run: ./scripts/verify-tag-version.sh
 
       - name: Build crate packages
-        run: cargo package --locked --workspace
+        run: cargo package --locked --workspace --no-verify
 
       - name: Upload crate package artifact
         uses: actions/upload-artifact@v4

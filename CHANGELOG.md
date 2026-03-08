@@ -13,6 +13,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added generated third-party license inventory output (`THIRD_PARTY_LICENSES.md`).
 - Added CI helper scripts for release checks and artifact metadata (`scripts/verify-tag-version.sh`, `scripts/detect-libc-suffix.sh`).
 - Added a `package-crate` CI job that packages all workspace crates and uploads `.crate` artifacts.
+- Added a dedicated `toki-schemas` workspace crate that owns canonical JSON schema payloads.
 
 ### Changed
 - Added shared workspace package metadata for versioning and repository fields to better support multi-crate releases.
@@ -21,12 +22,14 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Replaced the CI workflow with a multi-job pipeline (`build-debug`, `build-release`, `test`, `clippy`, `fmt`, `coverage`, `docs`, `release`, `deploy-pages`) modeled after `git-sync`.
 - Standardized CI release builds to a single Linux target (`ubuntu-24.04`) and removed Windows and distro-package jobs for now.
 - Updated internal workspace `path` dependencies to include explicit version requirements for packaging compatibility.
+- Switched editor asset validation to consume schema definitions from `toki-schemas`.
 
 ### Fixed
 - Fixed `cargo release` workspace packaging by moving build scripts into package-local `build.rs` files.
 - Fixed release configuration mismatches for branch policy, changelog replacement paths, and `0.0.x` version/tag flow.
 - Fixed package-crate CI failures by using workspace packaging (`cargo package --locked --workspace`) instead of per-crate packaging.
 - Fixed workspace clippy warnings in runtime/editor code and test assertions.
+- Fixed packaged `toki-editor` schema include failures by resolving schemas from package-local crate assets.
 
 ## [0.0.11] - 2026-03-08
 
