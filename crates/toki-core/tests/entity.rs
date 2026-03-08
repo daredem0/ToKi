@@ -411,3 +411,21 @@ fn test_spawn_from_definition_sets_definition_name_and_player_tracking() {
     assert_eq!(entity.position, IVec2::new(12, 34));
     assert_eq!(manager.get_player_id(), Some(entity_id));
 }
+
+#[test]
+fn test_spawn_from_definition_registers_audio_component() {
+    let mut manager = EntityManager::new();
+    let definition = test_definition("audio_player", "player");
+
+    let entity_id = manager
+        .spawn_from_definition(&definition, IVec2::new(0, 0))
+        .expect("definition spawn should succeed");
+
+    let audio = manager
+        .audio_component(entity_id)
+        .expect("audio component should be registered");
+    assert_eq!(audio.footstep_distance_accumulator, 0.0);
+    assert_eq!(audio.footstep_trigger_distance, 32.0);
+    assert!(!audio.last_collision_state);
+    assert_eq!(audio.movement_sound.as_deref(), Some("sfx_step"));
+}

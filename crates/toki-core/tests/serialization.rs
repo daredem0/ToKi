@@ -81,10 +81,6 @@ fn create_test_entity() -> Entity {
         definition_name: Some("player".to_string()),
         attributes,
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
-        footstep_distance_accumulator: 15.5,
-        footstep_trigger_distance: 32.0,
-        last_collision_state: true,
-        movement_sound: Some("test_sound".to_string()),
     }
 }
 
@@ -120,20 +116,6 @@ fn test_entity_roundtrip_serialization() {
     assert_eq!(entity.entity_type, deserialized.entity_type);
     assert_eq!(entity.definition_name, deserialized.definition_name);
 
-    // Verify audio state
-    assert_eq!(
-        entity.footstep_distance_accumulator,
-        deserialized.footstep_distance_accumulator
-    );
-    assert_eq!(
-        entity.footstep_trigger_distance,
-        deserialized.footstep_trigger_distance
-    );
-    assert_eq!(
-        entity.last_collision_state,
-        deserialized.last_collision_state
-    );
-
     // Verify attributes
     assert_eq!(entity.attributes.health, deserialized.attributes.health);
     assert_eq!(entity.attributes.speed, deserialized.attributes.speed);
@@ -152,10 +134,6 @@ fn test_entity_minimal_fields() {
         definition_name: None,
         attributes: EntityAttributes::default(),
         collision_box: None,
-        footstep_distance_accumulator: 0.0,
-        footstep_trigger_distance: 32.0,
-        last_collision_state: false,
-        movement_sound: None,
     };
 
     let json = serde_json::to_string_pretty(&entity).unwrap();
@@ -190,6 +168,13 @@ fn test_entity_manager_roundtrip() {
 
     let npc_entities = deserialized.entities_of_type(&EntityType::Npc);
     assert_eq!(npc_entities.len(), 1);
+
+    // Verify audio components were preserved
+    let audio_component = deserialized
+        .audio_component(original_player_id)
+        .expect("player audio component should exist");
+    assert_eq!(audio_component.footstep_trigger_distance, 32.0);
+    assert_eq!(audio_component.movement_sound.as_deref(), Some("sfx_step"));
 
     // Verify active status was preserved
     let active_entities = deserialized.active_entities();
@@ -246,10 +231,6 @@ fn test_save_load_entity_to_file() {
     assert_eq!(entity.id, loaded_entity.id);
     assert_eq!(entity.position, loaded_entity.position);
     assert_eq!(entity.entity_type, loaded_entity.entity_type);
-    assert_eq!(
-        entity.footstep_distance_accumulator,
-        loaded_entity.footstep_distance_accumulator
-    );
 }
 
 #[test]
@@ -302,9 +283,37 @@ fn test_json_structure() {
     assert!(json.contains("\"id\": 42"));
     assert!(json.contains("\"position\""));
     assert!(json.contains("\"entity_type\": \"Player\""));
-    assert!(json.contains("\"footstep_distance_accumulator\": 15.5"));
-    assert!(json.contains("\"last_collision_state\": true"));
-    assert!(json.contains("\"footstep_trigger_distance\": 32.0"));
+    assert!(!json.contains("\"footstep_distance_accumulator\""));
+    assert!(!json.contains("\"last_collision_state\""));
+    assert!(!json.contains("\"footstep_trigger_distance\""));
+}
+
+#[test]
+fn test_entity_deserialization_ignores_legacy_audio_fields() {
+    let mut json_value = serde_json::to_value(create_test_entity()).unwrap();
+    let object = json_value
+        .as_object_mut()
+        .expect("serialized entity should be a JSON object");
+    object.insert(
+        "footstep_distance_accumulator".to_string(),
+        serde_json::json!(15.5),
+    );
+    object.insert(
+        "footstep_trigger_distance".to_string(),
+        serde_json::json!(32.0),
+    );
+    object.insert("last_collision_state".to_string(), serde_json::json!(true));
+    object.insert(
+        "movement_sound".to_string(),
+        serde_json::json!("legacy_step"),
+    );
+
+    let json = serde_json::to_string(&json_value).unwrap();
+    let parsed: Entity = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(parsed.id, 42);
+    assert_eq!(parsed.position, IVec2::new(10, 20));
+    assert_eq!(parsed.entity_type, EntityType::Player);
 }
 
 #[test]

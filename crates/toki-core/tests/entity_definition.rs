@@ -92,9 +92,13 @@ fn test_entity_definition_create_entity_basic() {
     assert_eq!(collision.size.y, 16);
     assert_eq!(collision.trigger, false);
 
-    // Check audio
-    assert_eq!(entity.footstep_trigger_distance, 16.0);
-    assert_eq!(entity.movement_sound, Some("player_footsteps".to_string()));
+    // Check audio component conversion
+    let audio_component = entity_def.create_audio_component();
+    assert_eq!(audio_component.footstep_trigger_distance, 16.0);
+    assert_eq!(
+        audio_component.movement_sound.as_deref(),
+        Some("player_footsteps")
+    );
 
     // Check animation controller
     assert!(entity.attributes.animation_controller.is_some());
@@ -370,4 +374,58 @@ fn test_entity_definition_serialization() {
     );
     assert_eq!(entity_def.category, deserialized.category);
     assert_eq!(entity_def.tags, deserialized.tags);
+}
+
+#[test]
+fn test_entity_definition_create_audio_component() {
+    let entity_def = EntityDefinition {
+        name: "audio_test".to_string(),
+        display_name: "Audio Test".to_string(),
+        description: "Audio component extraction".to_string(),
+        entity_type: "player".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+        },
+        attributes: AttributesDef {
+            health: Some(100),
+            speed: 2,
+            solid: true,
+            active: true,
+            can_move: true,
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 24.0,
+            movement_sound: "sfx_custom_step".to_string(),
+        },
+        animations: AnimationsDef {
+            atlas_name: "test".to_string(),
+            clips: vec![AnimationClipDef {
+                state: "idle".to_string(),
+                frame_tiles: vec!["test_0".to_string()],
+                frame_duration_ms: 100.0,
+                loop_mode: "loop".to_string(),
+            }],
+            default_state: "idle".to_string(),
+        },
+        category: "test".to_string(),
+        tags: vec![],
+    };
+
+    let audio_component = entity_def.create_audio_component();
+    assert_eq!(audio_component.footstep_distance_accumulator, 0.0);
+    assert_eq!(audio_component.footstep_trigger_distance, 24.0);
+    assert!(!audio_component.last_collision_state);
+    assert_eq!(
+        audio_component.movement_sound.as_deref(),
+        Some("sfx_custom_step")
+    );
 }

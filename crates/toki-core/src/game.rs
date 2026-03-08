@@ -384,8 +384,10 @@ impl GameState {
         let initial_position = player_entity.position;
         let mut result = GameUpdateResult::new();
 
-        // Get mutable reference to player entity
-        let Some(player_entity) = self.entity_manager.get_entity_mut(player_id) else {
+        // Get mutable references to player entity and its runtime audio component
+        let Some((player_entity, player_audio)) =
+            self.entity_manager.get_entity_with_audio_mut(player_id)
+        else {
             return GameUpdateResult::new();
         };
 
@@ -402,13 +404,13 @@ impl GameState {
                         atlas,
                     ) {
                         player_entity.position.y = new_y;
-                        player_entity.last_collision_state = false;
+                        player_audio.last_collision_state = false;
                     } else {
                         // Only trigger audio on state change
-                        if !player_entity.last_collision_state {
+                        if !player_audio.last_collision_state {
                             result.add_event(AudioEvent::PlayerCollision);
                         }
-                        player_entity.last_collision_state = true;
+                        player_audio.last_collision_state = true;
                     }
                 }
                 InputKey::Left => {
@@ -422,13 +424,13 @@ impl GameState {
                         atlas,
                     ) {
                         player_entity.position.x = new_x;
-                        player_entity.last_collision_state = false;
+                        player_audio.last_collision_state = false;
                     } else {
                         // Only trigger audio on state change
-                        if !player_entity.last_collision_state {
+                        if !player_audio.last_collision_state {
                             result.add_event(AudioEvent::PlayerCollision);
                         }
-                        player_entity.last_collision_state = true;
+                        player_audio.last_collision_state = true;
                     }
                 }
                 InputKey::Down => {
@@ -443,13 +445,13 @@ impl GameState {
                         atlas,
                     ) {
                         player_entity.position.y = new_y;
-                        player_entity.last_collision_state = false;
+                        player_audio.last_collision_state = false;
                     } else {
                         // Only trigger audio on state change
-                        if !player_entity.last_collision_state {
+                        if !player_audio.last_collision_state {
                             result.add_event(AudioEvent::PlayerCollision);
                         }
-                        player_entity.last_collision_state = true;
+                        player_audio.last_collision_state = true;
                     }
                 }
                 InputKey::Right => {
@@ -464,13 +466,13 @@ impl GameState {
                         atlas,
                     ) {
                         player_entity.position.x = new_x;
-                        player_entity.last_collision_state = false;
+                        player_audio.last_collision_state = false;
                     } else {
                         // Only trigger audio on state change
-                        if !player_entity.last_collision_state {
+                        if !player_audio.last_collision_state {
                             result.add_event(AudioEvent::PlayerCollision);
                         }
-                        player_entity.last_collision_state = true;
+                        player_audio.last_collision_state = true;
                     }
                 }
                 InputKey::DebugToggle => {
@@ -491,15 +493,14 @@ impl GameState {
                 as f32)
                 .sqrt();
 
-            player_entity.footstep_distance_accumulator += distance_moved;
+            player_audio.footstep_distance_accumulator += distance_moved;
 
             // Trigger footstep when accumulated distance exceeds threshold
-            if player_entity.footstep_distance_accumulator
-                >= player_entity.footstep_trigger_distance
+            if player_audio.footstep_distance_accumulator >= player_audio.footstep_trigger_distance
             {
                 result.add_event(AudioEvent::PlayerWalk);
-                player_entity.footstep_distance_accumulator -=
-                    player_entity.footstep_trigger_distance;
+                player_audio.footstep_distance_accumulator -=
+                    player_audio.footstep_trigger_distance;
             }
         }
 

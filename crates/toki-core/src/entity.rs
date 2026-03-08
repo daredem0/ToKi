@@ -18,15 +18,29 @@ pub struct Entity {
     pub definition_name: Option<String>,
     pub attributes: EntityAttributes,
     pub collision_box: Option<CollisionBox>,
+}
 
-    /// Audio state tracking
+/// Runtime audio component attached to an entity.
+///
+/// This keeps transient audio behavior out of the core `Entity` model.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct EntityAudioComponent {
     pub footstep_distance_accumulator: f32,
     pub footstep_trigger_distance: f32,
     pub last_collision_state: bool,
-
-    /// Audio configuration from entity definition
     #[serde(default)]
-    pub movement_sound: Option<String>, // Sound to play when moving
+    pub movement_sound: Option<String>,
+}
+
+impl Default for EntityAudioComponent {
+    fn default() -> Self {
+        Self {
+            footstep_distance_accumulator: 0.0,
+            footstep_trigger_distance: 32.0,
+            last_collision_state: false,
+            movement_sound: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
@@ -86,6 +100,10 @@ pub struct EntityManager {
 
     // This is prepared for spatial queries (collission)
     active_entities: HashSet<EntityId>,
+
+    /// Runtime audio components keyed by entity id.
+    #[serde(default)]
+    audio_components: HashMap<EntityId, EntityAudioComponent>,
 }
 
 impl EntityManager {
@@ -96,6 +114,7 @@ impl EntityManager {
             player_id: None,
             entities_by_type: HashMap::new(),
             active_entities: HashSet::new(),
+            audio_components: HashMap::new(),
         }
     }
 
@@ -132,11 +151,9 @@ impl EntityManager {
             definition_name: None,
             attributes,
             collision_box,
-            footstep_distance_accumulator: 0.0,
-            footstep_trigger_distance: 32.0, // Trigger footstep every 32 pixels
-            last_collision_state: false,
-            movement_sound: None, // Default to no sound for existing entities
         };
+        self.audio_components
+            .insert(id, EntityAudioComponent::default());
 
         // Insert into main storage
         self.entities.insert(id, entity);
@@ -169,6 +186,7 @@ impl EntityManager {
 
         let entity = definition.create_entity(position, id)?;
         let entity_type = entity.entity_type.clone();
+        let audio_component = definition.create_audio_component();
 
         if matches!(entity_type, EntityType::Player) {
             self.player_id = Some(id);
@@ -184,6 +202,7 @@ impl EntityManager {
         }
 
         self.entities.insert(id, entity);
+        self.audio_components.insert(id, audio_component);
         Ok(id)
     }
 
@@ -209,6 +228,9 @@ impl EntityManager {
             .insert(id);
 
         self.active_entities.insert(id);
+        self.audio_components
+            .entry(id)
+            .or_insert_with(EntityAudioComponent::default);
 
         // Store the entity
         self.entities.insert(id, entity);
@@ -233,6 +255,7 @@ impl EntityManager {
 
         // We don't care whether it was present; just ensure it's gone.
         self.active_entities.remove(&id);
+        self.audio_components.remove(&id);
 
         true
     }
@@ -244,6 +267,24 @@ impl EntityManager {
 
     pub fn get_entity_mut(&mut self, id: EntityId) -> Option<&mut Entity> {
         self.entities.get_mut(&id)
+    }
+
+    pub fn audio_component(&self, id: EntityId) -> Option<&EntityAudioComponent> {
+        self.audio_components.get(&id)
+    }
+
+    pub fn audio_component_mut(&mut self, id: EntityId) -> Option<&mut EntityAudioComponent> {
+        self.audio_components.get_mut(&id)
+    }
+
+    pub fn get_entity_with_audio_mut(
+        &mut self,
+        id: EntityId,
+    ) -> Option<(&mut Entity, &mut EntityAudioComponent)> {
+        let (entities, audio_components) = (&mut self.entities, &mut self.audio_components);
+        let entity = entities.get_mut(&id)?;
+        let audio_component = audio_components.entry(id).or_default();
+        Some((entity, audio_component))
     }
 
     // Convenience methods
@@ -448,11 +489,17 @@ impl EntityDefinition {
             definition_name: Some(self.name.clone()),
             attributes,
             collision_box,
+        })
+    }
+
+    /// Build a runtime audio component from this definition.
+    pub fn create_audio_component(&self) -> EntityAudioComponent {
+        EntityAudioComponent {
             footstep_distance_accumulator: 0.0,
             footstep_trigger_distance: self.audio.footstep_trigger_distance,
             last_collision_state: false,
             movement_sound: Some(self.audio.movement_sound.clone()),
-        })
+        }
     }
 
     /// Get collision box from entity definition without creating full entity.

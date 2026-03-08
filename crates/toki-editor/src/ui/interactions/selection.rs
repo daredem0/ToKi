@@ -295,10 +295,6 @@ impl SelectionInteraction {
         if definition.attributes.health == entity.attributes.health {
             score += 1;
         }
-        if entity.movement_sound.as_deref() == Some(definition.audio.movement_sound.as_str()) {
-            score += 2;
-        }
-
         if definition.collision.enabled == entity.collision_box.is_some() {
             score += 2;
         }
