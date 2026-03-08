@@ -39,10 +39,37 @@ toki/
 ```
 
 ## 🧪 Running & Testing
-### ▶️ Build & Run
+### ▶️ Using `just` (recommended)
+```bash
+just help
+just build
+just run-editor
+just run-runtime
+just test
+```
+
+### ✅ Quality & Important Targets
+```bash
+just fmt-check
+just clippy
+just important
+just llm
+```
+
+### 📊 Code Coverage
+```bash
+just install-llvm-cov
+just coverage-open
+```
+
+### ▶️ Direct Cargo Commands (equivalent)
 ```bash
 cargo build
 cargo run -p toki-editor
+cargo run -p toki-runtime
+cargo test --workspace
+cargo install cargo-llvm-cov
+cargo llvm-cov -p toki-core --open
 ```
 
 ### 🎮 Editor Features
@@ -52,16 +79,6 @@ cargo run -p toki-editor
 - **Scene Hierarchy**: Visual scene management with entity organization
 - **Asset Validation**: Edit → "Validate Project Assets" for schema compliance checking
 
-### ☑️  Run Tests
-```bash
-cargo test --workspace
-```
-
-### 📊 Code Coverage
-```bash
-cargo install cargo-llvm-cov
-cargo llvm-cov -p toki-core --open
-```
 ## License
 
 This project is dual‑licensed under either:
