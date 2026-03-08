@@ -1,0 +1,113 @@
+<style>
+  .rustdoc .example-wrap>.rustdoc-mermaid-wrap {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .rustdoc-mermaid-wrap {
+    margin: 1rem 0;
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    background: #0d1117;
+  }
+
+  .rustdoc-mermaid {
+    width: 100%;
+  }
+
+  .rustdoc-mermaid>svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+    background: transparent;
+  }
+</style>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+  function convertRustdocMermaidBlocks() {
+    const blocks = document.querySelectorAll("pre.language-mermaid");
+    for (const pre of blocks) {
+      const code = pre.querySelector("code");
+      const source = code ? code.textContent : pre.textContent;
+      if (!source) continue;
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "rustdoc-mermaid-wrap";
+
+      const container = document.createElement("div");
+      container.className = "mermaid rustdoc-mermaid";
+      container.textContent = source.trim();
+
+      wrapper.append(container);
+      pre.replaceWith(wrapper);
+    }
+  }
+
+  function normalizeMermaidSvgSizing() {
+    const svgs = document.querySelectorAll(".rustdoc-mermaid > svg");
+    for (const svg of svgs) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      const viewBoxWidth = viewBox && viewBox.width > 0 ? viewBox.width : 0;
+      const attrWidth = Number.parseFloat(svg.getAttribute("width") || "");
+      const naturalWidth = Number.isFinite(viewBoxWidth) && viewBoxWidth > 0
+        ? viewBoxWidth
+        : Number.isFinite(attrWidth) && attrWidth > 0
+          ? attrWidth
+          : null;
+
+      // Keep small diagrams at natural size and only downscale when needed.
+      if (naturalWidth) {
+        svg.style.width = `min(100%, ${Math.ceil(naturalWidth)}px)`;
+      } else {
+        svg.style.width = "100%";
+      }
+      svg.style.maxWidth = "100%";
+      svg.style.height = "auto";
+    }
+  }
+
+  window.addEventListener("DOMContentLoaded", async () => {
+    convertRustdocMermaidBlocks();
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "loose",
+      theme: "base",
+      themeVariables: {
+        fontSize: "14px",
+        background: "#0d1117",
+        primaryColor: "#161b22",
+        primaryBorderColor: "#58a6ff",
+        primaryTextColor: "#e6edf3",
+        secondaryColor: "#161b22",
+        secondaryBorderColor: "#58a6ff",
+        secondaryTextColor: "#e6edf3",
+        tertiaryColor: "#1f2937",
+        tertiaryBorderColor: "#8b949e",
+        tertiaryTextColor: "#e6edf3",
+        lineColor: "#c9d1d9",
+        textColor: "#e6edf3",
+        mainBkg: "#0d1117",
+        clusterBkg: "#0d1117",
+        clusterBorder: "#8b949e",
+        edgeLabelBackground: "#0d1117",
+        titleColor: "#e6edf3",
+      },
+      flowchart: {
+        useMaxWidth: true,
+      },
+      sequence: {
+        useMaxWidth: true,
+      },
+      gantt: {
+        useMaxWidth: true,
+      },
+    });
+    await mermaid.run({ querySelector: ".rustdoc-mermaid" });
+    normalizeMermaidSvgSizing();
+  });
+</script>
