@@ -279,7 +279,7 @@ impl GameState {
         self.npc_ai_frame_counter += 1;
 
         // Only update NPC AI every 60 frames (roughly once per second at 60fps)
-        if self.npc_ai_frame_counter % 60 != 0 {
+        if !self.npc_ai_frame_counter.is_multiple_of(60) {
             return;
         }
 

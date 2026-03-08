@@ -188,7 +188,7 @@ fn animation_name_and_looped_properties() {
     };
 
     assert_eq!(anim.name, "test_animation");
-    assert_eq!(anim.looped, true);
+    assert!(anim.looped);
     assert_eq!(anim.frames.len(), 1);
 }
 

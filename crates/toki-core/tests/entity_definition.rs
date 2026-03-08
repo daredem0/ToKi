@@ -77,12 +77,12 @@ fn test_entity_definition_create_entity_basic() {
     // Check attributes
     assert_eq!(entity.attributes.health, Some(100));
     assert_eq!(entity.attributes.speed, 2);
-    assert_eq!(entity.attributes.solid, true);
-    assert_eq!(entity.attributes.visible, true);
+    assert!(entity.attributes.solid);
+    assert!(entity.attributes.visible);
     assert_eq!(entity.attributes.render_layer, 1);
-    assert_eq!(entity.attributes.active, true);
-    assert_eq!(entity.attributes.can_move, true);
-    assert_eq!(entity.attributes.has_inventory, true);
+    assert!(entity.attributes.active);
+    assert!(entity.attributes.can_move);
+    assert!(entity.attributes.has_inventory);
 
     // Check collision
     assert!(entity.collision_box.is_some());
@@ -90,7 +90,7 @@ fn test_entity_definition_create_entity_basic() {
     assert_eq!(collision.offset, IVec2::new(0, 0));
     assert_eq!(collision.size.x, 16);
     assert_eq!(collision.size.y, 16);
-    assert_eq!(collision.trigger, false);
+    assert!(!collision.trigger);
 
     // Check audio component conversion
     let audio_component = entity_def.create_audio_component();
@@ -168,8 +168,8 @@ fn test_entity_definition_create_npc_entity() {
     assert_eq!(entity.entity_type, EntityType::Npc);
 
     // Check attributes specific to NPC
-    assert_eq!(entity.attributes.can_move, false);
-    assert_eq!(entity.attributes.has_inventory, false);
+    assert!(!entity.attributes.can_move);
+    assert!(!entity.attributes.has_inventory);
     assert_eq!(entity.attributes.speed, 1);
 
     // Check no collision since disabled

@@ -118,40 +118,6 @@ impl EditorApp {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::EditorApp;
-
-    #[test]
-    fn resolve_scene_map_to_load_prefers_previously_loaded_map() {
-        let scene = toki_core::Scene::with_maps(
-            "Test Scene".to_string(),
-            vec!["map_a".to_string(), "map_b".to_string()],
-        );
-
-        let chosen = EditorApp::resolve_scene_map_to_load(&scene, Some("map_b"));
-        assert_eq!(chosen.as_deref(), Some("map_b"));
-    }
-
-    #[test]
-    fn resolve_scene_map_to_load_falls_back_to_first_map_when_preferred_missing() {
-        let scene = toki_core::Scene::with_maps(
-            "Test Scene".to_string(),
-            vec!["map_a".to_string(), "map_b".to_string()],
-        );
-
-        let chosen = EditorApp::resolve_scene_map_to_load(&scene, Some("map_missing"));
-        assert_eq!(chosen.as_deref(), Some("map_a"));
-    }
-
-    #[test]
-    fn resolve_scene_map_to_load_returns_none_when_scene_has_no_maps() {
-        let scene = toki_core::Scene::new("Empty Scene".to_string());
-        let chosen = EditorApp::resolve_scene_map_to_load(&scene, Some("any_map"));
-        assert_eq!(chosen, None);
-    }
-}
-
 impl ApplicationHandler for EditorApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         // Create window using config settings
@@ -390,7 +356,7 @@ impl EditorApp {
                             Some((
                                 entity_def.as_str(),
                                 *position,
-                                cached_frame.clone(),
+                                *cached_frame,
                                 is_valid,
                             ))
                         } else {
@@ -948,7 +914,7 @@ impl EditorApp {
     }
 
     /// Load sprite frame for preview (cached) - static version
-    fn load_preview_sprite_frame_static(
+fn load_preview_sprite_frame_static(
         entity_def_name: &str,
         project_path: &std::path::Path,
         project_assets: &crate::project::ProjectAssets,
@@ -1027,5 +993,39 @@ impl EditorApp {
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::EditorApp;
+
+    #[test]
+    fn resolve_scene_map_to_load_prefers_previously_loaded_map() {
+        let scene = toki_core::Scene::with_maps(
+            "Test Scene".to_string(),
+            vec!["map_a".to_string(), "map_b".to_string()],
+        );
+
+        let chosen = EditorApp::resolve_scene_map_to_load(&scene, Some("map_b"));
+        assert_eq!(chosen.as_deref(), Some("map_b"));
+    }
+
+    #[test]
+    fn resolve_scene_map_to_load_falls_back_to_first_map_when_preferred_missing() {
+        let scene = toki_core::Scene::with_maps(
+            "Test Scene".to_string(),
+            vec!["map_a".to_string(), "map_b".to_string()],
+        );
+
+        let chosen = EditorApp::resolve_scene_map_to_load(&scene, Some("map_missing"));
+        assert_eq!(chosen.as_deref(), Some("map_a"));
+    }
+
+    #[test]
+    fn resolve_scene_map_to_load_returns_none_when_scene_has_no_maps() {
+        let scene = toki_core::Scene::new("Empty Scene".to_string());
+        let chosen = EditorApp::resolve_scene_map_to_load(&scene, Some("any_map"));
+        assert_eq!(chosen, None);
     }
 }

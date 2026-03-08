@@ -230,7 +230,7 @@ impl EntityManager {
         self.active_entities.insert(id);
         self.audio_components
             .entry(id)
-            .or_insert_with(EntityAudioComponent::default);
+            .or_default();
 
         // Store the entity
         self.entities.insert(id, entity);

@@ -170,20 +170,20 @@ fn atlas_tile_collision_properties() {
     let atlas = create_test_atlas();
 
     // Test solid properties
-    assert_eq!(atlas.is_tile_solid("grass"), false);
-    assert_eq!(atlas.is_tile_solid("stone"), true);
-    assert_eq!(atlas.is_tile_solid("water"), false);
-    assert_eq!(atlas.is_tile_solid("dirt"), false);
+    assert!(!atlas.is_tile_solid("grass"));
+    assert!(atlas.is_tile_solid("stone"));
+    assert!(!atlas.is_tile_solid("water"));
+    assert!(!atlas.is_tile_solid("dirt"));
 
     // Test trigger properties
-    assert_eq!(atlas.is_tile_trigger("grass"), false);
-    assert_eq!(atlas.is_tile_trigger("stone"), false);
-    assert_eq!(atlas.is_tile_trigger("water"), true);
-    assert_eq!(atlas.is_tile_trigger("dirt"), false);
+    assert!(!atlas.is_tile_trigger("grass"));
+    assert!(!atlas.is_tile_trigger("stone"));
+    assert!(atlas.is_tile_trigger("water"));
+    assert!(!atlas.is_tile_trigger("dirt"));
 
     // Test nonexistent tiles default to false
-    assert_eq!(atlas.is_tile_solid("nonexistent"), false);
-    assert_eq!(atlas.is_tile_trigger("nonexistent"), false);
+    assert!(!atlas.is_tile_solid("nonexistent"));
+    assert!(!atlas.is_tile_trigger("nonexistent"));
 }
 
 #[test]
@@ -192,12 +192,12 @@ fn atlas_get_tile_properties() {
 
     // Test getting properties directly
     let stone_props = atlas.get_tile_properties("stone").unwrap();
-    assert_eq!(stone_props.solid, true);
-    assert_eq!(stone_props.trigger, false);
+    assert!(stone_props.solid);
+    assert!(!stone_props.trigger);
 
     let water_props = atlas.get_tile_properties("water").unwrap();
-    assert_eq!(water_props.solid, false);
-    assert_eq!(water_props.trigger, true);
+    assert!(!water_props.solid);
+    assert!(water_props.trigger);
 
     // Test nonexistent tile returns None
     assert_eq!(atlas.get_tile_properties("nonexistent"), None);
