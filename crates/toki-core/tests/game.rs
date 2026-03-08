@@ -5,6 +5,10 @@ use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
     tilemap::TileMap,
 };
+use toki_core::entity::{
+    AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
+    RenderingDef,
+};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{GameState, InputKey};
 
@@ -57,6 +61,50 @@ fn create_test_atlas() -> AtlasMeta {
         image: PathBuf::from("test_atlas.png"),
         tile_size: UVec2::new(16, 16),
         tiles,
+    }
+}
+
+fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
+    EntityDefinition {
+        name: name.to_string(),
+        display_name: format!("Display {name}"),
+        description: format!("Definition for {name}"),
+        entity_type: entity_type.to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+        },
+        attributes: AttributesDef {
+            health: Some(100),
+            speed: 2,
+            solid: true,
+            active: true,
+            can_move: true,
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 32.0,
+            movement_sound: "sfx_step".to_string(),
+        },
+        animations: AnimationsDef {
+            atlas_name: "creatures".to_string(),
+            clips: vec![AnimationClipDef {
+                state: "idle".to_string(),
+                frame_tiles: vec!["slime/idle_0".to_string()],
+                frame_duration_ms: 150.0,
+                loop_mode: "loop".to_string(),
+            }],
+            default_state: "idle".to_string(),
+        },
+        category: "test".to_string(),
+        tags: vec!["test".to_string()],
     }
 }
 
@@ -397,8 +445,12 @@ fn game_state_entity_manager_access() {
 
     // Should be able to spawn additional entities
     let entity_manager = game_state.entity_manager_mut();
-    let npc_id = entity_manager.spawn_npc(IVec2::new(100, 100), "guard");
-    let item_id = entity_manager.spawn_item(IVec2::new(200, 200), "coin");
+    let npc_id = entity_manager
+        .spawn_from_definition(&test_definition("npc", "npc"), IVec2::new(100, 100))
+        .expect("npc spawn from definition should succeed");
+    let item_id = entity_manager
+        .spawn_from_definition(&test_definition("item", "item"), IVec2::new(200, 200))
+        .expect("item spawn from definition should succeed");
 
     assert_eq!(entity_manager.active_entities().len(), 3);
     assert!(entity_manager.get_entity(npc_id).is_some());
@@ -421,4 +473,26 @@ fn game_state_player_entity_attributes() {
     assert!(player_entity.attributes.visible);
     assert_eq!(player_entity.attributes.render_layer, 0);
     assert!(player_entity.attributes.animation_controller.is_some());
+}
+
+#[test]
+fn game_state_new_uses_definition_based_player_creation() {
+    let sprite = create_test_sprite();
+    let game_state = GameState::new(sprite);
+    let player = game_state.player_entity().expect("player should exist");
+
+    assert_eq!(player.definition_name.as_deref(), Some("player"));
+}
+
+#[test]
+fn game_state_spawn_player_like_npc_uses_definition_metadata() {
+    let mut game_state = GameState::new_empty();
+    let npc_id = game_state.spawn_player_like_npc(IVec2::new(120, 72));
+    let npc = game_state
+        .entity_manager()
+        .get_entity(npc_id)
+        .expect("spawned npc should exist");
+
+    assert_eq!(npc.definition_name.as_deref(), Some("player_like_npc"));
+    assert_eq!(npc.entity_type, toki_core::entity::EntityType::Npc);
 }

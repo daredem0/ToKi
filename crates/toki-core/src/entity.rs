@@ -158,6 +158,35 @@ impl EntityManager {
         id
     }
 
+    /// Spawn an entity from an entity definition.
+    pub fn spawn_from_definition(
+        &mut self,
+        definition: &EntityDefinition,
+        position: IVec2,
+    ) -> Result<EntityId, String> {
+        let id = self.next_id;
+        self.next_id += 1;
+
+        let entity = definition.create_entity(position, id)?;
+        let entity_type = entity.entity_type.clone();
+
+        if matches!(entity_type, EntityType::Player) {
+            self.player_id = Some(id);
+        }
+
+        self.entities_by_type
+            .entry(entity_type)
+            .or_default()
+            .insert(id);
+
+        if entity.attributes.active {
+            self.active_entities.insert(id);
+        }
+
+        self.entities.insert(id, entity);
+        Ok(id)
+    }
+
     /// Add an existing entity to the manager (used for scene-to-gamestate conversion)
     pub fn add_existing_entity(&mut self, entity: Entity) -> EntityId {
         let id = entity.id;
@@ -263,138 +292,7 @@ impl EntityManager {
             }
         }
     }
-
-    // Factory methods
-    pub fn spawn_player(&mut self, position: IVec2) -> EntityId {
-        let mut controller = AnimationController::new();
-        let idle_clip = AnimationClip {
-            state: AnimationState::Idle,
-            atlas_name: "creatures".to_string(),
-            frame_tile_names: vec!["slime/idle_0".to_string(), "slime/idle_1".to_string()],
-            frame_duration_ms: 300.0,
-            loop_mode: LoopMode::Loop,
-        };
-        controller.add_clip(idle_clip);
-        let walk_clip = AnimationClip {
-            state: AnimationState::Walk,
-            atlas_name: "creatures".to_string(),
-            frame_tile_names: vec![
-                "slime/walk_0".to_string(),
-                "slime/walk_1".to_string(),
-                "slime/walk_2".to_string(),
-                "slime/walk_3".to_string(),
-            ],
-            frame_duration_ms: 150.0,
-            loop_mode: LoopMode::Loop,
-        };
-        controller.add_clip(walk_clip);
-        controller.play(AnimationState::Idle);
-        let attributes = EntityAttributes {
-            health: Some(100),
-            speed: 2,
-            animation_controller: Some(controller),
-            ..Default::default()
-        };
-        self.spawn_entity(
-            EntityType::Player,
-            position,
-            glam::UVec2::new(16, 16),
-            attributes,
-        )
-    }
-
-    pub fn spawn_npc(&mut self, position: glam::IVec2, animation_name: &str) -> EntityId {
-        let mut controller = AnimationController::new();
-        let idle_clip = AnimationClip {
-            state: AnimationState::Walk,
-            atlas_name: "creatures".to_string(),
-            frame_tile_names: vec![
-                format!("{}/walk_0", animation_name),
-                format!("{}/walk_1", animation_name),
-                format!("{}/walk_2", animation_name),
-                format!("{}/walk_3", animation_name),
-            ],
-            frame_duration_ms: 150.0,
-            loop_mode: LoopMode::Loop,
-        };
-        controller.add_clip(idle_clip);
-        controller.play(AnimationState::Walk);
-        let attributes = EntityAttributes {
-            health: Some(50),
-            speed: 1,
-            can_move: false, // NPCs don't move by themselves
-            animation_controller: Some(controller),
-            ..Default::default()
-        };
-        self.spawn_entity(
-            EntityType::Npc,
-            position,
-            glam::UVec2::new(16, 16),
-            attributes,
-        )
-    }
-
-    pub fn spawn_item(&mut self, position: IVec2, item_name: &str) -> EntityId {
-        let mut controller = AnimationController::new();
-        let idle_clip = AnimationClip {
-            state: AnimationState::Idle,
-            atlas_name: "objects".to_string(),
-            frame_tile_names: vec![
-                format!("{}_0", item_name),
-                format!("{}_1", item_name),
-                format!("{}_2", item_name),
-                format!("{}_3", item_name),
-            ],
-            frame_duration_ms: 150.0,
-            loop_mode: LoopMode::Loop,
-        };
-        controller.add_clip(idle_clip);
-        controller.play(AnimationState::Idle);
-        let attributes = EntityAttributes {
-            health: None,    // Items don't have health
-            solid: false,    // Items can be walked through
-            can_move: false, // Items don't move
-            animation_controller: Some(controller),
-            ..Default::default()
-        };
-
-        self.spawn_entity(EntityType::Item, position, UVec2::new(16, 16), attributes)
-    }
-
-    pub fn spawn_decoration(&mut self, position: IVec2, decoration_name: &str) -> EntityId {
-        let mut controller = AnimationController::new();
-        let idle_clip = AnimationClip {
-            state: AnimationState::Idle,
-            atlas_name: "terrain".to_string(),
-            frame_tile_names: vec![
-                format!("{}_0", decoration_name),
-                format!("{}_1", decoration_name),
-                format!("{}_2", decoration_name),
-                format!("{}_3", decoration_name),
-            ],
-            frame_duration_ms: 150.0,
-            loop_mode: LoopMode::Loop,
-        };
-        controller.add_clip(idle_clip);
-        controller.play(AnimationState::Idle);
-        let attributes: EntityAttributes = EntityAttributes {
-            health: None,
-            solid: false, // Decorations don't block movement
-            can_move: false,
-            animation_controller: Some(controller),
-            render_layer: -1, // Decorations render behind other entities
-            ..Default::default()
-        };
-
-        self.spawn_entity(
-            EntityType::Decoration,
-            position,
-            UVec2::new(16, 16),
-            attributes,
-        )
-    }
 }
-
 impl Default for EntityManager {
     fn default() -> Self {
         Self::new()

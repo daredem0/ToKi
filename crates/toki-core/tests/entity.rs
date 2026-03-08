@@ -1,6 +1,152 @@
 use glam::{IVec2, UVec2};
 use toki_core::entity::*;
 
+fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
+    EntityDefinition {
+        name: name.to_string(),
+        display_name: format!("Display {name}"),
+        description: format!("Definition for {name}"),
+        entity_type: entity_type.to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+        },
+        attributes: AttributesDef {
+            health: Some(100),
+            speed: 2,
+            solid: true,
+            active: true,
+            can_move: true,
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 32.0,
+            movement_sound: "sfx_step".to_string(),
+        },
+        animations: AnimationsDef {
+            atlas_name: "creatures".to_string(),
+            clips: vec![AnimationClipDef {
+                state: "idle".to_string(),
+                frame_tiles: vec!["slime/idle_0".to_string()],
+                frame_duration_ms: 150.0,
+                loop_mode: "loop".to_string(),
+            }],
+            default_state: "idle".to_string(),
+        },
+        category: "test".to_string(),
+        tags: vec!["test".to_string()],
+    }
+}
+
+fn player_definition() -> EntityDefinition {
+    let mut def = test_definition("player", "player");
+    def.attributes.health = Some(100);
+    def.attributes.speed = 2;
+    def.attributes.solid = true;
+    def.attributes.can_move = true;
+    def
+}
+
+fn npc_definition(animation_name: &str) -> EntityDefinition {
+    let mut def = test_definition("npc", "npc");
+    def.attributes.health = Some(50);
+    def.attributes.speed = 1;
+    def.attributes.solid = true;
+    def.attributes.can_move = false;
+    def.animations.clips = vec![AnimationClipDef {
+        state: "walk".to_string(),
+        frame_tiles: vec![
+            format!("{animation_name}/walk_0"),
+            format!("{animation_name}/walk_1"),
+            format!("{animation_name}/walk_2"),
+            format!("{animation_name}/walk_3"),
+        ],
+        frame_duration_ms: 150.0,
+        loop_mode: "loop".to_string(),
+    }];
+    def.animations.default_state = "walk".to_string();
+    def
+}
+
+fn item_definition(item_name: &str) -> EntityDefinition {
+    let mut def = test_definition("item", "item");
+    def.attributes.health = None;
+    def.attributes.solid = false;
+    def.attributes.can_move = false;
+    def.animations.atlas_name = "objects".to_string();
+    def.animations.clips = vec![AnimationClipDef {
+        state: "idle".to_string(),
+        frame_tiles: vec![
+            format!("{item_name}_0"),
+            format!("{item_name}_1"),
+            format!("{item_name}_2"),
+            format!("{item_name}_3"),
+        ],
+        frame_duration_ms: 150.0,
+        loop_mode: "loop".to_string(),
+    }];
+    def.animations.default_state = "idle".to_string();
+    def
+}
+
+fn decoration_definition(decoration_name: &str) -> EntityDefinition {
+    let mut def = test_definition("decoration", "decoration");
+    def.attributes.health = None;
+    def.attributes.solid = false;
+    def.attributes.can_move = false;
+    def.rendering.render_layer = -1;
+    def.animations.atlas_name = "terrain".to_string();
+    def.animations.clips = vec![AnimationClipDef {
+        state: "idle".to_string(),
+        frame_tiles: vec![
+            format!("{decoration_name}_0"),
+            format!("{decoration_name}_1"),
+            format!("{decoration_name}_2"),
+            format!("{decoration_name}_3"),
+        ],
+        frame_duration_ms: 150.0,
+        loop_mode: "loop".to_string(),
+    }];
+    def.animations.default_state = "idle".to_string();
+    def
+}
+
+trait DefinitionSpawnExt {
+    fn spawn_player(&mut self, position: IVec2) -> EntityId;
+    fn spawn_npc(&mut self, position: IVec2, animation_name: &str) -> EntityId;
+    fn spawn_item(&mut self, position: IVec2, item_name: &str) -> EntityId;
+    fn spawn_decoration(&mut self, position: IVec2, decoration_name: &str) -> EntityId;
+}
+
+impl DefinitionSpawnExt for EntityManager {
+    fn spawn_player(&mut self, position: IVec2) -> EntityId {
+        self.spawn_from_definition(&player_definition(), position)
+            .expect("player definition spawn should succeed")
+    }
+
+    fn spawn_npc(&mut self, position: IVec2, animation_name: &str) -> EntityId {
+        self.spawn_from_definition(&npc_definition(animation_name), position)
+            .expect("npc definition spawn should succeed")
+    }
+
+    fn spawn_item(&mut self, position: IVec2, item_name: &str) -> EntityId {
+        self.spawn_from_definition(&item_definition(item_name), position)
+            .expect("item definition spawn should succeed")
+    }
+
+    fn spawn_decoration(&mut self, position: IVec2, decoration_name: &str) -> EntityId {
+        self.spawn_from_definition(&decoration_definition(decoration_name), position)
+            .expect("decoration definition spawn should succeed")
+    }
+}
+
 #[test]
 fn test_entity_manager_creation() {
     let manager = EntityManager::new();
@@ -248,4 +394,20 @@ fn test_entity_position_and_size() {
 
     let entity = manager.get_entity(entity_id).unwrap();
     assert_eq!(entity.position, IVec2::new(100, 200));
+}
+
+#[test]
+fn test_spawn_from_definition_sets_definition_name_and_player_tracking() {
+    let mut manager = EntityManager::new();
+    let definition = test_definition("player", "player");
+
+    let entity_id = manager
+        .spawn_from_definition(&definition, IVec2::new(12, 34))
+        .expect("definition spawn should succeed");
+
+    let entity = manager.get_entity(entity_id).expect("entity should exist");
+    assert_eq!(entity.definition_name.as_deref(), Some("player"));
+    assert_eq!(entity.entity_type, EntityType::Player);
+    assert_eq!(entity.position, IVec2::new(12, 34));
+    assert_eq!(manager.get_player_id(), Some(entity_id));
 }

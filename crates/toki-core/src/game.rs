@@ -73,7 +73,10 @@ impl GameState {
         let mut entity_manager = EntityManager::new();
 
         // Create player entity at the sprite's initial position
-        let player_id = entity_manager.spawn_player(player_sprite.position);
+        let player_def = Self::default_player_definition();
+        let player_id = entity_manager
+            .spawn_from_definition(&player_def, player_sprite.position)
+            .expect("default player definition should always be valid");
 
         Self {
             scene_manager: SceneManager::new(),
@@ -103,55 +106,135 @@ impl GameState {
 
     /// Initialize the game with a player at the specified position
     pub fn spawn_player_at(&mut self, position: glam::IVec2) -> EntityId {
-        let player_id = self.entity_manager.spawn_player(position);
+        let player_def = Self::default_player_definition();
+        let player_id = self
+            .entity_manager
+            .spawn_from_definition(&player_def, position)
+            .expect("default player definition should always be valid");
         self.player_id = Some(player_id);
         player_id
     }
 
     /// Spawn an NPC that looks identical to the player
     pub fn spawn_player_like_npc(&mut self, position: glam::IVec2) -> EntityId {
-        use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
-        use crate::entity::EntityAttributes;
+        let npc_def = Self::player_like_npc_definition();
+        self.entity_manager
+            .spawn_from_definition(&npc_def, position)
+            .expect("default player-like npc definition should always be valid")
+    }
 
-        // Create identical animation controller as player
-        let mut controller = AnimationController::new();
-        let idle_clip = AnimationClip {
-            state: AnimationState::Idle,
-            atlas_name: "creatures".to_string(),
-            frame_tile_names: vec!["slime/idle_0".to_string(), "slime/idle_1".to_string()],
-            frame_duration_ms: 300.0,
-            loop_mode: LoopMode::Loop,
-        };
-        controller.add_clip(idle_clip);
-        let walk_clip = AnimationClip {
-            state: AnimationState::Walk,
-            atlas_name: "creatures".to_string(),
-            frame_tile_names: vec![
-                "slime/walk_0".to_string(),
-                "slime/walk_1".to_string(),
-                "slime/walk_2".to_string(),
-                "slime/walk_3".to_string(),
-            ],
-            frame_duration_ms: 150.0,
-            loop_mode: LoopMode::Loop,
-        };
-        controller.add_clip(walk_clip);
-        controller.play(AnimationState::Idle);
+    fn default_player_definition() -> crate::entity::EntityDefinition {
+        crate::entity::EntityDefinition {
+            name: "player".to_string(),
+            display_name: "Player".to_string(),
+            description: "Default player entity".to_string(),
+            entity_type: "player".to_string(),
+            rendering: crate::entity::RenderingDef {
+                size: [16, 16],
+                render_layer: 0,
+                visible: true,
+            },
+            attributes: crate::entity::AttributesDef {
+                health: Some(100),
+                speed: 2,
+                solid: true,
+                active: true,
+                can_move: true,
+                has_inventory: false,
+            },
+            collision: crate::entity::CollisionDef {
+                enabled: true,
+                offset: [0, 0],
+                size: [16, 16],
+                trigger: false,
+            },
+            audio: crate::entity::AudioDef {
+                footstep_trigger_distance: 32.0,
+                movement_sound: "sfx_step".to_string(),
+            },
+            animations: crate::entity::AnimationsDef {
+                atlas_name: "creatures".to_string(),
+                clips: vec![
+                    crate::entity::AnimationClipDef {
+                        state: "idle".to_string(),
+                        frame_tiles: vec!["slime/idle_0".to_string(), "slime/idle_1".to_string()],
+                        frame_duration_ms: 300.0,
+                        loop_mode: "loop".to_string(),
+                    },
+                    crate::entity::AnimationClipDef {
+                        state: "walk".to_string(),
+                        frame_tiles: vec![
+                            "slime/walk_0".to_string(),
+                            "slime/walk_1".to_string(),
+                            "slime/walk_2".to_string(),
+                            "slime/walk_3".to_string(),
+                        ],
+                        frame_duration_ms: 150.0,
+                        loop_mode: "loop".to_string(),
+                    },
+                ],
+                default_state: "idle".to_string(),
+            },
+            category: "character".to_string(),
+            tags: vec!["player".to_string()],
+        }
+    }
 
-        let attributes = EntityAttributes {
-            health: Some(50), // NPCs have less health than player
-            speed: 1,         // NPCs move slower
-            can_move: false,  // NPCs don't move by themselves
-            animation_controller: Some(controller),
-            ..Default::default()
-        };
-
-        self.entity_manager.spawn_entity(
-            crate::entity::EntityType::Npc,
-            position,
-            glam::UVec2::new(16, 16),
-            attributes,
-        )
+    fn player_like_npc_definition() -> crate::entity::EntityDefinition {
+        crate::entity::EntityDefinition {
+            name: "player_like_npc".to_string(),
+            display_name: "Player-like NPC".to_string(),
+            description: "NPC using the player visual style".to_string(),
+            entity_type: "npc".to_string(),
+            rendering: crate::entity::RenderingDef {
+                size: [16, 16],
+                render_layer: 0,
+                visible: true,
+            },
+            attributes: crate::entity::AttributesDef {
+                health: Some(50),
+                speed: 1,
+                solid: true,
+                active: true,
+                can_move: false,
+                has_inventory: false,
+            },
+            collision: crate::entity::CollisionDef {
+                enabled: true,
+                offset: [0, 0],
+                size: [16, 16],
+                trigger: false,
+            },
+            audio: crate::entity::AudioDef {
+                footstep_trigger_distance: 32.0,
+                movement_sound: "sfx_step".to_string(),
+            },
+            animations: crate::entity::AnimationsDef {
+                atlas_name: "creatures".to_string(),
+                clips: vec![
+                    crate::entity::AnimationClipDef {
+                        state: "idle".to_string(),
+                        frame_tiles: vec!["slime/idle_0".to_string(), "slime/idle_1".to_string()],
+                        frame_duration_ms: 300.0,
+                        loop_mode: "loop".to_string(),
+                    },
+                    crate::entity::AnimationClipDef {
+                        state: "walk".to_string(),
+                        frame_tiles: vec![
+                            "slime/walk_0".to_string(),
+                            "slime/walk_1".to_string(),
+                            "slime/walk_2".to_string(),
+                            "slime/walk_3".to_string(),
+                        ],
+                        frame_duration_ms: 150.0,
+                        loop_mode: "loop".to_string(),
+                    },
+                ],
+                default_state: "idle".to_string(),
+            },
+            category: "npc".to_string(),
+            tags: vec!["npc".to_string()],
+        }
     }
 
     /// Update game state by one tick

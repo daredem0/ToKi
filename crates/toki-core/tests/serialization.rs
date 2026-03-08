@@ -6,6 +6,50 @@ use toki_core::entity::*;
 use toki_core::serialization::*;
 use toki_core::{GameState, InputKey};
 
+fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
+    EntityDefinition {
+        name: name.to_string(),
+        display_name: format!("Display {name}"),
+        description: format!("Definition for {name}"),
+        entity_type: entity_type.to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+        },
+        attributes: AttributesDef {
+            health: Some(100),
+            speed: 2,
+            solid: true,
+            active: true,
+            can_move: true,
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 32.0,
+            movement_sound: "sfx_step".to_string(),
+        },
+        animations: AnimationsDef {
+            atlas_name: "creatures".to_string(),
+            clips: vec![AnimationClipDef {
+                state: "idle".to_string(),
+                frame_tiles: vec!["slime/idle_0".to_string()],
+                frame_duration_ms: 150.0,
+                loop_mode: "loop".to_string(),
+            }],
+            default_state: "idle".to_string(),
+        },
+        category: "test".to_string(),
+        tags: vec!["test".to_string()],
+    }
+}
+
 fn create_test_entity() -> Entity {
     let mut controller = AnimationController::new();
     let clip = AnimationClip {
@@ -46,8 +90,14 @@ fn create_test_entity() -> Entity {
 
 fn create_test_entity_manager() -> EntityManager {
     let mut manager = EntityManager::new();
-    let _player_id = manager.spawn_player(IVec2::new(100, 200));
-    let npc_id = manager.spawn_npc(IVec2::new(50, 75), "slime");
+    let player_def = test_definition("player", "player");
+    let npc_def = test_definition("npc", "npc");
+    let _player_id = manager
+        .spawn_from_definition(&player_def, IVec2::new(100, 200))
+        .expect("player spawn from definition should succeed");
+    let npc_id = manager
+        .spawn_from_definition(&npc_def, IVec2::new(50, 75))
+        .expect("npc spawn from definition should succeed");
 
     // Modify some state to test preservation
     manager.set_entity_active(npc_id, false);
