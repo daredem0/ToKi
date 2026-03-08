@@ -1,5 +1,6 @@
 use anyhow::Result;
 use egui_winit::winit;
+use std::collections::HashMap;
 use std::sync::Arc;
 use toki_core::GameState;
 use winit::application::ApplicationHandler;
@@ -51,6 +52,9 @@ struct EditorApp {
 
     /// Track last loaded active scene to avoid unnecessary reloading
     last_loaded_active_scene: Option<String>,
+
+    /// Remembers the currently loaded map per scene for viewport reloads.
+    loaded_scene_maps: HashMap<String, String>,
 }
 
 impl EditorApp {
@@ -75,6 +79,7 @@ impl EditorApp {
             log_capture,
             modifiers: ModifiersState::default(),
             last_loaded_active_scene: None,
+            loaded_scene_maps: HashMap::new(),
         }
     }
 
@@ -97,6 +102,53 @@ impl EditorApp {
             tracing::error!("Cannot initialize scene viewport: renderer not available");
             None
         }
+    }
+
+    fn resolve_scene_map_to_load(
+        scene: &toki_core::Scene,
+        preferred_map: Option<&str>,
+    ) -> Option<String> {
+        if let Some(preferred_map) = preferred_map {
+            if scene.maps.iter().any(|map| map == preferred_map) {
+                return Some(preferred_map.to_string());
+            }
+        }
+
+        scene.maps.first().cloned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::EditorApp;
+
+    #[test]
+    fn resolve_scene_map_to_load_prefers_previously_loaded_map() {
+        let scene = toki_core::Scene::with_maps(
+            "Test Scene".to_string(),
+            vec!["map_a".to_string(), "map_b".to_string()],
+        );
+
+        let chosen = EditorApp::resolve_scene_map_to_load(&scene, Some("map_b"));
+        assert_eq!(chosen.as_deref(), Some("map_b"));
+    }
+
+    #[test]
+    fn resolve_scene_map_to_load_falls_back_to_first_map_when_preferred_missing() {
+        let scene = toki_core::Scene::with_maps(
+            "Test Scene".to_string(),
+            vec!["map_a".to_string(), "map_b".to_string()],
+        );
+
+        let chosen = EditorApp::resolve_scene_map_to_load(&scene, Some("map_missing"));
+        assert_eq!(chosen.as_deref(), Some("map_a"));
+    }
+
+    #[test]
+    fn resolve_scene_map_to_load_returns_none_when_scene_has_no_maps() {
+        let scene = toki_core::Scene::new("Empty Scene".to_string());
+        let chosen = EditorApp::resolve_scene_map_to_load(&scene, Some("any_map"));
+        assert_eq!(chosen, None);
     }
 }
 
@@ -456,6 +508,8 @@ impl EditorApp {
                     match SceneViewport::with_game_state(game_state) {
                         Ok(viewport) => {
                             self.scene_viewport = self.initialize_viewport(viewport);
+                            self.last_loaded_active_scene = None;
+                            self.loaded_scene_maps.clear();
 
                             // Update config with new project path
                             let project_path = parent_path.join(&project_name);
@@ -508,6 +562,7 @@ impl EditorApp {
                             self.scene_viewport = self.initialize_viewport(viewport);
                             // Reset last loaded scene to force map loading for active scene
                             self.last_loaded_active_scene = None;
+                            self.loaded_scene_maps.clear();
 
                             // Update config with opened project path
                             self.config.set_project_path(project_path);
@@ -571,6 +626,7 @@ impl EditorApp {
                             self.scene_viewport = self.initialize_viewport(viewport);
                             // Reset last loaded scene to force map loading for active scene
                             self.last_loaded_active_scene = None;
+                            self.loaded_scene_maps.clear();
 
                             // Update config with opened project path
                             self.config.set_project_path(project_path);
@@ -721,9 +777,20 @@ impl EditorApp {
         };
 
         let project_path = self.config.current_project_path().cloned();
+        let preferred_map = self.loaded_scene_maps.get(scene_name).map(String::as_str);
+        let map_to_load = Self::resolve_scene_map_to_load(&active_scene, preferred_map);
 
         Self::load_scene_into_gamestate(viewport, &active_scene, scene_name);
-        Self::load_scene_tilemap(viewport, &active_scene, scene_name, project_path.as_deref());
+        Self::load_scene_tilemap(
+            viewport,
+            scene_name,
+            map_to_load.as_deref(),
+            project_path.as_deref(),
+        );
+
+        if preferred_map.is_some() && map_to_load.as_deref() != preferred_map {
+            self.loaded_scene_maps.remove(scene_name);
+        }
     }
 
     fn find_scene_by_name(&self, scene_name: &str) -> Option<&toki_core::Scene> {
@@ -764,11 +831,11 @@ impl EditorApp {
 
     fn load_scene_tilemap(
         viewport: &mut crate::scene::SceneViewport,
-        scene: &toki_core::Scene,
         scene_name: &str,
+        map_name: Option<&str>,
         project_path: Option<&std::path::Path>,
     ) {
-        let Some(map_name) = scene.maps.first() else {
+        let Some(map_name) = map_name else {
             // Even if there's no map, mark dirty to show entities
             viewport.mark_dirty();
             return;
@@ -828,6 +895,8 @@ impl EditorApp {
                                 map_name,
                                 scene_name
                             );
+                            self.loaded_scene_maps
+                                .insert(scene_name.clone(), map_name.clone());
                             // Mark viewport as needing re-render
                             viewport.mark_dirty();
                         }
