@@ -1,65 +1,377 @@
-name: Rust
+name: CI
 
 on:
   push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
 
 permissions:
   contents: read
-  actions: read
-  checks: write
-  pull-requests: write
 
 jobs:
-  build:
+  build-debug:
+    name: Build (debug)
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-      with: 
-        lfs: true
-        
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libasound2-dev pkg-config
-        
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
-      
-    - name: Install cargo-nextest
-      uses: taiki-e/install-action@nextest
-      
-    - name: Cache dependencies
-      uses: Swatinem/rust-cache@v2
-      
-    - name: Build
-      run: cargo build --verbose
-      
-    - name: Run tests with nextest
-      run: cargo nextest run --profile ci --verbose
-      continue-on-error: true
-      
-    - name: Publish test results
-      uses: dorny/test-reporter@v1
-      if: always()
-      with:
-        name: Rust Test Results
-        path: target/nextest/ci/**/*.xml   # <- glob is safer here
-        reporter: java-junit
-        fail-on-error: true
-        
-    - name: Upload test artifacts
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results
-        path: |
-          target/nextest/ci/junit.xml
-          target/nextest/ci/
-        retention-days: 30
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify tag/version consistency
+        run: ./scripts/verify-tag-version.sh
+
+      - name: Build debug binaries
+        run: cargo build --locked -p toki-runtime -p toki-editor
+
+      - name: Upload debug binary artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-debug
+          path: |
+            target/debug/toki-runtime
+            target/debug/toki-editor
+          if-no-files-found: error
+
+  build-release:
+    name: Build (release, ubuntu-24.04)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify tag/version consistency
+        run: ./scripts/verify-tag-version.sh
+
+      - name: Build release binaries
+        run: |
+          if TAG="$(git describe --tags --exact-match HEAD 2>/dev/null)"; then
+            VERSION="${TAG#v}"
+            echo "Building tagged release with version override: ${VERSION}"
+            TOKI_VERSION_OVERRIDE="${VERSION}" cargo build --locked --release -p toki-runtime -p toki-editor
+          else
+            cargo build --locked --release -p toki-runtime -p toki-editor
+          fi
+
+      - name: Derive release variant metadata
+        id: variant
+        run: |
+          set -euo pipefail
+          LIBC_SUFFIX="$(./scripts/detect-libc-suffix.sh)"
+          echo "libc_suffix=${LIBC_SUFFIX}" >> "${GITHUB_OUTPUT}"
+          cp target/release/toki-runtime "target/release/toki-runtime-ubuntu-24.04-${LIBC_SUFFIX}"
+          cp target/release/toki-editor "target/release/toki-editor-ubuntu-24.04-${LIBC_SUFFIX}"
+
+      - name: Upload release binary artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-release-ubuntu-24.04
+          path: |
+            target/release/toki-runtime-ubuntu-24.04-${{ steps.variant.outputs.libc_suffix }}
+            target/release/toki-editor-ubuntu-24.04-${{ steps.variant.outputs.libc_suffix }}
+          if-no-files-found: error
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run tests
+        run: cargo test --locked --workspace --all-targets
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run clippy
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+
+  fmt:
+    name: Fmt
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
+
+      - name: Install Rust toolchain with llvm-tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run coverage
+        run: |
+          mkdir -p target/coverage
+          cargo llvm-cov --workspace --all-features --lcov --output-path target/coverage/lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          slug: daredem0/ToKi
+          files: target/coverage/lcov.info
+          use_oidc: true
+          fail_ci_if_error: false
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: target/coverage/lcov.info
+          if-no-files-found: error
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Generate docs
+        run: cargo doc --locked --workspace --no-deps --document-private-items
+
+      - name: Create root docs index for GitHub Pages
+        run: |
+          set -euo pipefail
+          cat > target/doc/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8" />
+            <title>ToKi Rust Docs</title>
+          </head>
+          <body>
+            <h1>ToKi Rust Documentation</h1>
+            <ul>
+              <li><a href="./toki_core/index.html">toki_core</a></li>
+              <li><a href="./toki_render/index.html">toki_render</a></li>
+              <li><a href="./toki_runtime/index.html">toki_runtime</a></li>
+              <li><a href="./toki_editor/index.html">toki_editor</a></li>
+            </ul>
+          </body>
+          </html>
+          EOF
+
+          touch target/doc/.nojekyll
+
+      - name: Upload docs artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: target/doc
+
+      - name: Archive docs for release assets
+        run: tar -C target/doc -czf target/docs-html.tar.gz .
+
+      - name: Upload docs release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-html
+          path: target/docs-html.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-debug, build-release, test, clippy, fmt, coverage, docs]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download debug binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-debug
+          path: dist/binary-debug
+
+      - name: Download release binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binary-release-*
+          path: dist/binary-release
+          merge-multiple: true
+
+      - name: Download docs artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docs-html
+          path: dist/docs-html
+
+      - name: Download coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-lcov
+          path: dist/coverage-lcov
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p dist/release-assets
+          cp dist/binary-debug/* dist/release-assets/
+          cp dist/binary-release/* dist/release-assets/
+          cp dist/docs-html/*.tar.gz dist/release-assets/
+          cp dist/coverage-lcov/* dist/release-assets/
+
+      - name: Extract release notes from CHANGELOG
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          TAG_RE="$(printf '%s' "${TAG}" | sed -E 's/[][(){}.^$*+?|\\/]/\\&/g')"
+          VERSION_RE="$(printf '%s' "${VERSION}" | sed -E 's/[][(){}.^$*+?|\\/]/\\&/g')"
+          awk -v tag_re="${TAG_RE}" -v version_re="${VERSION_RE}" '
+            BEGIN {
+              capture = 0;
+              match_header = "^## \\[(" tag_re "|" version_re ")\\]";
+            }
+            $0 ~ "^## \\[" && capture && $0 !~ match_header { exit }
+            $0 ~ match_header { capture = 1 }
+            capture { print }
+          ' CHANGELOG.md > dist/release-notes.md
+
+          if ! grep -q '[^[:space:]]' dist/release-notes.md; then
+            echo "No CHANGELOG section found for tag ${TAG} (or ${VERSION})." >&2
+            exit 1
+          fi
+
+      - name: Publish GitHub release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          body_path: dist/release-notes.md
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/release-assets/*
+
+  deploy-pages:
+    name: Deploy Docs to GitHub Pages
+    needs: [build-debug, build-release, test, clippy, fmt, coverage, docs]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
