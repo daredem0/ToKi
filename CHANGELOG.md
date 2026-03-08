@@ -7,6 +7,22 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+## [0.0.12] - 2026-03-08
+
+### Added
+- Added workspace release flow targets for `cargo-release` (`release-dry-run`, `release-execute`) and related installer targets in `Justfile`.
+- Added dependency-license hygiene tooling with `cargo-deny`/`cargo-about` configs (`deny.toml`, `about.toml`, `about.hbs`) and helper scripts.
+- Added generated third-party license inventory output (`THIRD_PARTY_LICENSES.md`).
+
+### Changed
+- Added shared workspace package metadata for versioning and repository fields to better support multi-crate releases.
+- Updated crate package metadata and SPDX identifiers for release/tooling compatibility.
+- Updated README workflow docs for release and dependency-license checks.
+
+### Fixed
+- Fixed `cargo release` workspace packaging by moving build scripts into package-local `build.rs` files.
+- Fixed release configuration mismatches for branch policy, changelog replacement paths, and `0.0.x` version/tag flow.
+
 ## [0.0.11] - 2026-03-08
 
 ### Added
@@ -164,7 +180,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Fixed camera/map-bound movement and projection distortion on resize.
 - Improved tilemap upload strategy and window/surface resize handling.
 
-[Unreleased]: https://github.com/daredem0/ToKi/compare/0.0.11...HEAD
+[Unreleased]: https://github.com/daredem0/ToKi/compare/0.0.12...HEAD
+[0.0.12]: https://github.com/daredem0/ToKi/compare/0.0.11...0.0.12
 [0.0.11]: https://github.com/daredem0/ToKi/compare/0.0.10...0.0.11
 [0.0.10]: https://github.com/daredem0/ToKi/compare/0.0.9...0.0.10
 [0.0.9]: https://github.com/daredem0/ToKi/compare/0.0.8...0.0.9
