@@ -73,6 +73,10 @@
           "type": "string",
           "description": "Type of entity (Player, NPC, Item, etc.)"
         },
+        "definition_name": {
+          "type": ["string", "null"],
+          "description": "Source entity definition name used to instantiate this runtime entity"
+        },
         "attributes": {
           "$ref": "#/definitions/entityAttributes"
         },

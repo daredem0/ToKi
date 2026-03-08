@@ -504,6 +504,7 @@ mod tests {
         assert_eq!(scene.entities.len(), 1);
         assert_eq!(scene.entities[0].position, IVec2::new(32, 48));
         assert_eq!(scene.entities[0].entity_type, EntityType::Npc);
+        assert_eq!(scene.entities[0].definition_name.as_deref(), Some("sample"));
         assert!(ui_state.scene_content_changed);
         // Placement mode exits at a higher level after successful click.
         assert!(ui_state.is_in_placement_mode());

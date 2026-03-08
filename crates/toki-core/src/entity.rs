@@ -12,6 +12,10 @@ pub struct Entity {
     pub position: glam::IVec2,
     pub size: glam::UVec2,
     pub entity_type: EntityType,
+    /// Source entity definition name used to instantiate this entity.
+    /// This lets editor workflows (e.g. drag-to-move) re-enter placement mode without guessing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub definition_name: Option<String>,
     pub attributes: EntityAttributes,
     pub collision_box: Option<CollisionBox>,
 
@@ -125,6 +129,7 @@ impl EntityManager {
             position,
             size,
             entity_type: entity_type.clone(),
+            definition_name: None,
             attributes,
             collision_box,
             footstep_distance_accumulator: 0.0,
@@ -542,6 +547,7 @@ impl EntityDefinition {
             position,
             size: UVec2::new(self.rendering.size[0], self.rendering.size[1]),
             entity_type,
+            definition_name: Some(self.name.clone()),
             attributes,
             collision_box,
             footstep_distance_accumulator: 0.0,

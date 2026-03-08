@@ -34,6 +34,7 @@ fn create_test_entity() -> Entity {
         position: IVec2::new(10, 20),
         size: UVec2::new(16, 16),
         entity_type: EntityType::Player,
+        definition_name: Some("player".to_string()),
         attributes,
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
         footstep_distance_accumulator: 15.5,
@@ -67,6 +68,7 @@ fn test_entity_roundtrip_serialization() {
     assert_eq!(entity.position, deserialized.position);
     assert_eq!(entity.size, deserialized.size);
     assert_eq!(entity.entity_type, deserialized.entity_type);
+    assert_eq!(entity.definition_name, deserialized.definition_name);
 
     // Verify audio state
     assert_eq!(
@@ -97,6 +99,7 @@ fn test_entity_minimal_fields() {
         position: IVec2::ZERO,
         size: UVec2::new(1, 1),
         entity_type: EntityType::Item,
+        definition_name: None,
         attributes: EntityAttributes::default(),
         collision_box: None,
         footstep_distance_accumulator: 0.0,
@@ -111,6 +114,7 @@ fn test_entity_minimal_fields() {
     assert_eq!(entity.id, deserialized.id);
     assert_eq!(entity.position, deserialized.position);
     assert_eq!(entity.entity_type, deserialized.entity_type);
+    assert_eq!(deserialized.definition_name, None);
     assert!(deserialized.collision_box.is_none());
     assert!(deserialized.attributes.animation_controller.is_none());
     assert_eq!(deserialized.attributes.health, None);

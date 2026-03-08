@@ -20,6 +20,7 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
         position,
         size: UVec2::new(16, 16),
         entity_type: EntityType::Player,
+        definition_name: None,
         attributes: EntityAttributes {
             health: Some(100),
             speed: 2,

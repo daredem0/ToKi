@@ -8,6 +8,7 @@ fn create_test_entity(id: EntityId, position: IVec2) -> Entity {
         position,
         size: UVec2::new(16, 16), // Standard sprite size
         entity_type: EntityType::Player,
+        definition_name: None,
         attributes: EntityAttributes::default(),
         collision_box: None,
         footstep_distance_accumulator: 0.0,

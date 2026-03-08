@@ -62,7 +62,9 @@ impl PanelSystem {
                             );
                         } else {
                             // Normal entity selection - use new hit detection
-                            SelectionInteraction::handle_click(ui_state, viewport, click_pos, rect);
+                            SelectionInteraction::handle_click(
+                                ui_state, viewport, click_pos, rect, config,
+                            );
                         }
                     }
                 }

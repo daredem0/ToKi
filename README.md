@@ -79,6 +79,17 @@ cargo llvm-cov -p toki-core --open
 - **Scene Hierarchy**: Visual scene management with entity organization
 - **Asset Validation**: Edit → "Validate Project Assets" for schema compliance checking
 
+## Committing
+Commit Message Shape Rules
+
+1. First line format: "<Prefix>: Brief summary" (no trailing period).
+2. Allowed prefixes: Add:, Change:, Fix:, Refactor:, Doc:, chore.
+3. Leave exactly one blank line after the first line.
+4. Body uses dash bullets ("- "), one change per line, no extra blank lines between bullets.
+5. Keep bullets short and parallel in structure; wrap only if needed and indent continuation lines.
+6. Use bullets to state what changed and why; avoid long prose paragraphs.
+7. Only use more than 3 bullets for very large commits
+
 ## License
 
 This project is dual‑licensed under either:
