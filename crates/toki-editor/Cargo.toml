@@ -15,10 +15,10 @@ editor = []
 
 [dependencies]
 anyhow = "1.0.99"
-toki-runtime = { path = "../toki-runtime", version = "0.0.11" }
-toki-core = { path = "../toki-core", version = "0.0.11" }
-toki-render = { path = "../toki-render", version = "0.0.11", features = ["editor"] }
-toki-schemas = { path = "../toki-schemas", version = "0.0.11" }
+toki-runtime = { path = "../toki-runtime", version = "0.0.12" }
+toki-core = { path = "../toki-core", version = "0.0.12" }
+toki-render = { path = "../toki-render", version = "0.0.12", features = ["editor"] }
+toki-schemas = { path = "../toki-schemas", version = "0.0.12" }
 glam = "0.30.5"
 pollster = "0.4.0"
 wgpu = "25.0.2"

@@ -24,7 +24,7 @@ glam = "0.30.5"
 egui = { version = "0.32", optional = true }
 egui-wgpu = { version = "0.32", optional = true }
 
-toki-core = { path = "../toki-core", version = "0.0.11" }
+toki-core = { path = "../toki-core", version = "0.0.12" }
 
 tracing.workspace = true
 
