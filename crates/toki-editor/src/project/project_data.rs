@@ -59,7 +59,7 @@ pub struct AssetConfig {
     pub sprites: String,
     /// Tilemaps directory relative to project root
     pub tilemaps: String,
-    /// Audio directory relative to project root  
+    /// Audio directory relative to project root
     pub audio: String,
 }
 

@@ -53,7 +53,7 @@ pub enum CoreError {
     AnimationClipNotFound { clip_name: String },
 
     #[error(
-        "Animation frame index {frame_index} out of bounds for clip '{clip_name}' (max: 
+        "Animation frame index {frame_index} out of bounds for clip '{clip_name}' (max:
   {max_frames})"
     )]
     AnimationFrameOutOfBounds {

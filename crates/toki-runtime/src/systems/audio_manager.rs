@@ -79,7 +79,7 @@ impl AudioManager {
                             let path_str = path.to_string_lossy();
                             if let Err(e) = self.preload_sound(name, &path_str) {
                                 tracing::warn!(
-                                    "Failed to preload SFX '{}': 
+                                    "Failed to preload SFX '{}':
   {}",
                                     name,
                                     e
@@ -384,7 +384,7 @@ impl AudioManager {
         // Apply channel policy
         match channel_data.policy {
             PlaybackPolicy::Exclusive => {
-                tracing::debug!("Music channel '{}' policy=Exclusive: stopping {} active sounds before playing '{}'", 
+                tracing::debug!("Music channel '{}' policy=Exclusive: stopping {} active sounds before playing '{}'",
                     channel, active_count, name);
                 // Stop all existing sounds in this channel
                 for handle in &mut channel_data.active_handles {
@@ -400,7 +400,7 @@ impl AudioManager {
                 if !channel_data.active_handles.is_empty()
                     || !channel_data.active_streaming_handles.is_empty()
                 {
-                    tracing::trace!("Music channel '{}' policy=IgnoreIfPlaying: ignoring '{}' (has {} active sounds)", 
+                    tracing::trace!("Music channel '{}' policy=IgnoreIfPlaying: ignoring '{}' (has {} active sounds)",
                         channel, name, active_count);
                     return Ok(());
                 }
@@ -457,7 +457,7 @@ impl AudioManager {
         self.play_sound_in_channel("default", name)
     }
 
-    /// Legacy method - plays background music with exclusive behavior  
+    /// Legacy method - plays background music with exclusive behavior
     pub fn play_background_music(
         &mut self,
         name: &str,

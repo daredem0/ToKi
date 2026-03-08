@@ -120,9 +120,9 @@ impl SceneViewport {
         if let (Some(scene_renderer), Some(target)) =
             (&mut self.scene_renderer, &mut self.offscreen_target)
         {
-            tracing::trace!("About to render scene with data: tilemap={}, atlas={}, sprites={}, debug_shapes={}", 
+            tracing::trace!("About to render scene with data: tilemap={}, atlas={}, sprites={}, debug_shapes={}",
                            scene_data.tilemap.is_some(),
-                           scene_data.atlas.is_some(), 
+                           scene_data.atlas.is_some(),
                            scene_data.sprites.len(),
                            scene_data.debug_shapes.len());
 
@@ -1012,7 +1012,7 @@ impl SceneViewport {
         }
     }
 
-    /// Zoom out (decrease scale)  
+    /// Zoom out (decrease scale)
     pub fn zoom_out(&mut self) {
         if self.camera.scale < 8 {
             // Max zoom level

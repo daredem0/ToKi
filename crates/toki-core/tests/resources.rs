@@ -30,7 +30,7 @@ fn create_test_tilemap(dir: &Path, name: &str) -> std::io::Result<()> {
   "atlas": "terrain.json",
   "tiles": [
     "grass", "grass", "stone", "grass",
-    "grass", "stone", "stone", "grass", 
+    "grass", "stone", "stone", "grass",
     "stone", "grass", "grass", "stone",
     "grass", "grass", "grass", "grass"
   ]

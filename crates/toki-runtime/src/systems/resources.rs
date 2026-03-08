@@ -36,7 +36,7 @@ impl ResourceManager {
         &self.terrain_atlas
     }
 
-    /// Get reference to the creature atlas  
+    /// Get reference to the creature atlas
     pub fn get_creature_atlas(&self) -> &AtlasMeta {
         &self.creature_atlas
     }
@@ -51,7 +51,7 @@ impl ResourceManager {
         self.terrain_atlas.tile_size
     }
 
-    /// Get creature atlas tile size for convenience  
+    /// Get creature atlas tile size for convenience
     pub fn creature_tile_size(&self) -> glam::UVec2 {
         self.creature_atlas.tile_size
     }

@@ -13,7 +13,7 @@ use toki_core::{GameState, InputKey};
 /// Layout:
 /// ```
 /// F S F F
-/// F S S F  
+/// F S S F
 /// F F F F
 /// F F F F
 /// ```

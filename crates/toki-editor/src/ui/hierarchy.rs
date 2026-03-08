@@ -71,43 +71,43 @@ impl HierarchySystem {
                             // Sort categories for consistent display
                             let mut sorted_categories: Vec<_> = categories.into_iter().collect();
                             sorted_categories.sort_by(|a, b| a.0.cmp(&b.0));
-                            
+
                             for (category, mut entity_names) in sorted_categories {
                                 // Show category header
                                 ui.label(format!("📂 {}", category));
                                 ui.indent(format!("category_{}", category), |ui| {
                                     // Sort entity names
                                     entity_names.sort();
-                                    
+
                                     for entity_name in entity_names {
                                         // Show entity button with selection capability
                                         let is_selected = matches!(
                                             selection,
                                             Some(Selection::EntityDefinition(name)) if name == &entity_name
                                         );
-                                        
+
                                         let button = ui.selectable_label(is_selected, format!("🧙 {}", entity_name));
-                                        
+
                                         if button.clicked() {
                                             tracing::info!("Entity '{}' clicked - entering placement mode", entity_name);
                                             placement_mode_request = Some(entity_name.clone());
                                             selected_entity = Some(entity_name.clone());
                                         }
-                                        
+
                                         // Right-click context menu for entity actions
                                         button.context_menu(|ui| {
                                             ui.label(format!("Entity: {}", entity_name));
                                             ui.separator();
-                                            
+
                                             // Add to Scene section
                                             ui.label("Add to Scene:");
                                             ui.separator();
-                                            
+
                                             // Show available scenes
                                             let scene_names: Vec<String> = scenes.iter()
                                                 .map(|s| s.name.clone())
                                                 .collect();
-                                            
+
                                             for scene_name in scene_names {
                                                 if ui.button(&scene_name).clicked() {
                                                     tracing::info!("Adding entity '{}' to scene '{}'", entity_name, scene_name);
@@ -115,7 +115,7 @@ impl HierarchySystem {
                                                     ui.close();
                                                 }
                                             }
-                                            
+
                                             ui.separator();
                                             ui.label("Actions:");
                                             if ui.button("📖 View Definition").clicked() {

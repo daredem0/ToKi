@@ -218,7 +218,7 @@ impl EditorUI {
                     let mut entity_removals: Vec<(String, u32)> = Vec::new(); // (scene_name, entity_id)
                     let mut selection_changes: Vec<Selection> = Vec::new();
                     let mut active_scene_change: Option<String> = None;
-                    
+
                     for (scene_index, scene) in self.scenes.iter().enumerate() {
                         let is_active_scene = self.active_scene.as_ref() == Some(&scene.name);
                         let scene_header_text = if is_active_scene {
@@ -226,9 +226,9 @@ impl EditorUI {
                         } else {
                             format!("🎬 {}", scene.name)
                         };
-                        
+
                         let scene_header_response = ui.collapsing(&scene_header_text, |ui| {
-                            
+
                             // Maps section within the scene - only show configured maps
                             if !scene.maps.is_empty() {
                                 ui.label("Maps:");
@@ -238,14 +238,14 @@ impl EditorUI {
                                             &self.selection,
                                             Some(Selection::Map(s, m)) if s == &scene.name && m == map_name
                                         );
-                                        
+
                                         ui.horizontal(|ui| {
                                             let response = ui.selectable_label(is_selected, format!("🗺️ {}", map_name));
                                             if response.clicked() {
                                                 selection_changes.push(Selection::Map(scene.name.clone(), map_name.clone()));
                                                 tracing::info!("Selected map {} in scene {}", map_name, scene.name);
                                             }
-                                            
+
                                             // Remove map button
                                             if ui.small_button("✕").clicked() {
                                                 map_removals.push((scene_index, map_index));
@@ -256,7 +256,7 @@ impl EditorUI {
                                 });
                                 ui.add_space(5.0);
                             }
-                            
+
                             // Scene entities section (design-time entities in scene definition)
                             if !scene.entities.is_empty() {
                                 ui.label("Scene Entities:");
@@ -266,7 +266,7 @@ impl EditorUI {
                                             &self.selection,
                                             Some(Selection::Entity(id)) if id == &entity.id
                                         );
-                                        
+
                                         ui.horizontal(|ui| {
                                             let entity_display = match entity.entity_type {
                                                 toki_core::entity::EntityType::Player => format!("👤 Player (ID: {})", entity.id),
@@ -275,20 +275,20 @@ impl EditorUI {
                                                 toki_core::entity::EntityType::Decoration => format!("🎨 Decoration (ID: {})", entity.id),
                                                 toki_core::entity::EntityType::Trigger => format!("⚡ Trigger (ID: {})", entity.id),
                                             };
-                                            
+
                                             let response = ui.selectable_label(is_selected, entity_display);
-                                            
+
                                             if response.clicked() {
                                                 selection_changes.push(Selection::Entity(entity.id));
                                                 tracing::info!("Selected scene entity ID: {}", entity.id);
                                             }
-                                            
+
                                             // Show entity position
                                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                                 ui.label(format!("({}, {})", entity.position.x, entity.position.y));
                                             });
                                         });
-                                        
+
                                         // Right-click context menu for entity actions
                                         ui.horizontal(|ui| {
                                             ui.add_space(20.0); // Indent for context options
@@ -300,13 +300,13 @@ impl EditorUI {
                                     }
                                 });
                             }
-                            
+
                             // Runtime entities section (entities from game state)
                             ui.label("Runtime Entities:");
                             ui.indent("scene_runtime_entities", |ui| {
                                 if let Some(game_state) = game_state {
                                     let entity_ids = game_state.entity_manager().active_entities();
-                                    
+
                                     if entity_ids.is_empty() {
                                         ui.label("No runtime entities");
                                     } else {
@@ -316,18 +316,18 @@ impl EditorUI {
                                                     &self.selection,
                                                     Some(Selection::Entity(id)) if id == entity_id
                                                 );
-                                                
+
                                                 ui.horizontal(|ui| {
                                                     let response = ui.selectable_label(
                                                         is_selected,
                                                         format!("⚙️ Runtime Entity {}", entity_id)
                                                     );
-                                                    
+
                                                     if response.clicked() {
                                                         selection_changes.push(Selection::Entity(*entity_id));
                                                         self.selected_entity_id = Some(*entity_id);
                                                     }
-                                                    
+
                                                     // Show entity position
                                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                                         ui.label(format!("({}, {})", entity.position.x, entity.position.y));
@@ -341,7 +341,7 @@ impl EditorUI {
                                 }
                             });
                         });
-                        
+
                         // Scene selection (clicking on header)
                         if scene_header_response.header_response.clicked() {
                             selection_changes.push(Selection::Scene(scene.name.clone()));
@@ -351,7 +351,7 @@ impl EditorUI {
                         // Right-click context menu for scene
                         scene_header_response.header_response.context_menu(|ui| {
                             let is_active = self.active_scene.as_ref() == Some(&scene.name);
-                            
+
                             ui.horizontal(|ui| {
                                 if is_active {
                                     ui.label("✅ Active Scene");
@@ -359,12 +359,12 @@ impl EditorUI {
                                         active_scene_change = Some(scene.name.clone());
                                         tracing::info!("Setting {} as active scene", scene.name);
                                         ui.close();
-                                    
+
                                 }
                             });
                         });
                     }
-                    
+
                     // Process removals in reverse order to maintain correct indices
                     map_removals.sort_by(|a, b| b.1.cmp(&a.1));
                     for (scene_index, map_index) in map_removals {
@@ -378,29 +378,29 @@ impl EditorUI {
                             }
                         }
                     }
-                    
+
                     // Process entity removals
                     for (scene_name, entity_id) in entity_removals {
                         if let Some(scene) = self.scenes.iter_mut().find(|s| s.name == scene_name) {
                             if let Some(index) = scene.entities.iter().position(|e| e.id == entity_id) {
                                 scene.entities.remove(index);
                                 tracing::info!("Removed entity {} from scene {}", entity_id, scene_name);
-                                
+
                                 // Clear selection if it was the removed entity
                                 if matches!(&self.selection, Some(Selection::Entity(id)) if id == &entity_id) {
                                     self.clear_selection();
                                 }
-                                
+
                                 self.scene_content_changed = true;
                             }
                         }
                     }
-                    
+
                     // Apply selection changes (only apply the last one)
                     if let Some(selection) = selection_changes.last() {
                         self.set_selection(selection.clone());
                     }
-                    
+
                     // Apply active scene change
                     if let Some(new_active_scene) = active_scene_change {
                         self.active_scene = Some(new_active_scene);
@@ -408,14 +408,14 @@ impl EditorUI {
                 });
 
                 ui.separator();
-                
+
                 // Add new scene button
                 if ui.button("+ Add Scene").clicked() {
                     let new_scene_name = format!("Scene {}", self.scenes.len() + 1);
                     self.add_scene(new_scene_name.clone());
                     tracing::info!("Created new scene: {}", new_scene_name);
                 }
-                
+
                 // Add Maps section if enabled
                 if self.show_maps {
                     ui.add_space(10.0);
@@ -425,16 +425,16 @@ impl EditorUI {
                     if let Some(config) = config {
                         if let Some(project_path) = config.current_project_path() {
                             let tilemaps_path = project_path.join("assets").join("tilemaps");
-                            
+
                             if tilemaps_path.exists() {
                                 // Discover tilemap files
                                 if let Ok(entries) = std::fs::read_dir(&tilemaps_path) {
                                     let mut found_maps = false;
-                                    
+
                                     // Collect actions to perform after UI iteration
                                     let mut map_selections: Vec<String> = Vec::new();
                                     let mut scene_map_additions: Vec<(String, String)> = Vec::new(); // (scene_name, map_name)
-                                    
+
                                     egui::ScrollArea::vertical()
                                         .id_salt("maps_scroll")
                                         .max_height(150.0) // Limit height so hierarchy doesn't get too tall
@@ -444,29 +444,29 @@ impl EditorUI {
                                                     if name.ends_with(".json") {
                                                         let map_name = name.trim_end_matches(".json").to_string();
                                                         found_maps = true;
-                                                        
+
                                                         let is_selected = matches!(
                                                             &self.selection,
                                                             Some(Selection::StandaloneMap(name)) if name == &map_name
                                                         );
-                                                        
+
                                                         let response = ui.selectable_label(is_selected, &map_name);
-                                                        
+
                                                         if response.clicked() {
                                                             tracing::info!("Map selected: {}", map_name);
                                                             map_selections.push(map_name.clone());
                                                         }
-                                                        
+
                                                         // Right-click context menu for "Add to Scene"
                                                         response.context_menu(|ui| {
                                                             ui.label("Add to Scene:");
                                                             ui.separator();
-                                                            
+
                                                             // Show available scenes - create a copy to avoid borrowing issues
                                                             let scene_names: Vec<(String, bool)> = self.scenes.iter()
                                                                 .map(|s| (s.name.clone(), s.maps.contains(&map_name)))
                                                                 .collect();
-                                                            
+
                                                             for (scene_name, already_added) in scene_names {
                                                                 if !already_added {
                                                                     if ui.button(&scene_name).clicked() {
@@ -477,7 +477,7 @@ impl EditorUI {
                                                                     ui.add_enabled(false, egui::Button::new(format!("{} (already added)", scene_name)));
                                                                 }
                                                             }
-                                                            
+
                                                             if self.scenes.is_empty() {
                                                                 ui.label("No scenes available");
                                                             }
@@ -486,12 +486,12 @@ impl EditorUI {
                                                 }
                                             }
                                         });
-                                    
+
                                     // Apply collected actions
                                     for map_name in map_selections {
                                         self.set_selection(Selection::StandaloneMap(map_name));
                                     }
-                                    
+
                                     for (scene_name, map_name) in scene_map_additions {
                                         if let Some(target_scene) = self.scenes.iter_mut().find(|s| s.name == scene_name) {
                                             target_scene.maps.push(map_name.clone());
@@ -500,7 +500,7 @@ impl EditorUI {
                                             self.scene_content_changed = true;
                                         }
                                     }
-                                    
+
                                     if !found_maps {
                                         tracing::info!("No tilemap (.json) files found in assets/tilemaps/");
                                     }
@@ -517,26 +517,26 @@ impl EditorUI {
                         tracing::warn!("No project configuration available for Maps panel");
                     }
                 }
-                
+
                 // Add Entity Palette section
                 ui.add_space(10.0);
                 ui.heading("🧙 Entities");
                 ui.separator();
-                
+
                 if let Some(config) = config {
                     if let Some(project_path) = config.current_project_path() {
                         let (selected_entity, entity_additions, placement_request) = super::hierarchy::HierarchySystem::render_entity_palette(ui, project_path, &self.selection, &self.scenes);
-                        
+
                         // Handle entity selection
                         if let Some(selected_entity) = selected_entity {
                             self.set_selection(Selection::EntityDefinition(selected_entity));
                         }
-                        
+
                         // Handle placement mode request
                         if let Some(entity_definition) = placement_request {
                             self.enter_placement_mode(entity_definition);
                         }
-                        
+
                         // Process entity additions to scenes
                         for (scene_name, entity_name) in entity_additions {
                             if let Some(target_scene) = self.scenes.iter_mut().find(|s| s.name == scene_name) {
@@ -545,7 +545,7 @@ impl EditorUI {
                                     let entity_file = project_path
                                         .join("entities")
                                         .join(format!("{}.json", entity_name));
-                                    
+
                                     if entity_file.exists() {
                                         match std::fs::read_to_string(&entity_file) {
                                             Ok(content) => {
@@ -556,14 +556,14 @@ impl EditorUI {
                                                             .map(|e| e.id)
                                                             .max()
                                                             .unwrap_or(0) + 1;
-                                                        
+
                                                         // Default position at (100, 100) - user can move it later
                                                         let default_position = glam::IVec2::new(100, 100);
-                                                        
+
                                                         match entity_def.create_entity(default_position, new_id) {
                                                             Ok(entity) => {
                                                                 target_scene.entities.push(entity);
-                                                                tracing::info!("Successfully added entity '{}' (ID: {}) to scene '{}' at position ({}, {})", 
+                                                                tracing::info!("Successfully added entity '{}' (ID: {}) to scene '{}' at position ({}, {})",
                                                                     entity_name, new_id, scene_name, default_position.x, default_position.y);
                                                                 self.scene_content_changed = true;
                                                             }

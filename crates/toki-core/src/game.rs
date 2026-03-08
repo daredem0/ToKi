@@ -749,7 +749,7 @@ impl GameState {
         solid_tiles
     }
 
-    /// Get trigger tile positions for debug rendering  
+    /// Get trigger tile positions for debug rendering
     /// Returns Vec of (tile_x, tile_y) coordinates of trigger tiles
     pub fn get_trigger_tile_positions(
         &self,
