@@ -228,9 +228,7 @@ impl EntityManager {
             .insert(id);
 
         self.active_entities.insert(id);
-        self.audio_components
-            .entry(id)
-            .or_default();
+        self.audio_components.entry(id).or_default();
 
         // Store the entity
         self.entities.insert(id, entity);

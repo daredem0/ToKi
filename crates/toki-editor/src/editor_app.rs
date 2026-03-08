@@ -353,12 +353,7 @@ impl EditorApp {
                             &self.ui.placement_preview_cached_frame,
                         ) {
                             let is_valid = self.ui.placement_preview_valid.unwrap_or(true);
-                            Some((
-                                entity_def.as_str(),
-                                *position,
-                                *cached_frame,
-                                is_valid,
-                            ))
+                            Some((entity_def.as_str(), *position, *cached_frame, is_valid))
                         } else {
                             None
                         }
@@ -914,7 +909,7 @@ impl EditorApp {
     }
 
     /// Load sprite frame for preview (cached) - static version
-fn load_preview_sprite_frame_static(
+    fn load_preview_sprite_frame_static(
         entity_def_name: &str,
         project_path: &std::path::Path,
         project_assets: &crate::project::ProjectAssets,
