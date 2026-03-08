@@ -46,6 +46,11 @@ impl PanelSystem {
                     egui::Sense::click_and_drag().union(egui::Sense::hover()),
                 );
 
+                // Safety reset: don't keep entities hidden when no move drag is active.
+                if !ui_state.is_entity_move_drag_active() {
+                    viewport.clear_suppressed_entity_rendering();
+                }
+
                 // Start entity move drag if dragging began over an entity.
                 if response.drag_started() {
                     if let Some(drag_start_pos) = response.interact_pointer_pos() {

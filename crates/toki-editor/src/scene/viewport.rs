@@ -21,6 +21,8 @@ pub struct SceneViewport {
     // Mouse interaction state
     last_mouse_pos: Option<glam::Vec2>, // For camera panning
     is_dragging_camera: bool,
+    // Hide one entity while it is being interactively dragged in editor UI.
+    suppressed_entity_id: Option<toki_core::entity::EntityId>,
     // Sprite atlas caching to prevent redundant loads
     loaded_sprite_atlases: std::collections::HashMap<String, toki_core::assets::atlas::AtlasMeta>,
 }
@@ -49,6 +51,7 @@ impl SceneViewport {
             camera,
             last_mouse_pos: None,
             is_dragging_camera: false,
+            suppressed_entity_id: None,
             loaded_sprite_atlases: std::collections::HashMap::new(),
         })
     }
@@ -425,6 +428,9 @@ impl SceneViewport {
         }
 
         for (entity_id, position, size) in renderable_entities {
+            if self.suppressed_entity_id == Some(entity_id) {
+                continue;
+            }
             self.process_entity_sprite(
                 scene_data,
                 entity_id,
@@ -998,6 +1004,21 @@ impl SceneViewport {
     pub fn mark_dirty(&mut self) {
         tracing::trace!("Scene viewport marked dirty - will re-render on next frame");
         self.needs_render = true;
+    }
+
+    /// Temporarily suppress rendering for one entity (used during drag-move preview).
+    pub fn suppress_entity_rendering(&mut self, entity_id: toki_core::entity::EntityId) {
+        if self.suppressed_entity_id != Some(entity_id) {
+            self.suppressed_entity_id = Some(entity_id);
+            self.mark_dirty();
+        }
+    }
+
+    /// Clear temporary entity render suppression.
+    pub fn clear_suppressed_entity_rendering(&mut self) {
+        if self.suppressed_entity_id.take().is_some() {
+            self.mark_dirty();
+        }
     }
 
     /// Zoom in (increase scale)

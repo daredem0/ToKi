@@ -41,7 +41,7 @@ impl SelectionInteraction {
     /// Handle drag start (click+hold+drag): begin move operation if drag started over an entity.
     pub fn handle_drag_start(
         ui_state: &mut EditorUI,
-        viewport: &SceneViewport,
+        viewport: &mut SceneViewport,
         drag_start_pos: egui::Pos2,
         rect: egui::Rect,
         config: Option<&EditorConfig>,
@@ -86,6 +86,7 @@ impl SelectionInteraction {
             scene_name: active_scene_name,
             entity,
         });
+        viewport.suppress_entity_rendering(entity_id);
     }
 
     /// Handle drag release: try to drop entity at release position.
@@ -106,6 +107,7 @@ impl SelectionInteraction {
                 drag_state.entity.id
             );
             ui_state.exit_placement_mode();
+            viewport.clear_suppressed_entity_rendering();
             viewport.mark_dirty();
             return;
         };
@@ -153,6 +155,7 @@ impl SelectionInteraction {
         }
 
         ui_state.exit_placement_mode();
+        viewport.clear_suppressed_entity_rendering();
         viewport.mark_dirty();
     }
 
