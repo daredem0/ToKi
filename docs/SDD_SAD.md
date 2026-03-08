@@ -670,7 +670,7 @@ Build/test surfaces:
 Release architecture:
 
 - shared workspace version in root `Cargo.toml`
-- `cargo-release` drives version bump, tag creation, and push behavior
+- `cargo-release` drives version bump, `v`-prefixed tag creation, and push behavior
 - CI mirrors the `git-sync` multi-job structure with build, test, fmt, clippy, coverage, docs, package-crate, release, and pages deployment jobs
 - `.crate` packaging is workspace-aware to support inter-crate path/version coupling
 
