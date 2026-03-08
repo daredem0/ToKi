@@ -1,3 +1,7 @@
+#![doc = include_str!("../../../README.md")]
+#![doc = "\n\n"]
+#![doc = include_str!("../../../docs/SDD_SAD.md")]
+
 pub mod graphics {
     pub mod image;
     pub mod vertex;

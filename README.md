@@ -1,6 +1,11 @@
-[![pipeline](https://github.com/daredem0/ToKi/actions/workflows/rust.yml/badge.svg)](https://github.com/daredem0/ToKi/actions/workflows/rust.yml)
-
 # 🎮 ToKi — Top-down Kit for Game Boy–Style Games
+
+[![CI](https://github.com/daredem0/toki/actions/workflows/rust.yml/badge.svg)](https://github.com/daredem0/toki/actions/workflows/rust.yml)
+[![Coverage](https://codecov.io/gh/daredem0/toki/graph/badge.svg?branch=main)](https://codecov.io/gh/daredem0/toki)
+[![Docs](https://img.shields.io/badge/docs-github%20pages-2ea44f?logo=github)](https://daredem0.github.io/toki/)
+[![Release](https://img.shields.io/github/v/release/daredem0/toki)](https://github.com/daredem0/toki/releases)
+[![License](https://img.shields.io/github/license/daredem0/toki)](./LICENSE)
+[![Rust Edition](https://img.shields.io/badge/rust-2024%20edition-black?logo=rust)](https://www.rust-lang.org/)
 
 **ToKi** is a lightweight, pixel-perfect 2D game engine and editor inspired by the visual and design constraints of the original Nintendo Game Boy.  
 It provides a modular toolkit for making retro-style games with clean pixel graphics, tilemaps, animations, and visual scripting — all self-contained and offline.
@@ -52,6 +57,7 @@ just test
 ```bash
 just fmt-check
 just clippy
+just quality-docs
 just quality-licenses-check
 just quality-licenses-generate
 just important
@@ -110,10 +116,14 @@ cargo release 0.0.12 --workspace --no-publish --execute
 - **Scene Hierarchy**: Visual scene management with entity organization
 - **Asset Validation**: Edit → "Validate Project Assets" for schema compliance checking
 
+### 📚 Documentation
+- `just quality-docs` builds workspace rustdoc with Mermaid support.
+- The `toki_core` rustdoc landing page includes both `README.md` and `docs/SDD_SAD.md`.
+
 ## Committing
 Commit Message Shape Rules
 
-1. First line format: "<Prefix>: Brief summary" (no trailing period).
+1. First line format: `&lt;Prefix&gt;: Brief summary` (no trailing period).
 2. Allowed prefixes: Add:, Change:, Fix:, Refactor:, Doc:, chore.
 3. Leave exactly one blank line after the first line.
 4. Body uses dash bullets ("- "), one change per line, no extra blank lines between bullets.

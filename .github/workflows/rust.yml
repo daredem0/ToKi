@@ -272,7 +272,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Generate docs
-        run: cargo doc --locked --workspace --no-deps --document-private-items
+        run: RUSTDOCFLAGS="--html-in-header docs/mermaid-header.html" cargo doc --locked --workspace --no-deps --document-private-items
 
       - name: Create root docs index for GitHub Pages
         run: |
@@ -286,8 +286,13 @@ jobs:
           </head>
           <body>
             <h1>ToKi Rust Documentation</h1>
+            <p>
+              Project landing page:
+              <a href="./toki_core/index.html"><code>toki_core</code></a>
+              (includes the repository README and SDD/SAD).
+            </p>
             <ul>
-              <li><a href="./toki_core/index.html">toki_core</a></li>
+              <li><a href="./toki_core/index.html">toki_core (project docs + API)</a></li>
               <li><a href="./toki_render/index.html">toki_render</a></li>
               <li><a href="./toki_runtime/index.html">toki_runtime</a></li>
               <li><a href="./toki_editor/index.html">toki_editor</a></li>

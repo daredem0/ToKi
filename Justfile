@@ -71,6 +71,10 @@ coverage-summary:
 coverage:
     cargo llvm-cov --workspace --all-features --summary-only
 
+# Generate workspace rustdoc with Mermaid support (public items only).
+quality-docs:
+    RUSTDOCFLAGS="--html-in-header docs/mermaid-header.html" cargo doc --locked --workspace --no-deps
+
 # Verify third-party dependency licenses against deny policy.
 quality-licenses-check:
     ./scripts/check-licenses.sh
