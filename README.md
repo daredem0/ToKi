@@ -77,7 +77,6 @@ just quality-licenses-generate
 just install-cargo-release
 just release-dry-run 0.0.12
 just release-execute 0.0.12
-git push origin main --follow-tags
 ```
 
 Release behavior:
@@ -85,7 +84,7 @@ Release behavior:
 - Allows releases from `main` and `develop`.
 - Creates numeric tags like `0.0.12` (matching existing repository tags).
 - Expects `CHANGELOG.md` to be prepared before running release commands.
-- Does not publish crates or push automatically; push is explicit.
+- Does not publish crates, but does push release commit/tag automatically when executed.
 
 ### ▶️ Direct Cargo Commands (equivalent)
 ```bash
