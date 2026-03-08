@@ -38,7 +38,9 @@ impl AtlasMeta {
     }
 
     pub fn image_size(&self) -> Option<UVec2> {
-        let max_tile = self.tiles.values()
+        let max_tile = self
+            .tiles
+            .values()
             .map(|tile_info| tile_info.position)
             .max_by_key(|v| (v.y, v.x))?;
         Some((max_tile + UVec2::ONE) * self.tile_size)
@@ -63,18 +65,20 @@ impl AtlasMeta {
         let v0 = rect[1] as f32 / texture_size.y as f32;
         let u1 = (rect[0] + rect[2]) as f32 / texture_size.x as f32;
         let v1 = (rect[1] + rect[3]) as f32 / texture_size.y as f32;
-        
+
         Some([u0, v0, u1, v1])
     }
 
     pub fn is_tile_solid(&self, name: &str) -> bool {
-        self.tiles.get(name)
+        self.tiles
+            .get(name)
             .map(|tile_info| tile_info.properties.solid)
             .unwrap_or(false)
     }
 
     pub fn is_tile_trigger(&self, name: &str) -> bool {
-        self.tiles.get(name)
+        self.tiles
+            .get(name)
             .map(|tile_info| tile_info.properties.trigger)
             .unwrap_or(false)
     }

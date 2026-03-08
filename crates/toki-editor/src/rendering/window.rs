@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::sync::Arc;
-use winit::window::Window;
 use toki_render::wgpu_utils;
+use winit::window::Window;
 
 /// Handles WGPU window rendering and egui integration
 pub struct WindowRenderer {
@@ -16,11 +16,13 @@ impl WindowRenderer {
     /// Initialize the renderer with a window
     pub async fn new(window: Arc<Window>) -> Result<Self> {
         // Use consolidated WGPU setup from toki-render
-        let (device, queue, surface, surface_config) = wgpu_utils::create_device_and_surface_async(window).await;
-        
+        let (device, queue, surface, surface_config) =
+            wgpu_utils::create_device_and_surface_async(window).await;
+
         // Initialize egui renderer
-        let egui_renderer = egui_wgpu::Renderer::new(&device, surface_config.format, None, 1, false);
-        
+        let egui_renderer =
+            egui_wgpu::Renderer::new(&device, surface_config.format, None, 1, false);
+
         Ok(Self {
             device,
             queue,
@@ -29,7 +31,7 @@ impl WindowRenderer {
             egui_renderer,
         })
     }
-    
+
     /// Handle window resize
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
@@ -38,32 +40,37 @@ impl WindowRenderer {
             self.surface.configure(&self.device, &self.surface_config);
         }
     }
-    
+
     /// Get reference to WGPU device (for viewport initialization)
     #[allow(dead_code)] // Will be used for advanced WGPU integration
     pub fn device(&self) -> &wgpu::Device {
         &self.device
     }
-    
+
     /// Get reference to WGPU queue (for viewport initialization)
     #[allow(dead_code)] // Will be used for advanced WGPU integration
     pub fn queue(&self) -> &wgpu::Queue {
         &self.queue
     }
-    
+
     /// Get current surface format (for viewport initialization)
     #[allow(dead_code)] // Will be used for advanced WGPU integration
     pub fn surface_format(&self) -> wgpu::TextureFormat {
         self.surface_config.format
     }
-    
+
     /// Get mutable reference to egui renderer (for viewport texture registration)
     pub fn egui_renderer_mut(&mut self) -> &mut egui_wgpu::Renderer {
         &mut self.egui_renderer
     }
-    
+
     /// Render a frame with the given egui output and context
-    pub fn render(&mut self, _window: &Window, egui_output: egui::FullOutput, egui_ctx: &egui::Context) -> Result<()> {
+    pub fn render(
+        &mut self,
+        _window: &Window,
+        egui_output: egui::FullOutput,
+        egui_ctx: &egui::Context,
+    ) -> Result<()> {
         // Get surface texture
         let surface_texture = match self.surface.get_current_texture() {
             Ok(texture) => texture,
@@ -74,14 +81,18 @@ impl WindowRenderer {
             }
             Err(e) => return Err(anyhow::anyhow!("Failed to get surface texture: {e}")),
         };
-        
-        let surface_view = surface_texture.texture.create_view(&wgpu::TextureViewDescriptor::default());
-        
+
+        let surface_view = surface_texture
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
         // Create encoder
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Editor Render Encoder"),
-        });
-        
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Editor Render Encoder"),
+            });
+
         // Clear screen with dark background
         {
             let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -104,25 +115,33 @@ impl WindowRenderer {
                 occlusion_query_set: None,
             });
         }
-        
+
         // Render egui if we have shapes to render
         if !egui_output.shapes.is_empty() {
             let screen_descriptor = egui_wgpu::ScreenDescriptor {
                 size_in_pixels: [self.surface_config.width, self.surface_config.height],
                 pixels_per_point: egui_output.pixels_per_point,
             };
-            
+
             // Tessellate egui shapes using the context
-            let clipped_primitives = egui_ctx.tessellate(egui_output.shapes, egui_output.pixels_per_point);
-            
+            let clipped_primitives =
+                egui_ctx.tessellate(egui_output.shapes, egui_output.pixels_per_point);
+
             // Update egui textures
             for (id, image_delta) in &egui_output.textures_delta.set {
-                self.egui_renderer.update_texture(&self.device, &self.queue, *id, image_delta);
+                self.egui_renderer
+                    .update_texture(&self.device, &self.queue, *id, image_delta);
             }
-            
+
             // Update buffers
-            self.egui_renderer.update_buffers(&self.device, &self.queue, &mut encoder, &clipped_primitives, &screen_descriptor);
-            
+            self.egui_renderer.update_buffers(
+                &self.device,
+                &self.queue,
+                &mut encoder,
+                &clipped_primitives,
+                &screen_descriptor,
+            );
+
             // Create render pass and render egui
             let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("egui Render Pass"),
@@ -138,20 +157,24 @@ impl WindowRenderer {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            
+
             let mut render_pass_static = render_pass.forget_lifetime();
-            self.egui_renderer.render(&mut render_pass_static, &clipped_primitives, &screen_descriptor);
+            self.egui_renderer.render(
+                &mut render_pass_static,
+                &clipped_primitives,
+                &screen_descriptor,
+            );
         }
-        
+
         // Free egui textures
         for id in &egui_output.textures_delta.free {
             self.egui_renderer.free_texture(id);
         }
-        
+
         // Submit and present
         self.queue.submit(std::iter::once(encoder.finish()));
         surface_texture.present();
-        
+
         Ok(())
     }
 }

@@ -1,15 +1,15 @@
-use toki_render::RenderError;
-use toki_core::CoreError;
 use std::io;
+use toki_core::CoreError;
+use toki_render::RenderError;
 
 #[test]
 fn render_error_from_core_error() {
     let io_error = io::Error::new(io::ErrorKind::NotFound, "file not found");
     let core_error = CoreError::Io(io_error);
     let render_error = RenderError::from(core_error);
-    
+
     match render_error {
-        RenderError::Core(_) => {}, // Expected
+        RenderError::Core(_) => {} // Expected
         _ => panic!("Expected Core variant"),
     }
 }

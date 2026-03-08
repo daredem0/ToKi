@@ -1,6 +1,6 @@
 use glam::{IVec2, UVec2};
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
-use toki_core::entity::{Entity, EntityAttributes, EntityType, EntityId};
+use toki_core::entity::{Entity, EntityAttributes, EntityId, EntityType};
 
 fn create_test_entity(id: EntityId, position: IVec2) -> Entity {
     Entity {

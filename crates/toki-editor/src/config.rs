@@ -57,7 +57,7 @@ pub struct GridSettings {
 pub struct CameraSettings {
     /// Camera panning speed multiplier (1.0 = normal speed)
     pub pan_speed: f32,
-    /// Camera zoom speed multiplier (1.0 = normal speed) 
+    /// Camera zoom speed multiplier (1.0 = normal speed)
     pub zoom_speed: f32,
 }
 

@@ -154,17 +154,41 @@ impl DebugPipeline {
         // Create rectangle as line segments
         let vertices = [
             // Top line
-            DebugVertex { position: [x, y], color },
-            DebugVertex { position: [x + width, y], color },
+            DebugVertex {
+                position: [x, y],
+                color,
+            },
+            DebugVertex {
+                position: [x + width, y],
+                color,
+            },
             // Right line
-            DebugVertex { position: [x + width, y], color },
-            DebugVertex { position: [x + width, y + height], color },
+            DebugVertex {
+                position: [x + width, y],
+                color,
+            },
+            DebugVertex {
+                position: [x + width, y + height],
+                color,
+            },
             // Bottom line
-            DebugVertex { position: [x + width, y + height], color },
-            DebugVertex { position: [x, y + height], color },
+            DebugVertex {
+                position: [x + width, y + height],
+                color,
+            },
+            DebugVertex {
+                position: [x, y + height],
+                color,
+            },
             // Left line
-            DebugVertex { position: [x, y + height], color },
-            DebugVertex { position: [x, y], color },
+            DebugVertex {
+                position: [x, y + height],
+                color,
+            },
+            DebugVertex {
+                position: [x, y],
+                color,
+            },
         ];
 
         self.vertices.extend_from_slice(&vertices);
@@ -185,11 +209,13 @@ impl DebugPipeline {
             return;
         }
 
-        self.vertex_buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Debug Vertex Buffer"),
-            contents: bytemuck::cast_slice(&self.vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        }));
+        self.vertex_buffer = Some(
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Debug Vertex Buffer"),
+                contents: bytemuck::cast_slice(&self.vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            }),
+        );
     }
 }
 

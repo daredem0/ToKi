@@ -1,6 +1,6 @@
 use glam::IVec2;
-use toki_core::entity::*;
 use toki_core::animation::*;
+use toki_core::entity::*;
 
 #[test]
 fn test_entity_definition_create_entity_basic() {
@@ -51,7 +51,7 @@ fn test_entity_definition_create_entity_basic() {
                     ],
                     frame_duration_ms: 150.0,
                     loop_mode: "loop".to_string(),
-                }
+                },
             ],
             default_state: "idle".to_string(),
         },
@@ -63,17 +63,17 @@ fn test_entity_definition_create_entity_basic() {
     let entity_id = 42;
 
     let result = entity_def.create_entity(position, entity_id);
-    
+
     assert!(result.is_ok());
     let entity = result.unwrap();
-    
+
     // Check basic properties
     assert_eq!(entity.id, entity_id);
     assert_eq!(entity.position, position);
     assert_eq!(entity.size.x, 16);
     assert_eq!(entity.size.y, 16);
     assert_eq!(entity.entity_type, EntityType::Player);
-    
+
     // Check attributes
     assert_eq!(entity.attributes.health, Some(100));
     assert_eq!(entity.attributes.speed, 2);
@@ -83,7 +83,7 @@ fn test_entity_definition_create_entity_basic() {
     assert_eq!(entity.attributes.active, true);
     assert_eq!(entity.attributes.can_move, true);
     assert_eq!(entity.attributes.has_inventory, true);
-    
+
     // Check collision
     assert!(entity.collision_box.is_some());
     let collision = entity.collision_box.unwrap();
@@ -91,11 +91,11 @@ fn test_entity_definition_create_entity_basic() {
     assert_eq!(collision.size.x, 16);
     assert_eq!(collision.size.y, 16);
     assert_eq!(collision.trigger, false);
-    
+
     // Check audio
     assert_eq!(entity.footstep_trigger_distance, 16.0);
     assert_eq!(entity.movement_sound, Some("player_footsteps".to_string()));
-    
+
     // Check animation controller
     assert!(entity.attributes.animation_controller.is_some());
     let controller = entity.attributes.animation_controller.unwrap();
@@ -136,14 +136,12 @@ fn test_entity_definition_create_npc_entity() {
         },
         animations: AnimationsDef {
             atlas_name: "npc_atlas".to_string(),
-            clips: vec![
-                AnimationClipDef {
-                    state: "idle".to_string(),
-                    frame_tiles: vec!["npc/idle_0".to_string()],
-                    frame_duration_ms: 500.0,
-                    loop_mode: "loop".to_string(),
-                }
-            ],
+            clips: vec![AnimationClipDef {
+                state: "idle".to_string(),
+                frame_tiles: vec!["npc/idle_0".to_string()],
+                frame_duration_ms: 500.0,
+                loop_mode: "loop".to_string(),
+            }],
             default_state: "idle".to_string(),
         },
         category: "npc".to_string(),
@@ -154,22 +152,22 @@ fn test_entity_definition_create_npc_entity() {
     let entity_id = 100;
 
     let result = entity_def.create_entity(position, entity_id);
-    
+
     assert!(result.is_ok());
     let entity = result.unwrap();
-    
+
     // Check basic properties
     assert_eq!(entity.id, entity_id);
     assert_eq!(entity.position, position);
     assert_eq!(entity.size.x, 32);
     assert_eq!(entity.size.y, 32);
     assert_eq!(entity.entity_type, EntityType::Npc);
-    
+
     // Check attributes specific to NPC
     assert_eq!(entity.attributes.can_move, false);
     assert_eq!(entity.attributes.has_inventory, false);
     assert_eq!(entity.attributes.speed, 1);
-    
+
     // Check no collision since disabled
     assert!(entity.collision_box.is_none());
 }
@@ -250,14 +248,12 @@ fn test_entity_definition_invalid_animation_state() {
         },
         animations: AnimationsDef {
             atlas_name: "test".to_string(),
-            clips: vec![
-                AnimationClipDef {
-                    state: "invalid_state".to_string(), // Invalid state
-                    frame_tiles: vec!["test/frame_0".to_string()],
-                    frame_duration_ms: 100.0,
-                    loop_mode: "loop".to_string(),
-                }
-            ],
+            clips: vec![AnimationClipDef {
+                state: "invalid_state".to_string(), // Invalid state
+                frame_tiles: vec!["test/frame_0".to_string()],
+                frame_duration_ms: 100.0,
+                loop_mode: "loop".to_string(),
+            }],
             default_state: "invalid_state".to_string(),
         },
         category: "test".to_string(),
@@ -301,14 +297,12 @@ fn test_entity_definition_invalid_loop_mode() {
         },
         animations: AnimationsDef {
             atlas_name: "test".to_string(),
-            clips: vec![
-                AnimationClipDef {
-                    state: "idle".to_string(),
-                    frame_tiles: vec!["test/frame_0".to_string()],
-                    frame_duration_ms: 100.0,
-                    loop_mode: "invalid_loop".to_string(), // Invalid loop mode
-                }
-            ],
+            clips: vec![AnimationClipDef {
+                state: "idle".to_string(),
+                frame_tiles: vec!["test/frame_0".to_string()],
+                frame_duration_ms: 100.0,
+                loop_mode: "invalid_loop".to_string(), // Invalid loop mode
+            }],
             default_state: "idle".to_string(),
         },
         category: "test".to_string(),
@@ -362,7 +356,7 @@ fn test_entity_definition_serialization() {
     // Test serialization round-trip
     let json = serde_json::to_string_pretty(&entity_def).unwrap();
     let deserialized: EntityDefinition = serde_json::from_str(&json).unwrap();
-    
+
     // Check that important fields are preserved
     assert_eq!(entity_def.name, deserialized.name);
     assert_eq!(entity_def.display_name, deserialized.display_name);
@@ -370,7 +364,10 @@ fn test_entity_definition_serialization() {
     assert_eq!(entity_def.rendering.size, deserialized.rendering.size);
     assert_eq!(entity_def.attributes.speed, deserialized.attributes.speed);
     assert_eq!(entity_def.collision.enabled, deserialized.collision.enabled);
-    assert_eq!(entity_def.audio.movement_sound, deserialized.audio.movement_sound);
+    assert_eq!(
+        entity_def.audio.movement_sound,
+        deserialized.audio.movement_sound
+    );
     assert_eq!(entity_def.category, deserialized.category);
     assert_eq!(entity_def.tags, deserialized.tags);
 }

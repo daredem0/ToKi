@@ -1,4 +1,4 @@
-use crate::ui::editor_ui::{Selection, EditorUI};
+use crate::ui::editor_ui::{EditorUI, Selection};
 use toki_core::Scene;
 
 /// Handles hierarchy and entity management for the editor
@@ -13,48 +13,57 @@ impl HierarchySystem {
         scenes: &[Scene],
     ) -> (Option<String>, Vec<(String, String)>, Option<String>) {
         let entities_path = project_path.join("entities");
-        
+
         if entities_path.exists() {
             // Try to read entity definition files
             if let Ok(entries) = std::fs::read_dir(&entities_path) {
                 let mut found_entities = false;
-                let mut categories: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
-                
+                let mut categories: std::collections::HashMap<String, Vec<String>> =
+                    std::collections::HashMap::new();
+
                 // First pass: collect entities and group by category
                 for entry in entries.flatten() {
                     if let Some(name) = entry.file_name().to_str() {
                         if name.ends_with(".json") {
                             let entity_name = name.trim_end_matches(".json").to_string();
                             found_entities = true;
-                            
+
                             // Try to read the entity file to get its category
                             let entity_path = entry.path();
                             if let Ok(content) = std::fs::read_to_string(&entity_path) {
-                                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&content) {
+                                if let Ok(json_value) =
+                                    serde_json::from_str::<serde_json::Value>(&content)
+                                {
                                     let category = json_value
                                         .get("category")
                                         .and_then(|v| v.as_str())
                                         .unwrap_or("uncategorized")
                                         .to_string();
-                                    
+
                                     categories.entry(category).or_default().push(entity_name);
                                 } else {
                                     // If we can't parse JSON, put in uncategorized
-                                    categories.entry("uncategorized".to_string()).or_default().push(entity_name);
+                                    categories
+                                        .entry("uncategorized".to_string())
+                                        .or_default()
+                                        .push(entity_name);
                                 }
                             } else {
                                 // If we can't read file, put in uncategorized
-                                categories.entry("uncategorized".to_string()).or_default().push(entity_name);
+                                categories
+                                    .entry("uncategorized".to_string())
+                                    .or_default()
+                                    .push(entity_name);
                             }
                         }
                     }
                 }
-                
+
                 if found_entities {
                     let mut selected_entity = None;
                     let mut scene_entity_additions: Vec<(String, String)> = Vec::new(); // (scene_name, entity_name)
                     let mut placement_mode_request: Option<String> = None;
-                    
+
                     egui::ScrollArea::vertical()
                         .id_salt("entities_scroll")
                         .max_height(150.0)
@@ -119,8 +128,12 @@ impl HierarchySystem {
                                 ui.add_space(5.0);
                             }
                         });
-                    
-                    return (selected_entity, scene_entity_additions, placement_mode_request);
+
+                    return (
+                        selected_entity,
+                        scene_entity_additions,
+                        placement_mode_request,
+                    );
                 } else {
                     ui.label("No entity definition files found in entities/");
                 }
@@ -130,7 +143,7 @@ impl HierarchySystem {
         } else {
             ui.label("No entities directory found, expected: entities/");
         }
-        
+
         (None, Vec::new(), None)
     }
 

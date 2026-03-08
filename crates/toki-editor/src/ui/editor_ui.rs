@@ -1,7 +1,7 @@
-use crate::scene::SceneViewport;
+use super::inspector::InspectorSystem;
 use super::menus::MenuSystem;
 use super::panels::PanelSystem;
-use super::inspector::InspectorSystem;
+use crate::scene::SceneViewport;
 use toki_core::{entity::EntityId, Scene};
 
 #[derive(Debug, Clone)]
@@ -13,15 +13,14 @@ pub enum Selection {
     EntityDefinition(String), // Entity definition from palette
 }
 
-
 /// Manages the editor's UI state and rendering
 pub struct EditorUI {
     // Scene management
     pub scenes: Vec<Scene>,
     pub selection: Option<Selection>,
     pub active_scene: Option<String>, // Name of currently active scene
-    pub scene_content_changed: bool, // Flag to signal that scene content changed
-    
+    pub scene_content_changed: bool,  // Flag to signal that scene content changed
+
     // Legacy entity selection (keep for backward compatibility)
     pub selected_entity_id: Option<EntityId>,
 
@@ -40,13 +39,13 @@ pub struct EditorUI {
     pub save_project_requested: bool,
     pub init_config_requested: bool,
     pub window_title: Option<String>,
-    
+
     // Map loading request
     pub map_load_requested: Option<(String, String)>, // (scene_name, map_name)
-    
+
     // Asset validation
     pub validate_assets_requested: bool,
-    
+
     // Entity placement system
     pub placement_mode: bool,
     pub placement_entity_definition: Option<String>,
@@ -63,7 +62,7 @@ impl EditorUI {
             selection: None,
             active_scene: Some("Main Scene".to_string()), // Default scene starts active
             scene_content_changed: false,
-            
+
             // Legacy fields (keep for backward compatibility)
             selected_entity_id: None,
 
@@ -82,13 +81,13 @@ impl EditorUI {
             save_project_requested: false,
             init_config_requested: false,
             window_title: Some("No project open".to_string()),
-            
+
             // Map loading request
             map_load_requested: None,
-            
-            // Asset validation  
+
+            // Asset validation
             validate_assets_requested: false,
-            
+
             // Entity placement system
             placement_mode: false,
             placement_entity_definition: None,
@@ -111,7 +110,7 @@ impl EditorUI {
     pub fn load_scenes_from_project(&mut self, loaded_scenes: Vec<Scene>) {
         tracing::info!("Loading {} scenes into UI hierarchy", loaded_scenes.len());
         self.scenes = loaded_scenes;
-        
+
         // Set the first scene as active if we have scenes and no active scene is set
         if !self.scenes.is_empty() && self.active_scene.is_none() {
             self.active_scene = Some(self.scenes[0].name.clone());
@@ -131,7 +130,10 @@ impl EditorUI {
     pub fn enter_placement_mode(&mut self, entity_definition: String) {
         self.placement_mode = true;
         self.placement_entity_definition = Some(entity_definition);
-        tracing::info!("Entered placement mode for entity: {}", self.placement_entity_definition.as_ref().unwrap());
+        tracing::info!(
+            "Entered placement mode for entity: {}",
+            self.placement_entity_definition.as_ref().unwrap()
+        );
     }
 
     pub fn exit_placement_mode(&mut self) {
@@ -171,7 +173,9 @@ impl EditorUI {
             .map(|v| v.scene_manager().game_state());
 
         if self.show_hierarchy {
-            super::hierarchy::HierarchySystem::render_hierarchy_and_maps_combined_panel(self, ctx, game_state, config);
+            super::hierarchy::HierarchySystem::render_hierarchy_and_maps_combined_panel(
+                self, ctx, game_state, config,
+            );
         }
 
         if self.show_inspector {
@@ -189,13 +193,16 @@ impl EditorUI {
         self.show_console = config.editor_settings.panels.console_visible;
     }
 
-
-    pub fn set_title(&mut self, title: &str){
+    pub fn set_title(&mut self, title: &str) {
         self.window_title = Some(title.to_string());
     }
 
-
-    pub fn render_hierarchy_and_maps_combined_panel(&mut self, ctx: &egui::Context, game_state: Option<&toki_core::GameState>, config: Option<&crate::config::EditorConfig>) {
+    pub fn render_hierarchy_and_maps_combined_panel(
+        &mut self,
+        ctx: &egui::Context,
+        game_state: Option<&toki_core::GameState>,
+        config: Option<&crate::config::EditorConfig>,
+    ) {
         egui::SidePanel::left("hierarchy_panel")
             .resizable(true)
             .default_width(250.0)
@@ -590,6 +597,4 @@ impl EditorUI {
                 }
             });
     }
-
-
 }

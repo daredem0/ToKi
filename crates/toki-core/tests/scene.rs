@@ -1,7 +1,7 @@
 use glam::{IVec2, UVec2};
-use toki_core::entity::{Entity, EntityType, EntityAttributes};
+use toki_core::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
+use toki_core::entity::{Entity, EntityAttributes, EntityType};
 use toki_core::scene::Scene;
-use toki_core::animation::{AnimationController, AnimationClip, AnimationState, LoopMode};
 
 fn create_test_entity(id: u32, position: IVec2) -> Entity {
     let mut controller = AnimationController::new();
@@ -42,7 +42,7 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
 #[test]
 fn test_scene_new() {
     let scene = Scene::new("test_scene".to_string());
-    
+
     assert_eq!(scene.name, "test_scene");
     assert!(scene.description.is_none());
     assert!(scene.maps.is_empty());
@@ -55,7 +55,7 @@ fn test_scene_new() {
 fn test_scene_with_maps() {
     let maps = vec!["map1".to_string(), "map2".to_string()];
     let scene = Scene::with_maps("test_scene".to_string(), maps.clone());
-    
+
     assert_eq!(scene.name, "test_scene");
     assert!(scene.description.is_none());
     assert_eq!(scene.maps, maps);
@@ -68,9 +68,9 @@ fn test_scene_with_maps() {
 fn test_scene_add_entity() {
     let mut scene = Scene::new("test_scene".to_string());
     let entity = create_test_entity(1, IVec2::new(100, 200));
-    
+
     let returned_id = scene.add_entity(entity);
-    
+
     assert_eq!(returned_id, 1);
     assert_eq!(scene.entities.len(), 1);
     assert_eq!(scene.entities[0].id, 1);
@@ -80,13 +80,13 @@ fn test_scene_add_entity() {
 #[test]
 fn test_scene_add_multiple_entities() {
     let mut scene = Scene::new("test_scene".to_string());
-    
+
     let entity1 = create_test_entity(1, IVec2::new(100, 200));
     let entity2 = create_test_entity(2, IVec2::new(300, 400));
-    
+
     scene.add_entity(entity1);
     scene.add_entity(entity2);
-    
+
     assert_eq!(scene.entities.len(), 2);
     assert_eq!(scene.entities[0].id, 1);
     assert_eq!(scene.entities[1].id, 2);
@@ -95,13 +95,13 @@ fn test_scene_add_multiple_entities() {
 #[test]
 fn test_scene_remove_entity() {
     let mut scene = Scene::new("test_scene".to_string());
-    
+
     let entity1 = create_test_entity(1, IVec2::new(100, 200));
     let entity2 = create_test_entity(2, IVec2::new(300, 400));
-    
+
     scene.add_entity(entity1);
     scene.add_entity(entity2);
-    
+
     let removed = scene.remove_entity(1);
     assert!(removed);
     assert_eq!(scene.entities.len(), 1);
@@ -113,7 +113,7 @@ fn test_scene_remove_nonexistent_entity() {
     let mut scene = Scene::new("test_scene".to_string());
     let entity = create_test_entity(1, IVec2::new(100, 200));
     scene.add_entity(entity);
-    
+
     let removed = scene.remove_entity(999);
     assert!(!removed);
     assert_eq!(scene.entities.len(), 1);
@@ -124,12 +124,12 @@ fn test_scene_get_entity() {
     let mut scene = Scene::new("test_scene".to_string());
     let entity = create_test_entity(42, IVec2::new(100, 200));
     scene.add_entity(entity);
-    
+
     let found = scene.get_entity(42);
     assert!(found.is_some());
     assert_eq!(found.unwrap().id, 42);
     assert_eq!(found.unwrap().position, IVec2::new(100, 200));
-    
+
     let not_found = scene.get_entity(999);
     assert!(not_found.is_none());
 }
@@ -139,13 +139,13 @@ fn test_scene_get_entity_mut() {
     let mut scene = Scene::new("test_scene".to_string());
     let entity = create_test_entity(42, IVec2::new(100, 200));
     scene.add_entity(entity);
-    
+
     {
         let found = scene.get_entity_mut(42);
         assert!(found.is_some());
         found.unwrap().position = IVec2::new(500, 600);
     }
-    
+
     let entity = scene.get_entity(42).unwrap();
     assert_eq!(entity.position, IVec2::new(500, 600));
 }
@@ -153,15 +153,15 @@ fn test_scene_get_entity_mut() {
 #[test]
 fn test_scene_add_map() {
     let mut scene = Scene::new("test_scene".to_string());
-    
+
     scene.add_map("map1".to_string());
     assert_eq!(scene.maps.len(), 1);
     assert!(scene.maps.contains(&"map1".to_string()));
-    
+
     // Adding same map again should not duplicate
     scene.add_map("map1".to_string());
     assert_eq!(scene.maps.len(), 1);
-    
+
     // Adding different map should work
     scene.add_map("map2".to_string());
     assert_eq!(scene.maps.len(), 2);
@@ -172,9 +172,9 @@ fn test_scene_add_map() {
 fn test_scene_remove_map() {
     let mut scene = Scene::with_maps(
         "test_scene".to_string(),
-        vec!["map1".to_string(), "map2".to_string(), "map3".to_string()]
+        vec!["map1".to_string(), "map2".to_string(), "map3".to_string()],
     );
-    
+
     let removed = scene.remove_map("map2");
     assert!(removed);
     assert_eq!(scene.maps.len(), 2);
@@ -185,11 +185,8 @@ fn test_scene_remove_map() {
 
 #[test]
 fn test_scene_remove_nonexistent_map() {
-    let mut scene = Scene::with_maps(
-        "test_scene".to_string(),
-        vec!["map1".to_string()]
-    );
-    
+    let mut scene = Scene::with_maps("test_scene".to_string(), vec!["map1".to_string()]);
+
     let removed = scene.remove_map("nonexistent");
     assert!(!removed);
     assert_eq!(scene.maps.len(), 1);
@@ -199,14 +196,13 @@ fn test_scene_remove_nonexistent_map() {
 fn test_scene_has_map() {
     let scene = Scene::with_maps(
         "test_scene".to_string(),
-        vec!["map1".to_string(), "map2".to_string()]
+        vec!["map1".to_string(), "map2".to_string()],
     );
-    
+
     assert!(scene.has_map("map1"));
     assert!(scene.has_map("map2"));
     assert!(!scene.has_map("nonexistent"));
 }
-
 
 #[test]
 fn test_scene_serialization() {
@@ -215,14 +211,14 @@ fn test_scene_serialization() {
     scene.add_map("test_map".to_string());
     scene.camera_position = Some(IVec2::new(100, 200));
     scene.camera_scale = Some(2);
-    
+
     let entity = create_test_entity(1, IVec2::new(50, 75));
     scene.add_entity(entity);
-    
+
     // Test serialization round-trip
     let json = serde_json::to_string_pretty(&scene).unwrap();
     let deserialized: Scene = serde_json::from_str(&json).unwrap();
-    
+
     // Check that important fields are preserved
     assert_eq!(scene.name, deserialized.name);
     assert_eq!(scene.description, deserialized.description);
@@ -231,7 +227,10 @@ fn test_scene_serialization() {
     assert_eq!(scene.camera_scale, deserialized.camera_scale);
     assert_eq!(scene.entities.len(), deserialized.entities.len());
     assert_eq!(scene.entities[0].id, deserialized.entities[0].id);
-    assert_eq!(scene.entities[0].position, deserialized.entities[0].position);
+    assert_eq!(
+        scene.entities[0].position,
+        deserialized.entities[0].position
+    );
 }
 
 #[test]
@@ -239,12 +238,12 @@ fn test_scene_clone() {
     let mut scene = Scene::new("test_scene".to_string());
     scene.description = Some("A test scene".to_string());
     scene.add_map("test_map".to_string());
-    
+
     let entity = create_test_entity(1, IVec2::new(50, 75));
     scene.add_entity(entity);
-    
+
     let cloned_scene = scene.clone();
-    
+
     assert_eq!(scene.name, cloned_scene.name);
     assert_eq!(scene.description, cloned_scene.description);
     assert_eq!(scene.maps, cloned_scene.maps);
@@ -255,7 +254,7 @@ fn test_scene_clone() {
 #[test]
 fn test_scene_empty_operations() {
     let mut scene = Scene::new("empty_scene".to_string());
-    
+
     // Test operations on empty scene
     assert!(scene.get_entity(1).is_none());
     assert!(scene.get_entity_mut(1).is_none());
@@ -267,18 +266,18 @@ fn test_scene_empty_operations() {
 #[test]
 fn test_scene_with_camera_settings() {
     let mut scene = Scene::new("camera_scene".to_string());
-    
+
     // Test camera position and scale
     scene.camera_position = Some(IVec2::new(1000, 2000));
     scene.camera_scale = Some(4);
-    
+
     assert_eq!(scene.camera_position, Some(IVec2::new(1000, 2000)));
     assert_eq!(scene.camera_scale, Some(4));
-    
+
     // Test serialization with camera settings
     let json = serde_json::to_string(&scene).unwrap();
     let deserialized: Scene = serde_json::from_str(&json).unwrap();
-    
+
     assert_eq!(scene.camera_position, deserialized.camera_position);
     assert_eq!(scene.camera_scale, deserialized.camera_scale);
 }

@@ -32,16 +32,12 @@ impl MenuSystem {
                                 ui_state.browse_for_project_requested = true;
                             }
                         } else if ui.button("Open Project...").clicked() {
-                                tracing::info!(
-                                    "Open Project... clicked - no project path in config"
-                                );
-                                ui_state.browse_for_project_requested = true;
-                            
+                            tracing::info!("Open Project... clicked - no project path in config");
+                            ui_state.browse_for_project_requested = true;
                         }
                     } else if ui.button("Open Project...").clicked() {
-                            tracing::info!("Open Project... clicked - no config available");
-                            ui_state.browse_for_project_requested = true;
-                        
+                        tracing::info!("Open Project... clicked - no config available");
+                        ui_state.browse_for_project_requested = true;
                     }
 
                     ui.separator();
@@ -79,9 +75,12 @@ impl MenuSystem {
                     ui.checkbox(&mut ui_state.show_maps, "Maps");
                     ui.checkbox(&mut ui_state.show_console, "Console");
                 });
-                ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
+                ui.with_layout(
+                    egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
+                    |ui| {
                         ui.label(ui_state.window_title.as_ref().unwrap());
-        });
+                    },
+                );
             });
         });
     }

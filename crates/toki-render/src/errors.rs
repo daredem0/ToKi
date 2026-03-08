@@ -14,7 +14,7 @@ pub enum RenderError {
 
     #[error("Unknown render error")]
     Unknown,
-    
+
     #[error("Other error: {0}")]
     Other(String),
 }

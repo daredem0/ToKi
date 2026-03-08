@@ -29,7 +29,7 @@ fn main() -> Result<()> {
                 tracing_subscriber::fmt::layer()
                     .with_target(true)
                     .with_file(false)
-                    .with_line_number(true)
+                    .with_line_number(true),
             )
             .with(filter)
             .init();

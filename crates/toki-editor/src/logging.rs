@@ -62,7 +62,6 @@ impl LogCapture {
         self.logs.lock().unwrap().clone()
     }
 
-
     pub fn add_log(&self, level: String, message: String) {
         let timestamp = chrono::Local::now().format("%H:%M:%S").to_string();
         let entry = LogEntry {

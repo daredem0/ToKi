@@ -1,8 +1,8 @@
 use kira::{
     sound::static_sound::{StaticSoundData, StaticSoundHandle},
     sound::streaming::{StreamingSoundData, StreamingSoundHandle, StreamingSoundSettings},
-    AudioManager as KiraAudioManager, AudioManagerSettings, Tween,
     sound::FromFileError,
+    AudioManager as KiraAudioManager, AudioManagerSettings, Tween,
 };
 use std::collections::HashMap;
 use std::fs;
@@ -135,13 +135,16 @@ impl AudioManager {
     /// Create or configure an audio channel with a specific playback policy
     pub fn set_channel_policy(&mut self, channel: &str, policy: PlaybackPolicy) {
         tracing::trace!("Setting channel '{}' policy to {:?}", channel, policy);
-        self.channels.insert(channel.to_string(), AudioChannel {
-            policy,
-            active_handles: Vec::new(),
-            active_streaming_handles: Vec::new(),
-            last_played: None,
-            cooldown_duration: None,
-        });
+        self.channels.insert(
+            channel.to_string(),
+            AudioChannel {
+                policy,
+                active_handles: Vec::new(),
+                active_streaming_handles: Vec::new(),
+                last_played: None,
+                cooldown_duration: None,
+            },
+        );
     }
 
     /// Set a cooldown duration for a channel to prevent rapid-fire sounds
@@ -151,13 +154,16 @@ impl AudioManager {
             tracing::trace!("Set cooldown for channel '{}' to {:?}", channel, cooldown);
         } else {
             // Create channel with default policy and cooldown
-            self.channels.insert(channel.to_string(), AudioChannel {
-                policy: PlaybackPolicy::Overlap,
-                active_handles: Vec::new(),
-                active_streaming_handles: Vec::new(),
-                last_played: None,
-                cooldown_duration: Some(cooldown),
-            });
+            self.channels.insert(
+                channel.to_string(),
+                AudioChannel {
+                    policy: PlaybackPolicy::Overlap,
+                    active_handles: Vec::new(),
+                    active_streaming_handles: Vec::new(),
+                    last_played: None,
+                    cooldown_duration: Some(cooldown),
+                },
+            );
             tracing::trace!("Created channel '{}' with cooldown {:?}", channel, cooldown);
         }
     }
@@ -165,9 +171,10 @@ impl AudioManager {
     /// Stop all sounds in a specific channel
     pub fn stop_channel(&mut self, channel: &str) {
         if let Some(channel_data) = self.channels.get_mut(channel) {
-            let total_stopped = channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
+            let total_stopped =
+                channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
             tracing::debug!("Stopping {} sounds in channel '{}'", total_stopped, channel);
-            
+
             // Stop all static sound handles
             for handle in &mut channel_data.active_handles {
                 handle.stop(Tween::default());
@@ -189,11 +196,15 @@ impl AudioManager {
         for (channel_name, channel) in &mut self.channels {
             let initial_static = channel.active_handles.len();
             let initial_streaming = channel.active_streaming_handles.len();
-            
+
             // Trace: log states before cleanup
             if initial_static > 0 || initial_streaming > 0 {
-                tracing::trace!("Channel '{}' before cleanup: {} static, {} streaming", 
-                    channel_name, initial_static, initial_streaming);
+                tracing::trace!(
+                    "Channel '{}' before cleanup: {} static, {} streaming",
+                    channel_name,
+                    initial_static,
+                    initial_streaming
+                );
                 for (i, handle) in channel.active_handles.iter().enumerate() {
                     tracing::trace!("  Static handle {}: state={:?}", i, handle.state());
                 }
@@ -201,56 +212,77 @@ impl AudioManager {
                     tracing::trace!("  Streaming handle {}: state={:?}", i, handle.state());
                 }
             }
-            
-            channel.active_handles.retain(|handle| {
-                handle.state() != kira::sound::PlaybackState::Stopped
-            });
-            channel.active_streaming_handles.retain(|handle| {
-                handle.state() != kira::sound::PlaybackState::Stopped
-            });
-            
+
+            channel
+                .active_handles
+                .retain(|handle| handle.state() != kira::sound::PlaybackState::Stopped);
+            channel
+                .active_streaming_handles
+                .retain(|handle| handle.state() != kira::sound::PlaybackState::Stopped);
+
             let removed_static = initial_static - channel.active_handles.len();
             let removed_streaming = initial_streaming - channel.active_streaming_handles.len();
             let total_removed = removed_static + removed_streaming;
-            
+
             if total_removed > 0 {
-                tracing::trace!("Cleaned up {} finished sounds from channel '{}' (static: {}, streaming: {})",
-                    total_removed, channel_name, removed_static, removed_streaming);
+                tracing::trace!(
+                    "Cleaned up {} finished sounds from channel '{}' (static: {}, streaming: {})",
+                    total_removed,
+                    channel_name,
+                    removed_static,
+                    removed_streaming
+                );
             }
         }
     }
 
     /// Play sound in a specific channel with channel policy enforcement
-    pub fn play_sound_in_channel(&mut self, channel: &str, name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn play_sound_in_channel(
+        &mut self,
+        channel: &str,
+        name: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.cleanup_finished_sounds();
 
         // Get or create channel with default Overlap policy
         if !self.channels.contains_key(channel) {
-            tracing::trace!("Creating new channel '{}' with default Overlap policy", channel);
+            tracing::trace!(
+                "Creating new channel '{}' with default Overlap policy",
+                channel
+            );
             self.set_channel_policy(channel, PlaybackPolicy::Overlap);
         }
 
         let channel_data = self.channels.get_mut(channel).unwrap();
-        let active_count = channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
-        
+        let active_count =
+            channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
+
         // Check cooldown
         if let Some(cooldown) = channel_data.cooldown_duration {
             if let Some(last_played) = channel_data.last_played {
                 let elapsed = last_played.elapsed();
                 if elapsed < cooldown {
                     let remaining = cooldown - elapsed;
-                    tracing::trace!("Channel '{}' cooldown: ignoring '{}' ({}ms remaining)", 
-                        channel, name, remaining.as_millis());
+                    tracing::trace!(
+                        "Channel '{}' cooldown: ignoring '{}' ({}ms remaining)",
+                        channel,
+                        name,
+                        remaining.as_millis()
+                    );
                     return Ok(());
                 }
             }
         }
-        
+
         // Apply channel policy
         match channel_data.policy {
             PlaybackPolicy::Exclusive => {
-                tracing::debug!("Channel '{}' policy=Exclusive: stopping {} active sounds before playing '{}'", 
-                    channel, active_count, name);
+                tracing::debug!(
+                    "Channel '{}' policy=Exclusive: stopping {} active sounds before playing '{}'",
+                    channel,
+                    active_count,
+                    name
+                );
                 // Stop all existing sounds in this channel
                 for handle in &mut channel_data.active_handles {
                     handle.stop(Tween::default());
@@ -263,17 +295,30 @@ impl AudioManager {
             }
             PlaybackPolicy::IgnoreIfPlaying => {
                 // Don't play if any sound is still active in this channel
-                if !channel_data.active_handles.is_empty() || !channel_data.active_streaming_handles.is_empty() {
-                    tracing::trace!("Channel '{}' policy=IgnoreIfPlaying: ignoring '{}' (has {} active sounds)", 
-                        channel, name, active_count);
+                if !channel_data.active_handles.is_empty()
+                    || !channel_data.active_streaming_handles.is_empty()
+                {
+                    tracing::trace!(
+                        "Channel '{}' policy=IgnoreIfPlaying: ignoring '{}' (has {} active sounds)",
+                        channel,
+                        name,
+                        active_count
+                    );
                     return Ok(());
                 }
-                tracing::trace!("Channel '{}' policy=IgnoreIfPlaying: playing '{}' (no active sounds)", 
-                    channel, name);
+                tracing::trace!(
+                    "Channel '{}' policy=IgnoreIfPlaying: playing '{}' (no active sounds)",
+                    channel,
+                    name
+                );
             }
             PlaybackPolicy::Overlap => {
-                tracing::trace!("Channel '{}' policy=Overlap: playing '{}' (current active: {})", 
-                    channel, name, active_count);
+                tracing::trace!(
+                    "Channel '{}' policy=Overlap: playing '{}' (current active: {})",
+                    channel,
+                    name,
+                    active_count
+                );
             }
         }
 
@@ -282,8 +327,14 @@ impl AudioManager {
             let handle = self.manager.play(sound_data.clone())?;
             channel_data.active_handles.push(handle);
             channel_data.last_played = Some(Instant::now());
-            let new_total = channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
-            tracing::trace!("✓ Played sound '{}' in channel '{}' (active: {})", name, channel, new_total);
+            let new_total =
+                channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
+            tracing::trace!(
+                "✓ Played sound '{}' in channel '{}' (active: {})",
+                name,
+                channel,
+                new_total
+            );
             return Ok(());
         }
 
@@ -293,9 +344,14 @@ impl AudioManager {
             let handle = self.manager.play(sound_data)?;
             channel_data.active_handles.push(handle);
             channel_data.last_played = Some(Instant::now()); // Record timestamp
-            let new_total = channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
-            tracing::trace!("✓ Played music '{}' on-demand in channel '{}' (active sounds: {})", 
-                name, channel, new_total);
+            let new_total =
+                channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
+            tracing::trace!(
+                "✓ Played music '{}' on-demand in channel '{}' (active sounds: {})",
+                name,
+                channel,
+                new_total
+            );
             return Ok(());
         }
 
@@ -314,12 +370,16 @@ impl AudioManager {
 
         // Get or create channel with default Exclusive policy for music
         if !self.channels.contains_key(channel) {
-            tracing::trace!("Creating new music channel '{}' with default Exclusive policy", channel);
+            tracing::trace!(
+                "Creating new music channel '{}' with default Exclusive policy",
+                channel
+            );
             self.set_channel_policy(channel, PlaybackPolicy::Exclusive);
         }
 
         let channel_data = self.channels.get_mut(channel).unwrap();
-        let active_count = channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
+        let active_count =
+            channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
 
         // Apply channel policy
         match channel_data.policy {
@@ -337,35 +397,54 @@ impl AudioManager {
                 channel_data.active_streaming_handles.clear();
             }
             PlaybackPolicy::IgnoreIfPlaying => {
-                if !channel_data.active_handles.is_empty() || !channel_data.active_streaming_handles.is_empty() {
+                if !channel_data.active_handles.is_empty()
+                    || !channel_data.active_streaming_handles.is_empty()
+                {
                     tracing::trace!("Music channel '{}' policy=IgnoreIfPlaying: ignoring '{}' (has {} active sounds)", 
                         channel, name, active_count);
                     return Ok(());
                 }
-                tracing::trace!("Music channel '{}' policy=IgnoreIfPlaying: playing '{}' (no active sounds)", 
-                    channel, name);
+                tracing::trace!(
+                    "Music channel '{}' policy=IgnoreIfPlaying: playing '{}' (no active sounds)",
+                    channel,
+                    name
+                );
             }
             PlaybackPolicy::Overlap => {
-                tracing::trace!("Music channel '{}' policy=Overlap: playing '{}' (current active: {})", 
-                    channel, name, active_count);
+                tracing::trace!(
+                    "Music channel '{}' policy=Overlap: playing '{}' (current active: {})",
+                    channel,
+                    name,
+                    active_count
+                );
             }
         }
 
         // Try on-demand music loading
         if let Some(path) = self.music_paths.get(name) {
-            tracing::trace!("Playing theme '{}' with volume: {:?} in channel '{}'", name, volume, channel);
+            tracing::trace!(
+                "Playing theme '{}' with volume: {:?} in channel '{}'",
+                name,
+                volume,
+                channel
+            );
             let start = std::time::Instant::now();
             let sound_data = StreamingSoundData::from_file(path)?
                 .with_settings(StreamingSoundSettings::new().loop_region(..).volume(-10.0));
 
             let handle = self.manager.play(sound_data)?;
             channel_data.active_streaming_handles.push(handle);
-            
+
             let duration = start.elapsed();
-            let new_total = channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
+            let new_total =
+                channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
             tracing::trace!("Music loading took: {:?}", duration);
-            tracing::trace!("✓ Played streaming music '{}' in channel '{}' (active sounds: {})", 
-                name, channel, new_total);
+            tracing::trace!(
+                "✓ Played streaming music '{}' in channel '{}' (active sounds: {})",
+                name,
+                channel,
+                new_total
+            );
             return Ok(());
         }
 
@@ -379,7 +458,11 @@ impl AudioManager {
     }
 
     /// Legacy method - plays background music with exclusive behavior  
-    pub fn play_background_music(&mut self, name: &str, volume: f32) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn play_background_music(
+        &mut self,
+        name: &str,
+        volume: f32,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.play_background_music_in_channel("music", name, volume)
     }
 

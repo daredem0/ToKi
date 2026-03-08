@@ -55,7 +55,9 @@ impl GameManager {
     }
 
     /// Get all renderable entities with their sprite data
-    pub fn get_renderable_entities(&self) -> Vec<(toki_core::entity::EntityId, glam::IVec2, glam::UVec2)> {
+    pub fn get_renderable_entities(
+        &self,
+    ) -> Vec<(toki_core::entity::EntityId, glam::IVec2, glam::UVec2)> {
         self.game_state.get_renderable_entities()
     }
 
@@ -66,7 +68,8 @@ impl GameManager {
         atlas: &AtlasMeta,
         texture_size: glam::UVec2,
     ) -> Option<SpriteFrame> {
-        self.game_state.get_entity_sprite_frame(entity_id, atlas, texture_size)
+        self.game_state
+            .get_entity_sprite_frame(entity_id, atlas, texture_size)
     }
 
     /// Spawn an NPC that looks like the player

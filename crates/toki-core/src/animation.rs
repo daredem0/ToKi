@@ -11,8 +11,8 @@ pub enum AnimationState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LoopMode {
-    Loop,    // Repeart forever
-    Once,    // Play once
+    Loop,     // Repeart forever
+    Once,     // Play once
     PingPong, //Forward then backward
 }
 

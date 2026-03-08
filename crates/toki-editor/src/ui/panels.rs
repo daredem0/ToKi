@@ -1,6 +1,6 @@
-use crate::scene::SceneViewport;
-use crate::config::EditorConfig;
 use super::interactions::{CameraInteraction, PlacementInteraction, SelectionInteraction};
+use crate::config::EditorConfig;
+use crate::scene::SceneViewport;
 
 /// Handles panel rendering for the editor (viewport and log panels)
 pub struct PanelSystem;
@@ -41,8 +41,10 @@ impl PanelSystem {
 
                 // Handle viewport interactions
                 let available_size = ui.available_size();
-                let (rect, response) =
-                    ui.allocate_exact_size(available_size, egui::Sense::click_and_drag().union(egui::Sense::hover()));
+                let (rect, response) = ui.allocate_exact_size(
+                    available_size,
+                    egui::Sense::click_and_drag().union(egui::Sense::hover()),
+                );
 
                 // Handle camera panning with drag
                 CameraInteraction::handle_drag(viewport, &response, config);
@@ -53,10 +55,11 @@ impl PanelSystem {
                 // Handle viewport clicks (entity placement or selection)
                 if response.clicked() {
                     if let Some(click_pos) = response.hover_pos() {
-                        
                         // Check if we're in placement mode
                         if ui_state.is_in_placement_mode() {
-                            PlacementInteraction::handle_click(ui_state, viewport, click_pos, rect, config);
+                            PlacementInteraction::handle_click(
+                                ui_state, viewport, click_pos, rect, config,
+                            );
                         } else {
                             // Normal entity selection - use new hit detection
                             SelectionInteraction::handle_click(ui_state, viewport, click_pos, rect);

@@ -19,7 +19,7 @@ pub struct Entity {
     pub footstep_distance_accumulator: f32,
     pub footstep_trigger_distance: f32,
     pub last_collision_state: bool,
-    
+
     /// Audio configuration from entity definition
     #[serde(default)]
     pub movement_sound: Option<String>, // Sound to play when moving
@@ -49,7 +49,7 @@ pub struct EntityAttributes {
     // Behavior flags
     pub active: bool,
     pub can_move: bool, // Can we be moved by the player
-    
+
     // Extended attributes for entity definitions
     #[serde(default)]
     pub has_inventory: bool, // Can this entity carry items
@@ -152,33 +152,33 @@ impl EntityManager {
 
         id
     }
-    
+
     /// Add an existing entity to the manager (used for scene-to-gamestate conversion)
     pub fn add_existing_entity(&mut self, entity: Entity) -> EntityId {
         let id = entity.id;
         let entity_type = entity.entity_type.clone();
-        
+
         // Update next_id if needed to avoid conflicts
         if id >= self.next_id {
             self.next_id = id + 1;
         }
-        
+
         // Track player entity
         if matches!(entity_type, EntityType::Player) && self.player_id.is_none() {
             self.player_id = Some(id);
         }
-        
+
         // Update lookups
         self.entities_by_type
             .entry(entity_type)
             .or_default()
             .insert(id);
-            
+
         self.active_entities.insert(id);
-        
+
         // Store the entity
         self.entities.insert(id, entity);
-        
+
         tracing::trace!("Added existing entity {} to EntityManager", id);
         id
     }
@@ -503,7 +503,12 @@ impl EntityDefinition {
         let default_state = match self.animations.default_state.to_lowercase().as_str() {
             "idle" => AnimationState::Idle,
             "walk" => AnimationState::Walk,
-            _ => return Err(format!("Unknown default animation state: {}", self.animations.default_state)),
+            _ => {
+                return Err(format!(
+                    "Unknown default animation state: {}",
+                    self.animations.default_state
+                ))
+            }
         };
         animation_controller.play(default_state);
 

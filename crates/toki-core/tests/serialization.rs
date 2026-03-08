@@ -1,10 +1,10 @@
-use toki_core::serialization::*;
-use toki_core::entity::*;
-use toki_core::{GameState, InputKey};
-use toki_core::collision::CollisionBox;
-use toki_core::animation::{AnimationController, AnimationClip, AnimationState, LoopMode};
 use glam::{IVec2, UVec2};
 use tempfile::NamedTempFile;
+use toki_core::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
+use toki_core::collision::CollisionBox;
+use toki_core::entity::*;
+use toki_core::serialization::*;
+use toki_core::{GameState, InputKey};
 
 fn create_test_entity() -> Entity {
     let mut controller = AnimationController::new();
@@ -47,10 +47,10 @@ fn create_test_entity_manager() -> EntityManager {
     let mut manager = EntityManager::new();
     let _player_id = manager.spawn_player(IVec2::new(100, 200));
     let npc_id = manager.spawn_npc(IVec2::new(50, 75), "slime");
-    
+
     // Modify some state to test preservation
     manager.set_entity_active(npc_id, false);
-    
+
     manager
 }
 
@@ -67,11 +67,20 @@ fn test_entity_roundtrip_serialization() {
     assert_eq!(entity.position, deserialized.position);
     assert_eq!(entity.size, deserialized.size);
     assert_eq!(entity.entity_type, deserialized.entity_type);
-    
+
     // Verify audio state
-    assert_eq!(entity.footstep_distance_accumulator, deserialized.footstep_distance_accumulator);
-    assert_eq!(entity.footstep_trigger_distance, deserialized.footstep_trigger_distance);
-    assert_eq!(entity.last_collision_state, deserialized.last_collision_state);
+    assert_eq!(
+        entity.footstep_distance_accumulator,
+        deserialized.footstep_distance_accumulator
+    );
+    assert_eq!(
+        entity.footstep_trigger_distance,
+        deserialized.footstep_trigger_distance
+    );
+    assert_eq!(
+        entity.last_collision_state,
+        deserialized.last_collision_state
+    );
 
     // Verify attributes
     assert_eq!(entity.attributes.health, deserialized.attributes.health);
@@ -98,7 +107,7 @@ fn test_entity_minimal_fields() {
 
     let json = serde_json::to_string_pretty(&entity).unwrap();
     let deserialized: Entity = serde_json::from_str(&json).unwrap();
-    
+
     assert_eq!(entity.id, deserialized.id);
     assert_eq!(entity.position, deserialized.position);
     assert_eq!(entity.entity_type, deserialized.entity_type);
@@ -135,13 +144,13 @@ fn test_entity_manager_roundtrip() {
     assert_eq!(active_entities.len(), 1); // Only player active
 }
 
-#[test] 
+#[test]
 fn test_empty_entity_manager() {
     let manager = EntityManager::new();
-    
+
     let json = serde_json::to_string_pretty(&manager).unwrap();
     let deserialized: EntityManager = serde_json::from_str(&json).unwrap();
-    
+
     assert_eq!(deserialized.get_player_id(), None);
     assert_eq!(deserialized.active_entities().len(), 0);
     assert_eq!(deserialized.entities_of_type(&EntityType::Player).len(), 0);
@@ -152,10 +161,10 @@ fn test_empty_entity_manager() {
 fn test_game_state_roundtrip() {
     let mut game_state = GameState::new_empty();
     let player_id = game_state.spawn_player_at(IVec2::new(64, 128));
-    
+
     // Add some input state (should be reset due to #[serde(default)])
     game_state.handle_key_press(InputKey::Up);
-    
+
     // Test roundtrip
     let json = serde_json::to_string_pretty(&game_state).unwrap();
     let deserialized: GameState = serde_json::from_str(&json).unwrap();
@@ -172,18 +181,21 @@ fn test_save_load_entity_to_file() {
     let entity = create_test_entity();
     let temp_file = NamedTempFile::new().unwrap();
     let file_path = temp_file.path().to_str().unwrap();
-    
+
     // Test save
     save_entity_to_file(&entity, file_path).unwrap();
-    
+
     // Test load
     let loaded_entity = load_entity_from_file(file_path).unwrap();
-    
+
     // Verify
     assert_eq!(entity.id, loaded_entity.id);
     assert_eq!(entity.position, loaded_entity.position);
     assert_eq!(entity.entity_type, loaded_entity.entity_type);
-    assert_eq!(entity.footstep_distance_accumulator, loaded_entity.footstep_distance_accumulator);
+    assert_eq!(
+        entity.footstep_distance_accumulator,
+        loaded_entity.footstep_distance_accumulator
+    );
 }
 
 #[test]
@@ -192,18 +204,18 @@ fn test_save_load_scene() {
     let original_player_id = manager.get_player_id().unwrap();
     let temp_file = NamedTempFile::new().unwrap();
     let file_path = temp_file.path().to_str().unwrap();
-    
+
     // Test save
     save_scene(&manager, file_path).unwrap();
-    
+
     // Test load
     let loaded_manager = load_scene(file_path).unwrap();
-    
+
     // Verify
     assert_eq!(loaded_manager.get_player_id(), Some(original_player_id));
     let loaded_player = loaded_manager.get_player().unwrap();
     assert_eq!(loaded_player.position, IVec2::new(100, 200));
-    
+
     let npc_entities = loaded_manager.entities_of_type(&EntityType::Npc);
     assert_eq!(npc_entities.len(), 1);
 }
@@ -214,13 +226,13 @@ fn test_save_load_game_state() {
     let player_id = game_state.spawn_player_at(IVec2::new(100, 200));
     let temp_file = NamedTempFile::new().unwrap();
     let file_path = temp_file.path().to_str().unwrap();
-    
+
     // Test save
     save_game(&game_state, file_path).unwrap();
-    
+
     // Test load
     let loaded_game_state = load_game(file_path).unwrap();
-    
+
     // Verify
     assert_eq!(loaded_game_state.player_id(), Some(player_id));
     let loaded_player = loaded_game_state.player_entity().unwrap();
@@ -231,7 +243,7 @@ fn test_save_load_game_state() {
 fn test_json_structure() {
     let entity = create_test_entity();
     let json = serde_json::to_string_pretty(&entity).unwrap();
-    
+
     // Verify JSON contains expected fields for debugging
     assert!(json.contains("\"id\": 42"));
     assert!(json.contains("\"position\""));
@@ -244,13 +256,13 @@ fn test_json_structure() {
 #[test]
 fn test_invalid_json_handling() {
     let invalid_json = r#"{"invalid": "json"}"#;
-    
+
     let result = serde_json::from_str::<Entity>(invalid_json);
     assert!(result.is_err());
-    
+
     let result = serde_json::from_str::<EntityManager>(invalid_json);
     assert!(result.is_err());
-    
+
     let result = serde_json::from_str::<GameState>(invalid_json);
     assert!(result.is_err());
 }
@@ -260,10 +272,10 @@ fn test_file_error_handling() {
     // Test loading from non-existent file
     let result = load_entity_from_file("/non/existent/path.json");
     assert!(result.is_err());
-    
+
     let result = load_scene("/non/existent/path.json");
     assert!(result.is_err());
-    
+
     let result = load_game("/non/existent/path.json");
     assert!(result.is_err());
 }
@@ -277,7 +289,7 @@ fn test_entity_type_serialization() {
         EntityType::Decoration,
         EntityType::Trigger,
     ];
-    
+
     for entity_type in entity_types {
         let json = serde_json::to_string(&entity_type).unwrap();
         let deserialized: EntityType = serde_json::from_str(&json).unwrap();

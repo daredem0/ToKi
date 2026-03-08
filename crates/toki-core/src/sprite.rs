@@ -19,7 +19,10 @@ impl Default for Animation {
     fn default() -> Self {
         Self {
             name: "default".to_string(),
-            frames: vec![Frame { index: 0, duration_ms: 100 }],
+            frames: vec![Frame {
+                index: 0,
+                duration_ms: 100,
+            }],
             looped: true,
         }
     }

@@ -6,19 +6,19 @@ use winit::window::Window;
 pub trait RenderTarget {
     /// Get the texture view to render to
     fn get_render_view(&mut self) -> Result<&wgpu::TextureView, RenderError>;
-    
+
     /// Get the size of the render target
     fn size(&self) -> (u32, u32);
-    
+
     /// Called before rendering starts - prepares the render target
     fn begin_frame(&mut self) -> Result<(), RenderError>;
-    
+
     /// Called after rendering completes - presents or finalizes the target
     fn end_frame(&mut self) -> Result<(), RenderError>;
-    
+
     /// Get the texture format
     fn format(&self) -> wgpu::TextureFormat;
-    
+
     /// Handle resize events
     fn resize(&mut self, new_size: (u32, u32)) -> Result<(), RenderError>;
 }
@@ -33,22 +33,29 @@ pub struct WindowTarget {
 }
 
 impl WindowTarget {
-    pub fn new(window: Arc<Window>, device: wgpu::Device, adapter: &wgpu::Adapter) -> Result<Self, RenderError> {
+    pub fn new(
+        window: Arc<Window>,
+        device: wgpu::Device,
+        adapter: &wgpu::Adapter,
+    ) -> Result<Self, RenderError> {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             flags: wgpu::InstanceFlags::default(),
             ..Default::default()
         });
-        
-        let surface = instance.create_surface(Arc::clone(&window))
+
+        let surface = instance
+            .create_surface(Arc::clone(&window))
             .map_err(|e| RenderError::Other(format!("Failed to create surface: {}", e)))?;
-        
+
         let surface_caps = surface.get_capabilities(adapter);
-        let surface_format = surface_caps.formats.iter()
+        let surface_format = surface_caps
+            .formats
+            .iter()
             .find(|f| f.is_srgb())
             .copied()
             .unwrap_or(surface_caps.formats[0]);
-        
+
         let size = window.inner_size();
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -60,9 +67,9 @@ impl WindowTarget {
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         };
-        
+
         surface.configure(&device, &config);
-        
+
         Ok(Self {
             surface,
             current_texture: None,
@@ -79,11 +86,11 @@ impl RenderTarget for WindowTarget {
             RenderError::Other("No current view available. Call begin_frame() first.".to_string())
         })
     }
-    
+
     fn size(&self) -> (u32, u32) {
         (self.config.width, self.config.height)
     }
-    
+
     fn begin_frame(&mut self) -> Result<(), RenderError> {
         tracing::trace!("WindowTarget: Beginning frame");
         let surface_texture = match self.surface.get_current_texture() {
@@ -94,17 +101,24 @@ impl RenderTarget for WindowTarget {
                 self.surface.configure(&self.device, &self.config);
                 return Err(RenderError::Other("Surface lost, reconfigured".to_string()));
             }
-            Err(e) => return Err(RenderError::Other(format!("Failed to get surface texture: {}", e))),
+            Err(e) => {
+                return Err(RenderError::Other(format!(
+                    "Failed to get surface texture: {}",
+                    e
+                )))
+            }
         };
-        
-        let view = surface_texture.texture.create_view(&wgpu::TextureViewDescriptor::default());
-        
+
+        let view = surface_texture
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
         self.current_texture = Some(surface_texture);
         self.current_view = Some(view);
-        
+
         Ok(())
     }
-    
+
     fn end_frame(&mut self) -> Result<(), RenderError> {
         if let Some(texture) = self.current_texture.take() {
             tracing::trace!("WindowTarget: Presenting frame to window");
@@ -113,11 +127,11 @@ impl RenderTarget for WindowTarget {
         self.current_view = None;
         Ok(())
     }
-    
+
     fn format(&self) -> wgpu::TextureFormat {
         self.config.format
     }
-    
+
     fn resize(&mut self, new_size: (u32, u32)) -> Result<(), RenderError> {
         self.config.width = new_size.0.max(1);
         self.config.height = new_size.1.max(1);
@@ -158,9 +172,9 @@ impl OffscreenTarget {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         });
-        
+
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        
+
         Ok(Self {
             texture,
             view,
@@ -171,12 +185,12 @@ impl OffscreenTarget {
             egui_texture_id: None,
         })
     }
-    
+
     /// Get the underlying texture for egui integration
     pub fn texture(&self) -> &wgpu::Texture {
         &self.texture
     }
-    
+
     /// Register this texture with egui renderer
     #[cfg(feature = "editor")]
     pub fn register_with_egui(&mut self, renderer: &mut egui_wgpu::Renderer) -> egui::TextureId {
@@ -194,30 +208,34 @@ impl RenderTarget for OffscreenTarget {
     fn get_render_view(&mut self) -> Result<&wgpu::TextureView, RenderError> {
         Ok(&self.view)
     }
-    
+
     fn size(&self) -> (u32, u32) {
         self.size
     }
-    
+
     fn begin_frame(&mut self) -> Result<(), RenderError> {
-        tracing::trace!("OffscreenTarget: Beginning frame ({}x{})", self.size.0, self.size.1);
+        tracing::trace!(
+            "OffscreenTarget: Beginning frame ({}x{})",
+            self.size.0,
+            self.size.1
+        );
         Ok(())
     }
-    
+
     fn end_frame(&mut self) -> Result<(), RenderError> {
         tracing::trace!("OffscreenTarget: Frame complete");
         Ok(())
     }
-    
+
     fn format(&self) -> wgpu::TextureFormat {
         self.format
     }
-    
+
     fn resize(&mut self, new_size: (u32, u32)) -> Result<(), RenderError> {
         if new_size == self.size {
             return Ok(());
         }
-        
+
         // Recreate texture with new size
         let new_target = Self::new(self.device.clone(), new_size, self.format)?;
         self.texture = new_target.texture;

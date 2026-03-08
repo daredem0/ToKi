@@ -1,10 +1,10 @@
 use std::sync::Arc;
-use winit::window::Window;
 use toki_core::math::projection::{calculate_projection, ProjectionParameter};
 use toki_render::GpuState;
+use winit::window::Window;
 
 /// Rendering system that manages GPU state and projection calculations.
-/// 
+///
 /// Centralizes all rendering-related state and provides clean APIs for
 /// graphics operations while abstracting GPU implementation details.
 #[derive(Debug)]
@@ -32,7 +32,7 @@ impl RenderingSystem {
             },
         }
     }
-    
+
     /// Create a new RenderingSystem with custom projection parameters (for editor)
     pub fn new_with_projection(projection_params: ProjectionParameter) -> Self {
         Self {
@@ -40,98 +40,111 @@ impl RenderingSystem {
             projection_params,
         }
     }
-    
+
     /// Set new projection parameters at runtime
     pub fn set_projection_params(&mut self, params: ProjectionParameter) {
         self.projection_params = params;
     }
-    
+
     /// Update desired resolution (useful for editor viewport scaling)
     pub fn set_desired_resolution(&mut self, width: u32, height: u32) {
         self.projection_params.desired_width = width;
         self.projection_params.desired_height = height;
     }
-    
+
     /// Initialize GPU state with the given window (uses default textures)
     pub fn initialize_gpu(&mut self, window: Arc<Window>) {
         let gpu = GpuState::new(window);
         self.gpu = Some(gpu);
     }
-    
+
     /// Initialize GPU state with custom textures (for editor use)
     pub fn initialize_gpu_with_textures(
-        &mut self, 
+        &mut self,
         window: Arc<Window>,
         tilemap_texture: Option<std::path::PathBuf>,
-        sprite_texture: Option<std::path::PathBuf>
+        sprite_texture: Option<std::path::PathBuf>,
     ) -> Result<(), toki_render::RenderError> {
         let gpu = GpuState::new_with_textures(window, tilemap_texture, sprite_texture)?;
         self.gpu = Some(gpu);
         Ok(())
     }
-    
+
     /// Load new tilemap texture at runtime
-    pub fn load_tilemap_texture(&mut self, texture_path: std::path::PathBuf) -> Result<(), toki_render::RenderError> {
+    pub fn load_tilemap_texture(
+        &mut self,
+        texture_path: std::path::PathBuf,
+    ) -> Result<(), toki_render::RenderError> {
         if let Some(gpu) = &mut self.gpu {
             gpu.load_tilemap_texture(texture_path)
         } else {
-            Err(toki_render::RenderError::Other("GPU not initialized".to_string()))
+            Err(toki_render::RenderError::Other(
+                "GPU not initialized".to_string(),
+            ))
         }
     }
-    
+
     /// Load new sprite texture at runtime
-    pub fn load_sprite_texture(&mut self, texture_path: std::path::PathBuf) -> Result<(), toki_render::RenderError> {
+    pub fn load_sprite_texture(
+        &mut self,
+        texture_path: std::path::PathBuf,
+    ) -> Result<(), toki_render::RenderError> {
         if let Some(gpu) = &mut self.gpu {
             gpu.load_sprite_texture(texture_path)
         } else {
-            Err(toki_render::RenderError::Other("GPU not initialized".to_string()))
+            Err(toki_render::RenderError::Other(
+                "GPU not initialized".to_string(),
+            ))
         }
     }
-    
+
     /// Helper to load textures from a project assets directory
-    pub fn load_project_textures(&mut self, project_path: &std::path::Path) -> Result<(), toki_render::RenderError> {
+    pub fn load_project_textures(
+        &mut self,
+        project_path: &std::path::Path,
+    ) -> Result<(), toki_render::RenderError> {
         let assets_path = project_path.join("assets");
         let sprites_path = assets_path.join("sprites");
         let tilemaps_path = assets_path.join("tilemaps");
-        
+
         // Look for common sprite atlas files (only .json format supported)
         if let Some(creatures_atlas) = find_atlas_file(&sprites_path, "creatures") {
             if let Some(creatures_image) = find_image_for_atlas(&creatures_atlas) {
                 self.load_sprite_texture(creatures_image)?;
             }
         }
-        
+
         // Look for common tilemap atlas files (only .json format supported)
         if let Some(terrain_atlas) = find_atlas_file(&tilemaps_path, "terrain") {
             if let Some(terrain_image) = find_image_for_atlas(&terrain_atlas) {
                 self.load_tilemap_texture(terrain_image)?;
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Get mutable reference to GPU state
     pub fn gpu_mut(&mut self) -> Option<&mut GpuState> {
         self.gpu.as_mut()
     }
-    
+
     /// Get reference to GPU state
     pub fn gpu(&self) -> Option<&GpuState> {
         self.gpu.as_ref()
     }
-    
+
     /// Update projection parameters with new window size
     pub fn update_window_size(&mut self, size: winit::dpi::PhysicalSize<u32>) {
         self.projection_params.width = size.width;
         self.projection_params.height = size.height;
     }
-    
+
     /// Calculate current projection matrix
     pub fn calculate_projection(&self) -> glam::Mat4 {
         calculate_projection(self.projection_params)
     }
-    
+
     /// Update GPU projection matrix with view transform
     pub fn update_projection(&mut self, view_matrix: glam::Mat4) {
         let projection = self.calculate_projection();
@@ -139,7 +152,7 @@ impl RenderingSystem {
             gpu.update_projection(projection * view_matrix);
         }
     }
-    
+
     /// Resize GPU render targets
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if let Some(gpu) = &mut self.gpu {
@@ -147,19 +160,19 @@ impl RenderingSystem {
         }
         self.update_window_size(new_size);
     }
-    
+
     /// Draw the current frame
     pub fn draw(&mut self) {
         if let Some(gpu) = &mut self.gpu {
             gpu.draw();
         }
     }
-    
+
     /// Check if GPU is initialized
     pub fn has_gpu(&self) -> bool {
         self.gpu.is_some()
     }
-    
+
     /// Get current projection parameters
     pub fn projection_params(&self) -> ProjectionParameter {
         self.projection_params
@@ -171,13 +184,13 @@ fn find_atlas_file(dir: &std::path::Path, name: &str) -> Option<std::path::PathB
     if !dir.exists() {
         return None;
     }
-    
+
     // Look for .json atlas files (only supported format)
     let json_path = dir.join(format!("{}.json", name));
     if json_path.exists() {
         return Some(json_path);
     }
-    
+
     None
 }
 

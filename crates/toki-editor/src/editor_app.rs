@@ -309,9 +309,16 @@ impl EditorApp {
         // Load sprite frame cache if needed (before render loop to avoid borrowing issues)
         let project_path = self.config.current_project_path();
         if self.ui.is_in_placement_mode() && self.ui.placement_preview_cached_frame.is_none() {
-            if let (Some(entity_def), Some(project_path), Some(project_assets)) =
-                (&self.ui.placement_entity_definition, &project_path, self.project_manager.get_project_assets()) {
-                let cached_frame = EditorApp::load_preview_sprite_frame_static(entity_def, project_path.as_path(), project_assets);
+            if let (Some(entity_def), Some(project_path), Some(project_assets)) = (
+                &self.ui.placement_entity_definition,
+                &project_path,
+                self.project_manager.get_project_assets(),
+            ) {
+                let cached_frame = EditorApp::load_preview_sprite_frame_static(
+                    entity_def,
+                    project_path.as_path(),
+                    project_assets,
+                );
                 self.ui.placement_preview_cached_frame = cached_frame;
             }
         }
@@ -322,10 +329,18 @@ impl EditorApp {
                 if let Some(project_assets) = self.project_manager.get_project_assets() {
                     // Prepare preview data for entity placement
                     let preview_data = if self.ui.is_in_placement_mode() {
-                        if let (Some(entity_def), Some(position), Some(cached_frame)) =
-                            (&self.ui.placement_entity_definition, &self.ui.placement_preview_position, &self.ui.placement_preview_cached_frame) {
+                        if let (Some(entity_def), Some(position), Some(cached_frame)) = (
+                            &self.ui.placement_entity_definition,
+                            &self.ui.placement_preview_position,
+                            &self.ui.placement_preview_cached_frame,
+                        ) {
                             let is_valid = self.ui.placement_preview_valid.unwrap_or(true);
-                            Some((entity_def.as_str(), *position, cached_frame.clone(), is_valid))
+                            Some((
+                                entity_def.as_str(),
+                                *position,
+                                cached_frame.clone(),
+                                is_valid,
+                            ))
                         } else {
                             None
                         }
@@ -657,102 +672,138 @@ impl EditorApp {
 
     fn handle_active_scene_map_loading(&mut self) {
         let current_active_scene = self.ui.active_scene.clone();
-        
+
         if !self.should_reload_scene(&current_active_scene) {
             return;
         }
-        
+
         self.update_scene_state(&current_active_scene);
-        
+
         match &current_active_scene {
             Some(scene_name) => self.load_active_scene(scene_name),
             None => self.clear_viewport_scene(),
         }
     }
-    
+
     fn should_reload_scene(&self, current_scene: &Option<String>) -> bool {
         *current_scene != self.last_loaded_active_scene || self.ui.scene_content_changed
     }
-    
+
     fn update_scene_state(&mut self, current_scene: &Option<String>) {
         self.last_loaded_active_scene = current_scene.clone();
         self.ui.scene_content_changed = false;
-        
-        tracing::info!("Active scene or content changed, reloading map for scene: {:?}", current_scene);
-        
+
+        tracing::info!(
+            "Active scene or content changed, reloading map for scene: {:?}",
+            current_scene
+        );
+
         if let Some(viewport) = &mut self.scene_viewport {
             viewport.mark_dirty();
         }
     }
-    
+
     fn load_active_scene(&mut self, scene_name: &str) {
         let Some(active_scene) = self.find_scene_by_name(scene_name).cloned() else {
             tracing::warn!("Active scene '{}' not found in scenes list", scene_name);
             return;
         };
-        
-        tracing::info!("Found active scene '{}' with {} maps: {:?}",
-                      scene_name, active_scene.maps.len(), active_scene.maps);
-        
+
+        tracing::info!(
+            "Found active scene '{}' with {} maps: {:?}",
+            scene_name,
+            active_scene.maps.len(),
+            active_scene.maps
+        );
+
         let Some(viewport) = &mut self.scene_viewport else {
             return;
         };
-        
+
         let project_path = self.config.current_project_path().cloned();
-        
+
         Self::load_scene_into_gamestate(viewport, &active_scene, scene_name);
         Self::load_scene_tilemap(viewport, &active_scene, scene_name, project_path.as_deref());
     }
-    
+
     fn find_scene_by_name(&self, scene_name: &str) -> Option<&toki_core::Scene> {
         self.ui.scenes.iter().find(|s| s.name == scene_name)
     }
-    
-    fn load_scene_into_gamestate(viewport: &mut crate::scene::SceneViewport, scene: &toki_core::Scene, scene_name: &str) {
-        viewport.scene_manager_mut().game_state_mut().add_scene(scene.clone());
-        
-        match viewport.scene_manager_mut().game_state_mut().load_scene(scene_name) {
+
+    fn load_scene_into_gamestate(
+        viewport: &mut crate::scene::SceneViewport,
+        scene: &toki_core::Scene,
+        scene_name: &str,
+    ) {
+        viewport
+            .scene_manager_mut()
+            .game_state_mut()
+            .add_scene(scene.clone());
+
+        match viewport
+            .scene_manager_mut()
+            .game_state_mut()
+            .load_scene(scene_name)
+        {
             Ok(()) => {
-                tracing::info!("Loaded active scene '{}' with {} entities into GameState",
-                              scene_name, scene.entities.len());
+                tracing::info!(
+                    "Loaded active scene '{}' with {} entities into GameState",
+                    scene_name,
+                    scene.entities.len()
+                );
             }
             Err(e) => {
-                tracing::error!("Failed to load active scene '{}' into GameState: {}",
-                               scene_name, e);
+                tracing::error!(
+                    "Failed to load active scene '{}' into GameState: {}",
+                    scene_name,
+                    e
+                );
             }
         }
     }
-    
-    fn load_scene_tilemap(viewport: &mut crate::scene::SceneViewport, scene: &toki_core::Scene, scene_name: &str, project_path: Option<&std::path::Path>) {
+
+    fn load_scene_tilemap(
+        viewport: &mut crate::scene::SceneViewport,
+        scene: &toki_core::Scene,
+        scene_name: &str,
+        project_path: Option<&std::path::Path>,
+    ) {
         let Some(map_name) = scene.maps.first() else {
             // Even if there's no map, mark dirty to show entities
             viewport.mark_dirty();
             return;
         };
-        
+
         let Some(project_path) = project_path else {
             tracing::warn!("No project path available for loading tilemap");
             return;
         };
-        
+
         let map_file = project_path
             .join("assets")
             .join("tilemaps")
             .join(format!("{}.json", map_name));
-            
+
         match viewport.scene_manager_mut().load_tilemap(&map_file) {
             Ok(()) => {
-                tracing::info!("Loaded active scene '{}' map '{}' into viewport",
-                              scene_name, map_name);
+                tracing::info!(
+                    "Loaded active scene '{}' map '{}' into viewport",
+                    scene_name,
+                    map_name
+                );
                 viewport.mark_dirty();
             }
             Err(e) => {
-                tracing::error!("Failed to load active scene '{}' map '{}': {}",
-                               scene_name, map_name, e);
+                tracing::error!(
+                    "Failed to load active scene '{}' map '{}': {}",
+                    scene_name,
+                    map_name,
+                    e
+                );
             }
         }
     }
-    
+
     fn clear_viewport_scene(&mut self) {
         if let Some(viewport) = &mut self.scene_viewport {
             viewport.scene_manager_mut().clear_tilemap();
@@ -827,21 +878,33 @@ impl EditorApp {
         }
     }
 
-
     /// Load sprite frame for preview (cached) - static version
-    fn load_preview_sprite_frame_static(entity_def_name: &str, project_path: &std::path::Path, project_assets: &crate::project::ProjectAssets) -> Option<toki_core::sprite::SpriteFrame> {
-        tracing::info!("Loading preview sprite frame for entity '{}' (one-time cache)", entity_def_name);
+    fn load_preview_sprite_frame_static(
+        entity_def_name: &str,
+        project_path: &std::path::Path,
+        project_assets: &crate::project::ProjectAssets,
+    ) -> Option<toki_core::sprite::SpriteFrame> {
+        tracing::info!(
+            "Loading preview sprite frame for entity '{}' (one-time cache)",
+            entity_def_name
+        );
 
         // Load entity definition
-        let entity_file = project_path.join("entities").join(format!("{}.json", entity_def_name));
+        let entity_file = project_path
+            .join("entities")
+            .join(format!("{}.json", entity_def_name));
         if !entity_file.exists() {
-            tracing::warn!("Entity definition file not found for preview: {:?}", entity_file);
+            tracing::warn!(
+                "Entity definition file not found for preview: {:?}",
+                entity_file
+            );
             return None;
         }
 
-        let entity_def = match std::fs::read_to_string(&entity_file)
-            .and_then(|content| serde_json::from_str::<toki_core::entity::EntityDefinition>(&content).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-        {
+        let entity_def = match std::fs::read_to_string(&entity_file).and_then(|content| {
+            serde_json::from_str::<toki_core::entity::EntityDefinition>(&content)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+        }) {
             Ok(def) => def,
             Err(e) => {
                 tracing::warn!("Failed to load entity definition for preview: {}", e);
@@ -857,15 +920,18 @@ impl EditorApp {
         let atlas_asset = project_assets.sprite_atlases.get(atlas_name_clean)?;
 
         // Load the sprite atlas
-        let sprite_atlas = match toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_asset.path) {
-            Ok(atlas) => atlas,
-            Err(e) => {
-                tracing::warn!("Failed to load sprite atlas for preview: {}", e);
-                return None;
-            }
-        };
+        let sprite_atlas =
+            match toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_asset.path) {
+                Ok(atlas) => atlas,
+                Err(e) => {
+                    tracing::warn!("Failed to load sprite atlas for preview: {}", e);
+                    return None;
+                }
+            };
 
-        let sprite_texture_size = sprite_atlas.image_size().unwrap_or(glam::UVec2::new(64, 16));
+        let sprite_texture_size = sprite_atlas
+            .image_size()
+            .unwrap_or(glam::UVec2::new(64, 16));
 
         // Get the default animation frame (usually idle state, first frame)
         if let Some(clip_def) = entity_def.animations.clips.first() {
@@ -879,7 +945,10 @@ impl EditorApp {
                         v1: uvs[3],
                     });
                 } else {
-                    tracing::warn!("Failed to get UV coordinates for tile '{}' in preview", first_tile_name);
+                    tracing::warn!(
+                        "Failed to get UV coordinates for tile '{}' in preview",
+                        first_tile_name
+                    );
                 }
             } else {
                 tracing::warn!("No frame tiles found in first animation clip for preview");

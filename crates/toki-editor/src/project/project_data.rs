@@ -64,8 +64,7 @@ pub struct AssetConfig {
 }
 
 /// Editor-specific settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct EditorSettings {
     /// Last opened scene
     pub last_scene: Option<String>,
@@ -87,7 +86,6 @@ pub struct CameraSettings {
     /// Viewport size
     pub viewport_size: [u32; 2],
 }
-
 
 impl Default for AssetConfig {
     fn default() -> Self {

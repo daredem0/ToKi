@@ -110,8 +110,8 @@ impl GameState {
 
     /// Spawn an NPC that looks identical to the player
     pub fn spawn_player_like_npc(&mut self, position: glam::IVec2) -> EntityId {
-        use crate::entity::EntityAttributes;
         use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
+        use crate::entity::EntityAttributes;
 
         // Create identical animation controller as player
         let mut controller = AnimationController::new();
@@ -192,20 +192,16 @@ impl GameState {
     }
 
     /// Update NPC AI - makes NPCs move randomly every few frames
-    fn update_npc_ai(
-        &mut self,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
-    ) {
+    fn update_npc_ai(&mut self, world_bounds: glam::UVec2, tilemap: &TileMap, atlas: &AtlasMeta) {
         self.npc_ai_frame_counter += 1;
-        
+
         // Only update NPC AI every 60 frames (roughly once per second at 60fps)
         if self.npc_ai_frame_counter % 60 != 0 {
             return;
         }
 
-        let npc_entity_ids: Vec<_> = self.entity_manager
+        let npc_entity_ids: Vec<_> = self
+            .entity_manager
             .active_entities()
             .iter()
             .filter_map(|&entity_id| {
@@ -228,19 +224,38 @@ impl GameState {
                 // Choose random direction: 0=up, 1=down, 2=left, 3=right, 4=stay
                 let random_direction = fastrand::u32(0..5);
                 let current_position = npc_entity.position;
-                
+
                 let new_position = match random_direction {
-                    0 => glam::IVec2::new(current_position.x, (current_position.y - self.movement_step * 5).max(0)),
-                    1 => glam::IVec2::new(current_position.x, (current_position.y + self.movement_step * 5).min(world_bounds.y as i32 - self.sprite_size as i32)),
-                    2 => glam::IVec2::new((current_position.x - self.movement_step * 5).max(0), current_position.y),
-                    3 => glam::IVec2::new((current_position.x + self.movement_step * 5).min(world_bounds.x as i32 - self.sprite_size as i32), current_position.y),
+                    0 => glam::IVec2::new(
+                        current_position.x,
+                        (current_position.y - self.movement_step * 5).max(0),
+                    ),
+                    1 => glam::IVec2::new(
+                        current_position.x,
+                        (current_position.y + self.movement_step * 5)
+                            .min(world_bounds.y as i32 - self.sprite_size as i32),
+                    ),
+                    2 => glam::IVec2::new(
+                        (current_position.x - self.movement_step * 5).max(0),
+                        current_position.y,
+                    ),
+                    3 => glam::IVec2::new(
+                        (current_position.x + self.movement_step * 5)
+                            .min(world_bounds.x as i32 - self.sprite_size as i32),
+                        current_position.y,
+                    ),
                     4 => current_position, // Stay in place
                     _ => current_position,
                 };
 
                 let npc_moved = if new_position != current_position {
                     // Check collision before moving
-                    if collision::can_entity_move_to_position(npc_entity, new_position, tilemap, atlas) {
+                    if collision::can_entity_move_to_position(
+                        npc_entity,
+                        new_position,
+                        tilemap,
+                        atlas,
+                    ) {
                         npc_entity.position = new_position;
                         true
                     } else {
@@ -251,13 +266,14 @@ impl GameState {
                 };
 
                 // Update NPC animation based on movement
-                if let Some(animation_controller) = &mut npc_entity.attributes.animation_controller {
+                if let Some(animation_controller) = &mut npc_entity.attributes.animation_controller
+                {
                     let desired_animation = if npc_moved {
                         AnimationState::Walk
                     } else {
                         AnimationState::Idle
                     };
-                    
+
                     if animation_controller.current_clip_state != desired_animation {
                         animation_controller.play(desired_animation);
                     }
@@ -265,7 +281,6 @@ impl GameState {
             }
         }
     }
-
 
     /// Process input and update player position
     /// Returns GameUpdateResult with movement info and audio events
@@ -462,7 +477,9 @@ impl GameState {
     /// This will clear current entities and load entities from the scene
     pub fn load_scene(&mut self, scene_name: &str) -> Result<(), String> {
         // Get the scene first
-        let scene = self.scene_manager.get_scene(scene_name)
+        let scene = self
+            .scene_manager
+            .get_scene(scene_name)
             .ok_or_else(|| format!("Scene '{}' not found", scene_name))?
             .clone();
 
@@ -476,7 +493,7 @@ impl GameState {
         // Load entities from scene
         for entity in scene.entities {
             let entity_id = self.entity_manager.add_existing_entity(entity.clone());
-            
+
             // Track player entity
             if matches!(entity.entity_type, crate::entity::EntityType::Player) {
                 self.player_id = Some(entity_id);
@@ -502,7 +519,7 @@ impl GameState {
         if let Some(active_scene) = self.scene_manager.active_scene_mut() {
             // Clear scene entities and reload from current entity manager
             active_scene.entities.clear();
-            
+
             for entity_id in self.entity_manager.active_entities() {
                 if let Some(entity) = self.entity_manager.get_entity(entity_id) {
                     active_scene.entities.push(entity.clone());
@@ -539,20 +556,32 @@ impl GameState {
         atlas: &AtlasMeta,
         texture_size: glam::UVec2,
     ) -> Option<SpriteFrame> {
-        tracing::trace!("Getting sprite frame for entity {} with texture size {}x{}", entity_id, texture_size.x, texture_size.y);
-        
+        tracing::trace!(
+            "Getting sprite frame for entity {} with texture size {}x{}",
+            entity_id,
+            texture_size.x,
+            texture_size.y
+        );
+
         if let Some(entity) = self.entity_manager.get_entity(entity_id) {
             tracing::trace!("Found entity {} for sprite frame lookup", entity_id);
-            
+
             if let Some(animation_controller) = &entity.attributes.animation_controller {
                 tracing::trace!("Entity {} has animation controller", entity_id);
-                
+
                 if let Ok(tile_name) = animation_controller.current_tile_name() {
                     tracing::trace!("Entity {} requesting tile: '{}'", entity_id, tile_name);
-                    
+
                     // Look up the tile in the atlas to get UV coordinates
                     if let Some(uvs) = atlas.get_tile_uvs(&tile_name, texture_size) {
-                        tracing::trace!("Found UVs for tile '{}': [{:.3}, {:.3}, {:.3}, {:.3}]", tile_name, uvs[0], uvs[1], uvs[2], uvs[3]);
+                        tracing::trace!(
+                            "Found UVs for tile '{}': [{:.3}, {:.3}, {:.3}, {:.3}]",
+                            tile_name,
+                            uvs[0],
+                            uvs[1],
+                            uvs[2],
+                            uvs[3]
+                        );
                         return Some(SpriteFrame {
                             u0: uvs[0],
                             v0: uvs[1],
@@ -560,11 +589,21 @@ impl GameState {
                             v1: uvs[3],
                         });
                     } else {
-                        tracing::warn!("Tile '{}' not found in atlas for entity {}", tile_name, entity_id);
-                        tracing::trace!("Atlas contains tiles: {:?}", atlas.tiles.keys().collect::<Vec<_>>());
+                        tracing::warn!(
+                            "Tile '{}' not found in atlas for entity {}",
+                            tile_name,
+                            entity_id
+                        );
+                        tracing::trace!(
+                            "Atlas contains tiles: {:?}",
+                            atlas.tiles.keys().collect::<Vec<_>>()
+                        );
                     }
                 } else {
-                    tracing::trace!("Entity {} animation controller failed to provide tile name", entity_id);
+                    tracing::trace!(
+                        "Entity {} animation controller failed to provide tile name",
+                        entity_id
+                    );
                 }
             } else {
                 tracing::trace!("Entity {} has no animation controller", entity_id);
@@ -578,29 +617,48 @@ impl GameState {
     /// Get all renderable entities (entities that are visible and have animation controllers)
     pub fn get_renderable_entities(&self) -> Vec<(EntityId, glam::IVec2, glam::UVec2)> {
         let active_entities = self.entity_manager.active_entities();
-        tracing::trace!("Checking {} active entities for renderability", active_entities.len());
-        
-        let renderable: Vec<_> = self.entity_manager
+        tracing::trace!(
+            "Checking {} active entities for renderability",
+            active_entities.len()
+        );
+
+        let renderable: Vec<_> = self
+            .entity_manager
             .active_entities()
             .iter()
             .filter_map(|&entity_id| {
                 if let Some(entity) = self.entity_manager.get_entity(entity_id) {
                     let is_visible = entity.attributes.visible;
                     let has_animation = entity.attributes.animation_controller.is_some();
-                    
-                    tracing::trace!("Entity {}: visible={}, has_animation={}", entity_id, is_visible, has_animation);
-                    
+
+                    tracing::trace!(
+                        "Entity {}: visible={}, has_animation={}",
+                        entity_id,
+                        is_visible,
+                        has_animation
+                    );
+
                     if is_visible && has_animation {
-                        tracing::trace!("Entity {} is renderable at ({}, {}) with size {}x{}", 
-                                       entity_id, entity.position.x, entity.position.y, entity.size.x, entity.size.y);
+                        tracing::trace!(
+                            "Entity {} is renderable at ({}, {}) with size {}x{}",
+                            entity_id,
+                            entity.position.x,
+                            entity.position.y,
+                            entity.size.x,
+                            entity.size.y
+                        );
                         return Some((entity_id, entity.position, entity.size));
                     }
                 }
                 None
             })
             .collect();
-            
-        tracing::trace!("Found {} renderable entities out of {} active entities", renderable.len(), active_entities.len());
+
+        tracing::trace!(
+            "Found {} renderable entities out of {} active entities",
+            renderable.len(),
+            active_entities.len()
+        );
         renderable
     }
 

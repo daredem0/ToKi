@@ -1,8 +1,8 @@
-use toki_core::camera::{Camera, CameraController, RuntimeState};
 use toki_core::assets::tilemap::TileMap;
+use toki_core::camera::{Camera, CameraController, RuntimeState};
 
 /// Camera manager that handles camera state coordination, controller logic, and chunk caching optimization.
-/// 
+///
 /// Manages the coordination between camera movement, world bounds, and visible chunk caching
 /// for optimal rendering performance.
 #[derive(Debug)]
@@ -51,13 +51,13 @@ impl CameraManager {
     /// Returns true if the camera position changed.
     pub fn update(&mut self, runtime: &RuntimeState, world_size: glam::UVec2) -> bool {
         let prev_pos = self.camera.position;
-        
+
         // Update camera based on controller
         self.controller.update(&mut self.camera, runtime);
-        
-        // Clamp to world bounds  
+
+        // Clamp to world bounds
         self.camera.clamp_to_world_bounds(world_size);
-        
+
         // Return whether camera moved
         prev_pos != self.camera.position
     }
@@ -69,7 +69,7 @@ impl CameraManager {
             glam::UVec2::new(self.camera.position.x as u32, self.camera.position.y as u32),
             self.camera.viewport_size,
         );
-        
+
         if current_chunks != self.cached_visible_chunks {
             self.cached_visible_chunks = current_chunks;
             true

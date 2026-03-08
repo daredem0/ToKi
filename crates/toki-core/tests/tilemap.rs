@@ -1,7 +1,10 @@
 use glam::UVec2;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use toki_core::assets::{atlas::{AtlasMeta, TileInfo, TileProperties}, tilemap::TileMap};
+use toki_core::assets::{
+    atlas::{AtlasMeta, TileInfo, TileProperties},
+    tilemap::TileMap,
+};
 use toki_core::CoreError;
 
 // Helper function to create a simple test tilemap
@@ -22,22 +25,40 @@ fn create_test_tilemap() -> TileMap {
 // Helper function to create a test atlas
 fn create_test_atlas() -> AtlasMeta {
     let mut tiles = HashMap::new();
-    tiles.insert("grass".to_string(), TileInfo {
-        position: UVec2::new(0, 0),
-        properties: TileProperties::default(),
-    });
-    tiles.insert("stone".to_string(), TileInfo {
-        position: UVec2::new(1, 0),
-        properties: TileProperties { solid: true, trigger: false },
-    });
-    tiles.insert("water".to_string(), TileInfo {
-        position: UVec2::new(0, 1),
-        properties: TileProperties { solid: false, trigger: true },
-    });
-    tiles.insert("dirt".to_string(), TileInfo {
-        position: UVec2::new(1, 1),
-        properties: TileProperties::default(),
-    });
+    tiles.insert(
+        "grass".to_string(),
+        TileInfo {
+            position: UVec2::new(0, 0),
+            properties: TileProperties::default(),
+        },
+    );
+    tiles.insert(
+        "stone".to_string(),
+        TileInfo {
+            position: UVec2::new(1, 0),
+            properties: TileProperties {
+                solid: true,
+                trigger: false,
+            },
+        },
+    );
+    tiles.insert(
+        "water".to_string(),
+        TileInfo {
+            position: UVec2::new(0, 1),
+            properties: TileProperties {
+                solid: false,
+                trigger: true,
+            },
+        },
+    );
+    tiles.insert(
+        "dirt".to_string(),
+        TileInfo {
+            position: UVec2::new(1, 1),
+            properties: TileProperties::default(),
+        },
+    );
 
     AtlasMeta {
         image: PathBuf::from("test_texture.png"),
