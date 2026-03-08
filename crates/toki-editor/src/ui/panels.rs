@@ -46,8 +46,33 @@ impl PanelSystem {
                     egui::Sense::click_and_drag().union(egui::Sense::hover()),
                 );
 
-                // Handle camera panning with drag
-                CameraInteraction::handle_drag(viewport, &response, config);
+                // Start entity move drag if dragging began over an entity.
+                if response.drag_started() {
+                    if let Some(drag_start_pos) = response.interact_pointer_pos() {
+                        SelectionInteraction::handle_drag_start(
+                            ui_state,
+                            viewport,
+                            drag_start_pos,
+                            rect,
+                            config,
+                        );
+                    }
+                }
+
+                // Handle drag release for entity move operations.
+                if response.drag_stopped() {
+                    let drop_pos = response
+                        .interact_pointer_pos()
+                        .or_else(|| response.hover_pos());
+                    SelectionInteraction::handle_drag_release(ui_state, viewport, drop_pos, rect);
+                }
+
+                // Handle camera panning with drag (disabled while moving an entity).
+                if !ui_state.is_entity_move_drag_active() {
+                    CameraInteraction::handle_drag(viewport, &response, config);
+                } else {
+                    viewport.stop_camera_drag();
+                }
 
                 // Handle placement mode hover logic
                 PlacementInteraction::handle_hover(ui_state, viewport, &response, rect, config);
@@ -61,10 +86,8 @@ impl PanelSystem {
                                 ui_state, viewport, click_pos, rect, config,
                             );
                         } else {
-                            // Normal entity selection - use new hit detection
-                            SelectionInteraction::handle_click(
-                                ui_state, viewport, click_pos, rect, config,
-                            );
+                            // Normal entity selection
+                            SelectionInteraction::handle_click(ui_state, viewport, click_pos, rect);
                         }
                     }
                 }

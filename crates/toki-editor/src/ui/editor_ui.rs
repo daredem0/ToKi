@@ -2,7 +2,10 @@ use super::inspector::InspectorSystem;
 use super::menus::MenuSystem;
 use super::panels::PanelSystem;
 use crate::scene::SceneViewport;
-use toki_core::{entity::EntityId, Scene};
+use toki_core::{
+    entity::{Entity, EntityId},
+    Scene,
+};
 
 #[derive(Debug, Clone)]
 pub enum Selection {
@@ -11,6 +14,12 @@ pub enum Selection {
     Entity(EntityId),
     StandaloneMap(String), // Map selected from Maps panel (not in scene context)
     EntityDefinition(String), // Entity definition from palette
+}
+
+#[derive(Debug, Clone)]
+pub struct EntityMoveDragState {
+    pub scene_name: String,
+    pub entity: Entity,
 }
 
 /// Manages the editor's UI state and rendering
@@ -52,6 +61,7 @@ pub struct EditorUI {
     pub placement_preview_position: Option<glam::Vec2>, // World coordinates for preview
     pub placement_preview_cached_frame: Option<toki_core::sprite::SpriteFrame>, // Cached sprite frame for preview
     pub placement_preview_valid: Option<bool>, // Whether the current preview position is valid for placement
+    pub entity_move_drag: Option<EntityMoveDragState>, // Active drag-move operation for existing scene entities
 }
 
 impl EditorUI {
@@ -94,6 +104,7 @@ impl EditorUI {
             placement_preview_position: None,
             placement_preview_cached_frame: None,
             placement_preview_valid: None,
+            entity_move_drag: None,
         }
     }
 
@@ -145,10 +156,19 @@ impl EditorUI {
         self.placement_preview_position = None;
         self.placement_preview_cached_frame = None;
         self.placement_preview_valid = None;
+        self.entity_move_drag = None;
     }
 
     pub fn is_in_placement_mode(&self) -> bool {
         self.placement_mode
+    }
+
+    pub fn begin_entity_move_drag(&mut self, drag_state: EntityMoveDragState) {
+        self.entity_move_drag = Some(drag_state);
+    }
+
+    pub fn is_entity_move_drag_active(&self) -> bool {
+        self.entity_move_drag.is_some()
     }
 
     /// Render the entire UI

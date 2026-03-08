@@ -231,7 +231,7 @@ impl PlacementInteraction {
         }
     }
 
-    fn centered_world_position_from_sprite_center(
+    pub(crate) fn centered_world_position_from_sprite_center(
         world_pos: glam::Vec2,
         sprite_size: glam::UVec2,
     ) -> glam::IVec2 {
