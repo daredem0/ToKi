@@ -39,6 +39,18 @@ clippy:
 install-llvm-cov:
     cargo install cargo-llvm-cov
 
+# Install cargo-release.
+install-cargo-release:
+    cargo install cargo-release
+
+# Dry-run a workspace release (no publish, no push).
+release-dry-run version:
+    cargo release {{version}} --workspace --no-publish
+
+# Execute a workspace release commit/tag locally (no publish, no push).
+release-execute version:
+    cargo release {{version}} --workspace --no-publish --execute
+
 # Open coverage report for toki-core.
 coverage-open:
     cargo llvm-cov -p toki-core --open

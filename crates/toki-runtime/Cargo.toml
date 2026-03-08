@@ -1,8 +1,12 @@
 [package]
 name = "toki-runtime"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 license = "GPL-3.0"
+description = "Runtime executable and game loop integration for ToKi projects."
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
 
 [lib]
 name = "toki_runtime"
