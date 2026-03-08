@@ -2,7 +2,7 @@
 name = "toki-schemas"
 version.workspace = true
 edition.workspace = true
-license = "GPL-3.0-or-later"
+license = "MPL-2.0"
 description = "Canonical JSON schema definitions for ToKi assets."
 repository.workspace = true
 homepage.workspace = true

@@ -4,7 +4,7 @@
 [![Coverage](https://codecov.io/gh/daredem0/toki/graph/badge.svg?branch=main)](https://codecov.io/gh/daredem0/toki)
 [![Docs](https://img.shields.io/badge/docs-github%20pages-2ea44f?logo=github)](https://daredem0.github.io/toki/)
 [![Release](https://img.shields.io/github/v/release/daredem0/toki)](https://github.com/daredem0/toki/releases)
-[![License](https://img.shields.io/github/license/daredem0/toki)](./LICENSE)
+[![License](https://img.shields.io/badge/license-MPL--2.0%20libs%20%7C%20community%2Fcommercial%20apps-blue)](./README.md#license)
 [![Rust Edition](https://img.shields.io/badge/rust-2024%20edition-black?logo=rust)](https://www.rust-lang.org/)
 
 **ToKi** is a lightweight, pixel-perfect 2D game engine and editor inspired by the visual and design constraints of the original Nintendo Game Boy.  
@@ -133,9 +133,16 @@ Commit Message Shape Rules
 
 ## License
 
-This project is dual‑licensed under either:
+This workspace currently uses a mixed licensing model:
 
-- **GPL‑3.0‑or‑later** — see `LICENSE`; or
-- **Toki Commercial License v1.0** — see `LICENSE-COMMERCIAL.md`.
+- `toki-core`, `toki-schemas`, and `toki-render` are licensed under **MPL-2.0**
+- `toki-runtime` and `toki-editor` use the application-layer license in `LICENSE.md`
 
-Choose the option that fits your needs. To use this software in a proprietary product without GPL copyleft obligations, contact me to purchase a commercial license.
+See each crate's `Cargo.toml` for the authoritative package license.
+
+The application-layer packages use this model:
+
+- **Non-commercial and non-monetized use** — see `LICENSE.md`
+- **Separate written commercial agreement required** — see `LICENSE-COMMERCIAL.md` for commercial or monetized use
+
+`LICENSE.md` is the canonical and Cargo-facing license file for `toki-runtime` and `toki-editor`.
