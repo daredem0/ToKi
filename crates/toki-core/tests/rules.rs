@@ -387,6 +387,77 @@ fn rules_serialize_roundtrip() {
 }
 
 #[test]
+fn switch_scene_placeholder_does_not_change_active_scene_or_emit_events() {
+    let mut state = GameState::new_empty();
+    state.add_scene(Scene::new("Scene A".to_string()));
+    state.add_scene(Scene::new("Scene B".to_string()));
+    state
+        .load_scene("Scene A")
+        .expect("initial scene should load");
+
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "switch-placeholder",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::SwitchScene {
+                scene_name: "Scene B".to_string(),
+            }],
+        )],
+    });
+
+    let before = state
+        .active_scene()
+        .expect("active scene should exist")
+        .name
+        .clone();
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    let after = state
+        .active_scene()
+        .expect("active scene should exist")
+        .name
+        .clone();
+
+    assert_eq!(before, "Scene A");
+    assert_eq!(after, "Scene A");
+    assert!(result.events.is_empty());
+}
+
+#[test]
+fn on_start_set_velocity_initializes_persistent_movement() {
+    let mut state = GameState::new_empty();
+    state.spawn_player_at(IVec2::new(30, 30));
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "start-velocity",
+            RuleTrigger::OnStart,
+            0,
+            vec![RuleAction::SetVelocity {
+                target: RuleTarget::Player,
+                velocity: [3, 0],
+            }],
+        )],
+    });
+
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+    let world_bounds = UVec2::new(512, 512);
+
+    let before = state.player_position();
+    state.update(world_bounds, &tilemap, &atlas);
+    let after_first = state.player_position();
+    state.update(world_bounds, &tilemap, &atlas);
+    let after_second = state.player_position();
+
+    assert_eq!(after_first.x, before.x + 3);
+    assert_eq!(after_second.x, after_first.x + 3);
+}
+
+#[test]
 fn load_scene_applies_scene_rules() {
     let mut state = GameState::new_empty();
     let mut scene = Scene::new("Rule Scene".to_string());
