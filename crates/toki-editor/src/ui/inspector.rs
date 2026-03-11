@@ -1,5 +1,6 @@
 use super::editor_ui::{EditorUI, Selection};
 use crate::config::EditorConfig;
+use std::collections::HashMap;
 use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
 };
@@ -28,6 +29,34 @@ struct EntityPropertyDraft {
     collision_size_x: i64,
     collision_size_y: i64,
     collision_trigger: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RuleActionKind {
+    PlaySound,
+    SetVelocity,
+    SwitchScene,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RuleValidationIssue {
+    rule_index: usize,
+    action_index: Option<usize>,
+    message: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RuleEditorCommand {
+    Remove(usize),
+    Duplicate(usize),
+    MoveUp(usize),
+    MoveDown(usize),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct RuleEditorOutcome {
+    changed: bool,
+    command: Option<RuleEditorCommand>,
 }
 
 impl EntityPropertyDraft {
@@ -263,12 +292,180 @@ impl InspectorSystem {
         id
     }
 
+    fn duplicate_rule(rule_set: &mut RuleSet, rule_index: usize) -> Option<usize> {
+        let source_rule = rule_set.rules.get(rule_index)?.clone();
+        let mut duplicated = source_rule;
+        duplicated.id = Self::next_rule_id(rule_set);
+        let insert_index = (rule_index + 1).min(rule_set.rules.len());
+        rule_set.rules.insert(insert_index, duplicated);
+        Some(insert_index)
+    }
+
+    fn remove_rule(rule_set: &mut RuleSet, rule_index: usize) -> Option<usize> {
+        if rule_index >= rule_set.rules.len() {
+            return None;
+        }
+
+        rule_set.rules.remove(rule_index);
+        if rule_set.rules.is_empty() {
+            None
+        } else if rule_index < rule_set.rules.len() {
+            Some(rule_index)
+        } else {
+            Some(rule_set.rules.len() - 1)
+        }
+    }
+
+    fn move_rule_up(rule_set: &mut RuleSet, rule_index: usize) -> Option<usize> {
+        if rule_index >= rule_set.rules.len() {
+            return None;
+        }
+        if rule_index == 0 {
+            return Some(0);
+        }
+
+        rule_set.rules.swap(rule_index - 1, rule_index);
+        Some(rule_index - 1)
+    }
+
+    fn move_rule_down(rule_set: &mut RuleSet, rule_index: usize) -> Option<usize> {
+        if rule_index >= rule_set.rules.len() {
+            return None;
+        }
+        if rule_index + 1 >= rule_set.rules.len() {
+            return Some(rule_index);
+        }
+
+        rule_set.rules.swap(rule_index, rule_index + 1);
+        Some(rule_index + 1)
+    }
+
+    fn add_action(rule: &mut Rule, action_kind: RuleActionKind) {
+        rule.actions.push(Self::default_action(action_kind));
+    }
+
+    fn remove_action(rule: &mut Rule, action_index: usize) -> bool {
+        if action_index >= rule.actions.len() {
+            return false;
+        }
+        rule.actions.remove(action_index);
+        true
+    }
+
+    fn switch_action_kind(action: &mut RuleAction, action_kind: RuleActionKind) {
+        *action = Self::default_action(action_kind);
+    }
+
+    fn validate_rule_set(rule_set: &RuleSet) -> Vec<RuleValidationIssue> {
+        let mut issues = Vec::new();
+
+        let mut id_to_indices: HashMap<&str, Vec<usize>> = HashMap::new();
+        for (rule_index, rule) in rule_set.rules.iter().enumerate() {
+            id_to_indices
+                .entry(rule.id.as_str())
+                .or_default()
+                .push(rule_index);
+        }
+
+        for (rule_id, indices) in id_to_indices {
+            if indices.len() > 1 {
+                for rule_index in indices {
+                    issues.push(RuleValidationIssue {
+                        rule_index,
+                        action_index: None,
+                        message: format!("Duplicate rule id '{rule_id}'"),
+                    });
+                }
+            }
+        }
+
+        for (rule_index, rule) in rule_set.rules.iter().enumerate() {
+            if rule.id.trim().is_empty() {
+                issues.push(RuleValidationIssue {
+                    rule_index,
+                    action_index: None,
+                    message: "Rule id must not be empty".to_string(),
+                });
+            }
+
+            for (action_index, action) in rule.actions.iter().enumerate() {
+                match action {
+                    RuleAction::PlaySound { sound_id, .. } => {
+                        if sound_id.trim().is_empty() {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "PlaySound requires a non-empty sound id".to_string(),
+                            });
+                        }
+                    }
+                    RuleAction::SetVelocity { target, .. } => {
+                        if let RuleTarget::Entity(entity_id) = target {
+                            if *entity_id == 0 {
+                                issues.push(RuleValidationIssue {
+                                    rule_index,
+                                    action_index: Some(action_index),
+                                    message: "SetVelocity entity target must be non-zero"
+                                        .to_string(),
+                                });
+                            }
+                        }
+                    }
+                    RuleAction::SwitchScene { scene_name } => {
+                        if scene_name.trim().is_empty() {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "SwitchScene requires a scene name".to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        issues
+    }
+
+    fn default_action(action_kind: RuleActionKind) -> RuleAction {
+        match action_kind {
+            RuleActionKind::PlaySound => RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "sfx_placeholder".to_string(),
+            },
+            RuleActionKind::SetVelocity => RuleAction::SetVelocity {
+                target: RuleTarget::Player,
+                velocity: [0, 0],
+            },
+            RuleActionKind::SwitchScene => RuleAction::SwitchScene {
+                scene_name: String::new(),
+            },
+        }
+    }
+
+    fn action_kind(action: &RuleAction) -> RuleActionKind {
+        match action {
+            RuleAction::PlaySound { .. } => RuleActionKind::PlaySound,
+            RuleAction::SetVelocity { .. } => RuleActionKind::SetVelocity,
+            RuleAction::SwitchScene { .. } => RuleActionKind::SwitchScene,
+        }
+    }
+
+    fn action_kind_label(action_kind: RuleActionKind) -> &'static str {
+        match action_kind {
+            RuleActionKind::PlaySound => "PlaySound",
+            RuleActionKind::SetVelocity => "SetVelocity",
+            RuleActionKind::SwitchScene => "SwitchScene",
+        }
+    }
+
     fn render_scene_rules_editor(
         ui: &mut egui::Ui,
         scene_name: &str,
         rule_set: &mut RuleSet,
     ) -> bool {
         let mut changed = false;
+        let validation_issues = Self::validate_rule_set(rule_set);
 
         ui.label("Visual Rules");
         ui.horizontal(|ui| {
@@ -282,24 +479,51 @@ impl InspectorSystem {
             changed = true;
         }
 
+        if !validation_issues.is_empty() {
+            ui.colored_label(
+                egui::Color32::from_rgb(255, 210, 80),
+                format!("⚠ {} validation issues", validation_issues.len()),
+            );
+        }
+
         if rule_set.rules.is_empty() {
             ui.label("No rules configured");
             return changed;
         }
 
-        let mut remove_rule_index = None;
+        let mut pending_command = None;
         for (rule_index, rule) in rule_set.rules.iter_mut().enumerate() {
-            let (rule_changed, remove_rule) =
-                Self::render_rule_editor(ui, scene_name, rule_index, rule);
-            changed |= rule_changed;
-            if remove_rule {
-                remove_rule_index = Some(rule_index);
+            let outcome =
+                Self::render_rule_editor(ui, scene_name, rule_index, rule, &validation_issues);
+            changed |= outcome.changed;
+            if pending_command.is_none() {
+                pending_command = outcome.command;
             }
         }
 
-        if let Some(index) = remove_rule_index {
-            rule_set.rules.remove(index);
-            changed = true;
+        if let Some(command) = pending_command {
+            match command {
+                RuleEditorCommand::Remove(rule_index) => {
+                    if Self::remove_rule(rule_set, rule_index).is_some() {
+                        changed = true;
+                    }
+                }
+                RuleEditorCommand::Duplicate(rule_index) => {
+                    if Self::duplicate_rule(rule_set, rule_index).is_some() {
+                        changed = true;
+                    }
+                }
+                RuleEditorCommand::MoveUp(rule_index) => {
+                    if let Some(new_index) = Self::move_rule_up(rule_set, rule_index) {
+                        changed |= new_index != rule_index;
+                    }
+                }
+                RuleEditorCommand::MoveDown(rule_index) => {
+                    if let Some(new_index) = Self::move_rule_down(rule_set, rule_index) {
+                        changed |= new_index != rule_index;
+                    }
+                }
+            }
         }
 
         changed
@@ -310,27 +534,49 @@ impl InspectorSystem {
         scene_name: &str,
         rule_index: usize,
         rule: &mut Rule,
-    ) -> (bool, bool) {
-        let mut changed = false;
-        let mut remove_rule = false;
+        validation_issues: &[RuleValidationIssue],
+    ) -> RuleEditorOutcome {
+        let mut outcome = RuleEditorOutcome::default();
+        let has_rule_issues = validation_issues
+            .iter()
+            .any(|issue| issue.rule_index == rule_index && issue.action_index.is_none());
 
-        let header = format!("{} ({:?})", rule.id, rule.trigger);
+        let header = if has_rule_issues {
+            format!("⚠ {} ({:?})", rule.id, rule.trigger)
+        } else {
+            format!("{} ({:?})", rule.id, rule.trigger)
+        };
         egui::CollapsingHeader::new(header)
             .id_salt(format!("rule_header_{}_{}", scene_name, rule_index))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label("Id:");
-                    changed |= ui.text_edit_singleline(&mut rule.id).changed();
+                    if ui.small_button("⧉ Duplicate").clicked() {
+                        outcome.command = Some(RuleEditorCommand::Duplicate(rule_index));
+                    }
+                    if ui.small_button("↑").clicked() {
+                        outcome.command = Some(RuleEditorCommand::MoveUp(rule_index));
+                    }
+                    if ui.small_button("↓").clicked() {
+                        outcome.command = Some(RuleEditorCommand::MoveDown(rule_index));
+                    }
+                    if ui.small_button("🗑 Remove").clicked() {
+                        outcome.command = Some(RuleEditorCommand::Remove(rule_index));
+                    }
                 });
 
                 ui.horizontal(|ui| {
-                    changed |= ui.checkbox(&mut rule.enabled, "Enabled").changed();
-                    changed |= ui.checkbox(&mut rule.once, "Once").changed();
+                    ui.label("Id:");
+                    outcome.changed |= ui.text_edit_singleline(&mut rule.id).changed();
+                });
+
+                ui.horizontal(|ui| {
+                    outcome.changed |= ui.checkbox(&mut rule.enabled, "Enabled").changed();
+                    outcome.changed |= ui.checkbox(&mut rule.once, "Once").changed();
                 });
 
                 ui.horizontal(|ui| {
                     ui.label("Priority:");
-                    changed |= ui
+                    outcome.changed |= ui
                         .add(egui::DragValue::new(&mut rule.priority).speed(1.0))
                         .changed();
                 });
@@ -346,10 +592,10 @@ impl InspectorSystem {
                         RuleTrigger::OnUpdate => "OnUpdate",
                     })
                     .show_ui(ui, |ui| {
-                        changed |= ui
+                        outcome.changed |= ui
                             .selectable_value(&mut rule.trigger, RuleTrigger::OnStart, "OnStart")
                             .changed();
-                        changed |= ui
+                        outcome.changed |= ui
                             .selectable_value(&mut rule.trigger, RuleTrigger::OnUpdate, "OnUpdate")
                             .changed();
                     });
@@ -357,9 +603,15 @@ impl InspectorSystem {
 
                 if rule.conditions.is_empty() {
                     rule.conditions.push(RuleCondition::Always);
-                    changed = true;
+                    outcome.changed = true;
                 }
                 ui.label("Conditions: Always");
+                for issue in validation_issues
+                    .iter()
+                    .filter(|issue| issue.rule_index == rule_index && issue.action_index.is_none())
+                {
+                    ui.colored_label(egui::Color32::from_rgb(255, 210, 80), &issue.message);
+                }
 
                 ui.separator();
                 ui.label("Actions");
@@ -373,50 +625,38 @@ impl InspectorSystem {
                                 remove_action_index = Some(action_index);
                             }
                         });
-                        changed |= Self::render_rule_action_editor(
+                        outcome.changed |= Self::render_rule_action_editor(
                             ui,
                             scene_name,
                             rule_index,
                             action_index,
                             action,
+                            validation_issues,
                         );
                     });
                 }
 
                 if let Some(index) = remove_action_index {
-                    rule.actions.remove(index);
-                    changed = true;
+                    outcome.changed |= Self::remove_action(rule, index);
                 }
 
                 ui.horizontal(|ui| {
                     if ui.small_button("+ PlaySound").clicked() {
-                        rule.actions.push(RuleAction::PlaySound {
-                            channel: RuleSoundChannel::Movement,
-                            sound_id: "sfx_placeholder".to_string(),
-                        });
-                        changed = true;
+                        Self::add_action(rule, RuleActionKind::PlaySound);
+                        outcome.changed = true;
                     }
                     if ui.small_button("+ SetVelocity").clicked() {
-                        rule.actions.push(RuleAction::SetVelocity {
-                            target: RuleTarget::Player,
-                            velocity: [0, 0],
-                        });
-                        changed = true;
+                        Self::add_action(rule, RuleActionKind::SetVelocity);
+                        outcome.changed = true;
                     }
                     if ui.small_button("+ SwitchScene").clicked() {
-                        rule.actions.push(RuleAction::SwitchScene {
-                            scene_name: String::new(),
-                        });
-                        changed = true;
+                        Self::add_action(rule, RuleActionKind::SwitchScene);
+                        outcome.changed = true;
                     }
                 });
-
-                if ui.small_button("🗑️ Remove Rule").clicked() {
-                    remove_rule = true;
-                }
             });
 
-        (changed, remove_rule)
+        outcome
     }
 
     fn render_rule_action_editor(
@@ -425,13 +665,50 @@ impl InspectorSystem {
         rule_index: usize,
         action_index: usize,
         action: &mut RuleAction,
+        validation_issues: &[RuleValidationIssue],
     ) -> bool {
         let mut changed = false;
+
+        let current_kind = Self::action_kind(action);
+        let mut selected_kind = current_kind;
+        ui.horizontal(|ui| {
+            ui.label("Type:");
+            egui::ComboBox::from_id_salt(format!(
+                "rule_action_kind_{}_{}_{}",
+                scene_name, rule_index, action_index
+            ))
+            .selected_text(Self::action_kind_label(current_kind))
+            .show_ui(ui, |ui| {
+                changed |= ui
+                    .selectable_value(
+                        &mut selected_kind,
+                        RuleActionKind::PlaySound,
+                        Self::action_kind_label(RuleActionKind::PlaySound),
+                    )
+                    .changed();
+                changed |= ui
+                    .selectable_value(
+                        &mut selected_kind,
+                        RuleActionKind::SetVelocity,
+                        Self::action_kind_label(RuleActionKind::SetVelocity),
+                    )
+                    .changed();
+                changed |= ui
+                    .selectable_value(
+                        &mut selected_kind,
+                        RuleActionKind::SwitchScene,
+                        Self::action_kind_label(RuleActionKind::SwitchScene),
+                    )
+                    .changed();
+            });
+        });
+        if selected_kind != current_kind {
+            Self::switch_action_kind(action, selected_kind);
+        }
 
         match action {
             RuleAction::PlaySound { channel, sound_id } => {
                 ui.horizontal(|ui| {
-                    ui.label("Type: PlaySound");
                     ui.label("Channel:");
                     egui::ComboBox::from_id_salt(format!(
                         "rule_sound_channel_{}_{}_{}",
@@ -457,7 +734,6 @@ impl InspectorSystem {
                 });
             }
             RuleAction::SetVelocity { target, velocity } => {
-                ui.label("Type: SetVelocity");
                 changed |= Self::render_rule_target_editor(
                     ui,
                     scene_name,
@@ -477,12 +753,17 @@ impl InspectorSystem {
                 });
             }
             RuleAction::SwitchScene { scene_name } => {
-                ui.label("Type: SwitchScene");
                 ui.horizontal(|ui| {
                     ui.label("Scene:");
                     changed |= ui.text_edit_singleline(scene_name).changed();
                 });
             }
+        }
+
+        for issue in validation_issues.iter().filter(|issue| {
+            issue.rule_index == rule_index && issue.action_index == Some(action_index)
+        }) {
+            ui.colored_label(egui::Color32::from_rgb(255, 210, 80), &issue.message);
         }
 
         changed
@@ -1338,12 +1619,14 @@ impl InspectorSystem {
 
 #[cfg(test)]
 mod tests {
-    use super::{EntityPropertyDraft, InspectorSystem};
+    use super::{EntityPropertyDraft, InspectorSystem, RuleActionKind};
     use crate::ui::EditorUI;
     use glam::{IVec2, UVec2};
     use toki_core::collision::CollisionBox;
     use toki_core::entity::{EntityAttributes, EntityManager, EntityType};
-    use toki_core::rules::{RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
+    use toki_core::rules::{
+        Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
+    };
     use toki_core::Scene;
 
     fn sample_entity_with_id(id: u32) -> toki_core::entity::Entity {
@@ -1375,6 +1658,21 @@ mod tests {
             false,
         ));
         entity
+    }
+
+    fn sample_rule(id: &str) -> Rule {
+        Rule {
+            id: id.to_string(),
+            enabled: true,
+            priority: 0,
+            once: false,
+            trigger: RuleTrigger::OnUpdate,
+            conditions: vec![RuleCondition::Always],
+            actions: vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "sfx_step".to_string(),
+            }],
+        }
     }
 
     #[test]
@@ -1534,5 +1832,196 @@ mod tests {
                 sound_id: "sfx_placeholder".to_string(),
             }
         );
+    }
+
+    #[test]
+    fn duplicate_rule_clones_payload_with_new_id_and_insert_position() {
+        let mut rules = RuleSet {
+            rules: vec![sample_rule("rule_1"), sample_rule("rule_2")],
+        };
+
+        let inserted_index =
+            InspectorSystem::duplicate_rule(&mut rules, 0).expect("duplicate should succeed");
+
+        assert_eq!(inserted_index, 1);
+        assert_eq!(rules.rules.len(), 3);
+        assert_eq!(rules.rules[0].id, "rule_1");
+        assert_eq!(rules.rules[1].id, "rule_3");
+        assert_eq!(rules.rules[2].id, "rule_2");
+        assert_eq!(rules.rules[1].actions, rules.rules[0].actions);
+    }
+
+    #[test]
+    fn remove_rule_returns_next_selection_or_previous_for_last() {
+        let mut rules = RuleSet {
+            rules: vec![
+                sample_rule("rule_1"),
+                sample_rule("rule_2"),
+                sample_rule("rule_3"),
+            ],
+        };
+
+        let selected_after_middle =
+            InspectorSystem::remove_rule(&mut rules, 1).expect("selection should stay valid");
+        assert_eq!(selected_after_middle, 1);
+        assert_eq!(
+            rules
+                .rules
+                .iter()
+                .map(|rule| rule.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["rule_1", "rule_3"]
+        );
+
+        let selected_after_last =
+            InspectorSystem::remove_rule(&mut rules, 1).expect("last removal should select prev");
+        assert_eq!(selected_after_last, 0);
+        assert_eq!(
+            rules
+                .rules
+                .iter()
+                .map(|rule| rule.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["rule_1"]
+        );
+
+        let selected_after_final = InspectorSystem::remove_rule(&mut rules, 0);
+        assert!(selected_after_final.is_none());
+        assert!(rules.rules.is_empty());
+    }
+
+    #[test]
+    fn move_rule_up_and_down_reorders_and_handles_boundaries() {
+        let mut rules = RuleSet {
+            rules: vec![
+                sample_rule("rule_1"),
+                sample_rule("rule_2"),
+                sample_rule("rule_3"),
+            ],
+        };
+
+        let up_index = InspectorSystem::move_rule_up(&mut rules, 1).expect("move up should work");
+        assert_eq!(up_index, 0);
+        assert_eq!(
+            rules
+                .rules
+                .iter()
+                .map(|rule| rule.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["rule_2", "rule_1", "rule_3"]
+        );
+
+        let noop_up = InspectorSystem::move_rule_up(&mut rules, 0).expect("boundary no-op");
+        assert_eq!(noop_up, 0);
+        assert_eq!(
+            rules
+                .rules
+                .iter()
+                .map(|rule| rule.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["rule_2", "rule_1", "rule_3"]
+        );
+
+        let down_index =
+            InspectorSystem::move_rule_down(&mut rules, 1).expect("move down should work");
+        assert_eq!(down_index, 2);
+        assert_eq!(
+            rules
+                .rules
+                .iter()
+                .map(|rule| rule.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["rule_2", "rule_3", "rule_1"]
+        );
+
+        let noop_down = InspectorSystem::move_rule_down(&mut rules, 2).expect("boundary no-op");
+        assert_eq!(noop_down, 2);
+    }
+
+    #[test]
+    fn add_remove_and_switch_action_types() {
+        let mut rule = sample_rule("rule_1");
+        assert_eq!(rule.actions.len(), 1);
+
+        InspectorSystem::add_action(&mut rule, RuleActionKind::SetVelocity);
+        InspectorSystem::add_action(&mut rule, RuleActionKind::SwitchScene);
+        assert_eq!(rule.actions.len(), 3);
+        assert!(matches!(
+            rule.actions[1],
+            RuleAction::SetVelocity {
+                target: RuleTarget::Player,
+                velocity: [0, 0]
+            }
+        ));
+        assert!(matches!(
+            rule.actions[2],
+            RuleAction::SwitchScene { ref scene_name } if scene_name.is_empty()
+        ));
+
+        InspectorSystem::switch_action_kind(&mut rule.actions[0], RuleActionKind::SetVelocity);
+        assert!(matches!(
+            rule.actions[0],
+            RuleAction::SetVelocity {
+                target: RuleTarget::Player,
+                velocity: [0, 0]
+            }
+        ));
+        InspectorSystem::switch_action_kind(&mut rule.actions[0], RuleActionKind::PlaySound);
+        assert!(matches!(
+            rule.actions[0],
+            RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                ref sound_id,
+            } if sound_id == "sfx_placeholder"
+        ));
+
+        assert!(InspectorSystem::remove_action(&mut rule, 1));
+        assert_eq!(rule.actions.len(), 2);
+        assert!(!InspectorSystem::remove_action(&mut rule, 99));
+    }
+
+    #[test]
+    fn validate_rule_set_reports_duplicate_ids_and_invalid_action_payloads() {
+        let mut first = sample_rule("dupe");
+        first.actions = vec![
+            RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "   ".to_string(),
+            },
+            RuleAction::SetVelocity {
+                target: RuleTarget::Entity(0),
+                velocity: [1, 0],
+            },
+        ];
+
+        let second = Rule {
+            id: "dupe".to_string(),
+            enabled: true,
+            priority: 1,
+            once: false,
+            trigger: RuleTrigger::OnStart,
+            conditions: vec![RuleCondition::Always],
+            actions: vec![RuleAction::SwitchScene {
+                scene_name: "   ".to_string(),
+            }],
+        };
+
+        let rules = RuleSet {
+            rules: vec![first, second],
+        };
+
+        let issues = InspectorSystem::validate_rule_set(&rules);
+        assert!(issues
+            .iter()
+            .any(|issue| issue.message.contains("Duplicate rule id 'dupe'")));
+        assert!(issues.iter().any(|issue| issue
+            .message
+            .contains("PlaySound requires a non-empty sound id")));
+        assert!(issues.iter().any(|issue| issue
+            .message
+            .contains("SetVelocity entity target must be non-zero")));
+        assert!(issues
+            .iter()
+            .any(|issue| issue.message.contains("SwitchScene requires a scene name")));
     }
 }
