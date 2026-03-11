@@ -31,6 +31,62 @@ impl RenderPipeline for MockPipeline {
     }
 }
 
+// Pipeline that uses the trait's default `update_with_queue` implementation.
+struct DefaultQueuePipeline {
+    update_called: bool,
+}
+
+impl DefaultQueuePipeline {
+    fn new() -> Self {
+        Self {
+            update_called: false,
+        }
+    }
+}
+
+impl RenderPipeline for DefaultQueuePipeline {
+    fn render<'a>(&'a self, _render_pass: &mut wgpu::RenderPass<'a>) {}
+
+    fn update(&mut self) {
+        self.update_called = true;
+    }
+}
+
+fn create_queue() -> Option<wgpu::Queue> {
+    for backends in [
+        wgpu::Backends::PRIMARY,
+        wgpu::Backends::VULKAN,
+        wgpu::Backends::GL,
+    ] {
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+            backends,
+            ..Default::default()
+        });
+        let Ok(adapter) =
+            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::LowPower,
+                compatible_surface: None,
+                force_fallback_adapter: true,
+            }))
+        else {
+            continue;
+        };
+        let Ok((_device, queue)) =
+            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+                memory_hints: wgpu::MemoryHints::default(),
+                trace: wgpu::Trace::default(),
+                label: Some("pipeline-trait-test-device"),
+            }))
+        else {
+            continue;
+        };
+        return Some(queue);
+    }
+    None
+}
+
 #[test]
 fn render_pipeline_trait_update_method() {
     let mut pipeline = MockPipeline::new();
@@ -57,6 +113,19 @@ fn render_pipeline_trait_update_with_queue_calls_update() {
     // We can't create a real Queue without GPU, but we can test the trait method exists
     // and that our implementation works with the concept
     let _update_with_queue_fn = MockPipeline::update_with_queue;
+}
+
+#[test]
+fn default_update_with_queue_calls_update() {
+    let Some(queue) = create_queue() else {
+        eprintln!("Skipping queue-backed trait test: no compatible adapter/device available");
+        return;
+    };
+    let mut pipeline = DefaultQueuePipeline::new();
+    assert!(!pipeline.update_called);
+
+    pipeline.update_with_queue(&queue);
+    assert!(pipeline.update_called);
 }
 
 #[test]

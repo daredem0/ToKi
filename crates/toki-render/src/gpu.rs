@@ -221,3 +221,21 @@ impl GpuState {
         output.present();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::to_absolute_path;
+
+    #[test]
+    fn to_absolute_path_resolves_existing_path() {
+        let absolute = to_absolute_path(".").expect("current dir should be canonicalizable");
+        assert!(absolute.is_absolute());
+    }
+
+    #[test]
+    fn to_absolute_path_returns_error_for_missing_path() {
+        let missing = "this/path/should/not/exist/for/toki-render-tests";
+        let err = to_absolute_path(missing).expect_err("missing path should fail");
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+    }
+}

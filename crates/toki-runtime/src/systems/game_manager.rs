@@ -134,3 +134,31 @@ impl GameManager {
         self.game_state.is_debug_collision_rendering_enabled()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::GameManager;
+    use toki_core::GameState;
+    use winit::keyboard::KeyCode;
+
+    #[test]
+    fn debug_toggle_key_is_forwarded_to_core_input() {
+        let mut game_state = GameState::new_empty();
+        game_state.spawn_player_at(glam::IVec2::new(0, 0));
+        let mut manager = GameManager::new(game_state);
+
+        assert!(!manager.is_debug_collision_rendering_enabled());
+        manager.handle_keyboard_input(KeyCode::F4, true);
+        assert!(manager.is_debug_collision_rendering_enabled());
+    }
+
+    #[test]
+    fn unsupported_key_does_not_change_debug_state() {
+        let mut game_state = GameState::new_empty();
+        game_state.spawn_player_at(glam::IVec2::new(0, 0));
+        let mut manager = GameManager::new(game_state);
+
+        manager.handle_keyboard_input(KeyCode::Space, true);
+        assert!(!manager.is_debug_collision_rendering_enabled());
+    }
+}

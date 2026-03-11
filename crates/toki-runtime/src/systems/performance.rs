@@ -167,3 +167,34 @@ impl Default for PerformanceMonitor {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::PerformanceMonitor;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn toggle_display_flips_state() {
+        let mut monitor = PerformanceMonitor::new();
+        assert!(monitor.is_display_enabled());
+        monitor.toggle_display();
+        assert!(!monitor.is_display_enabled());
+        monitor.toggle_display();
+        assert!(monitor.is_display_enabled());
+    }
+
+    #[test]
+    fn recording_timings_does_not_panic() {
+        let mut monitor = PerformanceMonitor::new();
+        let now = Instant::now();
+
+        monitor.record_frame_interval(now);
+        monitor.record_tick_time(Duration::from_millis(2));
+        monitor.record_performance_breakdown(
+            Duration::from_millis(3),
+            Duration::from_millis(4),
+            Duration::from_millis(8),
+        );
+        monitor.print_stats_if_needed();
+    }
+}

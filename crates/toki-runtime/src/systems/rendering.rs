@@ -211,3 +211,80 @@ fn find_image_for_atlas(atlas_path: &std::path::Path) -> Option<std::path::PathB
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{find_atlas_file, find_image_for_atlas, RenderingSystem};
+    use std::path::Path;
+
+    fn make_unique_temp_dir() -> std::path::PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before unix epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("toki_runtime_rendering_tests_{nanos}"));
+        std::fs::create_dir_all(&dir).expect("temp dir should be created");
+        dir
+    }
+
+    #[test]
+    fn rendering_system_defaults_and_no_gpu_error_paths() {
+        let mut rendering = RenderingSystem::new();
+        assert!(!rendering.has_gpu());
+        let params = rendering.projection_params();
+        assert_eq!(params.width, 160);
+        assert_eq!(params.height, 144);
+        assert_eq!(params.desired_width, 160);
+        assert_eq!(params.desired_height, 144);
+
+        let tilemap_err = rendering
+            .load_tilemap_texture(std::path::PathBuf::from("terrain.png"))
+            .expect_err("tilemap load without gpu must fail");
+        assert!(
+            tilemap_err.to_string().contains("GPU not initialized"),
+            "unexpected error: {tilemap_err}"
+        );
+
+        let sprite_err = rendering
+            .load_sprite_texture(std::path::PathBuf::from("creatures.png"))
+            .expect_err("sprite load without gpu must fail");
+        assert!(
+            sprite_err.to_string().contains("GPU not initialized"),
+            "unexpected error: {sprite_err}"
+        );
+    }
+
+    #[test]
+    fn atlas_discovery_helpers_find_json_and_matching_image() {
+        let tmp = make_unique_temp_dir();
+        let sprites_dir = tmp.join("sprites");
+        std::fs::create_dir_all(&sprites_dir).expect("sprites dir should exist");
+
+        let atlas_path = sprites_dir.join("creatures.json");
+        let image_path = sprites_dir.join("creatures.png");
+        std::fs::write(&atlas_path, "{}").expect("atlas file should be created");
+        std::fs::write(&image_path, "x").expect("image file should be created");
+
+        let found_atlas = find_atlas_file(Path::new(&sprites_dir), "creatures")
+            .expect("atlas path should be found");
+        assert_eq!(found_atlas, atlas_path);
+
+        let found_image = find_image_for_atlas(&found_atlas).expect("image should be found");
+        assert_eq!(found_image, image_path);
+
+        std::fs::remove_dir_all(tmp).expect("temp dir cleanup should succeed");
+    }
+
+    #[test]
+    fn load_project_textures_returns_ok_when_assets_missing() {
+        let mut rendering = RenderingSystem::new();
+        let tmp = make_unique_temp_dir();
+
+        // No assets directory -> helper should no-op successfully.
+        rendering
+            .load_project_textures(&tmp)
+            .expect("missing project assets should be treated as no-op");
+
+        std::fs::remove_dir_all(tmp).expect("temp dir cleanup should succeed");
+    }
+}
