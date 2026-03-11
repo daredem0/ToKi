@@ -1,13 +1,14 @@
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use toki_core::animation::AnimationState;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
     tilemap::TileMap,
 };
 use toki_core::game::{AudioChannel, AudioEvent};
 use toki_core::rules::{
-    Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
+    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
 };
 use toki_core::{GameState, InputKey, Scene};
 
@@ -38,6 +39,49 @@ fn create_test_atlas() -> AtlasMeta {
         tile_size: UVec2::new(16, 16),
         tiles,
     }
+}
+
+fn create_collision_test_tilemap() -> TileMap {
+    let mut tilemap = create_test_tilemap();
+    // Place a solid wall tile directly to the right of the player spawn.
+    tilemap.tiles[1] = "wall".to_string();
+    tilemap
+}
+
+fn create_collision_test_atlas() -> AtlasMeta {
+    let mut atlas = create_test_atlas();
+    atlas.tiles.insert(
+        "wall".to_string(),
+        TileInfo {
+            position: UVec2::new(1, 0),
+            properties: TileProperties {
+                solid: true,
+                trigger: false,
+            },
+        },
+    );
+    atlas
+}
+
+fn create_trigger_test_tilemap() -> TileMap {
+    let mut tilemap = create_test_tilemap();
+    tilemap.tiles[0] = "trigger".to_string();
+    tilemap
+}
+
+fn create_trigger_test_atlas() -> AtlasMeta {
+    let mut atlas = create_test_atlas();
+    atlas.tiles.insert(
+        "trigger".to_string(),
+        TileInfo {
+            position: UVec2::new(2, 0),
+            properties: TileProperties {
+                solid: false,
+                trigger: true,
+            },
+        },
+    );
+    atlas
 }
 
 fn base_rule(id: &str, trigger: RuleTrigger, priority: i32, actions: Vec<RuleAction>) -> Rule {
@@ -86,6 +130,85 @@ fn on_start_rule_runs_once() {
 }
 
 #[test]
+fn on_collision_rule_runs_when_movement_is_blocked() {
+    let mut state = GameState::new_empty();
+    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    state
+        .entity_manager_mut()
+        .audio_component_mut(player_id)
+        .expect("player audio should exist")
+        .collision_sound = None;
+
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "collision-rule",
+            RuleTrigger::OnCollision,
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Collision,
+                sound_id: "rule_collision".to_string(),
+            }],
+        )],
+    });
+
+    state.handle_key_press(InputKey::Right);
+    let blocked = state.update(
+        UVec2::new(256, 256),
+        &create_collision_test_tilemap(),
+        &create_collision_test_atlas(),
+    );
+    assert!(blocked.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "rule_collision"
+    )));
+
+    state.handle_key_release(InputKey::Right);
+    let no_collision = state.update(
+        UVec2::new(256, 256),
+        &create_collision_test_tilemap(),
+        &create_collision_test_atlas(),
+    );
+    assert!(no_collision.events.is_empty());
+}
+
+#[test]
+fn on_trigger_rule_runs_when_entity_overlaps_trigger_tile() {
+    let mut state = GameState::new_empty();
+    state.spawn_player_at(IVec2::new(0, 0));
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "trigger-rule",
+            RuleTrigger::OnTrigger,
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "rule_trigger".to_string(),
+            }],
+        )],
+    });
+
+    let first = state.update(
+        UVec2::new(256, 256),
+        &create_trigger_test_tilemap(),
+        &create_trigger_test_atlas(),
+    );
+    assert!(first.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "rule_trigger"
+    )));
+
+    let second = state.update(
+        UVec2::new(256, 256),
+        &create_trigger_test_tilemap(),
+        &create_trigger_test_atlas(),
+    );
+    assert!(second.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "rule_trigger"
+    )));
+}
+
+#[test]
 fn on_update_rule_runs_every_tick() {
     let mut state = GameState::new_empty();
     state.set_rules(RuleSet {
@@ -112,6 +235,75 @@ fn on_update_rule_runs_every_tick() {
 }
 
 #[test]
+fn on_key_rule_runs_only_while_matching_key_is_held() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "right-key-sfx",
+            RuleTrigger::OnKey {
+                key: RuleKey::Right,
+            },
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "right_key".to_string(),
+            }],
+        )],
+    });
+
+    let none_pressed = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert!(none_pressed.events.is_empty());
+
+    state.handle_key_press(InputKey::Right);
+    let pressed = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert_eq!(pressed.events.len(), 1);
+    assert!(matches!(
+        &pressed.events[0],
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "right_key"
+    ));
+
+    state.handle_key_release(InputKey::Right);
+    let released = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert!(released.events.is_empty());
+}
+
+#[test]
+fn on_key_rule_ignores_non_matching_held_keys() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "up-only",
+            RuleTrigger::OnKey { key: RuleKey::Up },
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "up_key".to_string(),
+            }],
+        )],
+    });
+
+    state.handle_key_press(InputKey::Left);
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert!(result.events.is_empty());
+}
+
+#[test]
 fn play_music_action_emits_background_music_event() {
     let mut state = GameState::new_empty();
     state.set_rules(RuleSet {
@@ -135,6 +327,77 @@ fn play_music_action_emits_background_music_event() {
         &result.events[0],
         AudioEvent::BackgroundMusic(track_id) if track_id == "lavandia"
     ));
+}
+
+#[test]
+fn play_animation_action_overrides_default_animation_for_target() {
+    let mut state = GameState::new_empty();
+    state.spawn_player_at(IVec2::new(10, 10));
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "force-walk-animation",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::PlayAnimation {
+                target: RuleTarget::Player,
+                state: AnimationState::Walk,
+            }],
+        )],
+    });
+
+    state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    let player = state.player_entity().expect("player must exist");
+    let animation = player
+        .attributes
+        .animation_controller
+        .as_ref()
+        .expect("player should have animation controller");
+    assert_eq!(animation.current_clip_state, AnimationState::Walk);
+}
+
+#[test]
+fn play_animation_uses_priority_order_for_same_target() {
+    let mut state = GameState::new_empty();
+    state.spawn_player_at(IVec2::new(10, 10));
+    state.set_rules(RuleSet {
+        rules: vec![
+            base_rule(
+                "high",
+                RuleTrigger::OnUpdate,
+                10,
+                vec![RuleAction::PlayAnimation {
+                    target: RuleTarget::Player,
+                    state: AnimationState::Walk,
+                }],
+            ),
+            base_rule(
+                "low",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::PlayAnimation {
+                    target: RuleTarget::Player,
+                    state: AnimationState::Idle,
+                }],
+            ),
+        ],
+    });
+
+    state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    let player = state.player_entity().expect("player must exist");
+    let animation = player
+        .attributes
+        .animation_controller
+        .as_ref()
+        .expect("player should have animation controller");
+    assert_eq!(animation.current_clip_state, AnimationState::Walk);
 }
 
 #[test]
@@ -522,6 +785,10 @@ fn rules_serialize_roundtrip() {
                 RuleAction::SetVelocity {
                     target: RuleTarget::Player,
                     velocity: [1, -1],
+                },
+                RuleAction::PlayAnimation {
+                    target: RuleTarget::Player,
+                    state: AnimationState::Idle,
                 },
                 RuleAction::PlayMusic {
                     track_id: "lavandia".to_string(),

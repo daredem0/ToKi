@@ -84,8 +84,30 @@
           "description": "Run only once for this runtime session"
         },
         "trigger": {
-          "type": "string",
-          "enum": ["OnStart", "OnUpdate"],
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["OnStart", "OnUpdate", "OnCollision", "OnTrigger"]
+            },
+            {
+              "type": "object",
+              "required": ["OnKey"],
+              "additionalProperties": false,
+              "properties": {
+                "OnKey": {
+                  "type": "object",
+                  "required": ["key"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "enum": ["Up", "Down", "Left", "Right", "DebugToggle"]
+                    }
+                  }
+                }
+              }
+            }
+          ],
           "description": "Event that triggers this rule"
         },
         "conditions": {

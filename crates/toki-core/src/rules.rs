@@ -1,11 +1,24 @@
 use serde::{Deserialize, Serialize};
 
+use crate::animation::AnimationState;
 use crate::entity::EntityId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RuleTrigger {
     OnStart,
     OnUpdate,
+    OnKey { key: RuleKey },
+    OnCollision,
+    OnTrigger,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum RuleKey {
+    Up,
+    Down,
+    Left,
+    Right,
+    DebugToggle,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,6 +46,10 @@ pub enum RuleAction {
     },
     PlayMusic {
         track_id: String,
+    },
+    PlayAnimation {
+        target: RuleTarget,
+        state: AnimationState,
     },
     SetVelocity {
         target: RuleTarget,

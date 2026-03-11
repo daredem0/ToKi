@@ -1,8 +1,9 @@
 use super::editor_ui::{EditorUI, Selection};
 use crate::config::EditorConfig;
 use std::collections::HashMap;
+use toki_core::animation::AnimationState;
 use toki_core::rules::{
-    Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
+    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
 };
 
 /// Handles inspector panel rendering for assets and entities
@@ -35,8 +36,18 @@ struct EntityPropertyDraft {
 enum RuleActionKind {
     PlaySound,
     PlayMusic,
+    PlayAnimation,
     SetVelocity,
     SwitchScene,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RuleTriggerKind {
+    Start,
+    Update,
+    Key,
+    Collision,
+    Trigger,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -416,6 +427,7 @@ impl InspectorSystem {
                             });
                         }
                     }
+                    RuleAction::PlayAnimation { .. } => {}
                     RuleAction::SetVelocity { target, .. } => {
                         if let RuleTarget::Entity(entity_id) = target {
                             if *entity_id == 0 {
@@ -453,6 +465,10 @@ impl InspectorSystem {
             RuleActionKind::PlayMusic => RuleAction::PlayMusic {
                 track_id: "music_placeholder".to_string(),
             },
+            RuleActionKind::PlayAnimation => RuleAction::PlayAnimation {
+                target: RuleTarget::Player,
+                state: AnimationState::Idle,
+            },
             RuleActionKind::SetVelocity => RuleAction::SetVelocity {
                 target: RuleTarget::Player,
                 velocity: [0, 0],
@@ -467,6 +483,7 @@ impl InspectorSystem {
         match action {
             RuleAction::PlaySound { .. } => RuleActionKind::PlaySound,
             RuleAction::PlayMusic { .. } => RuleActionKind::PlayMusic,
+            RuleAction::PlayAnimation { .. } => RuleActionKind::PlayAnimation,
             RuleAction::SetVelocity { .. } => RuleActionKind::SetVelocity,
             RuleAction::SwitchScene { .. } => RuleActionKind::SwitchScene,
         }
@@ -476,8 +493,49 @@ impl InspectorSystem {
         match action_kind {
             RuleActionKind::PlaySound => "PlaySound",
             RuleActionKind::PlayMusic => "PlayMusic",
+            RuleActionKind::PlayAnimation => "PlayAnimation",
             RuleActionKind::SetVelocity => "SetVelocity",
             RuleActionKind::SwitchScene => "SwitchScene",
+        }
+    }
+
+    fn trigger_kind(trigger: &RuleTrigger) -> RuleTriggerKind {
+        match trigger {
+            RuleTrigger::OnStart => RuleTriggerKind::Start,
+            RuleTrigger::OnUpdate => RuleTriggerKind::Update,
+            RuleTrigger::OnKey { .. } => RuleTriggerKind::Key,
+            RuleTrigger::OnCollision => RuleTriggerKind::Collision,
+            RuleTrigger::OnTrigger => RuleTriggerKind::Trigger,
+        }
+    }
+
+    fn trigger_kind_label(kind: RuleTriggerKind) -> &'static str {
+        match kind {
+            RuleTriggerKind::Start => "OnStart",
+            RuleTriggerKind::Update => "OnUpdate",
+            RuleTriggerKind::Key => "OnKey",
+            RuleTriggerKind::Collision => "OnCollision",
+            RuleTriggerKind::Trigger => "OnTrigger",
+        }
+    }
+
+    fn set_rule_trigger_kind(rule: &mut Rule, kind: RuleTriggerKind) {
+        rule.trigger = match kind {
+            RuleTriggerKind::Start => RuleTrigger::OnStart,
+            RuleTriggerKind::Update => RuleTrigger::OnUpdate,
+            RuleTriggerKind::Key => RuleTrigger::OnKey { key: RuleKey::Up },
+            RuleTriggerKind::Collision => RuleTrigger::OnCollision,
+            RuleTriggerKind::Trigger => RuleTrigger::OnTrigger,
+        };
+    }
+
+    fn rule_key_label(key: RuleKey) -> &'static str {
+        match key {
+            RuleKey::Up => "Up",
+            RuleKey::Down => "Down",
+            RuleKey::Left => "Left",
+            RuleKey::Right => "Right",
+            RuleKey::DebugToggle => "DebugToggle",
         }
     }
 
@@ -660,23 +718,81 @@ impl InspectorSystem {
 
                 ui.horizontal(|ui| {
                     ui.label("Trigger:");
+                    let mut trigger_kind = Self::trigger_kind(&rule.trigger);
                     egui::ComboBox::from_id_salt(format!(
                         "rule_trigger_{}_{}",
                         scene_name, rule_index
                     ))
-                    .selected_text(match rule.trigger {
-                        RuleTrigger::OnStart => "OnStart",
-                        RuleTrigger::OnUpdate => "OnUpdate",
-                    })
+                    .selected_text(Self::trigger_kind_label(trigger_kind))
                     .show_ui(ui, |ui| {
                         outcome.changed |= ui
-                            .selectable_value(&mut rule.trigger, RuleTrigger::OnStart, "OnStart")
+                            .selectable_value(
+                                &mut trigger_kind,
+                                RuleTriggerKind::Start,
+                                Self::trigger_kind_label(RuleTriggerKind::Start),
+                            )
                             .changed();
                         outcome.changed |= ui
-                            .selectable_value(&mut rule.trigger, RuleTrigger::OnUpdate, "OnUpdate")
+                            .selectable_value(
+                                &mut trigger_kind,
+                                RuleTriggerKind::Update,
+                                Self::trigger_kind_label(RuleTriggerKind::Update),
+                            )
+                            .changed();
+                        outcome.changed |= ui
+                            .selectable_value(
+                                &mut trigger_kind,
+                                RuleTriggerKind::Key,
+                                Self::trigger_kind_label(RuleTriggerKind::Key),
+                            )
+                            .changed();
+                        outcome.changed |= ui
+                            .selectable_value(
+                                &mut trigger_kind,
+                                RuleTriggerKind::Collision,
+                                Self::trigger_kind_label(RuleTriggerKind::Collision),
+                            )
+                            .changed();
+                        outcome.changed |= ui
+                            .selectable_value(
+                                &mut trigger_kind,
+                                RuleTriggerKind::Trigger,
+                                Self::trigger_kind_label(RuleTriggerKind::Trigger),
+                            )
                             .changed();
                     });
+                    if trigger_kind != Self::trigger_kind(&rule.trigger) {
+                        Self::set_rule_trigger_kind(rule, trigger_kind);
+                    }
                 });
+
+                if let RuleTrigger::OnKey { key } = &mut rule.trigger {
+                    ui.horizontal(|ui| {
+                        ui.label("Key:");
+                        egui::ComboBox::from_id_salt(format!(
+                            "rule_trigger_key_{}_{}",
+                            scene_name, rule_index
+                        ))
+                        .selected_text(Self::rule_key_label(*key))
+                        .show_ui(ui, |ui| {
+                            for candidate in [
+                                RuleKey::Up,
+                                RuleKey::Down,
+                                RuleKey::Left,
+                                RuleKey::Right,
+                                RuleKey::DebugToggle,
+                            ] {
+                                outcome.changed |= ui
+                                    .selectable_value(
+                                        key,
+                                        candidate,
+                                        Self::rule_key_label(candidate),
+                                    )
+                                    .changed();
+                            }
+                        });
+                    });
+                }
 
                 if rule.conditions.is_empty() {
                     rule.conditions.push(RuleCondition::Always);
@@ -727,6 +843,10 @@ impl InspectorSystem {
                         Self::add_action(rule, RuleActionKind::PlayMusic);
                         outcome.changed = true;
                     }
+                    if ui.small_button("+ PlayAnimation").clicked() {
+                        Self::add_action(rule, RuleActionKind::PlayAnimation);
+                        outcome.changed = true;
+                    }
                     if ui.small_button("+ SetVelocity").clicked() {
                         Self::add_action(rule, RuleActionKind::SetVelocity);
                         outcome.changed = true;
@@ -774,6 +894,13 @@ impl InspectorSystem {
                         &mut selected_kind,
                         RuleActionKind::PlayMusic,
                         Self::action_kind_label(RuleActionKind::PlayMusic),
+                    )
+                    .changed();
+                changed |= ui
+                    .selectable_value(
+                        &mut selected_kind,
+                        RuleActionKind::PlayAnimation,
+                        Self::action_kind_label(RuleActionKind::PlayAnimation),
                     )
                     .changed();
                 changed |= ui
@@ -850,6 +977,35 @@ impl InspectorSystem {
                     track_id,
                     &audio_choices.music,
                 );
+            }
+            RuleAction::PlayAnimation { target, state } => {
+                changed |= Self::render_rule_target_editor(
+                    ui,
+                    scene_name,
+                    rule_index,
+                    action_index,
+                    target,
+                );
+
+                ui.horizontal(|ui| {
+                    ui.label("State:");
+                    egui::ComboBox::from_id_salt(format!(
+                        "rule_animation_state_{}_{}_{}",
+                        scene_name, rule_index, action_index
+                    ))
+                    .selected_text(match state {
+                        AnimationState::Idle => "Idle",
+                        AnimationState::Walk => "Walk",
+                    })
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(state, AnimationState::Idle, "Idle")
+                            .changed();
+                        changed |= ui
+                            .selectable_value(state, AnimationState::Walk, "Walk")
+                            .changed();
+                    });
+                });
             }
             RuleAction::SetVelocity { target, velocity } => {
                 changed |= Self::render_rule_target_editor(
@@ -1768,14 +1924,16 @@ impl InspectorSystem {
 
 #[cfg(test)]
 mod tests {
-    use super::{EntityPropertyDraft, InspectorSystem, RuleActionKind};
+    use super::{EntityPropertyDraft, InspectorSystem, RuleActionKind, RuleTriggerKind};
     use crate::ui::EditorUI;
     use glam::{IVec2, UVec2};
     use std::fs;
+    use toki_core::animation::AnimationState;
     use toki_core::collision::CollisionBox;
     use toki_core::entity::{EntityAttributes, EntityManager, EntityType};
     use toki_core::rules::{
-        Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
+        Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleTarget,
+        RuleTrigger,
     };
     use toki_core::Scene;
 
@@ -1985,6 +2143,26 @@ mod tests {
     }
 
     #[test]
+    fn set_rule_trigger_kind_sets_expected_trigger_payload() {
+        let mut rule = sample_rule("rule_1");
+
+        InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Start);
+        assert_eq!(rule.trigger, RuleTrigger::OnStart);
+
+        InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Update);
+        assert_eq!(rule.trigger, RuleTrigger::OnUpdate);
+
+        InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Collision);
+        assert_eq!(rule.trigger, RuleTrigger::OnCollision);
+
+        InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Trigger);
+        assert_eq!(rule.trigger, RuleTrigger::OnTrigger);
+
+        InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Key);
+        assert_eq!(rule.trigger, RuleTrigger::OnKey { key: RuleKey::Up });
+    }
+
+    #[test]
     fn duplicate_rule_clones_payload_with_new_id_and_insert_position() {
         let mut rules = RuleSet {
             rules: vec![sample_rule("rule_1"), sample_rule("rule_2")],
@@ -2094,22 +2272,30 @@ mod tests {
         assert_eq!(rule.actions.len(), 1);
 
         InspectorSystem::add_action(&mut rule, RuleActionKind::PlayMusic);
+        InspectorSystem::add_action(&mut rule, RuleActionKind::PlayAnimation);
         InspectorSystem::add_action(&mut rule, RuleActionKind::SetVelocity);
         InspectorSystem::add_action(&mut rule, RuleActionKind::SwitchScene);
-        assert_eq!(rule.actions.len(), 4);
+        assert_eq!(rule.actions.len(), 5);
         assert!(matches!(
             rule.actions[1],
             RuleAction::PlayMusic { ref track_id } if track_id == "music_placeholder"
         ));
         assert!(matches!(
             rule.actions[2],
+            RuleAction::PlayAnimation {
+                target: RuleTarget::Player,
+                state: AnimationState::Idle
+            }
+        ));
+        assert!(matches!(
+            rule.actions[3],
             RuleAction::SetVelocity {
                 target: RuleTarget::Player,
                 velocity: [0, 0]
             }
         ));
         assert!(matches!(
-            rule.actions[3],
+            rule.actions[4],
             RuleAction::SwitchScene { ref scene_name } if scene_name.is_empty()
         ));
 
@@ -2131,7 +2317,7 @@ mod tests {
         ));
 
         assert!(InspectorSystem::remove_action(&mut rule, 1));
-        assert_eq!(rule.actions.len(), 3);
+        assert_eq!(rule.actions.len(), 4);
         assert!(!InspectorSystem::remove_action(&mut rule, 99));
     }
 

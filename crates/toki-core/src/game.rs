@@ -9,7 +9,7 @@ use crate::collision;
 use crate::entity::{Entity, EntityId, EntityManager};
 use crate::events::{GameEvent, GameUpdateResult};
 use crate::rules::{
-    Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
+    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
 };
 use crate::scene_manager::SceneManager;
 use crate::sprite::{SpriteFrame, SpriteInstance};
@@ -90,6 +90,7 @@ struct RuleRuntimeState {
     started: bool,
     fired_once_rules: HashSet<String>,
     velocities: HashMap<EntityId, glam::IVec2>,
+    frame_collision_detected: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,6 +105,10 @@ enum RuleCommand {
     SetVelocity {
         entity_id: EntityId,
         velocity: glam::IVec2,
+    },
+    PlayAnimation {
+        entity_id: EntityId,
+        state: AnimationState,
     },
     SwitchScene {
         scene_name: String,
@@ -295,13 +300,15 @@ impl GameState {
     ) -> GameUpdateResult<AudioEvent> {
         let mut result = GameUpdateResult::new();
         let mut rule_commands = Vec::new();
+        self.rule_runtime.frame_collision_detected = false;
 
         if !self.rule_runtime.started {
             self.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut rule_commands);
             self.rule_runtime.started = true;
         }
         self.collect_rule_commands_for_trigger(RuleTrigger::OnUpdate, &mut rule_commands);
-        self.apply_rule_commands(rule_commands, &mut result);
+        self.collect_rule_commands_for_key_triggers(&mut rule_commands);
+        let mut pending_rule_animations = self.apply_rule_commands(rule_commands, &mut result);
 
         let input_result = self.process_input(world_bounds, tilemap, atlas);
         result.player_moved = input_result.player_moved;
@@ -332,6 +339,24 @@ impl GameState {
 
         // Update NPC AI
         self.update_npc_ai(world_bounds, tilemap, atlas);
+
+        let mut reactive_rule_commands = Vec::new();
+        if self.rule_runtime.frame_collision_detected {
+            self.collect_rule_commands_for_trigger(
+                RuleTrigger::OnCollision,
+                &mut reactive_rule_commands,
+            );
+        }
+        if self.any_entity_overlaps_trigger_tile(tilemap, atlas) {
+            self.collect_rule_commands_for_trigger(
+                RuleTrigger::OnTrigger,
+                &mut reactive_rule_commands,
+            );
+        }
+        let mut reactive_animations = self.apply_rule_commands(reactive_rule_commands, &mut result);
+        pending_rule_animations.append(&mut reactive_animations);
+
+        self.apply_rule_animations(pending_rule_animations);
 
         // Update entity animation timing
         self.entity_manager.update_animations(17.0);
@@ -485,6 +510,7 @@ impl GameState {
                             }
                         }
                         player_audio.last_collision_state = true;
+                        self.rule_runtime.frame_collision_detected = true;
                     }
                 }
                 InputKey::Left => {
@@ -514,6 +540,7 @@ impl GameState {
                             }
                         }
                         player_audio.last_collision_state = true;
+                        self.rule_runtime.frame_collision_detected = true;
                     }
                 }
                 InputKey::Down => {
@@ -544,6 +571,7 @@ impl GameState {
                             }
                         }
                         player_audio.last_collision_state = true;
+                        self.rule_runtime.frame_collision_detected = true;
                     }
                 }
                 InputKey::Right => {
@@ -574,6 +602,7 @@ impl GameState {
                             }
                         }
                         player_audio.last_collision_state = true;
+                        self.rule_runtime.frame_collision_detected = true;
                     }
                 }
                 InputKey::DebugToggle => {
@@ -1028,6 +1057,96 @@ impl GameState {
         }
     }
 
+    fn collect_rule_commands_for_key_triggers(&mut self, command_buffer: &mut Vec<RuleCommand>) {
+        let mut held_keys = self.keys_held.iter().copied().collect::<Vec<_>>();
+        held_keys.sort_by_key(|key| Self::input_key_order(*key));
+
+        for input_key in held_keys {
+            let trigger = RuleTrigger::OnKey {
+                key: Self::to_rule_key(input_key),
+            };
+            self.collect_rule_commands_for_trigger(trigger, command_buffer);
+        }
+    }
+
+    fn input_key_order(key: InputKey) -> u8 {
+        match key {
+            InputKey::Up => 0,
+            InputKey::Down => 1,
+            InputKey::Left => 2,
+            InputKey::Right => 3,
+            InputKey::DebugToggle => 4,
+        }
+    }
+
+    fn to_rule_key(key: InputKey) -> RuleKey {
+        match key {
+            InputKey::Up => RuleKey::Up,
+            InputKey::Down => RuleKey::Down,
+            InputKey::Left => RuleKey::Left,
+            InputKey::Right => RuleKey::Right,
+            InputKey::DebugToggle => RuleKey::DebugToggle,
+        }
+    }
+
+    fn any_entity_overlaps_trigger_tile(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> bool {
+        for entity_id in self.entity_manager.active_entities() {
+            let Some(entity) = self.entity_manager.get_entity(entity_id) else {
+                continue;
+            };
+            if Self::entity_overlaps_trigger_tile(entity, tilemap, atlas) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn entity_overlaps_trigger_tile(entity: &Entity, tilemap: &TileMap, atlas: &AtlasMeta) -> bool {
+        if tilemap.tile_size.x == 0 || tilemap.tile_size.y == 0 {
+            return false;
+        }
+        if tilemap.size.x == 0 || tilemap.size.y == 0 {
+            return false;
+        }
+
+        let (box_pos, box_size) = if let Some(collision_box) = &entity.collision_box {
+            collision_box.world_bounds(entity.position)
+        } else {
+            (entity.position, entity.size)
+        };
+        if box_size.x == 0 || box_size.y == 0 {
+            return false;
+        }
+
+        let tile_w = tilemap.tile_size.x as i32;
+        let tile_h = tilemap.tile_size.y as i32;
+
+        let tile_min_x = (box_pos.x / tile_w).max(0) as u32;
+        let tile_min_y = (box_pos.y / tile_h).max(0) as u32;
+        let tile_max_x = ((box_pos.x + box_size.x as i32 - 1) / tile_w).max(0) as u32;
+        let tile_max_y = ((box_pos.y + box_size.y as i32 - 1) / tile_h).max(0) as u32;
+
+        let map_max_x = tilemap.size.x.saturating_sub(1);
+        let map_max_y = tilemap.size.y.saturating_sub(1);
+        let tile_min_x = tile_min_x.min(map_max_x);
+        let tile_min_y = tile_min_y.min(map_max_y);
+        let tile_max_x = tile_max_x.min(map_max_x);
+        let tile_max_y = tile_max_y.min(map_max_y);
+
+        for y in tile_min_y..=tile_max_y {
+            for x in tile_min_x..=tile_max_x {
+                let Ok(tile_name) = tilemap.get_tile_name(x, y) else {
+                    continue;
+                };
+                if atlas.is_tile_trigger(tile_name) {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
     fn rule_conditions_match(&self, conditions: &[RuleCondition]) -> bool {
         conditions.iter().all(|condition| match condition {
             RuleCondition::Always => true,
@@ -1061,6 +1180,14 @@ impl GameState {
                     track_id: track_id.to_string(),
                 });
             }
+            RuleAction::PlayAnimation { target, state } => {
+                if let Some(entity_id) = self.resolve_rule_target(*target) {
+                    command_buffer.push(RuleCommand::PlayAnimation {
+                        entity_id,
+                        state: *state,
+                    });
+                }
+            }
             RuleAction::SetVelocity { target, velocity } => {
                 if let Some(entity_id) = self.resolve_rule_target(*target) {
                     command_buffer.push(RuleCommand::SetVelocity {
@@ -1081,8 +1208,9 @@ impl GameState {
         &mut self,
         commands: Vec<RuleCommand>,
         result: &mut GameUpdateResult<AudioEvent>,
-    ) {
+    ) -> Vec<(EntityId, AnimationState)> {
         let mut buffered_velocities = HashMap::new();
+        let mut buffered_animations = HashMap::new();
 
         for command in commands {
             match command {
@@ -1099,6 +1227,10 @@ impl GameState {
                     // Rules are already sorted by priority desc + id asc, so first command wins.
                     buffered_velocities.entry(entity_id).or_insert(velocity);
                 }
+                RuleCommand::PlayAnimation { entity_id, state } => {
+                    // Rules are already sorted by priority desc + id asc, so first command wins.
+                    buffered_animations.entry(entity_id).or_insert(state);
+                }
                 RuleCommand::SwitchScene { scene_name } => {
                     tracing::debug!(
                         "Rule requested scene switch to '{}'; action is a runtime placeholder",
@@ -1111,6 +1243,10 @@ impl GameState {
         for (entity_id, velocity) in buffered_velocities {
             self.rule_runtime.velocities.insert(entity_id, velocity);
         }
+
+        let mut pending_animations = buffered_animations.into_iter().collect::<Vec<_>>();
+        pending_animations.sort_by_key(|(entity_id, _)| *entity_id);
+        pending_animations
     }
 
     fn resolve_rule_target(&self, target: RuleTarget) -> Option<EntityId> {
@@ -1162,6 +1298,7 @@ impl GameState {
                 tilemap,
                 atlas,
             ) {
+                self.rule_runtime.frame_collision_detected = true;
                 continue;
             }
 
@@ -1174,5 +1311,20 @@ impl GameState {
         }
 
         moved_player
+    }
+
+    fn apply_rule_animations(&mut self, pending_animations: Vec<(EntityId, AnimationState)>) {
+        for (entity_id, state) in pending_animations {
+            let Some(entity) = self.entity_manager.get_entity_mut(entity_id) else {
+                continue;
+            };
+            let Some(animation_controller) = entity.attributes.animation_controller.as_mut() else {
+                continue;
+            };
+
+            if animation_controller.current_clip_state != state {
+                animation_controller.play(state);
+            }
+        }
     }
 }

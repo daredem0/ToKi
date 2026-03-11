@@ -66,13 +66,48 @@
           16
         ],
         "trigger": false
-      },
-      "footstep_distance_accumulator": 0.0,
-      "footstep_trigger_distance": 16.0,
-      "last_collision_state": false,
-      "movement_sound": "sfx_player_step"
+      }
     }
   ],
+  "rules": {
+    "rules": [
+      {
+        "id": "rule_1",
+        "enabled": true,
+        "priority": 0,
+        "once": false,
+        "trigger": "OnStart",
+        "conditions": [
+          "Always"
+        ],
+        "actions": [
+          {
+            "PlayMusic": {
+              "track_id": "lavandia"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rule_2",
+        "enabled": false,
+        "priority": 0,
+        "once": true,
+        "trigger": "OnUpdate",
+        "conditions": [
+          "Always"
+        ],
+        "actions": [
+          {
+            "PlaySound": {
+              "channel": "Movement",
+              "sound_id": "sfx_slime_bounce"
+            }
+          }
+        ]
+      }
+    ]
+  },
   "camera_position": null,
   "camera_scale": null
 }

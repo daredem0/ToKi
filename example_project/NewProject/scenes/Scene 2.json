@@ -5,6 +5,9 @@
     "my_new_map"
   ],
   "entities": [],
+  "rules": {
+    "rules": []
+  },
   "camera_position": null,
   "camera_scale": null
 }
