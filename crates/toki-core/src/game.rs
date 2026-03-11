@@ -92,6 +92,21 @@ struct RuleRuntimeState {
     velocities: HashMap<EntityId, glam::IVec2>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum RuleCommand {
+    PlaySound {
+        channel: AudioChannel,
+        sound_id: String,
+    },
+    SetVelocity {
+        entity_id: EntityId,
+        velocity: glam::IVec2,
+    },
+    SwitchScene {
+        scene_name: String,
+    },
+}
+
 impl GameState {
     /// Create a new GameState with the given player sprite
     pub fn new(player_sprite: SpriteInstance) -> Self {
@@ -276,12 +291,14 @@ impl GameState {
         atlas: &AtlasMeta,
     ) -> GameUpdateResult<AudioEvent> {
         let mut result = GameUpdateResult::new();
+        let mut rule_commands = Vec::new();
 
         if !self.rule_runtime.started {
-            self.execute_rules_for_trigger(RuleTrigger::OnStart, &mut result);
+            self.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut rule_commands);
             self.rule_runtime.started = true;
         }
-        self.execute_rules_for_trigger(RuleTrigger::OnUpdate, &mut result);
+        self.collect_rule_commands_for_trigger(RuleTrigger::OnUpdate, &mut rule_commands);
+        self.apply_rule_commands(rule_commands, &mut result);
 
         let input_result = self.process_input(world_bounds, tilemap, atlas);
         result.player_moved = input_result.player_moved;
@@ -970,10 +987,10 @@ impl GameState {
         trigger_tiles
     }
 
-    fn execute_rules_for_trigger(
+    fn collect_rule_commands_for_trigger(
         &mut self,
         trigger: RuleTrigger,
-        result: &mut GameUpdateResult<AudioEvent>,
+        command_buffer: &mut Vec<RuleCommand>,
     ) {
         let mut matching_rules = self
             .rules
@@ -999,7 +1016,7 @@ impl GameState {
             }
 
             for action in &rule.actions {
-                self.apply_rule_action(action, result);
+                self.buffer_rule_action(action, command_buffer);
             }
 
             if rule.once {
@@ -1014,11 +1031,7 @@ impl GameState {
         })
     }
 
-    fn apply_rule_action(
-        &mut self,
-        action: &RuleAction,
-        result: &mut GameUpdateResult<AudioEvent>,
-    ) {
+    fn buffer_rule_action(&self, action: &RuleAction, command_buffer: &mut Vec<RuleCommand>) {
         match action {
             RuleAction::PlaySound { channel, sound_id } => {
                 let sound_id = sound_id.trim();
@@ -1031,24 +1044,57 @@ impl GameState {
                     RuleSoundChannel::Collision => AudioChannel::Collision,
                 };
 
-                result.add_event(AudioEvent::PlaySound {
+                command_buffer.push(RuleCommand::PlaySound {
                     channel,
                     sound_id: sound_id.to_string(),
                 });
             }
             RuleAction::SetVelocity { target, velocity } => {
                 if let Some(entity_id) = self.resolve_rule_target(*target) {
-                    self.rule_runtime
-                        .velocities
-                        .insert(entity_id, glam::IVec2::new(velocity[0], velocity[1]));
+                    command_buffer.push(RuleCommand::SetVelocity {
+                        entity_id,
+                        velocity: glam::IVec2::new(velocity[0], velocity[1]),
+                    });
                 }
             }
             RuleAction::SwitchScene { scene_name } => {
-                tracing::debug!(
-                    "Rule requested scene switch to '{}'; action is a runtime placeholder",
-                    scene_name
-                );
+                command_buffer.push(RuleCommand::SwitchScene {
+                    scene_name: scene_name.clone(),
+                });
             }
+        }
+    }
+
+    fn apply_rule_commands(
+        &mut self,
+        commands: Vec<RuleCommand>,
+        result: &mut GameUpdateResult<AudioEvent>,
+    ) {
+        let mut buffered_velocities = HashMap::new();
+
+        for command in commands {
+            match command {
+                RuleCommand::PlaySound { channel, sound_id } => {
+                    result.add_event(AudioEvent::PlaySound { channel, sound_id });
+                }
+                RuleCommand::SetVelocity {
+                    entity_id,
+                    velocity,
+                } => {
+                    // Rules are already sorted by priority desc + id asc, so first command wins.
+                    buffered_velocities.entry(entity_id).or_insert(velocity);
+                }
+                RuleCommand::SwitchScene { scene_name } => {
+                    tracing::debug!(
+                        "Rule requested scene switch to '{}'; action is a runtime placeholder",
+                        scene_name
+                    );
+                }
+            }
+        }
+
+        for (entity_id, velocity) in buffered_velocities {
+            self.rule_runtime.velocities.insert(entity_id, velocity);
         }
     }
 
@@ -1065,12 +1111,13 @@ impl GameState {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> bool {
-        let velocities = self
+        let mut velocities = self
             .rule_runtime
             .velocities
             .iter()
             .map(|(entity_id, velocity)| (*entity_id, *velocity))
             .collect::<Vec<_>>();
+        velocities.sort_by_key(|(entity_id, _)| *entity_id);
 
         let mut moved_player = false;
 

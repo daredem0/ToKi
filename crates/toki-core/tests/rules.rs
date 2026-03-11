@@ -283,6 +283,83 @@ fn set_velocity_action_moves_player_without_input() {
 }
 
 #[test]
+fn higher_priority_velocity_command_wins_for_same_target() {
+    let mut state = GameState::new_empty();
+    state.spawn_player_at(IVec2::new(10, 10));
+    state.set_rules(RuleSet {
+        rules: vec![
+            base_rule(
+                "high",
+                RuleTrigger::OnUpdate,
+                100,
+                vec![RuleAction::SetVelocity {
+                    target: RuleTarget::Player,
+                    velocity: [4, 0],
+                }],
+            ),
+            base_rule(
+                "low",
+                RuleTrigger::OnUpdate,
+                1,
+                vec![RuleAction::SetVelocity {
+                    target: RuleTarget::Player,
+                    velocity: [1, 0],
+                }],
+            ),
+        ],
+    });
+
+    let before = state.player_position();
+    state.update(
+        UVec2::new(512, 512),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    let after = state.player_position();
+
+    assert_eq!(after.x, before.x + 4);
+}
+
+#[test]
+fn same_priority_velocity_uses_id_tiebreaker() {
+    let mut state = GameState::new_empty();
+    state.spawn_player_at(IVec2::new(20, 20));
+    state.set_rules(RuleSet {
+        rules: vec![
+            base_rule(
+                "b_rule",
+                RuleTrigger::OnUpdate,
+                5,
+                vec![RuleAction::SetVelocity {
+                    target: RuleTarget::Player,
+                    velocity: [3, 0],
+                }],
+            ),
+            base_rule(
+                "a_rule",
+                RuleTrigger::OnUpdate,
+                5,
+                vec![RuleAction::SetVelocity {
+                    target: RuleTarget::Player,
+                    velocity: [6, 0],
+                }],
+            ),
+        ],
+    });
+
+    let before = state.player_position();
+    state.update(
+        UVec2::new(512, 512),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    let after = state.player_position();
+
+    // Same priority resolves by id ascending, so "a_rule" wins.
+    assert_eq!(after.x, before.x + 6);
+}
+
+#[test]
 fn rules_serialize_roundtrip() {
     let rules = RuleSet {
         rules: vec![Rule {
