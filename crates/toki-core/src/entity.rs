@@ -30,6 +30,8 @@ pub struct EntityAudioComponent {
     pub last_collision_state: bool,
     #[serde(default)]
     pub movement_sound: Option<String>,
+    #[serde(default)]
+    pub collision_sound: Option<String>,
 }
 
 impl Default for EntityAudioComponent {
@@ -39,6 +41,7 @@ impl Default for EntityAudioComponent {
             footstep_trigger_distance: 32.0,
             last_collision_state: false,
             movement_sound: None,
+            collision_sound: None,
         }
     }
 }
@@ -384,6 +387,8 @@ pub struct CollisionDef {
 pub struct AudioDef {
     pub footstep_trigger_distance: f32,
     pub movement_sound: String,
+    #[serde(default)]
+    pub collision_sound: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -492,11 +497,28 @@ impl EntityDefinition {
 
     /// Build a runtime audio component from this definition.
     pub fn create_audio_component(&self) -> EntityAudioComponent {
+        let movement_sound = {
+            let trimmed = self.audio.movement_sound.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        };
+        let collision_sound = self
+            .audio
+            .collision_sound
+            .as_ref()
+            .map(|value| value.trim())
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string);
+
         EntityAudioComponent {
             footstep_distance_accumulator: 0.0,
             footstep_trigger_distance: self.audio.footstep_trigger_distance,
             last_collision_state: false,
-            movement_sound: Some(self.audio.movement_sound.clone()),
+            movement_sound,
+            collision_sound,
         }
     }
 

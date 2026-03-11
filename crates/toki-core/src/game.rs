@@ -25,12 +25,19 @@ pub enum InputKey {
 /// Audio events that can be triggered by game logic
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AudioEvent {
-    /// Player started walking
-    PlayerWalk,
-    /// Player collided with something
-    PlayerCollision,
+    /// Play a one-shot sound effect on a logical channel.
+    PlaySound {
+        channel: AudioChannel,
+        sound_id: String,
+    },
     /// Start background music
     BackgroundMusic(String),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AudioChannel {
+    Movement,
+    Collision,
 }
 
 impl GameEvent for AudioEvent {}
@@ -150,7 +157,8 @@ impl GameState {
             },
             audio: crate::entity::AudioDef {
                 footstep_trigger_distance: 32.0,
-                movement_sound: "sfx_step".to_string(),
+                movement_sound: "sfx_slime_bounce".to_string(),
+                collision_sound: Some("sfx_hit2".to_string()),
             },
             animations: crate::entity::AnimationsDef {
                 atlas_name: "creatures".to_string(),
@@ -207,7 +215,8 @@ impl GameState {
             },
             audio: crate::entity::AudioDef {
                 footstep_trigger_distance: 32.0,
-                movement_sound: "sfx_step".to_string(),
+                movement_sound: "sfx_slime_bounce".to_string(),
+                collision_sound: Some("sfx_hit2".to_string()),
             },
             animations: crate::entity::AnimationsDef {
                 atlas_name: "creatures".to_string(),
@@ -408,7 +417,16 @@ impl GameState {
                     } else {
                         // Only trigger audio on state change
                         if !player_audio.last_collision_state {
-                            result.add_event(AudioEvent::PlayerCollision);
+                            if let Some(collision_sound) = player_audio
+                                .collision_sound
+                                .as_deref()
+                                .filter(|s| !s.is_empty())
+                            {
+                                result.add_event(AudioEvent::PlaySound {
+                                    channel: AudioChannel::Collision,
+                                    sound_id: collision_sound.to_string(),
+                                });
+                            }
                         }
                         player_audio.last_collision_state = true;
                     }
@@ -428,7 +446,16 @@ impl GameState {
                     } else {
                         // Only trigger audio on state change
                         if !player_audio.last_collision_state {
-                            result.add_event(AudioEvent::PlayerCollision);
+                            if let Some(collision_sound) = player_audio
+                                .collision_sound
+                                .as_deref()
+                                .filter(|s| !s.is_empty())
+                            {
+                                result.add_event(AudioEvent::PlaySound {
+                                    channel: AudioChannel::Collision,
+                                    sound_id: collision_sound.to_string(),
+                                });
+                            }
                         }
                         player_audio.last_collision_state = true;
                     }
@@ -449,7 +476,16 @@ impl GameState {
                     } else {
                         // Only trigger audio on state change
                         if !player_audio.last_collision_state {
-                            result.add_event(AudioEvent::PlayerCollision);
+                            if let Some(collision_sound) = player_audio
+                                .collision_sound
+                                .as_deref()
+                                .filter(|s| !s.is_empty())
+                            {
+                                result.add_event(AudioEvent::PlaySound {
+                                    channel: AudioChannel::Collision,
+                                    sound_id: collision_sound.to_string(),
+                                });
+                            }
                         }
                         player_audio.last_collision_state = true;
                     }
@@ -470,7 +506,16 @@ impl GameState {
                     } else {
                         // Only trigger audio on state change
                         if !player_audio.last_collision_state {
-                            result.add_event(AudioEvent::PlayerCollision);
+                            if let Some(collision_sound) = player_audio
+                                .collision_sound
+                                .as_deref()
+                                .filter(|s| !s.is_empty())
+                            {
+                                result.add_event(AudioEvent::PlaySound {
+                                    channel: AudioChannel::Collision,
+                                    sound_id: collision_sound.to_string(),
+                                });
+                            }
                         }
                         player_audio.last_collision_state = true;
                     }
@@ -498,7 +543,16 @@ impl GameState {
             // Trigger footstep when accumulated distance exceeds threshold
             if player_audio.footstep_distance_accumulator >= player_audio.footstep_trigger_distance
             {
-                result.add_event(AudioEvent::PlayerWalk);
+                if let Some(movement_sound) = player_audio
+                    .movement_sound
+                    .as_deref()
+                    .filter(|s| !s.is_empty())
+                {
+                    result.add_event(AudioEvent::PlaySound {
+                        channel: AudioChannel::Movement,
+                        sound_id: movement_sound.to_string(),
+                    });
+                }
                 player_audio.footstep_distance_accumulator -=
                     player_audio.footstep_trigger_distance;
             }

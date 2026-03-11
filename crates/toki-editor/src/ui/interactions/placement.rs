@@ -337,6 +337,7 @@ mod tests {
             audio: AudioDef {
                 footstep_trigger_distance: 32.0,
                 movement_sound: "sfx_step".to_string(),
+                collision_sound: Some("sfx_hit2".to_string()),
             },
             animations: AnimationsDef {
                 atlas_name: "creatures".to_string(),

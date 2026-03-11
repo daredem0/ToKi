@@ -34,6 +34,7 @@ fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
         audio: AudioDef {
             footstep_trigger_distance: 32.0,
             movement_sound: "sfx_step".to_string(),
+            collision_sound: Some("sfx_hit2".to_string()),
         },
         animations: AnimationsDef {
             atlas_name: "creatures".to_string(),
@@ -175,6 +176,7 @@ fn test_entity_manager_roundtrip() {
         .expect("player audio component should exist");
     assert_eq!(audio_component.footstep_trigger_distance, 32.0);
     assert_eq!(audio_component.movement_sound.as_deref(), Some("sfx_step"));
+    assert_eq!(audio_component.collision_sound.as_deref(), Some("sfx_hit2"));
 
     // Verify active status was preserved
     let active_entities = deserialized.active_entities();

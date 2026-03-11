@@ -1,4 +1,4 @@
-use toki_core::game::AudioEvent;
+use toki_core::game::{AudioChannel, AudioEvent};
 use toki_core::{EventHandler, EventQueue, GameEvent, GameUpdateResult};
 
 // Test event implementation
@@ -274,7 +274,10 @@ fn game_update_result_combined_movement_and_events() {
 // Integration tests with actual AudioEvent
 #[test]
 fn audio_event_implements_game_event() {
-    let event = AudioEvent::PlayerWalk;
+    let event = AudioEvent::PlaySound {
+        channel: AudioChannel::Movement,
+        sound_id: "sfx_step".to_string(),
+    };
     // Test that AudioEvent implements GameEvent by using it in generic functions
     let mut queue = EventQueue::new();
     queue.push(event);
@@ -285,13 +288,31 @@ fn audio_event_implements_game_event() {
 fn audio_event_in_game_update_result() {
     let mut result = GameUpdateResult::new();
 
-    result.add_event(AudioEvent::PlayerWalk);
-    result.add_event(AudioEvent::PlayerCollision);
+    result.add_event(AudioEvent::PlaySound {
+        channel: AudioChannel::Movement,
+        sound_id: "sfx_step".to_string(),
+    });
+    result.add_event(AudioEvent::PlaySound {
+        channel: AudioChannel::Collision,
+        sound_id: "sfx_hit2".to_string(),
+    });
     result.add_event(AudioEvent::BackgroundMusic("test_music".to_string()));
 
     assert_eq!(result.events.len(), 3);
-    assert!(matches!(result.events[0], AudioEvent::PlayerWalk));
-    assert!(matches!(result.events[1], AudioEvent::PlayerCollision));
+    assert!(matches!(
+        result.events[0],
+        AudioEvent::PlaySound {
+            channel: AudioChannel::Movement,
+            ..
+        }
+    ));
+    assert!(matches!(
+        result.events[1],
+        AudioEvent::PlaySound {
+            channel: AudioChannel::Collision,
+            ..
+        }
+    ));
     assert!(matches!(result.events[2], AudioEvent::BackgroundMusic(_)));
 }
 
@@ -299,16 +320,34 @@ fn audio_event_in_game_update_result() {
 fn audio_event_queue_operations() {
     let mut queue = EventQueue::new();
 
-    queue.push(AudioEvent::PlayerWalk);
-    queue.push(AudioEvent::PlayerCollision);
+    queue.push(AudioEvent::PlaySound {
+        channel: AudioChannel::Movement,
+        sound_id: "sfx_step".to_string(),
+    });
+    queue.push(AudioEvent::PlaySound {
+        channel: AudioChannel::Collision,
+        sound_id: "sfx_hit2".to_string(),
+    });
 
     assert_eq!(queue.len(), 2);
 
     let first = queue.pop().unwrap();
-    assert!(matches!(first, AudioEvent::PlayerWalk));
+    assert!(matches!(
+        first,
+        AudioEvent::PlaySound {
+            channel: AudioChannel::Movement,
+            ..
+        }
+    ));
 
     let second = queue.pop().unwrap();
-    assert!(matches!(second, AudioEvent::PlayerCollision));
+    assert!(matches!(
+        second,
+        AudioEvent::PlaySound {
+            channel: AudioChannel::Collision,
+            ..
+        }
+    ));
 
     assert!(queue.is_empty());
 }

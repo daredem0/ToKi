@@ -29,6 +29,7 @@ fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
         audio: AudioDef {
             footstep_trigger_distance: 32.0,
             movement_sound: "sfx_step".to_string(),
+            collision_sound: Some("sfx_hit2".to_string()),
         },
         animations: AnimationsDef {
             atlas_name: "creatures".to_string(),
@@ -428,4 +429,5 @@ fn test_spawn_from_definition_registers_audio_component() {
     assert_eq!(audio.footstep_trigger_distance, 32.0);
     assert!(!audio.last_collision_state);
     assert_eq!(audio.movement_sound.as_deref(), Some("sfx_step"));
+    assert_eq!(audio.collision_sound.as_deref(), Some("sfx_hit2"));
 }

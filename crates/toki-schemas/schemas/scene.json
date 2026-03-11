@@ -100,6 +100,10 @@
         "movement_sound": {
           "type": ["string", "null"],
           "description": "Sound ID to play when entity moves"
+        },
+        "collision_sound": {
+          "type": ["string", "null"],
+          "description": "Sound ID to play when entity collides"
         }
       }
     },

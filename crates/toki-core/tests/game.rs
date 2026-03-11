@@ -10,7 +10,7 @@ use toki_core::entity::{
     RenderingDef,
 };
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
-use toki_core::{GameState, InputKey};
+use toki_core::{game::AudioChannel, game::AudioEvent, GameState, InputKey};
 
 fn create_test_sprite() -> SpriteInstance {
     let animation = Animation {
@@ -64,6 +64,26 @@ fn create_test_atlas() -> AtlasMeta {
     }
 }
 
+fn create_solid_test_atlas() -> AtlasMeta {
+    let mut tiles = HashMap::new();
+    tiles.insert(
+        "floor".to_string(),
+        TileInfo {
+            position: UVec2::new(0, 0),
+            properties: TileProperties {
+                solid: true,
+                trigger: false,
+            },
+        },
+    );
+
+    AtlasMeta {
+        image: PathBuf::from("test_atlas.png"),
+        tile_size: UVec2::new(16, 16),
+        tiles,
+    }
+}
+
 fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
     EntityDefinition {
         name: name.to_string(),
@@ -92,6 +112,7 @@ fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
         audio: AudioDef {
             footstep_trigger_distance: 32.0,
             movement_sound: "sfx_step".to_string(),
+            collision_sound: Some("sfx_hit2".to_string()),
         },
         animations: AnimationsDef {
             atlas_name: "creatures".to_string(),
@@ -495,4 +516,63 @@ fn game_state_spawn_player_like_npc_uses_definition_metadata() {
 
     assert_eq!(npc.definition_name.as_deref(), Some("player_like_npc"));
     assert_eq!(npc.entity_type, toki_core::entity::EntityType::Npc);
+}
+
+#[test]
+fn game_state_emits_movement_audio_event_with_component_sound_id() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player_id = game_state.player_id().expect("player should exist");
+    let player_audio = game_state
+        .entity_manager_mut()
+        .audio_component_mut(player_id)
+        .expect("player audio component should exist");
+    player_audio.footstep_trigger_distance = 1.0;
+    player_audio.movement_sound = Some("sfx_custom_step".to_string());
+
+    game_state.handle_key_press(InputKey::Right);
+    let result = game_state.update(
+        UVec2::new(1000, 1000),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(result.events.iter().any(|event| {
+        matches!(
+            event,
+            AudioEvent::PlaySound {
+                channel: AudioChannel::Movement,
+                sound_id,
+            } if sound_id == "sfx_custom_step"
+        )
+    }));
+}
+
+#[test]
+fn game_state_emits_collision_audio_event_with_component_sound_id() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player_id = game_state.player_id().expect("player should exist");
+    let player_audio = game_state
+        .entity_manager_mut()
+        .audio_component_mut(player_id)
+        .expect("player audio component should exist");
+    player_audio.collision_sound = Some("sfx_custom_collision".to_string());
+
+    game_state.handle_key_press(InputKey::Right);
+    let result = game_state.update(
+        UVec2::new(1000, 1000),
+        &create_test_tilemap(),
+        &create_solid_test_atlas(),
+    );
+
+    assert!(result.events.iter().any(|event| {
+        matches!(
+            event,
+            AudioEvent::PlaySound {
+                channel: AudioChannel::Collision,
+                sound_id,
+            } if sound_id == "sfx_custom_collision"
+        )
+    }));
 }

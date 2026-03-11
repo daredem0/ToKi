@@ -8,7 +8,10 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::time::{Duration, Instant};
-use toki_core::{game::AudioEvent, EventHandler};
+use toki_core::{
+    game::{AudioChannel as AudioEventChannel, AudioEvent},
+    EventHandler,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlaybackPolicy {
@@ -492,24 +495,28 @@ impl std::fmt::Debug for AudioManager {
 impl EventHandler<AudioEvent> for AudioManager {
     fn handle(&mut self, event: &AudioEvent) {
         match event {
-            AudioEvent::PlayerWalk => {
-                // Set policy once - no cooldown needed since game logic now controls frequency
-                if !self.channels.contains_key("movement") {
-                    self.set_channel_policy("movement", PlaybackPolicy::Overlap);
-                    tracing::trace!("🎵 Initialized movement channel with Overlap policy");
+            AudioEvent::PlaySound { channel, sound_id } => {
+                let (channel_name, policy) = match channel {
+                    AudioEventChannel::Movement => ("movement", PlaybackPolicy::Overlap),
+                    AudioEventChannel::Collision => ("collision", PlaybackPolicy::Exclusive),
+                };
+
+                if !self.channels.contains_key(channel_name) {
+                    self.set_channel_policy(channel_name, policy);
+                    tracing::trace!(
+                        "Initialized '{}' channel with {:?} policy",
+                        channel_name,
+                        policy
+                    );
                 }
-                if let Err(e) = self.play_sound_in_channel("movement", "sfx_slime_bounce") {
-                    tracing::warn!("Failed to play footstep sound: {}", e);
-                }
-            }
-            AudioEvent::PlayerCollision => {
-                // Set policy once - no cooldown needed since game logic now controls frequency
-                if !self.channels.contains_key("collision") {
-                    self.set_channel_policy("collision", PlaybackPolicy::Exclusive);
-                    tracing::trace!("💥 Initialized collision channel with Exclusive policy");
-                }
-                if let Err(e) = self.play_sound_in_channel("collision", "sfx_hit2") {
-                    tracing::warn!("Failed to play collision sound: {}", e);
+
+                if let Err(e) = self.play_sound_in_channel(channel_name, sound_id) {
+                    tracing::warn!(
+                        "Failed to play sound '{}' in '{}' channel: {}",
+                        sound_id,
+                        channel_name,
+                        e
+                    );
                 }
             }
             AudioEvent::BackgroundMusic(name) => {

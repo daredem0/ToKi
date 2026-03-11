@@ -880,6 +880,16 @@ impl InspectorSystem {
                                                     ui.label(movement_sound);
                                                 });
                                             }
+
+                                            if let Some(collision_sound) = audio
+                                                .get("collision_sound")
+                                                .and_then(|v| v.as_str())
+                                            {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Collision Sound:");
+                                                    ui.label(collision_sound);
+                                                });
+                                            }
                                         }
 
                                         // Show animation information

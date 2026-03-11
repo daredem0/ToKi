@@ -31,6 +31,7 @@ fn test_entity_definition_create_entity_basic() {
         audio: AudioDef {
             footstep_trigger_distance: 16.0,
             movement_sound: "player_footsteps".to_string(),
+            collision_sound: Some("player_collision".to_string()),
         },
         animations: AnimationsDef {
             atlas_name: "player_atlas".to_string(),
@@ -99,6 +100,10 @@ fn test_entity_definition_create_entity_basic() {
         audio_component.movement_sound.as_deref(),
         Some("player_footsteps")
     );
+    assert_eq!(
+        audio_component.collision_sound.as_deref(),
+        Some("player_collision")
+    );
 
     // Check animation controller
     assert!(entity.attributes.animation_controller.is_some());
@@ -137,6 +142,7 @@ fn test_entity_definition_create_npc_entity() {
         audio: AudioDef {
             footstep_trigger_distance: 32.0,
             movement_sound: "npc_footsteps".to_string(),
+            collision_sound: Some("npc_collision".to_string()),
         },
         animations: AnimationsDef {
             atlas_name: "npc_atlas".to_string(),
@@ -205,6 +211,7 @@ fn test_entity_definition_invalid_entity_type() {
         audio: AudioDef {
             footstep_trigger_distance: 32.0,
             movement_sound: "test".to_string(),
+            collision_sound: None,
         },
         animations: AnimationsDef {
             atlas_name: "test".to_string(),
@@ -249,6 +256,7 @@ fn test_entity_definition_invalid_animation_state() {
         audio: AudioDef {
             footstep_trigger_distance: 32.0,
             movement_sound: "test".to_string(),
+            collision_sound: None,
         },
         animations: AnimationsDef {
             atlas_name: "test".to_string(),
@@ -298,6 +306,7 @@ fn test_entity_definition_invalid_loop_mode() {
         audio: AudioDef {
             footstep_trigger_distance: 32.0,
             movement_sound: "test".to_string(),
+            collision_sound: None,
         },
         animations: AnimationsDef {
             atlas_name: "test".to_string(),
@@ -347,6 +356,7 @@ fn test_entity_definition_serialization() {
         audio: AudioDef {
             footstep_trigger_distance: 0.0,
             movement_sound: "".to_string(),
+            collision_sound: None,
         },
         animations: AnimationsDef {
             atlas_name: "items".to_string(),
@@ -371,6 +381,10 @@ fn test_entity_definition_serialization() {
     assert_eq!(
         entity_def.audio.movement_sound,
         deserialized.audio.movement_sound
+    );
+    assert_eq!(
+        entity_def.audio.collision_sound,
+        deserialized.audio.collision_sound
     );
     assert_eq!(entity_def.category, deserialized.category);
     assert_eq!(entity_def.tags, deserialized.tags);
@@ -405,6 +419,7 @@ fn test_entity_definition_create_audio_component() {
         audio: AudioDef {
             footstep_trigger_distance: 24.0,
             movement_sound: "sfx_custom_step".to_string(),
+            collision_sound: Some("sfx_custom_hit".to_string()),
         },
         animations: AnimationsDef {
             atlas_name: "test".to_string(),
@@ -427,5 +442,9 @@ fn test_entity_definition_create_audio_component() {
     assert_eq!(
         audio_component.movement_sound.as_deref(),
         Some("sfx_custom_step")
+    );
+    assert_eq!(
+        audio_component.collision_sound.as_deref(),
+        Some("sfx_custom_hit")
     );
 }
