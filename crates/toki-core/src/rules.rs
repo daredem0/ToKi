@@ -31,12 +31,17 @@ pub enum RuleAction {
         channel: RuleSoundChannel,
         sound_id: String,
     },
+    PlayMusic {
+        track_id: String,
+    },
     SetVelocity {
         target: RuleTarget,
         velocity: [i32; 2],
     },
     /// Runtime placeholder until scene-switch plumbing is integrated end-to-end.
-    SwitchScene { scene_name: String },
+    SwitchScene {
+        scene_name: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

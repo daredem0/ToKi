@@ -98,6 +98,9 @@ enum RuleCommand {
         channel: AudioChannel,
         sound_id: String,
     },
+    PlayMusic {
+        track_id: String,
+    },
     SetVelocity {
         entity_id: EntityId,
         velocity: glam::IVec2,
@@ -1049,6 +1052,15 @@ impl GameState {
                     sound_id: sound_id.to_string(),
                 });
             }
+            RuleAction::PlayMusic { track_id } => {
+                let track_id = track_id.trim();
+                if track_id.is_empty() {
+                    return;
+                }
+                command_buffer.push(RuleCommand::PlayMusic {
+                    track_id: track_id.to_string(),
+                });
+            }
             RuleAction::SetVelocity { target, velocity } => {
                 if let Some(entity_id) = self.resolve_rule_target(*target) {
                     command_buffer.push(RuleCommand::SetVelocity {
@@ -1076,6 +1088,9 @@ impl GameState {
             match command {
                 RuleCommand::PlaySound { channel, sound_id } => {
                     result.add_event(AudioEvent::PlaySound { channel, sound_id });
+                }
+                RuleCommand::PlayMusic { track_id } => {
+                    result.add_event(AudioEvent::BackgroundMusic(track_id));
                 }
                 RuleCommand::SetVelocity {
                     entity_id,

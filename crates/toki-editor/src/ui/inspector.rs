@@ -34,6 +34,7 @@ struct EntityPropertyDraft {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RuleActionKind {
     PlaySound,
+    PlayMusic,
     SetVelocity,
     SwitchScene,
 }
@@ -57,6 +58,12 @@ enum RuleEditorCommand {
 struct RuleEditorOutcome {
     changed: bool,
     command: Option<RuleEditorCommand>,
+}
+
+#[derive(Debug, Default, Clone)]
+struct RuleAudioChoices {
+    sfx: Vec<String>,
+    music: Vec<String>,
 }
 
 impl EntityPropertyDraft {
@@ -174,6 +181,7 @@ impl InspectorSystem {
                                         ui,
                                         scene_name,
                                         &mut scene.rules,
+                                        config,
                                     );
                                 }
 
@@ -399,6 +407,15 @@ impl InspectorSystem {
                             });
                         }
                     }
+                    RuleAction::PlayMusic { track_id } => {
+                        if track_id.trim().is_empty() {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "PlayMusic requires a non-empty track id".to_string(),
+                            });
+                        }
+                    }
                     RuleAction::SetVelocity { target, .. } => {
                         if let RuleTarget::Entity(entity_id) = target {
                             if *entity_id == 0 {
@@ -433,6 +450,9 @@ impl InspectorSystem {
                 channel: RuleSoundChannel::Movement,
                 sound_id: "sfx_placeholder".to_string(),
             },
+            RuleActionKind::PlayMusic => RuleAction::PlayMusic {
+                track_id: "music_placeholder".to_string(),
+            },
             RuleActionKind::SetVelocity => RuleAction::SetVelocity {
                 target: RuleTarget::Player,
                 velocity: [0, 0],
@@ -446,6 +466,7 @@ impl InspectorSystem {
     fn action_kind(action: &RuleAction) -> RuleActionKind {
         match action {
             RuleAction::PlaySound { .. } => RuleActionKind::PlaySound,
+            RuleAction::PlayMusic { .. } => RuleActionKind::PlayMusic,
             RuleAction::SetVelocity { .. } => RuleActionKind::SetVelocity,
             RuleAction::SwitchScene { .. } => RuleActionKind::SwitchScene,
         }
@@ -454,18 +475,67 @@ impl InspectorSystem {
     fn action_kind_label(action_kind: RuleActionKind) -> &'static str {
         match action_kind {
             RuleActionKind::PlaySound => "PlaySound",
+            RuleActionKind::PlayMusic => "PlayMusic",
             RuleActionKind::SetVelocity => "SetVelocity",
             RuleActionKind::SwitchScene => "SwitchScene",
         }
+    }
+
+    fn load_rule_audio_choices(config: Option<&EditorConfig>) -> RuleAudioChoices {
+        let Some(project_path) = config.and_then(|cfg| cfg.current_project_path()) else {
+            return RuleAudioChoices::default();
+        };
+
+        RuleAudioChoices {
+            sfx: Self::discover_audio_asset_names(project_path.join("assets/audio/sfx").as_path()),
+            music: Self::discover_audio_asset_names(
+                project_path.join("assets/audio/music").as_path(),
+            ),
+        }
+    }
+
+    fn discover_audio_asset_names(dir: &std::path::Path) -> Vec<String> {
+        if !dir.exists() {
+            return Vec::new();
+        }
+
+        let mut names = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_file() {
+                    continue;
+                }
+                let Some(extension) = path.extension().and_then(|ext| ext.to_str()) else {
+                    continue;
+                };
+                let supported = matches!(
+                    extension.to_ascii_lowercase().as_str(),
+                    "ogg" | "wav" | "mp3"
+                );
+                if !supported {
+                    continue;
+                }
+                if let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) {
+                    names.push(stem.to_string());
+                }
+            }
+        }
+
+        names.sort();
+        names.dedup();
+        names
     }
 
     fn render_scene_rules_editor(
         ui: &mut egui::Ui,
         scene_name: &str,
         rule_set: &mut RuleSet,
+        config: Option<&EditorConfig>,
     ) -> bool {
         let mut changed = false;
         let validation_issues = Self::validate_rule_set(rule_set);
+        let audio_choices = Self::load_rule_audio_choices(config);
 
         ui.label("Visual Rules");
         ui.horizontal(|ui| {
@@ -493,8 +563,14 @@ impl InspectorSystem {
 
         let mut pending_command = None;
         for (rule_index, rule) in rule_set.rules.iter_mut().enumerate() {
-            let outcome =
-                Self::render_rule_editor(ui, scene_name, rule_index, rule, &validation_issues);
+            let outcome = Self::render_rule_editor(
+                ui,
+                scene_name,
+                rule_index,
+                rule,
+                &validation_issues,
+                &audio_choices,
+            );
             changed |= outcome.changed;
             if pending_command.is_none() {
                 pending_command = outcome.command;
@@ -535,6 +611,7 @@ impl InspectorSystem {
         rule_index: usize,
         rule: &mut Rule,
         validation_issues: &[RuleValidationIssue],
+        audio_choices: &RuleAudioChoices,
     ) -> RuleEditorOutcome {
         let mut outcome = RuleEditorOutcome::default();
         let has_rule_issues = validation_issues
@@ -632,6 +709,7 @@ impl InspectorSystem {
                             action_index,
                             action,
                             validation_issues,
+                            audio_choices,
                         );
                     });
                 }
@@ -643,6 +721,10 @@ impl InspectorSystem {
                 ui.horizontal(|ui| {
                     if ui.small_button("+ PlaySound").clicked() {
                         Self::add_action(rule, RuleActionKind::PlaySound);
+                        outcome.changed = true;
+                    }
+                    if ui.small_button("+ PlayMusic").clicked() {
+                        Self::add_action(rule, RuleActionKind::PlayMusic);
                         outcome.changed = true;
                     }
                     if ui.small_button("+ SetVelocity").clicked() {
@@ -666,6 +748,7 @@ impl InspectorSystem {
         action_index: usize,
         action: &mut RuleAction,
         validation_issues: &[RuleValidationIssue],
+        audio_choices: &RuleAudioChoices,
     ) -> bool {
         let mut changed = false;
 
@@ -684,6 +767,13 @@ impl InspectorSystem {
                         &mut selected_kind,
                         RuleActionKind::PlaySound,
                         Self::action_kind_label(RuleActionKind::PlaySound),
+                    )
+                    .changed();
+                changed |= ui
+                    .selectable_value(
+                        &mut selected_kind,
+                        RuleActionKind::PlayMusic,
+                        Self::action_kind_label(RuleActionKind::PlayMusic),
                     )
                     .changed();
                 changed |= ui
@@ -732,6 +822,34 @@ impl InspectorSystem {
                     ui.label("Sound Id:");
                     changed |= ui.text_edit_singleline(sound_id).changed();
                 });
+
+                changed |= Self::render_audio_choice_picker(
+                    ui,
+                    format!(
+                        "rule_sfx_picker_{}_{}_{}",
+                        scene_name, rule_index, action_index
+                    ),
+                    "SFX",
+                    sound_id,
+                    &audio_choices.sfx,
+                );
+            }
+            RuleAction::PlayMusic { track_id } => {
+                ui.horizontal(|ui| {
+                    ui.label("Track Id:");
+                    changed |= ui.text_edit_singleline(track_id).changed();
+                });
+
+                changed |= Self::render_audio_choice_picker(
+                    ui,
+                    format!(
+                        "rule_music_picker_{}_{}_{}",
+                        scene_name, rule_index, action_index
+                    ),
+                    "Music",
+                    track_id,
+                    &audio_choices.music,
+                );
             }
             RuleAction::SetVelocity { target, velocity } => {
                 changed |= Self::render_rule_target_editor(
@@ -766,6 +884,37 @@ impl InspectorSystem {
             ui.colored_label(egui::Color32::from_rgb(255, 210, 80), &issue.message);
         }
 
+        changed
+    }
+
+    fn render_audio_choice_picker(
+        ui: &mut egui::Ui,
+        id_salt: String,
+        label: &str,
+        selected_name: &mut String,
+        choices: &[String],
+    ) -> bool {
+        if choices.is_empty() {
+            return false;
+        }
+
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label(format!("{label} Picker:"));
+            egui::ComboBox::from_id_salt(id_salt)
+                .selected_text(if selected_name.is_empty() {
+                    "(Select)".to_string()
+                } else {
+                    selected_name.clone()
+                })
+                .show_ui(ui, |ui| {
+                    for choice in choices {
+                        changed |= ui
+                            .selectable_value(selected_name, choice.clone(), choice)
+                            .changed();
+                    }
+                });
+        });
         changed
     }
 
@@ -1622,6 +1771,7 @@ mod tests {
     use super::{EntityPropertyDraft, InspectorSystem, RuleActionKind};
     use crate::ui::EditorUI;
     use glam::{IVec2, UVec2};
+    use std::fs;
     use toki_core::collision::CollisionBox;
     use toki_core::entity::{EntityAttributes, EntityManager, EntityType};
     use toki_core::rules::{
@@ -1943,18 +2093,23 @@ mod tests {
         let mut rule = sample_rule("rule_1");
         assert_eq!(rule.actions.len(), 1);
 
+        InspectorSystem::add_action(&mut rule, RuleActionKind::PlayMusic);
         InspectorSystem::add_action(&mut rule, RuleActionKind::SetVelocity);
         InspectorSystem::add_action(&mut rule, RuleActionKind::SwitchScene);
-        assert_eq!(rule.actions.len(), 3);
+        assert_eq!(rule.actions.len(), 4);
         assert!(matches!(
             rule.actions[1],
+            RuleAction::PlayMusic { ref track_id } if track_id == "music_placeholder"
+        ));
+        assert!(matches!(
+            rule.actions[2],
             RuleAction::SetVelocity {
                 target: RuleTarget::Player,
                 velocity: [0, 0]
             }
         ));
         assert!(matches!(
-            rule.actions[2],
+            rule.actions[3],
             RuleAction::SwitchScene { ref scene_name } if scene_name.is_empty()
         ));
 
@@ -1976,7 +2131,7 @@ mod tests {
         ));
 
         assert!(InspectorSystem::remove_action(&mut rule, 1));
-        assert_eq!(rule.actions.len(), 2);
+        assert_eq!(rule.actions.len(), 3);
         assert!(!InspectorSystem::remove_action(&mut rule, 99));
     }
 
@@ -2023,5 +2178,41 @@ mod tests {
         assert!(issues
             .iter()
             .any(|issue| issue.message.contains("SwitchScene requires a scene name")));
+    }
+
+    #[test]
+    fn validate_rule_set_reports_empty_play_music_track() {
+        let rules = RuleSet {
+            rules: vec![Rule {
+                id: "music-rule".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::PlayMusic {
+                    track_id: "   ".to_string(),
+                }],
+            }],
+        };
+
+        let issues = InspectorSystem::validate_rule_set(&rules);
+        assert!(issues.iter().any(|issue| issue
+            .message
+            .contains("PlayMusic requires a non-empty track id")));
+    }
+
+    #[test]
+    fn discover_audio_asset_names_reads_supported_audio_files() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        fs::write(temp_dir.path().join("battle_theme.ogg"), "x").expect("ogg file write");
+        fs::write(temp_dir.path().join("ambience.mp3"), "x").expect("mp3 file write");
+        fs::write(temp_dir.path().join("impact.wav"), "x").expect("wav file write");
+        fs::write(temp_dir.path().join("ignore.txt"), "x").expect("txt file write");
+        fs::create_dir(temp_dir.path().join("sub")).expect("subdir create");
+        fs::write(temp_dir.path().join("sub").join("nested.ogg"), "x").expect("nested write");
+
+        let names = InspectorSystem::discover_audio_asset_names(temp_dir.path());
+        assert_eq!(names, vec!["ambience", "battle_theme", "impact"]);
     }
 }

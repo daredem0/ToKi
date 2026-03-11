@@ -112,6 +112,54 @@ fn on_update_rule_runs_every_tick() {
 }
 
 #[test]
+fn play_music_action_emits_background_music_event() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "music-start",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::PlayMusic {
+                track_id: "lavandia".to_string(),
+            }],
+        )],
+    });
+
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert_eq!(result.events.len(), 1);
+    assert!(matches!(
+        &result.events[0],
+        AudioEvent::BackgroundMusic(track_id) if track_id == "lavandia"
+    ));
+}
+
+#[test]
+fn play_music_action_ignores_empty_track_id() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "music-empty",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::PlayMusic {
+                track_id: "   ".to_string(),
+            }],
+        )],
+    });
+
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert!(result.events.is_empty());
+}
+
+#[test]
 fn first_tick_emits_on_start_events_before_on_update_events() {
     let mut state = GameState::new_empty();
     state.set_rules(RuleSet {
@@ -474,6 +522,9 @@ fn rules_serialize_roundtrip() {
                 RuleAction::SetVelocity {
                     target: RuleTarget::Player,
                     velocity: [1, -1],
+                },
+                RuleAction::PlayMusic {
+                    track_id: "lavandia".to_string(),
                 },
                 RuleAction::SwitchScene {
                     scene_name: "Town".to_string(),
