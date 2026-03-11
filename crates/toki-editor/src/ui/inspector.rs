@@ -1,5 +1,8 @@
 use super::editor_ui::{EditorUI, Selection};
 use crate::config::EditorConfig;
+use toki_core::rules::{
+    Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
+};
 
 /// Handles inspector panel rendering for assets and entities
 pub struct InspectorSystem;
@@ -134,6 +137,20 @@ impl InspectorSystem {
                                         // TODO: Entity creation
                                     }
                                 }
+
+                                let mut rules_changed = false;
+                                if let Some(scene) = Self::find_scene_mut(ui_state, scene_name) {
+                                    ui.separator();
+                                    rules_changed = Self::render_scene_rules_editor(
+                                        ui,
+                                        scene_name,
+                                        &mut scene.rules,
+                                    );
+                                }
+
+                                if rules_changed {
+                                    ui_state.scene_content_changed = true;
+                                }
                             }
 
                             Some(Selection::Map(scene_name, map_name)) => {
@@ -205,6 +222,331 @@ impl InspectorSystem {
                         }
                     });
             });
+    }
+
+    fn find_scene_mut<'a>(
+        ui_state: &'a mut EditorUI,
+        scene_name: &str,
+    ) -> Option<&'a mut toki_core::Scene> {
+        ui_state
+            .scenes
+            .iter_mut()
+            .find(|scene| scene.name == scene_name)
+    }
+
+    fn next_rule_id(rule_set: &RuleSet) -> String {
+        let mut index = 1usize;
+        loop {
+            let candidate = format!("rule_{}", index);
+            if !rule_set.rules.iter().any(|rule| rule.id == candidate) {
+                return candidate;
+            }
+            index += 1;
+        }
+    }
+
+    fn add_default_rule(rule_set: &mut RuleSet) -> String {
+        let id = Self::next_rule_id(rule_set);
+        let rule = Rule {
+            id: id.clone(),
+            enabled: true,
+            priority: 0,
+            once: false,
+            trigger: RuleTrigger::OnUpdate,
+            conditions: vec![RuleCondition::Always],
+            actions: vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "sfx_placeholder".to_string(),
+            }],
+        };
+        rule_set.rules.push(rule);
+        id
+    }
+
+    fn render_scene_rules_editor(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        rule_set: &mut RuleSet,
+    ) -> bool {
+        let mut changed = false;
+
+        ui.label("Visual Rules");
+        ui.horizontal(|ui| {
+            ui.label("Count:");
+            ui.label(rule_set.rules.len().to_string());
+        });
+
+        if ui.button("➕ Add Rule").clicked() {
+            let rule_id = Self::add_default_rule(rule_set);
+            tracing::info!("Added rule '{}' to scene '{}'", rule_id, scene_name);
+            changed = true;
+        }
+
+        if rule_set.rules.is_empty() {
+            ui.label("No rules configured");
+            return changed;
+        }
+
+        let mut remove_rule_index = None;
+        for (rule_index, rule) in rule_set.rules.iter_mut().enumerate() {
+            let (rule_changed, remove_rule) =
+                Self::render_rule_editor(ui, scene_name, rule_index, rule);
+            changed |= rule_changed;
+            if remove_rule {
+                remove_rule_index = Some(rule_index);
+            }
+        }
+
+        if let Some(index) = remove_rule_index {
+            rule_set.rules.remove(index);
+            changed = true;
+        }
+
+        changed
+    }
+
+    fn render_rule_editor(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        rule_index: usize,
+        rule: &mut Rule,
+    ) -> (bool, bool) {
+        let mut changed = false;
+        let mut remove_rule = false;
+
+        let header = format!("{} ({:?})", rule.id, rule.trigger);
+        egui::CollapsingHeader::new(header)
+            .id_salt(format!("rule_header_{}_{}", scene_name, rule_index))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Id:");
+                    changed |= ui.text_edit_singleline(&mut rule.id).changed();
+                });
+
+                ui.horizontal(|ui| {
+                    changed |= ui.checkbox(&mut rule.enabled, "Enabled").changed();
+                    changed |= ui.checkbox(&mut rule.once, "Once").changed();
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Priority:");
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut rule.priority).speed(1.0))
+                        .changed();
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Trigger:");
+                    egui::ComboBox::from_id_salt(format!(
+                        "rule_trigger_{}_{}",
+                        scene_name, rule_index
+                    ))
+                    .selected_text(match rule.trigger {
+                        RuleTrigger::OnStart => "OnStart",
+                        RuleTrigger::OnUpdate => "OnUpdate",
+                    })
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(&mut rule.trigger, RuleTrigger::OnStart, "OnStart")
+                            .changed();
+                        changed |= ui
+                            .selectable_value(&mut rule.trigger, RuleTrigger::OnUpdate, "OnUpdate")
+                            .changed();
+                    });
+                });
+
+                if rule.conditions.is_empty() {
+                    rule.conditions.push(RuleCondition::Always);
+                    changed = true;
+                }
+                ui.label("Conditions: Always");
+
+                ui.separator();
+                ui.label("Actions");
+
+                let mut remove_action_index = None;
+                for (action_index, action) in rule.actions.iter_mut().enumerate() {
+                    ui.group(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("Action {}", action_index + 1));
+                            if ui.small_button("✕").clicked() {
+                                remove_action_index = Some(action_index);
+                            }
+                        });
+                        changed |= Self::render_rule_action_editor(
+                            ui,
+                            scene_name,
+                            rule_index,
+                            action_index,
+                            action,
+                        );
+                    });
+                }
+
+                if let Some(index) = remove_action_index {
+                    rule.actions.remove(index);
+                    changed = true;
+                }
+
+                ui.horizontal(|ui| {
+                    if ui.small_button("+ PlaySound").clicked() {
+                        rule.actions.push(RuleAction::PlaySound {
+                            channel: RuleSoundChannel::Movement,
+                            sound_id: "sfx_placeholder".to_string(),
+                        });
+                        changed = true;
+                    }
+                    if ui.small_button("+ SetVelocity").clicked() {
+                        rule.actions.push(RuleAction::SetVelocity {
+                            target: RuleTarget::Player,
+                            velocity: [0, 0],
+                        });
+                        changed = true;
+                    }
+                    if ui.small_button("+ SwitchScene").clicked() {
+                        rule.actions.push(RuleAction::SwitchScene {
+                            scene_name: String::new(),
+                        });
+                        changed = true;
+                    }
+                });
+
+                if ui.small_button("🗑️ Remove Rule").clicked() {
+                    remove_rule = true;
+                }
+            });
+
+        (changed, remove_rule)
+    }
+
+    fn render_rule_action_editor(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        rule_index: usize,
+        action_index: usize,
+        action: &mut RuleAction,
+    ) -> bool {
+        let mut changed = false;
+
+        match action {
+            RuleAction::PlaySound { channel, sound_id } => {
+                ui.horizontal(|ui| {
+                    ui.label("Type: PlaySound");
+                    ui.label("Channel:");
+                    egui::ComboBox::from_id_salt(format!(
+                        "rule_sound_channel_{}_{}_{}",
+                        scene_name, rule_index, action_index
+                    ))
+                    .selected_text(match channel {
+                        RuleSoundChannel::Movement => "Movement",
+                        RuleSoundChannel::Collision => "Collision",
+                    })
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(channel, RuleSoundChannel::Movement, "Movement")
+                            .changed();
+                        changed |= ui
+                            .selectable_value(channel, RuleSoundChannel::Collision, "Collision")
+                            .changed();
+                    });
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Sound Id:");
+                    changed |= ui.text_edit_singleline(sound_id).changed();
+                });
+            }
+            RuleAction::SetVelocity { target, velocity } => {
+                ui.label("Type: SetVelocity");
+                changed |= Self::render_rule_target_editor(
+                    ui,
+                    scene_name,
+                    rule_index,
+                    action_index,
+                    target,
+                );
+
+                ui.horizontal(|ui| {
+                    ui.label("Velocity:");
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut velocity[0]).speed(1.0))
+                        .changed();
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut velocity[1]).speed(1.0))
+                        .changed();
+                });
+            }
+            RuleAction::SwitchScene { scene_name } => {
+                ui.label("Type: SwitchScene");
+                ui.horizontal(|ui| {
+                    ui.label("Scene:");
+                    changed |= ui.text_edit_singleline(scene_name).changed();
+                });
+            }
+        }
+
+        changed
+    }
+
+    fn render_rule_target_editor(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        rule_index: usize,
+        action_index: usize,
+        target: &mut RuleTarget,
+    ) -> bool {
+        let mut changed = false;
+
+        ui.horizontal(|ui| {
+            ui.label("Target:");
+            egui::ComboBox::from_id_salt(format!(
+                "rule_target_{}_{}_{}",
+                scene_name, rule_index, action_index
+            ))
+            .selected_text(match target {
+                RuleTarget::Player => "Player",
+                RuleTarget::Entity(_) => "Entity",
+            })
+            .show_ui(ui, |ui| {
+                if ui
+                    .selectable_label(matches!(target, RuleTarget::Player), "Player")
+                    .clicked()
+                    && !matches!(target, RuleTarget::Player)
+                {
+                    *target = RuleTarget::Player;
+                    changed = true;
+                }
+
+                if ui
+                    .selectable_label(matches!(target, RuleTarget::Entity(_)), "Entity")
+                    .clicked()
+                    && !matches!(target, RuleTarget::Entity(_))
+                {
+                    *target = RuleTarget::Entity(1);
+                    changed = true;
+                }
+            });
+        });
+
+        if let RuleTarget::Entity(entity_id) = target {
+            ui.horizontal(|ui| {
+                ui.label("Entity Id:");
+                let mut value = *entity_id as i64;
+                if ui
+                    .add(
+                        egui::DragValue::new(&mut value)
+                            .speed(1.0)
+                            .range(1..=u32::MAX as i64),
+                    )
+                    .changed()
+                {
+                    *entity_id = value as u32;
+                    changed = true;
+                }
+            });
+        }
+
+        changed
     }
 
     fn render_scene_entity_editor(ui: &mut egui::Ui, draft: &mut EntityPropertyDraft) -> bool {
@@ -1001,6 +1343,7 @@ mod tests {
     use glam::{IVec2, UVec2};
     use toki_core::collision::CollisionBox;
     use toki_core::entity::{EntityAttributes, EntityManager, EntityType};
+    use toki_core::rules::{RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
     use toki_core::Scene;
 
     fn sample_entity_with_id(id: u32) -> toki_core::entity::Entity {
@@ -1137,5 +1480,59 @@ mod tests {
         scene.entities.push(sample_entity_with_id(42));
 
         assert!(InspectorSystem::find_selected_scene_entity_mut(&mut ui_state, 42).is_none());
+    }
+
+    #[test]
+    fn next_rule_id_fills_first_available_gap() {
+        let rules = RuleSet {
+            rules: vec![
+                toki_core::rules::Rule {
+                    id: "rule_1".to_string(),
+                    enabled: true,
+                    priority: 0,
+                    once: false,
+                    trigger: RuleTrigger::OnUpdate,
+                    conditions: vec![RuleCondition::Always],
+                    actions: vec![],
+                },
+                toki_core::rules::Rule {
+                    id: "rule_3".to_string(),
+                    enabled: true,
+                    priority: 0,
+                    once: false,
+                    trigger: RuleTrigger::OnUpdate,
+                    conditions: vec![RuleCondition::Always],
+                    actions: vec![],
+                },
+            ],
+        };
+
+        let next = InspectorSystem::next_rule_id(&rules);
+        assert_eq!(next, "rule_2");
+    }
+
+    #[test]
+    fn add_default_rule_appends_editable_placeholder_rule() {
+        let mut rules = RuleSet::default();
+        let id = InspectorSystem::add_default_rule(&mut rules);
+
+        assert_eq!(id, "rule_1");
+        assert_eq!(rules.rules.len(), 1);
+
+        let rule = &rules.rules[0];
+        assert_eq!(rule.id, "rule_1");
+        assert!(rule.enabled);
+        assert_eq!(rule.priority, 0);
+        assert!(!rule.once);
+        assert_eq!(rule.trigger, RuleTrigger::OnUpdate);
+        assert_eq!(rule.conditions, vec![RuleCondition::Always]);
+        assert_eq!(rule.actions.len(), 1);
+        assert_eq!(
+            rule.actions[0],
+            RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "sfx_placeholder".to_string(),
+            }
+        );
     }
 }

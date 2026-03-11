@@ -28,6 +28,10 @@
       },
       "description": "Array of entities present in the scene"
     },
+    "rules": {
+      "$ref": "#/definitions/ruleSet",
+      "description": "Scene-authored visual rules evaluated by the runtime rule engine"
+    },
     "camera_position": {
       "anyOf": [
         {"type": "null"},
@@ -46,6 +50,61 @@
     }
   },
   "definitions": {
+    "ruleSet": {
+      "type": "object",
+      "required": ["rules"],
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/rule"
+          },
+          "description": "Ordered rules authored for this scene"
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "required": ["id", "trigger", "actions"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable rule identifier"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this rule should execute"
+        },
+        "priority": {
+          "type": "integer",
+          "description": "Higher priority rules execute first"
+        },
+        "once": {
+          "type": "boolean",
+          "description": "Run only once for this runtime session"
+        },
+        "trigger": {
+          "type": "string",
+          "enum": ["OnStart", "OnUpdate"],
+          "description": "Event that triggers this rule"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["Always"]
+          },
+          "description": "Rule conditions (minimal scope currently supports Always)"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "description": "Rule action payloads (externally-tagged enum encoding)"
+        }
+      }
+    },
     "sceneEntity": {
       "type": "object",
       "required": ["id", "position", "size", "entity_type", "attributes", "collision_box"],

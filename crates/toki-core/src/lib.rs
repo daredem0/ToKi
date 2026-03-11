@@ -34,6 +34,7 @@ pub mod timing;
 pub use timing::{TimestepIterator, TimingSystem};
 
 pub mod entity;
+pub mod rules;
 pub mod scene;
 pub use scene::Scene;
 

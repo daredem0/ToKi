@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -8,6 +8,9 @@ use crate::assets::tilemap::TileMap;
 use crate::collision;
 use crate::entity::{Entity, EntityId, EntityManager};
 use crate::events::{GameEvent, GameUpdateResult};
+use crate::rules::{
+    Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
+};
 use crate::scene_manager::SceneManager;
 use crate::sprite::{SpriteFrame, SpriteInstance};
 
@@ -72,6 +75,21 @@ pub struct GameState {
     /// Frame counter for NPC AI decisions
     #[serde(default)]
     npc_ai_frame_counter: u32,
+
+    /// Data-driven gameplay rules evaluated each frame.
+    #[serde(default)]
+    rules: RuleSet,
+
+    /// Runtime-only rule execution state.
+    #[serde(skip, default)]
+    rule_runtime: RuleRuntimeState,
+}
+
+#[derive(Debug, Default)]
+struct RuleRuntimeState {
+    started: bool,
+    fired_once_rules: HashSet<String>,
+    velocities: HashMap<EntityId, glam::IVec2>,
 }
 
 impl GameState {
@@ -94,6 +112,8 @@ impl GameState {
             sprite_size: 16,  // Sprite is 16×16 pixels
             debug_collision_rendering: false,
             npc_ai_frame_counter: 0,
+            rules: RuleSet::default(),
+            rule_runtime: RuleRuntimeState::default(),
         }
     }
 
@@ -108,6 +128,8 @@ impl GameState {
             sprite_size: 16,
             debug_collision_rendering: false,
             npc_ai_frame_counter: 0,
+            rules: RuleSet::default(),
+            rule_runtime: RuleRuntimeState::default(),
         }
     }
 
@@ -253,12 +275,26 @@ impl GameState {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> GameUpdateResult<AudioEvent> {
+        let mut result = GameUpdateResult::new();
+
+        if !self.rule_runtime.started {
+            self.execute_rules_for_trigger(RuleTrigger::OnStart, &mut result);
+            self.rule_runtime.started = true;
+        }
+        self.execute_rules_for_trigger(RuleTrigger::OnUpdate, &mut result);
+
         let input_result = self.process_input(world_bounds, tilemap, atlas);
+        result.player_moved = input_result.player_moved;
+        result.add_events(input_result.events);
+
+        if self.apply_rule_velocities(world_bounds, tilemap, atlas) {
+            result.player_moved = true;
+        }
 
         // Pick moving or idle animation
         if let Some(player_entity) = self.entity_manager.get_player_mut() {
             if let Some(animation_controller) = &mut player_entity.attributes.animation_controller {
-                let desired_player_animation = if input_result.player_moved {
+                let desired_player_animation = if result.player_moved {
                     AnimationState::Walk
                 } else {
                     AnimationState::Idle
@@ -280,7 +316,7 @@ impl GameState {
         // Update entity animation timing
         self.entity_manager.update_animations(17.0);
 
-        input_result
+        result
     }
 
     /// Update NPC AI - makes NPCs move randomly every few frames
@@ -582,6 +618,23 @@ impl GameState {
         self.keys_held.remove(&key);
     }
 
+    pub fn rules(&self) -> &RuleSet {
+        &self.rules
+    }
+
+    pub fn rules_mut(&mut self) -> &mut RuleSet {
+        &mut self.rules
+    }
+
+    pub fn set_rules(&mut self, rules: RuleSet) {
+        self.rules = rules;
+        self.rule_runtime = RuleRuntimeState::default();
+    }
+
+    pub fn add_rule(&mut self, rule: Rule) {
+        self.rules.rules.push(rule);
+    }
+
     /// Get reference to all entities (legacy method - preserved for compatibility)
     pub fn entities(&self) -> Vec<&Entity> {
         self.entity_manager
@@ -627,6 +680,7 @@ impl GameState {
         // Clear current entities
         self.entity_manager = EntityManager::new();
         self.player_id = None;
+        self.set_rules(scene.rules.clone());
 
         // Load entities from scene
         for entity in scene.entities {
@@ -654,6 +708,7 @@ impl GameState {
     /// Sync current entities back to the active scene
     /// Useful for saving changes made during runtime back to scene data
     pub fn sync_entities_to_active_scene(&mut self) {
+        let rules = self.rules.clone();
         if let Some(active_scene) = self.scene_manager.active_scene_mut() {
             // Clear scene entities and reload from current entity manager
             active_scene.entities.clear();
@@ -663,6 +718,8 @@ impl GameState {
                     active_scene.entities.push(entity.clone());
                 }
             }
+
+            active_scene.rules = rules;
         }
     }
 
@@ -911,5 +968,149 @@ impl GameState {
         }
 
         trigger_tiles
+    }
+
+    fn execute_rules_for_trigger(
+        &mut self,
+        trigger: RuleTrigger,
+        result: &mut GameUpdateResult<AudioEvent>,
+    ) {
+        let mut matching_rules = self
+            .rules
+            .rules
+            .iter()
+            .filter(|rule| rule.enabled && rule.trigger == trigger)
+            .filter(|rule| {
+                !(rule.once
+                    && self
+                        .rule_runtime
+                        .fired_once_rules
+                        .contains(rule.id.as_str()))
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+
+        // Deterministic order: higher priority first, id as tie-breaker.
+        matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+
+        for rule in matching_rules {
+            if !self.rule_conditions_match(&rule.conditions) {
+                continue;
+            }
+
+            for action in &rule.actions {
+                self.apply_rule_action(action, result);
+            }
+
+            if rule.once {
+                self.rule_runtime.fired_once_rules.insert(rule.id);
+            }
+        }
+    }
+
+    fn rule_conditions_match(&self, conditions: &[RuleCondition]) -> bool {
+        conditions.iter().all(|condition| match condition {
+            RuleCondition::Always => true,
+        })
+    }
+
+    fn apply_rule_action(
+        &mut self,
+        action: &RuleAction,
+        result: &mut GameUpdateResult<AudioEvent>,
+    ) {
+        match action {
+            RuleAction::PlaySound { channel, sound_id } => {
+                let sound_id = sound_id.trim();
+                if sound_id.is_empty() {
+                    return;
+                }
+
+                let channel = match channel {
+                    RuleSoundChannel::Movement => AudioChannel::Movement,
+                    RuleSoundChannel::Collision => AudioChannel::Collision,
+                };
+
+                result.add_event(AudioEvent::PlaySound {
+                    channel,
+                    sound_id: sound_id.to_string(),
+                });
+            }
+            RuleAction::SetVelocity { target, velocity } => {
+                if let Some(entity_id) = self.resolve_rule_target(*target) {
+                    self.rule_runtime
+                        .velocities
+                        .insert(entity_id, glam::IVec2::new(velocity[0], velocity[1]));
+                }
+            }
+            RuleAction::SwitchScene { scene_name } => {
+                tracing::debug!(
+                    "Rule requested scene switch to '{}'; action is a runtime placeholder",
+                    scene_name
+                );
+            }
+        }
+    }
+
+    fn resolve_rule_target(&self, target: RuleTarget) -> Option<EntityId> {
+        match target {
+            RuleTarget::Player => self.player_id,
+            RuleTarget::Entity(entity_id) => Some(entity_id),
+        }
+    }
+
+    fn apply_rule_velocities(
+        &mut self,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> bool {
+        let velocities = self
+            .rule_runtime
+            .velocities
+            .iter()
+            .map(|(entity_id, velocity)| (*entity_id, *velocity))
+            .collect::<Vec<_>>();
+
+        let mut moved_player = false;
+
+        for (entity_id, velocity) in velocities {
+            if velocity == glam::IVec2::ZERO {
+                continue;
+            }
+
+            let Some(current_entity) = self.entity_manager.get_entity(entity_id).cloned() else {
+                continue;
+            };
+
+            let max_x = (world_bounds.x as i32 - current_entity.size.x as i32).max(0);
+            let max_y = (world_bounds.y as i32 - current_entity.size.y as i32).max(0);
+            let candidate_position = glam::IVec2::new(
+                (current_entity.position.x + velocity.x).clamp(0, max_x),
+                (current_entity.position.y + velocity.y).clamp(0, max_y),
+            );
+
+            if candidate_position == current_entity.position {
+                continue;
+            }
+
+            if !collision::can_entity_move_to_position(
+                &current_entity,
+                candidate_position,
+                tilemap,
+                atlas,
+            ) {
+                continue;
+            }
+
+            if let Some(entity) = self.entity_manager.get_entity_mut(entity_id) {
+                entity.position = candidate_position;
+                if Some(entity_id) == self.player_id {
+                    moved_player = true;
+                }
+            }
+        }
+
+        moved_player
     }
 }

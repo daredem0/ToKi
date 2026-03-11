@@ -1,6 +1,7 @@
 use glam::{IVec2, UVec2};
 use toki_core::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use toki_core::entity::{Entity, EntityAttributes, EntityType};
+use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::scene::Scene;
 
 fn create_test_entity(id: u32, position: IVec2) -> Entity {
@@ -44,6 +45,7 @@ fn test_scene_new() {
     assert!(scene.description.is_none());
     assert!(scene.maps.is_empty());
     assert!(scene.entities.is_empty());
+    assert!(scene.rules.rules.is_empty());
     assert!(scene.camera_position.is_none());
     assert!(scene.camera_scale.is_none());
 }
@@ -57,6 +59,7 @@ fn test_scene_with_maps() {
     assert!(scene.description.is_none());
     assert_eq!(scene.maps, maps);
     assert!(scene.entities.is_empty());
+    assert!(scene.rules.rules.is_empty());
     assert!(scene.camera_position.is_none());
     assert!(scene.camera_scale.is_none());
 }
@@ -277,4 +280,30 @@ fn test_scene_with_camera_settings() {
 
     assert_eq!(scene.camera_position, deserialized.camera_position);
     assert_eq!(scene.camera_scale, deserialized.camera_scale);
+}
+
+#[test]
+fn test_scene_rules_serialization_roundtrip() {
+    let mut scene = Scene::new("rule_scene".to_string());
+    scene.rules = RuleSet {
+        rules: vec![Rule {
+            id: "scene_rule".to_string(),
+            enabled: true,
+            priority: 7,
+            once: true,
+            trigger: RuleTrigger::OnStart,
+            conditions: vec![RuleCondition::Always],
+            actions: vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "sfx_scene_start".to_string(),
+            }],
+        }],
+    };
+
+    let json = serde_json::to_string_pretty(&scene).unwrap();
+    let deserialized: Scene = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(deserialized.rules.rules.len(), 1);
+    assert_eq!(deserialized.rules.rules[0].id, "scene_rule");
+    assert_eq!(deserialized.rules.rules[0].trigger, RuleTrigger::OnStart);
 }

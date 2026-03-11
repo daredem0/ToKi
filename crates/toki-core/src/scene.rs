@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::entity::{Entity, EntityId};
+use crate::rules::RuleSet;
 
 /// Represents a game scene - a complete game environment with entities, maps, and metadata.
 ///
@@ -19,6 +20,10 @@ pub struct Scene {
     /// Entities in this scene
     pub entities: Vec<Entity>,
 
+    /// Data-driven rules authored for this scene.
+    #[serde(default)]
+    pub rules: RuleSet,
+
     /// Scene-specific camera settings (optional override)
     pub camera_position: Option<glam::IVec2>,
     pub camera_scale: Option<u32>,
@@ -32,6 +37,7 @@ impl Scene {
             description: None,
             maps: Vec::new(),
             entities: Vec::new(),
+            rules: RuleSet::default(),
             camera_position: None,
             camera_scale: None,
         }
@@ -44,6 +50,7 @@ impl Scene {
             description: None,
             maps,
             entities: Vec::new(),
+            rules: RuleSet::default(),
             camera_position: None,
             camera_scale: None,
         }

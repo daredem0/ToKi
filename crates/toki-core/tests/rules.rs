@@ -1,0 +1,375 @@
+use glam::{IVec2, UVec2};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use toki_core::assets::{
+    atlas::{AtlasMeta, TileInfo, TileProperties},
+    tilemap::TileMap,
+};
+use toki_core::game::{AudioChannel, AudioEvent};
+use toki_core::rules::{
+    Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
+};
+use toki_core::{GameState, InputKey, Scene};
+
+fn create_test_tilemap() -> TileMap {
+    TileMap {
+        size: UVec2::new(10, 10),
+        tile_size: UVec2::new(16, 16),
+        atlas: PathBuf::from("test_atlas.json"),
+        tiles: vec!["floor".to_string(); 100],
+    }
+}
+
+fn create_test_atlas() -> AtlasMeta {
+    let mut tiles = HashMap::new();
+    tiles.insert(
+        "floor".to_string(),
+        TileInfo {
+            position: UVec2::new(0, 0),
+            properties: TileProperties {
+                solid: false,
+                trigger: false,
+            },
+        },
+    );
+
+    AtlasMeta {
+        image: PathBuf::from("test_atlas.png"),
+        tile_size: UVec2::new(16, 16),
+        tiles,
+    }
+}
+
+fn base_rule(id: &str, trigger: RuleTrigger, priority: i32, actions: Vec<RuleAction>) -> Rule {
+    Rule {
+        id: id.to_string(),
+        enabled: true,
+        priority,
+        once: false,
+        trigger,
+        conditions: vec![RuleCondition::Always],
+        actions,
+    }
+}
+
+#[test]
+fn on_start_rule_runs_once() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "start-beep",
+            RuleTrigger::OnStart,
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "sfx_start".to_string(),
+            }],
+        )],
+    });
+
+    let world_bounds = UVec2::new(256, 256);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    let first = state.update(world_bounds, &tilemap, &atlas);
+    let second = state.update(world_bounds, &tilemap, &atlas);
+
+    assert_eq!(first.events.len(), 1);
+    assert!(matches!(
+        first.events[0],
+        AudioEvent::PlaySound {
+            channel: AudioChannel::Movement,
+            ref sound_id,
+        } if sound_id == "sfx_start"
+    ));
+    assert!(second.events.is_empty());
+}
+
+#[test]
+fn on_update_rule_runs_every_tick() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "tick-beep",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Collision,
+                sound_id: "sfx_tick".to_string(),
+            }],
+        )],
+    });
+
+    let world_bounds = UVec2::new(256, 256);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    let first = state.update(world_bounds, &tilemap, &atlas);
+    let second = state.update(world_bounds, &tilemap, &atlas);
+
+    assert_eq!(first.events.len(), 1);
+    assert_eq!(second.events.len(), 1);
+}
+
+#[test]
+fn rules_execute_in_priority_order() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![
+            base_rule(
+                "low",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "low".to_string(),
+                }],
+            ),
+            base_rule(
+                "high",
+                RuleTrigger::OnUpdate,
+                10,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "high".to_string(),
+                }],
+            ),
+        ],
+    });
+
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert_eq!(result.events.len(), 2);
+
+    assert!(matches!(
+        &result.events[0],
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "high"
+    ));
+    assert!(matches!(
+        &result.events[1],
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "low"
+    ));
+}
+
+#[test]
+fn rules_with_same_priority_execute_in_stable_id_order() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![
+            base_rule(
+                "b_rule",
+                RuleTrigger::OnUpdate,
+                5,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "second".to_string(),
+                }],
+            ),
+            base_rule(
+                "a_rule",
+                RuleTrigger::OnUpdate,
+                5,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "first".to_string(),
+                }],
+            ),
+        ],
+    });
+
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert_eq!(result.events.len(), 2);
+    assert!(matches!(
+        &result.events[0],
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "first"
+    ));
+    assert!(matches!(
+        &result.events[1],
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "second"
+    ));
+}
+
+#[test]
+fn disabled_rule_is_not_executed() {
+    let mut disabled = base_rule(
+        "disabled",
+        RuleTrigger::OnUpdate,
+        0,
+        vec![RuleAction::PlaySound {
+            channel: RuleSoundChannel::Movement,
+            sound_id: "should_not_play".to_string(),
+        }],
+    );
+    disabled.enabled = false;
+
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![disabled],
+    });
+
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert!(result.events.is_empty());
+}
+
+#[test]
+fn once_on_update_rule_runs_only_first_tick() {
+    let mut once_rule = base_rule(
+        "once-update",
+        RuleTrigger::OnUpdate,
+        0,
+        vec![RuleAction::PlaySound {
+            channel: RuleSoundChannel::Movement,
+            sound_id: "only_once".to_string(),
+        }],
+    );
+    once_rule.once = true;
+
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![once_rule],
+    });
+
+    let world_bounds = UVec2::new(256, 256);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    let first = state.update(world_bounds, &tilemap, &atlas);
+    let second = state.update(world_bounds, &tilemap, &atlas);
+
+    assert_eq!(first.events.len(), 1);
+    assert!(second.events.is_empty());
+}
+
+#[test]
+fn set_velocity_action_moves_player_without_input() {
+    let mut state = GameState::new_empty();
+    state.spawn_player_at(IVec2::new(10, 10));
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "move-player",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::SetVelocity {
+                target: RuleTarget::Player,
+                velocity: [2, 0],
+            }],
+        )],
+    });
+
+    let world_bounds = UVec2::new(512, 512);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    state.handle_key_release(InputKey::Right);
+    let before = state.player_position();
+    state.update(world_bounds, &tilemap, &atlas);
+    let after_first = state.player_position();
+    state.update(world_bounds, &tilemap, &atlas);
+    let after_second = state.player_position();
+
+    assert_eq!(after_first.x, before.x + 2);
+    assert_eq!(after_second.x, after_first.x + 2);
+}
+
+#[test]
+fn rules_serialize_roundtrip() {
+    let rules = RuleSet {
+        rules: vec![Rule {
+            id: "serialize".to_string(),
+            enabled: true,
+            priority: 3,
+            once: true,
+            trigger: RuleTrigger::OnStart,
+            conditions: vec![RuleCondition::Always],
+            actions: vec![
+                RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "sfx_a".to_string(),
+                },
+                RuleAction::SwitchScene {
+                    scene_name: "Town".to_string(),
+                },
+            ],
+        }],
+    };
+
+    let json = serde_json::to_string_pretty(&rules).expect("rules should serialize");
+    let parsed: RuleSet = serde_json::from_str(&json).expect("rules should deserialize");
+    assert_eq!(rules, parsed);
+}
+
+#[test]
+fn load_scene_applies_scene_rules() {
+    let mut state = GameState::new_empty();
+    let mut scene = Scene::new("Rule Scene".to_string());
+    scene.rules = RuleSet {
+        rules: vec![base_rule(
+            "scene-start",
+            RuleTrigger::OnStart,
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "scene_start".to_string(),
+            }],
+        )],
+    };
+
+    state.add_scene(scene);
+    state
+        .load_scene("Rule Scene")
+        .expect("scene with rules should load");
+
+    let world_bounds = UVec2::new(256, 256);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    let first = state.update(world_bounds, &tilemap, &atlas);
+    let second = state.update(world_bounds, &tilemap, &atlas);
+
+    assert_eq!(first.events.len(), 1);
+    assert!(matches!(
+        first.events[0],
+        AudioEvent::PlaySound {
+            channel: AudioChannel::Movement,
+            ref sound_id,
+        } if sound_id == "scene_start"
+    ));
+    assert!(second.events.is_empty());
+}
+
+#[test]
+fn sync_entities_to_active_scene_persists_rules() {
+    let mut state = GameState::new_empty();
+    state.add_scene(Scene::new("Sync Scene".to_string()));
+    state
+        .load_scene("Sync Scene")
+        .expect("scene should load before syncing");
+
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "persist-me",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Collision,
+                sound_id: "persisted".to_string(),
+            }],
+        )],
+    });
+    state.sync_entities_to_active_scene();
+
+    let active_scene = state.active_scene().expect("active scene should exist");
+    assert_eq!(active_scene.rules.rules.len(), 1);
+    assert_eq!(active_scene.rules.rules[0].id, "persist-me");
+}
