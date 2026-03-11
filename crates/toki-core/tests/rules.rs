@@ -112,6 +112,48 @@ fn on_update_rule_runs_every_tick() {
 }
 
 #[test]
+fn first_tick_emits_on_start_events_before_on_update_events() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![
+            base_rule(
+                "start-first",
+                RuleTrigger::OnStart,
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "from_start".to_string(),
+                }],
+            ),
+            base_rule(
+                "update-second",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "from_update".to_string(),
+                }],
+            ),
+        ],
+    });
+
+    let first = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert_eq!(first.events.len(), 2);
+    assert!(matches!(
+        &first.events[0],
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "from_start"
+    ));
+    assert!(matches!(
+        &first.events[1],
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "from_update"
+    ));
+}
+
+#[test]
 fn rules_execute_in_priority_order() {
     let mut state = GameState::new_empty();
     state.set_rules(RuleSet {
@@ -360,6 +402,61 @@ fn same_priority_velocity_uses_id_tiebreaker() {
 }
 
 #[test]
+fn deterministic_execution_matches_across_identical_states() {
+    fn build_state() -> GameState {
+        let mut state = GameState::new_empty();
+        state.spawn_player_at(IVec2::new(40, 40));
+        state.set_rules(RuleSet {
+            rules: vec![
+                base_rule(
+                    "start-sfx",
+                    RuleTrigger::OnStart,
+                    0,
+                    vec![RuleAction::PlaySound {
+                        channel: RuleSoundChannel::Movement,
+                        sound_id: "boot".to_string(),
+                    }],
+                ),
+                base_rule(
+                    "move-player",
+                    RuleTrigger::OnUpdate,
+                    10,
+                    vec![RuleAction::SetVelocity {
+                        target: RuleTarget::Player,
+                        velocity: [2, 1],
+                    }],
+                ),
+                base_rule(
+                    "tick-sfx",
+                    RuleTrigger::OnUpdate,
+                    0,
+                    vec![RuleAction::PlaySound {
+                        channel: RuleSoundChannel::Collision,
+                        sound_id: "tick".to_string(),
+                    }],
+                ),
+            ],
+        });
+        state
+    }
+
+    let mut left = build_state();
+    let mut right = build_state();
+
+    let world_bounds = UVec2::new(512, 512);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    for _ in 0..3 {
+        let left_tick = left.update(world_bounds, &tilemap, &atlas);
+        let right_tick = right.update(world_bounds, &tilemap, &atlas);
+        assert_eq!(left_tick.player_moved, right_tick.player_moved);
+        assert_eq!(left_tick.events, right_tick.events);
+        assert_eq!(left.player_position(), right.player_position());
+    }
+}
+
+#[test]
 fn rules_serialize_roundtrip() {
     let rules = RuleSet {
         rules: vec![Rule {
@@ -373,6 +470,10 @@ fn rules_serialize_roundtrip() {
                 RuleAction::PlaySound {
                     channel: RuleSoundChannel::Movement,
                     sound_id: "sfx_a".to_string(),
+                },
+                RuleAction::SetVelocity {
+                    target: RuleTarget::Player,
+                    velocity: [1, -1],
                 },
                 RuleAction::SwitchScene {
                     scene_name: "Town".to_string(),
