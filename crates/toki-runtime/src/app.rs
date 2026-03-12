@@ -7,9 +7,10 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::WindowId;
 
 use std::time::Instant;
+use std::{fs, path::PathBuf};
 
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
-use toki_core::{EventHandler, GameState, TimingSystem};
+use toki_core::{EventHandler, GameState, Scene, TimingSystem};
 use toki_render::RenderError;
 
 use crate::systems::AudioManager;
@@ -18,6 +19,13 @@ use crate::systems::{
     ResourceManager,
 };
 use toki_core::serialization::{load_game, save_game};
+
+#[derive(Debug, Clone, Default)]
+pub struct RuntimeLaunchOptions {
+    pub project_path: Option<PathBuf>,
+    pub scene_name: Option<String>,
+    pub map_name: Option<String>,
+}
 
 #[derive(Debug)]
 struct App {
@@ -32,18 +40,12 @@ struct App {
     platform: PlatformSystem,
     rendering: RenderingSystem,
     timing: TimingSystem,
+    launch_options: RuntimeLaunchOptions,
 }
 
 impl App {
-    fn new() -> Self {
-        let resources = ResourceManager::load_all().expect("Failed to load resources");
-
-        let mut game_state = GameState::new_empty();
-        let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
-
-        // Spawn an NPC that looks like the player at a different position
-        let _npc_id = game_state.spawn_player_like_npc(glam::IVec2::new(120, 72));
-
+    fn new(launch_options: RuntimeLaunchOptions) -> Self {
+        let (resources, game_state) = Self::build_startup_state(&launch_options);
         let game_system = GameManager::new(game_state);
 
         let mut camera = Camera {
@@ -53,10 +55,14 @@ impl App {
         };
         camera.center_on(glam::IVec2::new(80, 72));
 
-        // Use the player entity ID from the GameState for camera following
-        let player_id = game_system.player_id().expect("Player should exist");
-        let cam_controller = CameraController {
-            mode: CameraMode::FollowEntity(player_id),
+        let cam_controller = if let Some(player_id) = game_system.player_id() {
+            CameraController {
+                mode: CameraMode::FollowEntity(player_id),
+            }
+        } else {
+            CameraController {
+                mode: CameraMode::FreeScroll,
+            }
         };
         let camera_system = CameraManager::new(camera, cam_controller);
         let audio_system = AudioManager::new().expect("Failed to initialize audio system");
@@ -73,7 +79,93 @@ impl App {
             platform: PlatformSystem::new(),
             rendering: RenderingSystem::new(),
             timing: TimingSystem::new(),
+            launch_options,
         }
+    }
+
+    fn build_startup_state(launch_options: &RuntimeLaunchOptions) -> (ResourceManager, GameState) {
+        if let Some(project_path) = &launch_options.project_path {
+            let scene = launch_options
+                .scene_name
+                .as_deref()
+                .and_then(|scene_name| Self::load_project_scene(project_path, scene_name).ok());
+
+            let map_name = launch_options.map_name.clone().or_else(|| {
+                scene
+                    .as_ref()
+                    .and_then(|loaded_scene| loaded_scene.maps.first().cloned())
+            });
+
+            match ResourceManager::load_for_project(project_path, map_name.as_deref()) {
+                Ok(resources) => {
+                    let game_state = if let Some(scene) = scene {
+                        Self::game_state_from_scene(scene)
+                    } else {
+                        Self::fallback_game_state()
+                    };
+                    return (resources, game_state);
+                }
+                Err(error) => {
+                    tracing::error!(
+                        "Failed to load project resources for '{}': {}",
+                        project_path.display(),
+                        error
+                    );
+                }
+            }
+        }
+
+        match ResourceManager::load_all() {
+            Ok(resources) => (resources, Self::fallback_game_state()),
+            Err(error) => {
+                panic!("Failed to initialize runtime resources: {error}");
+            }
+        }
+    }
+
+    fn load_project_scene(
+        project_path: &std::path::Path,
+        scene_name: &str,
+    ) -> Result<Scene, String> {
+        let scene_path = project_path
+            .join("scenes")
+            .join(format!("{scene_name}.json"));
+        let json = fs::read_to_string(&scene_path).map_err(|error| {
+            format!(
+                "Could not read scene file '{}': {}",
+                scene_path.display(),
+                error
+            )
+        })?;
+        serde_json::from_str::<Scene>(&json).map_err(|error| {
+            format!(
+                "Could not parse scene file '{}': {}",
+                scene_path.display(),
+                error
+            )
+        })
+    }
+
+    fn game_state_from_scene(scene: Scene) -> GameState {
+        let scene_name = scene.name.clone();
+        let mut game_state = GameState::new_empty();
+        game_state.add_scene(scene);
+        if let Err(error) = game_state.load_scene(&scene_name) {
+            tracing::error!(
+                "Failed to load startup scene '{}' into game state: {}",
+                scene_name,
+                error
+            );
+            return Self::fallback_game_state();
+        }
+        game_state
+    }
+
+    fn fallback_game_state() -> GameState {
+        let mut game_state = GameState::new_empty();
+        let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
+        let _npc_id = game_state.spawn_player_like_npc(glam::IVec2::new(120, 72));
+        game_state
     }
 
     fn tick(&mut self) {
@@ -342,6 +434,18 @@ impl ApplicationHandler for App {
             self.rendering.initialize_gpu(window);
         }
 
+        if self.rendering.has_gpu() {
+            if let Some(project_path) = &self.launch_options.project_path {
+                if let Err(error) = self.rendering.load_project_textures(project_path) {
+                    tracing::warn!(
+                        "Failed to load project textures from '{}': {}",
+                        project_path.display(),
+                        error
+                    );
+                }
+            }
+        }
+
         // Update rendering size
         if let Some(size) = self.platform.inner_size() {
             self.rendering.update_window_size(size);
@@ -370,8 +474,10 @@ impl ApplicationHandler for App {
         }
 
         self.audio_system.list_available_sounds();
-        if let Err(e) = self.audio_system.play_background_music("lavandia", -10.0) {
-            tracing::warn!("Failed to start background music: {}", e);
+        if self.launch_options.scene_name.is_none() {
+            if let Err(e) = self.audio_system.play_background_music("lavandia", -10.0) {
+                tracing::warn!("Failed to start background music: {}", e);
+            }
         }
     }
 
@@ -422,10 +528,16 @@ impl ApplicationHandler for App {
 }
 /// Runs a minimal window using the winit library.
 pub fn run_minimal_window() -> Result<(), RenderError> {
+    run_minimal_window_with_options(RuntimeLaunchOptions::default())
+}
+
+pub fn run_minimal_window_with_options(
+    launch_options: RuntimeLaunchOptions,
+) -> Result<(), RenderError> {
     let event_loop = EventLoop::new()?;
 
     // Create an instance of the App struct
-    let mut app = App::new();
+    let mut app = App::new(launch_options);
 
     // Run the application
     event_loop.run_app(&mut app)?;

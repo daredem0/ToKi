@@ -46,6 +46,7 @@ pub struct EditorUI {
     pub open_project_requested: bool,
     pub browse_for_project_requested: bool,
     pub save_project_requested: bool,
+    pub play_scene_requested: bool,
     pub init_config_requested: bool,
     pub window_title: Option<String>,
 
@@ -89,6 +90,7 @@ impl EditorUI {
             open_project_requested: false,
             browse_for_project_requested: false,
             save_project_requested: false,
+            play_scene_requested: false,
             init_config_requested: false,
             window_title: Some("No project open".to_string()),
 

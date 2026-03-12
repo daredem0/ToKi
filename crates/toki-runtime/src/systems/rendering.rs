@@ -115,7 +115,9 @@ impl RenderingSystem {
         }
 
         // Look for common tilemap atlas files (only .json format supported)
-        if let Some(terrain_atlas) = find_atlas_file(&tilemaps_path, "terrain") {
+        if let Some(terrain_atlas) = find_atlas_file(&tilemaps_path, "terrain")
+            .or_else(|| find_atlas_file(&sprites_path, "terrain"))
+        {
             if let Some(terrain_image) = find_image_for_atlas(&terrain_atlas) {
                 self.load_tilemap_texture(terrain_image)?;
             }

@@ -75,6 +75,17 @@ impl MenuSystem {
                     ui.checkbox(&mut ui_state.show_maps, "Maps");
                     ui.checkbox(&mut ui_state.show_console, "Console");
                 });
+
+                ui.separator();
+                let can_play_scene = ui_state.active_scene.is_some()
+                    && config.is_some_and(|editor_config| editor_config.has_project_path());
+                if ui
+                    .add_enabled(can_play_scene, egui::Button::new("▶ Play Scene"))
+                    .clicked()
+                {
+                    ui_state.play_scene_requested = true;
+                }
+
                 ui.with_layout(
                     egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
                     |ui| {

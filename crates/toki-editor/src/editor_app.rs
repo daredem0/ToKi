@@ -1,6 +1,7 @@
 use anyhow::Result;
 use egui_winit::winit;
 use std::collections::HashMap;
+use std::process::Command;
 use std::sync::Arc;
 use toki_core::GameState;
 use winit::application::ApplicationHandler;
@@ -428,6 +429,7 @@ impl EditorApp {
 
         // Handle project management requests and other actions after rendering is done
         self.handle_project_requests(event_loop);
+        self.handle_play_scene_request();
         self.handle_active_scene_map_loading();
         self.handle_map_requests();
     }
@@ -687,6 +689,59 @@ impl EditorApp {
         }
     }
 
+    fn handle_play_scene_request(&mut self) {
+        if !self.ui.play_scene_requested {
+            return;
+        }
+        self.ui.play_scene_requested = false;
+
+        let Some(project_path) = self.config.current_project_path().cloned() else {
+            tracing::warn!("Cannot play scene: no project is currently open");
+            return;
+        };
+        let Some(active_scene_name) = self.ui.active_scene.clone() else {
+            tracing::warn!("Cannot play scene: no active scene is selected");
+            return;
+        };
+
+        if let Err(error) = self.project_manager.save_current_project(&self.ui.scenes) {
+            tracing::error!(
+                "Cannot play scene '{}': failed to save current project state: {}",
+                active_scene_name,
+                error
+            );
+            return;
+        }
+
+        let map_name = self
+            .find_scene_by_name(&active_scene_name)
+            .and_then(|scene| {
+                self.loaded_scene_maps
+                    .get(&active_scene_name)
+                    .cloned()
+                    .filter(|map| scene.maps.iter().any(|scene_map| scene_map == map))
+                    .or_else(|| scene.maps.first().cloned())
+            });
+
+        if let Err(error) =
+            Self::launch_runtime_process(&project_path, &active_scene_name, map_name.as_deref())
+        {
+            tracing::error!(
+                "Failed to launch runtime for scene '{}' from '{}': {}",
+                active_scene_name,
+                project_path.display(),
+                error
+            );
+            return;
+        }
+
+        tracing::info!(
+            "Launched runtime for scene '{}' (map: {})",
+            active_scene_name,
+            map_name.as_deref().unwrap_or("<auto>")
+        );
+    }
+
     fn handle_active_scene_map_loading(&mut self) {
         let current_active_scene = self.ui.active_scene.clone();
 
@@ -756,6 +811,55 @@ impl EditorApp {
 
     fn find_scene_by_name(&self, scene_name: &str) -> Option<&toki_core::Scene> {
         self.ui.scenes.iter().find(|s| s.name == scene_name)
+    }
+
+    fn launch_runtime_process(
+        project_path: &std::path::Path,
+        scene_name: &str,
+        map_name: Option<&str>,
+    ) -> Result<()> {
+        let runtime_bin_name = if cfg!(target_os = "windows") {
+            "toki-runtime.exe"
+        } else {
+            "toki-runtime"
+        };
+        let runtime_bin_path = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|parent| parent.join(runtime_bin_name)));
+
+        let mut command = if let Some(runtime_bin_path) = runtime_bin_path.filter(|p| p.exists()) {
+            Command::new(runtime_bin_path)
+        } else {
+            let mut cargo_command = Command::new("cargo");
+            cargo_command
+                .current_dir(Self::workspace_root())
+                .arg("run")
+                .arg("-p")
+                .arg("toki-runtime")
+                .arg("--");
+            cargo_command
+        };
+
+        command
+            .arg("--project")
+            .arg(project_path)
+            .arg("--scene")
+            .arg(scene_name);
+        if let Some(map_name) = map_name {
+            command.arg("--map").arg(map_name);
+        }
+
+        command.spawn()?;
+        Ok(())
+    }
+
+    fn workspace_root() -> std::path::PathBuf {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        manifest_dir
+            .parent()
+            .and_then(|path| path.parent())
+            .map(std::path::Path::to_path_buf)
+            .unwrap_or(manifest_dir)
     }
 
     fn load_scene_into_gamestate(
