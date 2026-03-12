@@ -316,7 +316,8 @@ impl GameState {
         }
         self.collect_rule_commands_for_trigger(RuleTrigger::OnUpdate, &mut rule_commands);
         self.collect_rule_commands_for_key_triggers(&mut rule_commands);
-        let mut pending_rule_animations = self.apply_rule_commands(rule_commands, &mut result);
+        let (mut pending_rule_animations, mut pending_scene_switch) =
+            self.apply_rule_commands(rule_commands, &mut result);
 
         let input_result = self.process_input(world_bounds, tilemap, atlas);
         result.player_moved = input_result.player_moved;
@@ -361,13 +362,21 @@ impl GameState {
                 &mut reactive_rule_commands,
             );
         }
-        let mut reactive_animations = self.apply_rule_commands(reactive_rule_commands, &mut result);
+        let (mut reactive_animations, reactive_scene_switch) =
+            self.apply_rule_commands(reactive_rule_commands, &mut result);
+        if pending_scene_switch.is_none() {
+            pending_scene_switch = reactive_scene_switch;
+        }
         pending_rule_animations.append(&mut reactive_animations);
 
         self.apply_rule_animations(pending_rule_animations);
 
         // Update entity animation timing
         self.entity_manager.update_animations(17.0);
+
+        if let Some(scene_name) = pending_scene_switch {
+            self.apply_rule_scene_switch(&scene_name);
+        }
 
         result
     }
@@ -1230,9 +1239,10 @@ impl GameState {
         &mut self,
         commands: Vec<RuleCommand>,
         result: &mut GameUpdateResult<AudioEvent>,
-    ) -> Vec<(EntityId, AnimationState)> {
+    ) -> (Vec<(EntityId, AnimationState)>, Option<String>) {
         let mut buffered_velocities = HashMap::new();
         let mut buffered_animations = HashMap::new();
+        let mut pending_scene_switch = None;
 
         for command in commands {
             match command {
@@ -1269,10 +1279,10 @@ impl GameState {
                     }
                 }
                 RuleCommand::SwitchScene { scene_name } => {
-                    tracing::debug!(
-                        "Rule requested scene switch to '{}'; action is a runtime placeholder",
-                        scene_name
-                    );
+                    let target = scene_name.trim();
+                    if !target.is_empty() && pending_scene_switch.is_none() {
+                        pending_scene_switch = Some(target.to_string());
+                    }
                 }
             }
         }
@@ -1283,7 +1293,7 @@ impl GameState {
 
         let mut pending_animations = buffered_animations.into_iter().collect::<Vec<_>>();
         pending_animations.sort_by_key(|(entity_id, _)| *entity_id);
-        pending_animations
+        (pending_animations, pending_scene_switch)
     }
 
     fn resolve_rule_target(&self, target: RuleTarget) -> Option<EntityId> {
@@ -1337,6 +1347,13 @@ impl GameState {
                     ..EntityAttributes::default()
                 },
             ),
+        }
+    }
+
+    fn apply_rule_scene_switch(&mut self, scene_name: &str) {
+        self.sync_entities_to_active_scene();
+        if let Err(error) = self.load_scene(scene_name) {
+            tracing::warn!("Rule requested scene switch to '{}': {}", scene_name, error);
         }
     }
 
