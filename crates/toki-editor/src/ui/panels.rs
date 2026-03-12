@@ -1,7 +1,9 @@
 use super::editor_ui::CenterPanelTab;
 use super::interactions::{CameraInteraction, PlacementInteraction, SelectionInteraction};
+use super::rule_graph::{RuleGraph, RuleGraphNodeKind};
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
+use std::collections::HashMap;
 
 /// Handles panel rendering for the editor (viewport and log panels)
 pub struct PanelSystem;
@@ -158,29 +160,73 @@ impl PanelSystem {
             return;
         }
 
+        let graph = RuleGraph::from_rule_set(&scene.rules);
+        ui.label(format!(
+            "Chains: {} | Nodes: {} | Edges: {}",
+            graph.chains.len(),
+            graph.nodes.len(),
+            graph.edges.len()
+        ));
+
+        if let Err(error) = graph.to_rule_set() {
+            ui.colored_label(
+                egui::Color32::from_rgb(255, 120, 120),
+                format!("Graph validation failed: {:?}", error),
+            );
+        }
+
+        let node_by_id = graph
+            .nodes
+            .iter()
+            .map(|node| (node.id, node))
+            .collect::<HashMap<_, _>>();
+        let mut outgoing = HashMap::<u64, Vec<u64>>::new();
+        for edge in &graph.edges {
+            outgoing.entry(edge.from).or_default().push(edge.to);
+        }
+
         egui::ScrollArea::vertical().show(ui, |ui| {
-            for (rule_index, rule) in scene.rules.rules.iter().enumerate() {
+            for (rule_index, chain) in graph.chains.iter().enumerate() {
                 ui.group(|ui| {
                     ui.horizontal(|ui| {
-                        ui.strong(format!("Rule {}: {}", rule_index + 1, rule.id));
-                        if !rule.enabled {
+                        ui.strong(format!("Rule {}: {}", rule_index + 1, chain.rule_id));
+                        if !chain.enabled {
                             ui.label("(disabled)");
                         }
                     });
-                    ui.monospace(format!("Trigger: {:?}", rule.trigger));
-                    if rule.conditions.is_empty() {
-                        ui.monospace("Conditions: Always");
-                    } else {
-                        for condition in &rule.conditions {
-                            ui.monospace(format!("Condition -> {:?}", condition));
+
+                    let mut node_id = chain.trigger_node_id;
+                    let mut visited = std::collections::HashSet::new();
+                    loop {
+                        if !visited.insert(node_id) {
+                            ui.monospace("Cycle detected");
+                            break;
                         }
-                    }
-                    if rule.actions.is_empty() {
-                        ui.monospace("Action: (none)");
-                    } else {
-                        for action in &rule.actions {
-                            ui.monospace(format!("Action -> {:?}", action));
+                        let Some(node) = node_by_id.get(&node_id) else {
+                            ui.monospace(format!("Missing node {}", node_id));
+                            break;
+                        };
+                        match &node.kind {
+                            RuleGraphNodeKind::Trigger(trigger) => {
+                                ui.monospace(format!("Trigger -> {:?}", trigger));
+                            }
+                            RuleGraphNodeKind::Condition(condition) => {
+                                ui.monospace(format!("Condition -> {:?}", condition));
+                            }
+                            RuleGraphNodeKind::Action(action) => {
+                                ui.monospace(format!("Action -> {:?}", action));
+                            }
                         }
+
+                        let next = outgoing.get(&node_id).cloned().unwrap_or_default();
+                        if next.is_empty() {
+                            break;
+                        }
+                        if next.len() > 1 {
+                            ui.monospace("Branching chain");
+                            break;
+                        }
+                        node_id = next[0];
                     }
                 });
                 ui.add_space(6.0);
