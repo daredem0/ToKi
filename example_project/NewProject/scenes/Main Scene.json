@@ -8,8 +8,8 @@
     {
       "id": 1,
       "position": [
-        100,
-        100
+        83,
+        66
       ],
       "size": [
         16,
@@ -23,6 +23,16 @@
         "visible": true,
         "animation_controller": {
           "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures",
@@ -33,16 +43,6 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -102,6 +102,24 @@
             "PlaySound": {
               "channel": "Movement",
               "sound_id": "sfx_slime_bounce"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rule_3",
+        "enabled": true,
+        "priority": 0,
+        "once": false,
+        "trigger": "OnCollision",
+        "conditions": [
+          "Always"
+        ],
+        "actions": [
+          {
+            "PlaySound": {
+              "channel": "Collision",
+              "sound_id": "sfx_hit"
             }
           }
         ]

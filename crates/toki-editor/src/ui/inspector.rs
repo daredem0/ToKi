@@ -56,6 +56,7 @@ enum RuleConditionKind {
 enum RuleTriggerKind {
     Start,
     Update,
+    PlayerMove,
     Key,
     Collision,
     Trigger,
@@ -622,6 +623,7 @@ impl InspectorSystem {
         match trigger {
             RuleTrigger::OnStart => RuleTriggerKind::Start,
             RuleTrigger::OnUpdate => RuleTriggerKind::Update,
+            RuleTrigger::OnPlayerMove => RuleTriggerKind::PlayerMove,
             RuleTrigger::OnKey { .. } => RuleTriggerKind::Key,
             RuleTrigger::OnCollision => RuleTriggerKind::Collision,
             RuleTrigger::OnTrigger => RuleTriggerKind::Trigger,
@@ -632,6 +634,7 @@ impl InspectorSystem {
         match kind {
             RuleTriggerKind::Start => "OnStart",
             RuleTriggerKind::Update => "OnUpdate",
+            RuleTriggerKind::PlayerMove => "OnPlayerMove",
             RuleTriggerKind::Key => "OnKey",
             RuleTriggerKind::Collision => "OnCollision",
             RuleTriggerKind::Trigger => "OnTrigger",
@@ -642,6 +645,7 @@ impl InspectorSystem {
         rule.trigger = match kind {
             RuleTriggerKind::Start => RuleTrigger::OnStart,
             RuleTriggerKind::Update => RuleTrigger::OnUpdate,
+            RuleTriggerKind::PlayerMove => RuleTrigger::OnPlayerMove,
             RuleTriggerKind::Key => RuleTrigger::OnKey { key: RuleKey::Up },
             RuleTriggerKind::Collision => RuleTrigger::OnCollision,
             RuleTriggerKind::Trigger => RuleTrigger::OnTrigger,
@@ -856,6 +860,13 @@ impl InspectorSystem {
                                 &mut trigger_kind,
                                 RuleTriggerKind::Update,
                                 Self::trigger_kind_label(RuleTriggerKind::Update),
+                            )
+                            .changed();
+                        outcome.changed |= ui
+                            .selectable_value(
+                                &mut trigger_kind,
+                                RuleTriggerKind::PlayerMove,
+                                Self::trigger_kind_label(RuleTriggerKind::PlayerMove),
                             )
                             .changed();
                         outcome.changed |= ui
@@ -2552,6 +2563,9 @@ mod tests {
 
         InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Update);
         assert_eq!(rule.trigger, RuleTrigger::OnUpdate);
+
+        InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::PlayerMove);
+        assert_eq!(rule.trigger, RuleTrigger::OnPlayerMove);
 
         InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Collision);
         assert_eq!(rule.trigger, RuleTrigger::OnCollision);

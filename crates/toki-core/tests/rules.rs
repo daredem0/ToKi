@@ -249,6 +249,39 @@ fn on_update_rule_runs_every_tick() {
 }
 
 #[test]
+fn on_player_move_rule_runs_only_when_player_moves() {
+    let mut state = GameState::new_empty();
+    state.spawn_player_at(IVec2::new(10, 10));
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "move-sfx",
+            RuleTrigger::OnPlayerMove,
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "player_moved".to_string(),
+            }],
+        )],
+    });
+
+    let world_bounds = UVec2::new(256, 256);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    let idle = state.update(world_bounds, &tilemap, &atlas);
+    assert!(idle.events.is_empty());
+
+    state.handle_key_press(InputKey::Right);
+    let moved = state.update(world_bounds, &tilemap, &atlas);
+    assert!(moved.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "player_moved"
+    )));
+
+    state.handle_key_release(InputKey::Right);
+}
+
+#[test]
 fn target_exists_condition_gates_rule_execution() {
     let mut state = GameState::new_empty();
     state.set_rules(RuleSet {

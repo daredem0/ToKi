@@ -350,6 +350,12 @@ impl GameState {
         self.update_npc_ai(world_bounds, tilemap, atlas);
 
         let mut reactive_rule_commands = Vec::new();
+        if result.player_moved {
+            self.collect_rule_commands_for_trigger(
+                RuleTrigger::OnPlayerMove,
+                &mut reactive_rule_commands,
+            );
+        }
         if self.rule_runtime.frame_collision_detected {
             self.collect_rule_commands_for_trigger(
                 RuleTrigger::OnCollision,

@@ -7,6 +7,7 @@ use crate::entity::EntityId;
 pub enum RuleTrigger {
     OnStart,
     OnUpdate,
+    OnPlayerMove,
     OnKey { key: RuleKey },
     OnCollision,
     OnTrigger,
