@@ -3,7 +3,8 @@ use crate::config::EditorConfig;
 use std::collections::HashMap;
 use toki_core::animation::AnimationState;
 use toki_core::rules::{
-    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
+    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
+    RuleTarget, RuleTrigger,
 };
 
 /// Handles inspector panel rendering for assets and entities
@@ -38,6 +39,8 @@ enum RuleActionKind {
     PlayMusic,
     PlayAnimation,
     SetVelocity,
+    Spawn,
+    DestroySelf,
     SwitchScene,
 }
 
@@ -440,6 +443,19 @@ impl InspectorSystem {
                             }
                         }
                     }
+                    RuleAction::Spawn { .. } => {}
+                    RuleAction::DestroySelf { target } => {
+                        if let RuleTarget::Entity(entity_id) = target {
+                            if *entity_id == 0 {
+                                issues.push(RuleValidationIssue {
+                                    rule_index,
+                                    action_index: Some(action_index),
+                                    message: "DestroySelf entity target must be non-zero"
+                                        .to_string(),
+                                });
+                            }
+                        }
+                    }
                     RuleAction::SwitchScene { scene_name } => {
                         if scene_name.trim().is_empty() {
                             issues.push(RuleValidationIssue {
@@ -473,6 +489,13 @@ impl InspectorSystem {
                 target: RuleTarget::Player,
                 velocity: [0, 0],
             },
+            RuleActionKind::Spawn => RuleAction::Spawn {
+                entity_type: RuleSpawnEntityType::Npc,
+                position: [0, 0],
+            },
+            RuleActionKind::DestroySelf => RuleAction::DestroySelf {
+                target: RuleTarget::Player,
+            },
             RuleActionKind::SwitchScene => RuleAction::SwitchScene {
                 scene_name: String::new(),
             },
@@ -485,6 +508,8 @@ impl InspectorSystem {
             RuleAction::PlayMusic { .. } => RuleActionKind::PlayMusic,
             RuleAction::PlayAnimation { .. } => RuleActionKind::PlayAnimation,
             RuleAction::SetVelocity { .. } => RuleActionKind::SetVelocity,
+            RuleAction::Spawn { .. } => RuleActionKind::Spawn,
+            RuleAction::DestroySelf { .. } => RuleActionKind::DestroySelf,
             RuleAction::SwitchScene { .. } => RuleActionKind::SwitchScene,
         }
     }
@@ -495,7 +520,19 @@ impl InspectorSystem {
             RuleActionKind::PlayMusic => "PlayMusic",
             RuleActionKind::PlayAnimation => "PlayAnimation",
             RuleActionKind::SetVelocity => "SetVelocity",
+            RuleActionKind::Spawn => "Spawn",
+            RuleActionKind::DestroySelf => "DestroySelf",
             RuleActionKind::SwitchScene => "SwitchScene",
+        }
+    }
+
+    fn spawn_entity_type_label(entity_type: RuleSpawnEntityType) -> &'static str {
+        match entity_type {
+            RuleSpawnEntityType::PlayerLikeNpc => "PlayerLikeNpc",
+            RuleSpawnEntityType::Npc => "Npc",
+            RuleSpawnEntityType::Item => "Item",
+            RuleSpawnEntityType::Decoration => "Decoration",
+            RuleSpawnEntityType::Trigger => "Trigger",
         }
     }
 
@@ -851,6 +888,14 @@ impl InspectorSystem {
                         Self::add_action(rule, RuleActionKind::SetVelocity);
                         outcome.changed = true;
                     }
+                    if ui.small_button("+ Spawn").clicked() {
+                        Self::add_action(rule, RuleActionKind::Spawn);
+                        outcome.changed = true;
+                    }
+                    if ui.small_button("+ DestroySelf").clicked() {
+                        Self::add_action(rule, RuleActionKind::DestroySelf);
+                        outcome.changed = true;
+                    }
                     if ui.small_button("+ SwitchScene").clicked() {
                         Self::add_action(rule, RuleActionKind::SwitchScene);
                         outcome.changed = true;
@@ -908,6 +953,20 @@ impl InspectorSystem {
                         &mut selected_kind,
                         RuleActionKind::SetVelocity,
                         Self::action_kind_label(RuleActionKind::SetVelocity),
+                    )
+                    .changed();
+                changed |= ui
+                    .selectable_value(
+                        &mut selected_kind,
+                        RuleActionKind::Spawn,
+                        Self::action_kind_label(RuleActionKind::Spawn),
+                    )
+                    .changed();
+                changed |= ui
+                    .selectable_value(
+                        &mut selected_kind,
+                        RuleActionKind::DestroySelf,
+                        Self::action_kind_label(RuleActionKind::DestroySelf),
                     )
                     .changed();
                 changed |= ui
@@ -1025,6 +1084,55 @@ impl InspectorSystem {
                         .add(egui::DragValue::new(&mut velocity[1]).speed(1.0))
                         .changed();
                 });
+            }
+            RuleAction::Spawn {
+                entity_type,
+                position,
+            } => {
+                ui.horizontal(|ui| {
+                    ui.label("Entity Type:");
+                    egui::ComboBox::from_id_salt(format!(
+                        "rule_spawn_type_{}_{}_{}",
+                        scene_name, rule_index, action_index
+                    ))
+                    .selected_text(Self::spawn_entity_type_label(*entity_type))
+                    .show_ui(ui, |ui| {
+                        for candidate in [
+                            RuleSpawnEntityType::PlayerLikeNpc,
+                            RuleSpawnEntityType::Npc,
+                            RuleSpawnEntityType::Item,
+                            RuleSpawnEntityType::Decoration,
+                            RuleSpawnEntityType::Trigger,
+                        ] {
+                            changed |= ui
+                                .selectable_value(
+                                    entity_type,
+                                    candidate,
+                                    Self::spawn_entity_type_label(candidate),
+                                )
+                                .changed();
+                        }
+                    });
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Position:");
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut position[0]).speed(1.0))
+                        .changed();
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut position[1]).speed(1.0))
+                        .changed();
+                });
+            }
+            RuleAction::DestroySelf { target } => {
+                changed |= Self::render_rule_target_editor(
+                    ui,
+                    scene_name,
+                    rule_index,
+                    action_index,
+                    target,
+                );
             }
             RuleAction::SwitchScene { scene_name } => {
                 ui.horizontal(|ui| {
@@ -1932,8 +2040,8 @@ mod tests {
     use toki_core::collision::CollisionBox;
     use toki_core::entity::{EntityAttributes, EntityManager, EntityType};
     use toki_core::rules::{
-        Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleTarget,
-        RuleTrigger,
+        Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
+        RuleTarget, RuleTrigger,
     };
     use toki_core::Scene;
 
@@ -2274,8 +2382,10 @@ mod tests {
         InspectorSystem::add_action(&mut rule, RuleActionKind::PlayMusic);
         InspectorSystem::add_action(&mut rule, RuleActionKind::PlayAnimation);
         InspectorSystem::add_action(&mut rule, RuleActionKind::SetVelocity);
+        InspectorSystem::add_action(&mut rule, RuleActionKind::Spawn);
+        InspectorSystem::add_action(&mut rule, RuleActionKind::DestroySelf);
         InspectorSystem::add_action(&mut rule, RuleActionKind::SwitchScene);
-        assert_eq!(rule.actions.len(), 5);
+        assert_eq!(rule.actions.len(), 7);
         assert!(matches!(
             rule.actions[1],
             RuleAction::PlayMusic { ref track_id } if track_id == "music_placeholder"
@@ -2296,6 +2406,19 @@ mod tests {
         ));
         assert!(matches!(
             rule.actions[4],
+            RuleAction::Spawn {
+                entity_type: RuleSpawnEntityType::Npc,
+                position: [0, 0]
+            }
+        ));
+        assert!(matches!(
+            rule.actions[5],
+            RuleAction::DestroySelf {
+                target: RuleTarget::Player
+            }
+        ));
+        assert!(matches!(
+            rule.actions[6],
             RuleAction::SwitchScene { ref scene_name } if scene_name.is_empty()
         ));
 
@@ -2315,9 +2438,16 @@ mod tests {
                 ref sound_id,
             } if sound_id == "sfx_placeholder"
         ));
+        InspectorSystem::switch_action_kind(&mut rule.actions[0], RuleActionKind::DestroySelf);
+        assert!(matches!(
+            rule.actions[0],
+            RuleAction::DestroySelf {
+                target: RuleTarget::Player
+            }
+        ));
 
         assert!(InspectorSystem::remove_action(&mut rule, 1));
-        assert_eq!(rule.actions.len(), 4);
+        assert_eq!(rule.actions.len(), 6);
         assert!(!InspectorSystem::remove_action(&mut rule, 99));
     }
 
@@ -2332,6 +2462,9 @@ mod tests {
             RuleAction::SetVelocity {
                 target: RuleTarget::Entity(0),
                 velocity: [1, 0],
+            },
+            RuleAction::DestroySelf {
+                target: RuleTarget::Entity(0),
             },
         ];
 
@@ -2361,6 +2494,9 @@ mod tests {
         assert!(issues.iter().any(|issue| issue
             .message
             .contains("SetVelocity entity target must be non-zero")));
+        assert!(issues.iter().any(|issue| issue
+            .message
+            .contains("DestroySelf entity target must be non-zero")));
         assert!(issues
             .iter()
             .any(|issue| issue.message.contains("SwitchScene requires a scene name")));

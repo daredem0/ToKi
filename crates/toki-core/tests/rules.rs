@@ -8,9 +8,10 @@ use toki_core::assets::{
 };
 use toki_core::game::{AudioChannel, AudioEvent};
 use toki_core::rules::{
-    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
+    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
+    RuleTarget, RuleTrigger,
 };
-use toki_core::{GameState, InputKey, Scene};
+use toki_core::{entity::EntityType, GameState, InputKey, Scene};
 
 fn create_test_tilemap() -> TileMap {
     TileMap {
@@ -423,6 +424,149 @@ fn play_music_action_ignores_empty_track_id() {
 }
 
 #[test]
+fn spawn_action_creates_entity_at_requested_position() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "spawn-npc",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::Spawn {
+                entity_type: RuleSpawnEntityType::Npc,
+                position: [42, 84],
+            }],
+        )],
+    });
+
+    state.update(
+        UVec2::new(512, 512),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    let mut npc_ids = state.entity_manager().entities_of_type(&EntityType::Npc);
+    npc_ids.sort_unstable();
+    assert_eq!(npc_ids.len(), 1);
+    let spawned = state
+        .entity_manager()
+        .get_entity(npc_ids[0])
+        .expect("spawned npc should exist");
+    assert_eq!(spawned.position, IVec2::new(42, 84));
+}
+
+#[test]
+fn spawn_actions_follow_rule_priority_order() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![
+            base_rule(
+                "low-spawn",
+                RuleTrigger::OnUpdate,
+                1,
+                vec![RuleAction::Spawn {
+                    entity_type: RuleSpawnEntityType::Npc,
+                    position: [100, 100],
+                }],
+            ),
+            base_rule(
+                "high-spawn",
+                RuleTrigger::OnUpdate,
+                10,
+                vec![RuleAction::Spawn {
+                    entity_type: RuleSpawnEntityType::Npc,
+                    position: [10, 10],
+                }],
+            ),
+        ],
+    });
+
+    state.update(
+        UVec2::new(512, 512),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    let mut npc_ids = state.entity_manager().entities_of_type(&EntityType::Npc);
+    npc_ids.sort_unstable();
+    assert_eq!(npc_ids.len(), 2);
+
+    let first_spawn = state
+        .entity_manager()
+        .get_entity(npc_ids[0])
+        .expect("first spawned npc should exist");
+    let second_spawn = state
+        .entity_manager()
+        .get_entity(npc_ids[1])
+        .expect("second spawned npc should exist");
+
+    // Higher-priority rule should execute first and therefore get lower entity id.
+    assert_eq!(first_spawn.position, IVec2::new(10, 10));
+    assert_eq!(second_spawn.position, IVec2::new(100, 100));
+}
+
+#[test]
+fn destroy_self_action_removes_target_entity() {
+    let mut state = GameState::new_empty();
+    let npc_id = state.spawn_player_like_npc(IVec2::new(50, 60));
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "destroy-npc",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::DestroySelf {
+                target: RuleTarget::Entity(npc_id),
+            }],
+        )],
+    });
+
+    state.update(
+        UVec2::new(512, 512),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(state.entity_manager().get_entity(npc_id).is_none());
+}
+
+#[test]
+fn destroy_self_applies_before_lower_priority_velocity_for_same_target() {
+    let mut state = GameState::new_empty();
+    let npc_id = state.spawn_player_like_npc(IVec2::new(10, 10));
+    state.set_rules(RuleSet {
+        rules: vec![
+            base_rule(
+                "high-destroy",
+                RuleTrigger::OnUpdate,
+                10,
+                vec![RuleAction::DestroySelf {
+                    target: RuleTarget::Entity(npc_id),
+                }],
+            ),
+            base_rule(
+                "low-velocity",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::SetVelocity {
+                    target: RuleTarget::Entity(npc_id),
+                    velocity: [5, 0],
+                }],
+            ),
+        ],
+    });
+
+    state.update(
+        UVec2::new(512, 512),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(
+        state.entity_manager().get_entity(npc_id).is_none(),
+        "entity should be removed before velocity application"
+    );
+}
+
+#[test]
 fn first_tick_emits_on_start_events_before_on_update_events() {
     let mut state = GameState::new_empty();
     state.set_rules(RuleSet {
@@ -795,6 +939,13 @@ fn rules_serialize_roundtrip() {
                 },
                 RuleAction::SwitchScene {
                     scene_name: "Town".to_string(),
+                },
+                RuleAction::Spawn {
+                    entity_type: RuleSpawnEntityType::Npc,
+                    position: [5, 6],
+                },
+                RuleAction::DestroySelf {
+                    target: RuleTarget::Player,
                 },
             ],
         }],

@@ -38,6 +38,15 @@ pub enum RuleTarget {
     Entity(EntityId),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RuleSpawnEntityType {
+    PlayerLikeNpc,
+    Npc,
+    Item,
+    Decoration,
+    Trigger,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RuleAction {
     PlaySound {
@@ -54,6 +63,13 @@ pub enum RuleAction {
     SetVelocity {
         target: RuleTarget,
         velocity: [i32; 2],
+    },
+    Spawn {
+        entity_type: RuleSpawnEntityType,
+        position: [i32; 2],
+    },
+    DestroySelf {
+        target: RuleTarget,
     },
     /// Runtime placeholder until scene-switch plumbing is integrated end-to-end.
     SwitchScene {

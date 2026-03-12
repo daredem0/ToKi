@@ -6,10 +6,11 @@ use crate::animation::AnimationState;
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::collision;
-use crate::entity::{Entity, EntityId, EntityManager};
+use crate::entity::{Entity, EntityAttributes, EntityId, EntityManager, EntityType};
 use crate::events::{GameEvent, GameUpdateResult};
 use crate::rules::{
-    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,
+    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
+    RuleTarget, RuleTrigger,
 };
 use crate::scene_manager::SceneManager;
 use crate::sprite::{SpriteFrame, SpriteInstance};
@@ -109,6 +110,13 @@ enum RuleCommand {
     PlayAnimation {
         entity_id: EntityId,
         state: AnimationState,
+    },
+    Spawn {
+        entity_type: RuleSpawnEntityType,
+        position: glam::IVec2,
+    },
+    DestroySelf {
+        entity_id: EntityId,
     },
     SwitchScene {
         scene_name: String,
@@ -1196,6 +1204,20 @@ impl GameState {
                     });
                 }
             }
+            RuleAction::Spawn {
+                entity_type,
+                position,
+            } => {
+                command_buffer.push(RuleCommand::Spawn {
+                    entity_type: *entity_type,
+                    position: glam::IVec2::new(position[0], position[1]),
+                });
+            }
+            RuleAction::DestroySelf { target } => {
+                if let Some(entity_id) = self.resolve_rule_target(*target) {
+                    command_buffer.push(RuleCommand::DestroySelf { entity_id });
+                }
+            }
             RuleAction::SwitchScene { scene_name } => {
                 command_buffer.push(RuleCommand::SwitchScene {
                     scene_name: scene_name.clone(),
@@ -1231,6 +1253,21 @@ impl GameState {
                     // Rules are already sorted by priority desc + id asc, so first command wins.
                     buffered_animations.entry(entity_id).or_insert(state);
                 }
+                RuleCommand::Spawn {
+                    entity_type,
+                    position,
+                } => {
+                    self.spawn_entity_from_rule(entity_type, position);
+                }
+                RuleCommand::DestroySelf { entity_id } => {
+                    let removed = self.entity_manager.despawn_entity(entity_id);
+                    if removed {
+                        if self.player_id == Some(entity_id) {
+                            self.player_id = None;
+                        }
+                        self.rule_runtime.velocities.remove(&entity_id);
+                    }
+                }
                 RuleCommand::SwitchScene { scene_name } => {
                     tracing::debug!(
                         "Rule requested scene switch to '{}'; action is a runtime placeholder",
@@ -1253,6 +1290,53 @@ impl GameState {
         match target {
             RuleTarget::Player => self.player_id,
             RuleTarget::Entity(entity_id) => Some(entity_id),
+        }
+    }
+
+    fn spawn_entity_from_rule(
+        &mut self,
+        entity_type: RuleSpawnEntityType,
+        position: glam::IVec2,
+    ) -> EntityId {
+        match entity_type {
+            RuleSpawnEntityType::PlayerLikeNpc => self.spawn_player_like_npc(position),
+            RuleSpawnEntityType::Npc => self.entity_manager.spawn_entity(
+                EntityType::Npc,
+                position,
+                glam::UVec2::new(16, 16),
+                EntityAttributes::default(),
+            ),
+            RuleSpawnEntityType::Item => self.entity_manager.spawn_entity(
+                EntityType::Item,
+                position,
+                glam::UVec2::new(16, 16),
+                EntityAttributes {
+                    solid: false,
+                    can_move: false,
+                    ..EntityAttributes::default()
+                },
+            ),
+            RuleSpawnEntityType::Decoration => self.entity_manager.spawn_entity(
+                EntityType::Decoration,
+                position,
+                glam::UVec2::new(16, 16),
+                EntityAttributes {
+                    solid: false,
+                    can_move: false,
+                    ..EntityAttributes::default()
+                },
+            ),
+            RuleSpawnEntityType::Trigger => self.entity_manager.spawn_entity(
+                EntityType::Trigger,
+                position,
+                glam::UVec2::new(16, 16),
+                EntityAttributes {
+                    solid: false,
+                    can_move: false,
+                    visible: false,
+                    ..EntityAttributes::default()
+                },
+            ),
         }
     }
 
