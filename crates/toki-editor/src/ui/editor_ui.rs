@@ -70,6 +70,8 @@ pub struct EditorUI {
     pub placement_preview_valid: Option<bool>, // Whether the current preview position is valid for placement
     pub entity_move_drag: Option<EntityMoveDragState>, // Active drag-move operation for existing scene entities
     pub center_panel_tab: CenterPanelTab,              // Active tab in center workspace
+    pub graph_connect_from_node: Option<u64>,          // Scene graph connect source node
+    pub graph_connect_to_node: Option<u64>,            // Scene graph connect target node
 }
 
 impl EditorUI {
@@ -115,6 +117,8 @@ impl EditorUI {
             placement_preview_valid: None,
             entity_move_drag: None,
             center_panel_tab: CenterPanelTab::SceneViewport,
+            graph_connect_from_node: None,
+            graph_connect_to_node: None,
         }
     }
 
