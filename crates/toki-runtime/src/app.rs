@@ -168,6 +168,24 @@ impl App {
         game_state
     }
 
+    fn project_texture_paths(project_path: &std::path::Path) -> (Option<PathBuf>, Option<PathBuf>) {
+        let tilemap_texture = first_existing_path(&[
+            project_path
+                .join("assets")
+                .join("sprites")
+                .join("terrain.png"),
+            project_path.join("assets").join("terrain.png"),
+        ]);
+        let sprite_texture = first_existing_path(&[
+            project_path
+                .join("assets")
+                .join("sprites")
+                .join("creatures.png"),
+            project_path.join("assets").join("creatures.png"),
+        ]);
+        (tilemap_texture, sprite_texture)
+    }
+
     fn tick(&mut self) {
         let tick_start = std::time::Instant::now();
         tracing::trace!("TICK @ {:?}", tick_start);
@@ -431,7 +449,23 @@ impl ApplicationHandler for App {
 
         // Initialize rendering system (GPU)
         if let Some(window) = self.platform.window_for_gpu() {
-            self.rendering.initialize_gpu(window);
+            if let Some(project_path) = &self.launch_options.project_path {
+                let (tilemap_texture, sprite_texture) = Self::project_texture_paths(project_path);
+                if let Err(error) = self.rendering.initialize_gpu_with_textures(
+                    window.clone(),
+                    tilemap_texture.clone(),
+                    sprite_texture.clone(),
+                ) {
+                    tracing::error!(
+                        "Failed to initialize GPU with project textures from '{}': {}",
+                        project_path.display(),
+                        error
+                    );
+                    self.rendering.initialize_gpu(window);
+                }
+            } else {
+                self.rendering.initialize_gpu(window);
+            }
         }
 
         if self.rendering.has_gpu() {
@@ -544,4 +578,8 @@ pub fn run_minimal_window_with_options(
 
     // Return Ok if the application was closed successfully
     Ok(())
+}
+
+fn first_existing_path(candidates: &[PathBuf]) -> Option<PathBuf> {
+    candidates.iter().find(|path| path.exists()).cloned()
 }

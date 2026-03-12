@@ -818,6 +818,36 @@ impl EditorApp {
         scene_name: &str,
         map_name: Option<&str>,
     ) -> Result<()> {
+        let mut runtime_args = vec![
+            "--project".to_string(),
+            project_path.display().to_string(),
+            "--scene".to_string(),
+            scene_name.to_string(),
+        ];
+        if let Some(map_name) = map_name {
+            runtime_args.push("--map".to_string());
+            runtime_args.push(map_name.to_string());
+        }
+
+        let mut cargo_command = Command::new("cargo");
+        cargo_command
+            .current_dir(Self::workspace_root())
+            .arg("run")
+            .arg("-p")
+            .arg("toki-runtime")
+            .arg("--")
+            .args(&runtime_args);
+
+        match cargo_command.spawn() {
+            Ok(_) => return Ok(()),
+            Err(cargo_error) => {
+                tracing::warn!(
+                    "Failed to launch runtime via cargo ({}), trying direct binary fallback",
+                    cargo_error
+                );
+            }
+        }
+
         let runtime_bin_name = if cfg!(target_os = "windows") {
             "toki-runtime.exe"
         } else {
@@ -825,31 +855,10 @@ impl EditorApp {
         };
         let runtime_bin_path = std::env::current_exe()
             .ok()
-            .and_then(|exe| exe.parent().map(|parent| parent.join(runtime_bin_name)));
+            .and_then(|exe| exe.parent().map(|parent| parent.join(runtime_bin_name)))
+            .ok_or_else(|| anyhow::anyhow!("Could not resolve runtime binary path"))?;
 
-        let mut command = if let Some(runtime_bin_path) = runtime_bin_path.filter(|p| p.exists()) {
-            Command::new(runtime_bin_path)
-        } else {
-            let mut cargo_command = Command::new("cargo");
-            cargo_command
-                .current_dir(Self::workspace_root())
-                .arg("run")
-                .arg("-p")
-                .arg("toki-runtime")
-                .arg("--");
-            cargo_command
-        };
-
-        command
-            .arg("--project")
-            .arg(project_path)
-            .arg("--scene")
-            .arg(scene_name);
-        if let Some(map_name) = map_name {
-            command.arg("--map").arg(map_name);
-        }
-
-        command.spawn()?;
+        Command::new(runtime_bin_path).args(&runtime_args).spawn()?;
         Ok(())
     }
 

@@ -7,8 +7,8 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-main = "scenes/main.json"
 "Scene 2" = "scenes/scene2.json"
+main = "scenes/main.json"
 "Main Scene" = "scenes/mainscene.json"
 
 [assets]
