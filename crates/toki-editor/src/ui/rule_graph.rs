@@ -373,6 +373,89 @@ impl RuleGraph {
         Ok(())
     }
 
+    pub fn set_condition_for_node(
+        &mut self,
+        node_id: RuleGraphNodeId,
+        condition: RuleCondition,
+    ) -> Result<(), RuleGraphEditError> {
+        let mut rules = self
+            .to_rule_set()
+            .map_err(RuleGraphEditError::GraphInvalid)?;
+
+        let mut chain_hit = None::<(usize, Vec<RuleGraphNodeId>)>;
+        for (chain_index, chain) in self.chains.iter().enumerate() {
+            let sequence = self
+                .chain_node_sequence(chain.trigger_node_id)
+                .map_err(RuleGraphEditError::GraphInvalid)?;
+            if sequence.contains(&node_id) {
+                chain_hit = Some((chain_index, sequence));
+                break;
+            }
+        }
+        let Some((chain_index, sequence)) = chain_hit else {
+            return Err(RuleGraphEditError::MissingNode { node_id });
+        };
+        let chain = &self.chains[chain_index];
+        let Some(rule) = rules.rules.iter_mut().find(|rule| rule.id == chain.rule_id) else {
+            return Err(RuleGraphEditError::MissingChain {
+                trigger_node_id: chain.trigger_node_id,
+            });
+        };
+        let Some(node_position) = sequence.iter().position(|id| *id == node_id) else {
+            return Err(RuleGraphEditError::MissingNode { node_id });
+        };
+        if node_position == 0 || node_position > rule.conditions.len() {
+            return Err(RuleGraphEditError::MissingNode { node_id });
+        }
+        rule.conditions[node_position - 1] = condition;
+        *self = Self::from_rule_set(&rules);
+        Ok(())
+    }
+
+    pub fn set_action_for_node(
+        &mut self,
+        node_id: RuleGraphNodeId,
+        action: RuleAction,
+    ) -> Result<(), RuleGraphEditError> {
+        let mut rules = self
+            .to_rule_set()
+            .map_err(RuleGraphEditError::GraphInvalid)?;
+
+        let mut chain_hit = None::<(usize, Vec<RuleGraphNodeId>)>;
+        for (chain_index, chain) in self.chains.iter().enumerate() {
+            let sequence = self
+                .chain_node_sequence(chain.trigger_node_id)
+                .map_err(RuleGraphEditError::GraphInvalid)?;
+            if sequence.contains(&node_id) {
+                chain_hit = Some((chain_index, sequence));
+                break;
+            }
+        }
+        let Some((chain_index, sequence)) = chain_hit else {
+            return Err(RuleGraphEditError::MissingNode { node_id });
+        };
+        let chain = &self.chains[chain_index];
+        let Some(rule) = rules.rules.iter_mut().find(|rule| rule.id == chain.rule_id) else {
+            return Err(RuleGraphEditError::MissingChain {
+                trigger_node_id: chain.trigger_node_id,
+            });
+        };
+        let Some(node_position) = sequence.iter().position(|id| *id == node_id) else {
+            return Err(RuleGraphEditError::MissingNode { node_id });
+        };
+        let action_start = 1 + rule.conditions.len();
+        if node_position < action_start {
+            return Err(RuleGraphEditError::MissingNode { node_id });
+        }
+        let action_index = node_position - action_start;
+        if action_index >= rule.actions.len() {
+            return Err(RuleGraphEditError::MissingNode { node_id });
+        }
+        rule.actions[action_index] = action;
+        *self = Self::from_rule_set(&rules);
+        Ok(())
+    }
+
     pub fn connect_nodes(
         &mut self,
         from: RuleGraphNodeId,

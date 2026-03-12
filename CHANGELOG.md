@@ -7,6 +7,31 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+### Added
+- Added the visual rules baseline across runtime/editor/schema with scene-authored rule loading and inspector authoring support.
+- Added rule triggers `OnCollision`, `OnTrigger`, and `OnPlayerMove` with end-to-end runtime/editor/schema support.
+- Added rule actions `PlayMusic`, `Spawn`, and `DestroySelf` with inspector authoring support.
+- Added runtime rule conditions beyond `Always` (target existence, key-held state, and simple entity-active checks) with inspector authoring support.
+- Added an editor `Play Scene` workflow that launches runtime for the currently active scene and map.
+- Added runtime startup argument support for project/scene/map overrides so editor Play Scene mode can boot into the selected content.
+- Added a tabbed center workspace in `toki-editor` (`Scene Viewport` + `Scene Graph`) and introduced a graph-backed `RuleGraph` model.
+- Added Scene Graph MVP editing operations: add rule chains, append condition/action nodes, remove nodes, and connect/disconnect edges with safety constraints.
+
+### Changed
+- Changed runtime rule execution to deterministic buffered command processing with stable ordering semantics.
+- Changed `SwitchScene` behavior from placeholder handling to deterministic end-of-tick scene switching with state/map consistency safeguards.
+- Changed scene graph rendering and persistence to use `RuleSet <-> RuleGraph` conversion so inspector and graph authoring stay serialization-compatible.
+- Changed runtime audio state handling to a component-driven approach as part of audio cleanup.
+
+### Fixed
+- Fixed runtime initialization when launched from editor play mode by ensuring GPU/resource setup uses the active project texture context.
+- Fixed Play Scene behavior that could fall back to hardcoded runtime content instead of the active editor scene/map.
+
+### Tests
+- Added focused visual-rules test coverage across stepwise implementation milestones (baseline, deterministic ordering, trigger emissions, and authoring behavior).
+- Raised unit-test coverage across stable `toki-core`/`toki-render` paths and added additional runtime unit tests.
+- Added rule-graph tests for deterministic roundtrip parity, invalid graph rejection, and graph edit operation safety.
+
 ## [0.0.13] - 2026-03-08
 
 ### Added
