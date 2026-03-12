@@ -45,6 +45,14 @@ enum RuleActionKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RuleConditionKind {
+    Always,
+    TargetExists,
+    KeyHeld,
+    EntityActive,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RuleTriggerKind {
     Start,
     Update,
@@ -366,6 +374,26 @@ impl InspectorSystem {
         rule.actions.push(Self::default_action(action_kind));
     }
 
+    fn add_condition(rule: &mut Rule, condition_kind: RuleConditionKind) {
+        rule.conditions
+            .push(Self::default_condition(condition_kind));
+    }
+
+    fn remove_condition(rule: &mut Rule, condition_index: usize) -> bool {
+        if condition_index >= rule.conditions.len() {
+            return false;
+        }
+        rule.conditions.remove(condition_index);
+        if rule.conditions.is_empty() {
+            rule.conditions.push(RuleCondition::Always);
+        }
+        true
+    }
+
+    fn switch_condition_kind(condition: &mut RuleCondition, condition_kind: RuleConditionKind) {
+        *condition = Self::default_condition(condition_kind);
+    }
+
     fn remove_action(rule: &mut Rule, action_index: usize) -> bool {
         if action_index >= rule.actions.len() {
             return false;
@@ -408,6 +436,28 @@ impl InspectorSystem {
                     action_index: None,
                     message: "Rule id must not be empty".to_string(),
                 });
+            }
+
+            for (condition_index, condition) in rule.conditions.iter().enumerate() {
+                match condition {
+                    RuleCondition::Always => {}
+                    RuleCondition::TargetExists { target }
+                    | RuleCondition::EntityActive { target, .. } => {
+                        if let RuleTarget::Entity(entity_id) = target {
+                            if *entity_id == 0 {
+                                issues.push(RuleValidationIssue {
+                                    rule_index,
+                                    action_index: None,
+                                    message: format!(
+                                        "Condition {} entity target must be non-zero",
+                                        condition_index + 1
+                                    ),
+                                });
+                            }
+                        }
+                    }
+                    RuleCondition::KeyHeld { .. } => {}
+                }
             }
 
             for (action_index, action) in rule.actions.iter().enumerate() {
@@ -499,6 +549,38 @@ impl InspectorSystem {
             RuleActionKind::SwitchScene => RuleAction::SwitchScene {
                 scene_name: String::new(),
             },
+        }
+    }
+
+    fn default_condition(condition_kind: RuleConditionKind) -> RuleCondition {
+        match condition_kind {
+            RuleConditionKind::Always => RuleCondition::Always,
+            RuleConditionKind::TargetExists => RuleCondition::TargetExists {
+                target: RuleTarget::Player,
+            },
+            RuleConditionKind::KeyHeld => RuleCondition::KeyHeld { key: RuleKey::Up },
+            RuleConditionKind::EntityActive => RuleCondition::EntityActive {
+                target: RuleTarget::Player,
+                is_active: true,
+            },
+        }
+    }
+
+    fn condition_kind(condition: &RuleCondition) -> RuleConditionKind {
+        match condition {
+            RuleCondition::Always => RuleConditionKind::Always,
+            RuleCondition::TargetExists { .. } => RuleConditionKind::TargetExists,
+            RuleCondition::KeyHeld { .. } => RuleConditionKind::KeyHeld,
+            RuleCondition::EntityActive { .. } => RuleConditionKind::EntityActive,
+        }
+    }
+
+    fn condition_kind_label(condition_kind: RuleConditionKind) -> &'static str {
+        match condition_kind {
+            RuleConditionKind::Always => "Always",
+            RuleConditionKind::TargetExists => "TargetExists",
+            RuleConditionKind::KeyHeld => "KeyHeld",
+            RuleConditionKind::EntityActive => "EntityActive",
         }
     }
 
@@ -835,7 +917,51 @@ impl InspectorSystem {
                     rule.conditions.push(RuleCondition::Always);
                     outcome.changed = true;
                 }
-                ui.label("Conditions: Always");
+                ui.separator();
+                ui.label("Conditions");
+
+                let mut remove_condition_index = None;
+                for (condition_index, condition) in rule.conditions.iter_mut().enumerate() {
+                    ui.group(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("Condition {}", condition_index + 1));
+                            if ui.small_button("✕").clicked() {
+                                remove_condition_index = Some(condition_index);
+                            }
+                        });
+                        outcome.changed |= Self::render_rule_condition_editor(
+                            ui,
+                            scene_name,
+                            rule_index,
+                            condition_index,
+                            condition,
+                        );
+                    });
+                }
+
+                if let Some(index) = remove_condition_index {
+                    outcome.changed |= Self::remove_condition(rule, index);
+                }
+
+                ui.horizontal(|ui| {
+                    if ui.small_button("+ Always").clicked() {
+                        Self::add_condition(rule, RuleConditionKind::Always);
+                        outcome.changed = true;
+                    }
+                    if ui.small_button("+ TargetExists").clicked() {
+                        Self::add_condition(rule, RuleConditionKind::TargetExists);
+                        outcome.changed = true;
+                    }
+                    if ui.small_button("+ KeyHeld").clicked() {
+                        Self::add_condition(rule, RuleConditionKind::KeyHeld);
+                        outcome.changed = true;
+                    }
+                    if ui.small_button("+ EntityActive").clicked() {
+                        Self::add_condition(rule, RuleConditionKind::EntityActive);
+                        outcome.changed = true;
+                    }
+                });
+
                 for issue in validation_issues
                     .iter()
                     .filter(|issue| issue.rule_index == rule_index && issue.action_index.is_none())
@@ -1151,6 +1277,110 @@ impl InspectorSystem {
         changed
     }
 
+    fn render_rule_condition_editor(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        rule_index: usize,
+        condition_index: usize,
+        condition: &mut RuleCondition,
+    ) -> bool {
+        let mut changed = false;
+
+        let current_kind = Self::condition_kind(condition);
+        let mut selected_kind = current_kind;
+        ui.horizontal(|ui| {
+            ui.label("Type:");
+            egui::ComboBox::from_id_salt(format!(
+                "rule_condition_kind_{}_{}_{}",
+                scene_name, rule_index, condition_index
+            ))
+            .selected_text(Self::condition_kind_label(current_kind))
+            .show_ui(ui, |ui| {
+                changed |= ui
+                    .selectable_value(
+                        &mut selected_kind,
+                        RuleConditionKind::Always,
+                        Self::condition_kind_label(RuleConditionKind::Always),
+                    )
+                    .changed();
+                changed |= ui
+                    .selectable_value(
+                        &mut selected_kind,
+                        RuleConditionKind::TargetExists,
+                        Self::condition_kind_label(RuleConditionKind::TargetExists),
+                    )
+                    .changed();
+                changed |= ui
+                    .selectable_value(
+                        &mut selected_kind,
+                        RuleConditionKind::KeyHeld,
+                        Self::condition_kind_label(RuleConditionKind::KeyHeld),
+                    )
+                    .changed();
+                changed |= ui
+                    .selectable_value(
+                        &mut selected_kind,
+                        RuleConditionKind::EntityActive,
+                        Self::condition_kind_label(RuleConditionKind::EntityActive),
+                    )
+                    .changed();
+            });
+        });
+        if selected_kind != current_kind {
+            Self::switch_condition_kind(condition, selected_kind);
+        }
+
+        match condition {
+            RuleCondition::Always => {}
+            RuleCondition::TargetExists { target } => {
+                changed |= Self::render_rule_condition_target_editor(
+                    ui,
+                    scene_name,
+                    rule_index,
+                    condition_index,
+                    target,
+                );
+            }
+            RuleCondition::KeyHeld { key } => {
+                ui.horizontal(|ui| {
+                    ui.label("Key:");
+                    egui::ComboBox::from_id_salt(format!(
+                        "rule_condition_key_{}_{}_{}",
+                        scene_name, rule_index, condition_index
+                    ))
+                    .selected_text(Self::rule_key_label(*key))
+                    .show_ui(ui, |ui| {
+                        for candidate in [
+                            RuleKey::Up,
+                            RuleKey::Down,
+                            RuleKey::Left,
+                            RuleKey::Right,
+                            RuleKey::DebugToggle,
+                        ] {
+                            changed |= ui
+                                .selectable_value(key, candidate, Self::rule_key_label(candidate))
+                                .changed();
+                        }
+                    });
+                });
+            }
+            RuleCondition::EntityActive { target, is_active } => {
+                changed |= Self::render_rule_condition_target_editor(
+                    ui,
+                    scene_name,
+                    rule_index,
+                    condition_index,
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    changed |= ui.checkbox(is_active, "Target Is Active").changed();
+                });
+            }
+        }
+
+        changed
+    }
+
     fn render_audio_choice_picker(
         ui: &mut egui::Ui,
         id_salt: String,
@@ -1196,6 +1426,67 @@ impl InspectorSystem {
             egui::ComboBox::from_id_salt(format!(
                 "rule_target_{}_{}_{}",
                 scene_name, rule_index, action_index
+            ))
+            .selected_text(match target {
+                RuleTarget::Player => "Player",
+                RuleTarget::Entity(_) => "Entity",
+            })
+            .show_ui(ui, |ui| {
+                if ui
+                    .selectable_label(matches!(target, RuleTarget::Player), "Player")
+                    .clicked()
+                    && !matches!(target, RuleTarget::Player)
+                {
+                    *target = RuleTarget::Player;
+                    changed = true;
+                }
+
+                if ui
+                    .selectable_label(matches!(target, RuleTarget::Entity(_)), "Entity")
+                    .clicked()
+                    && !matches!(target, RuleTarget::Entity(_))
+                {
+                    *target = RuleTarget::Entity(1);
+                    changed = true;
+                }
+            });
+        });
+
+        if let RuleTarget::Entity(entity_id) = target {
+            ui.horizontal(|ui| {
+                ui.label("Entity Id:");
+                let mut value = *entity_id as i64;
+                if ui
+                    .add(
+                        egui::DragValue::new(&mut value)
+                            .speed(1.0)
+                            .range(1..=u32::MAX as i64),
+                    )
+                    .changed()
+                {
+                    *entity_id = value as u32;
+                    changed = true;
+                }
+            });
+        }
+
+        changed
+    }
+
+    fn render_rule_condition_target_editor(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        rule_index: usize,
+        condition_index: usize,
+        target: &mut RuleTarget,
+    ) -> bool {
+        let mut changed = false;
+
+        ui.horizontal(|ui| {
+            ui.label("Target:");
+            egui::ComboBox::from_id_salt(format!(
+                "rule_condition_target_{}_{}_{}",
+                scene_name, rule_index, condition_index
             ))
             .selected_text(match target {
                 RuleTarget::Player => "Player",
@@ -2032,7 +2323,9 @@ impl InspectorSystem {
 
 #[cfg(test)]
 mod tests {
-    use super::{EntityPropertyDraft, InspectorSystem, RuleActionKind, RuleTriggerKind};
+    use super::{
+        EntityPropertyDraft, InspectorSystem, RuleActionKind, RuleConditionKind, RuleTriggerKind,
+    };
     use crate::ui::EditorUI;
     use glam::{IVec2, UVec2};
     use std::fs;
@@ -2452,8 +2745,56 @@ mod tests {
     }
 
     #[test]
+    fn add_remove_and_switch_condition_types() {
+        let mut rule = sample_rule("rule_1");
+        assert_eq!(rule.conditions, vec![RuleCondition::Always]);
+
+        InspectorSystem::add_condition(&mut rule, RuleConditionKind::TargetExists);
+        InspectorSystem::add_condition(&mut rule, RuleConditionKind::KeyHeld);
+        InspectorSystem::add_condition(&mut rule, RuleConditionKind::EntityActive);
+
+        assert_eq!(rule.conditions.len(), 4);
+        assert!(matches!(
+            rule.conditions[1],
+            RuleCondition::TargetExists {
+                target: RuleTarget::Player
+            }
+        ));
+        assert!(matches!(
+            rule.conditions[2],
+            RuleCondition::KeyHeld { key: RuleKey::Up }
+        ));
+        assert!(matches!(
+            rule.conditions[3],
+            RuleCondition::EntityActive {
+                target: RuleTarget::Player,
+                is_active: true
+            }
+        ));
+
+        InspectorSystem::switch_condition_kind(
+            &mut rule.conditions[0],
+            RuleConditionKind::EntityActive,
+        );
+        assert!(matches!(
+            rule.conditions[0],
+            RuleCondition::EntityActive {
+                target: RuleTarget::Player,
+                is_active: true
+            }
+        ));
+
+        assert!(InspectorSystem::remove_condition(&mut rule, 2));
+        assert_eq!(rule.conditions.len(), 3);
+        assert!(!InspectorSystem::remove_condition(&mut rule, 99));
+    }
+
+    #[test]
     fn validate_rule_set_reports_duplicate_ids_and_invalid_action_payloads() {
         let mut first = sample_rule("dupe");
+        first.conditions = vec![RuleCondition::TargetExists {
+            target: RuleTarget::Entity(0),
+        }];
         first.actions = vec![
             RuleAction::PlaySound {
                 channel: RuleSoundChannel::Movement,
@@ -2497,6 +2838,9 @@ mod tests {
         assert!(issues.iter().any(|issue| issue
             .message
             .contains("DestroySelf entity target must be non-zero")));
+        assert!(issues.iter().any(|issue| issue
+            .message
+            .contains("Condition 1 entity target must be non-zero")));
         assert!(issues
             .iter()
             .any(|issue| issue.message.contains("SwitchScene requires a scene name")));

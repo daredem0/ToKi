@@ -1106,6 +1106,16 @@ impl GameState {
         }
     }
 
+    fn to_input_key(key: RuleKey) -> InputKey {
+        match key {
+            RuleKey::Up => InputKey::Up,
+            RuleKey::Down => InputKey::Down,
+            RuleKey::Left => InputKey::Left,
+            RuleKey::Right => InputKey::Right,
+            RuleKey::DebugToggle => InputKey::DebugToggle,
+        }
+    }
+
     fn any_entity_overlaps_trigger_tile(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> bool {
         for entity_id in self.entity_manager.active_entities() {
             let Some(entity) = self.entity_manager.get_entity(entity_id) else {
@@ -1167,6 +1177,15 @@ impl GameState {
     fn rule_conditions_match(&self, conditions: &[RuleCondition]) -> bool {
         conditions.iter().all(|condition| match condition {
             RuleCondition::Always => true,
+            RuleCondition::TargetExists { target } => self
+                .resolve_rule_target(*target)
+                .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
+                .is_some(),
+            RuleCondition::KeyHeld { key } => self.keys_held.contains(&Self::to_input_key(*key)),
+            RuleCondition::EntityActive { target, is_active } => self
+                .resolve_rule_target(*target)
+                .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
+                .is_some_and(|entity| entity.attributes.active == *is_active),
         })
     }
 

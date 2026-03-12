@@ -113,10 +113,101 @@
         "conditions": {
           "type": "array",
           "items": {
-            "type": "string",
-            "enum": ["Always"]
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": ["Always"]
+              },
+              {
+                "type": "object",
+                "required": ["TargetExists"],
+                "additionalProperties": false,
+                "properties": {
+                  "TargetExists": {
+                    "type": "object",
+                    "required": ["target"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "target": {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": ["Player"]
+                          },
+                          {
+                            "type": "object",
+                            "required": ["Entity"],
+                            "additionalProperties": false,
+                            "properties": {
+                              "Entity": {
+                                "type": "integer",
+                                "minimum": 1
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["KeyHeld"],
+                "additionalProperties": false,
+                "properties": {
+                  "KeyHeld": {
+                    "type": "object",
+                    "required": ["key"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "key": {
+                        "type": "string",
+                        "enum": ["Up", "Down", "Left", "Right", "DebugToggle"]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["EntityActive"],
+                "additionalProperties": false,
+                "properties": {
+                  "EntityActive": {
+                    "type": "object",
+                    "required": ["target", "is_active"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "target": {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "enum": ["Player"]
+                          },
+                          {
+                            "type": "object",
+                            "required": ["Entity"],
+                            "additionalProperties": false,
+                            "properties": {
+                              "Entity": {
+                                "type": "integer",
+                                "minimum": 1
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "is_active": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            ]
           },
-          "description": "Rule conditions (minimal scope currently supports Always)"
+          "description": "Rule conditions supported by runtime evaluator"
         },
         "actions": {
           "type": "array",

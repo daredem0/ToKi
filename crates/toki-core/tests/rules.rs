@@ -249,6 +249,123 @@ fn on_update_rule_runs_every_tick() {
 }
 
 #[test]
+fn target_exists_condition_gates_rule_execution() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "requires-player",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "cond_target_exists".to_string(),
+            }],
+        )],
+    });
+    state.rules_mut().rules[0].conditions = vec![RuleCondition::TargetExists {
+        target: RuleTarget::Player,
+    }];
+
+    let world_bounds = UVec2::new(256, 256);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    let no_player = state.update(world_bounds, &tilemap, &atlas);
+    assert!(no_player.events.is_empty());
+
+    state.spawn_player_at(IVec2::new(0, 0));
+    let with_player = state.update(world_bounds, &tilemap, &atlas);
+    assert!(with_player.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "cond_target_exists"
+    )));
+}
+
+#[test]
+fn key_held_condition_matches_runtime_input_state() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "requires-right",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "cond_key_held".to_string(),
+            }],
+        )],
+    });
+    state.rules_mut().rules[0].conditions = vec![RuleCondition::KeyHeld {
+        key: RuleKey::Right,
+    }];
+
+    let world_bounds = UVec2::new(256, 256);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    let without_key = state.update(world_bounds, &tilemap, &atlas);
+    assert!(without_key.events.is_empty());
+
+    state.handle_key_press(InputKey::Right);
+    let with_key = state.update(world_bounds, &tilemap, &atlas);
+    assert!(with_key.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "cond_key_held"
+    )));
+
+    state.handle_key_release(InputKey::Right);
+    let released = state.update(world_bounds, &tilemap, &atlas);
+    assert!(released.events.is_empty());
+}
+
+#[test]
+fn entity_active_condition_checks_target_active_flag() {
+    let mut state = GameState::new_empty();
+    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "requires-active-player",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Collision,
+                sound_id: "cond_active".to_string(),
+            }],
+        )],
+    });
+    state.rules_mut().rules[0].conditions = vec![RuleCondition::EntityActive {
+        target: RuleTarget::Player,
+        is_active: true,
+    }];
+
+    let world_bounds = UVec2::new(256, 256);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .expect("player should exist")
+        .attributes
+        .active = false;
+
+    let inactive = state.update(world_bounds, &tilemap, &atlas);
+    assert!(inactive.events.is_empty());
+
+    state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .expect("player should exist")
+        .attributes
+        .active = true;
+    let active = state.update(world_bounds, &tilemap, &atlas);
+    assert!(active.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "cond_active"
+    )));
+}
+
+#[test]
 fn on_key_rule_runs_only_while_matching_key_is_held() {
     let mut state = GameState::new_empty();
     state.set_rules(RuleSet {
@@ -933,7 +1050,17 @@ fn rules_serialize_roundtrip() {
             priority: 3,
             once: true,
             trigger: RuleTrigger::OnStart,
-            conditions: vec![RuleCondition::Always],
+            conditions: vec![
+                RuleCondition::Always,
+                RuleCondition::TargetExists {
+                    target: RuleTarget::Player,
+                },
+                RuleCondition::KeyHeld { key: RuleKey::Up },
+                RuleCondition::EntityActive {
+                    target: RuleTarget::Entity(7),
+                    is_active: true,
+                },
+            ],
             actions: vec![
                 RuleAction::PlaySound {
                     channel: RuleSoundChannel::Movement,

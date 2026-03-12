@@ -24,6 +24,9 @@ pub enum RuleKey {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RuleCondition {
     Always,
+    TargetExists { target: RuleTarget },
+    KeyHeld { key: RuleKey },
+    EntityActive { target: RuleTarget, is_active: bool },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
