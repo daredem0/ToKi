@@ -16,6 +16,12 @@ pub enum Selection {
     EntityDefinition(String), // Entity definition from palette
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CenterPanelTab {
+    SceneViewport,
+    SceneGraph,
+}
+
 #[derive(Debug, Clone)]
 pub struct EntityMoveDragState {
     pub scene_name: String,
@@ -63,6 +69,7 @@ pub struct EditorUI {
     pub placement_preview_cached_frame: Option<toki_core::sprite::SpriteFrame>, // Cached sprite frame for preview
     pub placement_preview_valid: Option<bool>, // Whether the current preview position is valid for placement
     pub entity_move_drag: Option<EntityMoveDragState>, // Active drag-move operation for existing scene entities
+    pub center_panel_tab: CenterPanelTab,              // Active tab in center workspace
 }
 
 impl EditorUI {
@@ -107,6 +114,7 @@ impl EditorUI {
             placement_preview_cached_frame: None,
             placement_preview_valid: None,
             entity_move_drag: None,
+            center_panel_tab: CenterPanelTab::SceneViewport,
         }
     }
 

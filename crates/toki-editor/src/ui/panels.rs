@@ -1,3 +1,4 @@
+use super::editor_ui::CenterPanelTab;
 use super::interactions::{CameraInteraction, PlacementInteraction, SelectionInteraction};
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
@@ -15,25 +16,36 @@ impl PanelSystem {
         renderer: Option<&mut egui_wgpu::Renderer>,
     ) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Scene Viewport");
+            ui.horizontal(|ui| {
+                ui.selectable_value(
+                    &mut ui_state.center_panel_tab,
+                    CenterPanelTab::SceneViewport,
+                    "Scene Viewport",
+                );
+                ui.selectable_value(
+                    &mut ui_state.center_panel_tab,
+                    CenterPanelTab::SceneGraph,
+                    "Scene Graph",
+                );
+            });
             ui.separator();
 
-            // Collect stats before updating viewport to avoid borrowing conflicts
-            let (entity_count, selected_entity) = if let Some(ref viewport) = scene_viewport {
-                let count = viewport
+            if ui_state.center_panel_tab == CenterPanelTab::SceneGraph {
+                Self::render_scene_graph(ui, ui_state);
+                return;
+            }
+
+            // Update and render the scene viewport
+            if let Some(viewport) = scene_viewport {
+                // Collect stats before updating viewport to avoid borrowing conflicts
+                let entity_count = viewport
                     .scene_manager()
                     .game_state()
                     .entity_manager()
                     .active_entities()
                     .len();
-                let selected = viewport.selected_entity();
-                (count, selected)
-            } else {
-                (0, None)
-            };
+                let selected_entity = viewport.selected_entity();
 
-            // Update and render the scene viewport
-            if let Some(viewport) = scene_viewport {
                 // Update the viewport systems
                 if let Err(e) = viewport.update() {
                     tracing::error!("Scene viewport update error: {e}");
@@ -100,23 +112,79 @@ impl PanelSystem {
                 // Render the scene content
                 let project_path = config.and_then(|c| c.current_project_path());
                 viewport.render(ui, rect, project_path.map(|p| p.as_path()), renderer);
+
+                ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("📊 Stats:");
+                        ui.label(format!(
+                            "Entities: {} | Selected: {:?}",
+                            entity_count, selected_entity
+                        ));
+                        ui.label("Press F1/F2 to toggle panels");
+                    });
+                });
             } else {
                 // Show placeholder when no viewport
                 let available_size = ui.available_size();
                 ui.allocate_response(available_size, egui::Sense::click())
                     .on_hover_text("Scene viewport not initialized");
             }
+        });
+    }
 
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                ui.horizontal(|ui| {
-                    ui.label("📊 Stats:");
-                    ui.label(format!(
-                        "Entities: {} | Selected: {:?}",
-                        entity_count, selected_entity
-                    ));
-                    ui.label("Press F1/F2 to toggle panels");
+    fn render_scene_graph(ui: &mut egui::Ui, ui_state: &super::EditorUI) {
+        ui.heading("Active Scene Graph");
+        ui.separator();
+
+        let Some(active_scene_name) = ui_state.active_scene.as_deref() else {
+            ui.label("No active scene selected.");
+            return;
+        };
+
+        let Some(scene) = ui_state
+            .scenes
+            .iter()
+            .find(|scene| scene.name == active_scene_name)
+        else {
+            ui.label(format!(
+                "Active scene '{}' is not loaded.",
+                active_scene_name
+            ));
+            return;
+        };
+
+        if scene.rules.rules.is_empty() {
+            ui.label("No rules in active scene. Add rules in the Inspector first.");
+            return;
+        }
+
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            for (rule_index, rule) in scene.rules.rules.iter().enumerate() {
+                ui.group(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.strong(format!("Rule {}: {}", rule_index + 1, rule.id));
+                        if !rule.enabled {
+                            ui.label("(disabled)");
+                        }
+                    });
+                    ui.monospace(format!("Trigger: {:?}", rule.trigger));
+                    if rule.conditions.is_empty() {
+                        ui.monospace("Conditions: Always");
+                    } else {
+                        for condition in &rule.conditions {
+                            ui.monospace(format!("Condition -> {:?}", condition));
+                        }
+                    }
+                    if rule.actions.is_empty() {
+                        ui.monospace("Action: (none)");
+                    } else {
+                        for action in &rule.actions {
+                            ui.monospace(format!("Action -> {:?}", action));
+                        }
+                    }
                 });
-            });
+                ui.add_space(6.0);
+            }
         });
     }
 
