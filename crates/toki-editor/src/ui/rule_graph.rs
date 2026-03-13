@@ -717,11 +717,7 @@ impl RuleGraph {
             return Ok(());
         }
 
-        let original_edges = self.edges.clone();
-        self.edges.retain(|edge| edge.from != from);
-
         if self.is_reachable(to, from) {
-            self.edges = original_edges;
             return Err(RuleGraphEditError::InvalidConnection {
                 reason: "Connection would create a cycle".to_string(),
             });
@@ -1014,6 +1010,15 @@ mod tests {
                 matches!(node.kind, super::RuleGraphNodeKind::Action(_))
             })
             .expect("action node expected");
+        let previous_targets = graph
+            .edges
+            .iter()
+            .filter(|edge| edge.from == action_node)
+            .map(|edge| edge.to)
+            .collect::<Vec<_>>();
+        for previous_target in previous_targets {
+            graph.disconnect_nodes(action_node, previous_target);
+        }
         graph
             .connect_nodes(action_node, second_trigger)
             .expect("action -> trigger should be accepted in free-connection mode");
@@ -1057,6 +1062,15 @@ mod tests {
                 matches!(node.kind, super::RuleGraphNodeKind::Condition(_))
             })
             .expect("second chain condition should exist");
+        let previous_targets = graph
+            .edges
+            .iter()
+            .filter(|edge| edge.from == first_action)
+            .map(|edge| edge.to)
+            .collect::<Vec<_>>();
+        for previous_target in previous_targets {
+            graph.disconnect_nodes(first_action, previous_target);
+        }
 
         graph
             .connect_nodes(first_action, second_condition)
@@ -1066,6 +1080,38 @@ mod tests {
             .to_rule_set()
             .expect("joined chain should still serialize");
         assert_eq!(roundtrip.rules.len(), 2);
+    }
+
+    #[test]
+    fn connect_nodes_preserves_existing_outgoing_edges() {
+        let mut graph = RuleGraph::from_rule_set(&sample_rules());
+        let from = graph
+            .add_action_node(RuleAction::PlayMusic {
+                track_id: "music_a".to_string(),
+            })
+            .expect("detached source node should be created");
+        let to_a = graph
+            .add_condition_node(RuleCondition::Always)
+            .expect("first detached target should be created");
+        let to_b = graph
+            .add_condition_node(RuleCondition::KeyHeld { key: RuleKey::Left })
+            .expect("second detached target should be created");
+
+        graph
+            .connect_nodes(from, to_a)
+            .expect("first connect should succeed");
+        graph
+            .connect_nodes(from, to_b)
+            .expect("second connect should keep the first one");
+
+        assert!(graph
+            .edges
+            .iter()
+            .any(|edge| edge.from == from && edge.to == to_a));
+        assert!(graph
+            .edges
+            .iter()
+            .any(|edge| edge.from == from && edge.to == to_b));
     }
 
     #[test]
