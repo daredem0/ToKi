@@ -918,33 +918,54 @@ impl InspectorSystem {
         }
 
         ui.separator();
-        let mut connected_node_ids = graph
+        let mut outgoing_connected_ids = graph
             .edges
             .iter()
-            .filter_map(|edge| {
-                if edge.from == node_id {
-                    Some(edge.to)
-                } else if edge.to == node_id {
-                    Some(edge.from)
-                } else {
-                    None
-                }
-            })
+            .filter(|edge| edge.from == node_id)
+            .map(|edge| edge.to)
             .collect::<Vec<_>>();
-        connected_node_ids.sort_unstable();
-        connected_node_ids.dedup();
-        let connectable_nodes = graph
+        outgoing_connected_ids.sort_unstable();
+        outgoing_connected_ids.dedup();
+        let mut incoming_connected_ids = graph
+            .edges
+            .iter()
+            .filter(|edge| edge.to == node_id)
+            .map(|edge| edge.from)
+            .collect::<Vec<_>>();
+        incoming_connected_ids.sort_unstable();
+        incoming_connected_ids.dedup();
+
+        let connectable_to_nodes = graph
             .nodes
             .iter()
             .filter_map(|node| {
-                (node.id != node_id && !connected_node_ids.contains(&node.id)).then_some((
+                (node.id != node_id
+                    && !outgoing_connected_ids.contains(&node.id)
+                    && graph.can_connect_nodes(node_id, node.id).is_ok())
+                .then_some((
                     node.id,
                     Self::rule_graph_node_label_for_inspector(&graph, &node_badges, node.id),
                 ))
             })
             .filter_map(|(id, label)| label.map(|label| (id, label)))
             .collect::<Vec<_>>();
+        let connectable_from_nodes = graph
+            .nodes
+            .iter()
+            .filter_map(|node| {
+                (node.id != node_id
+                    && !incoming_connected_ids.contains(&node.id)
+                    && graph.can_connect_nodes(node.id, node_id).is_ok())
+                .then_some((
+                    node.id,
+                    Self::rule_graph_node_label_for_inspector(&graph, &node_badges, node.id),
+                ))
+            })
+            .filter_map(|(id, label)| label.map(|label| (id, label)))
+            .collect::<Vec<_>>();
+
         let mut pending_connect_to = None::<u64>;
+        let mut pending_connect_from = None::<u64>;
         let mut pending_disconnect_edge = None::<(u64, u64)>;
         ui.horizontal(|ui| {
             if ui.button("Disconnect Node").clicked() {
@@ -954,12 +975,24 @@ impl InspectorSystem {
                     graph_mutated = true;
                 }
             }
-            ui.menu_button("Connect To", |ui| {
-                if connectable_nodes.is_empty() {
+            ui.menu_button("Connect From", |ui| {
+                if connectable_from_nodes.is_empty() {
                     ui.label("No available nodes");
                     return;
                 }
-                for (candidate_id, label) in &connectable_nodes {
+                for (candidate_id, label) in &connectable_from_nodes {
+                    if ui.button(label).clicked() {
+                        pending_connect_from = Some(*candidate_id);
+                        ui.close();
+                    }
+                }
+            });
+            ui.menu_button("Connect To", |ui| {
+                if connectable_to_nodes.is_empty() {
+                    ui.label("No available nodes");
+                    return;
+                }
+                for (candidate_id, label) in &connectable_to_nodes {
                     if ui.button(label).clicked() {
                         pending_connect_to = Some(*candidate_id);
                         ui.close();
@@ -978,37 +1011,58 @@ impl InspectorSystem {
             }
         });
         ui.separator();
-        let connected_edges = graph
+        let outgoing_edges = graph
             .edges
             .iter()
-            .filter(|edge| edge.from == node_id || edge.to == node_id)
+            .filter(|edge| edge.from == node_id)
+            .copied()
+            .collect::<Vec<_>>();
+        let incoming_edges = graph
+            .edges
+            .iter()
+            .filter(|edge| edge.to == node_id)
             .copied()
             .collect::<Vec<_>>();
         ui.label("Connections");
-        if connected_edges.is_empty() {
+        if outgoing_edges.is_empty() && incoming_edges.is_empty() {
             ui.label("None");
         } else {
             egui::ScrollArea::vertical()
                 .max_height(220.0)
                 .show(ui, |ui| {
-                    for edge in &connected_edges {
-                        let (peer_id, direction) = if edge.from == node_id {
-                            (edge.to, "->")
-                        } else {
-                            (edge.from, "<-")
-                        };
-                        let label = Self::rule_graph_node_label_for_inspector(
-                            &graph,
-                            &node_badges,
-                            peer_id,
-                        )
-                        .unwrap_or_else(|| format!("node {}", peer_id));
-                        ui.horizontal(|ui| {
-                            ui.label(format!("{} {}", direction, label));
-                            if ui.small_button("Disconnect").clicked() {
-                                pending_disconnect_edge = Some((edge.from, edge.to));
-                            }
-                        });
+                    if !outgoing_edges.is_empty() {
+                        ui.label("Outgoing");
+                        for edge in &outgoing_edges {
+                            let label = Self::rule_graph_node_label_for_inspector(
+                                &graph,
+                                &node_badges,
+                                edge.to,
+                            )
+                            .unwrap_or_else(|| format!("node {}", edge.to));
+                            ui.horizontal(|ui| {
+                                ui.label(format!("-> {}", label));
+                                if ui.small_button("Disconnect").clicked() {
+                                    pending_disconnect_edge = Some((edge.from, edge.to));
+                                }
+                            });
+                        }
+                    }
+                    if !incoming_edges.is_empty() {
+                        ui.label("Incoming");
+                        for edge in &incoming_edges {
+                            let label = Self::rule_graph_node_label_for_inspector(
+                                &graph,
+                                &node_badges,
+                                edge.from,
+                            )
+                            .unwrap_or_else(|| format!("node {}", edge.from));
+                            ui.horizontal(|ui| {
+                                ui.label(format!("<- {}", label));
+                                if ui.small_button("Disconnect").clicked() {
+                                    pending_disconnect_edge = Some((edge.from, edge.to));
+                                }
+                            });
+                        }
                     }
                 });
         }
@@ -1017,6 +1071,13 @@ impl InspectorSystem {
                 graph_mutated = true;
             } else {
                 operation_error = Some("Failed to disconnect selected connection".to_string());
+            }
+        }
+        if let Some(connect_from) = pending_connect_from {
+            if let Err(error) = graph.connect_nodes(connect_from, node_id) {
+                operation_error = Some(format!("Failed to connect nodes: {:?}", error));
+            } else {
+                graph_mutated = true;
             }
         }
         if let Some(connect_to) = pending_connect_to {

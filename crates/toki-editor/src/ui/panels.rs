@@ -936,26 +936,50 @@ impl PanelSystem {
             )
         };
 
-        let node_positions = graph
-            .nodes
-            .iter()
-            .map(|node| (node.id, to_canvas(node.position)))
-            .collect::<HashMap<_, _>>();
+        let mut node_positions = HashMap::<u64, egui::Pos2>::new();
+        let mut node_labels = HashMap::<u64, String>::new();
+        let mut node_rects = HashMap::<u64, egui::Rect>::new();
+        for node in &graph.nodes {
+            let center = to_canvas(node.position);
+            let badge = node_badges
+                .get(&node.id)
+                .cloned()
+                .unwrap_or_else(|| "?".to_string());
+            let label = format!(
+                "{}: {}",
+                badge,
+                Self::rule_graph_node_kind_compact_label(&node.kind)
+            );
+            let node_size = Self::graph_node_size_for_label(ui, &label, scale);
+            let node_rect = egui::Rect::from_center_size(center, node_size);
+            node_positions.insert(node.id, center);
+            node_labels.insert(node.id, label);
+            node_rects.insert(node.id, node_rect);
+        }
 
         for edge in &graph.edges {
-            let Some(from_pos) = node_positions.get(&edge.from).copied() else {
+            let Some(from_rect) = node_rects.get(&edge.from).copied() else {
                 continue;
             };
-            let Some(to_pos) = node_positions.get(&edge.to).copied() else {
+            let Some(to_rect) = node_rects.get(&edge.to).copied() else {
                 continue;
             };
-            painter.line_segment(
-                [from_pos, to_pos],
-                egui::Stroke::new(
-                    Self::graph_edge_stroke_width(scale),
-                    egui::Color32::from_rgb(130, 150, 185),
-                ),
+            let Some((start, end, direction)) = Self::graph_edge_points(from_rect, to_rect) else {
+                continue;
+            };
+            let stroke = egui::Stroke::new(
+                Self::graph_edge_stroke_width(scale),
+                egui::Color32::from_rgb(130, 150, 185),
             );
+            let arrow_length = (10.0 * scale).clamp(6.0, 18.0);
+            let arrow_width = (5.0 * scale).clamp(3.0, 12.0);
+            let body_end = end - direction * (arrow_length * 0.85);
+            painter.line_segment([start, body_end], stroke);
+            let perp = egui::vec2(-direction.y, direction.x);
+            let arrow_left = end - direction * arrow_length + perp * arrow_width;
+            let arrow_right = end - direction * arrow_length - perp * arrow_width;
+            painter.line_segment([end, arrow_left], stroke);
+            painter.line_segment([end, arrow_right], stroke);
         }
 
         let mut moved_node = None;
@@ -968,15 +992,9 @@ impl PanelSystem {
             let Some(center) = node_positions.get(&node.id).copied() else {
                 continue;
             };
-            let badge = node_badges
-                .get(&node.id)
-                .cloned()
-                .unwrap_or_else(|| "?".to_string());
-            let label = format!(
-                "{}: {}",
-                badge,
-                Self::rule_graph_node_kind_compact_label(&node.kind)
-            );
+            let Some(label) = node_labels.get(&node.id).cloned() else {
+                continue;
+            };
             let node_size = Self::graph_node_size_for_label(ui, &label, scale);
             let (fill, stroke) = match node.kind {
                 RuleGraphNodeKind::Trigger(_) => (
@@ -1029,7 +1047,7 @@ impl PanelSystem {
             painter.text(
                 node_rect.center(),
                 egui::Align2::CENTER_CENTER,
-                label,
+                &label,
                 egui::FontId::proportional(node_font_size),
                 egui::Color32::WHITE,
             );
@@ -1044,6 +1062,40 @@ impl PanelSystem {
         }
 
         (moved_node, clicked_node)
+    }
+
+    fn graph_edge_points(
+        from_rect: egui::Rect,
+        to_rect: egui::Rect,
+    ) -> Option<(egui::Pos2, egui::Pos2, egui::Vec2)> {
+        let from_center = from_rect.center();
+        let to_center = to_rect.center();
+        let center_delta = to_center - from_center;
+        if center_delta.length_sq() <= f32::EPSILON {
+            return None;
+        }
+        let start = Self::rect_border_point_toward(from_rect, to_center);
+        let end = Self::rect_border_point_toward(to_rect, from_center);
+        let line_delta = end - start;
+        let line_length = line_delta.length();
+        if line_length <= f32::EPSILON {
+            return None;
+        }
+        Some((start, end, line_delta / line_length))
+    }
+
+    fn rect_border_point_toward(rect: egui::Rect, toward: egui::Pos2) -> egui::Pos2 {
+        let center = rect.center();
+        let delta = toward - center;
+        let half_size = rect.size() * 0.5;
+        if half_size.x <= f32::EPSILON || half_size.y <= f32::EPSILON {
+            return center;
+        }
+        let scale = (delta.x.abs() / half_size.x).max(delta.y.abs() / half_size.y);
+        if scale <= f32::EPSILON {
+            return center;
+        }
+        center + delta / scale
     }
 
     fn enforce_graph_border_gap(graph: &RuleGraph, graph_zoom: f32, graph_pan: &mut [f32; 2]) {

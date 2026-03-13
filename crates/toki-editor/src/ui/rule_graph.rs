@@ -706,6 +706,31 @@ impl RuleGraph {
         from: RuleGraphNodeId,
         to: RuleGraphNodeId,
     ) -> Result<(), RuleGraphEditError> {
+        self.validate_connection(from, to)?;
+        if self
+            .edges
+            .iter()
+            .any(|edge| edge.from == from && edge.to == to)
+        {
+            return Ok(());
+        }
+        self.edges.push(RuleGraphEdge { from, to });
+        Ok(())
+    }
+
+    pub fn can_connect_nodes(
+        &self,
+        from: RuleGraphNodeId,
+        to: RuleGraphNodeId,
+    ) -> Result<(), RuleGraphEditError> {
+        self.validate_connection(from, to)
+    }
+
+    fn validate_connection(
+        &self,
+        from: RuleGraphNodeId,
+        to: RuleGraphNodeId,
+    ) -> Result<(), RuleGraphEditError> {
         if from == to {
             return Err(RuleGraphEditError::InvalidConnection {
                 reason: "Cannot connect a node to itself".to_string(),
@@ -723,21 +748,11 @@ impl RuleGraph {
             return Err(RuleGraphEditError::MissingNode { node_id: to });
         }
 
-        if self
-            .edges
-            .iter()
-            .any(|edge| edge.from == from && edge.to == to)
-        {
-            return Ok(());
-        }
-
         if self.is_reachable(to, from) {
             return Err(RuleGraphEditError::InvalidConnection {
                 reason: "Connection would create a cycle".to_string(),
             });
         }
-
-        self.edges.push(RuleGraphEdge { from, to });
         Ok(())
     }
 
@@ -1126,6 +1141,34 @@ mod tests {
             .edges
             .iter()
             .any(|edge| edge.from == from && edge.to == to_b));
+    }
+
+    #[test]
+    fn can_connect_nodes_rejects_cycle_candidates() {
+        let graph = RuleGraph::from_rule_set(&sample_rules());
+        let first_trigger = graph.chains[0].trigger_node_id;
+        let sequence = graph
+            .chain_node_sequence(first_trigger)
+            .expect("chain should be valid");
+        let last_action = *sequence
+            .iter()
+            .rev()
+            .find(|node_id| {
+                graph
+                    .nodes
+                    .iter()
+                    .find(|node| node.id == **node_id)
+                    .is_some_and(|node| matches!(node.kind, super::RuleGraphNodeKind::Action(_)))
+            })
+            .expect("expected action in chain");
+
+        let error = graph
+            .can_connect_nodes(last_action, first_trigger)
+            .expect_err("action -> trigger in same chain must be rejected as cycle");
+        assert!(matches!(
+            error,
+            super::RuleGraphEditError::InvalidConnection { .. }
+        ));
     }
 
     #[test]
