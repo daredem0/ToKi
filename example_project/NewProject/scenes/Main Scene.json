@@ -123,6 +123,15 @@
             }
           }
         ]
+      },
+      {
+        "id": "rule_4",
+        "enabled": true,
+        "priority": 0,
+        "once": false,
+        "trigger": "OnUpdate",
+        "conditions": [],
+        "actions": []
       }
     ]
   },

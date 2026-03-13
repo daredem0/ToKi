@@ -7,9 +7,9 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-main = "scenes/main.json"
-"Scene 2" = "scenes/scene2.json"
 "Main Scene" = "scenes/mainscene.json"
+"Scene 2" = "scenes/scene2.json"
+main = "scenes/main.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -24,44 +24,136 @@ recent_files = []
 [editor.graph_layouts."Main Scene"]
 zoom = 1.0
 pan = [
-    40.0,
+    110.0,
     16.0,
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
-"rule_3:trigger" = [
+"rule_4:action:0" = [
+    410.0,
+    278.0,
+]
+"node:1" = [
     60.0,
-    170.0,
-]
-"rule_2:condition:0" = [
-    280.0,
-    110.0,
-]
-"rule_1:condition:0" = [
-    280.0,
     50.0,
 ]
+"rule_4:action:1" = [
+    408.16015625,
+    330.32421875,
+]
+"node:5" = [
+    459.171875,
+    126.0,
+]
+"rule_1:condition:0" = [
+    217.359375,
+    50.0,
+]
+"detached:8" = [
+    495.62109375,
+    217.7734375,
+]
+"detached:10" = [
+    502.36328125,
+    211.51953125,
+]
 "rule_2:action:0" = [
-    500.0,
-    110.0,
+    459.171875,
+    126.0,
+]
+"rule_4:condition:0" = [
+    410.0,
+    278.0,
+]
+"node:6" = [
+    223.21875,
+    126.0,
+]
+"rule_5:action:0" = [
+    410.0,
+    354.0,
 ]
 "rule_1:trigger" = [
     60.0,
     50.0,
 ]
-"rule_3:action:0" = [
-    500.0,
-    170.0,
+"rule_4:trigger" = [
+    60.0,
+    278.0,
 ]
-"rule_1:action:0" = [
-    500.0,
+"rule_6:action:0" = [
+    410.0,
+    430.0,
+]
+"detached:11" = [
+    454.25390625,
+    341.29296875,
+]
+"node:3" = [
+    217.359375,
     50.0,
 ]
-"rule_3:condition:0" = [
-    280.0,
-    170.0,
+"rule_2:condition:0" = [
+    223.21875,
+    126.0,
+]
+"rule_1:action:1" = [
+    711.1526489257813,
+    49.724422454833984,
+]
+"rule_1:action:0" = [
+    400.640625,
+    50.0,
 ]
 "rule_2:trigger" = [
     60.0,
-    110.0,
+    126.0,
+]
+"rule_3:condition:0" = [
+    226.0,
+    202.0,
+]
+"rule_3:action:0" = [
+    461.44921875,
+    256.48828125,
+]
+"rule_6:trigger" = [
+    60.0,
+    430.0,
+]
+"rule_5:condition:0" = [
+    410.0,
+    354.0,
+]
+"node:9" = [
+    226.0,
+    202.0,
+]
+"node:8" = [
+    429.625,
+    202.0,
+]
+"node:2" = [
+    400.640625,
+    50.0,
+]
+"rule_3:trigger" = [
+    42.84765625,
+    225.66015625,
+]
+"node:4" = [
+    60.0,
+    126.0,
+]
+"node:7" = [
+    60.0,
+    202.0,
+]
+"node:10" = [
+    60.0,
+    278.0,
+]
+"rule_5:trigger" = [
+    60.0,
+    354.0,
 ]

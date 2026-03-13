@@ -351,6 +351,13 @@ impl RuleGraph {
     }
 
     pub fn stable_node_key(&self, node_id: RuleGraphNodeId) -> Option<String> {
+        self.nodes
+            .iter()
+            .any(|node| node.id == node_id)
+            .then_some(format!("node:{node_id}"))
+    }
+
+    fn legacy_stable_node_key(&self, node_id: RuleGraphNodeId) -> Option<String> {
         let node_by_id = self
             .nodes
             .iter()
@@ -400,6 +407,12 @@ impl RuleGraph {
     }
 
     pub fn node_id_for_stable_key(&self, stable_key: &str) -> Option<RuleGraphNodeId> {
+        if let Some(node_id) = stable_key.strip_prefix("node:") {
+            let parsed_id = node_id.parse::<RuleGraphNodeId>().ok()?;
+            if self.nodes.iter().any(|node| node.id == parsed_id) {
+                return Some(parsed_id);
+            }
+        }
         if let Some(detached_id) = stable_key.strip_prefix("detached:") {
             let parsed_id = detached_id.parse::<RuleGraphNodeId>().ok()?;
             if self.nodes.iter().any(|node| node.id == parsed_id) {
@@ -407,7 +420,7 @@ impl RuleGraph {
             }
         }
         self.nodes.iter().find_map(|node| {
-            self.stable_node_key(node.id)
+            self.legacy_stable_node_key(node.id)
                 .filter(|candidate| candidate == stable_key)
                 .map(|_| node.id)
         })
@@ -1115,6 +1128,40 @@ mod tests {
     }
 
     #[test]
+    fn stable_node_keys_remain_unique_after_cross_chain_connect() {
+        let mut graph = RuleGraph::from_rule_set(&sample_rules());
+        let first_trigger = graph.chains[0].trigger_node_id;
+        let second_trigger = graph.chains[1].trigger_node_id;
+        let first_sequence = graph
+            .chain_node_sequence(first_trigger)
+            .expect("first chain should be valid");
+        let first_action = *first_sequence
+            .iter()
+            .find(|node_id| {
+                graph
+                    .nodes
+                    .iter()
+                    .find(|node| node.id == **node_id)
+                    .is_some_and(|node| matches!(node.kind, super::RuleGraphNodeKind::Action(_)))
+            })
+            .expect("expected action in first chain");
+
+        graph
+            .connect_nodes(first_action, second_trigger)
+            .expect("cross-chain connect should succeed");
+
+        let mut keys = graph
+            .nodes
+            .iter()
+            .filter_map(|node| graph.stable_node_key(node.id))
+            .collect::<Vec<_>>();
+        let total = keys.len();
+        keys.sort();
+        keys.dedup();
+        assert_eq!(keys.len(), total, "stable keys must remain unique");
+    }
+
+    #[test]
     fn from_rule_set_merges_shared_action_nodes_for_multiple_triggers() {
         let shared_action = RuleAction::PlayMusic {
             track_id: "bgm_shared".to_string(),
@@ -1314,16 +1361,39 @@ mod tests {
             .filter_map(|node_id| graph.stable_node_key(*node_id))
             .collect::<Vec<_>>();
 
-        assert!(keys.iter().any(|key| key == "rule_spawn:trigger"));
-        assert!(keys.iter().any(|key| key == "rule_spawn:condition:0"));
-        assert!(keys.iter().any(|key| key == "rule_spawn:action:0"));
+        assert_eq!(keys.len(), sequence.len());
+        assert!(keys.iter().all(|key| key.starts_with("node:")));
+        let mut unique = keys.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), keys.len());
     }
 
     #[test]
     fn node_id_for_stable_key_resolves_existing_node() {
         let graph = RuleGraph::from_rule_set(&sample_rules());
+        let trigger_key = graph
+            .stable_node_key(graph.chains[0].trigger_node_id)
+            .expect("expected trigger to have a stable key");
+        let Some(trigger_id) = graph.node_id_for_stable_key(&trigger_key) else {
+            panic!("expected stable key to resolve to a node id");
+        };
+        let trigger_node = graph
+            .nodes
+            .iter()
+            .find(|node| node.id == trigger_id)
+            .expect("resolved node id should exist");
+        assert!(matches!(
+            trigger_node.kind,
+            super::RuleGraphNodeKind::Trigger(_)
+        ));
+    }
+
+    #[test]
+    fn node_id_for_stable_key_supports_legacy_chain_keys() {
+        let graph = RuleGraph::from_rule_set(&sample_rules());
         let Some(trigger_id) = graph.node_id_for_stable_key("rule_spawn:trigger") else {
-            panic!("expected trigger stable key to resolve to a node id");
+            panic!("expected legacy trigger key to resolve");
         };
         let trigger_node = graph
             .nodes
