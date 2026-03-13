@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
+use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleTrigger};
 
 pub type RuleGraphNodeId = u64;
 
@@ -74,7 +74,7 @@ pub enum RuleGraphEditError {
 
 impl RuleGraph {
     pub fn from_rule_set(rule_set: &RuleSet) -> Self {
-        const H_SPACING: f32 = 220.0;
+        const H_SPACING: f32 = 350.0;
         const V_SPACING: f32 = 60.0;
         const START_X: f32 = 60.0;
         const START_Y: f32 = 50.0;
@@ -176,7 +176,6 @@ impl RuleGraph {
             let mut actions = Vec::new();
             let mut visited = HashSet::new();
             let mut current_id = chain.trigger_node_id;
-            let mut has_seen_action = false;
             visited.insert(current_id);
 
             loop {
@@ -205,23 +204,11 @@ impl RuleGraph {
                 };
 
                 match &next_node.kind {
-                    RuleGraphNodeKind::Trigger(_) => {
-                        return Err(RuleGraphError::NonLinearChain {
-                            rule_id: chain.rule_id.clone(),
-                            node_id: next_id,
-                        });
-                    }
+                    RuleGraphNodeKind::Trigger(_) => {}
                     RuleGraphNodeKind::Condition(condition) => {
-                        if has_seen_action {
-                            return Err(RuleGraphError::NonLinearChain {
-                                rule_id: chain.rule_id.clone(),
-                                node_id: next_id,
-                            });
-                        }
                         conditions.push(*condition);
                     }
                     RuleGraphNodeKind::Action(action) => {
-                        has_seen_action = true;
                         actions.push(action.clone());
                     }
                 }
@@ -309,7 +296,7 @@ impl RuleGraph {
         })
     }
 
-    pub fn add_default_chain(&mut self) -> Result<String, RuleGraphEditError> {
+    pub fn add_trigger_chain(&mut self) -> Result<String, RuleGraphEditError> {
         let mut rules = self
             .to_rule_set()
             .map_err(RuleGraphEditError::GraphInvalid)?;
@@ -320,11 +307,8 @@ impl RuleGraph {
             priority: 0,
             once: false,
             trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::Always],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "sfx_placeholder".to_string(),
-            }],
+            conditions: Vec::new(),
+            actions: Vec::new(),
         });
         *self = Self::from_rule_set(&rules);
         Ok(rule_id)
@@ -567,26 +551,11 @@ impl RuleGraph {
             .iter()
             .map(|node| (node.id, node))
             .collect::<HashMap<_, _>>();
-        let Some(from_node) = node_by_id.get(&from).copied() else {
+        if !node_by_id.contains_key(&from) {
             return Err(RuleGraphEditError::MissingNode { node_id: from });
-        };
-        let Some(to_node) = node_by_id.get(&to).copied() else {
-            return Err(RuleGraphEditError::MissingNode { node_id: to });
-        };
-
-        if matches!(to_node.kind, RuleGraphNodeKind::Trigger(_)) {
-            return Err(RuleGraphEditError::InvalidConnection {
-                reason: "Trigger nodes cannot be connection targets".to_string(),
-            });
         }
-
-        let from_rank = Self::node_stage_rank(&from_node.kind);
-        let to_rank = Self::node_stage_rank(&to_node.kind);
-        if to_rank < from_rank {
-            return Err(RuleGraphEditError::InvalidConnection {
-                reason: "Connections must follow Trigger -> Condition -> Action ordering"
-                    .to_string(),
-            });
+        if !node_by_id.contains_key(&to) {
+            return Err(RuleGraphEditError::MissingNode { node_id: to });
         }
 
         if self
@@ -597,26 +566,11 @@ impl RuleGraph {
             return Ok(());
         }
 
-        if self.edges.iter().any(|edge| edge.from == from) {
-            return Err(RuleGraphEditError::InvalidConnection {
-                reason: "Source node already has an outgoing edge".to_string(),
-            });
-        }
-        if self.edges.iter().any(|edge| edge.to == to) {
-            return Err(RuleGraphEditError::InvalidConnection {
-                reason: "Target node already has an incoming edge".to_string(),
-            });
-        }
-
-        let from_chain = self.chain_index_for_node(from);
-        let to_chain = self.chain_index_for_node(to);
-        if from_chain.is_none() || to_chain.is_none() || from_chain != to_chain {
-            return Err(RuleGraphEditError::InvalidConnection {
-                reason: "Nodes must belong to the same rule chain".to_string(),
-            });
-        }
+        let original_edges = self.edges.clone();
+        self.edges.retain(|edge| edge.from != from);
 
         if self.is_reachable(to, from) {
+            self.edges = original_edges;
             return Err(RuleGraphEditError::InvalidConnection {
                 reason: "Connection would create a cycle".to_string(),
             });
@@ -701,6 +655,18 @@ impl RuleGraph {
         Ok(sequence)
     }
 
+    pub fn trigger_node_for_node(&self, node_id: RuleGraphNodeId) -> Option<RuleGraphNodeId> {
+        for chain in &self.chains {
+            let Ok(sequence) = self.chain_node_sequence(chain.trigger_node_id) else {
+                continue;
+            };
+            if sequence.contains(&node_id) {
+                return Some(chain.trigger_node_id);
+            }
+        }
+        None
+    }
+
     fn next_rule_id(rule_set: &RuleSet) -> String {
         let mut index = 1_u32;
         loop {
@@ -710,21 +676,6 @@ impl RuleGraph {
             }
             index += 1;
         }
-    }
-
-    fn node_stage_rank(kind: &RuleGraphNodeKind) -> u8 {
-        match kind {
-            RuleGraphNodeKind::Trigger(_) => 0,
-            RuleGraphNodeKind::Condition(_) => 1,
-            RuleGraphNodeKind::Action(_) => 2,
-        }
-    }
-
-    fn chain_index_for_node(&self, node_id: RuleGraphNodeId) -> Option<usize> {
-        self.chains.iter().enumerate().find_map(|(index, chain)| {
-            self.is_reachable(chain.trigger_node_id, node_id)
-                .then_some(index)
-        })
     }
 
     fn is_reachable(&self, start: RuleGraphNodeId, goal: RuleGraphNodeId) -> bool {
@@ -845,14 +796,19 @@ mod tests {
     }
 
     #[test]
-    fn add_default_chain_appends_new_rule() {
+    fn add_trigger_chain_appends_trigger_only_rule() {
         let mut graph = RuleGraph::from_rule_set(&sample_rules());
         let rule_id = graph
-            .add_default_chain()
-            .expect("adding default chain should work");
+            .add_trigger_chain()
+            .expect("adding trigger chain should work");
         let roundtrip = graph.to_rule_set().expect("graph must remain valid");
-
-        assert!(roundtrip.rules.iter().any(|rule| rule.id == rule_id));
+        let added_rule = roundtrip
+            .rules
+            .iter()
+            .find(|rule| rule.id == rule_id)
+            .expect("new rule should exist");
+        assert!(added_rule.conditions.is_empty());
+        assert!(added_rule.actions.is_empty());
     }
 
     #[test]
@@ -875,11 +831,12 @@ mod tests {
     }
 
     #[test]
-    fn connect_nodes_rejects_invalid_direction() {
+    fn connect_nodes_allows_action_to_trigger_when_linear() {
         let mut graph = RuleGraph::from_rule_set(&sample_rules());
-        let trigger = graph.chains[0].trigger_node_id;
+        let first_trigger = graph.chains[0].trigger_node_id;
+        let second_trigger = graph.chains[1].trigger_node_id;
         let nodes = graph
-            .chain_node_sequence(trigger)
+            .chain_node_sequence(first_trigger)
             .expect("chain should be valid");
         let action_node = *nodes
             .iter()
@@ -892,7 +849,39 @@ mod tests {
                 matches!(node.kind, super::RuleGraphNodeKind::Action(_))
             })
             .expect("action node expected");
-        let condition_node = *nodes
+        graph
+            .connect_nodes(action_node, second_trigger)
+            .expect("action -> trigger should be accepted in free-connection mode");
+        graph
+            .to_rule_set()
+            .expect("rewired linear chain should still serialize");
+    }
+
+    #[test]
+    fn connect_nodes_allows_joining_into_existing_trigger_chain() {
+        let mut graph = RuleGraph::from_rule_set(&sample_rules());
+        let first_trigger = graph.chains[0].trigger_node_id;
+        let second_trigger = graph.chains[1].trigger_node_id;
+
+        let first_sequence = graph
+            .chain_node_sequence(first_trigger)
+            .expect("first chain should be valid");
+        let second_sequence = graph
+            .chain_node_sequence(second_trigger)
+            .expect("second chain should be valid");
+
+        let first_action = *first_sequence
+            .iter()
+            .find(|node_id| {
+                let node = graph
+                    .nodes
+                    .iter()
+                    .find(|candidate| candidate.id == **node_id)
+                    .expect("node must exist");
+                matches!(node.kind, super::RuleGraphNodeKind::Action(_))
+            })
+            .expect("first chain action should exist");
+        let second_condition = *second_sequence
             .iter()
             .find(|node_id| {
                 let node = graph
@@ -902,16 +891,37 @@ mod tests {
                     .expect("node must exist");
                 matches!(node.kind, super::RuleGraphNodeKind::Condition(_))
             })
-            .expect("condition node expected");
+            .expect("second chain condition should exist");
 
-        graph.disconnect_nodes(condition_node, action_node);
-        let error = graph
-            .connect_nodes(action_node, condition_node)
-            .expect_err("action -> condition should be rejected");
-        assert!(matches!(
-            error,
-            super::RuleGraphEditError::InvalidConnection { .. }
-        ));
+        graph
+            .connect_nodes(first_action, second_condition)
+            .expect("joining into existing condition node should be accepted");
+
+        let roundtrip = graph
+            .to_rule_set()
+            .expect("joined chain should still serialize");
+        assert_eq!(roundtrip.rules.len(), 2);
+    }
+
+    #[test]
+    fn trigger_node_for_node_resolves_owner_chain_trigger() {
+        let graph = RuleGraph::from_rule_set(&sample_rules());
+        let trigger = graph.chains[0].trigger_node_id;
+        let sequence = graph
+            .chain_node_sequence(trigger)
+            .expect("chain should be valid");
+        let action_node = *sequence
+            .iter()
+            .find(|node_id| {
+                let node = graph
+                    .nodes
+                    .iter()
+                    .find(|candidate| candidate.id == **node_id)
+                    .expect("node must exist");
+                matches!(node.kind, super::RuleGraphNodeKind::Action(_))
+            })
+            .expect("action node expected");
+        assert_eq!(graph.trigger_node_for_node(action_node), Some(trigger));
     }
 
     #[test]

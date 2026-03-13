@@ -194,7 +194,7 @@ impl PanelSystem {
         show_scene_rules: bool,
     ) {
         enum GraphCommand {
-            AddChain,
+            AddTrigger,
             ResetLayout,
             SetTrigger(u64, RuleTrigger),
             AppendCondition(u64),
@@ -265,6 +265,10 @@ impl PanelSystem {
                     selected_graph_node = graph.node_id_for_stable_key(node_key);
                 }
             }
+            let node_badges = Self::rule_graph_node_badges(&graph);
+            let selected_trigger_for_add = selected_graph_node
+                .and_then(|node_id| graph.trigger_node_for_node(node_id))
+                .or_else(|| graph.chains.first().map(|chain| chain.trigger_node_id));
 
             if !show_scene_rules {
                 ui.horizontal(|ui| {
@@ -281,15 +285,59 @@ impl PanelSystem {
                     }
                     ui.label(format!("Zoom: {:.0}%", graph_zoom * 100.0));
                     ui.label("Tip: Drag Empty Space To Pan");
-                    if ui.button("➕ Add Rule Chain").clicked() {
-                        pending_command = Some(GraphCommand::AddChain);
+                    if ui.button("➕ Add Trigger").clicked() {
+                        pending_command = Some(GraphCommand::AddTrigger);
+                    }
+                    if ui.button("➕ Add Condition").clicked() {
+                        if let Some(trigger_node_id) = selected_trigger_for_add {
+                            pending_command = Some(GraphCommand::AppendCondition(trigger_node_id));
+                        } else {
+                            operation_error = Some(
+                                "Select a node first to determine where to append condition."
+                                    .to_string(),
+                            );
+                        }
+                    }
+                    if ui.button("➕ Add Action").clicked() {
+                        if let Some(trigger_node_id) = selected_trigger_for_add {
+                            pending_command = Some(GraphCommand::AppendAction(trigger_node_id));
+                        } else {
+                            operation_error = Some(
+                                "Select a node first to determine where to append action."
+                                    .to_string(),
+                            );
+                        }
                     }
                     if ui.button("↺ Reset Auto Layout").clicked() {
                         pending_command = Some(GraphCommand::ResetLayout);
                     }
                 });
-            } else if ui.button("➕ Add Rule Chain").clicked() {
-                pending_command = Some(GraphCommand::AddChain);
+            } else {
+                ui.horizontal(|ui| {
+                    if ui.button("➕ Add Trigger").clicked() {
+                        pending_command = Some(GraphCommand::AddTrigger);
+                    }
+                    if ui.button("➕ Add Condition").clicked() {
+                        if let Some(trigger_node_id) = selected_trigger_for_add {
+                            pending_command = Some(GraphCommand::AppendCondition(trigger_node_id));
+                        } else {
+                            operation_error = Some(
+                                "Select a node first to determine where to append condition."
+                                    .to_string(),
+                            );
+                        }
+                    }
+                    if ui.button("➕ Add Action").clicked() {
+                        if let Some(trigger_node_id) = selected_trigger_for_add {
+                            pending_command = Some(GraphCommand::AppendAction(trigger_node_id));
+                        } else {
+                            operation_error = Some(
+                                "Select a node first to determine where to append action."
+                                    .to_string(),
+                            );
+                        }
+                    }
+                });
             }
 
             if connect_from.is_some_and(|id| !graph.nodes.iter().any(|node| node.id == id)) {
@@ -306,7 +354,9 @@ impl PanelSystem {
                     egui::ComboBox::from_id_salt(format!("graph_connect_from_{}", scene_index))
                         .selected_text(
                             connect_from
-                                .and_then(|id| Self::rule_graph_node_label(&graph, id))
+                                .and_then(|id| {
+                                    Self::rule_graph_node_label(&graph, &node_badges, id)
+                                })
                                 .unwrap_or_else(|| "<source>".to_string()),
                         )
                         .show_ui(ui, |ui| {
@@ -314,7 +364,7 @@ impl PanelSystem {
                                 ui.selectable_value(
                                     &mut connect_from,
                                     Some(node.id),
-                                    Self::rule_graph_node_label(&graph, node.id)
+                                    Self::rule_graph_node_label(&graph, &node_badges, node.id)
                                         .unwrap_or_else(|| format!("{}", node.id)),
                                 );
                             }
@@ -323,7 +373,9 @@ impl PanelSystem {
                     egui::ComboBox::from_id_salt(format!("graph_connect_to_{}", scene_index))
                         .selected_text(
                             connect_to
-                                .and_then(|id| Self::rule_graph_node_label(&graph, id))
+                                .and_then(|id| {
+                                    Self::rule_graph_node_label(&graph, &node_badges, id)
+                                })
                                 .unwrap_or_else(|| "<target>".to_string()),
                         )
                         .show_ui(ui, |ui| {
@@ -331,7 +383,7 @@ impl PanelSystem {
                                 ui.selectable_value(
                                     &mut connect_to,
                                     Some(node.id),
-                                    Self::rule_graph_node_label(&graph, node.id)
+                                    Self::rule_graph_node_label(&graph, &node_badges, node.id)
                                         .unwrap_or_else(|| format!("{}", node.id)),
                                 );
                             }
@@ -353,8 +405,13 @@ impl PanelSystem {
             ));
             if !show_scene_rules {
                 if pending_command.is_none() {
-                    let (moved_node, clicked_node) =
-                        Self::render_graph_canvas(ui, &graph, graph_zoom, &mut graph_pan);
+                    let (moved_node, clicked_node) = Self::render_graph_canvas(
+                        ui,
+                        &graph,
+                        &node_badges,
+                        graph_zoom,
+                        &mut graph_pan,
+                    );
                     if let Some((node_id, position)) = moved_node {
                         pending_command = Some(GraphCommand::SetNodePosition(node_id, position));
                     }
@@ -421,8 +478,13 @@ impl PanelSystem {
                                     ui.push_id(("graph_node", node_id), |ui| {
                                         ui.horizontal(|ui| match &node.kind {
                                             RuleGraphNodeKind::Trigger(trigger) => {
+                                                let badge = node_badges
+                                                    .get(&node_id)
+                                                    .cloned()
+                                                    .unwrap_or_else(|| "T?".to_string());
                                                 let node_label = format!(
-                                                    "Trigger: {}",
+                                                    "{} Trigger: {}",
+                                                    badge,
                                                     Self::trigger_summary(*trigger)
                                                 );
                                                 let is_selected = selected_graph_node == Some(node_id);
@@ -462,8 +524,13 @@ impl PanelSystem {
                                                 }
                                             }
                                             RuleGraphNodeKind::Condition(condition) => {
+                                                let badge = node_badges
+                                                    .get(&node_id)
+                                                    .cloned()
+                                                    .unwrap_or_else(|| "C?".to_string());
                                                 let node_label = format!(
-                                                    "Condition: {}",
+                                                    "{} Condition: {}",
+                                                    badge,
                                                     Self::condition_summary(*condition)
                                                 );
                                                 let is_selected = selected_graph_node == Some(node_id);
@@ -509,8 +576,16 @@ impl PanelSystem {
                                                 }
                                             }
                                             RuleGraphNodeKind::Action(action) => {
+                                                let badge = node_badges
+                                                    .get(&node_id)
+                                                    .cloned()
+                                                    .unwrap_or_else(|| "A?".to_string());
                                                 let node_label =
-                                                    format!("Action: {}", Self::action_summary(action));
+                                                    format!(
+                                                        "{} Action: {}",
+                                                        badge,
+                                                        Self::action_summary(action)
+                                                    );
                                                 let is_selected = selected_graph_node == Some(node_id);
                                                 if ui.selectable_label(is_selected, node_label).clicked() {
                                                     selected_graph_node = Some(node_id);
@@ -575,11 +650,15 @@ impl PanelSystem {
                                             for edge in edge_list {
                                                 ui.horizontal(|ui| {
                                                     let from_label = Self::rule_graph_node_label(
-                                                        &graph, edge.from,
+                                                        &graph,
+                                                        &node_badges,
+                                                        edge.from,
                                                     )
                                                     .unwrap_or_else(|| format!("node {}", edge.from));
                                                     let to_label = Self::rule_graph_node_label(
-                                                        &graph, edge.to,
+                                                        &graph,
+                                                        &node_badges,
+                                                        edge.to,
                                                     )
                                                     .unwrap_or_else(|| format!("node {}", edge.to));
                                                     ui.monospace(format!(
@@ -618,7 +697,7 @@ impl PanelSystem {
                 let is_reset_layout = matches!(command, GraphCommand::ResetLayout);
                 let remembered_layout = Self::remember_graph_layout(&graph);
                 let command_result = match command {
-                    GraphCommand::AddChain => graph.add_default_chain().map(|_| ()),
+                    GraphCommand::AddTrigger => graph.add_trigger_chain().map(|_| ()),
                     GraphCommand::ResetLayout => {
                         let auto_layout_graph = RuleGraph::from_rule_set(&scene_rules);
                         auto_layout_graph
@@ -729,14 +808,58 @@ impl PanelSystem {
         }
     }
 
-    fn rule_graph_node_label(graph: &RuleGraph, node_id: u64) -> Option<String> {
+    fn rule_graph_node_label(
+        graph: &RuleGraph,
+        node_badges: &HashMap<u64, String>,
+        node_id: u64,
+    ) -> Option<String> {
         let node = graph.nodes.iter().find(|node| node.id == node_id)?;
-        Some(Self::rule_graph_node_kind_label(&node.kind))
+        let badge = node_badges
+            .get(&node_id)
+            .cloned()
+            .unwrap_or_else(|| "?".to_string());
+        Some(format!(
+            "{}: {}",
+            badge,
+            Self::rule_graph_node_kind_compact_label(&node.kind)
+        ))
+    }
+
+    fn rule_graph_node_badges(graph: &RuleGraph) -> HashMap<u64, String> {
+        let mut node_ids = graph.nodes.iter().map(|node| node.id).collect::<Vec<_>>();
+        node_ids.sort_unstable();
+
+        let mut trigger_index = 0usize;
+        let mut condition_index = 0usize;
+        let mut action_index = 0usize;
+        let mut badges = HashMap::new();
+        for node_id in node_ids {
+            let Some(node) = graph.nodes.iter().find(|candidate| candidate.id == node_id) else {
+                continue;
+            };
+            let badge = match node.kind {
+                RuleGraphNodeKind::Trigger(_) => {
+                    trigger_index += 1;
+                    format!("T{}", trigger_index)
+                }
+                RuleGraphNodeKind::Condition(_) => {
+                    condition_index += 1;
+                    format!("C{}", condition_index)
+                }
+                RuleGraphNodeKind::Action(_) => {
+                    action_index += 1;
+                    format!("A{}", action_index)
+                }
+            };
+            badges.insert(node_id, badge);
+        }
+        badges
     }
 
     fn render_graph_canvas(
         ui: &mut egui::Ui,
         graph: &RuleGraph,
+        node_badges: &HashMap<u64, String>,
         graph_zoom: f32,
         graph_pan: &mut [f32; 2],
     ) -> (Option<(u64, [f32; 2])>, Option<u64>) {
@@ -806,7 +929,15 @@ impl PanelSystem {
             let Some(center) = node_positions.get(&node.id).copied() else {
                 continue;
             };
-            let label = Self::rule_graph_node_kind_label(&node.kind);
+            let badge = node_badges
+                .get(&node.id)
+                .cloned()
+                .unwrap_or_else(|| "?".to_string());
+            let label = format!(
+                "{}: {}",
+                badge,
+                Self::rule_graph_node_kind_compact_label(&node.kind)
+            );
             let (fill, stroke) = match node.kind {
                 RuleGraphNodeKind::Trigger(_) => (
                     egui::Color32::from_rgb(45, 122, 199),
@@ -911,8 +1042,8 @@ impl PanelSystem {
 
     fn graph_node_size(scale: f32) -> egui::Vec2 {
         egui::vec2(
-            (180.0 * scale).clamp(72.0, 540.0),
-            (30.0 * scale).clamp(14.0, 84.0),
+            (320.0 * scale).clamp(120.0, 860.0),
+            (36.0 * scale).clamp(18.0, 96.0),
         )
     }
 
@@ -949,16 +1080,16 @@ impl PanelSystem {
         }
     }
 
-    fn rule_graph_node_kind_label(kind: &RuleGraphNodeKind) -> String {
+    fn rule_graph_node_kind_compact_label(kind: &RuleGraphNodeKind) -> String {
         match kind {
             RuleGraphNodeKind::Trigger(trigger) => {
-                format!("Trigger: {}", Self::trigger_summary(*trigger))
+                format!("Trigger {}", Self::trigger_summary(*trigger))
             }
             RuleGraphNodeKind::Condition(condition) => {
-                format!("Condition: {}", Self::condition_summary(*condition))
+                format!("Condition {}", Self::condition_summary(*condition))
             }
             RuleGraphNodeKind::Action(action) => {
-                format!("Action: {}", Self::action_summary(action))
+                format!("Action {}", Self::action_summary(action))
             }
         }
     }
@@ -1474,8 +1605,8 @@ mod tests {
 
         let remembered_layout = PanelSystem::remember_graph_layout(&graph);
         graph
-            .add_default_chain()
-            .expect("adding default chain should succeed");
+            .add_trigger_chain()
+            .expect("adding trigger chain should succeed");
         PanelSystem::restore_graph_layout(&mut graph, &remembered_layout);
 
         for node_id in initial_nodes {
