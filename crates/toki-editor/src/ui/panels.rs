@@ -688,8 +688,6 @@ impl PanelSystem {
                         ui.add_space(6.0);
                     }
                 });
-            } else {
-                ui.label("Use the 'Scene Rules' top tab to inspect and edit rule chains.");
             }
 
             if let Some(command) = pending_command {
@@ -700,10 +698,17 @@ impl PanelSystem {
                     GraphCommand::AddTrigger => graph.add_trigger_chain().map(|_| ()),
                     GraphCommand::ResetLayout => {
                         let auto_layout_graph = RuleGraph::from_rule_set(&scene_rules);
-                        auto_layout_graph
-                            .nodes
+                        let auto_node_badges = Self::rule_graph_node_badges(&auto_layout_graph);
+                        let auto_positions = Self::compute_auto_layout_positions(
+                            ui,
+                            &auto_layout_graph,
+                            &auto_node_badges,
+                        );
+                        auto_positions
                             .into_iter()
-                            .try_for_each(|node| graph.set_node_position(node.id, node.position))
+                            .try_for_each(|(node_id, position)| {
+                                graph.set_node_position(node_id, position)
+                            })
                     }
                     GraphCommand::AppendCondition(trigger_node_id) => {
                         graph.append_condition_to_chain(trigger_node_id, RuleCondition::Always)
@@ -856,6 +861,72 @@ impl PanelSystem {
         badges
     }
 
+    fn compute_auto_layout_positions(
+        ui: &egui::Ui,
+        graph: &RuleGraph,
+        node_badges: &HashMap<u64, String>,
+    ) -> HashMap<u64, [f32; 2]> {
+        let node_by_id = graph
+            .nodes
+            .iter()
+            .map(|node| (node.id, node))
+            .collect::<HashMap<_, _>>();
+
+        let mut positions = HashMap::<u64, [f32; 2]>::new();
+        let mut y = RuleGraph::auto_layout_start_y();
+
+        for chain in &graph.chains {
+            let Ok(sequence) = graph.chain_node_sequence(chain.trigger_node_id) else {
+                continue;
+            };
+            if sequence.is_empty() {
+                continue;
+            }
+
+            let mut node_sizes = Vec::<egui::Vec2>::with_capacity(sequence.len());
+            for node_id in &sequence {
+                let Some(node) = node_by_id.get(node_id) else {
+                    node_sizes.push(egui::vec2(
+                        RuleGraph::auto_layout_node_width(),
+                        RuleGraph::auto_layout_node_height(),
+                    ));
+                    continue;
+                };
+                let badge = node_badges
+                    .get(node_id)
+                    .cloned()
+                    .unwrap_or_else(|| "?".to_string());
+                let label = format!(
+                    "{}: {}",
+                    badge,
+                    Self::rule_graph_node_kind_compact_label(&node.kind)
+                );
+                node_sizes.push(Self::graph_node_size_for_label(ui, &label, 1.0));
+            }
+
+            let row_height = node_sizes
+                .iter()
+                .map(|size| size.y)
+                .fold(0.0_f32, f32::max)
+                .max(RuleGraph::auto_layout_node_height());
+
+            let mut x = RuleGraph::auto_layout_start_x();
+            for (index, node_id) in sequence.iter().enumerate() {
+                positions.insert(*node_id, [x, y]);
+                if let Some(next_size) = node_sizes.get(index + 1) {
+                    let current_size = node_sizes[index];
+                    x += current_size.x * 0.5
+                        + RuleGraph::auto_layout_horizontal_edge_spacing()
+                        + next_size.x * 0.5;
+                }
+            }
+
+            y += row_height + RuleGraph::auto_layout_vertical_edge_spacing();
+        }
+
+        positions
+    }
+
     fn render_graph_canvas(
         ui: &mut egui::Ui,
         graph: &RuleGraph,
@@ -863,7 +934,7 @@ impl PanelSystem {
         graph_zoom: f32,
         graph_pan: &mut [f32; 2],
     ) -> (Option<(u64, [f32; 2])>, Option<u64>) {
-        let desired_size = egui::vec2(ui.available_width(), 220.0);
+        let desired_size = egui::vec2(ui.available_width(), ui.available_height().max(220.0));
         let (rect, canvas_response) =
             ui.allocate_exact_size(desired_size, egui::Sense::click_and_drag());
         let painter = ui.painter_at(rect);
@@ -921,7 +992,6 @@ impl PanelSystem {
         let mut moved_node = None;
         let mut clicked_node = None;
         let mut any_node_dragged = false;
-        let node_size = Self::graph_node_size(scale);
         let node_corner_radius = (6.0 * scale).clamp(2.0, 18.0);
         let node_stroke_width = (1.0 * scale).clamp(0.7, 2.5);
         let node_font_size = Self::graph_node_font_size(scale);
@@ -938,6 +1008,7 @@ impl PanelSystem {
                 badge,
                 Self::rule_graph_node_kind_compact_label(&node.kind)
             );
+            let node_size = Self::graph_node_size_for_label(ui, &label, scale);
             let (fill, stroke) = match node.kind {
                 RuleGraphNodeKind::Trigger(_) => (
                     egui::Color32::from_rgb(45, 122, 199),
@@ -1025,7 +1096,7 @@ impl PanelSystem {
         };
 
         let scale = graph_zoom.max(0.01);
-        let node_size = Self::graph_node_size(scale);
+        let node_size = Self::graph_node_max_size(scale);
         let border_gap = 10.0;
         let min_center_x = border_gap + node_size.x * 0.5;
         let min_center_y = border_gap + node_size.y * 0.5;
@@ -1040,10 +1111,35 @@ impl PanelSystem {
         }
     }
 
-    fn graph_node_size(scale: f32) -> egui::Vec2 {
+    fn graph_node_max_size(scale: f32) -> egui::Vec2 {
         egui::vec2(
             (320.0 * scale).clamp(120.0, 860.0),
             (36.0 * scale).clamp(18.0, 96.0),
+        )
+    }
+
+    fn graph_node_min_size(scale: f32) -> egui::Vec2 {
+        egui::vec2(
+            (120.0 * scale).clamp(80.0, 300.0),
+            (20.0 * scale).clamp(14.0, 48.0),
+        )
+    }
+
+    fn graph_node_size_for_label(ui: &egui::Ui, label: &str, scale: f32) -> egui::Vec2 {
+        let font_size = Self::graph_node_font_size(scale);
+        let font_id = egui::FontId::proportional(font_size);
+        let text_size = ui
+            .painter()
+            .layout_no_wrap(label.to_string(), font_id, egui::Color32::WHITE)
+            .size();
+        let padding_x = (16.0 * scale).clamp(8.0, 36.0);
+        let padding_y = (8.0 * scale).clamp(4.0, 24.0);
+        let desired = egui::vec2(text_size.x + padding_x * 2.0, text_size.y + padding_y * 2.0);
+        let min_size = Self::graph_node_min_size(scale);
+        let max_size = Self::graph_node_max_size(scale);
+        egui::vec2(
+            desired.x.clamp(min_size.x, max_size.x),
+            desired.y.clamp(min_size.y, max_size.y),
         )
     }
 
@@ -1628,8 +1724,8 @@ mod tests {
 
     #[test]
     fn graph_zoom_scales_node_visuals() {
-        let zoomed_out = PanelSystem::graph_node_size(0.5);
-        let zoomed_in = PanelSystem::graph_node_size(2.0);
+        let zoomed_out = PanelSystem::graph_node_max_size(0.5);
+        let zoomed_in = PanelSystem::graph_node_max_size(2.0);
         assert!(
             zoomed_out.x < zoomed_in.x && zoomed_out.y < zoomed_in.y,
             "node size should increase with zoom"

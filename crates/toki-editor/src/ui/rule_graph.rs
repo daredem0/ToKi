@@ -73,20 +73,25 @@ pub enum RuleGraphEditError {
 }
 
 impl RuleGraph {
-    pub fn from_rule_set(rule_set: &RuleSet) -> Self {
-        const H_SPACING: f32 = 350.0;
-        const V_SPACING: f32 = 60.0;
-        const START_X: f32 = 60.0;
-        const START_Y: f32 = 50.0;
+    // Auto-layout spacing between node edges (not centers).
+    const H_SPACING: f32 = 30.0;
+    const V_SPACING: f32 = 40.0;
+    // Keep in sync with graph canvas max node size at 100% zoom.
+    const AUTO_LAYOUT_NODE_WIDTH: f32 = 320.0;
+    const AUTO_LAYOUT_NODE_HEIGHT: f32 = 36.0;
+    const AUTO_LAYOUT_START_X: f32 = 60.0;
+    const AUTO_LAYOUT_START_Y: f32 = 50.0;
 
+    pub fn from_rule_set(rule_set: &RuleSet) -> Self {
         let mut nodes = Vec::new();
         let mut edges = Vec::new();
         let mut chains = Vec::new();
         let mut next_node_id: RuleGraphNodeId = 1;
 
         for (rule_index, rule) in rule_set.rules.iter().enumerate() {
-            let y = START_Y + (rule_index as f32 * V_SPACING);
-            let mut next_x = START_X;
+            let y =
+                Self::AUTO_LAYOUT_START_Y + (rule_index as f32 * Self::auto_layout_vertical_step());
+            let mut next_x = Self::AUTO_LAYOUT_START_X;
 
             let trigger_id = next_node_id;
             next_node_id += 1;
@@ -95,7 +100,7 @@ impl RuleGraph {
                 kind: RuleGraphNodeKind::Trigger(rule.trigger),
                 position: [next_x, y],
             });
-            next_x += H_SPACING;
+            next_x += Self::auto_layout_horizontal_step();
 
             let mut previous_id = trigger_id;
             for condition in &rule.conditions {
@@ -111,7 +116,7 @@ impl RuleGraph {
                     to: node_id,
                 });
                 previous_id = node_id;
-                next_x += H_SPACING;
+                next_x += Self::auto_layout_horizontal_step();
             }
 
             for action in &rule.actions {
@@ -127,7 +132,7 @@ impl RuleGraph {
                     to: node_id,
                 });
                 previous_id = node_id;
-                next_x += H_SPACING;
+                next_x += Self::auto_layout_horizontal_step();
             }
 
             chains.push(RuleGraphChain {
@@ -144,6 +149,38 @@ impl RuleGraph {
             edges,
             chains,
         }
+    }
+
+    pub(crate) fn auto_layout_node_height() -> f32 {
+        Self::AUTO_LAYOUT_NODE_HEIGHT
+    }
+
+    pub(crate) fn auto_layout_vertical_edge_spacing() -> f32 {
+        Self::V_SPACING
+    }
+
+    fn auto_layout_vertical_step() -> f32 {
+        Self::auto_layout_node_height() + Self::auto_layout_vertical_edge_spacing()
+    }
+
+    pub(crate) fn auto_layout_node_width() -> f32 {
+        Self::AUTO_LAYOUT_NODE_WIDTH
+    }
+
+    pub(crate) fn auto_layout_horizontal_edge_spacing() -> f32 {
+        Self::H_SPACING
+    }
+
+    fn auto_layout_horizontal_step() -> f32 {
+        Self::auto_layout_node_width() + Self::auto_layout_horizontal_edge_spacing()
+    }
+
+    pub(crate) fn auto_layout_start_x() -> f32 {
+        Self::AUTO_LAYOUT_START_X
+    }
+
+    pub(crate) fn auto_layout_start_y() -> f32 {
+        Self::AUTO_LAYOUT_START_Y
     }
 
     pub fn to_rule_set(&self) -> Result<RuleSet, RuleGraphError> {
@@ -977,9 +1014,11 @@ mod tests {
             .find(|node| node.id == second_trigger)
             .expect("second trigger node should exist");
 
+        let center_spacing = second_trigger_node.position[1] - first_trigger_node.position[1];
+        let edge_spacing = center_spacing - super::RuleGraph::auto_layout_node_height();
         assert!(
-            second_trigger_node.position[1] - first_trigger_node.position[1] >= 40.0,
-            "vertical chain spacing should keep chains visually separated"
+            edge_spacing >= super::RuleGraph::auto_layout_vertical_edge_spacing(),
+            "vertical edge spacing should keep chains visually separated"
         );
 
         let first_sequence = graph
@@ -996,9 +1035,11 @@ mod tests {
                 .iter()
                 .find(|node| node.id == pair[1])
                 .expect("right node should exist");
+            let center_spacing = right.position[0] - left.position[0];
+            let edge_spacing = center_spacing - super::RuleGraph::auto_layout_node_width();
             assert!(
-                right.position[0] - left.position[0] >= 120.0,
-                "horizontal node spacing should keep consecutive nodes visually separated"
+                edge_spacing >= super::RuleGraph::auto_layout_horizontal_edge_spacing(),
+                "horizontal edge spacing should keep consecutive nodes visually separated"
             );
         }
     }
