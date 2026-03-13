@@ -1,0 +1,20 @@
+[project]
+name = "NewProject"
+version = "1.0.0"
+created = "2026-03-12T20:49:20.210465620Z"
+modified = "2026-03-12T20:49:20.210465620Z"
+toki_editor_version = "0.0.13"
+description = ""
+
+[scenes]
+main = "scenes/main.json"
+
+[assets]
+sprites = "assets/sprites/"
+tilemaps = "assets/tilemaps/"
+audio = "assets/audio/"
+
+[editor]
+recent_files = []
+
+[editor.camera_settings]

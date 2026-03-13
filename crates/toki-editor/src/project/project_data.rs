@@ -74,6 +74,40 @@ pub struct EditorSettings {
     /// Editor camera settings for each scene
     #[serde(default)]
     pub camera_settings: HashMap<String, CameraSettings>,
+    /// Scene graph layout settings for each scene
+    #[serde(default)]
+    pub graph_layouts: HashMap<String, SceneGraphLayout>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SceneGraphLayout {
+    /// Persisted graph node positions keyed by stable node key
+    #[serde(default)]
+    pub node_positions: HashMap<String, [f32; 2]>,
+    /// Graph zoom level for the scene
+    #[serde(default = "default_graph_zoom")]
+    pub zoom: f32,
+    /// Graph pan offset for the scene
+    #[serde(default = "default_graph_pan")]
+    pub pan: [f32; 2],
+}
+
+impl Default for SceneGraphLayout {
+    fn default() -> Self {
+        Self {
+            node_positions: HashMap::new(),
+            zoom: default_graph_zoom(),
+            pan: default_graph_pan(),
+        }
+    }
+}
+
+fn default_graph_zoom() -> f32 {
+    1.0
+}
+
+fn default_graph_pan() -> [f32; 2] {
+    [16.0, 16.0]
 }
 
 /// Camera settings for a specific scene

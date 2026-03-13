@@ -74,14 +74,19 @@ pub enum RuleGraphEditError {
 
 impl RuleGraph {
     pub fn from_rule_set(rule_set: &RuleSet) -> Self {
+        const H_SPACING: f32 = 220.0;
+        const V_SPACING: f32 = 60.0;
+        const START_X: f32 = 60.0;
+        const START_Y: f32 = 50.0;
+
         let mut nodes = Vec::new();
         let mut edges = Vec::new();
         let mut chains = Vec::new();
         let mut next_node_id: RuleGraphNodeId = 1;
 
         for (rule_index, rule) in rule_set.rules.iter().enumerate() {
-            let y = 40.0 + (rule_index as f32 * 140.0);
-            let mut next_x = 40.0;
+            let y = START_Y + (rule_index as f32 * V_SPACING);
+            let mut next_x = START_X;
 
             let trigger_id = next_node_id;
             next_node_id += 1;
@@ -90,7 +95,7 @@ impl RuleGraph {
                 kind: RuleGraphNodeKind::Trigger(rule.trigger),
                 position: [next_x, y],
             });
-            next_x += 220.0;
+            next_x += H_SPACING;
 
             let mut previous_id = trigger_id;
             for condition in &rule.conditions {
@@ -106,7 +111,7 @@ impl RuleGraph {
                     to: node_id,
                 });
                 previous_id = node_id;
-                next_x += 220.0;
+                next_x += H_SPACING;
             }
 
             for action in &rule.actions {
@@ -122,7 +127,7 @@ impl RuleGraph {
                     to: node_id,
                 });
                 previous_id = node_id;
-                next_x += 220.0;
+                next_x += H_SPACING;
             }
 
             chains.push(RuleGraphChain {
@@ -237,6 +242,65 @@ impl RuleGraph {
         Ok(RuleSet { rules })
     }
 
+    pub fn set_node_position(
+        &mut self,
+        node_id: RuleGraphNodeId,
+        position: [f32; 2],
+    ) -> Result<(), RuleGraphEditError> {
+        let Some(node) = self.nodes.iter_mut().find(|node| node.id == node_id) else {
+            return Err(RuleGraphEditError::MissingNode { node_id });
+        };
+        node.position = position;
+        Ok(())
+    }
+
+    pub fn stable_node_key(&self, node_id: RuleGraphNodeId) -> Option<String> {
+        let node_by_id = self
+            .nodes
+            .iter()
+            .map(|node| (node.id, node))
+            .collect::<HashMap<_, _>>();
+
+        for chain in &self.chains {
+            let Ok(sequence) = self.chain_node_sequence(chain.trigger_node_id) else {
+                continue;
+            };
+            if !sequence.contains(&node_id) {
+                continue;
+            }
+
+            let mut condition_index = 0_usize;
+            let mut action_index = 0_usize;
+            for current_node_id in sequence {
+                let node = node_by_id.get(&current_node_id)?;
+                match node.kind {
+                    RuleGraphNodeKind::Trigger(_) => {
+                        if current_node_id == node_id {
+                            return Some(format!("{}:trigger", chain.rule_id));
+                        }
+                    }
+                    RuleGraphNodeKind::Condition(_) => {
+                        if current_node_id == node_id {
+                            return Some(format!(
+                                "{}:condition:{}",
+                                chain.rule_id, condition_index
+                            ));
+                        }
+                        condition_index += 1;
+                    }
+                    RuleGraphNodeKind::Action(_) => {
+                        if current_node_id == node_id {
+                            return Some(format!("{}:action:{}", chain.rule_id, action_index));
+                        }
+                        action_index += 1;
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
     pub fn add_default_chain(&mut self) -> Result<String, RuleGraphEditError> {
         let mut rules = self
             .to_rule_set()
@@ -302,6 +366,30 @@ impl RuleGraph {
             .find(|rule| rule.id == rule_id)
             .ok_or(RuleGraphEditError::MissingChain { trigger_node_id })?;
         rule.actions.push(action);
+        *self = Self::from_rule_set(&rules);
+        Ok(())
+    }
+
+    pub fn set_trigger_for_chain(
+        &mut self,
+        trigger_node_id: RuleGraphNodeId,
+        trigger: RuleTrigger,
+    ) -> Result<(), RuleGraphEditError> {
+        let mut rules = self
+            .to_rule_set()
+            .map_err(RuleGraphEditError::GraphInvalid)?;
+        let rule_id = self
+            .chains
+            .iter()
+            .find(|chain| chain.trigger_node_id == trigger_node_id)
+            .map(|chain| chain.rule_id.clone())
+            .ok_or(RuleGraphEditError::MissingChain { trigger_node_id })?;
+        let rule = rules
+            .rules
+            .iter_mut()
+            .find(|rule| rule.id == rule_id)
+            .ok_or(RuleGraphEditError::MissingChain { trigger_node_id })?;
+        rule.trigger = trigger;
         *self = Self::from_rule_set(&rules);
         Ok(())
     }
@@ -816,5 +904,67 @@ mod tests {
             error,
             super::RuleGraphEditError::InvalidConnection { .. }
         ));
+    }
+
+    #[test]
+    fn stable_node_keys_are_generated_for_chain_nodes() {
+        let graph = RuleGraph::from_rule_set(&sample_rules());
+        let trigger = graph.chains[0].trigger_node_id;
+        let sequence = graph
+            .chain_node_sequence(trigger)
+            .expect("chain should be valid");
+
+        let keys = sequence
+            .iter()
+            .filter_map(|node_id| graph.stable_node_key(*node_id))
+            .collect::<Vec<_>>();
+
+        assert!(keys.iter().any(|key| key == "rule_spawn:trigger"));
+        assert!(keys.iter().any(|key| key == "rule_spawn:condition:0"));
+        assert!(keys.iter().any(|key| key == "rule_spawn:action:0"));
+    }
+
+    #[test]
+    fn auto_layout_uses_minimum_spacing_between_nodes_and_chains() {
+        let graph = RuleGraph::from_rule_set(&sample_rules());
+
+        let first_trigger = graph.chains[0].trigger_node_id;
+        let second_trigger = graph.chains[1].trigger_node_id;
+
+        let first_trigger_node = graph
+            .nodes
+            .iter()
+            .find(|node| node.id == first_trigger)
+            .expect("first trigger node should exist");
+        let second_trigger_node = graph
+            .nodes
+            .iter()
+            .find(|node| node.id == second_trigger)
+            .expect("second trigger node should exist");
+
+        assert!(
+            second_trigger_node.position[1] - first_trigger_node.position[1] >= 40.0,
+            "vertical chain spacing should keep chains visually separated"
+        );
+
+        let first_sequence = graph
+            .chain_node_sequence(first_trigger)
+            .expect("first chain should be valid");
+        for pair in first_sequence.windows(2) {
+            let left = graph
+                .nodes
+                .iter()
+                .find(|node| node.id == pair[0])
+                .expect("left node should exist");
+            let right = graph
+                .nodes
+                .iter()
+                .find(|node| node.id == pair[1])
+                .expect("right node should exist");
+            assert!(
+                right.position[0] - left.position[0] >= 120.0,
+                "horizontal node spacing should keep consecutive nodes visually separated"
+            );
+        }
     }
 }

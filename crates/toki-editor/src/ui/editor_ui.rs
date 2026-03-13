@@ -1,7 +1,9 @@
 use super::inspector::InspectorSystem;
 use super::menus::MenuSystem;
 use super::panels::PanelSystem;
+use crate::project::SceneGraphLayout;
 use crate::scene::SceneViewport;
+use std::collections::HashMap;
 use toki_core::{
     entity::{Entity, EntityId},
     Scene,
@@ -72,6 +74,10 @@ pub struct EditorUI {
     pub center_panel_tab: CenterPanelTab,              // Active tab in center workspace
     pub graph_connect_from_node: Option<u64>,          // Scene graph connect source node
     pub graph_connect_to_node: Option<u64>,            // Scene graph connect target node
+    pub graph_canvas_zoom: f32,                        // Scene graph canvas zoom factor
+    pub graph_canvas_pan: [f32; 2], // Scene graph canvas pan offset (screen-space)
+    pub graph_layouts_by_scene: HashMap<String, SceneGraphLayout>, // Persisted scene graph layouts loaded from project
+    pub graph_layout_dirty: bool, // Graph layout changed and should be flushed into project metadata
 }
 
 impl EditorUI {
@@ -119,6 +125,10 @@ impl EditorUI {
             center_panel_tab: CenterPanelTab::SceneViewport,
             graph_connect_from_node: None,
             graph_connect_to_node: None,
+            graph_canvas_zoom: 1.0,
+            graph_canvas_pan: [16.0, 16.0],
+            graph_layouts_by_scene: HashMap::new(),
+            graph_layout_dirty: false,
         }
     }
 
@@ -190,11 +200,12 @@ impl EditorUI {
         &mut self,
         ctx: &egui::Context,
         scene_viewport: Option<&mut SceneViewport>,
-        config: Option<&crate::config::EditorConfig>,
+        config: Option<&mut crate::config::EditorConfig>,
         log_capture: Option<&crate::logging::LogCapture>,
         renderer: Option<&mut egui_wgpu::Renderer>,
     ) {
-        MenuSystem::render_top_menu(self, ctx, config);
+        let config_readonly = config.as_deref();
+        MenuSystem::render_top_menu(self, ctx, config_readonly);
 
         // Render log panel first to claim full width at bottom
         if self.show_console {
@@ -208,12 +219,15 @@ impl EditorUI {
 
         if self.show_hierarchy {
             super::hierarchy::HierarchySystem::render_hierarchy_and_maps_combined_panel(
-                self, ctx, game_state, config,
+                self,
+                ctx,
+                game_state,
+                config_readonly,
             );
         }
 
         if self.show_inspector {
-            InspectorSystem::render_inspector_panel(self, ctx, game_state, config);
+            InspectorSystem::render_inspector_panel(self, ctx, game_state, config_readonly);
         }
 
         // Render viewport last (mutable access)
@@ -229,6 +243,72 @@ impl EditorUI {
 
     pub fn set_title(&mut self, title: &str) {
         self.window_title = Some(title.to_string());
+    }
+
+    pub fn load_graph_layouts_from_project(
+        &mut self,
+        graph_layouts: &HashMap<String, SceneGraphLayout>,
+    ) {
+        self.graph_layouts_by_scene = graph_layouts.clone();
+        self.graph_layout_dirty = false;
+    }
+
+    pub fn export_graph_layouts_for_project(&self) -> HashMap<String, SceneGraphLayout> {
+        self.graph_layouts_by_scene.clone()
+    }
+
+    pub fn is_graph_layout_dirty(&self) -> bool {
+        self.graph_layout_dirty
+    }
+
+    pub fn clear_graph_layout_dirty(&mut self) {
+        self.graph_layout_dirty = false;
+    }
+
+    pub fn graph_layout_position(&self, scene_name: &str, node_key: &str) -> Option<[f32; 2]> {
+        self.graph_layouts_by_scene
+            .get(scene_name)
+            .and_then(|layout| layout.node_positions.get(node_key).copied())
+    }
+
+    pub fn set_graph_layout_position(
+        &mut self,
+        scene_name: &str,
+        node_key: &str,
+        position: [f32; 2],
+    ) {
+        let layout = self
+            .graph_layouts_by_scene
+            .entry(scene_name.to_string())
+            .or_default();
+        let changed = layout
+            .node_positions
+            .get(node_key)
+            .is_none_or(|existing| *existing != position);
+        if changed {
+            layout.node_positions.insert(node_key.to_string(), position);
+            self.graph_layout_dirty = true;
+        }
+    }
+
+    pub fn graph_view_for_scene(&self, scene_name: &str) -> (f32, [f32; 2]) {
+        if let Some(layout) = self.graph_layouts_by_scene.get(scene_name) {
+            (layout.zoom, layout.pan)
+        } else {
+            (1.0, [16.0, 16.0])
+        }
+    }
+
+    pub fn set_graph_view_for_scene(&mut self, scene_name: &str, zoom: f32, pan: [f32; 2]) {
+        let layout = self
+            .graph_layouts_by_scene
+            .entry(scene_name.to_string())
+            .or_default();
+        if (layout.zoom - zoom).abs() > f32::EPSILON || layout.pan != pan {
+            layout.zoom = zoom;
+            layout.pan = pan;
+            self.graph_layout_dirty = true;
+        }
     }
 
     pub fn render_hierarchy_and_maps_combined_panel(

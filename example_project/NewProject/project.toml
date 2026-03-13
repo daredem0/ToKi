@@ -7,9 +7,9 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-"Main Scene" = "scenes/mainscene.json"
-"Scene 2" = "scenes/scene2.json"
 main = "scenes/main.json"
+"Scene 2" = "scenes/scene2.json"
+"Main Scene" = "scenes/mainscene.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -20,3 +20,48 @@ audio = "assets/audio/"
 recent_files = []
 
 [editor.camera_settings]
+
+[editor.graph_layouts."Main Scene"]
+zoom = 1.0
+pan = [
+    40.0,
+    16.0,
+]
+
+[editor.graph_layouts."Main Scene".node_positions]
+"rule_3:trigger" = [
+    60.0,
+    170.0,
+]
+"rule_2:condition:0" = [
+    280.0,
+    110.0,
+]
+"rule_1:condition:0" = [
+    280.0,
+    50.0,
+]
+"rule_2:action:0" = [
+    500.0,
+    110.0,
+]
+"rule_1:trigger" = [
+    60.0,
+    50.0,
+]
+"rule_3:action:0" = [
+    500.0,
+    170.0,
+]
+"rule_1:action:0" = [
+    500.0,
+    50.0,
+]
+"rule_3:condition:0" = [
+    280.0,
+    170.0,
+]
+"rule_2:trigger" = [
+    60.0,
+    110.0,
+]

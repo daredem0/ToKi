@@ -17,6 +17,7 @@ use crate::logging::LogCapture;
 use crate::project::ProjectManager;
 use crate::rendering::WindowRenderer;
 use crate::scene::SceneViewport;
+use crate::ui::editor_ui::CenterPanelTab;
 use crate::ui::EditorUI;
 use crate::validation::AssetValidator;
 
@@ -116,6 +117,153 @@ impl EditorApp {
         }
 
         scene.maps.first().cloned()
+    }
+
+    fn parse_legacy_graph_layout_key(key: &str) -> Option<(String, String, String)> {
+        let mut parts = key.rsplitn(3, "::");
+        let node_key = parts.next()?.to_string();
+        let scene_name = parts.next()?.to_string();
+        let project_key = parts.next()?.to_string();
+        Some((project_key, scene_name, node_key))
+    }
+
+    fn sync_ui_graph_layouts_from_project(&mut self) {
+        let graph_layouts = self
+            .project_manager
+            .current_project
+            .as_ref()
+            .map(|project| project.metadata.editor.graph_layouts.clone())
+            .unwrap_or_default();
+        self.ui.load_graph_layouts_from_project(&graph_layouts);
+    }
+
+    fn migrate_legacy_graph_layouts_into_project(&mut self) {
+        let Some(project) = self.project_manager.current_project.as_mut() else {
+            return;
+        };
+
+        let config_path = match std::env::current_dir() {
+            Ok(dir) => dir.join("toki_editor_config.json"),
+            Err(error) => {
+                tracing::warn!(
+                    "Cannot determine current directory for legacy graph layout migration: {}",
+                    error
+                );
+                return;
+            }
+        };
+
+        let raw_config = match std::fs::read_to_string(&config_path) {
+            Ok(raw_config) => raw_config,
+            Err(_) => return,
+        };
+        let mut config_json = match serde_json::from_str::<serde_json::Value>(&raw_config) {
+            Ok(json) => json,
+            Err(error) => {
+                tracing::warn!(
+                    "Failed to parse config for legacy graph layout migration: {}",
+                    error
+                );
+                return;
+            }
+        };
+        let Some(layouts_object) = config_json
+            .get("graph_layouts")
+            .and_then(|value| value.as_object())
+            .cloned()
+        else {
+            return;
+        };
+
+        let project_key = project.path.to_string_lossy().to_string();
+        let mut migrated_any = false;
+
+        for (key, value) in layouts_object {
+            let Some((entry_project_key, scene_name, node_key)) =
+                Self::parse_legacy_graph_layout_key(&key)
+            else {
+                continue;
+            };
+            let Some(position_values) = value.as_array() else {
+                continue;
+            };
+            if position_values.len() != 2 {
+                continue;
+            }
+            let Some(x) = position_values[0].as_f64() else {
+                continue;
+            };
+            let Some(y) = position_values[1].as_f64() else {
+                continue;
+            };
+            let position = [x as f32, y as f32];
+
+            if entry_project_key == project_key {
+                project
+                    .metadata
+                    .editor
+                    .graph_layouts
+                    .entry(scene_name)
+                    .or_default()
+                    .node_positions
+                    .insert(node_key, position);
+                migrated_any = true;
+            }
+        }
+
+        if migrated_any {
+            if let Err(error) = project.save_metadata() {
+                tracing::warn!(
+                    "Failed to persist migrated graph layout metadata: {}",
+                    error
+                );
+            }
+            tracing::info!(
+                "Migrated legacy scene graph layout entries from global config into project metadata"
+            );
+        }
+
+        if let Some(config_object) = config_json.as_object_mut() {
+            config_object.remove("graph_layouts");
+            match serde_json::to_string_pretty(&config_json) {
+                Ok(serialized) => {
+                    if let Err(error) = std::fs::write(&config_path, serialized) {
+                        tracing::warn!(
+                            "Failed to remove legacy graph layouts from config file: {}",
+                            error
+                        );
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        "Failed to serialize config after removing legacy graph layouts: {}",
+                        error
+                    );
+                }
+            }
+        }
+    }
+
+    fn persist_graph_layout_metadata_if_needed(&mut self, egui_ctx: &egui::Context) {
+        if !self.ui.is_graph_layout_dirty() {
+            return;
+        }
+        if egui_ctx.input(|input| input.pointer.any_down()) {
+            return;
+        }
+
+        let Some(project) = self.project_manager.current_project.as_mut() else {
+            return;
+        };
+
+        project.metadata.editor.graph_layouts = self.ui.export_graph_layouts_for_project();
+        match project.save_metadata() {
+            Ok(()) => self.ui.clear_graph_layout_dirty(),
+            Err(error) => tracing::warn!(
+                "Failed to persist scene graph layout to project metadata: {}",
+                error
+            ),
+        }
     }
 }
 
@@ -221,23 +369,28 @@ impl ApplicationHandler for EditorApp {
 
             WindowEvent::KeyboardInput { event, .. } => {
                 if event.state.is_pressed() {
-                    // Try viewport keyboard input first (for zoom controls) using logical keys
-                    if let Some(viewport) = &mut self.scene_viewport {
-                        tracing::debug!("Passing logical key {:?} to viewport", event.logical_key);
-                        if viewport.handle_keyboard_input(
-                            &event.logical_key,
-                            Modifiers::from(self.modifiers),
-                            true,
-                        ) {
-                            // Viewport handled the input, request redraw
+                    // Route viewport zoom keys only while Scene Viewport is the active center tab.
+                    if self.ui.center_panel_tab == CenterPanelTab::SceneViewport {
+                        if let Some(viewport) = &mut self.scene_viewport {
                             tracing::debug!(
-                                "Viewport consumed key {:?}, requesting redraw",
+                                "Passing logical key {:?} to viewport",
                                 event.logical_key
                             );
-                            if let Some(window) = &self.window {
-                                window.request_redraw();
+                            if viewport.handle_keyboard_input(
+                                &event.logical_key,
+                                Modifiers::from(self.modifiers),
+                                true,
+                            ) {
+                                // Viewport handled the input, request redraw
+                                tracing::debug!(
+                                    "Viewport consumed key {:?}, requesting redraw",
+                                    event.logical_key
+                                );
+                                if let Some(window) = &self.window {
+                                    window.request_redraw();
+                                }
+                                return; // Input consumed by viewport
                             }
-                            return; // Input consumed by viewport
                         }
                     }
 
@@ -312,9 +465,13 @@ impl ApplicationHandler for EditorApp {
 
 impl EditorApp {
     fn render(&mut self, event_loop: &ActiveEventLoop) {
-        let (window, renderer) = match (&self.window, &mut self.renderer) {
-            (Some(w), Some(r)) => (w, r),
-            _ => return, // Not initialized yet
+        let window = match &self.window {
+            Some(window) => window.clone(),
+            None => return, // Not initialized yet
+        };
+        let renderer = match &mut self.renderer {
+            Some(renderer) => renderer,
+            None => return, // Not initialized yet
         };
 
         let egui_winit = match &mut self.egui_winit {
@@ -323,7 +480,7 @@ impl EditorApp {
         };
 
         // Prepare egui input
-        let raw_input = egui_winit.take_egui_input(window);
+        let raw_input = egui_winit.take_egui_input(&window);
 
         // Load sprite frame cache if needed (before render loop to avoid borrowing issues)
         let project_path = self.config.current_project_path();
@@ -392,7 +549,7 @@ impl EditorApp {
             self.ui.render(
                 ctx,
                 self.scene_viewport.as_mut(),
-                Some(&self.config),
+                Some(&mut self.config),
                 self.log_capture.as_ref(),
                 None, // Can't pass renderer due to borrow issues
             );
@@ -415,12 +572,14 @@ impl EditorApp {
         }
 
         // Handle platform output (cursor, clipboard, etc.)
-        egui_winit.handle_platform_output(window, full_output.platform_output.clone());
+        egui_winit.handle_platform_output(&window, full_output.platform_output.clone());
 
         // Render frame
-        if let Err(e) = renderer.render(window, full_output, &egui_ctx) {
+        if let Err(e) = renderer.render(&window, full_output, &egui_ctx) {
             tracing::error!("Render error: {e}");
         }
+
+        self.persist_graph_layout_metadata_if_needed(&egui_ctx);
 
         // Request redraw if egui wants a repaint
         if egui_ctx.has_requested_repaint() {
@@ -483,6 +642,8 @@ impl EditorApp {
                                     e
                                 );
                             }
+
+                            self.sync_ui_graph_layouts_from_project();
 
                             tracing::info!("Created new project '{}' successfully", project_name);
                         }
@@ -556,6 +717,9 @@ impl EditorApp {
                                 }
                             }
 
+                            self.migrate_legacy_graph_layouts_into_project();
+                            self.sync_ui_graph_layouts_from_project();
+
                             tracing::info!("Opened project successfully");
                         }
                         Err(e) => {
@@ -616,6 +780,9 @@ impl EditorApp {
                                 }
                             }
 
+                            self.migrate_legacy_graph_layouts_into_project();
+                            self.sync_ui_graph_layouts_from_project();
+
                             tracing::info!("Opened browsed project successfully");
                         }
                         Err(e) => {
@@ -636,11 +803,16 @@ impl EditorApp {
     fn handle_save_project_request(&mut self) {
         self.ui.save_project_requested = false;
 
+        if let Some(project) = self.project_manager.current_project.as_mut() {
+            project.metadata.editor.graph_layouts = self.ui.export_graph_layouts_for_project();
+        }
+
         // Get scenes from UI
         let scenes = &self.ui.scenes;
         match self.project_manager.save_current_project(scenes) {
             Ok(_) => {
                 tracing::info!("Project saved successfully");
+                self.ui.clear_graph_layout_dirty();
             }
             Err(e) => {
                 tracing::error!("Failed to save project: {}", e);
@@ -1135,5 +1307,15 @@ mod tests {
         let scene = toki_core::Scene::new("Empty Scene".to_string());
         let chosen = EditorApp::resolve_scene_map_to_load(&scene, Some("any_map"));
         assert_eq!(chosen, None);
+    }
+
+    #[test]
+    fn parse_legacy_graph_layout_key_splits_project_scene_and_node() {
+        let key = "/tmp/project::Main Scene::rule_1:action:0";
+        let parsed = EditorApp::parse_legacy_graph_layout_key(key)
+            .expect("legacy graph layout key should parse");
+        assert_eq!(parsed.0, "/tmp/project");
+        assert_eq!(parsed.1, "Main Scene");
+        assert_eq!(parsed.2, "rule_1:action:0");
     }
 }
