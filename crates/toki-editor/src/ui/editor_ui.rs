@@ -16,12 +16,18 @@ pub enum Selection {
     Entity(EntityId),
     StandaloneMap(String), // Map selected from Maps panel (not in scene context)
     EntityDefinition(String), // Entity definition from palette
+    RuleGraphNode {
+        scene_name: String,
+        node_key: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)]
 pub(crate) enum CenterPanelTab {
     SceneViewport,
     SceneGraph,
+    SceneRules,
 }
 
 #[derive(Debug, Clone)]

@@ -1,4 +1,5 @@
 use super::editor_ui::{EditorUI, Selection};
+use super::rule_graph::{RuleGraph, RuleGraphNodeKind};
 use crate::config::EditorConfig;
 use std::collections::HashMap;
 use toki_core::animation::AnimationState;
@@ -209,6 +210,33 @@ impl InspectorSystem {
                                 }
 
                                 if rules_changed {
+                                    ui_state.scene_content_changed = true;
+                                }
+                            }
+
+                            Some(Selection::RuleGraphNode {
+                                scene_name,
+                                node_key,
+                            }) => {
+                                ui.heading("🧩 Scene Rule Node");
+                                ui.label(format!("Scene: {}", scene_name));
+                                ui.monospace(node_key);
+                                ui.separator();
+
+                                let mut changed = false;
+                                if let Some(scene) = Self::find_scene_mut(ui_state, scene_name) {
+                                    changed = Self::render_selected_rule_graph_node_editor(
+                                        ui,
+                                        scene_name,
+                                        node_key,
+                                        &mut scene.rules,
+                                        config,
+                                    );
+                                } else {
+                                    ui.label("Scene not found.");
+                                }
+
+                                if changed {
                                     ui_state.scene_content_changed = true;
                                 }
                             }
@@ -783,6 +811,517 @@ impl InspectorSystem {
             }
         }
 
+        changed
+    }
+
+    fn render_selected_rule_graph_node_editor(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        node_key: &str,
+        rule_set: &mut RuleSet,
+        config: Option<&EditorConfig>,
+    ) -> bool {
+        let audio_choices = Self::load_rule_audio_choices(config);
+        let validation_issues = Self::validate_rule_set(rule_set);
+        let mut graph = RuleGraph::from_rule_set(rule_set);
+        let Some(node_id) = graph.node_id_for_stable_key(node_key) else {
+            ui.colored_label(
+                egui::Color32::from_rgb(255, 210, 80),
+                "Selected node no longer exists in this scene.",
+            );
+            return false;
+        };
+        let Some(node_kind) = graph
+            .nodes
+            .iter()
+            .find(|node| node.id == node_id)
+            .map(|node| node.kind.clone())
+        else {
+            ui.colored_label(
+                egui::Color32::from_rgb(255, 120, 120),
+                "Failed to resolve selected node.",
+            );
+            return false;
+        };
+
+        let mut changed = false;
+        match node_kind {
+            RuleGraphNodeKind::Trigger(trigger) => {
+                ui.label("Trigger");
+                let mut edited_trigger = trigger;
+                changed |= Self::render_rule_graph_trigger_editor(
+                    ui,
+                    scene_name,
+                    node_key,
+                    &mut edited_trigger,
+                );
+                if changed && edited_trigger != trigger {
+                    if let Err(error) = graph.set_trigger_for_chain(node_id, edited_trigger) {
+                        ui.colored_label(
+                            egui::Color32::from_rgb(255, 120, 120),
+                            format!("Failed to update trigger: {:?}", error),
+                        );
+                        return false;
+                    }
+                }
+            }
+            RuleGraphNodeKind::Condition(condition) => {
+                ui.label("Condition");
+                let mut edited_condition = condition;
+                changed |= Self::render_rule_graph_condition_editor(
+                    ui,
+                    scene_name,
+                    node_key,
+                    &mut edited_condition,
+                );
+                if changed && edited_condition != condition {
+                    if let Err(error) = graph.set_condition_for_node(node_id, edited_condition) {
+                        ui.colored_label(
+                            egui::Color32::from_rgb(255, 120, 120),
+                            format!("Failed to update condition: {:?}", error),
+                        );
+                        return false;
+                    }
+                }
+            }
+            RuleGraphNodeKind::Action(action) => {
+                ui.label("Action");
+                let mut edited_action = action.clone();
+                changed |= Self::render_rule_graph_action_editor(
+                    ui,
+                    scene_name,
+                    node_key,
+                    &mut edited_action,
+                    &validation_issues,
+                    &audio_choices,
+                );
+                if changed && edited_action != action {
+                    if let Err(error) = graph.set_action_for_node(node_id, edited_action) {
+                        ui.colored_label(
+                            egui::Color32::from_rgb(255, 120, 120),
+                            format!("Failed to update action: {:?}", error),
+                        );
+                        return false;
+                    }
+                }
+            }
+        }
+
+        if !changed {
+            return false;
+        }
+
+        match graph.to_rule_set() {
+            Ok(updated_rules) => {
+                *rule_set = updated_rules;
+                true
+            }
+            Err(error) => {
+                ui.colored_label(
+                    egui::Color32::from_rgb(255, 120, 120),
+                    format!("Failed to rebuild rule set from graph: {:?}", error),
+                );
+                false
+            }
+        }
+    }
+
+    fn render_rule_graph_trigger_editor(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        node_key: &str,
+        trigger: &mut RuleTrigger,
+    ) -> bool {
+        let mut changed = false;
+        let mut trigger_kind = Self::trigger_kind(trigger);
+        ui.horizontal(|ui| {
+            ui.label("Type:");
+            egui::ComboBox::from_id_salt(format!(
+                "graph_node_trigger_kind_{}_{}",
+                scene_name, node_key
+            ))
+            .selected_text(Self::trigger_kind_label(trigger_kind))
+            .show_ui(ui, |ui| {
+                for candidate in [
+                    RuleTriggerKind::Start,
+                    RuleTriggerKind::Update,
+                    RuleTriggerKind::PlayerMove,
+                    RuleTriggerKind::Key,
+                    RuleTriggerKind::Collision,
+                    RuleTriggerKind::Trigger,
+                ] {
+                    changed |= ui
+                        .selectable_value(
+                            &mut trigger_kind,
+                            candidate,
+                            Self::trigger_kind_label(candidate),
+                        )
+                        .changed();
+                }
+            });
+        });
+
+        if trigger_kind != Self::trigger_kind(trigger) {
+            *trigger = match trigger_kind {
+                RuleTriggerKind::Start => RuleTrigger::OnStart,
+                RuleTriggerKind::Update => RuleTrigger::OnUpdate,
+                RuleTriggerKind::PlayerMove => RuleTrigger::OnPlayerMove,
+                RuleTriggerKind::Key => RuleTrigger::OnKey { key: RuleKey::Up },
+                RuleTriggerKind::Collision => RuleTrigger::OnCollision,
+                RuleTriggerKind::Trigger => RuleTrigger::OnTrigger,
+            };
+            changed = true;
+        }
+
+        if let RuleTrigger::OnKey { key } = trigger {
+            changed |= Self::render_rule_key_editor_with_salt(
+                ui,
+                &format!("graph_node_trigger_key_{}_{}", scene_name, node_key),
+                key,
+            );
+        }
+
+        changed
+    }
+
+    fn render_rule_graph_condition_editor(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        node_key: &str,
+        condition: &mut RuleCondition,
+    ) -> bool {
+        let mut changed = false;
+
+        let current_kind = Self::condition_kind(condition);
+        let mut selected_kind = current_kind;
+        ui.horizontal(|ui| {
+            ui.label("Type:");
+            egui::ComboBox::from_id_salt(format!(
+                "graph_node_condition_kind_{}_{}",
+                scene_name, node_key
+            ))
+            .selected_text(Self::condition_kind_label(current_kind))
+            .show_ui(ui, |ui| {
+                for candidate in [
+                    RuleConditionKind::Always,
+                    RuleConditionKind::TargetExists,
+                    RuleConditionKind::KeyHeld,
+                    RuleConditionKind::EntityActive,
+                ] {
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            candidate,
+                            Self::condition_kind_label(candidate),
+                        )
+                        .changed();
+                }
+            });
+        });
+
+        if selected_kind != current_kind {
+            Self::switch_condition_kind(condition, selected_kind);
+            changed = true;
+        }
+
+        match condition {
+            RuleCondition::Always => {}
+            RuleCondition::TargetExists { target } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!("graph_node_condition_target_{}_{}", scene_name, node_key),
+                    target,
+                );
+            }
+            RuleCondition::KeyHeld { key } => {
+                changed |= Self::render_rule_key_editor_with_salt(
+                    ui,
+                    &format!("graph_node_condition_key_{}_{}", scene_name, node_key),
+                    key,
+                );
+            }
+            RuleCondition::EntityActive { target, is_active } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!(
+                        "graph_node_condition_entity_target_{}_{}",
+                        scene_name, node_key
+                    ),
+                    target,
+                );
+                changed |= ui.checkbox(is_active, "Target Is Active").changed();
+            }
+        }
+
+        changed
+    }
+
+    fn render_rule_graph_action_editor(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        node_key: &str,
+        action: &mut RuleAction,
+        _validation_issues: &[RuleValidationIssue],
+        audio_choices: &RuleAudioChoices,
+    ) -> bool {
+        let mut changed = false;
+        let current_kind = Self::action_kind(action);
+        let mut selected_kind = current_kind;
+        ui.horizontal(|ui| {
+            ui.label("Type:");
+            egui::ComboBox::from_id_salt(format!(
+                "graph_node_action_kind_{}_{}",
+                scene_name, node_key
+            ))
+            .selected_text(Self::action_kind_label(current_kind))
+            .show_ui(ui, |ui| {
+                for candidate in [
+                    RuleActionKind::PlaySound,
+                    RuleActionKind::PlayMusic,
+                    RuleActionKind::PlayAnimation,
+                    RuleActionKind::SetVelocity,
+                    RuleActionKind::Spawn,
+                    RuleActionKind::DestroySelf,
+                    RuleActionKind::SwitchScene,
+                ] {
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            candidate,
+                            Self::action_kind_label(candidate),
+                        )
+                        .changed();
+                }
+            });
+        });
+        if selected_kind != current_kind {
+            Self::switch_action_kind(action, selected_kind);
+            changed = true;
+        }
+
+        match action {
+            RuleAction::PlaySound { channel, sound_id } => {
+                ui.horizontal(|ui| {
+                    ui.label("Channel:");
+                    egui::ComboBox::from_id_salt(format!(
+                        "graph_node_sound_channel_{}_{}",
+                        scene_name, node_key
+                    ))
+                    .selected_text(match channel {
+                        RuleSoundChannel::Movement => "Movement",
+                        RuleSoundChannel::Collision => "Collision",
+                    })
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(channel, RuleSoundChannel::Movement, "Movement")
+                            .changed();
+                        changed |= ui
+                            .selectable_value(channel, RuleSoundChannel::Collision, "Collision")
+                            .changed();
+                    });
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Sound Id:");
+                    changed |= ui.text_edit_singleline(sound_id).changed();
+                });
+                changed |= Self::render_audio_choice_picker(
+                    ui,
+                    format!("graph_node_sfx_picker_{}_{}", scene_name, node_key),
+                    "SFX",
+                    sound_id,
+                    &audio_choices.sfx,
+                );
+            }
+            RuleAction::PlayMusic { track_id } => {
+                ui.horizontal(|ui| {
+                    ui.label("Track Id:");
+                    changed |= ui.text_edit_singleline(track_id).changed();
+                });
+                changed |= Self::render_audio_choice_picker(
+                    ui,
+                    format!("graph_node_music_picker_{}_{}", scene_name, node_key),
+                    "Music",
+                    track_id,
+                    &audio_choices.music,
+                );
+            }
+            RuleAction::PlayAnimation { target, state } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!("graph_node_anim_target_{}_{}", scene_name, node_key),
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    ui.label("State:");
+                    egui::ComboBox::from_id_salt(format!(
+                        "graph_node_anim_state_{}_{}",
+                        scene_name, node_key
+                    ))
+                    .selected_text(match state {
+                        AnimationState::Idle => "Idle",
+                        AnimationState::Walk => "Walk",
+                    })
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(state, AnimationState::Idle, "Idle")
+                            .changed();
+                        changed |= ui
+                            .selectable_value(state, AnimationState::Walk, "Walk")
+                            .changed();
+                    });
+                });
+            }
+            RuleAction::SetVelocity { target, velocity } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!("graph_node_velocity_target_{}_{}", scene_name, node_key),
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    ui.label("Velocity:");
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut velocity[0]).speed(1.0))
+                        .changed();
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut velocity[1]).speed(1.0))
+                        .changed();
+                });
+            }
+            RuleAction::Spawn {
+                entity_type,
+                position,
+            } => {
+                ui.horizontal(|ui| {
+                    ui.label("Entity Type:");
+                    egui::ComboBox::from_id_salt(format!(
+                        "graph_node_spawn_type_{}_{}",
+                        scene_name, node_key
+                    ))
+                    .selected_text(Self::spawn_entity_type_label(*entity_type))
+                    .show_ui(ui, |ui| {
+                        for candidate in [
+                            RuleSpawnEntityType::PlayerLikeNpc,
+                            RuleSpawnEntityType::Npc,
+                            RuleSpawnEntityType::Item,
+                            RuleSpawnEntityType::Decoration,
+                            RuleSpawnEntityType::Trigger,
+                        ] {
+                            changed |= ui
+                                .selectable_value(
+                                    entity_type,
+                                    candidate,
+                                    Self::spawn_entity_type_label(candidate),
+                                )
+                                .changed();
+                        }
+                    });
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Position:");
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut position[0]).speed(1.0))
+                        .changed();
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut position[1]).speed(1.0))
+                        .changed();
+                });
+            }
+            RuleAction::DestroySelf { target } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!("graph_node_destroy_target_{}_{}", scene_name, node_key),
+                    target,
+                );
+            }
+            RuleAction::SwitchScene { scene_name } => {
+                ui.horizontal(|ui| {
+                    ui.label("Scene:");
+                    changed |= ui.text_edit_singleline(scene_name).changed();
+                });
+            }
+        }
+
+        changed
+    }
+
+    fn render_rule_target_editor_with_salt(
+        ui: &mut egui::Ui,
+        id_salt: &str,
+        target: &mut RuleTarget,
+    ) -> bool {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Target:");
+            egui::ComboBox::from_id_salt((id_salt, "kind"))
+                .selected_text(match target {
+                    RuleTarget::Player => "Player",
+                    RuleTarget::Entity(_) => "Entity",
+                })
+                .show_ui(ui, |ui| {
+                    if ui
+                        .selectable_label(matches!(target, RuleTarget::Player), "Player")
+                        .clicked()
+                        && !matches!(target, RuleTarget::Player)
+                    {
+                        *target = RuleTarget::Player;
+                        changed = true;
+                    }
+                    if ui
+                        .selectable_label(matches!(target, RuleTarget::Entity(_)), "Entity")
+                        .clicked()
+                        && !matches!(target, RuleTarget::Entity(_))
+                    {
+                        *target = RuleTarget::Entity(1);
+                        changed = true;
+                    }
+                });
+        });
+
+        if let RuleTarget::Entity(entity_id) = target {
+            ui.horizontal(|ui| {
+                ui.label("Entity Id:");
+                let mut value = *entity_id as i64;
+                if ui
+                    .add(
+                        egui::DragValue::new(&mut value)
+                            .speed(1.0)
+                            .range(1..=u32::MAX as i64),
+                    )
+                    .changed()
+                {
+                    *entity_id = value as u32;
+                    changed = true;
+                }
+            });
+        }
+
+        changed
+    }
+
+    fn render_rule_key_editor_with_salt(
+        ui: &mut egui::Ui,
+        id_salt: &str,
+        key: &mut RuleKey,
+    ) -> bool {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Key:");
+            egui::ComboBox::from_id_salt(id_salt)
+                .selected_text(Self::rule_key_label(*key))
+                .show_ui(ui, |ui| {
+                    for candidate in [
+                        RuleKey::Up,
+                        RuleKey::Down,
+                        RuleKey::Left,
+                        RuleKey::Right,
+                        RuleKey::DebugToggle,
+                    ] {
+                        changed |= ui
+                            .selectable_value(key, candidate, Self::rule_key_label(candidate))
+                            .changed();
+                    }
+                });
+        });
         changed
     }
 

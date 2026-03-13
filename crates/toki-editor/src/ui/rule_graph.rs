@@ -301,6 +301,14 @@ impl RuleGraph {
         None
     }
 
+    pub fn node_id_for_stable_key(&self, stable_key: &str) -> Option<RuleGraphNodeId> {
+        self.nodes.iter().find_map(|node| {
+            self.stable_node_key(node.id)
+                .filter(|candidate| candidate == stable_key)
+                .map(|_| node.id)
+        })
+    }
+
     pub fn add_default_chain(&mut self) -> Result<String, RuleGraphEditError> {
         let mut rules = self
             .to_rule_set()
@@ -922,6 +930,23 @@ mod tests {
         assert!(keys.iter().any(|key| key == "rule_spawn:trigger"));
         assert!(keys.iter().any(|key| key == "rule_spawn:condition:0"));
         assert!(keys.iter().any(|key| key == "rule_spawn:action:0"));
+    }
+
+    #[test]
+    fn node_id_for_stable_key_resolves_existing_node() {
+        let graph = RuleGraph::from_rule_set(&sample_rules());
+        let Some(trigger_id) = graph.node_id_for_stable_key("rule_spawn:trigger") else {
+            panic!("expected trigger stable key to resolve to a node id");
+        };
+        let trigger_node = graph
+            .nodes
+            .iter()
+            .find(|node| node.id == trigger_id)
+            .expect("resolved node id should exist");
+        assert!(matches!(
+            trigger_node.kind,
+            super::RuleGraphNodeKind::Trigger(_)
+        ));
     }
 
     #[test]
