@@ -57,6 +57,8 @@ struct EditorApp {
 
     /// Remembers the currently loaded map per scene for viewport reloads.
     loaded_scene_maps: HashMap<String, String>,
+    /// Ensures startup auto-open from config only runs once.
+    startup_project_auto_open_done: bool,
 }
 
 impl EditorApp {
@@ -82,6 +84,7 @@ impl EditorApp {
             modifiers: ModifiersState::default(),
             last_loaded_active_scene: None,
             loaded_scene_maps: HashMap::new(),
+            startup_project_auto_open_done: false,
         }
     }
 
@@ -337,6 +340,13 @@ impl ApplicationHandler for EditorApp {
         }
 
         tracing::info!("Editor initialized successfully");
+        if !self.startup_project_auto_open_done {
+            self.startup_project_auto_open_done = true;
+            if self.config.has_project_path() {
+                tracing::info!("Auto-opening last project from config on startup");
+                self.ui.open_project_requested = true;
+            }
+        }
         window.request_redraw();
     }
 

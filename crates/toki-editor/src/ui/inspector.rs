@@ -829,6 +829,7 @@ impl InspectorSystem {
             .rule_graph_for_scene(scene_name)
             .cloned()
             .unwrap_or_else(|| RuleGraph::from_rule_set(&scene_rules));
+        let node_badges = Self::rule_graph_node_badges(&graph);
         let Some(node_id) = graph.node_id_for_stable_key(node_key) else {
             ui.colored_label(
                 egui::Color32::from_rgb(255, 210, 80),
@@ -850,6 +851,7 @@ impl InspectorSystem {
         };
 
         let mut graph_mutated = false;
+        let mut operation_error = None::<String>;
         match node_kind {
             RuleGraphNodeKind::Trigger(trigger) => {
                 ui.label("Trigger");
@@ -916,31 +918,93 @@ impl InspectorSystem {
         }
 
         ui.separator();
+        let mut connected_node_ids = graph
+            .edges
+            .iter()
+            .filter_map(|edge| {
+                if edge.from == node_id {
+                    Some(edge.to)
+                } else if edge.to == node_id {
+                    Some(edge.from)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        connected_node_ids.sort_unstable();
+        connected_node_ids.dedup();
+        let connectable_nodes = graph
+            .nodes
+            .iter()
+            .filter_map(|node| {
+                (node.id != node_id && !connected_node_ids.contains(&node.id)).then_some((
+                    node.id,
+                    Self::rule_graph_node_label_for_inspector(&graph, &node_badges, node.id),
+                ))
+            })
+            .filter_map(|(id, label)| label.map(|label| (id, label)))
+            .collect::<Vec<_>>();
+        let mut pending_connect_to = None::<u64>;
         ui.horizontal(|ui| {
             if ui.button("Disconnect Node").clicked() {
                 if let Err(error) = graph.disconnect_node(node_id) {
-                    ui.colored_label(
-                        egui::Color32::from_rgb(255, 120, 120),
-                        format!("Failed to disconnect node: {:?}", error),
-                    );
+                    operation_error = Some(format!("Failed to disconnect node: {:?}", error));
                 } else {
                     graph_mutated = true;
                 }
             }
+            ui.menu_button("Connect To", |ui| {
+                if connectable_nodes.is_empty() {
+                    ui.label("No available nodes");
+                    return;
+                }
+                for (candidate_id, label) in &connectable_nodes {
+                    if ui.button(label).clicked() {
+                        pending_connect_to = Some(*candidate_id);
+                        ui.close();
+                    }
+                }
+            });
             if ui
                 .add(egui::Button::new("Delete Node").fill(egui::Color32::from_rgb(120, 30, 30)))
                 .clicked()
             {
                 if let Err(error) = graph.remove_node(node_id) {
-                    ui.colored_label(
-                        egui::Color32::from_rgb(255, 120, 120),
-                        format!("Failed to delete node: {:?}", error),
-                    );
+                    operation_error = Some(format!("Failed to delete node: {:?}", error));
                 } else {
                     graph_mutated = true;
                 }
             }
         });
+        ui.separator();
+        ui.label("Connected Nodes");
+        if connected_node_ids.is_empty() {
+            ui.label("None");
+        } else {
+            egui::ScrollArea::vertical()
+                .max_height(220.0)
+                .show(ui, |ui| {
+                    for connected_id in &connected_node_ids {
+                        let label = Self::rule_graph_node_label_for_inspector(
+                            &graph,
+                            &node_badges,
+                            *connected_id,
+                        )
+                        .unwrap_or_else(|| format!("node {}", connected_id));
+                        ui.label(label);
+                    }
+                });
+        }
+        if let Some(connect_to) = pending_connect_to {
+            if let Err(error) = graph.connect_nodes(node_id, connect_to) {
+                operation_error = Some(format!("Failed to connect nodes: {:?}", error));
+            } else {
+                graph_mutated = true;
+            }
+        }
+        if let Some(message) = operation_error {
+            ui.colored_label(egui::Color32::from_rgb(255, 120, 120), message);
+        }
 
         if !graph_mutated {
             return false;
@@ -960,6 +1024,150 @@ impl InspectorSystem {
                 );
                 false
             }
+        }
+    }
+
+    fn rule_graph_node_badges(graph: &RuleGraph) -> HashMap<u64, String> {
+        let mut node_ids = graph.nodes.iter().map(|node| node.id).collect::<Vec<_>>();
+        node_ids.sort_unstable();
+
+        let mut trigger_index = 0usize;
+        let mut condition_index = 0usize;
+        let mut action_index = 0usize;
+        let mut badges = HashMap::new();
+        for node_id in node_ids {
+            let Some(node) = graph.nodes.iter().find(|candidate| candidate.id == node_id) else {
+                continue;
+            };
+            let badge = match node.kind {
+                RuleGraphNodeKind::Trigger(_) => {
+                    trigger_index += 1;
+                    format!("T{}", trigger_index)
+                }
+                RuleGraphNodeKind::Condition(_) => {
+                    condition_index += 1;
+                    format!("C{}", condition_index)
+                }
+                RuleGraphNodeKind::Action(_) => {
+                    action_index += 1;
+                    format!("A{}", action_index)
+                }
+            };
+            badges.insert(node_id, badge);
+        }
+        badges
+    }
+
+    fn rule_graph_node_label_for_inspector(
+        graph: &RuleGraph,
+        node_badges: &HashMap<u64, String>,
+        node_id: u64,
+    ) -> Option<String> {
+        let node = graph.nodes.iter().find(|node| node.id == node_id)?;
+        let badge = node_badges
+            .get(&node_id)
+            .cloned()
+            .unwrap_or_else(|| "?".to_string());
+        let details = match &node.kind {
+            RuleGraphNodeKind::Trigger(trigger) => {
+                format!("Trigger {}", Self::rule_graph_trigger_summary(*trigger))
+            }
+            RuleGraphNodeKind::Condition(condition) => {
+                format!(
+                    "Condition {}",
+                    Self::rule_graph_condition_summary(*condition)
+                )
+            }
+            RuleGraphNodeKind::Action(action) => {
+                format!("Action {}", Self::rule_graph_action_summary(action))
+            }
+        };
+        Some(format!("{}: {}", badge, details))
+    }
+
+    fn rule_graph_trigger_summary(trigger: RuleTrigger) -> String {
+        match trigger {
+            RuleTrigger::OnStart => "OnStart".to_string(),
+            RuleTrigger::OnUpdate => "OnUpdate".to_string(),
+            RuleTrigger::OnPlayerMove => "OnPlayerMove".to_string(),
+            RuleTrigger::OnKey { key } => format!("OnKey({})", Self::rule_key_label(key)),
+            RuleTrigger::OnCollision => "OnCollision".to_string(),
+            RuleTrigger::OnTrigger => "OnTrigger".to_string(),
+        }
+    }
+
+    fn rule_graph_condition_summary(condition: RuleCondition) -> String {
+        match condition {
+            RuleCondition::Always => "Always".to_string(),
+            RuleCondition::TargetExists { target } => {
+                format!("TargetExists({})", Self::rule_graph_target_summary(target))
+            }
+            RuleCondition::KeyHeld { key } => format!("KeyHeld({})", Self::rule_key_label(key)),
+            RuleCondition::EntityActive { target, is_active } => format!(
+                "EntityActive({}, {})",
+                Self::rule_graph_target_summary(target),
+                if is_active { "true" } else { "false" }
+            ),
+        }
+    }
+
+    fn rule_graph_action_summary(action: &RuleAction) -> String {
+        match action {
+            RuleAction::PlaySound { channel, sound_id } => format!(
+                "PlaySound({:?}, {})",
+                channel,
+                if sound_id.is_empty() {
+                    "<empty>"
+                } else {
+                    sound_id
+                }
+            ),
+            RuleAction::PlayMusic { track_id } => format!(
+                "PlayMusic({})",
+                if track_id.is_empty() {
+                    "<empty>"
+                } else {
+                    track_id
+                }
+            ),
+            RuleAction::PlayAnimation { target, state } => {
+                format!(
+                    "PlayAnimation({}, {:?})",
+                    Self::rule_graph_target_summary(*target),
+                    state
+                )
+            }
+            RuleAction::SetVelocity { target, velocity } => format!(
+                "SetVelocity({}, [{}, {}])",
+                Self::rule_graph_target_summary(*target),
+                velocity[0],
+                velocity[1]
+            ),
+            RuleAction::Spawn {
+                entity_type,
+                position,
+            } => format!(
+                "Spawn({:?}, [{}, {}])",
+                entity_type, position[0], position[1]
+            ),
+            RuleAction::DestroySelf { target } => {
+                format!("DestroySelf({})", Self::rule_graph_target_summary(*target))
+            }
+            RuleAction::SwitchScene { scene_name } => format!(
+                "SwitchScene({})",
+                if scene_name.is_empty() {
+                    "<empty>"
+                } else {
+                    scene_name
+                }
+            ),
+        }
+    }
+
+    fn rule_graph_target_summary(target: RuleTarget) -> String {
+        match target {
+            RuleTarget::Player => "Player".to_string(),
+            RuleTarget::Entity(id) => format!("Entity({})", id),
         }
     }
 
