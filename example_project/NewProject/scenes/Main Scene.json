@@ -8,8 +8,8 @@
     {
       "id": 1,
       "position": [
-        83,
-        66
+        87,
+        52
       ],
       "size": [
         16,
@@ -90,24 +90,6 @@
       },
       {
         "id": "rule_2",
-        "enabled": false,
-        "priority": 0,
-        "once": true,
-        "trigger": "OnUpdate",
-        "conditions": [
-          "Always"
-        ],
-        "actions": [
-          {
-            "PlaySound": {
-              "channel": "Movement",
-              "sound_id": "sfx_slime_bounce"
-            }
-          }
-        ]
-      },
-      {
-        "id": "rule_3",
         "enabled": true,
         "priority": 0,
         "once": false,
@@ -123,15 +105,6 @@
             }
           }
         ]
-      },
-      {
-        "id": "rule_4",
-        "enabled": true,
-        "priority": 0,
-        "once": false,
-        "trigger": "OnUpdate",
-        "conditions": [],
-        "actions": []
       }
     ]
   },
