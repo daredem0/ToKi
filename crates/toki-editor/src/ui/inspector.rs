@@ -945,6 +945,7 @@ impl InspectorSystem {
             .filter_map(|(id, label)| label.map(|label| (id, label)))
             .collect::<Vec<_>>();
         let mut pending_connect_to = None::<u64>;
+        let mut pending_disconnect_edge = None::<(u64, u64)>;
         ui.horizontal(|ui| {
             if ui.button("Disconnect Node").clicked() {
                 if let Err(error) = graph.disconnect_node(node_id) {
@@ -977,23 +978,46 @@ impl InspectorSystem {
             }
         });
         ui.separator();
-        ui.label("Connected Nodes");
-        if connected_node_ids.is_empty() {
+        let connected_edges = graph
+            .edges
+            .iter()
+            .filter(|edge| edge.from == node_id || edge.to == node_id)
+            .copied()
+            .collect::<Vec<_>>();
+        ui.label("Connections");
+        if connected_edges.is_empty() {
             ui.label("None");
         } else {
             egui::ScrollArea::vertical()
                 .max_height(220.0)
                 .show(ui, |ui| {
-                    for connected_id in &connected_node_ids {
+                    for edge in &connected_edges {
+                        let (peer_id, direction) = if edge.from == node_id {
+                            (edge.to, "->")
+                        } else {
+                            (edge.from, "<-")
+                        };
                         let label = Self::rule_graph_node_label_for_inspector(
                             &graph,
                             &node_badges,
-                            *connected_id,
+                            peer_id,
                         )
-                        .unwrap_or_else(|| format!("node {}", connected_id));
-                        ui.label(label);
+                        .unwrap_or_else(|| format!("node {}", peer_id));
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{} {}", direction, label));
+                            if ui.small_button("Disconnect").clicked() {
+                                pending_disconnect_edge = Some((edge.from, edge.to));
+                            }
+                        });
                     }
                 });
+        }
+        if let Some((from, to)) = pending_disconnect_edge {
+            if graph.disconnect_nodes(from, to) {
+                graph_mutated = true;
+            } else {
+                operation_error = Some("Failed to disconnect selected connection".to_string());
+            }
         }
         if let Some(connect_to) = pending_connect_to {
             if let Err(error) = graph.connect_nodes(node_id, connect_to) {
