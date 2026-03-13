@@ -4235,7 +4235,7 @@ dependencies = [
 
 [[package]]
 name = "toki-core"
-version = "0.0.13"
+version = "0.0.14"
 dependencies = [
  "bytemuck",
  "fastrand",
@@ -4251,7 +4251,7 @@ dependencies = [
 
 [[package]]
 name = "toki-editor"
-version = "0.0.13"
+version = "0.0.14"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4278,7 +4278,7 @@ dependencies = [
 
 [[package]]
 name = "toki-render"
-version = "0.0.13"
+version = "0.0.14"
 dependencies = [
  "bytemuck",
  "egui",
@@ -4295,7 +4295,7 @@ dependencies = [
 
 [[package]]
 name = "toki-runtime"
-version = "0.0.13"
+version = "0.0.14"
 dependencies = [
  "anyhow",
  "glam",
@@ -4310,7 +4310,7 @@ dependencies = [
 
 [[package]]
 name = "toki-schemas"
-version = "0.0.13"
+version = "0.0.14"
 
 [[package]]
 name = "tokio"
