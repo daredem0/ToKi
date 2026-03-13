@@ -87,52 +87,52 @@ impl RuleGraph {
         let mut edges = Vec::new();
         let mut chains = Vec::new();
         let mut next_node_id: RuleGraphNodeId = 1;
+        let mut edge_set = HashSet::<(RuleGraphNodeId, RuleGraphNodeId)>::new();
+        let mut suffix_cache = Vec::<(
+            (RuleGraphNodeKind, Option<RuleGraphNodeId>),
+            RuleGraphNodeId,
+        )>::new();
 
-        for (rule_index, rule) in rule_set.rules.iter().enumerate() {
-            let y =
-                Self::AUTO_LAYOUT_START_Y + (rule_index as f32 * Self::auto_layout_vertical_step());
-            let mut next_x = Self::AUTO_LAYOUT_START_X;
-
+        for rule in &rule_set.rules {
             let trigger_id = next_node_id;
             next_node_id += 1;
             nodes.push(RuleGraphNode {
                 id: trigger_id,
                 kind: RuleGraphNodeKind::Trigger(rule.trigger),
-                position: [next_x, y],
+                position: [0.0, 0.0],
             });
-            next_x += Self::auto_layout_horizontal_step();
+            let mut next_in_chain = None::<RuleGraphNodeId>;
 
-            let mut previous_id = trigger_id;
-            for condition in &rule.conditions {
-                let node_id = next_node_id;
-                next_node_id += 1;
-                nodes.push(RuleGraphNode {
-                    id: node_id,
-                    kind: RuleGraphNodeKind::Condition(*condition),
-                    position: [next_x, y],
-                });
-                edges.push(RuleGraphEdge {
-                    from: previous_id,
-                    to: node_id,
-                });
-                previous_id = node_id;
-                next_x += Self::auto_layout_horizontal_step();
+            for action in rule.actions.iter().rev() {
+                let node_id = Self::get_or_create_suffix_node(
+                    &mut nodes,
+                    &mut next_node_id,
+                    &mut suffix_cache,
+                    RuleGraphNodeKind::Action(action.clone()),
+                    next_in_chain,
+                );
+                if let Some(next_node) = next_in_chain {
+                    Self::insert_edge_unique(&mut edges, &mut edge_set, node_id, next_node);
+                }
+                next_in_chain = Some(node_id);
             }
 
-            for action in &rule.actions {
-                let node_id = next_node_id;
-                next_node_id += 1;
-                nodes.push(RuleGraphNode {
-                    id: node_id,
-                    kind: RuleGraphNodeKind::Action(action.clone()),
-                    position: [next_x, y],
-                });
-                edges.push(RuleGraphEdge {
-                    from: previous_id,
-                    to: node_id,
-                });
-                previous_id = node_id;
-                next_x += Self::auto_layout_horizontal_step();
+            for condition in rule.conditions.iter().rev() {
+                let node_id = Self::get_or_create_suffix_node(
+                    &mut nodes,
+                    &mut next_node_id,
+                    &mut suffix_cache,
+                    RuleGraphNodeKind::Condition(*condition),
+                    next_in_chain,
+                );
+                if let Some(next_node) = next_in_chain {
+                    Self::insert_edge_unique(&mut edges, &mut edge_set, node_id, next_node);
+                }
+                next_in_chain = Some(node_id);
+            }
+
+            if let Some(first_node) = next_in_chain {
+                Self::insert_edge_unique(&mut edges, &mut edge_set, trigger_id, first_node);
             }
 
             chains.push(RuleGraphChain {
@@ -144,10 +144,82 @@ impl RuleGraph {
             });
         }
 
-        Self {
+        let mut graph = Self {
             nodes,
             edges,
             chains,
+        };
+        graph.apply_auto_layout_positions();
+        graph
+    }
+
+    fn get_or_create_suffix_node(
+        nodes: &mut Vec<RuleGraphNode>,
+        next_node_id: &mut RuleGraphNodeId,
+        suffix_cache: &mut Vec<(
+            (RuleGraphNodeKind, Option<RuleGraphNodeId>),
+            RuleGraphNodeId,
+        )>,
+        kind: RuleGraphNodeKind,
+        next_node: Option<RuleGraphNodeId>,
+    ) -> RuleGraphNodeId {
+        if let Some((_, node_id)) =
+            suffix_cache
+                .iter()
+                .find(|((existing_kind, existing_next), _)| {
+                    *existing_kind == kind && *existing_next == next_node
+                })
+        {
+            return *node_id;
+        }
+
+        let node_id = *next_node_id;
+        *next_node_id += 1;
+        nodes.push(RuleGraphNode {
+            id: node_id,
+            kind: kind.clone(),
+            position: [0.0, 0.0],
+        });
+        suffix_cache.push(((kind, next_node), node_id));
+        node_id
+    }
+
+    fn insert_edge_unique(
+        edges: &mut Vec<RuleGraphEdge>,
+        edge_set: &mut HashSet<(RuleGraphNodeId, RuleGraphNodeId)>,
+        from: RuleGraphNodeId,
+        to: RuleGraphNodeId,
+    ) {
+        if edge_set.insert((from, to)) {
+            edges.push(RuleGraphEdge { from, to });
+        }
+    }
+
+    fn apply_auto_layout_positions(&mut self) {
+        let mut positioned = HashSet::<RuleGraphNodeId>::new();
+        for (chain_index, chain) in self.chains.iter().enumerate() {
+            let Ok(sequence) = self.chain_node_sequence(chain.trigger_node_id) else {
+                continue;
+            };
+
+            let y = Self::AUTO_LAYOUT_START_Y
+                + (chain_index as f32 * Self::auto_layout_vertical_step());
+            let mut x = Self::AUTO_LAYOUT_START_X;
+            for node_id in sequence {
+                if positioned.insert(node_id) {
+                    if let Some(node) = self.nodes.iter_mut().find(|node| node.id == node_id) {
+                        node.position = [x, y];
+                    }
+                }
+                x += Self::auto_layout_horizontal_step();
+            }
+        }
+
+        for node in &mut self.nodes {
+            if positioned.contains(&node.id) {
+                continue;
+            }
+            node.position = [Self::AUTO_LAYOUT_START_X, Self::AUTO_LAYOUT_START_Y];
         }
     }
 
@@ -322,10 +394,18 @@ impl RuleGraph {
             }
         }
 
-        None
+        node_by_id
+            .contains_key(&node_id)
+            .then_some(format!("detached:{node_id}"))
     }
 
     pub fn node_id_for_stable_key(&self, stable_key: &str) -> Option<RuleGraphNodeId> {
+        if let Some(detached_id) = stable_key.strip_prefix("detached:") {
+            let parsed_id = detached_id.parse::<RuleGraphNodeId>().ok()?;
+            if self.nodes.iter().any(|node| node.id == parsed_id) {
+                return Some(parsed_id);
+            }
+        }
         self.nodes.iter().find_map(|node| {
             self.stable_node_key(node.id)
                 .filter(|candidate| candidate == stable_key)
@@ -351,6 +431,7 @@ impl RuleGraph {
         Ok(rule_id)
     }
 
+    #[cfg(test)]
     pub fn append_condition_to_chain(
         &mut self,
         trigger_node_id: RuleGraphNodeId,
@@ -375,28 +456,36 @@ impl RuleGraph {
         Ok(())
     }
 
-    pub fn append_action_to_chain(
+    pub fn add_condition_node(
         &mut self,
-        trigger_node_id: RuleGraphNodeId,
+        condition: RuleCondition,
+    ) -> Result<RuleGraphNodeId, RuleGraphEditError> {
+        let node_id = self.next_node_id();
+        self.nodes.push(RuleGraphNode {
+            id: node_id,
+            kind: RuleGraphNodeKind::Condition(condition),
+            position: [
+                Self::AUTO_LAYOUT_START_X + (self.nodes.len() as f32 * 12.0),
+                Self::AUTO_LAYOUT_START_Y + (self.nodes.len() as f32 * 8.0),
+            ],
+        });
+        Ok(node_id)
+    }
+
+    pub fn add_action_node(
+        &mut self,
         action: RuleAction,
-    ) -> Result<(), RuleGraphEditError> {
-        let mut rules = self
-            .to_rule_set()
-            .map_err(RuleGraphEditError::GraphInvalid)?;
-        let rule_id = self
-            .chains
-            .iter()
-            .find(|chain| chain.trigger_node_id == trigger_node_id)
-            .map(|chain| chain.rule_id.clone())
-            .ok_or(RuleGraphEditError::MissingChain { trigger_node_id })?;
-        let rule = rules
-            .rules
-            .iter_mut()
-            .find(|rule| rule.id == rule_id)
-            .ok_or(RuleGraphEditError::MissingChain { trigger_node_id })?;
-        rule.actions.push(action);
-        *self = Self::from_rule_set(&rules);
-        Ok(())
+    ) -> Result<RuleGraphNodeId, RuleGraphEditError> {
+        let node_id = self.next_node_id();
+        self.nodes.push(RuleGraphNode {
+            id: node_id,
+            kind: RuleGraphNodeKind::Action(action),
+            position: [
+                Self::AUTO_LAYOUT_START_X + (self.nodes.len() as f32 * 12.0),
+                Self::AUTO_LAYOUT_START_Y + (self.nodes.len() as f32 * 8.0),
+            ],
+        });
+        Ok(node_id)
     }
 
     pub fn set_trigger_for_chain(
@@ -449,7 +538,10 @@ impl RuleGraph {
             }
         }
         let Some((chain_index, sequence)) = chain_hit else {
-            return Err(RuleGraphEditError::MissingNode { node_id });
+            self.nodes.retain(|candidate| candidate.id != node_id);
+            self.edges
+                .retain(|edge| edge.from != node_id && edge.to != node_id);
+            return Ok(());
         };
         let chain = &self.chains[chain_index];
         let Some(rule) = rules.rules.iter_mut().find(|rule| rule.id == chain.rule_id) else {
@@ -510,7 +602,18 @@ impl RuleGraph {
             }
         }
         let Some((chain_index, sequence)) = chain_hit else {
-            return Err(RuleGraphEditError::MissingNode { node_id });
+            let Some(node) = self
+                .nodes
+                .iter_mut()
+                .find(|candidate| candidate.id == node_id)
+            else {
+                return Err(RuleGraphEditError::MissingNode { node_id });
+            };
+            if !matches!(node.kind, RuleGraphNodeKind::Condition(_)) {
+                return Err(RuleGraphEditError::MissingNode { node_id });
+            }
+            node.kind = RuleGraphNodeKind::Condition(condition);
+            return Ok(());
         };
         let chain = &self.chains[chain_index];
         let Some(rule) = rules.rules.iter_mut().find(|rule| rule.id == chain.rule_id) else {
@@ -549,7 +652,18 @@ impl RuleGraph {
             }
         }
         let Some((chain_index, sequence)) = chain_hit else {
-            return Err(RuleGraphEditError::MissingNode { node_id });
+            let Some(node) = self
+                .nodes
+                .iter_mut()
+                .find(|candidate| candidate.id == node_id)
+            else {
+                return Err(RuleGraphEditError::MissingNode { node_id });
+            };
+            if !matches!(node.kind, RuleGraphNodeKind::Action(_)) {
+                return Err(RuleGraphEditError::MissingNode { node_id });
+            }
+            node.kind = RuleGraphNodeKind::Action(action);
+            return Ok(());
         };
         let chain = &self.chains[chain_index];
         let Some(rule) = rules.rules.iter_mut().find(|rule| rule.id == chain.rule_id) else {
@@ -624,6 +738,15 @@ impl RuleGraph {
         self.edges.len() != original_len
     }
 
+    pub fn disconnect_node(&mut self, node_id: RuleGraphNodeId) -> Result<(), RuleGraphEditError> {
+        if !self.nodes.iter().any(|node| node.id == node_id) {
+            return Err(RuleGraphEditError::MissingNode { node_id });
+        }
+        self.edges
+            .retain(|edge| edge.from != node_id && edge.to != node_id);
+        Ok(())
+    }
+
     pub fn chain_node_sequence(
         &self,
         trigger_node_id: RuleGraphNodeId,
@@ -692,6 +815,7 @@ impl RuleGraph {
         Ok(sequence)
     }
 
+    #[cfg(test)]
     pub fn trigger_node_for_node(&self, node_id: RuleGraphNodeId) -> Option<RuleGraphNodeId> {
         for chain in &self.chains {
             let Ok(sequence) = self.chain_node_sequence(chain.trigger_node_id) else {
@@ -713,6 +837,10 @@ impl RuleGraph {
             }
             index += 1;
         }
+    }
+
+    fn next_node_id(&self) -> RuleGraphNodeId {
+        self.nodes.iter().map(|node| node.id).max().unwrap_or(0) + 1
     }
 
     fn is_reachable(&self, start: RuleGraphNodeId, goal: RuleGraphNodeId) -> bool {
@@ -938,6 +1066,172 @@ mod tests {
             .to_rule_set()
             .expect("joined chain should still serialize");
         assert_eq!(roundtrip.rules.len(), 2);
+    }
+
+    #[test]
+    fn from_rule_set_merges_shared_action_nodes_for_multiple_triggers() {
+        let shared_action = RuleAction::PlayMusic {
+            track_id: "bgm_shared".to_string(),
+        };
+        let rules = RuleSet {
+            rules: vec![
+                toki_core::rules::Rule {
+                    id: "rule_a".to_string(),
+                    enabled: true,
+                    priority: 0,
+                    once: false,
+                    trigger: RuleTrigger::OnStart,
+                    conditions: Vec::new(),
+                    actions: vec![shared_action.clone()],
+                },
+                toki_core::rules::Rule {
+                    id: "rule_b".to_string(),
+                    enabled: true,
+                    priority: 0,
+                    once: false,
+                    trigger: RuleTrigger::OnUpdate,
+                    conditions: Vec::new(),
+                    actions: vec![shared_action.clone()],
+                },
+            ],
+        };
+
+        let graph = RuleGraph::from_rule_set(&rules);
+        let shared_action_nodes = graph
+            .nodes
+            .iter()
+            .filter(|node| matches!(&node.kind, super::RuleGraphNodeKind::Action(action) if *action == shared_action))
+            .map(|node| node.id)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            shared_action_nodes.len(),
+            1,
+            "identical action suffix should be represented by one shared node"
+        );
+
+        let shared_action_id = shared_action_nodes[0];
+        let trigger_ids = graph
+            .chains
+            .iter()
+            .map(|chain| chain.trigger_node_id)
+            .collect::<Vec<_>>();
+        assert!(
+            graph
+                .edges
+                .iter()
+                .filter(|edge| trigger_ids.contains(&edge.from) && edge.to == shared_action_id)
+                .count()
+                >= 2
+        );
+    }
+
+    #[test]
+    fn from_rule_set_merges_shared_condition_and_action_suffixes() {
+        let shared_action = RuleAction::DestroySelf {
+            target: RuleTarget::Player,
+        };
+        let rules = RuleSet {
+            rules: vec![
+                toki_core::rules::Rule {
+                    id: "rule_a".to_string(),
+                    enabled: true,
+                    priority: 0,
+                    once: false,
+                    trigger: RuleTrigger::OnStart,
+                    conditions: vec![RuleCondition::Always],
+                    actions: vec![shared_action.clone()],
+                },
+                toki_core::rules::Rule {
+                    id: "rule_b".to_string(),
+                    enabled: true,
+                    priority: 0,
+                    once: false,
+                    trigger: RuleTrigger::OnUpdate,
+                    conditions: vec![RuleCondition::Always],
+                    actions: vec![shared_action.clone()],
+                },
+            ],
+        };
+
+        let graph = RuleGraph::from_rule_set(&rules);
+        let condition_nodes = graph
+            .nodes
+            .iter()
+            .filter(|node| {
+                matches!(
+                    node.kind,
+                    super::RuleGraphNodeKind::Condition(RuleCondition::Always)
+                )
+            })
+            .map(|node| node.id)
+            .collect::<Vec<_>>();
+        let action_nodes = graph
+            .nodes
+            .iter()
+            .filter(|node| matches!(&node.kind, super::RuleGraphNodeKind::Action(action) if *action == shared_action))
+            .map(|node| node.id)
+            .collect::<Vec<_>>();
+
+        assert_eq!(condition_nodes.len(), 1);
+        assert_eq!(action_nodes.len(), 1);
+        assert!(graph
+            .edges
+            .iter()
+            .any(|edge| { edge.from == condition_nodes[0] && edge.to == action_nodes[0] }));
+    }
+
+    #[test]
+    fn add_condition_node_creates_new_independent_chain() {
+        let mut graph = RuleGraph::from_rule_set(&sample_rules());
+        let existing_trigger = graph.chains[0].trigger_node_id;
+        let initial_chains = graph.chains.len();
+
+        let new_condition = graph
+            .add_condition_node(RuleCondition::Always)
+            .expect("adding standalone condition node should succeed");
+        assert_eq!(graph.chains.len(), initial_chains);
+
+        assert!(
+            !graph
+                .edges
+                .iter()
+                .any(|edge| edge.from == existing_trigger && edge.to == new_condition),
+            "new condition should not auto-connect to the existing chain"
+        );
+        assert!(
+            graph.stable_node_key(new_condition).is_some(),
+            "standalone condition should receive a stable key in the editor graph"
+        );
+    }
+
+    #[test]
+    fn disconnect_node_removes_all_incident_edges() {
+        let mut graph = RuleGraph::from_rule_set(&sample_rules());
+        let first_trigger = graph.chains[0].trigger_node_id;
+        let sequence = graph
+            .chain_node_sequence(first_trigger)
+            .expect("chain should be valid");
+        let disconnect_target = *sequence
+            .iter()
+            .find(|node_id| {
+                graph
+                    .nodes
+                    .iter()
+                    .find(|node| node.id == **node_id)
+                    .is_some_and(|node| matches!(node.kind, super::RuleGraphNodeKind::Action(_)))
+            })
+            .expect("chain should contain an action node");
+
+        graph
+            .disconnect_node(disconnect_target)
+            .expect("disconnecting node should succeed");
+        assert!(!graph
+            .edges
+            .iter()
+            .any(|edge| edge.from == disconnect_target || edge.to == disconnect_target));
+        graph
+            .to_rule_set()
+            .expect("graph should remain serializable after disconnect");
     }
 
     #[test]

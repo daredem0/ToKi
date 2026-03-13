@@ -223,18 +223,9 @@ impl InspectorSystem {
                                 ui.monospace(node_key);
                                 ui.separator();
 
-                                let mut changed = false;
-                                if let Some(scene) = Self::find_scene_mut(ui_state, scene_name) {
-                                    changed = Self::render_selected_rule_graph_node_editor(
-                                        ui,
-                                        scene_name,
-                                        node_key,
-                                        &mut scene.rules,
-                                        config,
-                                    );
-                                } else {
-                                    ui.label("Scene not found.");
-                                }
+                                let changed = Self::render_selected_rule_graph_node_editor(
+                                    ui, ui_state, scene_name, node_key, config,
+                                );
 
                                 if changed {
                                     ui_state.scene_content_changed = true;
@@ -816,14 +807,28 @@ impl InspectorSystem {
 
     fn render_selected_rule_graph_node_editor(
         ui: &mut egui::Ui,
+        ui_state: &mut EditorUI,
         scene_name: &str,
         node_key: &str,
-        rule_set: &mut RuleSet,
         config: Option<&EditorConfig>,
     ) -> bool {
+        let Some(scene_index) = ui_state
+            .scenes
+            .iter()
+            .position(|scene| scene.name == scene_name)
+        else {
+            ui.label("Scene not found.");
+            return false;
+        };
+        let scene_rules = ui_state.scenes[scene_index].rules.clone();
+        ui_state.sync_rule_graph_with_rule_set(scene_name, &scene_rules);
+
         let audio_choices = Self::load_rule_audio_choices(config);
-        let validation_issues = Self::validate_rule_set(rule_set);
-        let mut graph = RuleGraph::from_rule_set(rule_set);
+        let validation_issues = Self::validate_rule_set(&scene_rules);
+        let mut graph = ui_state
+            .rule_graph_for_scene(scene_name)
+            .cloned()
+            .unwrap_or_else(|| RuleGraph::from_rule_set(&scene_rules));
         let Some(node_id) = graph.node_id_for_stable_key(node_key) else {
             ui.colored_label(
                 egui::Color32::from_rgb(255, 210, 80),
@@ -844,12 +849,12 @@ impl InspectorSystem {
             return false;
         };
 
-        let mut changed = false;
+        let mut graph_mutated = false;
         match node_kind {
             RuleGraphNodeKind::Trigger(trigger) => {
                 ui.label("Trigger");
                 let mut edited_trigger = trigger;
-                changed |= Self::render_rule_graph_trigger_editor(
+                let changed = Self::render_rule_graph_trigger_editor(
                     ui,
                     scene_name,
                     node_key,
@@ -863,12 +868,13 @@ impl InspectorSystem {
                         );
                         return false;
                     }
+                    graph_mutated = true;
                 }
             }
             RuleGraphNodeKind::Condition(condition) => {
                 ui.label("Condition");
                 let mut edited_condition = condition;
-                changed |= Self::render_rule_graph_condition_editor(
+                let changed = Self::render_rule_graph_condition_editor(
                     ui,
                     scene_name,
                     node_key,
@@ -882,12 +888,13 @@ impl InspectorSystem {
                         );
                         return false;
                     }
+                    graph_mutated = true;
                 }
             }
             RuleGraphNodeKind::Action(action) => {
                 ui.label("Action");
                 let mut edited_action = action.clone();
-                changed |= Self::render_rule_graph_action_editor(
+                let changed = Self::render_rule_graph_action_editor(
                     ui,
                     scene_name,
                     node_key,
@@ -903,18 +910,48 @@ impl InspectorSystem {
                         );
                         return false;
                     }
+                    graph_mutated = true;
                 }
             }
         }
 
-        if !changed {
+        ui.separator();
+        ui.horizontal(|ui| {
+            if ui.button("Disconnect Node").clicked() {
+                if let Err(error) = graph.disconnect_node(node_id) {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(255, 120, 120),
+                        format!("Failed to disconnect node: {:?}", error),
+                    );
+                } else {
+                    graph_mutated = true;
+                }
+            }
+            if ui
+                .add(egui::Button::new("Delete Node").fill(egui::Color32::from_rgb(120, 30, 30)))
+                .clicked()
+            {
+                if let Err(error) = graph.remove_node(node_id) {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(255, 120, 120),
+                        format!("Failed to delete node: {:?}", error),
+                    );
+                } else {
+                    graph_mutated = true;
+                }
+            }
+        });
+
+        if !graph_mutated {
             return false;
         }
 
         match graph.to_rule_set() {
             Ok(updated_rules) => {
-                *rule_set = updated_rules;
-                true
+                let rules_changed = ui_state.scenes[scene_index].rules != updated_rules;
+                ui_state.scenes[scene_index].rules = updated_rules;
+                ui_state.set_rule_graph_for_scene(scene_name.to_string(), graph);
+                rules_changed
             }
             Err(error) => {
                 ui.colored_label(

@@ -1,11 +1,13 @@
 use super::inspector::InspectorSystem;
 use super::menus::MenuSystem;
 use super::panels::PanelSystem;
+use super::rule_graph::RuleGraph;
 use crate::project::SceneGraphLayout;
 use crate::scene::SceneViewport;
 use std::collections::HashMap;
 use toki_core::{
     entity::{Entity, EntityId},
+    rules::RuleSet,
     Scene,
 };
 
@@ -84,6 +86,7 @@ pub struct EditorUI {
     pub graph_canvas_pan: [f32; 2], // Scene graph canvas pan offset (screen-space)
     pub graph_layouts_by_scene: HashMap<String, SceneGraphLayout>, // Persisted scene graph layouts loaded from project
     pub graph_layout_dirty: bool, // Graph layout changed and should be flushed into project metadata
+    pub rule_graphs_by_scene: HashMap<String, RuleGraph>, // In-memory scene graph drafts (can contain detached nodes)
 }
 
 impl EditorUI {
@@ -135,6 +138,7 @@ impl EditorUI {
             graph_canvas_pan: [16.0, 16.0],
             graph_layouts_by_scene: HashMap::new(),
             graph_layout_dirty: false,
+            rule_graphs_by_scene: HashMap::new(),
         }
     }
 
@@ -151,6 +155,7 @@ impl EditorUI {
     pub fn load_scenes_from_project(&mut self, loaded_scenes: Vec<Scene>) {
         tracing::info!("Loading {} scenes into UI hierarchy", loaded_scenes.len());
         self.scenes = loaded_scenes;
+        self.rule_graphs_by_scene.clear();
 
         // Set the first scene as active if we have scenes and no active scene is set
         if !self.scenes.is_empty() && self.active_scene.is_none() {
@@ -315,6 +320,26 @@ impl EditorUI {
             layout.pan = pan;
             self.graph_layout_dirty = true;
         }
+    }
+
+    pub fn sync_rule_graph_with_rule_set(&mut self, scene_name: &str, rule_set: &RuleSet) {
+        let needs_rebuild = self
+            .rule_graphs_by_scene
+            .get(scene_name)
+            .and_then(|graph| graph.to_rule_set().ok())
+            .is_none_or(|graph_rules| graph_rules != *rule_set);
+        if needs_rebuild {
+            self.rule_graphs_by_scene
+                .insert(scene_name.to_string(), RuleGraph::from_rule_set(rule_set));
+        }
+    }
+
+    pub fn rule_graph_for_scene(&self, scene_name: &str) -> Option<&RuleGraph> {
+        self.rule_graphs_by_scene.get(scene_name)
+    }
+
+    pub fn set_rule_graph_for_scene(&mut self, scene_name: String, graph: RuleGraph) {
+        self.rule_graphs_by_scene.insert(scene_name, graph);
     }
 
     pub fn render_hierarchy_and_maps_combined_panel(

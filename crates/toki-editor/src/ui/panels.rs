@@ -197,8 +197,8 @@ impl PanelSystem {
             AddTrigger,
             ResetLayout,
             SetTrigger(u64, RuleTrigger),
-            AppendCondition(u64),
-            AppendAction(u64),
+            AddConditionNode,
+            AddActionNode,
             SetCondition(u64, RuleCondition),
             SetAction(u64, RuleAction),
             SetNodePosition(u64, [f32; 2]),
@@ -241,7 +241,11 @@ impl PanelSystem {
 
         {
             let scene_rules = ui_state.scenes[scene_index].rules.clone();
-            let mut graph = RuleGraph::from_rule_set(&scene_rules);
+            ui_state.sync_rule_graph_with_rule_set(&active_scene_name, &scene_rules);
+            let mut graph = ui_state
+                .rule_graph_for_scene(&active_scene_name)
+                .cloned()
+                .unwrap_or_else(|| RuleGraph::from_rule_set(&scene_rules));
             let mut pending_command: Option<GraphCommand> = None;
 
             let node_ids = graph.nodes.iter().map(|node| node.id).collect::<Vec<_>>();
@@ -266,9 +270,6 @@ impl PanelSystem {
                 }
             }
             let node_badges = Self::rule_graph_node_badges(&graph);
-            let selected_trigger_for_add = selected_graph_node
-                .and_then(|node_id| graph.trigger_node_for_node(node_id))
-                .or_else(|| graph.chains.first().map(|chain| chain.trigger_node_id));
 
             if !show_scene_rules {
                 ui.horizontal(|ui| {
@@ -289,24 +290,10 @@ impl PanelSystem {
                         pending_command = Some(GraphCommand::AddTrigger);
                     }
                     if ui.button("➕ Add Condition").clicked() {
-                        if let Some(trigger_node_id) = selected_trigger_for_add {
-                            pending_command = Some(GraphCommand::AppendCondition(trigger_node_id));
-                        } else {
-                            operation_error = Some(
-                                "Select a node first to determine where to append condition."
-                                    .to_string(),
-                            );
-                        }
+                        pending_command = Some(GraphCommand::AddConditionNode);
                     }
                     if ui.button("➕ Add Action").clicked() {
-                        if let Some(trigger_node_id) = selected_trigger_for_add {
-                            pending_command = Some(GraphCommand::AppendAction(trigger_node_id));
-                        } else {
-                            operation_error = Some(
-                                "Select a node first to determine where to append action."
-                                    .to_string(),
-                            );
-                        }
+                        pending_command = Some(GraphCommand::AddActionNode);
                     }
                     if ui.button("↺ Reset Auto Layout").clicked() {
                         pending_command = Some(GraphCommand::ResetLayout);
@@ -318,24 +305,10 @@ impl PanelSystem {
                         pending_command = Some(GraphCommand::AddTrigger);
                     }
                     if ui.button("➕ Add Condition").clicked() {
-                        if let Some(trigger_node_id) = selected_trigger_for_add {
-                            pending_command = Some(GraphCommand::AppendCondition(trigger_node_id));
-                        } else {
-                            operation_error = Some(
-                                "Select a node first to determine where to append condition."
-                                    .to_string(),
-                            );
-                        }
+                        pending_command = Some(GraphCommand::AddConditionNode);
                     }
                     if ui.button("➕ Add Action").clicked() {
-                        if let Some(trigger_node_id) = selected_trigger_for_add {
-                            pending_command = Some(GraphCommand::AppendAction(trigger_node_id));
-                        } else {
-                            operation_error = Some(
-                                "Select a node first to determine where to append action."
-                                    .to_string(),
-                            );
-                        }
+                        pending_command = Some(GraphCommand::AddActionNode);
                     }
                 });
             }
@@ -444,14 +417,6 @@ impl PanelSystem {
                                     ui.strong(format!("Rule {}: {}", rule_index + 1, chain.rule_id));
                                     if !chain.enabled {
                                         ui.label("(disabled)");
-                                    }
-                                    if ui.small_button("➕ Condition").clicked() {
-                                        pending_command =
-                                            Some(GraphCommand::AppendCondition(chain.trigger_node_id));
-                                    }
-                                    if ui.small_button("➕ Action").clicked() {
-                                        pending_command =
-                                            Some(GraphCommand::AppendAction(chain.trigger_node_id));
                                     }
                                     if ui.small_button("🗑 Rule").clicked() {
                                         pending_command =
@@ -693,6 +658,10 @@ impl PanelSystem {
             if let Some(command) = pending_command {
                 let is_layout_command = matches!(command, GraphCommand::SetNodePosition(_, _));
                 let is_reset_layout = matches!(command, GraphCommand::ResetLayout);
+                let is_draft_only_command = matches!(
+                    command,
+                    GraphCommand::AddConditionNode | GraphCommand::AddActionNode
+                );
                 let remembered_layout = Self::remember_graph_layout(&graph);
                 let command_result = match command {
                     GraphCommand::AddTrigger => graph.add_trigger_chain().map(|_| ()),
@@ -710,19 +679,18 @@ impl PanelSystem {
                                 graph.set_node_position(node_id, position)
                             })
                     }
-                    GraphCommand::AppendCondition(trigger_node_id) => {
-                        graph.append_condition_to_chain(trigger_node_id, RuleCondition::Always)
+                    GraphCommand::AddConditionNode => {
+                        graph.add_condition_node(RuleCondition::Always).map(|_| ())
                     }
                     GraphCommand::SetTrigger(trigger_node_id, trigger) => {
                         graph.set_trigger_for_chain(trigger_node_id, trigger)
                     }
-                    GraphCommand::AppendAction(trigger_node_id) => graph.append_action_to_chain(
-                        trigger_node_id,
-                        RuleAction::PlaySound {
+                    GraphCommand::AddActionNode => graph
+                        .add_action_node(RuleAction::PlaySound {
                             channel: RuleSoundChannel::Movement,
                             sound_id: "sfx_placeholder".to_string(),
-                        },
-                    ),
+                        })
+                        .map(|_| ()),
                     GraphCommand::SetCondition(node_id, condition) => {
                         graph.set_condition_for_node(node_id, condition)
                     }
@@ -750,7 +718,7 @@ impl PanelSystem {
                         if !is_layout_command && !is_reset_layout {
                             Self::restore_graph_layout(&mut graph, &remembered_layout);
                         }
-                        if is_layout_command || is_reset_layout {
+                        if is_layout_command || is_reset_layout || is_draft_only_command {
                             layout_changed = true;
                         } else {
                             scene_changed = true;
@@ -798,6 +766,7 @@ impl PanelSystem {
                     });
                 }
             }
+            ui_state.set_rule_graph_for_scene(active_scene_name.clone(), graph);
         }
 
         ui_state.graph_connect_from_node = connect_from;
