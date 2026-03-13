@@ -264,8 +264,16 @@ impl EditorUI {
         self.graph_layout_dirty = false;
     }
 
+    pub fn load_rule_graph_drafts_from_project(&mut self, drafts: &HashMap<String, RuleGraph>) {
+        self.rule_graphs_by_scene = drafts.clone();
+    }
+
     pub fn export_graph_layouts_for_project(&self) -> HashMap<String, SceneGraphLayout> {
         self.graph_layouts_by_scene.clone()
+    }
+
+    pub fn export_rule_graph_drafts_for_project(&self) -> HashMap<String, RuleGraph> {
+        self.rule_graphs_by_scene.clone()
     }
 
     pub fn is_graph_layout_dirty(&self) -> bool {
@@ -323,11 +331,13 @@ impl EditorUI {
     }
 
     pub fn sync_rule_graph_with_rule_set(&mut self, scene_name: &str, rule_set: &RuleSet) {
-        let needs_rebuild = self
-            .rule_graphs_by_scene
-            .get(scene_name)
-            .and_then(|graph| graph.to_rule_set().ok())
-            .is_none_or(|graph_rules| graph_rules != *rule_set);
+        let needs_rebuild = match self.rule_graphs_by_scene.get(scene_name) {
+            None => true,
+            Some(graph) => match graph.to_rule_set() {
+                Ok(graph_rules) => graph_rules != *rule_set,
+                Err(_) => false,
+            },
+        };
         if needs_rebuild {
             self.rule_graphs_by_scene
                 .insert(scene_name.to_string(), RuleGraph::from_rule_set(rule_set));
@@ -741,5 +751,62 @@ impl EditorUI {
                     ui.label("No project configuration available for Entity palette");
                 }
             });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use toki_core::rules::{
+        Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger,
+    };
+
+    use super::EditorUI;
+    use crate::ui::rule_graph::RuleGraph;
+
+    #[test]
+    fn sync_rule_graph_with_rule_set_preserves_unserializable_existing_draft() {
+        let mut ui = EditorUI::new();
+        let rule_set = RuleSet {
+            rules: vec![Rule {
+                id: "rule_1".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "sfx".to_string(),
+                }],
+            }],
+        };
+        let mut graph = RuleGraph::from_rule_set(&rule_set);
+        let trigger_id = graph.chains[0].trigger_node_id;
+        let detached_target = graph
+            .add_condition_node(RuleCondition::KeyHeld {
+                key: toki_core::rules::RuleKey::Left,
+            })
+            .expect("detached target should be created");
+        graph
+            .connect_nodes(trigger_id, detached_target)
+            .expect("branching connect should succeed");
+        assert!(
+            graph.to_rule_set().is_err(),
+            "graph should be intentionally non-serializable due to branching"
+        );
+
+        ui.set_rule_graph_for_scene("Main Scene".to_string(), graph.clone());
+        ui.sync_rule_graph_with_rule_set("Main Scene", &rule_set);
+
+        let persisted_graph = ui
+            .rule_graph_for_scene("Main Scene")
+            .expect("graph draft should still exist");
+        assert!(
+            persisted_graph
+                .edges
+                .iter()
+                .any(|edge| edge.from == trigger_id && edge.to == detached_target),
+            "branching edge should be preserved instead of rebuilding from RuleSet"
+        );
     }
 }

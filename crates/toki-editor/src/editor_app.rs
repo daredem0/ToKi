@@ -131,13 +131,20 @@ impl EditorApp {
     }
 
     fn sync_ui_graph_layouts_from_project(&mut self) {
-        let graph_layouts = self
+        let (graph_layouts, rule_graph_drafts) = self
             .project_manager
             .current_project
             .as_ref()
-            .map(|project| project.metadata.editor.graph_layouts.clone())
+            .map(|project| {
+                (
+                    project.metadata.editor.graph_layouts.clone(),
+                    project.metadata.editor.rule_graph_drafts.clone(),
+                )
+            })
             .unwrap_or_default();
         self.ui.load_graph_layouts_from_project(&graph_layouts);
+        self.ui
+            .load_rule_graph_drafts_from_project(&rule_graph_drafts);
     }
 
     fn migrate_legacy_graph_layouts_into_project(&mut self) {
@@ -260,6 +267,7 @@ impl EditorApp {
         };
 
         project.metadata.editor.graph_layouts = self.ui.export_graph_layouts_for_project();
+        project.metadata.editor.rule_graph_drafts = self.ui.export_rule_graph_drafts_for_project();
         match project.save_metadata() {
             Ok(()) => self.ui.clear_graph_layout_dirty(),
             Err(error) => tracing::warn!(
@@ -815,6 +823,8 @@ impl EditorApp {
 
         if let Some(project) = self.project_manager.current_project.as_mut() {
             project.metadata.editor.graph_layouts = self.ui.export_graph_layouts_for_project();
+            project.metadata.editor.rule_graph_drafts =
+                self.ui.export_rule_graph_drafts_for_project();
         }
 
         // Get scenes from UI

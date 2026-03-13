@@ -1,30 +1,31 @@
 use std::collections::{HashMap, HashSet};
 
+use serde::{Deserialize, Serialize};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleTrigger};
 
 pub type RuleGraphNodeId = u64;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RuleGraphNodeKind {
     Trigger(RuleTrigger),
     Condition(RuleCondition),
     Action(RuleAction),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RuleGraphNode {
     pub id: RuleGraphNodeId,
     pub kind: RuleGraphNodeKind,
     pub position: [f32; 2],
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuleGraphEdge {
     pub from: RuleGraphNodeId,
     pub to: RuleGraphNodeId,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuleGraphChain {
     pub rule_id: String,
     pub enabled: bool,
@@ -33,7 +34,7 @@ pub struct RuleGraphChain {
     pub trigger_node_id: RuleGraphNodeId,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RuleGraph {
     pub nodes: Vec<RuleGraphNode>,
     pub edges: Vec<RuleGraphEdge>,
