@@ -967,48 +967,60 @@ impl InspectorSystem {
         let mut pending_connect_to = None::<u64>;
         let mut pending_connect_from = None::<u64>;
         let mut pending_disconnect_edge = None::<(u64, u64)>;
-        ui.horizontal(|ui| {
-            if ui.button("Disconnect Node").clicked() {
-                if let Err(error) = graph.disconnect_node(node_id) {
-                    operation_error = Some(format!("Failed to disconnect node: {:?}", error));
-                } else {
-                    graph_mutated = true;
-                }
-            }
-            ui.menu_button("Connect From", |ui| {
-                if connectable_from_nodes.is_empty() {
-                    ui.label("No available nodes");
-                    return;
-                }
-                for (candidate_id, label) in &connectable_from_nodes {
-                    if ui.button(label).clicked() {
-                        pending_connect_from = Some(*candidate_id);
-                        ui.close();
+        ui.push_id(("graph_node_action_buttons", scene_name, node_id), |ui| {
+            egui::Grid::new("graph_node_action_grid")
+                .num_columns(2)
+                .spacing([8.0, 6.0])
+                .show(ui, |ui| {
+                    if ui.button("Disconnect Node").clicked() {
+                        if let Err(error) = graph.disconnect_node(node_id) {
+                            operation_error =
+                                Some(format!("Failed to disconnect node: {:?}", error));
+                        } else {
+                            graph_mutated = true;
+                        }
                     }
-                }
-            });
-            ui.menu_button("Connect To", |ui| {
-                if connectable_to_nodes.is_empty() {
-                    ui.label("No available nodes");
-                    return;
-                }
-                for (candidate_id, label) in &connectable_to_nodes {
-                    if ui.button(label).clicked() {
-                        pending_connect_to = Some(*candidate_id);
-                        ui.close();
+                    if ui
+                        .add(
+                            egui::Button::new("Delete Node")
+                                .fill(egui::Color32::from_rgb(120, 30, 30)),
+                        )
+                        .clicked()
+                    {
+                        if let Err(error) = graph.remove_node(node_id) {
+                            operation_error = Some(format!("Failed to delete node: {:?}", error));
+                        } else {
+                            graph_mutated = true;
+                        }
                     }
-                }
-            });
-            if ui
-                .add(egui::Button::new("Delete Node").fill(egui::Color32::from_rgb(120, 30, 30)))
-                .clicked()
-            {
-                if let Err(error) = graph.remove_node(node_id) {
-                    operation_error = Some(format!("Failed to delete node: {:?}", error));
-                } else {
-                    graph_mutated = true;
-                }
-            }
+                    ui.end_row();
+
+                    ui.menu_button("Connect From", |ui| {
+                        if connectable_from_nodes.is_empty() {
+                            ui.label("No available nodes");
+                            return;
+                        }
+                        for (candidate_id, label) in &connectable_from_nodes {
+                            if ui.button(label).clicked() {
+                                pending_connect_from = Some(*candidate_id);
+                                ui.close();
+                            }
+                        }
+                    });
+                    ui.menu_button("Connect To", |ui| {
+                        if connectable_to_nodes.is_empty() {
+                            ui.label("No available nodes");
+                            return;
+                        }
+                        for (candidate_id, label) in &connectable_to_nodes {
+                            if ui.button(label).clicked() {
+                                pending_connect_to = Some(*candidate_id);
+                                ui.close();
+                            }
+                        }
+                    });
+                    ui.end_row();
+                });
         });
         ui.separator();
         let outgoing_edges = graph
