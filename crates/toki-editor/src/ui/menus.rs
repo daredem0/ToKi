@@ -45,6 +45,10 @@ impl MenuSystem {
                         tracing::info!("Save Project clicked");
                         ui_state.save_project_requested = true;
                     }
+                    if ui.button("Export Bundle...").clicked() {
+                        tracing::info!("Export Bundle clicked");
+                        ui_state.export_project_requested = true;
+                    }
                     ui.separator();
                     if ui.button("Create Test Entities").clicked() {
                         tracing::info!("Create Test Entities clicked");

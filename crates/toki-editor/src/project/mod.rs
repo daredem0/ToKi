@@ -1,4 +1,5 @@
 pub mod assets;
+pub mod export;
 pub mod manager;
 pub mod project_data;
 

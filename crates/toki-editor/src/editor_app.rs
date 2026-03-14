@@ -944,6 +944,10 @@ impl EditorApp {
             self.handle_save_project_request();
         }
 
+        if self.ui.export_project_requested {
+            self.handle_export_project_request();
+        }
+
         if self.ui.init_config_requested {
             self.handle_init_project_request();
         }
@@ -1013,6 +1017,65 @@ impl EditorApp {
             active_scene_name,
             map_name.as_deref().unwrap_or("<auto>")
         );
+    }
+
+    fn handle_export_project_request(&mut self) {
+        if !self.ui.export_project_requested {
+            return;
+        }
+        self.ui.export_project_requested = false;
+
+        let Some(project_path) = self.config.current_project_path().cloned() else {
+            tracing::warn!("Cannot export bundle: no project is currently open");
+            return;
+        };
+
+        if let Err(error) = self.project_manager.save_current_project(&self.ui.scenes) {
+            tracing::error!(
+                "Cannot export bundle: failed to save current project state: {}",
+                error
+            );
+            return;
+        }
+
+        let default_export_root = project_path
+            .parent()
+            .map(std::path::Path::to_path_buf)
+            .unwrap_or_else(Self::workspace_root);
+        let export_root = match rfd::FileDialog::new()
+            .set_title("Select export destination directory")
+            .set_directory(default_export_root)
+            .pick_folder()
+        {
+            Some(path) => path,
+            None => {
+                tracing::info!("Bundle export cancelled by user");
+                return;
+            }
+        };
+
+        let runtime_binary_path = match Self::build_runtime_binary_for_export() {
+            Ok(path) => path,
+            Err(error) => {
+                tracing::error!(
+                    "Cannot export bundle: failed to build runtime binary: {}",
+                    error
+                );
+                return;
+            }
+        };
+
+        match self
+            .project_manager
+            .export_current_project_bundle(&runtime_binary_path, &export_root)
+        {
+            Ok(bundle_dir) => {
+                tracing::info!("Exported hybrid bundle to '{}'", bundle_dir.display());
+            }
+            Err(error) => {
+                tracing::error!("Failed to export hybrid bundle: {}", error);
+            }
+        }
     }
 
     fn handle_active_scene_map_loading(&mut self) {
@@ -1114,11 +1177,7 @@ impl EditorApp {
             }
         }
 
-        let runtime_bin_name = if cfg!(target_os = "windows") {
-            "toki-runtime.exe"
-        } else {
-            "toki-runtime"
-        };
+        let runtime_bin_name = Self::runtime_binary_name();
         let runtime_bin_path = std::env::current_exe()
             .ok()
             .and_then(|exe| exe.parent().map(|parent| parent.join(runtime_bin_name)))
@@ -1149,6 +1208,44 @@ impl EditorApp {
             runtime_args.push(duration_ms.to_string());
         }
         runtime_args
+    }
+
+    fn runtime_binary_name() -> &'static str {
+        if cfg!(target_os = "windows") {
+            "toki-runtime.exe"
+        } else {
+            "toki-runtime"
+        }
+    }
+
+    fn build_runtime_binary_for_export() -> Result<std::path::PathBuf> {
+        let workspace_root = Self::workspace_root();
+        let status = Command::new("cargo")
+            .current_dir(&workspace_root)
+            .arg("build")
+            .arg("-p")
+            .arg("toki-runtime")
+            .status()
+            .map_err(|error| anyhow::anyhow!("Failed to launch cargo build: {}", error))?;
+
+        if !status.success() {
+            return Err(anyhow::anyhow!(
+                "cargo build -p toki-runtime failed with status {}",
+                status
+            ));
+        }
+
+        let runtime_binary_path = workspace_root
+            .join("target")
+            .join("debug")
+            .join(Self::runtime_binary_name());
+        if !runtime_binary_path.exists() {
+            return Err(anyhow::anyhow!(
+                "Runtime binary not found after build: {}",
+                runtime_binary_path.display()
+            ));
+        }
+        Ok(runtime_binary_path)
     }
 
     fn workspace_root() -> std::path::PathBuf {

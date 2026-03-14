@@ -16,6 +16,9 @@ sprites = "assets/sprites/"
 tilemaps = "assets/tilemaps/"
 audio = "assets/audio/"
 
+[runtime.splash]
+duration_ms = 1200
+
 [editor]
 recent_files = []
 
@@ -29,25 +32,25 @@ pan = [
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
-"node:6" = [
-    296.5447082519531,
-    162.4777374267578,
-]
-"node:4" = [
-    8.566792488098145,
-    179.10220336914063,
+"node:1" = [
+    60.0,
+    64.328125,
 ]
 "node:2" = [
     440.640625,
     64.328125,
 ]
+"node:6" = [
+    296.5447082519531,
+    162.4777374267578,
+]
 "node:3" = [
     220.7003631591797,
     47.67403030395508,
 ]
-"node:1" = [
-    60.0,
-    64.328125,
+"node:4" = [
+    8.566792488098145,
+    179.10220336914063,
 ]
 "node:5" = [
     579.13037109375,
