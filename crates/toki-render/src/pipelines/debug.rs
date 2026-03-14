@@ -52,6 +52,81 @@ pub struct DebugPipeline {
 }
 
 impl DebugPipeline {
+    fn quad_vertices(x0: f32, y0: f32, x1: f32, y1: f32, color: [f32; 4]) -> [DebugVertex; 6] {
+        [
+            DebugVertex {
+                position: [x0, y0],
+                color,
+            },
+            DebugVertex {
+                position: [x1, y0],
+                color,
+            },
+            DebugVertex {
+                position: [x1, y1],
+                color,
+            },
+            DebugVertex {
+                position: [x0, y0],
+                color,
+            },
+            DebugVertex {
+                position: [x1, y1],
+                color,
+            },
+            DebugVertex {
+                position: [x0, y1],
+                color,
+            },
+        ]
+    }
+
+    fn rect_outline_vertices(
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        color: [f32; 4],
+    ) -> Vec<DebugVertex> {
+        if width <= 0.0 || height <= 0.0 {
+            return Vec::new();
+        }
+
+        let thickness = 1.0_f32.min(width).min(height);
+        let x0 = x;
+        let y0 = y;
+        let x1 = x + width;
+        let y1 = y + height;
+
+        // For very small rectangles, draw a filled quad to avoid inverted borders.
+        if width <= thickness * 2.0 || height <= thickness * 2.0 {
+            return Self::quad_vertices(x0, y0, x1, y1, color).to_vec();
+        }
+
+        let mut vertices = Vec::with_capacity(24);
+        // Top edge
+        vertices.extend_from_slice(&Self::quad_vertices(x0, y0, x1, y0 + thickness, color));
+        // Bottom edge
+        vertices.extend_from_slice(&Self::quad_vertices(x0, y1 - thickness, x1, y1, color));
+        // Left edge (excluding corners covered by top/bottom)
+        vertices.extend_from_slice(&Self::quad_vertices(
+            x0,
+            y0 + thickness,
+            x0 + thickness,
+            y1 - thickness,
+            color,
+        ));
+        // Right edge (excluding corners covered by top/bottom)
+        vertices.extend_from_slice(&Self::quad_vertices(
+            x1 - thickness,
+            y0 + thickness,
+            x1,
+            y1 - thickness,
+            color,
+        ));
+        vertices
+    }
+
     pub fn new(device: &Device, surface_format: wgpu::TextureFormat) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Debug Shader"),
@@ -118,7 +193,7 @@ impl DebugPipeline {
                 })],
             }),
             primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::LineList,
+                topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: None,
@@ -151,46 +226,7 @@ impl DebugPipeline {
 
     /// Add a rectangle outline to be rendered
     pub fn add_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        // Create rectangle as line segments
-        let vertices = [
-            // Top line
-            DebugVertex {
-                position: [x, y],
-                color,
-            },
-            DebugVertex {
-                position: [x + width, y],
-                color,
-            },
-            // Right line
-            DebugVertex {
-                position: [x + width, y],
-                color,
-            },
-            DebugVertex {
-                position: [x + width, y + height],
-                color,
-            },
-            // Bottom line
-            DebugVertex {
-                position: [x + width, y + height],
-                color,
-            },
-            DebugVertex {
-                position: [x, y + height],
-                color,
-            },
-            // Left line
-            DebugVertex {
-                position: [x, y + height],
-                color,
-            },
-            DebugVertex {
-                position: [x, y],
-                color,
-            },
-        ];
-
+        let vertices = Self::rect_outline_vertices(x, y, width, height, color);
         self.vertices.extend_from_slice(&vertices);
     }
 
@@ -233,5 +269,32 @@ impl RenderPipeline for DebugPipeline {
 
     fn update(&mut self) {
         // Debug pipeline updates are handled externally via update_vertices
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DebugPipeline;
+
+    #[test]
+    fn rect_outline_vertices_cover_all_corners_with_triangle_outline() {
+        let color = [1.0, 0.0, 0.0, 1.0];
+        let vertices = DebugPipeline::rect_outline_vertices(0.0, 0.0, 16.0, 16.0, color);
+
+        // 4 edge quads * 2 triangles * 3 vertices
+        assert_eq!(vertices.len(), 24);
+        assert!(vertices.iter().any(|v| v.position == [0.0, 0.0]));
+        assert!(vertices.iter().any(|v| v.position == [16.0, 0.0]));
+        assert!(vertices.iter().any(|v| v.position == [16.0, 16.0]));
+        assert!(vertices.iter().any(|v| v.position == [0.0, 16.0]));
+    }
+
+    #[test]
+    fn rect_outline_vertices_tiny_rect_falls_back_to_single_quad() {
+        let color = [0.0, 1.0, 0.0, 1.0];
+        let vertices = DebugPipeline::rect_outline_vertices(4.0, 8.0, 0.2, 0.2, color);
+        assert_eq!(vertices.len(), 6);
+        assert!(vertices.iter().any(|v| v.position == [4.0, 8.0]));
+        assert!(vertices.iter().any(|v| v.position == [4.2, 8.2]));
     }
 }
