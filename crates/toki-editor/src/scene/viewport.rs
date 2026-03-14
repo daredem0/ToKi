@@ -52,6 +52,22 @@ fn screen_to_world_from_camera(
     glam::Vec2::new(world_x, world_y)
 }
 
+fn world_to_i32_floor(world_pos: glam::Vec2) -> glam::IVec2 {
+    glam::IVec2::new(world_pos.x.floor() as i32, world_pos.y.floor() as i32)
+}
+
+fn point_in_entity_bounds(
+    point_world: glam::IVec2,
+    entity_top_left: glam::IVec2,
+    entity_size: glam::UVec2,
+) -> bool {
+    let entity_max = entity_top_left + glam::IVec2::new(entity_size.x as i32, entity_size.y as i32);
+    point_world.x >= entity_top_left.x
+        && point_world.x < entity_max.x
+        && point_world.y >= entity_top_left.y
+        && point_world.y < entity_max.y
+}
+
 /// Handles the scene viewport - integration between scene data and rendering
 pub struct SceneViewport {
     scene_manager: SceneManager,
@@ -341,7 +357,7 @@ impl SceneViewport {
             .active_entities();
 
         // Convert world position to integer coordinates for comparison
-        let world_pos_i32 = glam::IVec2::new(world_pos.x as i32, world_pos.y as i32);
+        let world_pos_i32 = world_to_i32_floor(world_pos);
 
         // Iterate through entity IDs in reverse order (top layer first)
         // This ensures we select the topmost entity if they overlap
@@ -352,17 +368,7 @@ impl SceneViewport {
                 .entity_manager()
                 .get_entity(entity_id)
             {
-                // Calculate entity bounds (entities are positioned by their top-left corner)
-                let entity_min = entity.position;
-                let entity_max =
-                    entity.position + glam::IVec2::new(entity.size.x as i32, entity.size.y as i32);
-
-                // Check if click point is within entity bounds
-                if world_pos_i32.x >= entity_min.x
-                    && world_pos_i32.x < entity_max.x
-                    && world_pos_i32.y >= entity_min.y
-                    && world_pos_i32.y < entity_max.y
-                {
+                if point_in_entity_bounds(world_pos_i32, entity.position, entity.size) {
                     tracing::debug!(
                         "Entity hit detected: ID={}, position=({}, {}), size={}x{}, click=({}, {})",
                         entity.id,
@@ -636,11 +642,8 @@ impl SceneViewport {
             return;
         };
 
-        // Convert entity center position to top-left corner position for rendering
-        let half_size = glam::Vec2::new(size.x as f32 / 2.0, size.y as f32 / 2.0);
-        let render_position = glam::Vec2::new(position.x as f32, position.y as f32) - half_size;
-        let render_position_i32 =
-            glam::IVec2::new(render_position.x as i32, render_position.y as i32);
+        // Runtime/editor entity positions are top-left world coordinates.
+        let render_position_i32 = position;
 
         let sprite_instance = toki_render::SpriteInstance {
             frame,
@@ -653,8 +656,8 @@ impl SceneViewport {
         let viewport_x = (position.x - self.camera.position.x) as f32 / self.camera.scale as f32;
         let viewport_y = (position.y - self.camera.position.y) as f32 / self.camera.scale as f32;
 
-        tracing::trace!("Added sprite instance for entity {} - entity center: ({}, {}), viewport coords: ({:.1}, {:.1}), render position: ({:.1}, {:.1}), size: {}x{}",
-                       entity_id, position.x, position.y, viewport_x, viewport_y, render_position.x, render_position.y, size.x, size.y);
+        tracing::trace!("Added sprite instance for entity {} - entity world top-left: ({}, {}), viewport coords: ({:.1}, {:.1}), render position: ({}, {}), size: {}x{}",
+                       entity_id, position.x, position.y, viewport_x, viewport_y, render_position_i32.x, render_position_i32.y, size.x, size.y);
         tracing::trace!(
             "Sprite frame UVs: u0={:.3}, v0={:.3}, u1={:.3}, v1={:.3}",
             frame.u0,
@@ -711,11 +714,8 @@ impl SceneViewport {
         let entity_size =
             glam::UVec2::new(entity_def.rendering.size[0], entity_def.rendering.size[1]);
 
-        // Convert world position to render position (subtract half size for center-based positioning)
-        let half_size = glam::Vec2::new(entity_size.x as f32 / 2.0, entity_size.y as f32 / 2.0);
-        let render_position = preview_position - half_size;
-        let render_position_i32 =
-            glam::IVec2::new(render_position.x as i32, render_position.y as i32);
+        // Preview position uses top-left world coordinates.
+        let render_position_i32 = world_to_i32_floor(preview_position);
 
         let preview_sprite = toki_render::SpriteInstance {
             frame: cached_frame,
@@ -1340,7 +1340,7 @@ impl SceneViewport {
 
 #[cfg(test)]
 mod tests {
-    use super::screen_to_world_from_camera;
+    use super::{point_in_entity_bounds, screen_to_world_from_camera, world_to_i32_floor};
 
     #[test]
     fn screen_to_world_uses_camera_and_has_no_hardcoded_tile_offset() {
@@ -1377,5 +1377,24 @@ mod tests {
             1,
         );
         assert_eq!(right_letterbox.x, 160.0);
+    }
+
+    #[test]
+    fn world_to_i32_floor_uses_floor_for_negative_values() {
+        assert_eq!(
+            world_to_i32_floor(glam::Vec2::new(-0.1, -15.1)),
+            glam::IVec2::new(-1, -16)
+        );
+    }
+
+    #[test]
+    fn point_in_entity_bounds_is_left_top_inclusive_and_right_bottom_exclusive() {
+        let pos = glam::IVec2::new(10, 20);
+        let size = glam::UVec2::new(16, 16);
+
+        assert!(point_in_entity_bounds(glam::IVec2::new(10, 20), pos, size));
+        assert!(point_in_entity_bounds(glam::IVec2::new(25, 35), pos, size));
+        assert!(!point_in_entity_bounds(glam::IVec2::new(26, 35), pos, size));
+        assert!(!point_in_entity_bounds(glam::IVec2::new(25, 36), pos, size));
     }
 }
