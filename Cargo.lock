@@ -4311,6 +4311,10 @@ dependencies = [
 [[package]]
 name = "toki-schemas"
 version = "0.0.14"
+dependencies = [
+ "jsonschema",
+ "serde_json",
+]
 
 [[package]]
 name = "tokio"

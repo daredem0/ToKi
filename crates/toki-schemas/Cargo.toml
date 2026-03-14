@@ -11,3 +11,7 @@ readme.workspace = true
 [lib]
 name = "toki_schemas"
 path = "src/lib.rs"
+
+[dev-dependencies]
+jsonschema = "0.18"
+serde_json = "1.0"

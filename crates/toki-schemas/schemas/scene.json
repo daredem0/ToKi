@@ -212,11 +212,181 @@
         "actions": {
           "type": "array",
           "items": {
-            "type": "object"
+            "$ref": "#/definitions/ruleAction"
           },
           "description": "Rule action payloads (externally-tagged enum encoding)"
         }
       }
+    },
+    "ruleTarget": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": ["Player"]
+        },
+        {
+          "type": "object",
+          "required": ["Entity"],
+          "additionalProperties": false,
+          "properties": {
+            "Entity": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      ]
+    },
+    "ruleAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["PlaySound"],
+          "additionalProperties": false,
+          "properties": {
+            "PlaySound": {
+              "type": "object",
+              "required": ["channel", "sound_id"],
+              "additionalProperties": false,
+              "properties": {
+                "channel": {
+                  "type": "string",
+                  "enum": ["Movement", "Collision"]
+                },
+                "sound_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["PlayMusic"],
+          "additionalProperties": false,
+          "properties": {
+            "PlayMusic": {
+              "type": "object",
+              "required": ["track_id"],
+              "additionalProperties": false,
+              "properties": {
+                "track_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["PlayAnimation"],
+          "additionalProperties": false,
+          "properties": {
+            "PlayAnimation": {
+              "type": "object",
+              "required": ["target", "state"],
+              "additionalProperties": false,
+              "properties": {
+                "target": {
+                  "$ref": "#/definitions/ruleTarget"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": ["Idle", "Walk"]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["SetVelocity"],
+          "additionalProperties": false,
+          "properties": {
+            "SetVelocity": {
+              "type": "object",
+              "required": ["target", "velocity"],
+              "additionalProperties": false,
+              "properties": {
+                "target": {
+                  "$ref": "#/definitions/ruleTarget"
+                },
+                "velocity": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["Spawn"],
+          "additionalProperties": false,
+          "properties": {
+            "Spawn": {
+              "type": "object",
+              "required": ["entity_type", "position"],
+              "additionalProperties": false,
+              "properties": {
+                "entity_type": {
+                  "type": "string",
+                  "enum": ["PlayerLikeNpc", "Npc", "Item", "Decoration", "Trigger"]
+                },
+                "position": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["DestroySelf"],
+          "additionalProperties": false,
+          "properties": {
+            "DestroySelf": {
+              "type": "object",
+              "required": ["target"],
+              "additionalProperties": false,
+              "properties": {
+                "target": {
+                  "$ref": "#/definitions/ruleTarget"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["SwitchScene"],
+          "additionalProperties": false,
+          "properties": {
+            "SwitchScene": {
+              "type": "object",
+              "required": ["scene_name"],
+              "additionalProperties": false,
+              "properties": {
+                "scene_name": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "sceneEntity": {
       "type": "object",
