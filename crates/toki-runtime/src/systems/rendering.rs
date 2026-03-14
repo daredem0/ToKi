@@ -1,7 +1,104 @@
 use std::sync::Arc;
+use toki_core::graphics::vertex::QuadVertex;
 use toki_core::math::projection::{calculate_projection, ProjectionParameter};
+use toki_core::sprite::SpriteFrame;
 use toki_render::GpuState;
 use winit::window::Window;
+
+trait RuntimeRenderBackend: std::fmt::Debug {
+    fn load_tilemap_texture(
+        &mut self,
+        texture_path: std::path::PathBuf,
+    ) -> Result<(), toki_render::RenderError>;
+    fn load_sprite_texture(
+        &mut self,
+        texture_path: std::path::PathBuf,
+    ) -> Result<(), toki_render::RenderError>;
+    fn update_projection(&mut self, mvp: glam::Mat4);
+    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>);
+    fn draw(&mut self);
+    fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]);
+    fn clear_sprites(&mut self);
+    fn add_sprite(&mut self, frame: SpriteFrame, position: glam::IVec2, size: glam::UVec2);
+    fn clear_debug_shapes(&mut self);
+    fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
+    fn finalize_debug_shapes(&mut self);
+}
+
+#[derive(Debug)]
+struct WgpuRenderBackend {
+    gpu: GpuState,
+}
+
+impl WgpuRenderBackend {
+    fn new(window: Arc<Window>) -> Self {
+        Self {
+            gpu: GpuState::new(window),
+        }
+    }
+
+    fn new_with_textures(
+        window: Arc<Window>,
+        tilemap_texture: Option<std::path::PathBuf>,
+        sprite_texture: Option<std::path::PathBuf>,
+    ) -> Result<Self, toki_render::RenderError> {
+        Ok(Self {
+            gpu: GpuState::new_with_textures(window, tilemap_texture, sprite_texture)?,
+        })
+    }
+}
+
+impl RuntimeRenderBackend for WgpuRenderBackend {
+    fn load_tilemap_texture(
+        &mut self,
+        texture_path: std::path::PathBuf,
+    ) -> Result<(), toki_render::RenderError> {
+        self.gpu.load_tilemap_texture(texture_path)
+    }
+
+    fn load_sprite_texture(
+        &mut self,
+        texture_path: std::path::PathBuf,
+    ) -> Result<(), toki_render::RenderError> {
+        self.gpu.load_sprite_texture(texture_path)
+    }
+
+    fn update_projection(&mut self, mvp: glam::Mat4) {
+        self.gpu.update_projection(mvp);
+    }
+
+    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        self.gpu.resize(new_size);
+    }
+
+    fn draw(&mut self) {
+        self.gpu.draw();
+    }
+
+    fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
+        self.gpu.update_tilemap_vertices(vertices);
+    }
+
+    fn clear_sprites(&mut self) {
+        self.gpu.clear_sprites();
+    }
+
+    fn add_sprite(&mut self, frame: SpriteFrame, position: glam::IVec2, size: glam::UVec2) {
+        self.gpu.add_sprite(frame, position, size);
+    }
+
+    fn clear_debug_shapes(&mut self) {
+        self.gpu.clear_debug_shapes();
+    }
+
+    fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+        self.gpu.add_debug_rect(x, y, width, height, color);
+    }
+
+    fn finalize_debug_shapes(&mut self) {
+        self.gpu.finalize_debug_shapes();
+    }
+}
 
 /// Rendering system that manages GPU state and projection calculations.
 ///
@@ -9,7 +106,7 @@ use winit::window::Window;
 /// graphics operations while abstracting GPU implementation details.
 #[derive(Debug)]
 pub struct RenderingSystem {
-    gpu: Option<GpuState>,
+    backend: Option<Box<dyn RuntimeRenderBackend>>,
     projection_params: ProjectionParameter,
 }
 
@@ -23,7 +120,7 @@ impl RenderingSystem {
     /// Create a new RenderingSystem with default projection parameters
     pub fn new() -> Self {
         Self {
-            gpu: None,
+            backend: None,
             projection_params: ProjectionParameter {
                 width: 160,
                 height: 144,
@@ -36,7 +133,7 @@ impl RenderingSystem {
     /// Create a new RenderingSystem with custom projection parameters (for editor)
     pub fn new_with_projection(projection_params: ProjectionParameter) -> Self {
         Self {
-            gpu: None,
+            backend: None,
             projection_params,
         }
     }
@@ -54,8 +151,8 @@ impl RenderingSystem {
 
     /// Initialize GPU state with the given window (uses default textures)
     pub fn initialize_gpu(&mut self, window: Arc<Window>) {
-        let gpu = GpuState::new(window);
-        self.gpu = Some(gpu);
+        let backend = WgpuRenderBackend::new(window);
+        self.backend = Some(Box::new(backend));
     }
 
     /// Initialize GPU state with custom textures (for editor use)
@@ -65,8 +162,9 @@ impl RenderingSystem {
         tilemap_texture: Option<std::path::PathBuf>,
         sprite_texture: Option<std::path::PathBuf>,
     ) -> Result<(), toki_render::RenderError> {
-        let gpu = GpuState::new_with_textures(window, tilemap_texture, sprite_texture)?;
-        self.gpu = Some(gpu);
+        let backend =
+            WgpuRenderBackend::new_with_textures(window, tilemap_texture, sprite_texture)?;
+        self.backend = Some(Box::new(backend));
         Ok(())
     }
 
@@ -75,8 +173,8 @@ impl RenderingSystem {
         &mut self,
         texture_path: std::path::PathBuf,
     ) -> Result<(), toki_render::RenderError> {
-        if let Some(gpu) = &mut self.gpu {
-            gpu.load_tilemap_texture(texture_path)
+        if let Some(backend) = &mut self.backend {
+            backend.load_tilemap_texture(texture_path)
         } else {
             Err(toki_render::RenderError::Other(
                 "GPU not initialized".to_string(),
@@ -89,8 +187,8 @@ impl RenderingSystem {
         &mut self,
         texture_path: std::path::PathBuf,
     ) -> Result<(), toki_render::RenderError> {
-        if let Some(gpu) = &mut self.gpu {
-            gpu.load_sprite_texture(texture_path)
+        if let Some(backend) = &mut self.backend {
+            backend.load_sprite_texture(texture_path)
         } else {
             Err(toki_render::RenderError::Other(
                 "GPU not initialized".to_string(),
@@ -126,16 +224,6 @@ impl RenderingSystem {
         Ok(())
     }
 
-    /// Get mutable reference to GPU state
-    pub fn gpu_mut(&mut self) -> Option<&mut GpuState> {
-        self.gpu.as_mut()
-    }
-
-    /// Get reference to GPU state
-    pub fn gpu(&self) -> Option<&GpuState> {
-        self.gpu.as_ref()
-    }
-
     /// Update projection parameters with new window size
     pub fn update_window_size(&mut self, size: winit::dpi::PhysicalSize<u32>) {
         self.projection_params.width = size.width;
@@ -150,34 +238,75 @@ impl RenderingSystem {
     /// Update GPU projection matrix with view transform
     pub fn update_projection(&mut self, view_matrix: glam::Mat4) {
         let projection = self.calculate_projection();
-        if let Some(gpu) = &mut self.gpu {
-            gpu.update_projection(projection * view_matrix);
+        if let Some(backend) = &mut self.backend {
+            backend.update_projection(projection * view_matrix);
         }
     }
 
     /// Resize GPU render targets
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        if let Some(gpu) = &mut self.gpu {
-            gpu.resize(new_size);
+        if let Some(backend) = &mut self.backend {
+            backend.resize(new_size);
         }
         self.update_window_size(new_size);
     }
 
     /// Draw the current frame
     pub fn draw(&mut self) {
-        if let Some(gpu) = &mut self.gpu {
-            gpu.draw();
+        if let Some(backend) = &mut self.backend {
+            backend.draw();
         }
     }
 
     /// Check if GPU is initialized
     pub fn has_gpu(&self) -> bool {
-        self.gpu.is_some()
+        self.backend.is_some()
     }
 
     /// Get current projection parameters
     pub fn projection_params(&self) -> ProjectionParameter {
         self.projection_params
+    }
+
+    pub fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
+        if let Some(backend) = &mut self.backend {
+            backend.update_tilemap_vertices(vertices);
+        }
+    }
+
+    pub fn clear_sprites(&mut self) {
+        if let Some(backend) = &mut self.backend {
+            backend.clear_sprites();
+        }
+    }
+
+    pub fn add_sprite(&mut self, frame: SpriteFrame, position: glam::IVec2, size: glam::UVec2) {
+        if let Some(backend) = &mut self.backend {
+            backend.add_sprite(frame, position, size);
+        }
+    }
+
+    pub fn clear_debug_shapes(&mut self) {
+        if let Some(backend) = &mut self.backend {
+            backend.clear_debug_shapes();
+        }
+    }
+
+    pub fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+        if let Some(backend) = &mut self.backend {
+            backend.add_debug_rect(x, y, width, height, color);
+        }
+    }
+
+    pub fn finalize_debug_shapes(&mut self) {
+        if let Some(backend) = &mut self.backend {
+            backend.finalize_debug_shapes();
+        }
+    }
+
+    #[cfg(test)]
+    fn set_backend_for_tests(&mut self, backend: Box<dyn RuntimeRenderBackend>) {
+        self.backend = Some(backend);
     }
 }
 
@@ -216,8 +345,83 @@ fn find_image_for_atlas(atlas_path: &std::path::Path) -> Option<std::path::PathB
 
 #[cfg(test)]
 mod tests {
-    use super::{find_atlas_file, find_image_for_atlas, RenderingSystem};
+    use super::{find_atlas_file, find_image_for_atlas, RenderingSystem, RuntimeRenderBackend};
+    use std::cell::{Cell, RefCell};
     use std::path::Path;
+    use std::rc::Rc;
+    use toki_core::graphics::vertex::QuadVertex;
+    use toki_core::sprite::SpriteFrame;
+
+    #[derive(Default, Debug)]
+    struct FakeBackend {
+        projection_updates: Rc<Cell<usize>>,
+        draw_calls: Rc<Cell<usize>>,
+        resize_calls: Rc<Cell<usize>>,
+        tilemap_vertex_counts: Rc<RefCell<Vec<usize>>>,
+        sprite_count: Rc<Cell<usize>>,
+        debug_rect_count: Rc<Cell<usize>>,
+        finalized_debug: Rc<Cell<usize>>,
+    }
+
+    impl RuntimeRenderBackend for FakeBackend {
+        fn load_tilemap_texture(
+            &mut self,
+            _texture_path: std::path::PathBuf,
+        ) -> Result<(), toki_render::RenderError> {
+            Ok(())
+        }
+
+        fn load_sprite_texture(
+            &mut self,
+            _texture_path: std::path::PathBuf,
+        ) -> Result<(), toki_render::RenderError> {
+            Ok(())
+        }
+
+        fn update_projection(&mut self, _mvp: glam::Mat4) {
+            self.projection_updates
+                .set(self.projection_updates.get() + 1);
+        }
+
+        fn resize(&mut self, _new_size: winit::dpi::PhysicalSize<u32>) {
+            self.resize_calls.set(self.resize_calls.get() + 1);
+        }
+
+        fn draw(&mut self) {
+            self.draw_calls.set(self.draw_calls.get() + 1);
+        }
+
+        fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
+            self.tilemap_vertex_counts.borrow_mut().push(vertices.len());
+        }
+
+        fn clear_sprites(&mut self) {
+            self.sprite_count.set(0);
+        }
+
+        fn add_sprite(&mut self, _frame: SpriteFrame, _position: glam::IVec2, _size: glam::UVec2) {
+            self.sprite_count.set(self.sprite_count.get() + 1);
+        }
+
+        fn clear_debug_shapes(&mut self) {
+            self.debug_rect_count.set(0);
+        }
+
+        fn add_debug_rect(
+            &mut self,
+            _x: f32,
+            _y: f32,
+            _width: f32,
+            _height: f32,
+            _color: [f32; 4],
+        ) {
+            self.debug_rect_count.set(self.debug_rect_count.get() + 1);
+        }
+
+        fn finalize_debug_shapes(&mut self) {
+            self.finalized_debug.set(self.finalized_debug.get() + 1);
+        }
+    }
 
     fn make_unique_temp_dir() -> std::path::PathBuf {
         let nanos = std::time::SystemTime::now()
@@ -288,5 +492,56 @@ mod tests {
             .expect("missing project assets should be treated as no-op");
 
         std::fs::remove_dir_all(tmp).expect("temp dir cleanup should succeed");
+    }
+
+    #[test]
+    fn backend_seam_dispatches_runtime_render_commands() {
+        let fake = FakeBackend::default();
+        let projection_counter = fake.projection_updates.clone();
+        let draw_counter = fake.draw_calls.clone();
+        let resize_counter = fake.resize_calls.clone();
+        let tilemap_counts = fake.tilemap_vertex_counts.clone();
+        let debug_finalize_counter = fake.finalized_debug.clone();
+
+        let mut rendering = RenderingSystem::new();
+        rendering.set_backend_for_tests(Box::new(fake));
+        assert!(
+            rendering.has_gpu(),
+            "test backend should be treated as initialized"
+        );
+
+        rendering.update_projection(glam::Mat4::IDENTITY);
+        rendering.resize(winit::dpi::PhysicalSize::new(640, 480));
+        rendering.update_tilemap_vertices(&[
+            QuadVertex {
+                position: [0.0, 0.0],
+                tex_coords: [0.0, 0.0],
+            },
+            QuadVertex {
+                position: [16.0, 16.0],
+                tex_coords: [1.0, 1.0],
+            },
+        ]);
+        rendering.clear_sprites();
+        rendering.add_sprite(
+            SpriteFrame {
+                u0: 0.0,
+                v0: 0.0,
+                u1: 1.0,
+                v1: 1.0,
+            },
+            glam::IVec2::new(10, 20),
+            glam::UVec2::new(16, 16),
+        );
+        rendering.clear_debug_shapes();
+        rendering.add_debug_rect(0.0, 0.0, 16.0, 16.0, [1.0, 0.0, 0.0, 1.0]);
+        rendering.finalize_debug_shapes();
+        rendering.draw();
+
+        assert_eq!(projection_counter.get(), 1);
+        assert_eq!(draw_counter.get(), 1);
+        assert_eq!(resize_counter.get(), 1);
+        assert_eq!(tilemap_counts.borrow().as_slice(), &[2]);
+        assert_eq!(debug_finalize_counter.get(), 1);
     }
 }
