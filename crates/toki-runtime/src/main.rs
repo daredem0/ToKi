@@ -400,10 +400,102 @@ mod tests {
     }
 
     #[test]
+    fn apply_runtime_config_keeps_existing_paths_and_scene_but_updates_splash_duration() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let mut options = RuntimeLaunchOptions::default();
+        options.project_path = Some(PathBuf::from("/cli/project"));
+        options.pack_path = Some(PathBuf::from("/cli/game.toki.pak"));
+        options.scene_name = Some("CLI Scene".to_string());
+        options.splash.duration_ms = 2500;
+        options.splash.show_branding = false;
+
+        apply_runtime_config(
+            &mut options,
+            RuntimeConfig {
+                version: 1,
+                bundle_name: Some("Demo".to_string()),
+                pack: Some(RuntimeConfigPack {
+                    path: "game.toki.pak".to_string(),
+                    enabled: true,
+                }),
+                startup: Some(RuntimeConfigStartup {
+                    scene: Some("Config Scene".to_string()),
+                }),
+                splash: Some(RuntimeConfigSplash {
+                    duration_ms: Some(3200),
+                }),
+            },
+            temp.path(),
+        );
+
+        assert_eq!(options.project_path, Some(PathBuf::from("/cli/project")));
+        assert_eq!(options.pack_path, Some(PathBuf::from("/cli/game.toki.pak")));
+        assert_eq!(options.scene_name.as_deref(), Some("CLI Scene"));
+        assert_eq!(options.splash.duration_ms, 3200);
+        assert!(!options.splash.show_branding);
+    }
+
+    #[test]
+    fn apply_runtime_config_ignores_disabled_pack_entry() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let mut options = RuntimeLaunchOptions::default();
+        apply_runtime_config(
+            &mut options,
+            RuntimeConfig {
+                version: 1,
+                bundle_name: Some("Demo".to_string()),
+                pack: Some(RuntimeConfigPack {
+                    path: "game.toki.pak".to_string(),
+                    enabled: false,
+                }),
+                startup: Some(RuntimeConfigStartup {
+                    scene: Some("Main Scene".to_string()),
+                }),
+                splash: None,
+            },
+            temp.path(),
+        );
+
+        assert_eq!(options.project_path, Some(temp.path().to_path_buf()));
+        assert!(options.pack_path.is_none());
+        assert_eq!(options.scene_name.as_deref(), Some("Main Scene"));
+    }
+
+    #[test]
     fn load_runtime_config_returns_none_without_file() {
         let temp = tempfile::tempdir().expect("temp dir");
         let cfg = load_runtime_config_from_candidates(&[temp.path().join("runtime_config.json")]);
         assert!(cfg.is_none());
+    }
+
+    #[test]
+    fn load_runtime_config_skips_invalid_candidate_and_uses_next() {
+        let first = tempfile::tempdir().expect("first temp dir");
+        let second = tempfile::tempdir().expect("second temp dir");
+        let first_cfg = first.path().join("runtime_config.json");
+        let second_cfg = second.path().join("runtime_config.json");
+        std::fs::write(&first_cfg, "{ invalid json ").expect("first config");
+        std::fs::write(
+            &second_cfg,
+            r#"{
+  "version": 1,
+  "pack": { "path": "game.toki.pak", "enabled": true },
+  "startup": { "scene": "Main Scene" },
+  "splash": { "duration_ms": 3000 }
+}"#,
+        )
+        .expect("second config");
+
+        let loaded = load_runtime_config_from_candidates(&[first_cfg, second_cfg.clone()])
+            .expect("second candidate should load");
+        assert_eq!(loaded.1, second.path().to_path_buf());
+        assert_eq!(
+            loaded.0.pack,
+            Some(RuntimeConfigPack {
+                path: "game.toki.pak".to_string(),
+                enabled: true
+            })
+        );
     }
 
     #[test]

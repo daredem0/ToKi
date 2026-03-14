@@ -79,28 +79,15 @@ impl AudioManager {
             return Ok(());
         }
 
-        let entries = fs::read_dir(&sfx_dir)?;
-
-        for entry in entries {
-            let entry = entry?;
-            let path = entry.path();
-
-            if let Some(extension) = path.extension() {
-                if extension == "ogg" {
-                    if let Some(file_stem) = path.file_stem() {
-                        if let Some(name) = file_stem.to_str() {
-                            let path_str = path.to_string_lossy().to_string();
-                            if let Err(e) = self.preload_sound(name, &path_str) {
-                                tracing::warn!(
-                                    "Failed to preload SFX '{}':
+        for (name, path) in discover_ogg_assets(&sfx_dir)? {
+            let path_str = path.to_string_lossy().to_string();
+            if let Err(e) = self.preload_sound(&name, &path_str) {
+                tracing::warn!(
+                    "Failed to preload SFX '{}':
   {}",
-                                    name,
-                                    e
-                                );
-                            }
-                        }
-                    }
-                }
+                    name,
+                    e
+                );
             }
         }
 
@@ -116,22 +103,9 @@ impl AudioManager {
             return Ok(());
         }
 
-        let entries = fs::read_dir(&music_dir)?;
-
-        for entry in entries {
-            let entry = entry?;
-            let path = entry.path();
-
-            if let Some(extension) = path.extension() {
-                if extension == "ogg" {
-                    if let Some(file_stem) = path.file_stem() {
-                        if let Some(name) = file_stem.to_str() {
-                            let path_str = path.to_string_lossy().to_string();
-                            self.music_paths.insert(name.to_string(), path_str);
-                        }
-                    }
-                }
-            }
+        for (name, path) in discover_ogg_assets(&music_dir)? {
+            let path_str = path.to_string_lossy().to_string();
+            self.music_paths.insert(name, path_str);
         }
 
         tracing::info!("Discovered {} music files", self.music_paths.len());
@@ -489,6 +463,70 @@ impl AudioManager {
             "Available Music: {:?}",
             self.music_paths.keys().collect::<Vec<_>>()
         );
+    }
+}
+
+fn discover_ogg_assets(dir: &Path) -> Result<Vec<(String, PathBuf)>, std::io::Error> {
+    let mut discovered = Vec::new();
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("ogg"))
+        {
+            if let Some(name) = path
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .map(str::to_string)
+            {
+                discovered.push((name, path));
+            }
+        }
+    }
+    discovered.sort_by(|(a, _), (b, _)| a.cmp(b));
+    Ok(discovered)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::discover_ogg_assets;
+    use std::fs;
+
+    #[test]
+    fn discover_ogg_assets_returns_sorted_stems_and_paths() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let audio_dir = temp.path().join("audio");
+        fs::create_dir_all(&audio_dir).expect("audio dir");
+        fs::write(audio_dir.join("z_sound.ogg"), "z").expect("z");
+        fs::write(audio_dir.join("a_sound.ogg"), "a").expect("a");
+        fs::write(audio_dir.join("readme.txt"), "ignore").expect("txt");
+
+        let discovered = discover_ogg_assets(&audio_dir).expect("discover");
+        assert_eq!(discovered.len(), 2);
+        assert_eq!(discovered[0].0, "a_sound");
+        assert_eq!(discovered[1].0, "z_sound");
+        assert_eq!(
+            discovered[0].1.file_name().and_then(|name| name.to_str()),
+            Some("a_sound.ogg")
+        );
+        assert_eq!(
+            discovered[1].1.file_name().and_then(|name| name.to_str()),
+            Some("z_sound.ogg")
+        );
+    }
+
+    #[test]
+    fn discover_ogg_assets_ignores_non_audio_extensions() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let audio_dir = temp.path().join("audio");
+        fs::create_dir_all(&audio_dir).expect("audio dir");
+        fs::write(audio_dir.join("sound.mp3"), "x").expect("mp3");
+        fs::write(audio_dir.join("sound.wav"), "x").expect("wav");
+
+        let discovered = discover_ogg_assets(&audio_dir).expect("discover");
+        assert!(discovered.is_empty());
     }
 }
 

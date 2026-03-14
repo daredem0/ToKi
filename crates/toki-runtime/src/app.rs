@@ -941,6 +941,8 @@ mod tests {
         first_existing_path, App, RuntimeLaunchOptions, RuntimeSplashOptions, SplashPolicy,
     };
     use std::fs;
+    use std::io::{Seek, Write};
+    use std::path::PathBuf;
     use std::time::Duration;
     use toki_core::math::projection::ProjectionParameter;
     use toki_core::rules::{
@@ -956,6 +958,41 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("toki_runtime_app_tests_{nanos}"));
         std::fs::create_dir_all(&dir).expect("temp dir should be created");
         dir
+    }
+
+    fn write_test_pak(pak_path: &std::path::Path, entries: &[(String, Vec<u8>)]) {
+        let mut file = fs::File::create(pak_path).expect("create pak");
+        file.write_all(b"TOKIPAK1").expect("magic");
+        file.write_all(&0u64.to_le_bytes())
+            .expect("offset placeholder");
+        file.write_all(&0u64.to_le_bytes())
+            .expect("size placeholder");
+
+        let mut manifest_entries = Vec::new();
+        for (path, payload) in entries {
+            let offset = file.stream_position().expect("offset");
+            file.write_all(payload).expect("payload");
+            manifest_entries.push(serde_json::json!({
+                "path": path,
+                "offset": offset,
+                "size": payload.len(),
+                "compression": "none"
+            }));
+        }
+
+        let index_offset = file.stream_position().expect("index offset");
+        let index_bytes = serde_json::to_vec_pretty(&serde_json::json!({
+            "version": 1,
+            "entries": manifest_entries
+        }))
+        .expect("manifest");
+        file.write_all(&index_bytes).expect("index");
+        let index_size = index_bytes.len() as u64;
+        file.seek(std::io::SeekFrom::Start(8)).expect("seek header");
+        file.write_all(&index_offset.to_le_bytes())
+            .expect("write offset");
+        file.write_all(&index_size.to_le_bytes())
+            .expect("write size");
     }
 
     #[test]
@@ -1172,6 +1209,75 @@ mod tests {
         let resolved =
             App::resolve_post_splash_sprite_texture_path(&options, Some(&mount_dir));
         assert_eq!(resolved, Some(mount_creatures));
+    }
+
+    #[test]
+    fn build_startup_state_loads_resources_and_scene_from_pack_mount() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let pack_path = temp.path().join("game.toki.pak");
+
+        let mut scene = Scene::new("Main Scene".to_string());
+        scene.maps.push("demo_map".to_string());
+        let scene_json = serde_json::to_vec_pretty(&scene).expect("scene json");
+
+        let creatures_atlas = br#"{
+  "image": "creatures.png",
+  "tile_size": [16, 16],
+  "tiles": {
+    "idle": { "position": [0, 0], "properties": { "solid": false } }
+  }
+}"#
+        .to_vec();
+
+        let terrain_atlas_path = PathBuf::from("terrain.json");
+        let map_json = format!(
+            r#"{{
+  "size": [1, 1],
+  "tile_size": [16, 16],
+  "atlas": "{}",
+  "tiles": ["floor"]
+}}"#,
+            terrain_atlas_path.display()
+        )
+        .into_bytes();
+
+        let terrain_atlas = br#"{
+  "image": "terrain.png",
+  "tile_size": [16, 16],
+  "tiles": {
+    "floor": { "position": [0, 0], "properties": { "solid": false } }
+  }
+}"#
+        .to_vec();
+
+        write_test_pak(
+            &pack_path,
+            &[
+                ("scenes/Main Scene.json".to_string(), scene_json),
+                ("assets/sprites/creatures.json".to_string(), creatures_atlas),
+                ("assets/tilemaps/demo_map.json".to_string(), map_json),
+                ("assets/tilemaps/terrain.json".to_string(), terrain_atlas),
+            ],
+        );
+
+        let launch_options = RuntimeLaunchOptions {
+            project_path: None,
+            pack_path: Some(pack_path),
+            scene_name: Some("Main Scene".to_string()),
+            map_name: None,
+            splash: RuntimeSplashOptions::default(),
+        };
+
+        let (resources, game_state, pack_mount) = App::build_startup_state(&launch_options);
+
+        assert!(pack_mount.is_some(), "pack mount should be retained");
+        assert_eq!(
+            game_state.scene_manager().active_scene_name(),
+            Some("Main Scene")
+        );
+        assert_eq!(game_state.entity_manager().active_entities().len(), 0);
+        assert_eq!(resources.get_tilemap().size, glam::UVec2::new(1, 1));
+        assert_eq!(resources.get_tilemap().atlas, terrain_atlas_path);
     }
 
     #[test]
