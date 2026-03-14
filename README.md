@@ -7,6 +7,10 @@
 [![License](https://img.shields.io/badge/license-MPL--2.0%20libs%20%7C%20community%2Fcommercial%20apps-blue)](./README.md#license)
 [![Rust Edition](https://img.shields.io/badge/rust-2024%20edition-black?logo=rust)](https://www.rust-lang.org/)
 
+<p align="center">
+  <img src="./assets/TokiLogo.png" alt="ToKi Logo" width="320" />
+</p>
+
 **ToKi** is a lightweight, pixel-perfect 2D game engine and editor inspired by the visual and design constraints of the original Nintendo Game Boy.  
 It provides a modular toolkit for making retro-style games with clean pixel graphics, tilemaps, animations, and visual scripting — all self-contained and offline.
 
@@ -146,3 +150,8 @@ The application-layer packages use this model:
 - **Separate written commercial agreement required** — see `LICENSE-COMMERCIAL.md` for commercial or monetized use
 
 `LICENSE.md` is the canonical and Cargo-facing license file for `toki-runtime` and `toki-editor`.
+
+### Logo Rights
+
+The ToKi logo file at `assets/TokiLogo.png` is **not** covered by the source-code licenses above.  
+All rights to the ToKi logo are reserved.
