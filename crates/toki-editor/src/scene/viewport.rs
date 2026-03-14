@@ -672,6 +672,10 @@ impl SceneViewport {
                 .path
                 .parent()
                 .map(|parent| parent.join(&sprite_atlas.image)),
+            flip_x: self
+                .scene_manager
+                .game_state()
+                .get_entity_sprite_flip_x(entity_id),
         };
 
         scene_data.sprites.push(sprite_instance);
@@ -745,6 +749,7 @@ impl SceneViewport {
             position: render_position_i32,
             size: entity_size,
             texture_path: None,
+            flip_x: false,
         };
 
         scene_data.sprites.push(preview_sprite);

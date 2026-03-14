@@ -24,6 +24,7 @@ pub struct SpriteInstance {
     pub position: glam::IVec2,
     pub size: glam::UVec2,
     pub texture_path: Option<std::path::PathBuf>,
+    pub flip_x: bool,
 }
 
 /// Debug shape for rendering
@@ -182,6 +183,7 @@ impl SceneRenderer {
             frame: sprite.frame,
             position: sprite.position.as_vec2(),
             size: sprite.size.as_vec2(),
+            flip_x: sprite.flip_x,
         };
 
         if let Some(texture_path) = &sprite.texture_path {

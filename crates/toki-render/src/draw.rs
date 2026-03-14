@@ -7,33 +7,39 @@ pub fn build_quad_vertices(
     width: f32,
     height: f32,
     origin: Vec2, // <— new
+    flip_x: bool,
 ) -> [QuadVertex; 6] {
     let ox = origin.x;
     let oy = origin.y;
+    let (u0, u1) = if flip_x {
+        (frame.u1, frame.u0)
+    } else {
+        (frame.u0, frame.u1)
+    };
     [
         QuadVertex {
             position: [ox, oy],
-            tex_coords: [frame.u0, frame.v0],
+            tex_coords: [u0, frame.v0],
         },
         QuadVertex {
             position: [ox + width, oy],
-            tex_coords: [frame.u1, frame.v0],
+            tex_coords: [u1, frame.v0],
         },
         QuadVertex {
             position: [ox + width, oy + height],
-            tex_coords: [frame.u1, frame.v1],
+            tex_coords: [u1, frame.v1],
         },
         QuadVertex {
             position: [ox, oy],
-            tex_coords: [frame.u0, frame.v0],
+            tex_coords: [u0, frame.v0],
         },
         QuadVertex {
             position: [ox + width, oy + height],
-            tex_coords: [frame.u1, frame.v1],
+            tex_coords: [u1, frame.v1],
         },
         QuadVertex {
             position: [ox, oy + height],
-            tex_coords: [frame.u0, frame.v1],
+            tex_coords: [u0, frame.v1],
         },
     ]
 }
@@ -52,7 +58,7 @@ mod tests {
             u1: 0.9,
             v1: 0.8,
         };
-        let vertices = build_quad_vertices(frame, 32.0, 16.0, Vec2::new(5.0, 7.0));
+        let vertices = build_quad_vertices(frame, 32.0, 16.0, Vec2::new(5.0, 7.0), false);
 
         assert_eq!(vertices.len(), 6);
         assert_eq!(vertices[0].position, [5.0, 7.0]);
@@ -62,5 +68,21 @@ mod tests {
 
         assert_eq!(vertices[0].tex_coords, [0.1, 0.2]);
         assert_eq!(vertices[2].tex_coords, [0.9, 0.8]);
+    }
+
+    #[test]
+    fn build_quad_vertices_swaps_horizontal_uvs_when_flipped() {
+        let frame = SpriteFrame {
+            u0: 0.1,
+            v0: 0.2,
+            u1: 0.9,
+            v1: 0.8,
+        };
+        let vertices = build_quad_vertices(frame, 32.0, 16.0, Vec2::new(5.0, 7.0), true);
+
+        assert_eq!(vertices[0].tex_coords, [0.9, 0.2]);
+        assert_eq!(vertices[1].tex_coords, [0.1, 0.2]);
+        assert_eq!(vertices[2].tex_coords, [0.1, 0.8]);
+        assert_eq!(vertices[5].tex_coords, [0.9, 0.8]);
     }
 }

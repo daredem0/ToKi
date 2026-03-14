@@ -30,13 +30,20 @@ trait RuntimeRenderBackend: std::fmt::Debug {
     fn draw(&mut self);
     fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]);
     fn clear_sprites(&mut self);
-    fn add_sprite(&mut self, frame: SpriteFrame, position: glam::IVec2, size: glam::UVec2);
+    fn add_sprite(
+        &mut self,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    );
     fn add_sprite_with_texture(
         &mut self,
         texture_path: std::path::PathBuf,
         frame: SpriteFrame,
         position: glam::IVec2,
         size: glam::UVec2,
+        flip_x: bool,
     );
     fn clear_text_items(&mut self);
     fn add_text_item(&mut self, text: TextItem);
@@ -121,8 +128,14 @@ impl RuntimeRenderBackend for WgpuRenderBackend {
         self.gpu.clear_sprites();
     }
 
-    fn add_sprite(&mut self, frame: SpriteFrame, position: glam::IVec2, size: glam::UVec2) {
-        self.gpu.add_sprite(frame, position, size);
+    fn add_sprite(
+        &mut self,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    ) {
+        self.gpu.add_sprite_flipped(frame, position, size, flip_x);
     }
 
     fn add_sprite_with_texture(
@@ -131,9 +144,10 @@ impl RuntimeRenderBackend for WgpuRenderBackend {
         frame: SpriteFrame,
         position: glam::IVec2,
         size: glam::UVec2,
+        flip_x: bool,
     ) {
         self.gpu
-            .add_sprite_with_texture(texture_path, frame, position, size);
+            .add_sprite_with_texture_flipped(texture_path, frame, position, size, flip_x);
     }
 
     fn clear_text_items(&mut self) {
@@ -395,9 +409,15 @@ impl RenderingSystem {
         }
     }
 
-    pub fn add_sprite(&mut self, frame: SpriteFrame, position: glam::IVec2, size: glam::UVec2) {
+    pub fn add_sprite(
+        &mut self,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    ) {
         if let Some(backend) = &mut self.backend {
-            backend.add_sprite(frame, position, size);
+            backend.add_sprite(frame, position, size, flip_x);
         }
     }
 
@@ -407,9 +427,10 @@ impl RenderingSystem {
         frame: SpriteFrame,
         position: glam::IVec2,
         size: glam::UVec2,
+        flip_x: bool,
     ) {
         if let Some(backend) = &mut self.backend {
-            backend.add_sprite_with_texture(texture_path, frame, position, size);
+            backend.add_sprite_with_texture(texture_path, frame, position, size, flip_x);
         }
     }
 
@@ -591,7 +612,13 @@ mod tests {
             self.sprite_count.set(0);
         }
 
-        fn add_sprite(&mut self, _frame: SpriteFrame, _position: glam::IVec2, _size: glam::UVec2) {
+        fn add_sprite(
+            &mut self,
+            _frame: SpriteFrame,
+            _position: glam::IVec2,
+            _size: glam::UVec2,
+            _flip_x: bool,
+        ) {
             self.sprite_count.set(self.sprite_count.get() + 1);
         }
 
@@ -601,6 +628,7 @@ mod tests {
             _frame: SpriteFrame,
             _position: glam::IVec2,
             _size: glam::UVec2,
+            _flip_x: bool,
         ) {
             self.sprite_count.set(self.sprite_count.get() + 1);
         }
@@ -773,6 +801,7 @@ mod tests {
             },
             glam::IVec2::new(10, 20),
             glam::UVec2::new(16, 16),
+            false,
         );
         rendering.clear_text_items();
         rendering.add_text_item(TextItem::new_screen(

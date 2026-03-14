@@ -54,6 +54,23 @@ impl GpuState {
             frame,
             position: pos.as_vec2(), // Convert to float for GPU
             size: size.as_vec2(),    // Convert to float for GPU
+            flip_x: false,
+        };
+        self.sprite_pipeline.add_sprite(instance);
+    }
+
+    pub fn add_sprite_flipped(
+        &mut self,
+        frame: SpriteFrame,
+        pos: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    ) {
+        let instance = SpriteInstance {
+            frame,
+            position: pos.as_vec2(),
+            size: size.as_vec2(),
+            flip_x,
         };
         self.sprite_pipeline.add_sprite(instance);
     }
@@ -69,6 +86,36 @@ impl GpuState {
             frame,
             position: pos.as_vec2(),
             size: size.as_vec2(),
+            flip_x: false,
+        };
+        let pipeline = self
+            .sprite_pipelines_by_texture
+            .entry(texture_path.clone())
+            .or_insert_with(|| {
+                SpritePipeline::new(
+                    &self.device,
+                    &self.queue,
+                    self.config.format,
+                    texture_path,
+                )
+            });
+        pipeline.update_projection(&self.queue, self.current_mvp);
+        pipeline.add_sprite(instance);
+    }
+
+    pub fn add_sprite_with_texture_flipped(
+        &mut self,
+        texture_path: PathBuf,
+        frame: SpriteFrame,
+        pos: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    ) {
+        let instance = SpriteInstance {
+            frame,
+            position: pos.as_vec2(),
+            size: size.as_vec2(),
+            flip_x,
         };
         let pipeline = self
             .sprite_pipelines_by_texture

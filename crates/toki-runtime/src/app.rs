@@ -517,13 +517,14 @@ impl App {
                     sprite_atlas,
                     texture_size,
                 ) {
+                    let flip_x = self.game_system.get_entity_sprite_flip_x(entity_id);
                     if let Some(texture_path) =
                         self.resources.get_sprite_texture_path(&atlas_name).cloned()
                     {
                         self.rendering
-                            .add_sprite_with_texture(texture_path, frame, position, size);
+                            .add_sprite_with_texture(texture_path, frame, position, size, flip_x);
                     } else {
-                        self.rendering.add_sprite(frame, position, size);
+                        self.rendering.add_sprite(frame, position, size, flip_x);
                     }
                 }
             }
@@ -768,6 +769,7 @@ impl App {
                 },
                 logo_origin,
                 logo_size,
+                false,
             );
         }
         if self.splash_config.show_branding {

@@ -174,6 +174,10 @@ impl GameState {
         }
     }
 
+    fn animation_state_flip_x(state: AnimationState) -> bool {
+        matches!(state, AnimationState::IdleLeft | AnimationState::WalkLeft)
+    }
+
     fn resolve_animation_state(
         animation_controller: &AnimationController,
         moving: bool,
@@ -968,6 +972,14 @@ impl GameState {
             .get_entity(entity_id)
             .and_then(|entity| entity.attributes.animation_controller.as_ref())
             .and_then(|controller| controller.current_atlas_name().ok())
+    }
+
+    pub fn get_entity_sprite_flip_x(&self, entity_id: EntityId) -> bool {
+        self.entity_manager
+            .get_entity(entity_id)
+            .and_then(|entity| entity.attributes.animation_controller.as_ref())
+            .map(|controller| Self::animation_state_flip_x(controller.current_clip_state))
+            .unwrap_or(false)
     }
 
     /// Get all renderable entities (entities that are visible and have animation controllers)

@@ -25,6 +25,7 @@ pub struct SpriteInstance {
     pub frame: SpriteFrame,
     pub position: Vec2,
     pub size: Vec2,
+    pub flip_x: bool,
 }
 
 #[derive(Debug)]
@@ -199,6 +200,7 @@ impl SpritePipeline {
                 instance.size.x,
                 instance.size.y,
                 instance.position,
+                instance.flip_x,
             );
             vertices.extend_from_slice(&quad_verts);
         }

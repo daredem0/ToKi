@@ -452,6 +452,47 @@ fn game_state_directional_walk_animation_follows_movement_direction() {
 }
 
 #[test]
+fn game_state_left_direction_requests_horizontal_flip() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleDown,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::WalkLeft,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.play(AnimationState::IdleDown);
+
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    game_state.handle_key_press(InputKey::Left);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.handle_key_release(InputKey::Left);
+
+    let player_id = game_state.player_id().expect("player id should exist");
+    assert!(game_state.get_entity_sprite_flip_x(player_id));
+}
+
+#[test]
 fn game_state_sprite_animation_updates() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
