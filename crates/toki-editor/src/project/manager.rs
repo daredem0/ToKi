@@ -225,7 +225,10 @@ impl ProjectManager {
 #[cfg(test)]
 mod tests {
     use super::ProjectManager;
-    use std::collections::HashMap;
+    use crate::ui::rule_graph::RuleGraph;
+    use jsonschema::JSONSchema;
+    use serde_json::Value;
+    use std::collections::{HashMap, HashSet};
     use std::fs;
     use std::path::PathBuf;
     use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
@@ -234,7 +237,12 @@ mod tests {
     use toki_core::rules::{
         Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger,
     };
-    use toki_core::{GameState, Scene};
+    use toki_core::{GameState, InputKey, Scene};
+
+    const FULL_SURFACE_FIXTURE: &str =
+        include_str!("../../tests/fixtures/scene_rules_full_surface.json");
+    const ON_PLAYER_MOVE_RUNTIME_FIXTURE: &str =
+        include_str!("../../tests/fixtures/scene_rules_on_player_move_runtime.json");
 
     #[test]
     fn scene_json_roundtrip_through_editor_persists_rules_and_executes_in_runtime() {
@@ -337,6 +345,170 @@ mod tests {
         assert!(!second_update.events.iter().any(|event| {
             matches!(event, AudioEvent::BackgroundMusic(track_id) if track_id == "lavandia")
         }));
+    }
+
+    #[test]
+    fn regression_fixtures_validate_schema_and_roundtrip_across_core_and_editor_graph() {
+        let scene_schema = compile_scene_schema();
+
+        for (fixture_name, fixture_source) in [
+            ("scene_rules_full_surface.json", FULL_SURFACE_FIXTURE),
+            (
+                "scene_rules_on_player_move_runtime.json",
+                ON_PLAYER_MOVE_RUNTIME_FIXTURE,
+            ),
+        ] {
+            let fixture_value: Value =
+                serde_json::from_str(fixture_source).unwrap_or_else(|error| {
+                    panic!("Fixture '{}' should parse: {}", fixture_name, error)
+                });
+            assert_valid_scene_schema(&scene_schema, &fixture_value, fixture_name);
+
+            let scene: Scene = serde_json::from_str(fixture_source).unwrap_or_else(|error| {
+                panic!(
+                    "Fixture '{}' should deserialize into toki-core Scene: {}",
+                    fixture_name, error
+                )
+            });
+
+            let graph = RuleGraph::from_rule_set(&scene.rules);
+            let roundtrip_rules = graph.to_rule_set().unwrap_or_else(|error| {
+                panic!(
+                    "Fixture '{}' should roundtrip through editor RuleGraph: {:?}",
+                    fixture_name, error
+                )
+            });
+            assert_eq!(
+                roundtrip_rules, scene.rules,
+                "Fixture '{}' rules should survive RuleGraph conversion unchanged",
+                fixture_name
+            );
+
+            let reserialized_scene =
+                serde_json::to_value(&scene).expect("scene should serialize back to JSON");
+            assert_valid_scene_schema(&scene_schema, &reserialized_scene, fixture_name);
+        }
+    }
+
+    #[test]
+    fn full_surface_fixture_covers_all_rule_trigger_and_action_variants() {
+        let scene: Scene = serde_json::from_str(FULL_SURFACE_FIXTURE)
+            .expect("full-surface fixture should deserialize into Scene");
+
+        let mut seen_triggers = HashSet::new();
+        let mut seen_actions = HashSet::new();
+
+        for rule in &scene.rules.rules {
+            seen_triggers.insert(trigger_kind_label(&rule.trigger));
+            for action in &rule.actions {
+                seen_actions.insert(action_kind_label(action));
+            }
+        }
+
+        assert_eq!(
+            seen_triggers,
+            HashSet::from([
+                "OnStart",
+                "OnUpdate",
+                "OnPlayerMove",
+                "OnKey",
+                "OnCollision",
+                "OnTrigger",
+            ]),
+            "Fixture should cover every supported trigger variant"
+        );
+        assert_eq!(
+            seen_actions,
+            HashSet::from([
+                "PlaySound",
+                "PlayMusic",
+                "PlayAnimation",
+                "SetVelocity",
+                "Spawn",
+                "DestroySelf",
+                "SwitchScene",
+            ]),
+            "Fixture should cover every supported action variant"
+        );
+    }
+
+    #[test]
+    fn on_player_move_fixture_executes_in_runtime_and_emits_expected_audio_event() {
+        let scene: Scene = serde_json::from_str(ON_PLAYER_MOVE_RUNTIME_FIXTURE)
+            .expect("on-player-move fixture should deserialize into Scene");
+
+        let mut game_state = GameState::new_empty();
+        game_state.spawn_player_at(glam::IVec2::new(0, 0));
+        game_state.set_rules(scene.rules.clone());
+        game_state.handle_key_press(InputKey::Right);
+
+        let update = game_state.update(
+            glam::UVec2::new(128, 128),
+            &movement_test_tilemap(),
+            &test_atlas(),
+        );
+        assert!(
+            update.player_moved,
+            "player should move to trigger OnPlayerMove"
+        );
+        assert!(update.events.iter().any(|event| {
+            matches!(
+                event,
+                AudioEvent::PlaySound {
+                    channel: AudioChannel::Movement,
+                    sound_id
+                } if sound_id == "sfx_move_tick"
+            )
+        }));
+    }
+
+    fn compile_scene_schema() -> JSONSchema {
+        let scene_schema_json: Value =
+            serde_json::from_str(toki_schemas::SCENE_SCHEMA).expect("schema should parse");
+        JSONSchema::compile(&scene_schema_json).expect("scene schema should compile")
+    }
+
+    fn assert_valid_scene_schema(schema: &JSONSchema, scene_json: &Value, fixture_name: &str) {
+        if let Err(errors) = schema.validate(scene_json) {
+            let details = errors.map(|error| error.to_string()).collect::<Vec<_>>();
+            panic!(
+                "Fixture '{}' failed scene schema validation: {}",
+                fixture_name,
+                details.join(" | ")
+            );
+        }
+    }
+
+    fn trigger_kind_label(trigger: &RuleTrigger) -> &'static str {
+        match trigger {
+            RuleTrigger::OnStart => "OnStart",
+            RuleTrigger::OnUpdate => "OnUpdate",
+            RuleTrigger::OnPlayerMove => "OnPlayerMove",
+            RuleTrigger::OnKey { .. } => "OnKey",
+            RuleTrigger::OnCollision => "OnCollision",
+            RuleTrigger::OnTrigger => "OnTrigger",
+        }
+    }
+
+    fn action_kind_label(action: &RuleAction) -> &'static str {
+        match action {
+            RuleAction::PlaySound { .. } => "PlaySound",
+            RuleAction::PlayMusic { .. } => "PlayMusic",
+            RuleAction::PlayAnimation { .. } => "PlayAnimation",
+            RuleAction::SetVelocity { .. } => "SetVelocity",
+            RuleAction::Spawn { .. } => "Spawn",
+            RuleAction::DestroySelf { .. } => "DestroySelf",
+            RuleAction::SwitchScene { .. } => "SwitchScene",
+        }
+    }
+
+    fn movement_test_tilemap() -> TileMap {
+        TileMap {
+            size: glam::UVec2::new(8, 8),
+            tile_size: glam::UVec2::new(16, 16),
+            atlas: PathBuf::from("atlas.json"),
+            tiles: vec!["floor".to_string(); 64],
+        }
     }
 
     fn test_tilemap() -> TileMap {

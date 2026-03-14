@@ -1,0 +1,26 @@
+{
+  "name": "fixture_on_player_move_runtime",
+  "description": "Regression fixture for OnPlayerMove runtime execution",
+  "maps": ["main_map"],
+  "entities": [],
+  "rules": {
+    "rules": [
+      {
+        "id": "rule_player_move_sound",
+        "enabled": true,
+        "priority": 10,
+        "once": false,
+        "trigger": "OnPlayerMove",
+        "conditions": ["Always"],
+        "actions": [
+          {
+            "PlaySound": {
+              "channel": "Movement",
+              "sound_id": "sfx_move_tick"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

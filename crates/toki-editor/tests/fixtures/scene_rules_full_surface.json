@@ -1,0 +1,110 @@
+{
+  "name": "fixture_full_surface",
+  "description": "Regression fixture covering full trigger and action surface",
+  "maps": ["main_map"],
+  "entities": [],
+  "rules": {
+    "rules": [
+      {
+        "id": "rule_start_audio",
+        "enabled": true,
+        "priority": 100,
+        "once": true,
+        "trigger": "OnStart",
+        "conditions": ["Always"],
+        "actions": [
+          { "PlayMusic": { "track_id": "lavandia" } },
+          {
+            "PlaySound": {
+              "channel": "Movement",
+              "sound_id": "sfx_start"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rule_update_velocity",
+        "enabled": true,
+        "priority": 90,
+        "once": false,
+        "trigger": "OnUpdate",
+        "conditions": [
+          { "TargetExists": { "target": "Player" } },
+          { "KeyHeld": { "key": "Right" } }
+        ],
+        "actions": [
+          {
+            "SetVelocity": {
+              "target": { "Entity": 42 },
+              "velocity": [2, -1]
+            }
+          }
+        ]
+      },
+      {
+        "id": "rule_player_move_anim",
+        "enabled": true,
+        "priority": 80,
+        "once": false,
+        "trigger": "OnPlayerMove",
+        "conditions": [
+          { "EntityActive": { "target": "Player", "is_active": true } }
+        ],
+        "actions": [
+          {
+            "PlayAnimation": {
+              "target": "Player",
+              "state": "Walk"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rule_key_spawn",
+        "enabled": true,
+        "priority": 70,
+        "once": false,
+        "trigger": { "OnKey": { "key": "Up" } },
+        "conditions": ["Always"],
+        "actions": [
+          {
+            "Spawn": {
+              "entity_type": "Npc",
+              "position": [64, 32]
+            }
+          }
+        ]
+      },
+      {
+        "id": "rule_collision_destroy",
+        "enabled": true,
+        "priority": 60,
+        "once": false,
+        "trigger": "OnCollision",
+        "conditions": ["Always"],
+        "actions": [
+          {
+            "DestroySelf": {
+              "target": { "Entity": 7 }
+            }
+          }
+        ]
+      },
+      {
+        "id": "rule_trigger_switch",
+        "enabled": true,
+        "priority": 50,
+        "once": false,
+        "trigger": "OnTrigger",
+        "conditions": ["Always"],
+        "actions": [
+          {
+            "SwitchScene": {
+              "scene_name": "BossRoom"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
