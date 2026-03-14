@@ -45,8 +45,14 @@ impl MenuSystem {
                         tracing::info!("Save Project clicked");
                         ui_state.save_project_requested = true;
                     }
-                    if ui.button("Export Bundle...").clicked() {
-                        tracing::info!("Export Bundle clicked");
+                    if ui
+                        .add_enabled(
+                            !ui_state.background_task_running,
+                            egui::Button::new("Export Game..."),
+                        )
+                        .clicked()
+                    {
+                        tracing::info!("Export Game clicked");
                         ui_state.export_project_requested = true;
                     }
                     ui.separator();
@@ -85,7 +91,13 @@ impl MenuSystem {
                         tracing::info!("Redo command applied");
                     }
                     ui.separator();
-                    if ui.button("Validate Project Assets").clicked() {
+                    if ui
+                        .add_enabled(
+                            !ui_state.background_task_running,
+                            egui::Button::new("Validate Project Assets"),
+                        )
+                        .clicked()
+                    {
                         tracing::info!("Validate Project Assets clicked");
                         ui_state.validate_assets_requested = true;
                     }
@@ -114,6 +126,17 @@ impl MenuSystem {
                         ui.label(ui_state.window_title.as_ref().unwrap());
                     },
                 );
+
+                if ui_state.background_task_running {
+                    ui.separator();
+                    ui.add(egui::Spinner::new());
+                }
+                if let Some(status) = &ui_state.background_task_status {
+                    ui.label(status);
+                }
+                if ui_state.background_task_running && ui.button("Cancel Task").clicked() {
+                    ui_state.cancel_background_task_requested = true;
+                }
             });
         });
     }

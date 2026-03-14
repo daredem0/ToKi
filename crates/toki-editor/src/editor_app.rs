@@ -14,13 +14,15 @@ use winit::window::{Window, WindowId};
 
 use crate::config::EditorConfig;
 use crate::logging::LogCapture;
+use crate::background_tasks::{
+    BackgroundTaskManager, BackgroundTaskUpdate, ExportBundleJob, ValidateAssetsJob,
+};
 use crate::project::ProjectManager;
 use crate::rendering::WindowRenderer;
 use crate::scene::viewport::DragPreviewSprite;
 use crate::scene::SceneViewport;
 use crate::ui::editor_ui::CenterPanelTab;
 use crate::ui::EditorUI;
-use crate::validation::AssetValidator;
 
 pub fn run_editor(log_capture: Option<LogCapture>) -> Result<()> {
     let event_loop = EventLoop::new()?;
@@ -60,6 +62,8 @@ struct EditorApp {
     loaded_scene_maps: HashMap<String, String>,
     /// Ensures startup auto-open from config only runs once.
     startup_project_auto_open_done: bool,
+    /// Runs long-running editor operations off the UI thread.
+    background_tasks: BackgroundTaskManager,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,6 +96,7 @@ impl EditorApp {
             last_loaded_active_scene: None,
             loaded_scene_maps: HashMap::new(),
             startup_project_auto_open_done: false,
+            background_tasks: BackgroundTaskManager::default(),
         }
     }
 
@@ -927,6 +932,15 @@ impl EditorApp {
     }
 
     fn handle_project_requests(&mut self, _event_loop: &ActiveEventLoop) {
+        self.poll_background_task_updates();
+
+        if self.ui.cancel_background_task_requested {
+            self.ui.cancel_background_task_requested = false;
+            if self.background_tasks.request_cancel() {
+                tracing::info!("Background task cancellation requested");
+            }
+        }
+
         if self.ui.new_project_requested {
             self.handle_new_project_requested();
         }
@@ -954,6 +968,43 @@ impl EditorApp {
 
         if self.ui.validate_assets_requested {
             self.handle_validate_assets_request();
+        }
+    }
+
+    fn poll_background_task_updates(&mut self) {
+        for update in self.background_tasks.poll_updates() {
+            self.apply_background_task_update(update);
+        }
+    }
+
+    fn apply_background_task_update(&mut self, update: BackgroundTaskUpdate) {
+        match update {
+            BackgroundTaskUpdate::Started { kind, message } => {
+                self.ui.background_task_running = true;
+                self.ui.background_task_status = Some(format!("{}: {}", kind.label(), message));
+                tracing::info!("{}", self.ui.background_task_status.as_deref().unwrap_or(""));
+            }
+            BackgroundTaskUpdate::Progress { kind, message } => {
+                self.ui.background_task_running = true;
+                self.ui.background_task_status = Some(format!("{}: {}", kind.label(), message));
+            }
+            BackgroundTaskUpdate::Completed { kind, message } => {
+                self.ui.background_task_running = false;
+                self.ui.background_task_status =
+                    Some(format!("{}: {}", kind.label(), message.clone()));
+                tracing::info!("{} completed: {}", kind.label(), message);
+            }
+            BackgroundTaskUpdate::Failed { kind, message } => {
+                self.ui.background_task_running = false;
+                self.ui.background_task_status =
+                    Some(format!("{} failed: {}", kind.label(), message.clone()));
+                tracing::error!("{} failed: {}", kind.label(), message);
+            }
+            BackgroundTaskUpdate::Cancelled { kind } => {
+                self.ui.background_task_running = false;
+                self.ui.background_task_status = Some(format!("{} cancelled", kind.label()));
+                tracing::info!("{} cancelled", kind.label());
+            }
         }
     }
 
@@ -1025,14 +1076,19 @@ impl EditorApp {
         }
         self.ui.export_project_requested = false;
 
+        if self.background_tasks.is_running() {
+            tracing::warn!("Cannot export game: another background task is running");
+            return;
+        }
+
         let Some(project_path) = self.config.current_project_path().cloned() else {
-            tracing::warn!("Cannot export bundle: no project is currently open");
+            tracing::warn!("Cannot export game: no project is currently open");
             return;
         };
 
         if let Err(error) = self.project_manager.save_current_project(&self.ui.scenes) {
             tracing::error!(
-                "Cannot export bundle: failed to save current project state: {}",
+                "Cannot export game: failed to save current project state: {}",
                 error
             );
             return;
@@ -1049,18 +1105,7 @@ impl EditorApp {
         {
             Some(path) => path,
             None => {
-                tracing::info!("Bundle export cancelled by user");
-                return;
-            }
-        };
-
-        let runtime_binary_path = match Self::build_runtime_binary_for_export() {
-            Ok(path) => path,
-            Err(error) => {
-                tracing::error!(
-                    "Cannot export bundle: failed to build runtime binary: {}",
-                    error
-                );
+                tracing::info!("Game export cancelled by user");
                 return;
             }
         };
@@ -1073,18 +1118,23 @@ impl EditorApp {
             .map(|project| project.metadata.runtime.splash.duration_ms)
             .unwrap_or(3000);
 
-        match self.project_manager.export_current_project_bundle(
-            &runtime_binary_path,
-            &export_root,
-            startup_scene,
+        let Some(project) = self.project_manager.current_project.as_ref().cloned() else {
+            tracing::warn!("Cannot export game: no project is currently open");
+            return;
+        };
+
+        let job = ExportBundleJob {
+            project,
+            workspace_root: Self::workspace_root(),
+            export_root,
+            startup_scene: startup_scene.map(str::to_string),
             splash_duration_ms,
-        ) {
-            Ok(bundle_dir) => {
-                tracing::info!("Exported hybrid bundle to '{}'", bundle_dir.display());
-            }
-            Err(error) => {
-                tracing::error!("Failed to export hybrid bundle: {}", error);
-            }
+        };
+
+        if let Err(error) = self.background_tasks.start_export_bundle(job) {
+            tracing::error!("Failed to start game export job: {}", error);
+        } else {
+            self.poll_background_task_updates();
         }
     }
 
@@ -1228,36 +1278,6 @@ impl EditorApp {
         }
     }
 
-    fn build_runtime_binary_for_export() -> Result<std::path::PathBuf> {
-        let workspace_root = Self::workspace_root();
-        let status = Command::new("cargo")
-            .current_dir(&workspace_root)
-            .arg("build")
-            .arg("-p")
-            .arg("toki-runtime")
-            .status()
-            .map_err(|error| anyhow::anyhow!("Failed to launch cargo build: {}", error))?;
-
-        if !status.success() {
-            return Err(anyhow::anyhow!(
-                "cargo build -p toki-runtime failed with status {}",
-                status
-            ));
-        }
-
-        let runtime_binary_path = workspace_root
-            .join("target")
-            .join("debug")
-            .join(Self::runtime_binary_name());
-        if !runtime_binary_path.exists() {
-            return Err(anyhow::anyhow!(
-                "Runtime binary not found after build: {}",
-                runtime_binary_path.display()
-            ));
-        }
-        Ok(runtime_binary_path)
-    }
-
     fn workspace_root() -> std::path::PathBuf {
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         manifest_dir
@@ -1399,21 +1419,24 @@ impl EditorApp {
     fn handle_validate_assets_request(&mut self) {
         self.ui.validate_assets_requested = false;
 
-        if let Some(project_assets) = self.project_manager.get_project_assets() {
-            tracing::info!("Starting asset validation");
+        if self.background_tasks.is_running() {
+            tracing::warn!("Cannot validate assets: another background task is running");
+            return;
+        }
 
-            match AssetValidator::new() {
-                Ok(validator) => {
-                    if let Err(e) = validator.validate_project_assets(project_assets) {
-                        tracing::error!("Asset validation failed: {}", e);
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("Failed to create asset validator: {}", e);
-                }
-            }
-        } else {
+        let Some(project_path) = self.config.current_project_path().cloned() else {
             tracing::warn!("No project loaded - cannot validate assets");
+            return;
+        };
+
+        tracing::info!("Starting asset validation task");
+        if let Err(error) = self
+            .background_tasks
+            .start_validate_assets(ValidateAssetsJob { project_path })
+        {
+            tracing::error!("Failed to start asset validation task: {}", error);
+        } else {
+            self.poll_background_task_updates();
         }
     }
 

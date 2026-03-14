@@ -159,27 +159,6 @@ impl ProjectManager {
         Ok(())
     }
 
-    pub fn export_current_project_bundle(
-        &mut self,
-        runtime_binary_path: &std::path::Path,
-        export_root: &std::path::Path,
-        startup_scene: Option<&str>,
-        splash_duration_ms: u64,
-    ) -> Result<std::path::PathBuf> {
-        let project = self
-            .current_project
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("No project currently loaded"))?;
-
-        crate::project::export::export_hybrid_bundle(
-            project,
-            runtime_binary_path,
-            export_root,
-            startup_scene,
-            splash_duration_ms,
-        )
-    }
-
     /// Legacy method for backward compatibility
     #[allow(dead_code)]
     pub fn save_current_project_legacy(&mut self, _game_state: &GameState) -> Result<()> {

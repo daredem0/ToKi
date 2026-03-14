@@ -87,6 +87,9 @@ pub struct EditorUI {
     pub play_scene_requested: bool,
     pub init_config_requested: bool,
     pub window_title: Option<String>,
+    pub background_task_running: bool,
+    pub background_task_status: Option<String>,
+    pub cancel_background_task_requested: bool,
 
     // Map loading request
     pub map_load_requested: Option<(String, String)>, // (scene_name, map_name)
@@ -149,6 +152,9 @@ impl EditorUI {
             play_scene_requested: false,
             init_config_requested: false,
             window_title: Some("No project open".to_string()),
+            background_task_running: false,
+            background_task_status: None,
+            cancel_background_task_requested: false,
 
             // Map loading request
             map_load_requested: None,
