@@ -201,3 +201,191 @@ fn resolve_tilemap_atlas_path(
         project_path.join("assets").join(atlas_path),
     ])
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        find_first_json_file, first_existing_path, resolve_tilemap_atlas_path, ResourceManager,
+    };
+    use std::fs;
+    use std::path::PathBuf;
+    use toki_core::assets::tilemap::TileMap;
+
+    fn make_unique_temp_dir() -> std::path::PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before unix epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("toki_runtime_resources_tests_{nanos}"));
+        std::fs::create_dir_all(&dir).expect("temp dir should be created");
+        dir
+    }
+
+    fn write_minimal_atlas(path: &std::path::Path, image_name: &str) {
+        let content = format!(
+            r#"{{
+  "image": "{image_name}",
+  "tile_size": [16, 16],
+  "tiles": {{
+    "floor": {{
+      "position": [0, 0],
+      "properties": {{
+        "solid": false
+      }}
+    }}
+  }}
+}}"#
+        );
+        fs::write(path, content).expect("atlas write");
+    }
+
+    fn write_minimal_map(path: &std::path::Path, atlas_ref: &str) {
+        let content = format!(
+            r#"{{
+  "size": [1, 1],
+  "tile_size": [16, 16],
+  "atlas": "{atlas_ref}",
+  "tiles": ["floor"]
+}}"#
+        );
+        fs::write(path, content).expect("map write");
+    }
+
+    #[test]
+    fn first_existing_path_picks_first_existing_candidate() {
+        let dir = make_unique_temp_dir();
+        let missing = dir.join("missing.json");
+        let first = dir.join("a.json");
+        let second = dir.join("b.json");
+        fs::write(&first, "{}").expect("first write");
+        fs::write(&second, "{}").expect("second write");
+
+        let resolved = first_existing_path(&[missing, first.clone(), second]);
+        assert_eq!(resolved, Some(first));
+    }
+
+    #[test]
+    fn find_first_json_file_returns_sorted_first_json_entry() {
+        let dir = make_unique_temp_dir();
+        fs::create_dir_all(&dir).expect("dir");
+        fs::write(dir.join("z_map.json"), "{}").expect("z map");
+        fs::write(dir.join("a_map.json"), "{}").expect("a map");
+        fs::write(dir.join("note.txt"), "ignore").expect("txt");
+
+        let first = find_first_json_file(&dir).expect("json file should be found");
+        assert_eq!(
+            first.file_name().and_then(|name| name.to_str()),
+            Some("a_map.json")
+        );
+    }
+
+    #[test]
+    fn resolve_tilemap_atlas_path_prefers_map_directory_relative_atlas() {
+        let project_dir = make_unique_temp_dir();
+        let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+        fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+        let tilemap_path = tilemaps_dir.join("main_map.json");
+        let atlas_path = tilemaps_dir.join("terrain.json");
+        fs::write(&tilemap_path, "{}").expect("tilemap file");
+        fs::write(&atlas_path, "{}").expect("atlas file");
+
+        let tilemap = TileMap {
+            size: glam::UVec2::new(1, 1),
+            tile_size: glam::UVec2::new(16, 16),
+            atlas: PathBuf::from("terrain.json"),
+            tiles: vec!["floor".to_string()],
+        };
+
+        let resolved = resolve_tilemap_atlas_path(&project_dir, &tilemap_path, &tilemap)
+            .expect("atlas should resolve");
+        assert_eq!(resolved, atlas_path);
+    }
+
+    #[test]
+    fn resolve_tilemap_atlas_path_falls_back_to_project_sprites_dir() {
+        let project_dir = make_unique_temp_dir();
+        let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+        let sprites_dir = project_dir.join("assets").join("sprites");
+        fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+        fs::create_dir_all(&sprites_dir).expect("sprites dir");
+        let tilemap_path = tilemaps_dir.join("main_map.json");
+        let sprites_atlas = sprites_dir.join("terrain.json");
+        fs::write(&tilemap_path, "{}").expect("tilemap file");
+        fs::write(&sprites_atlas, "{}").expect("sprites atlas");
+
+        let tilemap = TileMap {
+            size: glam::UVec2::new(1, 1),
+            tile_size: glam::UVec2::new(16, 16),
+            atlas: PathBuf::from("terrain.json"),
+            tiles: vec!["floor".to_string()],
+        };
+
+        let resolved = resolve_tilemap_atlas_path(&project_dir, &tilemap_path, &tilemap)
+            .expect("atlas should resolve from sprites dir");
+        assert_eq!(resolved, sprites_atlas);
+    }
+
+    #[test]
+    fn load_for_project_with_named_map_loads_resources() {
+        let project_dir = make_unique_temp_dir();
+        let sprites_dir = project_dir.join("assets").join("sprites");
+        let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+        fs::create_dir_all(&sprites_dir).expect("sprites dir");
+        fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+
+        write_minimal_atlas(&sprites_dir.join("creatures.json"), "creatures.png");
+        write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
+        write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+
+        let manager = ResourceManager::load_for_project(&project_dir, Some("demo_map"))
+            .expect("project resources should load");
+        assert_eq!(manager.tilemap_size(), glam::UVec2::new(1, 1));
+        assert_eq!(manager.tilemap_tile_size(), glam::UVec2::new(16, 16));
+        assert_eq!(manager.terrain_tile_size(), glam::UVec2::new(16, 16));
+        assert_eq!(manager.creature_tile_size(), glam::UVec2::new(16, 16));
+    }
+
+    #[test]
+    fn load_for_project_without_map_name_discovers_first_tilemap() {
+        let project_dir = make_unique_temp_dir();
+        let sprites_dir = project_dir.join("assets").join("sprites");
+        let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+        fs::create_dir_all(&sprites_dir).expect("sprites dir");
+        fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+
+        write_minimal_atlas(&sprites_dir.join("creatures.json"), "creatures.png");
+        write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
+        write_minimal_map(&tilemaps_dir.join("b_map.json"), "terrain.json");
+        let a_map = r#"{
+  "size": [2, 1],
+  "tile_size": [16, 16],
+  "atlas": "terrain.json",
+  "tiles": ["floor", "floor"]
+}"#;
+        fs::write(tilemaps_dir.join("a_map.json"), a_map).expect("a_map write");
+
+        let manager =
+            ResourceManager::load_for_project(&project_dir, None).expect("resources should load");
+        assert_eq!(
+            manager.tilemap_size(),
+            glam::UVec2::new(2, 1),
+            "alphabetically first discovered map should be selected"
+        );
+    }
+
+    #[test]
+    fn load_for_project_errors_when_creatures_atlas_missing() {
+        let project_dir = make_unique_temp_dir();
+        let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+        fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+        write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
+        write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+
+        let error = ResourceManager::load_for_project(&project_dir, Some("demo_map"))
+            .expect_err("missing creatures atlas should fail");
+        assert!(
+            error.to_string().contains("Could not find creatures atlas"),
+            "unexpected error: {error}"
+        );
+    }
+}

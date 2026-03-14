@@ -583,3 +583,148 @@ pub fn run_minimal_window_with_options(
 fn first_existing_path(candidates: &[PathBuf]) -> Option<PathBuf> {
     candidates.iter().find(|path| path.exists()).cloned()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{first_existing_path, App};
+    use std::fs;
+    use toki_core::rules::{
+        Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger,
+    };
+    use toki_core::Scene;
+
+    fn make_unique_temp_dir() -> std::path::PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before unix epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("toki_runtime_app_tests_{nanos}"));
+        std::fs::create_dir_all(&dir).expect("temp dir should be created");
+        dir
+    }
+
+    #[test]
+    fn first_existing_path_returns_first_match() {
+        let dir = make_unique_temp_dir();
+        let missing = dir.join("missing.txt");
+        let first = dir.join("a.txt");
+        let second = dir.join("b.txt");
+        fs::write(&first, "a").expect("first file write");
+        fs::write(&second, "b").expect("second file write");
+
+        let resolved = first_existing_path(&[missing, first.clone(), second.clone()]);
+        assert_eq!(resolved, Some(first));
+    }
+
+    #[test]
+    fn project_texture_paths_prefers_assets_sprites_files() {
+        let project_dir = make_unique_temp_dir();
+        let sprites_dir = project_dir.join("assets").join("sprites");
+        fs::create_dir_all(&sprites_dir).expect("sprites dir");
+        let terrain = sprites_dir.join("terrain.png");
+        let creatures = sprites_dir.join("creatures.png");
+        fs::write(&terrain, "terrain").expect("terrain write");
+        fs::write(&creatures, "creatures").expect("creatures write");
+
+        let (tilemap_texture, sprite_texture) = App::project_texture_paths(&project_dir);
+        assert_eq!(tilemap_texture, Some(terrain));
+        assert_eq!(sprite_texture, Some(creatures));
+    }
+
+    #[test]
+    fn project_texture_paths_falls_back_to_assets_root() {
+        let project_dir = make_unique_temp_dir();
+        let assets_dir = project_dir.join("assets");
+        fs::create_dir_all(&assets_dir).expect("assets dir");
+        let terrain = assets_dir.join("terrain.png");
+        let creatures = assets_dir.join("creatures.png");
+        fs::write(&terrain, "terrain").expect("terrain write");
+        fs::write(&creatures, "creatures").expect("creatures write");
+
+        let (tilemap_texture, sprite_texture) = App::project_texture_paths(&project_dir);
+        assert_eq!(tilemap_texture, Some(terrain));
+        assert_eq!(sprite_texture, Some(creatures));
+    }
+
+    #[test]
+    fn load_project_scene_reads_valid_scene_file() {
+        let project_dir = make_unique_temp_dir();
+        let scenes_dir = project_dir.join("scenes");
+        fs::create_dir_all(&scenes_dir).expect("scenes dir");
+
+        let mut scene = Scene::new("Main Scene".to_string());
+        scene.maps.push("main_map".to_string());
+        scene.rules = RuleSet {
+            rules: vec![Rule {
+                id: "rule_1".to_string(),
+                enabled: true,
+                priority: 1,
+                once: false,
+                trigger: RuleTrigger::OnStart,
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "sfx_start".to_string(),
+                }],
+            }],
+        };
+        let scene_json =
+            serde_json::to_string_pretty(&scene).expect("scene should serialize to json");
+        fs::write(scenes_dir.join("Main Scene.json"), scene_json).expect("scene write");
+
+        let loaded = App::load_project_scene(&project_dir, "Main Scene")
+            .expect("scene should load from project");
+        assert_eq!(loaded.name, "Main Scene");
+        assert_eq!(loaded.maps, vec!["main_map".to_string()]);
+        assert_eq!(loaded.rules, scene.rules);
+    }
+
+    #[test]
+    fn load_project_scene_returns_error_for_invalid_json() {
+        let project_dir = make_unique_temp_dir();
+        let scenes_dir = project_dir.join("scenes");
+        fs::create_dir_all(&scenes_dir).expect("scenes dir");
+        fs::write(scenes_dir.join("Broken.json"), "{ invalid json").expect("scene write");
+
+        let error = App::load_project_scene(&project_dir, "Broken")
+            .expect_err("invalid scene json should fail");
+        assert!(error.contains("Could not parse scene file"));
+    }
+
+    #[test]
+    fn game_state_from_scene_uses_scene_data_without_fallback_entities() {
+        let mut scene = Scene::new("Gameplay".to_string());
+        scene.rules = RuleSet {
+            rules: vec![Rule {
+                id: "rule_1".to_string(),
+                enabled: true,
+                priority: 3,
+                once: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::PlayMusic {
+                    track_id: "lavandia".to_string(),
+                }],
+            }],
+        };
+
+        let game_state = App::game_state_from_scene(scene.clone());
+        assert_eq!(
+            game_state.scene_manager().active_scene_name(),
+            Some("Gameplay")
+        );
+        assert_eq!(game_state.rules(), &scene.rules);
+        assert_eq!(game_state.entity_manager().active_entities().len(), 0);
+    }
+
+    #[test]
+    fn fallback_game_state_spawns_player_and_npc() {
+        let game_state = App::fallback_game_state();
+        assert!(game_state.player_id().is_some(), "player should exist");
+        assert_eq!(
+            game_state.entity_manager().active_entities().len(),
+            2,
+            "fallback state should spawn player and one npc"
+        );
+    }
+}
