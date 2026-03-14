@@ -1,4 +1,4 @@
-use super::{GridInteraction, PlacementInteraction};
+use super::GridInteraction;
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
 use crate::ui::editor_ui::{EntityMoveDragState, Selection};
@@ -118,10 +118,7 @@ impl SelectionInteraction {
             viewport.scene_manager().tilemap(),
             config,
         );
-        let drop_world_pos_i32 = PlacementInteraction::centered_world_position_from_sprite_center(
-            drop_world_pos,
-            drag_state.entity.size,
-        );
+        let drop_world_pos_i32 = Self::drop_world_position_to_entity_position(drop_world_pos);
 
         let can_drop = Self::can_place_entity_at(viewport, &drag_state.entity, drop_world_pos_i32);
         if can_drop {
@@ -180,6 +177,13 @@ impl SelectionInteraction {
         } else {
             true
         }
+    }
+
+    fn drop_world_position_to_entity_position(drop_world_pos: glam::Vec2) -> glam::IVec2 {
+        glam::IVec2::new(
+            drop_world_pos.x.floor() as i32,
+            drop_world_pos.y.floor() as i32,
+        )
     }
 
     fn find_scene_entity(
@@ -534,5 +538,13 @@ mod tests {
             IVec2::new(42, 84),
         );
         assert!(!moved);
+    }
+
+    #[test]
+    fn drop_world_position_to_entity_position_keeps_snapped_top_left() {
+        // Regression: drag-drop used an extra center->top-left conversion, causing one-tile offset.
+        let drop_world = glam::Vec2::new(32.0, 48.0);
+        let dropped = SelectionInteraction::drop_world_position_to_entity_position(drop_world);
+        assert_eq!(dropped, IVec2::new(32, 48));
     }
 }
