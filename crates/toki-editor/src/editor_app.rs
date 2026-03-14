@@ -544,21 +544,19 @@ impl EditorApp {
 
                     let drag_preview_data = self.ui.entity_move_drag.as_ref().and_then(|drag| {
                         self.ui.placement_preview_position.map(|preview_position| {
-                            let anchor_preview = glam::IVec2::new(
-                                preview_position.x.floor() as i32,
-                                preview_position.y.floor() as i32,
-                            );
-                            let delta = anchor_preview - drag.entity.position;
-                            let is_valid = self.ui.placement_preview_valid.unwrap_or(true);
-
-                            drag.dragged_entities
-                                .iter()
-                                .map(|entity| DragPreviewSprite {
-                                    entity_id: entity.id,
-                                    world_position: entity.position + delta,
-                                    is_valid,
-                                })
-                                .collect::<Vec<_>>()
+                            let tilemap = scene_viewport.scene_manager().tilemap();
+                            let terrain_atlas = tilemap.map(|_| {
+                                scene_viewport
+                                    .scene_manager()
+                                    .resources()
+                                    .get_terrain_atlas()
+                            });
+                            Self::build_drag_preview_sprites(
+                                drag,
+                                preview_position,
+                                tilemap,
+                                terrain_atlas,
+                            )
                         })
                     });
 
@@ -1320,11 +1318,57 @@ impl EditorApp {
 
         None
     }
+
+    fn build_drag_preview_sprites(
+        drag_state: &crate::ui::editor_ui::EntityMoveDragState,
+        preview_position: glam::Vec2,
+        tilemap: Option<&toki_core::assets::tilemap::TileMap>,
+        terrain_atlas: Option<&toki_core::assets::atlas::AtlasMeta>,
+    ) -> Vec<DragPreviewSprite> {
+        let anchor_preview = glam::IVec2::new(
+            preview_position.x.floor() as i32,
+            preview_position.y.floor() as i32,
+        );
+        let delta = anchor_preview - drag_state.entity.position;
+
+        drag_state
+            .dragged_entities
+            .iter()
+            .map(|entity| {
+                let world_position = entity.position + delta;
+                let is_valid = match (tilemap, terrain_atlas) {
+                    (Some(tilemap), Some(terrain_atlas)) => {
+                        toki_core::collision::can_entity_move_to_position(
+                            entity,
+                            world_position,
+                            tilemap,
+                            terrain_atlas,
+                        )
+                    }
+                    _ => true,
+                };
+
+                DragPreviewSprite {
+                    entity_id: entity.id,
+                    world_position,
+                    is_valid,
+                }
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::EditorApp;
+    use crate::ui::editor_ui::EntityMoveDragState;
+    use glam::{IVec2, UVec2, Vec2};
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
+    use toki_core::assets::tilemap::TileMap;
+    use toki_core::collision::CollisionBox;
+    use toki_core::entity::{Entity, EntityAttributes, EntityType};
 
     #[test]
     fn resolve_scene_map_to_load_prefers_previously_loaded_map() {
@@ -1363,5 +1407,100 @@ mod tests {
         assert_eq!(parsed.0, "/tmp/project");
         assert_eq!(parsed.1, "Main Scene");
         assert_eq!(parsed.2, "rule_1:action:0");
+    }
+
+    fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {
+        let mut tiles = HashMap::new();
+        tiles.insert(
+            "solid".to_string(),
+            TileInfo {
+                position: UVec2::new(0, 0),
+                properties: TileProperties {
+                    solid: true,
+                    trigger: false,
+                },
+            },
+        );
+        tiles.insert(
+            "floor".to_string(),
+            TileInfo {
+                position: UVec2::new(1, 0),
+                properties: TileProperties {
+                    solid: false,
+                    trigger: false,
+                },
+            },
+        );
+
+        let atlas = AtlasMeta {
+            image: PathBuf::from("test.png"),
+            tile_size: UVec2::new(16, 16),
+            tiles,
+        };
+
+        let tilemap = TileMap {
+            size: UVec2::new(3, 3),
+            tile_size: UVec2::new(16, 16),
+            atlas: PathBuf::from("test_atlas.json"),
+            tiles: vec![
+                "floor".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+                "solid".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+                "floor".to_string(),
+            ],
+        };
+
+        (tilemap, atlas)
+    }
+
+    fn solid_entity(id: u32, position: IVec2) -> Entity {
+        Entity {
+            id,
+            position,
+            size: UVec2::new(16, 16),
+            entity_type: EntityType::Npc,
+            definition_name: Some("test".to_string()),
+            attributes: EntityAttributes::default(),
+            collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
+        }
+    }
+
+    #[test]
+    fn build_drag_preview_sprites_computes_validity_per_entity() {
+        let (tilemap, atlas) = collision_assets_with_center_solid_tile();
+        let first = solid_entity(1, IVec2::new(0, 0));
+        let second = solid_entity(2, IVec2::new(0, 16));
+        let drag_state = EntityMoveDragState {
+            scene_name: "Main Scene".to_string(),
+            entity: first.clone(),
+            dragged_entities: vec![first.clone(), second.clone()],
+            grab_offset: Vec2::ZERO,
+        };
+
+        let previews = EditorApp::build_drag_preview_sprites(
+            &drag_state,
+            Vec2::new(16.0, 0.0),
+            Some(&tilemap),
+            Some(&atlas),
+        );
+
+        let first_preview = previews
+            .iter()
+            .find(|preview| preview.entity_id == first.id)
+            .expect("first preview should exist");
+        let second_preview = previews
+            .iter()
+            .find(|preview| preview.entity_id == second.id)
+            .expect("second preview should exist");
+
+        assert_eq!(first_preview.world_position, IVec2::new(16, 0));
+        assert_eq!(second_preview.world_position, IVec2::new(16, 16));
+        assert!(first_preview.is_valid);
+        assert!(!second_preview.is_valid);
     }
 }
