@@ -12,7 +12,10 @@
     },
     "grid": {
       "show_grid": true,
-      "grid_size": 16,
+      "grid_size": [
+        16,
+        16
+      ],
       "snap_to_grid": true
     },
     "camera": {

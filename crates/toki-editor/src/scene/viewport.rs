@@ -6,6 +6,52 @@ use toki_core::assets::atlas::AtlasMeta;
 use toki_core::Camera;
 use toki_render::{OffscreenTarget, SceneData, SceneRenderer};
 
+fn screen_to_world_from_camera(
+    screen_pos: egui::Pos2,
+    display_rect: egui::Rect,
+    viewport_size: (u32, u32),
+    camera_position: glam::IVec2,
+    camera_scale: u32,
+) -> glam::Vec2 {
+    // Convert screen position relative to display rect to 0-1 normalized coordinates
+    let normalized_x = (screen_pos.x - display_rect.min.x) / display_rect.width();
+    let normalized_y = (screen_pos.y - display_rect.min.y) / display_rect.height();
+
+    // The scene is rendered to a fixed offscreen target, then stretched to fit display_rect.
+    // Account for letterboxing to get logical viewport coordinates.
+    let display_aspect = display_rect.width() / display_rect.height();
+    let viewport_aspect = viewport_size.0 as f32 / viewport_size.1 as f32;
+
+    let (viewport_x, viewport_y) = if display_aspect > viewport_aspect {
+        // Display rect is wider than viewport - letterboxing on sides
+        let effective_width = display_rect.height() * viewport_aspect;
+        let x_offset = (display_rect.width() - effective_width) * 0.5;
+        let adjusted_x = (screen_pos.x - display_rect.min.x - x_offset) / effective_width;
+        let adjusted_y = normalized_y;
+
+        (
+            adjusted_x.clamp(0.0, 1.0) * viewport_size.0 as f32,
+            adjusted_y * viewport_size.1 as f32,
+        )
+    } else {
+        // Display rect is taller than viewport - letterboxing on top/bottom
+        let effective_height = display_rect.width() / viewport_aspect;
+        let y_offset = (display_rect.height() - effective_height) * 0.5;
+        let adjusted_x = normalized_x;
+        let adjusted_y = (screen_pos.y - display_rect.min.y - y_offset) / effective_height;
+
+        (
+            adjusted_x * viewport_size.0 as f32,
+            adjusted_y.clamp(0.0, 1.0) * viewport_size.1 as f32,
+        )
+    };
+
+    // Convert to world coordinates using camera state
+    let world_x = camera_position.x as f32 + viewport_x * camera_scale as f32;
+    let world_y = camera_position.y as f32 + viewport_y * camera_scale as f32;
+    glam::Vec2::new(world_x, world_y)
+}
+
 /// Handles the scene viewport - integration between scene data and rendering
 pub struct SceneViewport {
     scene_manager: SceneManager,
@@ -1216,44 +1262,13 @@ impl SceneViewport {
         screen_pos: egui::Pos2,
         display_rect: egui::Rect,
     ) -> glam::Vec2 {
-        // Convert screen position relative to display rect to 0-1 normalized coordinates
-        let normalized_x = (screen_pos.x - display_rect.min.x) / display_rect.width();
-        let normalized_y = (screen_pos.y - display_rect.min.y) / display_rect.height();
-
-        // The scene is rendered to a fixed 160x144 offscreen target, then stretched to fit the display rect.
-        // We need to account for aspect ratio differences between the display rect and the logical viewport.
-        let display_aspect = display_rect.width() / display_rect.height();
-        let viewport_aspect = self.viewport_size.0 as f32 / self.viewport_size.1 as f32;
-
-        let (viewport_x, viewport_y) = if display_aspect > viewport_aspect {
-            // Display rect is wider than viewport - letterboxing on sides
-            let effective_width = display_rect.height() * viewport_aspect;
-            let x_offset = (display_rect.width() - effective_width) * 0.5;
-            let adjusted_x = (screen_pos.x - display_rect.min.x - x_offset) / effective_width;
-            let adjusted_y = normalized_y;
-
-            (
-                adjusted_x.clamp(0.0, 1.0) * self.viewport_size.0 as f32,
-                adjusted_y * self.viewport_size.1 as f32,
-            )
-        } else {
-            // Display rect is taller than viewport - letterboxing on top/bottom
-            let effective_height = display_rect.width() / viewport_aspect;
-            let y_offset = (display_rect.height() - effective_height) * 0.5;
-            let adjusted_x = normalized_x;
-            let adjusted_y = (screen_pos.y - display_rect.min.y - y_offset) / effective_height;
-
-            (
-                adjusted_x * self.viewport_size.0 as f32,
-                adjusted_y.clamp(0.0, 1.0) * self.viewport_size.1 as f32,
-            )
-        };
-
-        // Convert to world coordinates using camera
-        let world_x = self.camera.position.x as f32 + viewport_x * self.camera.scale as f32;
-        let world_y = self.camera.position.y as f32 + viewport_y * self.camera.scale as f32;
-
-        glam::Vec2::new(world_x, world_y)
+        screen_to_world_from_camera(
+            screen_pos,
+            display_rect,
+            self.viewport_size,
+            self.camera.position,
+            self.camera.scale,
+        )
     }
 
     /// Convert screen position to world position (with placement offsets for entity placement)
@@ -1262,64 +1277,8 @@ impl SceneViewport {
         screen_pos: egui::Pos2,
         display_rect: egui::Rect,
     ) -> glam::Vec2 {
-        // Convert screen position relative to display rect to 0-1 normalized coordinates
-        let normalized_x = (screen_pos.x - display_rect.min.x) / display_rect.width();
-        let normalized_y = (screen_pos.y - display_rect.min.y) / display_rect.height();
-
-        // The scene is rendered to a fixed 160x144 offscreen target, then stretched to fit the display rect.
-        // We need to account for aspect ratio differences between the display rect and the logical viewport.
-        let display_aspect = display_rect.width() / display_rect.height();
-        let viewport_aspect = self.viewport_size.0 as f32 / self.viewport_size.1 as f32;
-
-        let (viewport_x, viewport_y) = if display_aspect > viewport_aspect {
-            // Display rect is wider than viewport - letterboxing on sides
-            let effective_width = display_rect.height() * viewport_aspect;
-            let x_offset = (display_rect.width() - effective_width) * 0.5;
-            let adjusted_x = (screen_pos.x - display_rect.min.x - x_offset) / effective_width;
-            let adjusted_y = normalized_y;
-
-            (
-                adjusted_x.clamp(0.0, 1.0) * self.viewport_size.0 as f32,
-                adjusted_y * self.viewport_size.1 as f32,
-            )
-        } else {
-            // Display rect is taller than viewport - letterboxing on top/bottom
-            let effective_height = display_rect.width() / viewport_aspect;
-            let y_offset = (display_rect.height() - effective_height) * 0.5;
-            let adjusted_x = normalized_x;
-            let adjusted_y = (screen_pos.y - display_rect.min.y - y_offset) / effective_height;
-
-            (
-                adjusted_x * self.viewport_size.0 as f32,
-                adjusted_y.clamp(0.0, 1.0) * self.viewport_size.1 as f32,
-            )
-        };
-
-        // Convert to world coordinates using camera
-        let world_x = self.camera.position.x as f32 + viewport_x * self.camera.scale as f32;
-        let world_y = self.camera.position.y as f32 + viewport_y * self.camera.scale as f32;
-
-        // COORDINATE SYSTEM FIX:
-        // There are two sources of offset that need to be corrected:
-        // 1. Tile vs Entity positioning: Tiles use top-left corner, entities use center (half tile offset)
-        // 2. Additional coordinate system offset: Related to camera/viewport origin (half tile offset)
-        // Total offset needed: 1 full tile size to make entities appear where clicked
-        // This is currently hard-coded for 8x8 tiles, but should ideally be dynamic
-        const TILE_SIZE: f32 = 8.0; // TODO: Get this from the actual tilemap
-        let world_x = world_x + TILE_SIZE;
-        let world_y = world_y + TILE_SIZE;
-
-        // Additional debug info to understand coordinate systems
-        let tile_x = (world_x - TILE_SIZE) / TILE_SIZE;
-        let tile_y = (world_y - TILE_SIZE) / TILE_SIZE;
-        let world_before_offset_x = world_x - TILE_SIZE;
-        let world_before_offset_y = world_y - TILE_SIZE;
-
-        tracing::trace!("screen_to_world: screen({:.1}, {:.1}) -> normalized({:.3}, {:.3}) -> viewport({:.1}, {:.1}) -> world_before_offset({:.1}, {:.1}) -> world_final({:.1}, {:.1}) -> tile({:.2}, {:.2}) [camera: pos({}, {}), scale: {}, aspects: display={:.3}, viewport={:.3}]",
-            screen_pos.x, screen_pos.y, normalized_x, normalized_y, viewport_x, viewport_y, world_before_offset_x, world_before_offset_y, world_x, world_y, tile_x, tile_y,
-            self.camera.position.x, self.camera.position.y, self.camera.scale, display_aspect, viewport_aspect);
-
-        glam::Vec2::new(world_x, world_y)
+        // Canonical conversion path shared with hover/selection/placement previews.
+        self.screen_to_world_pos_raw(screen_pos, display_rect)
     }
 
     /// Start camera panning drag
@@ -1368,4 +1327,46 @@ impl SceneViewport {
     }
 
     // Note: Additional methods like toggle_collision_boxes, etc. can be added when needed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::screen_to_world_from_camera;
+
+    #[test]
+    fn screen_to_world_uses_camera_and_has_no_hardcoded_tile_offset() {
+        let display = egui::Rect::from_min_size(egui::Pos2::new(0.0, 0.0), egui::vec2(160.0, 144.0));
+        let world = screen_to_world_from_camera(
+            egui::Pos2::new(0.0, 0.0),
+            display,
+            (160, 144),
+            glam::IVec2::new(10, 20),
+            1,
+        );
+        assert_eq!(world, glam::Vec2::new(10.0, 20.0));
+    }
+
+    #[test]
+    fn screen_to_world_clamps_letterbox_sides_to_viewport_bounds() {
+        let display = egui::Rect::from_min_size(egui::Pos2::new(0.0, 0.0), egui::vec2(320.0, 144.0));
+
+        // In this setup, logical viewport is centered with 80px left/right letterboxes.
+        let left_letterbox = screen_to_world_from_camera(
+            egui::Pos2::new(0.0, 72.0),
+            display,
+            (160, 144),
+            glam::IVec2::ZERO,
+            1,
+        );
+        assert_eq!(left_letterbox.x, 0.0);
+
+        let right_letterbox = screen_to_world_from_camera(
+            egui::Pos2::new(320.0, 72.0),
+            display,
+            (160, 144),
+            glam::IVec2::ZERO,
+            1,
+        );
+        assert_eq!(right_letterbox.x, 160.0);
+    }
 }

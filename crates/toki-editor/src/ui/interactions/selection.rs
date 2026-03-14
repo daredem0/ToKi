@@ -1,4 +1,4 @@
-use super::PlacementInteraction;
+use super::{GridInteraction, PlacementInteraction};
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
 use crate::ui::editor_ui::{EntityMoveDragState, Selection};
@@ -96,6 +96,7 @@ impl SelectionInteraction {
         viewport: &mut SceneViewport,
         drop_pos: Option<egui::Pos2>,
         rect: egui::Rect,
+        config: Option<&EditorConfig>,
     ) {
         let Some(drag_state) = ui_state.entity_move_drag.clone() else {
             return;
@@ -112,7 +113,11 @@ impl SelectionInteraction {
             return;
         };
 
-        let drop_world_pos = viewport.screen_to_world_pos(drop_pos, rect);
+        let drop_world_pos = GridInteraction::maybe_snap_world_position(
+            viewport.screen_to_world_pos_raw(drop_pos, rect),
+            viewport.scene_manager().tilemap(),
+            config,
+        );
         let drop_world_pos_i32 = PlacementInteraction::centered_world_position_from_sprite_center(
             drop_world_pos,
             drag_state.entity.size,

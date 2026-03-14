@@ -1,5 +1,5 @@
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
@@ -46,11 +46,59 @@ pub struct PanelSettings {
     pub console_visible: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct GridSettings {
     pub show_grid: bool,
-    pub grid_size: u32,
+    pub grid_size: [u32; 2],
     pub snap_to_grid: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum GridSizeField {
+    Scalar(u32),
+    Vector([u32; 2]),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GridSettingsWire {
+    #[serde(default = "default_show_grid")]
+    show_grid: bool,
+    #[serde(default = "default_grid_size_field")]
+    grid_size: GridSizeField,
+    #[serde(default = "default_snap_to_grid")]
+    snap_to_grid: bool,
+}
+
+impl<'de> Deserialize<'de> for GridSettings {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = GridSettingsWire::deserialize(deserializer)?;
+        let grid_size = match wire.grid_size {
+            GridSizeField::Scalar(size) => [size, size],
+            GridSizeField::Vector(size) => size,
+        };
+
+        Ok(Self {
+            show_grid: wire.show_grid,
+            grid_size,
+            snap_to_grid: wire.snap_to_grid,
+        })
+    }
+}
+
+fn default_show_grid() -> bool {
+    true
+}
+
+fn default_snap_to_grid() -> bool {
+    true
+}
+
+fn default_grid_size_field() -> GridSizeField {
+    GridSizeField::Vector([16, 16])
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,7 +155,7 @@ impl Default for GridSettings {
     fn default() -> Self {
         Self {
             show_grid: true,
-            grid_size: 16,
+            grid_size: [16, 16],
             snap_to_grid: true,
         }
     }
@@ -212,5 +260,61 @@ impl EditorConfig {
     /// Check if a project path is set
     pub fn has_project_path(&self) -> bool {
         self.project_path.is_some()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{EditorConfig, GridSettings};
+
+    #[test]
+    fn grid_settings_deserializes_legacy_scalar_grid_size() {
+        let json = r#"{
+          "project_path": null,
+          "editor_settings": {
+            "window_size": [1200, 800],
+            "panels": {
+              "hierarchy_visible": true,
+              "inspector_visible": true,
+              "console_visible": true
+            },
+            "grid": {
+              "show_grid": true,
+              "grid_size": 16,
+              "snap_to_grid": true
+            },
+            "camera": {
+              "pan_speed": 1.0,
+              "zoom_speed": 1.0
+            }
+          },
+          "recent_projects": [],
+          "rendering": {
+            "vsync": true,
+            "target_fps": 60,
+            "show_collision_boxes": true,
+            "show_debug_info": false
+          },
+          "log_to_terminal": true,
+          "log_level": "INFO"
+        }"#;
+
+        let config: EditorConfig =
+            serde_json::from_str(json).expect("legacy scalar grid config should parse");
+        assert_eq!(config.editor_settings.grid.grid_size, [16, 16]);
+    }
+
+    #[test]
+    fn grid_settings_serializes_as_2d_grid_size() {
+        let mut config = EditorConfig::default();
+        config.editor_settings.grid = GridSettings {
+            show_grid: true,
+            grid_size: [8, 12],
+            snap_to_grid: false,
+        };
+
+        let json =
+            serde_json::to_string(&config).expect("editor config should serialize to json");
+        assert!(json.contains("\"grid_size\":[8,12]"));
     }
 }

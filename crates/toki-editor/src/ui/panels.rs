@@ -170,7 +170,13 @@ impl PanelSystem {
                     let drop_pos = response
                         .interact_pointer_pos()
                         .or_else(|| response.hover_pos());
-                    SelectionInteraction::handle_drag_release(ui_state, viewport, drop_pos, rect);
+                    SelectionInteraction::handle_drag_release(
+                        ui_state,
+                        viewport,
+                        drop_pos,
+                        rect,
+                        config.as_deref(),
+                    );
                 }
 
                 // Handle camera panning with drag (disabled while moving an entity).

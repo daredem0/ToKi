@@ -1,3 +1,4 @@
+use super::GridInteraction;
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
 use crate::ui::EditorUI;
@@ -19,7 +20,11 @@ impl PlacementInteraction {
     ) {
         if ui_state.is_in_placement_mode() {
             if let Some(hover_pos) = response.hover_pos() {
-                let world_pos = viewport.screen_to_world_pos_raw(hover_pos, rect);
+                let world_pos = GridInteraction::maybe_snap_world_position(
+                    viewport.screen_to_world_pos_raw(hover_pos, rect),
+                    viewport.scene_manager().tilemap(),
+                    config,
+                );
                 ui_state.placement_preview_position = Some(world_pos);
 
                 let is_valid =
@@ -49,7 +54,11 @@ impl PlacementInteraction {
             return;
         };
 
-        let world_pos = viewport.screen_to_world_pos(click_pos, rect);
+        let world_pos = GridInteraction::maybe_snap_world_position(
+            viewport.screen_to_world_pos_raw(click_pos, rect),
+            viewport.scene_manager().tilemap(),
+            config,
+        );
         tracing::info!(
             "Placing entity '{}' at world coordinates ({}, {}) [converted from screen ({}, {})]",
             entity_def_name,
