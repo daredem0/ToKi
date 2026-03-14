@@ -1,6 +1,6 @@
 use super::editor_ui::{CenterPanelTab, Selection};
 use super::interactions::{CameraInteraction, PlacementInteraction, SelectionInteraction};
-use super::rule_graph::{RuleGraph, RuleGraphNodeKind};
+use super::rule_graph::{RuleGraph, RuleGraphError, RuleGraphNodeKind};
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
 use std::collections::{HashMap, HashSet};
@@ -40,6 +40,19 @@ enum GraphTriggerKind {
     Key,
     Collision,
     Trigger,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GraphValidationSeverity {
+    Error,
+    Warning,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GraphValidationIssue {
+    severity: GraphValidationSeverity,
+    message: String,
+    hint: String,
 }
 
 impl PanelSystem {
@@ -376,6 +389,8 @@ impl PanelSystem {
                 graph.nodes.len(),
                 graph.edges.len()
             ));
+            let validation_issues = Self::collect_graph_validation_issues(&graph, &node_badges);
+            Self::render_graph_validation_summary(ui, &validation_issues);
             if !show_scene_rules {
                 if pending_command.is_none() {
                     let (moved_node, clicked_node) = Self::render_graph_canvas(
@@ -737,9 +752,10 @@ impl PanelSystem {
                     }
                     Err(error) => {
                         scene_changed = false;
+                        let issue = Self::rule_graph_error_issue(&graph, &node_badges, &error);
                         operation_error = Some(format!(
-                            "Graph is invalid and could not be saved: {:?}",
-                            error
+                            "{} Scene JSON was not updated. Hint: {}",
+                            issue.message, issue.hint
                         ));
                     }
                 }
@@ -828,6 +844,155 @@ impl PanelSystem {
             badges.insert(node_id, badge);
         }
         badges
+    }
+
+    fn collect_graph_validation_issues(
+        graph: &RuleGraph,
+        node_badges: &HashMap<u64, String>,
+    ) -> Vec<GraphValidationIssue> {
+        let mut issues = Vec::<GraphValidationIssue>::new();
+        let graph_serialization_error = graph.to_rule_set().err();
+        if let Some(error) = graph_serialization_error.as_ref() {
+            issues.push(Self::rule_graph_error_issue(graph, node_badges, error));
+        }
+
+        let mut serialized_nodes = HashSet::<u64>::new();
+        for chain in &graph.chains {
+            if let Ok(sequence) = graph.chain_node_sequence(chain.trigger_node_id) {
+                serialized_nodes.extend(sequence);
+            }
+        }
+
+        for node in &graph.nodes {
+            if matches!(
+                node.kind,
+                RuleGraphNodeKind::Condition(_) | RuleGraphNodeKind::Action(_)
+            ) && !serialized_nodes.contains(&node.id)
+            {
+                let node_label = Self::rule_graph_node_label(graph, node_badges, node.id)
+                    .unwrap_or_else(|| format!("node {}", node.id));
+                issues.push(GraphValidationIssue {
+                    severity: GraphValidationSeverity::Warning,
+                    message: format!("{node_label} is detached from all trigger chains."),
+                    hint: "Connect it into a trigger chain, or delete it if it is no longer needed. Detached nodes stay in editor drafts but are not exported to scene JSON/runtime.".to_string(),
+                });
+            }
+        }
+
+        issues
+    }
+
+    fn rule_graph_error_issue(
+        graph: &RuleGraph,
+        node_badges: &HashMap<u64, String>,
+        error: &RuleGraphError,
+    ) -> GraphValidationIssue {
+        match error {
+            RuleGraphError::MissingTriggerNode { rule_id, node_id } => {
+                let node_label = Self::rule_graph_node_label(graph, node_badges, *node_id)
+                    .unwrap_or_else(|| format!("node {}", node_id));
+                GraphValidationIssue {
+                    severity: GraphValidationSeverity::Error,
+                    message: format!(
+                        "Rule '{}' references missing trigger {}.",
+                        rule_id, node_label
+                    ),
+                    hint: "Delete and recreate the affected trigger chain.".to_string(),
+                }
+            }
+            RuleGraphError::TriggerNodeKindMismatch { rule_id, node_id } => {
+                let node_label = Self::rule_graph_node_label(graph, node_badges, *node_id)
+                    .unwrap_or_else(|| format!("node {}", node_id));
+                GraphValidationIssue {
+                    severity: GraphValidationSeverity::Error,
+                    message: format!(
+                        "Rule '{}' trigger node has invalid kind at {}.",
+                        rule_id, node_label
+                    ),
+                    hint: "Replace the node with a proper trigger node for this chain.".to_string(),
+                }
+            }
+            RuleGraphError::MissingNode { rule_id, node_id } => {
+                let node_label = Self::rule_graph_node_label(graph, node_badges, *node_id)
+                    .unwrap_or_else(|| format!("node {}", node_id));
+                GraphValidationIssue {
+                    severity: GraphValidationSeverity::Error,
+                    message: format!("Rule '{}' references missing {}.", rule_id, node_label),
+                    hint: "Disconnect stale edges or remove/recreate the broken chain segment."
+                        .to_string(),
+                }
+            }
+            RuleGraphError::NonLinearChain { rule_id, node_id } => {
+                let node_label = Self::rule_graph_node_label(graph, node_badges, *node_id)
+                    .unwrap_or_else(|| format!("node {}", node_id));
+                GraphValidationIssue {
+                    severity: GraphValidationSeverity::Error,
+                    message: format!(
+                        "Rule '{}' branches at {} (multiple outgoing edges).",
+                        rule_id, node_label
+                    ),
+                    hint:
+                        "Disconnect extra outgoing edges from this node, or split logic into separate trigger chains."
+                            .to_string(),
+                }
+            }
+            RuleGraphError::CycleDetected { rule_id, node_id } => {
+                let node_label = Self::rule_graph_node_label(graph, node_badges, *node_id)
+                    .unwrap_or_else(|| format!("node {}", node_id));
+                GraphValidationIssue {
+                    severity: GraphValidationSeverity::Error,
+                    message: format!("Rule '{}' contains a cycle at {}.", rule_id, node_label),
+                    hint: "Disconnect one edge in the loop so each chain has a forward-only path."
+                        .to_string(),
+                }
+            }
+        }
+    }
+
+    fn render_graph_validation_summary(ui: &mut egui::Ui, issues: &[GraphValidationIssue]) {
+        if issues.is_empty() {
+            ui.colored_label(
+                egui::Color32::from_rgb(150, 210, 150),
+                "Validation: Serializable (runtime/export ready)",
+            );
+            return;
+        }
+
+        let error_count = issues
+            .iter()
+            .filter(|issue| issue.severity == GraphValidationSeverity::Error)
+            .count();
+        let warning_count = issues
+            .iter()
+            .filter(|issue| issue.severity == GraphValidationSeverity::Warning)
+            .count();
+
+        let header_color = if error_count > 0 {
+            egui::Color32::from_rgb(255, 130, 130)
+        } else {
+            egui::Color32::from_rgb(255, 210, 120)
+        };
+        ui.group(|ui| {
+            ui.colored_label(
+                header_color,
+                format!(
+                    "Validation: {} error(s), {} warning(s)",
+                    error_count, warning_count
+                ),
+            );
+            for issue in issues {
+                let (prefix, color) = match issue.severity {
+                    GraphValidationSeverity::Error => {
+                        ("Error", egui::Color32::from_rgb(255, 140, 140))
+                    }
+                    GraphValidationSeverity::Warning => {
+                        ("Warning", egui::Color32::from_rgb(255, 210, 120))
+                    }
+                };
+                ui.colored_label(color, format!("{prefix}: {}", issue.message));
+                ui.label(format!("Hint: {}", issue.hint));
+            }
+        });
     }
 
     fn compute_auto_layout_positions(
@@ -1792,5 +1957,73 @@ mod tests {
             pan[1] > 0.0,
             "y pan should be increased to preserve border gap"
         );
+    }
+
+    #[test]
+    fn collect_graph_validation_issues_reports_non_linear_chain_error() {
+        let rules = RuleSet {
+            rules: vec![Rule {
+                id: "rule_1".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                trigger: RuleTrigger::OnStart,
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::PlayMusic {
+                    track_id: "bgm_1".to_string(),
+                }],
+            }],
+        };
+        let mut graph = RuleGraph::from_rule_set(&rules);
+        let trigger = graph.chains[0].trigger_node_id;
+        let detached = graph
+            .add_action_node(RuleAction::PlayMusic {
+                track_id: "bgm_2".to_string(),
+            })
+            .expect("detached node should be added");
+        graph
+            .connect_nodes(trigger, detached)
+            .expect("adding a second trigger outgoing edge should be allowed in free graph");
+
+        let badges = PanelSystem::rule_graph_node_badges(&graph);
+        let issues = PanelSystem::collect_graph_validation_issues(&graph, &badges);
+        assert!(issues.iter().any(|issue| {
+            issue.severity == super::GraphValidationSeverity::Error
+                && issue.message.contains("multiple outgoing edges")
+        }));
+    }
+
+    #[test]
+    fn collect_graph_validation_issues_warns_for_detached_action_nodes() {
+        let rules = RuleSet {
+            rules: vec![Rule {
+                id: "rule_1".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                trigger: RuleTrigger::OnStart,
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::PlayMusic {
+                    track_id: "bgm_1".to_string(),
+                }],
+            }],
+        };
+        let mut graph = RuleGraph::from_rule_set(&rules);
+        let detached = graph
+            .add_action_node(RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "sfx_step".to_string(),
+            })
+            .expect("detached action should be added");
+
+        let badges = PanelSystem::rule_graph_node_badges(&graph);
+        let detached_label = PanelSystem::rule_graph_node_label(&graph, &badges, detached)
+            .expect("detached node should have a display label");
+        let issues = PanelSystem::collect_graph_validation_issues(&graph, &badges);
+        assert!(issues.iter().any(|issue| {
+            issue.severity == super::GraphValidationSeverity::Warning
+                && issue.message.contains(&detached_label)
+                && issue.message.contains("detached")
+        }));
     }
 }
