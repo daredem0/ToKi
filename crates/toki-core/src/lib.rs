@@ -12,6 +12,7 @@ pub mod math {
 }
 pub mod errors;
 pub use errors::CoreError;
+pub mod pack;
 
 pub mod sprite;
 pub mod text;

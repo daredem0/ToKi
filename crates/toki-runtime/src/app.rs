@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use std::{fs, path::PathBuf};
 
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
+use toki_core::graphics::image::load_image_rgba8_from_bytes;
 use toki_core::math::projection::ProjectionParameter;
 use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
 use toki_core::{EventHandler, GameState, Scene, TimingSystem};
@@ -28,6 +29,7 @@ const COMMUNITY_SPLASH_DEFAULT_DURATION_MS: u64 = 3000;
 const COMMUNITY_SPLASH_BRANDING_TEXT: &str = "Powered by ToKi";
 const SPLASH_LOGO_WIDTH: u32 = 128;
 const SPLASH_LOGO_HEIGHT: u32 = 108;
+const COMMUNITY_SPLASH_LOGO_PNG: &[u8] = include_bytes!("../../../assets/TokiLogo.png");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeSplashOptions {
@@ -104,7 +106,6 @@ struct App {
     splash_config: ResolvedSplashConfig,
     splash_active: bool,
     splash_started_at: Option<Instant>,
-    splash_logo_path: Option<PathBuf>,
     splash_logo_loaded: bool,
     post_splash_sprite_texture_path: Option<PathBuf>,
     #[allow(dead_code)]
@@ -190,7 +191,6 @@ impl App {
             splash_config,
             splash_active: true,
             splash_started_at: None,
-            splash_logo_path: None,
             splash_logo_loaded: false,
             post_splash_sprite_texture_path: None,
             pack_mount,
@@ -201,44 +201,14 @@ impl App {
         launch_options: &RuntimeLaunchOptions,
     ) -> (ResourceManager, GameState, Option<tempfile::TempDir>) {
         if let Some(pack_path) = &launch_options.pack_path {
-            match crate::pack::extract_pak_to_tempdir(pack_path) {
-                Ok(mount) => {
-                    let mount_path = mount.path().to_path_buf();
-                    let scene = launch_options.scene_name.as_deref().and_then(|scene_name| {
-                        Self::load_project_scene(&mount_path, scene_name).ok()
-                    });
-                    let map_name = launch_options.map_name.clone().or_else(|| {
-                        scene
-                            .as_ref()
-                            .and_then(|loaded_scene| loaded_scene.maps.first().cloned())
-                    });
-                    match ResourceManager::load_for_project(&mount_path, map_name.as_deref()) {
-                        Ok(resources) => {
-                            let game_state = if let Some(scene) = scene {
-                                Self::game_state_from_scene(scene)
-                            } else {
-                                Self::fallback_game_state()
-                            };
-                            return (resources, game_state, Some(mount));
-                        }
-                        Err(error) => {
-                            tracing::error!(
-                                "Failed to load resources from pack '{}' mounted at '{}': {}",
-                                pack_path.display(),
-                                mount_path.display(),
-                                error
-                            );
-                        }
-                    }
-                }
-                Err(error) => {
-                    tracing::error!(
-                        "Failed to extract pack '{}': {}",
+            return Self::build_startup_state_from_pack(launch_options, pack_path)
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "Failed to initialize runtime from pack '{}': {}",
                         pack_path.display(),
                         error
-                    );
-                }
-            }
+                    )
+                });
         }
 
         if let Some(project_path) = &launch_options.project_path {
@@ -278,6 +248,32 @@ impl App {
                 panic!("Failed to initialize runtime resources: {error}");
             }
         }
+    }
+
+    fn build_startup_state_from_pack(
+        launch_options: &RuntimeLaunchOptions,
+        pack_path: &std::path::Path,
+    ) -> anyhow::Result<(ResourceManager, GameState, Option<tempfile::TempDir>)> {
+        let mount = crate::pack::extract_pak_to_tempdir(pack_path)?;
+        let mount_path = mount.path().to_path_buf();
+        let scene = launch_options
+            .scene_name
+            .as_deref()
+            .map(|scene_name| Self::load_project_scene(&mount_path, scene_name))
+            .transpose()
+            .map_err(anyhow::Error::msg)?;
+        let map_name = launch_options.map_name.clone().or_else(|| {
+            scene
+                .as_ref()
+                .and_then(|loaded_scene| loaded_scene.maps.first().cloned())
+        });
+        let resources = ResourceManager::load_for_project(&mount_path, map_name.as_deref())?;
+        let game_state = if let Some(scene) = scene {
+            Self::game_state_from_scene(scene)
+        } else {
+            Self::fallback_game_state()
+        };
+        Ok((resources, game_state, Some(mount)))
     }
 
     fn load_project_scene(
@@ -716,39 +712,6 @@ impl App {
         self.rendering.update_tilemap_vertices(&verts);
     }
 
-    fn resolve_logo_path(
-        launch_options: &RuntimeLaunchOptions,
-        content_root: Option<&std::path::Path>,
-    ) -> Option<PathBuf> {
-        let mut candidates = Vec::new();
-
-        if let Some(root) = content_root {
-            candidates.push(root.join("assets").join("TokiLogo.png"));
-            if let Some(parent) = root.parent() {
-                candidates.push(parent.join("assets").join("TokiLogo.png"));
-            }
-        }
-
-        if let Some(project_path) = &launch_options.project_path {
-            candidates.push(project_path.join("assets").join("TokiLogo.png"));
-            if let Some(parent) = project_path.parent() {
-                candidates.push(parent.join("assets").join("TokiLogo.png"));
-                if let Some(grand_parent) = parent.parent() {
-                    candidates.push(grand_parent.join("assets").join("TokiLogo.png"));
-                }
-            }
-        }
-
-        if let Ok(current_dir) = std::env::current_dir() {
-            candidates.push(current_dir.join("assets").join("TokiLogo.png"));
-        }
-
-        candidates
-            .push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/TokiLogo.png"));
-
-        first_existing_path(&candidates)
-    }
-
     fn resolve_post_splash_sprite_texture_path(
         launch_options: &RuntimeLaunchOptions,
         content_root: Option<&std::path::Path>,
@@ -814,18 +777,15 @@ impl ApplicationHandler for App {
             }
         }
 
-        self.splash_logo_path =
-            Self::resolve_logo_path(&self.launch_options, content_root.as_deref());
         self.post_splash_sprite_texture_path = Self::resolve_post_splash_sprite_texture_path(
             &self.launch_options,
             content_root.as_deref(),
         );
         self.splash_config = self.splash_policy.resolve(&self.launch_options.splash);
-        if let Some(path) = &self.splash_logo_path {
-            if let Err(error) = self.rendering.load_sprite_texture(path.clone()) {
+        if let Ok(decoded_logo) = load_image_rgba8_from_bytes(COMMUNITY_SPLASH_LOGO_PNG) {
+            if let Err(error) = self.rendering.load_sprite_texture_rgba8(&decoded_logo) {
                 tracing::warn!(
-                    "Failed to load startup logo texture '{}' (splash will render branding-only): {}",
-                    path.display(),
+                    "Failed to load embedded startup logo texture (splash will render branding-only): {}",
                     error
                 );
                 self.splash_logo_loaded = false;
@@ -834,7 +794,7 @@ impl ApplicationHandler for App {
             }
         } else {
             tracing::warn!(
-                "No startup logo found at assets/TokiLogo.png candidate paths; splash will render branding-only"
+                "Failed to decode embedded startup logo bytes; splash will render branding-only"
             );
             self.splash_logo_loaded = false;
         }
@@ -1140,27 +1100,6 @@ mod tests {
     }
 
     #[test]
-    fn resolve_logo_path_prefers_project_local_assets_logo() {
-        let project_dir = make_unique_temp_dir()
-            .join("example_project")
-            .join("MyGame");
-        fs::create_dir_all(project_dir.join("assets")).expect("assets dir");
-        let logo_path = project_dir.join("assets").join("TokiLogo.png");
-        fs::write(&logo_path, "logo").expect("logo write");
-
-        let options = RuntimeLaunchOptions {
-            project_path: Some(project_dir),
-            pack_path: None,
-            scene_name: None,
-            map_name: None,
-            splash: RuntimeSplashOptions::default(),
-        };
-
-        let resolved = App::resolve_logo_path(&options, None);
-        assert_eq!(resolved, Some(logo_path));
-    }
-
-    #[test]
     fn resolve_post_splash_sprite_texture_path_prefers_project_creatures_texture() {
         let project_dir = make_unique_temp_dir()
             .join("example_project")
@@ -1278,6 +1217,40 @@ mod tests {
         assert_eq!(game_state.entity_manager().active_entities().len(), 0);
         assert_eq!(resources.get_tilemap().size, glam::UVec2::new(1, 1));
         assert_eq!(resources.get_tilemap().atlas, terrain_atlas_path);
+    }
+
+    #[test]
+    fn build_startup_state_from_pack_returns_error_when_required_assets_are_missing() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let pack_path = temp.path().join("broken.toki.pak");
+
+        let mut scene = Scene::new("Main Scene".to_string());
+        scene.maps.push("demo_map".to_string());
+        let scene_json = serde_json::to_vec_pretty(&scene).expect("scene json");
+
+        write_test_pak(
+            &pack_path,
+            &[
+                ("scenes/Main Scene.json".to_string(), scene_json),
+                ("assets/tilemaps/demo_map.json".to_string(), b"{}".to_vec()),
+            ],
+        );
+
+        let launch_options = RuntimeLaunchOptions {
+            project_path: None,
+            pack_path: Some(pack_path.clone()),
+            scene_name: Some("Main Scene".to_string()),
+            map_name: None,
+            splash: RuntimeSplashOptions::default(),
+        };
+
+        let error = App::build_startup_state_from_pack(&launch_options, &pack_path)
+            .expect_err("missing pack assets should fail startup");
+        let text = error.to_string();
+        assert!(
+            text.contains("atlas") || text.contains("resources") || text.contains("Core error"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]

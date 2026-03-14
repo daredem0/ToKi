@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::math::projection::{calculate_projection, ProjectionParameter};
 use toki_core::sprite::SpriteFrame;
@@ -14,6 +15,10 @@ trait RuntimeRenderBackend: std::fmt::Debug {
     fn load_sprite_texture(
         &mut self,
         texture_path: std::path::PathBuf,
+    ) -> Result<(), toki_render::RenderError>;
+    fn load_sprite_texture_rgba8(
+        &mut self,
+        image: &DecodedImage,
     ) -> Result<(), toki_render::RenderError>;
     fn load_font_file(
         &mut self,
@@ -69,6 +74,13 @@ impl RuntimeRenderBackend for WgpuRenderBackend {
         texture_path: std::path::PathBuf,
     ) -> Result<(), toki_render::RenderError> {
         self.gpu.load_sprite_texture(texture_path)
+    }
+
+    fn load_sprite_texture_rgba8(
+        &mut self,
+        image: &DecodedImage,
+    ) -> Result<(), toki_render::RenderError> {
+        self.gpu.load_sprite_texture_rgba8(image)
     }
 
     fn load_font_file(
@@ -216,6 +228,19 @@ impl RenderingSystem {
     ) -> Result<(), toki_render::RenderError> {
         if let Some(backend) = &mut self.backend {
             backend.load_sprite_texture(texture_path)
+        } else {
+            Err(toki_render::RenderError::Other(
+                "GPU not initialized".to_string(),
+            ))
+        }
+    }
+
+    pub fn load_sprite_texture_rgba8(
+        &mut self,
+        image: &DecodedImage,
+    ) -> Result<(), toki_render::RenderError> {
+        if let Some(backend) = &mut self.backend {
+            backend.load_sprite_texture_rgba8(image)
         } else {
             Err(toki_render::RenderError::Other(
                 "GPU not initialized".to_string(),
@@ -437,6 +462,7 @@ mod tests {
     use std::cell::{Cell, RefCell};
     use std::path::Path;
     use std::rc::Rc;
+    use toki_core::graphics::image::DecodedImage;
     use toki_core::graphics::vertex::QuadVertex;
     use toki_core::sprite::SpriteFrame;
     use toki_core::text::{TextItem, TextStyle};
@@ -465,6 +491,13 @@ mod tests {
         fn load_sprite_texture(
             &mut self,
             _texture_path: std::path::PathBuf,
+        ) -> Result<(), toki_render::RenderError> {
+            Ok(())
+        }
+
+        fn load_sprite_texture_rgba8(
+            &mut self,
+            _image: &DecodedImage,
         ) -> Result<(), toki_render::RenderError> {
             Ok(())
         }

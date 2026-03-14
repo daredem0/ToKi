@@ -10,6 +10,7 @@ use std::sync::Arc;
 // Local modules
 
 use crate::texture::GpuTexture;
+use toki_core::graphics::image::DecodedImage;
 
 pub fn create_texture_bindgroup(
     device: &wgpu::Device,
@@ -61,6 +62,25 @@ pub fn create_texture_bindgroup(
     }
 
     bind_group
+}
+
+pub fn create_texture_bindgroup_from_rgba8(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    texture_bind_group_layout: &wgpu::BindGroupLayout,
+    uniform_buffer: &wgpu::Buffer,
+    image: &DecodedImage,
+    texture_label: Option<&str>,
+) -> wgpu::BindGroup {
+    let texture = GpuTexture::from_rgba8(device, queue, image, texture_label).unwrap_or_else(|e| {
+        tracing::error!(
+            "Failed to create texture from decoded RGBA8 image for {:?}: {}",
+            texture_label,
+            e
+        );
+        panic!("Texture creation from decoded image failed for {:?}: {}", texture_label, e);
+    });
+    create_bind_group(device, texture_bind_group_layout, &texture, uniform_buffer)
 }
 pub fn create_device_and_surface(
     window: Arc<Window>,

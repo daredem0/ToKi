@@ -3,6 +3,7 @@ use std::sync::Arc;
 use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
 use winit::window::Window;
 
+use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::sprite::SpriteFrame;
 use toki_core::text::TextItem;
@@ -140,6 +141,16 @@ impl GpuState {
         // Create new sprite pipeline with the specified texture
         let new_pipeline =
             SpritePipeline::new(&self.device, &self.queue, self.config.format, texture_path);
+        self.sprite_pipeline = new_pipeline;
+        Ok(())
+    }
+
+    pub fn load_sprite_texture_rgba8(
+        &mut self,
+        image: &DecodedImage,
+    ) -> Result<(), crate::RenderError> {
+        let new_pipeline =
+            SpritePipeline::from_rgba8(&self.device, &self.queue, self.config.format, image);
         self.sprite_pipeline = new_pipeline;
         Ok(())
     }

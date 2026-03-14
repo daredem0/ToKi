@@ -4,22 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-
-const PAK_MAGIC: &[u8; 8] = b"TOKIPAK1";
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-struct PakManifest {
-    version: u32,
-    entries: Vec<PakEntry>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-struct PakEntry {
-    path: String,
-    offset: u64,
-    size: u64,
-    compression: String,
-}
+use toki_core::pack::{
+    hash_bytes, infer_pack_asset_type, recommended_pack_compression, PakEntry, PakManifest,
+    PackCompression, PAK_MAGIC, PAK_VERSION,
+};
 
 #[derive(Debug, Clone)]
 struct SourceFile {
@@ -158,18 +146,33 @@ fn write_project_pak(pak_output_path: &Path, source_files: &[SourceFile]) -> Res
                 source.absolute_path.display()
             )
         })?;
-        file.write_all(&bytes)?;
+        let relative_path = source.relative_path.to_string_lossy().replace('\\', "/");
+        let asset_type = infer_pack_asset_type(&source.relative_path);
+        let preferred_compression = recommended_pack_compression(&source.relative_path, asset_type);
+        let candidate_bytes = preferred_compression.compress(&bytes).with_context(|| {
+            format!(
+                "Failed to {} '{}' for pak export",
+                compression_label(preferred_compression),
+                source.absolute_path.display()
+            )
+        })?;
+        let (compression, stored_bytes) =
+            choose_final_payload_encoding(preferred_compression, &bytes, candidate_bytes);
+        file.write_all(&stored_bytes)?;
         entries.push(PakEntry {
-            path: source.relative_path.to_string_lossy().replace('\\', "/"),
+            path: relative_path,
             offset,
             size: bytes.len() as u64,
-            compression: "none".to_string(),
+            stored_size: stored_bytes.len() as u64,
+            compression,
+            hash: Some(hash_bytes(&bytes)),
+            asset_type,
         });
     }
 
     let index_offset = file.stream_position()?;
     let manifest = PakManifest {
-        version: 1,
+        version: PAK_VERSION,
         entries,
     };
     let index_bytes = serde_json::to_vec_pretty(&manifest)?;
@@ -181,6 +184,27 @@ fn write_project_pak(pak_output_path: &Path, source_files: &[SourceFile]) -> Res
     file.write_all(&index_size.to_le_bytes())?;
 
     Ok(())
+}
+
+fn compression_label(compression: PackCompression) -> &'static str {
+    match compression {
+        PackCompression::Store => "store",
+        PackCompression::Zstd => "compress",
+    }
+}
+
+fn choose_final_payload_encoding(
+    preferred_compression: PackCompression,
+    source_bytes: &[u8],
+    candidate_bytes: Vec<u8>,
+) -> (PackCompression, Vec<u8>) {
+    match preferred_compression {
+        PackCompression::Store => (PackCompression::Store, candidate_bytes),
+        PackCompression::Zstd if candidate_bytes.len() < source_bytes.len() => {
+            (PackCompression::Zstd, candidate_bytes)
+        }
+        PackCompression::Zstd => (PackCompression::Store, source_bytes.to_vec()),
+    }
 }
 
 fn collect_source_files(
@@ -238,10 +262,11 @@ fn collect_source_files_recursive(
 
 #[cfg(test)]
 mod tests {
-    use super::{collect_source_files, export_hybrid_bundle, RuntimeBundleConfig, PAK_MAGIC};
+    use super::{collect_source_files, export_hybrid_bundle, RuntimeBundleConfig};
     use crate::project::Project;
     use std::fs;
     use std::io::{Read, Seek, SeekFrom};
+    use toki_core::pack::{PakManifest, PackAssetType, PackCompression, PAK_MAGIC, PAK_VERSION};
 
     #[test]
     fn collect_source_files_returns_sorted_relative_paths() {
@@ -338,10 +363,21 @@ mod tests {
             .expect("seek index");
         let mut index_bytes = vec![0u8; index_size as usize];
         pak_file.read_exact(&mut index_bytes).expect("read index");
-        let index_text = String::from_utf8(index_bytes).expect("utf8 index");
-        assert!(index_text.contains("\"project.toml\""));
-        assert!(index_text.contains("\"scenes/main.json\""));
-        assert!(index_text.contains("\"assets/audio/test.ogg\""));
+        let manifest: PakManifest = serde_json::from_slice(&index_bytes).expect("manifest");
+        assert_eq!(manifest.version, PAK_VERSION);
+        assert!(manifest.entries.iter().any(|entry| entry.path == "project.toml"
+            && entry.asset_type == PackAssetType::ProjectConfig
+            && entry.hash.is_some()
+            && entry.stored_size > 0));
+        assert!(manifest.entries.iter().any(|entry| entry.path == "scenes/main.json"
+            && entry.asset_type == PackAssetType::Scene
+            && entry.hash.is_some()
+            && entry.stored_size > 0));
+        assert!(manifest.entries.iter().any(|entry| entry.path == "assets/audio/test.ogg"
+            && entry.compression == PackCompression::Store
+            && entry.asset_type == PackAssetType::Audio
+            && entry.hash.is_some()
+            && entry.stored_size == entry.size));
 
         let runtime_config: RuntimeBundleConfig =
             serde_json::from_str(&fs::read_to_string(config_path).expect("read config"))
@@ -377,5 +413,70 @@ mod tests {
         assert_eq!(bundle_dir, parent.join("MyGame-bundle"));
         assert!(project_root.join("project.toml").exists());
         assert!(project_root.join("assets/file.txt").exists());
+    }
+
+    #[test]
+    fn export_hybrid_bundle_compresses_text_assets_and_stores_already_compressed_assets() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let parent = temp.path();
+        let project_root = parent.join("MyGame");
+        fs::create_dir_all(project_root.join("assets/sprites")).expect("sprites dir");
+        fs::create_dir_all(project_root.join("scenes")).expect("scenes dir");
+        fs::write(project_root.join("project.toml"), "name='MyGame'\nversion='1'").expect("project");
+        let repeated_entities = (0..128)
+            .map(|index| format!("{{\"id\":{index},\"type\":\"npc\",\"x\":0,\"y\":0}}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        fs::write(
+            project_root.join("scenes/main.json"),
+            format!("{{\"name\":\"main\",\"maps\":[],\"entities\":[{repeated_entities}]}}"),
+        )
+        .expect("scene");
+        fs::write(project_root.join("assets/sprites/a.png"), [137u8, 80, 78, 71, 13, 10, 26, 10])
+            .expect("png");
+
+        let runtime_bin = parent.join(if cfg!(target_os = "windows") {
+            "toki-runtime.exe"
+        } else {
+            "toki-runtime"
+        });
+        fs::write(&runtime_bin, "runtime-binary").expect("runtime");
+
+        let project = Project::new("MyGame".to_string(), project_root.clone());
+        let bundle_dir =
+            export_hybrid_bundle(&project, &runtime_bin, parent, Some("Main Scene"), 3000)
+                .expect("bundle export");
+
+        let pak_path = bundle_dir.join("game.toki.pak");
+        let mut pak_file = fs::File::open(&pak_path).expect("open pak");
+        pak_file.seek(SeekFrom::Start(8)).expect("seek header");
+        let mut index_offset_buf = [0u8; 8];
+        let mut index_size_buf = [0u8; 8];
+        pak_file.read_exact(&mut index_offset_buf).expect("offset");
+        pak_file.read_exact(&mut index_size_buf).expect("size");
+        let index_offset = u64::from_le_bytes(index_offset_buf);
+        let index_size = u64::from_le_bytes(index_size_buf);
+        pak_file
+            .seek(SeekFrom::Start(index_offset))
+            .expect("seek index");
+        let mut index_bytes = vec![0u8; index_size as usize];
+        pak_file.read_exact(&mut index_bytes).expect("read index");
+        let manifest: PakManifest = serde_json::from_slice(&index_bytes).expect("manifest");
+
+        let scene_entry = manifest
+            .entries
+            .iter()
+            .find(|entry| entry.path == "scenes/main.json")
+            .expect("scene entry");
+        assert_eq!(scene_entry.compression, PackCompression::Zstd);
+        assert!(scene_entry.stored_size <= scene_entry.size);
+
+        let image_entry = manifest
+            .entries
+            .iter()
+            .find(|entry| entry.path == "assets/sprites/a.png")
+            .expect("image entry");
+        assert_eq!(image_entry.compression, PackCompression::Store);
+        assert_eq!(image_entry.stored_size, image_entry.size);
     }
 }

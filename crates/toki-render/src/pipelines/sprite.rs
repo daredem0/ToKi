@@ -1,10 +1,14 @@
 use super::RenderPipeline;
 use crate::draw::build_quad_vertices;
 use crate::vertex::VertexLayout;
-use crate::wgpu_utils::{create_bind_group_layout, create_shader_module, create_texture_bindgroup};
+use crate::wgpu_utils::{
+    create_bind_group_layout, create_shader_module, create_texture_bindgroup,
+    create_texture_bindgroup_from_rgba8,
+};
 use bytemuck::{Pod, Zeroable};
 use glam::Vec2;
 use std::path::PathBuf;
+use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::sprite::SpriteFrame;
 use wgpu::util::DeviceExt;
@@ -34,42 +38,19 @@ pub struct SpritePipeline {
 }
 
 impl SpritePipeline {
-    pub fn new(
+    fn build_render_pipeline(
         device: &Device,
-        queue: &Queue,
         surface_format: wgpu::TextureFormat,
-        texture_path: PathBuf,
-    ) -> Self {
+        bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> WgpuRenderPipeline {
         let shader = create_shader_module(device);
-
-        let dummy_uniforms = SpriteUniforms {
-            mvp: glam::Mat4::IDENTITY.to_cols_array_2d(),
-        };
-
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Sprite Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[dummy_uniforms]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let bind_group_layout = create_bind_group_layout(device);
-
-        let bind_group = create_texture_bindgroup(
-            device,
-            queue,
-            &bind_group_layout,
-            &uniform_buffer,
-            texture_path,
-            Some("Sprite Texture"),
-        );
-
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Sprite Pipeline Layout"),
-            bind_group_layouts: &[&bind_group_layout],
+            bind_group_layouts: &[bind_group_layout],
             push_constant_ranges: &[],
         });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Sprite Pipeline"),
             cache: None,
             layout: Some(&pipeline_layout),
@@ -93,7 +74,84 @@ impl SpritePipeline {
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
+        })
+    }
+
+    pub fn new(
+        device: &Device,
+        queue: &Queue,
+        surface_format: wgpu::TextureFormat,
+        texture_path: PathBuf,
+    ) -> Self {
+        let dummy_uniforms = SpriteUniforms {
+            mvp: glam::Mat4::IDENTITY.to_cols_array_2d(),
+        };
+
+        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Sprite Uniform Buffer"),
+            contents: bytemuck::cast_slice(&[dummy_uniforms]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
+
+        let bind_group_layout = create_bind_group_layout(device);
+
+        let bind_group = create_texture_bindgroup(
+            device,
+            queue,
+            &bind_group_layout,
+            &uniform_buffer,
+            texture_path,
+            Some("Sprite Texture"),
+        );
+
+        let render_pipeline = Self::build_render_pipeline(device, surface_format, &bind_group_layout);
+
+        // Create initial empty vertex buffer
+        let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Sprite Vertex Buffer"),
+            size: std::mem::size_of::<QuadVertex>() as u64 * 6 * 1000, // Space for 1000 sprites
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        Self {
+            render_pipeline,
+            bind_group,
+            uniform_buffer,
+            vertex_buffer,
+            instances: Vec::new(),
+            needs_buffer_update: false,
+        }
+    }
+
+    pub fn from_rgba8(
+        device: &Device,
+        queue: &Queue,
+        surface_format: wgpu::TextureFormat,
+        image: &DecodedImage,
+    ) -> Self {
+        let dummy_uniforms = SpriteUniforms {
+            mvp: glam::Mat4::IDENTITY.to_cols_array_2d(),
+        };
+
+        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Sprite Uniform Buffer"),
+            contents: bytemuck::cast_slice(&[dummy_uniforms]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let bind_group_layout = create_bind_group_layout(device);
+
+        let bind_group = create_texture_bindgroup_from_rgba8(
+            device,
+            queue,
+            &bind_group_layout,
+            &uniform_buffer,
+            image,
+            Some("Sprite Texture"),
+        );
+
+        let render_pipeline = Self::build_render_pipeline(device, surface_format, &bind_group_layout);
 
         // Create initial empty vertex buffer
         let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {

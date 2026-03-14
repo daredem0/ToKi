@@ -1,26 +1,8 @@
 use anyhow::{Context, Result};
-use serde::Deserialize;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
-
-const PAK_MAGIC: &[u8; 8] = b"TOKIPAK1";
-
-#[derive(Debug, Clone, Deserialize)]
-struct PakManifest {
-    #[allow(dead_code)]
-    version: u32,
-    entries: Vec<PakEntry>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct PakEntry {
-    path: String,
-    offset: u64,
-    size: u64,
-    #[allow(dead_code)]
-    compression: String,
-}
+use toki_core::pack::{hash_bytes, PakManifest, PAK_MAGIC};
 
 pub fn extract_pak_to_tempdir(pak_path: &Path) -> Result<tempfile::TempDir> {
     let mut file = fs::File::open(pak_path)
@@ -68,8 +50,33 @@ pub fn extract_pak_to_tempdir(pak_path: &Path) -> Result<tempfile::TempDir> {
         }
 
         file.seek(SeekFrom::Start(entry.offset))?;
-        let mut payload = vec![0u8; entry.size as usize];
-        file.read_exact(&mut payload)?;
+        let mut stored_payload = vec![0u8; entry.stored_size_or_size() as usize];
+        file.read_exact(&mut stored_payload)?;
+        let payload = entry.compression.decompress(&stored_payload).with_context(|| {
+            format!(
+                "Failed to decompress pak entry '{}' with {:?}",
+                entry.path, entry.compression
+            )
+        })?;
+        if payload.len() as u64 != entry.size {
+            return Err(anyhow::anyhow!(
+                "Pak entry '{}' size mismatch: expected {} bytes after decode, got {}",
+                entry.path,
+                entry.size,
+                payload.len()
+            ));
+        }
+        if let Some(expected_hash) = &entry.hash {
+            let actual_hash = hash_bytes(&payload);
+            if &actual_hash != expected_hash {
+                return Err(anyhow::anyhow!(
+                    "Pak entry '{}' hash mismatch: expected {}, got {}",
+                    entry.path,
+                    expected_hash,
+                    actual_hash
+                ));
+            }
+        }
         fs::write(&destination, payload).with_context(|| {
             format!(
                 "Failed to write pak extracted file '{}'",
@@ -86,6 +93,7 @@ mod tests {
     use super::extract_pak_to_tempdir;
     use std::fs;
     use std::io::{Read, Seek, Write};
+    use toki_core::pack::{hash_bytes, PackAssetType, PackCompression, PAK_VERSION};
 
     fn write_minimal_pak(
         pak_path: &std::path::Path,
@@ -237,6 +245,94 @@ mod tests {
         let text = error.to_string();
         assert!(
             text.contains("failed to fill whole buffer") || text.contains("unexpected end of file"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn extract_pak_to_tempdir_decompresses_zstd_entries_and_verifies_hashes() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let pak_path = temp.path().join("compressed.toki.pak");
+        let source = br#"{"name":"main","entities":[]}"#;
+        let compressed = PackCompression::Zstd.compress(source).expect("compress");
+
+        let mut file = fs::File::create(&pak_path).expect("create pak");
+        file.write_all(b"TOKIPAK1").expect("magic");
+        file.write_all(&0u64.to_le_bytes())
+            .expect("offset placeholder");
+        file.write_all(&0u64.to_le_bytes())
+            .expect("size placeholder");
+        let payload_offset = file.stream_position().expect("offset");
+        file.write_all(&compressed).expect("payload");
+        let index_offset = file.stream_position().expect("index offset");
+        let index_bytes = serde_json::to_vec_pretty(&serde_json::json!({
+            "version": PAK_VERSION,
+            "entries": [
+                {
+                    "path": "scenes/main.json",
+                    "offset": payload_offset,
+                    "size": source.len(),
+                    "stored_size": compressed.len(),
+                    "compression": "zstd",
+                    "hash": hash_bytes(source),
+                    "asset_type": PackAssetType::Scene,
+                }
+            ]
+        }))
+        .expect("manifest");
+        file.write_all(&index_bytes).expect("index");
+        file.seek(std::io::SeekFrom::Start(8)).expect("seek header");
+        file.write_all(&index_offset.to_le_bytes())
+            .expect("write offset");
+        file.write_all(&(index_bytes.len() as u64).to_le_bytes())
+            .expect("write size");
+
+        let mount = extract_pak_to_tempdir(&pak_path).expect("extract");
+        let decoded =
+            fs::read_to_string(mount.path().join("scenes/main.json")).expect("read extracted");
+        assert_eq!(decoded, String::from_utf8_lossy(source));
+    }
+
+    #[test]
+    fn extract_pak_to_tempdir_rejects_hash_mismatches() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let pak_path = temp.path().join("bad_hash.toki.pak");
+        let source = b"hello pack";
+
+        let mut file = fs::File::create(&pak_path).expect("create pak");
+        file.write_all(b"TOKIPAK1").expect("magic");
+        file.write_all(&0u64.to_le_bytes())
+            .expect("offset placeholder");
+        file.write_all(&0u64.to_le_bytes())
+            .expect("size placeholder");
+        let payload_offset = file.stream_position().expect("offset");
+        file.write_all(source).expect("payload");
+        let index_offset = file.stream_position().expect("index offset");
+        let index_bytes = serde_json::to_vec_pretty(&serde_json::json!({
+            "version": PAK_VERSION,
+            "entries": [
+                {
+                    "path": "project.toml",
+                    "offset": payload_offset,
+                    "size": source.len(),
+                    "stored_size": source.len(),
+                    "compression": "store",
+                    "hash": hash_bytes(b"something else"),
+                    "asset_type": PackAssetType::ProjectConfig,
+                }
+            ]
+        }))
+        .expect("manifest");
+        file.write_all(&index_bytes).expect("index");
+        file.seek(std::io::SeekFrom::Start(8)).expect("seek header");
+        file.write_all(&index_offset.to_le_bytes())
+            .expect("write offset");
+        file.write_all(&(index_bytes.len() as u64).to_le_bytes())
+            .expect("write size");
+
+        let error = extract_pak_to_tempdir(&pak_path).expect_err("hash mismatch should fail");
+        assert!(
+            error.to_string().contains("hash mismatch"),
             "unexpected error: {error}"
         );
     }
