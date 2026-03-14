@@ -6,14 +6,16 @@ use winit::window::Window;
 
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::sprite::SpriteFrame;
+use toki_core::text::TextItem;
 
 use crate::pipelines::sprite::SpriteInstance;
 use crate::pipelines::RenderPipeline;
 use crate::wgpu_utils::create_device_and_surface;
-use crate::{DebugPipeline, SpritePipeline, TilemapPipeline};
+use crate::{
+    DebugPipeline, GlyphonTextRenderer, SpritePipeline, TextBackgroundRect, TilemapPipeline,
+};
 
 #[allow(dead_code)]
-#[derive(Debug)]
 pub struct GpuState {
     surface: Surface<'static>,
     config: SurfaceConfiguration,
@@ -22,7 +24,21 @@ pub struct GpuState {
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
     debug_pipeline: DebugPipeline,
+    ui_debug_pipeline: DebugPipeline,
+    text_renderer: GlyphonTextRenderer,
+    text_items: Vec<TextItem>,
     tilemap_render_enabled: bool,
+    current_mvp: glam::Mat4,
+}
+
+impl std::fmt::Debug for GpuState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GpuState")
+            .field("config", &self.config)
+            .field("tilemap_render_enabled", &self.tilemap_render_enabled)
+            .field("text_items_len", &self.text_items.len())
+            .finish_non_exhaustive()
+    }
 }
 
 fn to_absolute_path<P: AsRef<Path>>(relative: P) -> std::io::Result<PathBuf> {
@@ -41,6 +57,18 @@ impl GpuState {
 
     pub fn clear_sprites(&mut self) {
         self.sprite_pipeline.clear_sprites();
+    }
+
+    pub fn clear_text_items(&mut self) {
+        self.text_items.clear();
+    }
+
+    pub fn add_text_item(&mut self, text: TextItem) {
+        self.text_items.push(text);
+    }
+
+    pub fn load_font_file(&mut self, path: &Path) -> Result<(), crate::RenderError> {
+        self.text_renderer.load_font_file(path)
     }
 
     /// Clear all debug shapes
@@ -84,6 +112,8 @@ impl GpuState {
         );
 
         let debug_pipeline = DebugPipeline::new(&device, config.format);
+        let ui_debug_pipeline = DebugPipeline::new(&device, config.format);
+        let text_renderer = GlyphonTextRenderer::new(&device, &queue, config.format);
 
         Self {
             surface,
@@ -93,7 +123,11 @@ impl GpuState {
             tilemap_pipeline,
             sprite_pipeline,
             debug_pipeline,
+            ui_debug_pipeline,
+            text_renderer,
+            text_items: Vec::new(),
             tilemap_render_enabled: true,
+            current_mvp: glam::Mat4::IDENTITY,
         }
     }
 
@@ -142,6 +176,8 @@ impl GpuState {
         let sprite_pipeline = SpritePipeline::new(&device, &queue, config.format, sprite_path);
 
         let debug_pipeline = DebugPipeline::new(&device, config.format);
+        let ui_debug_pipeline = DebugPipeline::new(&device, config.format);
+        let text_renderer = GlyphonTextRenderer::new(&device, &queue, config.format);
 
         Ok(Self {
             surface,
@@ -151,7 +187,11 @@ impl GpuState {
             tilemap_pipeline,
             sprite_pipeline,
             debug_pipeline,
+            ui_debug_pipeline,
+            text_renderer,
+            text_items: Vec::new(),
             tilemap_render_enabled: true,
+            current_mvp: glam::Mat4::IDENTITY,
         })
     }
 
@@ -165,6 +205,7 @@ impl GpuState {
     }
 
     pub fn update_projection(&mut self, mvp: glam::Mat4) {
+        self.current_mvp = mvp;
         self.tilemap_pipeline.update_projection(&self.queue, mvp);
         self.sprite_pipeline.update_projection(&self.queue, mvp);
         self.debug_pipeline.update_camera(&self.queue, mvp);
@@ -174,6 +215,22 @@ impl GpuState {
         // Update pipelines before rendering
         self.tilemap_pipeline.update_with_queue(&self.queue);
         self.sprite_pipeline.update_with_queue(&self.queue);
+
+        let text_backgrounds = self
+            .text_renderer
+            .prepare(
+                &self.device,
+                &self.queue,
+                self.config.width,
+                self.config.height,
+                &self.text_items,
+                self.current_mvp,
+            )
+            .unwrap_or_else(|error| {
+                tracing::warn!("Failed to prepare text renderer: {error}");
+                Vec::new()
+            });
+        self.refresh_ui_text_backgrounds(&text_backgrounds);
 
         let output = self
             .surface
@@ -224,10 +281,42 @@ impl GpuState {
 
             // Render debug shapes last (on top of everything)
             self.debug_pipeline.render(&mut render_pass);
+
+            // Render UI background rectangles for text boxes in screen-space.
+            self.ui_debug_pipeline.render(&mut render_pass);
+
+            if let Err(error) = self.text_renderer.render(&mut render_pass) {
+                tracing::warn!("Failed to render text layer: {error}");
+            }
         }
 
         self.queue.submit(Some(encoder.finish()));
         output.present();
+    }
+
+    fn refresh_ui_text_backgrounds(&mut self, backgrounds: &[TextBackgroundRect]) {
+        self.ui_debug_pipeline.clear();
+        for rect in backgrounds {
+            self.ui_debug_pipeline.add_filled_rect(
+                rect.x,
+                rect.y,
+                rect.width,
+                rect.height,
+                rect.background_color,
+            );
+            if let Some(border_color) = rect.border_color {
+                self.ui_debug_pipeline.add_rect(
+                    rect.x,
+                    rect.y,
+                    rect.width,
+                    rect.height,
+                    border_color,
+                );
+            }
+        }
+        self.ui_debug_pipeline
+            .update_camera(&self.queue, glam::Mat4::IDENTITY);
+        self.ui_debug_pipeline.update_vertices(&self.device);
     }
 }
 

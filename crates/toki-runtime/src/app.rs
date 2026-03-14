@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use std::{fs, path::PathBuf};
 
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
+use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
 use toki_core::{EventHandler, GameState, Scene, TimingSystem};
 use toki_render::RenderError;
 
@@ -251,6 +252,7 @@ impl App {
                 .unwrap_or(glam::UVec2::new(64, 16)); // fallback
 
             self.rendering.clear_sprites(); // Clear previous frame's sprites
+            self.rendering.clear_text_items();
 
             // Render all visible entities with animation controllers
             let renderable_entities = self.game_system.get_renderable_entities();
@@ -327,6 +329,20 @@ impl App {
                 }
             }
             self.rendering.finalize_debug_shapes();
+
+            if let Some(stats_line) = self.performance.stats_line() {
+                let hud_style = TextStyle {
+                    font_family: "Sans".to_string(),
+                    size_px: 14.0,
+                    weight: TextWeight::Bold,
+                    ..TextStyle::default()
+                };
+                let hud_text =
+                    TextItem::new_screen(stats_line, glam::Vec2::new(8.0, 8.0), hud_style)
+                        .with_anchor(TextAnchor::TopLeft)
+                        .with_layer(1);
+                self.rendering.add_text_item(hud_text);
+            }
         }
 
         self.platform.request_redraw();

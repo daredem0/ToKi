@@ -4,6 +4,7 @@ mod gpu;
 mod pipelines;
 mod scene;
 mod targets;
+mod text;
 mod texture;
 mod vertex;
 pub mod wgpu_utils;
@@ -15,4 +16,5 @@ pub use pipelines::{
 };
 pub use scene::{DebugShape, DebugShapeType, SceneData, SceneRenderer, SpriteInstance};
 pub use targets::{OffscreenTarget, RenderTarget, WindowTarget};
+pub use text::{GlyphonTextRenderer, TextBackgroundRect};
 pub use vertex::VertexLayout;

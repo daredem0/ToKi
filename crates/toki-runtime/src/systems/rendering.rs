@@ -2,6 +2,7 @@ use std::sync::Arc;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::math::projection::{calculate_projection, ProjectionParameter};
 use toki_core::sprite::SpriteFrame;
+use toki_core::text::TextItem;
 use toki_render::GpuState;
 use winit::window::Window;
 
@@ -14,6 +15,10 @@ trait RuntimeRenderBackend: std::fmt::Debug {
         &mut self,
         texture_path: std::path::PathBuf,
     ) -> Result<(), toki_render::RenderError>;
+    fn load_font_file(
+        &mut self,
+        font_path: std::path::PathBuf,
+    ) -> Result<(), toki_render::RenderError>;
     fn update_projection(&mut self, mvp: glam::Mat4);
     fn set_tilemap_render_enabled(&mut self, enabled: bool);
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>);
@@ -21,6 +26,8 @@ trait RuntimeRenderBackend: std::fmt::Debug {
     fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]);
     fn clear_sprites(&mut self);
     fn add_sprite(&mut self, frame: SpriteFrame, position: glam::IVec2, size: glam::UVec2);
+    fn clear_text_items(&mut self);
+    fn add_text_item(&mut self, text: TextItem);
     fn clear_debug_shapes(&mut self);
     fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
     fn finalize_debug_shapes(&mut self);
@@ -64,6 +71,13 @@ impl RuntimeRenderBackend for WgpuRenderBackend {
         self.gpu.load_sprite_texture(texture_path)
     }
 
+    fn load_font_file(
+        &mut self,
+        font_path: std::path::PathBuf,
+    ) -> Result<(), toki_render::RenderError> {
+        self.gpu.load_font_file(&font_path)
+    }
+
     fn update_projection(&mut self, mvp: glam::Mat4) {
         self.gpu.update_projection(mvp);
     }
@@ -90,6 +104,14 @@ impl RuntimeRenderBackend for WgpuRenderBackend {
 
     fn add_sprite(&mut self, frame: SpriteFrame, position: glam::IVec2, size: glam::UVec2) {
         self.gpu.add_sprite(frame, position, size);
+    }
+
+    fn clear_text_items(&mut self) {
+        self.gpu.clear_text_items();
+    }
+
+    fn add_text_item(&mut self, text: TextItem) {
+        self.gpu.add_text_item(text);
     }
 
     fn clear_debug_shapes(&mut self) {
@@ -201,6 +223,20 @@ impl RenderingSystem {
         }
     }
 
+    /// Load font from a specific file path.
+    pub fn load_font_file(
+        &mut self,
+        font_path: std::path::PathBuf,
+    ) -> Result<(), toki_render::RenderError> {
+        if let Some(backend) = &mut self.backend {
+            backend.load_font_file(font_path)
+        } else {
+            Err(toki_render::RenderError::Other(
+                "GPU not initialized".to_string(),
+            ))
+        }
+    }
+
     /// Helper to load textures from a project assets directory
     pub fn load_project_textures(
         &mut self,
@@ -224,6 +260,11 @@ impl RenderingSystem {
             if let Some(terrain_image) = find_image_for_atlas(&terrain_atlas) {
                 self.load_tilemap_texture(terrain_image)?;
             }
+        }
+
+        let fonts_path = assets_path.join("fonts");
+        for font_file in find_font_files(&fonts_path) {
+            self.load_font_file(font_file)?;
         }
 
         Ok(())
@@ -297,6 +338,18 @@ impl RenderingSystem {
         }
     }
 
+    pub fn clear_text_items(&mut self) {
+        if let Some(backend) = &mut self.backend {
+            backend.clear_text_items();
+        }
+    }
+
+    pub fn add_text_item(&mut self, text: TextItem) {
+        if let Some(backend) = &mut self.backend {
+            backend.add_text_item(text);
+        }
+    }
+
     pub fn clear_debug_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
             backend.clear_debug_shapes();
@@ -354,14 +407,39 @@ fn find_image_for_atlas(atlas_path: &std::path::Path) -> Option<std::path::PathB
     None
 }
 
+fn find_font_files(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    if !dir.exists() {
+        return Vec::new();
+    }
+
+    let mut fonts: Vec<std::path::PathBuf> = std::fs::read_dir(dir)
+        .ok()
+        .into_iter()
+        .flat_map(|entries| entries.filter_map(Result::ok))
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| matches!(ext.to_ascii_lowercase().as_str(), "ttf" | "otf" | "ttc"))
+                .unwrap_or(false)
+        })
+        .collect();
+    fonts.sort();
+    fonts
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{find_atlas_file, find_image_for_atlas, RenderingSystem, RuntimeRenderBackend};
+    use super::{
+        find_atlas_file, find_font_files, find_image_for_atlas, RenderingSystem,
+        RuntimeRenderBackend,
+    };
     use std::cell::{Cell, RefCell};
     use std::path::Path;
     use std::rc::Rc;
     use toki_core::graphics::vertex::QuadVertex;
     use toki_core::sprite::SpriteFrame;
+    use toki_core::text::{TextItem, TextStyle};
 
     #[derive(Default, Debug)]
     struct FakeBackend {
@@ -371,6 +449,7 @@ mod tests {
         tilemap_render_enabled: Rc<Cell<bool>>,
         tilemap_vertex_counts: Rc<RefCell<Vec<usize>>>,
         sprite_count: Rc<Cell<usize>>,
+        text_count: Rc<Cell<usize>>,
         debug_rect_count: Rc<Cell<usize>>,
         finalized_debug: Rc<Cell<usize>>,
     }
@@ -386,6 +465,13 @@ mod tests {
         fn load_sprite_texture(
             &mut self,
             _texture_path: std::path::PathBuf,
+        ) -> Result<(), toki_render::RenderError> {
+            Ok(())
+        }
+
+        fn load_font_file(
+            &mut self,
+            _font_path: std::path::PathBuf,
         ) -> Result<(), toki_render::RenderError> {
             Ok(())
         }
@@ -417,6 +503,14 @@ mod tests {
 
         fn add_sprite(&mut self, _frame: SpriteFrame, _position: glam::IVec2, _size: glam::UVec2) {
             self.sprite_count.set(self.sprite_count.get() + 1);
+        }
+
+        fn clear_text_items(&mut self) {
+            self.text_count.set(0);
+        }
+
+        fn add_text_item(&mut self, _text: TextItem) {
+            self.text_count.set(self.text_count.get() + 1);
         }
 
         fn clear_debug_shapes(&mut self) {
@@ -511,6 +605,25 @@ mod tests {
     }
 
     #[test]
+    fn find_font_files_only_returns_supported_extensions_sorted() {
+        let tmp = make_unique_temp_dir();
+        std::fs::create_dir_all(&tmp).expect("temp dir should exist");
+        let supported_a = tmp.join("A.ttf");
+        let supported_b = tmp.join("b.otf");
+        let supported_c = tmp.join("c.TTC");
+        let ignored = tmp.join("readme.txt");
+        std::fs::write(&supported_a, "a").expect("font a");
+        std::fs::write(&supported_b, "b").expect("font b");
+        std::fs::write(&supported_c, "c").expect("font c");
+        std::fs::write(&ignored, "x").expect("ignored");
+
+        let found = find_font_files(&tmp);
+        assert_eq!(found, vec![supported_a, supported_b, supported_c]);
+
+        std::fs::remove_dir_all(tmp).expect("temp dir cleanup should succeed");
+    }
+
+    #[test]
     fn backend_seam_dispatches_runtime_render_commands() {
         let fake = FakeBackend::default();
         let projection_counter = fake.projection_updates.clone();
@@ -518,6 +631,7 @@ mod tests {
         let resize_counter = fake.resize_calls.clone();
         let tilemap_render_enabled = fake.tilemap_render_enabled.clone();
         let tilemap_counts = fake.tilemap_vertex_counts.clone();
+        let text_count = fake.text_count.clone();
         let debug_finalize_counter = fake.finalized_debug.clone();
 
         let mut rendering = RenderingSystem::new();
@@ -552,6 +666,12 @@ mod tests {
             glam::IVec2::new(10, 20),
             glam::UVec2::new(16, 16),
         );
+        rendering.clear_text_items();
+        rendering.add_text_item(TextItem::new_screen(
+            "Runtime HUD",
+            glam::Vec2::new(8.0, 8.0),
+            TextStyle::default(),
+        ));
         rendering.clear_debug_shapes();
         rendering.add_debug_rect(0.0, 0.0, 16.0, 16.0, [1.0, 0.0, 0.0, 1.0]);
         rendering.finalize_debug_shapes();
@@ -562,6 +682,7 @@ mod tests {
         assert_eq!(resize_counter.get(), 1);
         assert!(tilemap_render_enabled.get());
         assert_eq!(tilemap_counts.borrow().as_slice(), &[2]);
+        assert_eq!(text_count.get(), 1);
         assert_eq!(debug_finalize_counter.get(), 1);
     }
 }

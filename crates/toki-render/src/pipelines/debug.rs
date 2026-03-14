@@ -230,6 +230,15 @@ impl DebugPipeline {
         self.vertices.extend_from_slice(&vertices);
     }
 
+    /// Add a filled rectangle to be rendered
+    pub fn add_filled_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+        if width <= 0.0 || height <= 0.0 {
+            return;
+        }
+        let vertices = Self::quad_vertices(x, y, x + width, y + height, color);
+        self.vertices.extend_from_slice(&vertices);
+    }
+
     /// Update MVP matrix for camera transformation
     pub fn update_camera(&self, queue: &Queue, mvp_matrix: glam::Mat4) {
         let uniforms = DebugUniforms {
@@ -296,5 +305,13 @@ mod tests {
         assert_eq!(vertices.len(), 6);
         assert!(vertices.iter().any(|v| v.position == [4.0, 8.0]));
         assert!(vertices.iter().any(|v| v.position == [4.2, 8.2]));
+    }
+
+    #[test]
+    fn quad_vertices_for_fill_emits_two_triangles() {
+        let vertices = DebugPipeline::quad_vertices(10.0, 12.0, 30.0, 20.0, [1.0, 1.0, 1.0, 1.0]);
+        assert_eq!(vertices.len(), 6);
+        assert_eq!(vertices[0].position, [10.0, 12.0]);
+        assert_eq!(vertices[2].position, [30.0, 20.0]);
     }
 }

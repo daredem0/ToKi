@@ -1,5 +1,29 @@
 use std::time::{Duration, Instant};
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct PerformanceStats {
+    pub fps: f64,
+    pub frame_ms: f64,
+    pub tick_ms: f64,
+    pub draw_ms: f64,
+    pub cpu_ms: f64,
+    pub overhead_ms: f64,
+}
+
+impl PerformanceStats {
+    pub fn format_line(&self) -> String {
+        format!(
+            "FPS: {:.1} | Frame: {:.2}ms | Tick: {:.2}ms | Draw: {:.2}ms | CPU: {:.2}ms | Overhead: {:.2}ms",
+            self.fps,
+            self.frame_ms,
+            self.tick_ms,
+            self.draw_ms,
+            self.cpu_ms,
+            self.overhead_ms
+        )
+    }
+}
+
 /// Performance monitoring system that tracks frame timing and displays statistics.
 ///
 /// Uses Option B approach: App provides the timing measurements, PerformanceMonitor
@@ -101,11 +125,16 @@ impl PerformanceMonitor {
 
     /// Print comprehensive performance statistics
     fn print_performance_stats(&self) {
+        if let Some(stats) = self.current_stats() {
+            println!("{}", stats.format_line());
+        }
+    }
+
+    pub fn current_stats(&self) -> Option<PerformanceStats> {
         if self.frame_times.is_empty() {
-            return;
+            return None;
         }
 
-        // Calculate FPS from frame intervals
         let total_time: Duration = self.frame_times.iter().sum();
         let avg_frame_time = total_time / self.frame_times.len() as u32;
         let fps = if avg_frame_time.as_nanos() > 0 {
@@ -114,7 +143,6 @@ impl PerformanceMonitor {
             0.0
         };
 
-        // Calculate average tick time (game logic)
         let avg_tick_time = if !self.tick_times.is_empty() {
             let total: Duration = self.tick_times.iter().sum();
             (total / self.tick_times.len() as u32).as_secs_f64() * 1000.0
@@ -122,7 +150,6 @@ impl PerformanceMonitor {
             0.0
         };
 
-        // Calculate average draw time (GPU rendering)
         let avg_draw_time = if !self.draw_times.is_empty() {
             let total: Duration = self.draw_times.iter().sum();
             (total / self.draw_times.len() as u32).as_secs_f64() * 1000.0
@@ -130,7 +157,6 @@ impl PerformanceMonitor {
             0.0
         };
 
-        // Calculate average CPU work time (frame preparation)
         let avg_cpu_time = if !self.cpu_work_times.is_empty() {
             let total: Duration = self.cpu_work_times.iter().sum();
             (total / self.cpu_work_times.len() as u32).as_secs_f64() * 1000.0
@@ -138,7 +164,6 @@ impl PerformanceMonitor {
             0.0
         };
 
-        // Calculate average total frame time
         let avg_total_frame = if !self.total_frame_times.is_empty() {
             let total: Duration = self.total_frame_times.iter().sum();
             (total / self.total_frame_times.len() as u32).as_secs_f64() * 1000.0
@@ -146,19 +171,23 @@ impl PerformanceMonitor {
             0.0
         };
 
-        // Calculate overhead (total - cpu - draw)
-        let overhead = avg_total_frame - avg_cpu_time - avg_draw_time;
+        let overhead = (avg_total_frame - avg_cpu_time - avg_draw_time).max(0.0);
 
-        // Print comprehensive performance breakdown
-        println!(
-            "FPS: {:.1} | Frame: {:.2}ms | Tick: {:.2}ms | Draw: {:.2}ms | CPU: {:.2}ms | Overhead: {:.2}ms",
+        Some(PerformanceStats {
             fps,
-            avg_total_frame,
-            avg_tick_time,
-            avg_draw_time,
-            avg_cpu_time,
-            overhead.max(0.0) // Don't show negative overhead
-        );
+            frame_ms: avg_total_frame,
+            tick_ms: avg_tick_time,
+            draw_ms: avg_draw_time,
+            cpu_ms: avg_cpu_time,
+            overhead_ms: overhead,
+        })
+    }
+
+    pub fn stats_line(&self) -> Option<String> {
+        if !self.show_fps_stats {
+            return None;
+        }
+        self.current_stats().map(|stats| stats.format_line())
     }
 }
 
@@ -233,5 +262,33 @@ mod tests {
         monitor.print_stats_if_needed();
 
         assert_eq!(monitor.last_fps_print, before);
+    }
+
+    #[test]
+    fn stats_line_is_available_with_data_and_enabled() {
+        let mut monitor = PerformanceMonitor::new();
+        monitor.frame_times.push(Duration::from_millis(16));
+        monitor.tick_times.push(Duration::from_millis(2));
+        monitor.draw_times.push(Duration::from_millis(3));
+        monitor.cpu_work_times.push(Duration::from_millis(4));
+        monitor.total_frame_times.push(Duration::from_millis(8));
+
+        let line = monitor
+            .stats_line()
+            .expect("stats line should exist for populated monitor");
+        assert!(line.contains("FPS:"));
+        assert!(line.contains("Frame:"));
+        assert!(line.contains("Tick:"));
+        assert!(line.contains("Draw:"));
+        assert!(line.contains("CPU:"));
+        assert!(line.contains("Overhead:"));
+    }
+
+    #[test]
+    fn stats_line_is_none_when_display_disabled() {
+        let mut monitor = PerformanceMonitor::new();
+        monitor.frame_times.push(Duration::from_millis(16));
+        monitor.show_fps_stats = false;
+        assert!(monitor.stats_line().is_none());
     }
 }

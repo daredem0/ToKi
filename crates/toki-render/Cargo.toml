@@ -19,6 +19,7 @@ image = { version = "0.25.6", features = [ "png", "default" ]}                  
 pollster = "0.4.0"                  # For simplifying async GPU init
 bytemuck = { version = "1.14", features = ["derive"] }
 glam = "0.30.5"
+glyphon = "0.9"
 
 # Optional dependencies for editor integration
 egui = { version = "0.32", optional = true }
