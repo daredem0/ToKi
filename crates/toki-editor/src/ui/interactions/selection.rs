@@ -94,12 +94,20 @@ impl SelectionInteraction {
             entity_def_name
         );
 
-        ui_state.set_single_entity_selection(entity_id);
+        let dragged_entities =
+            Self::drag_entities_for_start(ui_state, &active_scene_name, &entity, entity_id);
+        if dragged_entities.len() == 1 {
+            ui_state.set_single_entity_selection(entity_id);
+        } else {
+            ui_state.selection = Some(crate::ui::editor_ui::Selection::Entity(entity_id));
+            ui_state.selected_entity_id = Some(entity_id);
+        }
         ui_state.enter_placement_mode(entity_def_name.clone());
         let grab_offset = world_pos - entity.position.as_vec2();
         ui_state.begin_entity_move_drag(EntityMoveDragState {
             scene_name: active_scene_name,
             entity,
+            dragged_entities,
             grab_offset,
         });
         viewport.suppress_entity_rendering(entity_id);
@@ -162,19 +170,29 @@ impl SelectionInteraction {
         );
         let drop_world_pos_i32 = Self::drop_world_position_to_entity_position(drop_world_pos);
 
-        let can_drop = Self::can_place_entity_at(viewport, &drag_state.entity, drop_world_pos_i32);
+        let drop_delta = drop_world_pos_i32 - drag_state.entity.position;
+        let can_drop =
+            Self::can_drop_dragged_entities(viewport, &drag_state.dragged_entities, drop_delta);
         if can_drop {
-            let moved = Self::update_scene_entity_position(
+            let moved_count = Self::update_scene_entities_position(
                 ui_state,
                 &drag_state.scene_name,
-                drag_state.entity.id,
-                drop_world_pos_i32,
+                &drag_state.dragged_entities,
+                drop_delta,
             );
-            if moved {
+            if moved_count > 0 {
                 ui_state.scene_content_changed = true;
-                ui_state.set_single_entity_selection(drag_state.entity.id);
+                if drag_state.dragged_entities.len() == 1 {
+                    ui_state.set_single_entity_selection(drag_state.entity.id);
+                } else {
+                    ui_state.selection = Some(crate::ui::editor_ui::Selection::Entity(
+                        drag_state.entity.id,
+                    ));
+                    ui_state.selected_entity_id = Some(drag_state.entity.id);
+                }
                 tracing::info!(
-                    "Dropped entity {} at ({}, {})",
+                    "Dropped {} dragged entities with anchor {} at ({}, {})",
+                    moved_count,
                     drag_state.entity.id,
                     drop_world_pos_i32.x,
                     drop_world_pos_i32.y
@@ -218,6 +236,17 @@ impl SelectionInteraction {
         } else {
             true
         }
+    }
+
+    fn can_drop_dragged_entities(
+        viewport: &SceneViewport,
+        dragged_entities: &[Entity],
+        drop_delta: glam::IVec2,
+    ) -> bool {
+        dragged_entities.iter().all(|entity| {
+            let target_position = entity.position + drop_delta;
+            Self::can_place_entity_at(viewport, entity, target_position)
+        })
     }
 
     fn drop_world_position_to_entity_position(drop_world_pos: glam::Vec2) -> glam::IVec2 {
@@ -312,6 +341,65 @@ impl SelectionInteraction {
 
         entity.position = new_position;
         true
+    }
+
+    fn update_scene_entities_position(
+        ui_state: &mut EditorUI,
+        scene_name: &str,
+        dragged_entities: &[Entity],
+        drop_delta: glam::IVec2,
+    ) -> usize {
+        let Some(scene) = ui_state.scenes.iter_mut().find(|s| s.name == scene_name) else {
+            return 0;
+        };
+
+        let mut moved_count = 0;
+        for dragged_entity in dragged_entities {
+            if let Some(entity) = scene
+                .entities
+                .iter_mut()
+                .find(|e| e.id == dragged_entity.id)
+            {
+                entity.position = dragged_entity.position + drop_delta;
+                moved_count += 1;
+            }
+        }
+
+        moved_count
+    }
+
+    fn drag_entities_for_start(
+        ui_state: &EditorUI,
+        scene_name: &str,
+        clicked_entity: &Entity,
+        clicked_entity_id: toki_core::entity::EntityId,
+    ) -> Vec<Entity> {
+        if ui_state.selected_entity_ids.len() <= 1
+            || !ui_state.selected_entity_ids.contains(&clicked_entity_id)
+        {
+            return vec![clicked_entity.clone()];
+        }
+
+        let Some(scene) = ui_state.scenes.iter().find(|s| s.name == scene_name) else {
+            return vec![clicked_entity.clone()];
+        };
+
+        let selected_set = ui_state
+            .selected_entity_ids
+            .iter()
+            .copied()
+            .collect::<std::collections::HashSet<_>>();
+        let mut dragged = scene
+            .entities
+            .iter()
+            .filter(|entity| selected_set.contains(&entity.id))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if dragged.is_empty() {
+            dragged.push(clicked_entity.clone());
+        }
+        dragged
     }
 
     /// Resolve the best entity definition name for placement preview during drag-move.
@@ -639,6 +727,114 @@ mod tests {
             IVec2::new(42, 84),
         );
         assert!(!moved);
+    }
+
+    #[test]
+    fn drag_entities_for_start_uses_multi_selection_when_clicking_selected_entity() {
+        let mut ui_state = EditorUI::new();
+        let mut manager = EntityManager::new();
+        let first_id = manager.spawn_entity(
+            EntityType::Npc,
+            IVec2::new(0, 0),
+            UVec2::new(16, 16),
+            EntityAttributes::default(),
+        );
+        let second_id = manager.spawn_entity(
+            EntityType::Npc,
+            IVec2::new(32, 0),
+            UVec2::new(16, 16),
+            EntityAttributes::default(),
+        );
+        let first = manager
+            .get_entity(first_id)
+            .expect("first entity should exist")
+            .clone();
+        let second = manager
+            .get_entity(second_id)
+            .expect("second entity should exist")
+            .clone();
+
+        let scene = ui_state
+            .scenes
+            .iter_mut()
+            .find(|s| s.name == "Main Scene")
+            .expect("default scene should exist");
+        scene.entities.push(first.clone());
+        scene.entities.push(second.clone());
+
+        ui_state.set_single_entity_selection(first_id);
+        ui_state.toggle_entity_selection(second_id);
+
+        let dragged = SelectionInteraction::drag_entities_for_start(
+            &ui_state,
+            "Main Scene",
+            &first,
+            first_id,
+        );
+        let mut ids = dragged.iter().map(|entity| entity.id).collect::<Vec<_>>();
+        ids.sort_unstable();
+        assert_eq!(ids, vec![first_id, second_id]);
+    }
+
+    #[test]
+    fn update_scene_entities_position_moves_all_dragged_entities_by_delta() {
+        let mut ui_state = EditorUI::new();
+        let mut manager = EntityManager::new();
+        let first_id = manager.spawn_entity(
+            EntityType::Npc,
+            IVec2::new(10, 20),
+            UVec2::new(16, 16),
+            EntityAttributes::default(),
+        );
+        let second_id = manager.spawn_entity(
+            EntityType::Npc,
+            IVec2::new(30, 40),
+            UVec2::new(16, 16),
+            EntityAttributes::default(),
+        );
+        let first = manager
+            .get_entity(first_id)
+            .expect("first entity should exist")
+            .clone();
+        let second = manager
+            .get_entity(second_id)
+            .expect("second entity should exist")
+            .clone();
+
+        let scene = ui_state
+            .scenes
+            .iter_mut()
+            .find(|s| s.name == "Main Scene")
+            .expect("default scene should exist");
+        scene.entities.push(first.clone());
+        scene.entities.push(second.clone());
+
+        let moved = SelectionInteraction::update_scene_entities_position(
+            &mut ui_state,
+            "Main Scene",
+            &[first.clone(), second.clone()],
+            IVec2::new(5, -3),
+        );
+        assert_eq!(moved, 2);
+
+        let scene = ui_state
+            .scenes
+            .iter()
+            .find(|s| s.name == "Main Scene")
+            .expect("default scene should exist");
+        let moved_first = scene
+            .entities
+            .iter()
+            .find(|entity| entity.id == first_id)
+            .expect("first moved entity should exist");
+        let moved_second = scene
+            .entities
+            .iter()
+            .find(|entity| entity.id == second_id)
+            .expect("second moved entity should exist");
+
+        assert_eq!(moved_first.position, IVec2::new(15, 17));
+        assert_eq!(moved_second.position, IVec2::new(35, 37));
     }
 
     #[test]
