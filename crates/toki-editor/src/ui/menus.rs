@@ -9,8 +9,10 @@ impl MenuSystem {
         ui_state: &mut super::EditorUI,
         ctx: &egui::Context,
         config: Option<&EditorConfig>,
+        busy_logo_texture: Option<&egui::TextureHandle>,
     ) {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            let panel_rect = ui.max_rect();
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     if ui.button("New Project...").clicked() {
@@ -120,24 +122,99 @@ impl MenuSystem {
                     ui_state.play_scene_requested = true;
                 }
 
-                ui.with_layout(
-                    egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
-                    |ui| {
-                        ui.label(ui_state.window_title.as_ref().unwrap());
-                    },
-                );
-
-                if ui_state.background_task_running {
-                    ui.separator();
-                    ui.add(egui::Spinner::new());
-                }
-                if let Some(status) = &ui_state.background_task_status {
-                    ui.label(status);
-                }
-                if ui_state.background_task_running && ui.button("Cancel Task").clicked() {
-                    ui_state.cancel_background_task_requested = true;
-                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui_state.background_task_running && ui.button("Cancel Task").clicked() {
+                        ui_state.cancel_background_task_requested = true;
+                    }
+                    if let Some(status) = &ui_state.background_task_status {
+                        ui.label(status);
+                    }
+                    if ui_state.background_task_running {
+                        ui.separator();
+                        Self::render_busy_logo(ui, ctx, busy_logo_texture);
+                    }
+                });
             });
+
+            if let Some(window_title) = &ui_state.window_title {
+                ui.painter().text(
+                    panel_rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    window_title,
+                    egui::TextStyle::Button.resolve(ui.style()),
+                    ui.visuals().text_color(),
+                );
+            }
         });
+    }
+
+    fn render_busy_logo(
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        busy_logo_texture: Option<&egui::TextureHandle>,
+    ) {
+        let Some(texture) = busy_logo_texture else {
+            ui.add(egui::Spinner::new());
+            return;
+        };
+
+        let animation = Self::busy_logo_animation(ctx.input(|input| input.time));
+        let size = egui::vec2(22.0, 22.0);
+        let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+        let image_rect = rect.translate(egui::vec2(0.0, animation.bob_offset));
+
+        let glow_color =
+            egui::Color32::from_rgba_unmultiplied(110, 210, 255, animation.glow_alpha);
+        let glow_rect = image_rect.expand(animation.glow_spread);
+        ui.painter()
+            .rect_filled(glow_rect, glow_rect.width() * 0.35, glow_color);
+
+        ui.painter().image(
+            texture.id(),
+            image_rect,
+            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+            egui::Color32::WHITE,
+        );
+    }
+
+    fn busy_logo_animation(time_seconds: f64) -> BusyLogoAnimation {
+        let phase = time_seconds as f32 * 2.4;
+        let bob_wave = phase.sin();
+        let glow_wave = ((phase * 0.85).sin() + 1.0) * 0.5;
+        BusyLogoAnimation {
+            bob_offset: bob_wave * 2.0,
+            glow_alpha: (28.0 + glow_wave * 38.0).round() as u8,
+            glow_spread: 3.0 + glow_wave * 2.5,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct BusyLogoAnimation {
+    bob_offset: f32,
+    glow_alpha: u8,
+    glow_spread: f32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MenuSystem;
+
+    #[test]
+    fn busy_logo_animation_stays_within_expected_visual_bounds() {
+        let sample_points = [0.0, 0.5, 1.0, 2.0, 4.0, 8.0];
+        for sample in sample_points {
+            let animation = MenuSystem::busy_logo_animation(sample);
+            assert!(animation.bob_offset >= -2.1 && animation.bob_offset <= 2.1);
+            assert!(animation.glow_alpha >= 28 && animation.glow_alpha <= 66);
+            assert!(animation.glow_spread >= 3.0 && animation.glow_spread <= 5.6);
+        }
+    }
+
+    #[test]
+    fn busy_logo_animation_changes_over_time() {
+        let early = MenuSystem::busy_logo_animation(0.0);
+        let later = MenuSystem::busy_logo_animation(1.0);
+        assert_ne!(early, later);
     }
 }

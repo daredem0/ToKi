@@ -368,9 +368,10 @@ impl EditorUI {
         config: Option<&mut crate::config::EditorConfig>,
         log_capture: Option<&crate::logging::LogCapture>,
         renderer: Option<&mut egui_wgpu::Renderer>,
+        busy_logo_texture: Option<&egui::TextureHandle>,
     ) {
         let config_readonly = config.as_deref();
-        MenuSystem::render_top_menu(self, ctx, config_readonly);
+        MenuSystem::render_top_menu(self, ctx, config_readonly, busy_logo_texture);
 
         // Render log panel first to claim full width at bottom
         if self.show_console {

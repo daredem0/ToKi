@@ -64,6 +64,8 @@ struct EditorApp {
     startup_project_auto_open_done: bool,
     /// Runs long-running editor operations off the UI thread.
     background_tasks: BackgroundTaskManager,
+    /// Lazily loaded ToKi logo texture used for background task activity feedback.
+    busy_logo_texture: Option<egui::TextureHandle>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,7 +99,49 @@ impl EditorApp {
             loaded_scene_maps: HashMap::new(),
             startup_project_auto_open_done: false,
             background_tasks: BackgroundTaskManager::default(),
+            busy_logo_texture: None,
         }
+    }
+
+    fn busy_logo_path() -> Option<std::path::PathBuf> {
+        let candidates = [
+            std::env::current_dir().ok().map(|dir| dir.join("assets").join("TokiLogo.png")),
+            Some(Self::workspace_root().join("assets").join("TokiLogo.png")),
+        ];
+        candidates.into_iter().flatten().find(|path| path.exists())
+    }
+
+    fn ensure_busy_logo_texture(&mut self, ctx: &egui::Context) {
+        if self.busy_logo_texture.is_some() {
+            return;
+        }
+
+        let Some(logo_path) = Self::busy_logo_path() else {
+            tracing::warn!("Could not resolve ToKi logo path for editor task indicator");
+            return;
+        };
+
+        let decoded = match toki_core::graphics::image::load_image_rgba8(&logo_path) {
+            Ok(decoded) => decoded,
+            Err(error) => {
+                tracing::warn!(
+                    "Failed to load ToKi logo texture '{}' for editor task indicator: {}",
+                    logo_path.display(),
+                    error
+                );
+                return;
+            }
+        };
+
+        let color_image = egui::ColorImage::from_rgba_unmultiplied(
+            [decoded.width as usize, decoded.height as usize],
+            &decoded.data,
+        );
+        self.busy_logo_texture = Some(ctx.load_texture(
+            "toki_busy_logo",
+            color_image,
+            egui::TextureOptions::LINEAR,
+        ));
     }
 
     /// Helper method to initialize a viewport with WGPU context
@@ -541,18 +585,26 @@ impl EditorApp {
             Some(window) => window.clone(),
             None => return, // Not initialized yet
         };
-        let renderer = match &mut self.renderer {
-            Some(renderer) => renderer,
+        let egui_ctx = match self.egui_winit.as_ref() {
+            Some(egui) => egui.egui_ctx().clone(),
             None => return, // Not initialized yet
         };
+        if self.ui.background_task_running {
+            self.ensure_busy_logo_texture(&egui_ctx);
+        }
 
         let egui_winit = match &mut self.egui_winit {
             Some(egui) => egui,
-            None => return,
+            None => return, // Not initialized yet
         };
 
         // Prepare egui input
         let raw_input = egui_winit.take_egui_input(&window);
+
+        let renderer = match &mut self.renderer {
+            Some(renderer) => renderer,
+            None => return, // Not initialized yet
+        };
 
         // Load sprite frame cache if needed (before render loop to avoid borrowing issues)
         let project_path = self.config.current_project_path();
@@ -638,7 +690,6 @@ impl EditorApp {
         }
 
         // Run egui UI
-        let egui_ctx = egui_winit.egui_ctx().clone();
         let full_output = egui_ctx.run(raw_input, |ctx| {
             // Render UI - viewport will use the pre-rendered texture
             self.ui.render(
@@ -647,6 +698,7 @@ impl EditorApp {
                 Some(&mut self.config),
                 self.log_capture.as_ref(),
                 None, // Can't pass renderer due to borrow issues
+                self.busy_logo_texture.as_ref(),
             );
         });
 
@@ -990,19 +1042,17 @@ impl EditorApp {
             }
             BackgroundTaskUpdate::Completed { kind, message } => {
                 self.ui.background_task_running = false;
-                self.ui.background_task_status =
-                    Some(format!("{}: {}", kind.label(), message.clone()));
+                self.ui.background_task_status = None;
                 tracing::info!("{} completed: {}", kind.label(), message);
             }
             BackgroundTaskUpdate::Failed { kind, message } => {
                 self.ui.background_task_running = false;
-                self.ui.background_task_status =
-                    Some(format!("{} failed: {}", kind.label(), message.clone()));
+                self.ui.background_task_status = None;
                 tracing::error!("{} failed: {}", kind.label(), message);
             }
             BackgroundTaskUpdate::Cancelled { kind } => {
                 self.ui.background_task_running = false;
-                self.ui.background_task_status = Some(format!("{} cancelled", kind.label()));
+                self.ui.background_task_status = None;
                 tracing::info!("{} cancelled", kind.label());
             }
         }
