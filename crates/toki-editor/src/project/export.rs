@@ -87,6 +87,7 @@ pub fn export_hybrid_bundle(
             runtime_bundle_path.display()
         )
     })?;
+    copy_bundle_legal_documents(&bundle_dir)?;
 
     let source_files = collect_source_files(&project.path, Some(&bundle_dir))?;
 
@@ -111,6 +112,27 @@ pub fn export_hybrid_bundle(
     )?;
 
     Ok(bundle_dir)
+}
+
+fn copy_bundle_legal_documents(bundle_dir: &Path) -> Result<()> {
+    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .ok_or_else(|| anyhow::anyhow!("Failed to resolve workspace root for exporter"))?;
+
+    for filename in ["LICENSE-TOKI.md", "THIRD_PARTY_LICENSES.md"] {
+        let source_path = workspace_root.join(filename);
+        let target_path = bundle_dir.join(filename);
+        fs::copy(&source_path, &target_path).with_context(|| {
+            format!(
+                "Failed to copy legal document '{}' to '{}'",
+                source_path.display(),
+                target_path.display()
+            )
+        })?;
+    }
+
+    Ok(())
 }
 
 fn write_runtime_bundle_config(bundle_dir: &Path, config: &RuntimeBundleConfig) -> Result<()> {
@@ -331,13 +353,17 @@ mod tests {
         assert!(pak_path.exists());
         let config_path = bundle_dir.join("runtime_config.json");
         assert!(config_path.exists());
+        let toki_license_path = bundle_dir.join("LICENSE-TOKI.md");
+        assert!(toki_license_path.exists());
+        let third_party_licenses_path = bundle_dir.join("THIRD_PARTY_LICENSES.md");
+        assert!(third_party_licenses_path.exists());
 
         let root_entries = fs::read_dir(&bundle_dir)
             .expect("read bundle root")
             .flatten()
             .map(|entry| entry.file_name().to_string_lossy().to_string())
             .collect::<Vec<_>>();
-        assert_eq!(root_entries.len(), 3);
+        assert_eq!(root_entries.len(), 5);
         assert!(root_entries.contains(
             &runtime_bin
                 .file_name()
@@ -347,6 +373,8 @@ mod tests {
         ));
         assert!(root_entries.contains(&"game.toki.pak".to_string()));
         assert!(root_entries.contains(&"runtime_config.json".to_string()));
+        assert!(root_entries.contains(&"LICENSE-TOKI.md".to_string()));
+        assert!(root_entries.contains(&"THIRD_PARTY_LICENSES.md".to_string()));
 
         let mut pak_file = fs::File::open(&pak_path).expect("open pak");
         let mut magic = [0u8; 8];
