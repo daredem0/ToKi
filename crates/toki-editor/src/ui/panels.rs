@@ -1,6 +1,7 @@
 use super::editor_ui::{CenterPanelTab, Selection};
 use super::interactions::{CameraInteraction, PlacementInteraction, SelectionInteraction};
 use super::rule_graph::{RuleGraph, RuleGraphError, RuleGraphNodeKind};
+use super::undo_redo::EditorCommand;
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -492,13 +493,20 @@ impl PanelSystem {
         let mut connect_from = ui_state.graph_connect_from_node;
         let mut connect_to = ui_state.graph_connect_to_node;
         let (mut graph_zoom, mut graph_pan) = ui_state.graph_view_for_scene(&active_scene_name);
+        let before_rule_set = ui_state.scenes[scene_index].rules.clone();
+        let before_graph_snapshot = ui_state.rule_graph_for_scene(&active_scene_name).cloned();
+        let before_layout_snapshot = ui_state
+            .graph_layouts_by_scene
+            .get(&active_scene_name)
+            .cloned();
         let mut scene_changed = false;
+        let mut graph_changed = false;
         let mut layout_changed = false;
         let mut operation_error: Option<String> = None;
         let mut selected_graph_node: Option<u64> = None;
 
         {
-            let scene_rules = ui_state.scenes[scene_index].rules.clone();
+            let scene_rules = before_rule_set.clone();
             ui_state.sync_rule_graph_with_rule_set(&active_scene_name, &scene_rules);
             let mut graph = ui_state
                 .rule_graph_for_scene(&active_scene_name)
@@ -1033,6 +1041,7 @@ impl PanelSystem {
 
                 match command_result {
                     Ok(()) => {
+                        graph_changed = true;
                         if is_reset_layout {
                             // Keep a visible border gap when snapping to auto layout.
                             graph_pan = [16.0, 16.0];
@@ -1053,10 +1062,15 @@ impl PanelSystem {
                 }
             }
 
+            let mut after_rule_set = before_rule_set.clone();
             if scene_changed {
                 match graph.to_rule_set() {
                     Ok(rule_set) => {
-                        ui_state.scenes[scene_index].rules = rule_set;
+                        if rule_set != before_rule_set {
+                            after_rule_set = rule_set;
+                        } else {
+                            scene_changed = false;
+                        }
                     }
                     Err(error) => {
                         scene_changed = false;
@@ -1069,17 +1083,33 @@ impl PanelSystem {
                 }
             }
 
-            if scene_changed || layout_changed {
+            let state_changed = graph_changed || scene_changed || layout_changed;
+            if state_changed {
+                let mut after_layout = before_layout_snapshot.clone().unwrap_or_default();
+                after_layout.node_positions.clear();
                 for node in &graph.nodes {
                     let Some(node_key) = graph.stable_node_key(node.id) else {
                         continue;
                     };
-                    ui_state.set_graph_layout_position(
-                        &active_scene_name,
-                        &node_key,
-                        node.position,
-                    );
+                    after_layout.node_positions.insert(node_key, node.position);
                 }
+                after_layout.zoom = graph_zoom;
+                after_layout.pan = graph_pan;
+
+                if !ui_state.execute_command(EditorCommand::update_scene_rules_graph(
+                    active_scene_name.clone(),
+                    before_rule_set.clone(),
+                    after_rule_set,
+                    before_graph_snapshot.clone(),
+                    Some(graph.clone()),
+                    before_layout_snapshot.clone(),
+                    Some(after_layout),
+                )) {
+                    operation_error =
+                        Some("Failed to record scene graph change in undo history.".to_string());
+                }
+            } else if ui_state.rule_graph_for_scene(&active_scene_name).is_none() {
+                ui_state.set_rule_graph_for_scene(active_scene_name.clone(), graph.clone());
             }
 
             if let Some(node_id) = selected_graph_node {
@@ -1090,7 +1120,6 @@ impl PanelSystem {
                     });
                 }
             }
-            ui_state.set_rule_graph_for_scene(active_scene_name.clone(), graph);
         }
 
         ui_state.graph_connect_from_node = connect_from;

@@ -63,6 +63,24 @@ impl MenuSystem {
                 });
 
                 ui.menu_button("Edit", |ui| {
+                    if ui
+                        .add_enabled(ui_state.can_undo(), egui::Button::new("Undo (Ctrl+Z)"))
+                        .clicked()
+                        && ui_state.undo()
+                    {
+                        tracing::info!("Undo command applied");
+                    }
+                    if ui
+                        .add_enabled(
+                            ui_state.can_redo(),
+                            egui::Button::new("Redo (Ctrl+Y / Ctrl+Shift+Z)"),
+                        )
+                        .clicked()
+                        && ui_state.redo()
+                    {
+                        tracing::info!("Redo command applied");
+                    }
+                    ui.separator();
                     if ui.button("Validate Project Assets").clicked() {
                         tracing::info!("Validate Project Assets clicked");
                         ui_state.validate_assets_requested = true;

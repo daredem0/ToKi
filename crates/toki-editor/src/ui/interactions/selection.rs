@@ -2,6 +2,7 @@ use super::GridInteraction;
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
 use crate::ui::editor_ui::EntityMoveDragState;
+use crate::ui::undo_redo::{EditorCommand, EntityPosition};
 use crate::ui::EditorUI;
 use std::path::Path;
 use toki_core::entity::{Entity, EntityDefinition, EntityType};
@@ -180,13 +181,23 @@ impl SelectionInteraction {
         let can_drop =
             Self::can_drop_dragged_entities(viewport, &drag_state.dragged_entities, drop_delta);
         if can_drop {
-            let moved_count = Self::update_scene_entities_position(
-                ui_state,
-                &drag_state.scene_name,
-                &drag_state.dragged_entities,
-                drop_delta,
-            );
-            if moved_count > 0 {
+            let before_positions = drag_state
+                .dragged_entities
+                .iter()
+                .map(|entity| EntityPosition::new(entity.id, entity.position))
+                .collect::<Vec<_>>();
+            let after_positions = drag_state
+                .dragged_entities
+                .iter()
+                .map(|entity| EntityPosition::new(entity.id, entity.position + drop_delta))
+                .collect::<Vec<_>>();
+            let moved_count = after_positions.len();
+
+            if ui_state.execute_command(EditorCommand::move_entities(
+                drag_state.scene_name.clone(),
+                before_positions,
+                after_positions,
+            )) {
                 ui_state.scene_content_changed = true;
                 if drag_state.dragged_entities.len() == 1 {
                     ui_state.set_single_entity_selection(drag_state.entity.id);
@@ -331,6 +342,7 @@ impl SelectionInteraction {
         scene.entities.iter().find(|e| e.id == entity_id).cloned()
     }
 
+    #[cfg(test)]
     fn update_scene_entity_position(
         ui_state: &mut EditorUI,
         scene_name: &str,
@@ -349,6 +361,7 @@ impl SelectionInteraction {
         true
     }
 
+    #[cfg(test)]
     fn update_scene_entities_position(
         ui_state: &mut EditorUI,
         scene_name: &str,

@@ -413,6 +413,43 @@ impl ApplicationHandler for EditorApp {
                         }
                     }
 
+                    // Layout-aware editor shortcuts use logical key values.
+                    if self.modifiers.control_key() {
+                        if let winit::keyboard::Key::Character(ch) = &event.logical_key {
+                            let key = ch.to_ascii_lowercase();
+                            match key.as_str() {
+                                "z" if self.modifiers.shift_key() => {
+                                    if self.ui.redo() {
+                                        tracing::info!("Redo applied via Ctrl+Shift+Z");
+                                    }
+                                    if let Some(window) = &self.window {
+                                        window.request_redraw();
+                                    }
+                                    return;
+                                }
+                                "z" => {
+                                    if self.ui.undo() {
+                                        tracing::info!("Undo applied via Ctrl+Z");
+                                    }
+                                    if let Some(window) = &self.window {
+                                        window.request_redraw();
+                                    }
+                                    return;
+                                }
+                                "y" => {
+                                    if self.ui.redo() {
+                                        tracing::info!("Redo applied via Ctrl+Y");
+                                    }
+                                    if let Some(window) = &self.window {
+                                        window.request_redraw();
+                                    }
+                                    return;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+
                     // Fallback: try physical key for other editor shortcuts
                     if let PhysicalKey::Code(key_code) = event.physical_key {
                         // Handle other editor keyboard shortcuts

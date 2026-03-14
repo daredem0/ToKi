@@ -1,5 +1,6 @@
 use super::editor_ui::{EditorUI, Selection};
 use super::rule_graph::{RuleGraph, RuleGraphNodeKind};
+use super::undo_redo::EditorCommand;
 use crate::config::EditorConfig;
 use std::collections::{HashMap, HashSet};
 use toki_core::animation::AnimationState;
@@ -225,19 +226,42 @@ impl InspectorSystem {
                                     }
                                 }
 
-                                let mut rules_changed = false;
-                                if let Some(scene) = Self::find_scene_mut(ui_state, scene_name) {
+                                if let Some(scene_index) = ui_state
+                                    .scenes
+                                    .iter()
+                                    .position(|scene| scene.name == *scene_name)
+                                {
                                     ui.separator();
-                                    rules_changed = Self::render_scene_rules_editor(
+                                    let before_rules = ui_state.scenes[scene_index].rules.clone();
+                                    let mut edited_rules = before_rules.clone();
+                                    let rules_changed = Self::render_scene_rules_editor(
                                         ui,
                                         scene_name,
-                                        &mut scene.rules,
+                                        &mut edited_rules,
                                         config,
                                     );
-                                }
-
-                                if rules_changed {
-                                    ui_state.scene_content_changed = true;
+                                    if rules_changed && edited_rules != before_rules {
+                                        let before_graph =
+                                            ui_state.rule_graph_for_scene(scene_name).cloned();
+                                        let after_graph =
+                                            Some(RuleGraph::from_rule_set(&edited_rules));
+                                        let before_layout = ui_state
+                                            .graph_layouts_by_scene
+                                            .get(scene_name)
+                                            .cloned();
+                                        let after_layout = before_layout.clone();
+                                        let _ = ui_state.execute_command(
+                                            EditorCommand::update_scene_rules_graph(
+                                                scene_name.clone(),
+                                                before_rules,
+                                                edited_rules,
+                                                before_graph,
+                                                after_graph,
+                                                before_layout,
+                                                after_layout,
+                                            ),
+                                        );
+                                    }
                                 }
                             }
 
@@ -288,15 +312,15 @@ impl InspectorSystem {
                                     ui.heading(format!("👤 Entity {}", entity_id));
                                     ui.separator();
                                     if let Some(scene_entity) =
-                                        Self::find_selected_scene_entity_mut(ui_state, *entity_id)
+                                        Self::find_selected_scene_entity(ui_state, *entity_id)
                                     {
                                         let mut draft =
-                                            EntityPropertyDraft::from_entity(scene_entity);
+                                            EntityPropertyDraft::from_entity(&scene_entity);
                                         if Self::render_scene_entity_editor(ui, &mut draft) {
-                                            entity_changed = Self::apply_entity_property_draft(
-                                                scene_entity,
-                                                &draft,
-                                            );
+                                            entity_changed =
+                                                Self::apply_entity_property_draft_with_undo(
+                                                    ui_state, *entity_id, &draft,
+                                                );
                                         }
                                     } else {
                                         ui.label("Runtime-only entity (read-only)");
@@ -342,16 +366,6 @@ impl InspectorSystem {
                         }
                     });
             });
-    }
-
-    fn find_scene_mut<'a>(
-        ui_state: &'a mut EditorUI,
-        scene_name: &str,
-    ) -> Option<&'a mut toki_core::Scene> {
-        ui_state
-            .scenes
-            .iter_mut()
-            .find(|scene| scene.name == scene_name)
     }
 
     fn next_rule_id(rule_set: &RuleSet) -> String {
@@ -862,6 +876,9 @@ impl InspectorSystem {
             return false;
         };
         let scene_rules = ui_state.scenes[scene_index].rules.clone();
+        let before_rules = scene_rules.clone();
+        let before_graph = ui_state.rule_graph_for_scene(scene_name).cloned();
+        let before_layout = ui_state.graph_layouts_by_scene.get(scene_name).cloned();
         ui_state.sync_rule_graph_with_rule_set(scene_name, &scene_rules);
 
         let audio_choices = Self::load_rule_audio_choices(config);
@@ -1150,10 +1167,29 @@ impl InspectorSystem {
 
         match graph.to_rule_set() {
             Ok(updated_rules) => {
-                let rules_changed = ui_state.scenes[scene_index].rules != updated_rules;
-                ui_state.scenes[scene_index].rules = updated_rules;
-                ui_state.set_rule_graph_for_scene(scene_name.to_string(), graph);
-                rules_changed
+                let (zoom, pan) = ui_state.graph_view_for_scene(scene_name);
+                let mut after_layout = before_layout.clone().unwrap_or_default();
+                after_layout.node_positions.clear();
+                for node in &graph.nodes {
+                    let Some(stable_key) = graph.stable_node_key(node.id) else {
+                        continue;
+                    };
+                    after_layout
+                        .node_positions
+                        .insert(stable_key, node.position);
+                }
+                after_layout.zoom = zoom;
+                after_layout.pan = pan;
+
+                ui_state.execute_command(EditorCommand::update_scene_rules_graph(
+                    scene_name.to_string(),
+                    before_rules,
+                    updated_rules,
+                    before_graph,
+                    Some(graph),
+                    before_layout,
+                    Some(after_layout),
+                ))
             }
             Err(error) => {
                 ui.colored_label(
@@ -2696,13 +2732,12 @@ impl InspectorSystem {
             return false;
         }
 
-        let scene = &mut ui_state.scenes[scene_index];
-        let mut selected_entities_mut = scene
-            .entities
-            .iter_mut()
-            .filter(|entity| selected_set.contains(&entity.id))
-            .collect::<Vec<_>>();
-        Self::apply_multi_entity_batch_edit(&mut selected_entities_mut, edit)
+        Self::apply_multi_entity_batch_edit_with_undo(
+            ui_state,
+            &active_scene_name,
+            &selected_set,
+            edit,
+        )
     }
 
     fn render_multi_entity_bool_row(
@@ -2764,53 +2799,95 @@ impl InspectorSystem {
         }
     }
 
-    fn apply_multi_entity_batch_edit(
-        entities: &mut [&mut toki_core::entity::Entity],
+    fn apply_multi_entity_batch_edit_with_undo(
+        ui_state: &mut EditorUI,
+        scene_name: &str,
+        selected_set: &HashSet<toki_core::entity::EntityId>,
+        edit: MultiEntityBatchEdit,
+    ) -> bool {
+        let Some(scene_index) = ui_state
+            .scenes
+            .iter()
+            .position(|scene| scene.name == scene_name)
+        else {
+            return false;
+        };
+
+        let before_entities = ui_state.scenes[scene_index]
+            .entities
+            .iter()
+            .filter(|entity| selected_set.contains(&entity.id))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if before_entities.is_empty() {
+            return false;
+        }
+
+        let mut changed = false;
+        let mut after_entities = Vec::with_capacity(before_entities.len());
+        for before_entity in &before_entities {
+            let mut after_entity = before_entity.clone();
+            changed |= Self::apply_multi_entity_batch_edit_to_entity(&mut after_entity, edit);
+            after_entities.push(after_entity);
+        }
+
+        if !changed {
+            return false;
+        }
+
+        ui_state.execute_command(EditorCommand::update_entities(
+            scene_name.to_string(),
+            before_entities,
+            after_entities,
+        ))
+    }
+
+    fn apply_multi_entity_batch_edit_to_entity(
+        entity: &mut toki_core::entity::Entity,
         edit: MultiEntityBatchEdit,
     ) -> bool {
         let mut changed = false;
 
-        for entity in entities.iter_mut() {
-            if let Some(visible) = edit.set_visible {
-                if entity.attributes.visible != visible {
-                    entity.attributes.visible = visible;
-                    changed = true;
-                }
+        if let Some(visible) = edit.set_visible {
+            if entity.attributes.visible != visible {
+                entity.attributes.visible = visible;
+                changed = true;
             }
+        }
 
-            if let Some(active) = edit.set_active {
-                if entity.attributes.active != active {
-                    entity.attributes.active = active;
-                    changed = true;
-                }
+        if let Some(active) = edit.set_active {
+            if entity.attributes.active != active {
+                entity.attributes.active = active;
+                changed = true;
             }
+        }
 
-            if let Some(render_layer) = edit.set_render_layer {
-                if entity.attributes.render_layer != render_layer {
-                    entity.attributes.render_layer = render_layer;
-                    changed = true;
-                }
+        if let Some(render_layer) = edit.set_render_layer {
+            if entity.attributes.render_layer != render_layer {
+                entity.attributes.render_layer = render_layer;
+                changed = true;
             }
+        }
 
-            if let Some(delta) = edit.position_delta {
-                let new_position = entity.position + delta;
-                if entity.position != new_position {
-                    entity.position = new_position;
-                    changed = true;
-                }
+        if let Some(delta) = edit.position_delta {
+            let new_position = entity.position + delta;
+            if entity.position != new_position {
+                entity.position = new_position;
+                changed = true;
             }
+        }
 
-            if let Some(collision_enabled) = edit.set_collision_enabled {
-                if collision_enabled {
-                    if entity.collision_box.is_none() {
-                        entity.collision_box =
-                            Some(toki_core::collision::CollisionBox::solid_box(entity.size));
-                        changed = true;
-                    }
-                } else if entity.collision_box.is_some() {
-                    entity.collision_box = None;
+        if let Some(collision_enabled) = edit.set_collision_enabled {
+            if collision_enabled {
+                if entity.collision_box.is_none() {
+                    entity.collision_box =
+                        Some(toki_core::collision::CollisionBox::solid_box(entity.size));
                     changed = true;
                 }
+            } else if entity.collision_box.is_some() {
+                entity.collision_box = None;
+                changed = true;
             }
         }
 
@@ -2907,19 +2984,56 @@ impl InspectorSystem {
         }
     }
 
-    fn find_selected_scene_entity_mut(
-        ui_state: &mut EditorUI,
+    fn find_selected_scene_entity(
+        ui_state: &EditorUI,
         entity_id: toki_core::entity::EntityId,
-    ) -> Option<&mut toki_core::entity::Entity> {
+    ) -> Option<toki_core::entity::Entity> {
         let active_scene_name = ui_state.active_scene.clone()?;
         let scene = ui_state
             .scenes
-            .iter_mut()
+            .iter()
             .find(|scene| scene.name == active_scene_name)?;
         scene
             .entities
-            .iter_mut()
+            .iter()
             .find(|entity| entity.id == entity_id)
+            .cloned()
+    }
+
+    fn apply_entity_property_draft_with_undo(
+        ui_state: &mut EditorUI,
+        entity_id: toki_core::entity::EntityId,
+        draft: &EntityPropertyDraft,
+    ) -> bool {
+        let Some(active_scene_name) = ui_state.active_scene.clone() else {
+            return false;
+        };
+        let Some(scene_index) = ui_state
+            .scenes
+            .iter()
+            .position(|scene| scene.name == active_scene_name)
+        else {
+            return false;
+        };
+        let Some(entity_index) = ui_state.scenes[scene_index]
+            .entities
+            .iter()
+            .position(|entity| entity.id == entity_id)
+        else {
+            return false;
+        };
+
+        let before = ui_state.scenes[scene_index].entities[entity_index].clone();
+        let mut after = before.clone();
+        if !Self::apply_entity_property_draft(&mut after, draft) {
+            return false;
+        }
+
+        ui_state.execute_command(EditorCommand::update_entities(
+            active_scene_name,
+            vec![before],
+            vec![after],
+        ))
     }
 
     fn apply_entity_property_draft(
@@ -3639,17 +3753,15 @@ mod tests {
         let mut second = sample_entity_with_id(2);
         second.collision_box = None;
 
-        let mut entities = vec![&mut first, &mut second];
-        let changed = InspectorSystem::apply_multi_entity_batch_edit(
-            &mut entities,
-            MultiEntityBatchEdit {
-                set_visible: Some(false),
-                set_active: Some(false),
-                set_collision_enabled: Some(true),
-                set_render_layer: Some(7),
-                position_delta: Some(IVec2::new(2, -3)),
-            },
-        );
+        let edit = MultiEntityBatchEdit {
+            set_visible: Some(false),
+            set_active: Some(false),
+            set_collision_enabled: Some(true),
+            set_render_layer: Some(7),
+            position_delta: Some(IVec2::new(2, -3)),
+        };
+        let changed = InspectorSystem::apply_multi_entity_batch_edit_to_entity(&mut first, edit)
+            | InspectorSystem::apply_multi_entity_batch_edit_to_entity(&mut second, edit);
 
         assert!(changed);
         assert!(!first.attributes.visible);
@@ -3665,7 +3777,7 @@ mod tests {
     }
 
     #[test]
-    fn find_selected_scene_entity_mut_returns_entity_from_active_scene() {
+    fn find_selected_scene_entity_returns_entity_from_active_scene() {
         let mut ui_state = EditorUI::new();
         let entity = sample_entity_with_id(7);
         let scene = ui_state
@@ -3675,25 +3787,14 @@ mod tests {
             .expect("missing default scene");
         scene.entities.push(entity);
 
-        let selected_entity = InspectorSystem::find_selected_scene_entity_mut(&mut ui_state, 7)
+        let selected_entity = InspectorSystem::find_selected_scene_entity(&ui_state, 7)
             .expect("entity should be found");
-        selected_entity.position = IVec2::new(50, 60);
-
-        let scene = ui_state
-            .scenes
-            .iter()
-            .find(|scene| scene.name == "Main Scene")
-            .expect("missing default scene");
-        let entity = scene
-            .entities
-            .iter()
-            .find(|entity| entity.id == 7)
-            .expect("entity should still exist");
-        assert_eq!(entity.position, IVec2::new(50, 60));
+        assert_eq!(selected_entity.id, 7);
+        assert_eq!(selected_entity.position, IVec2::new(10, 20));
     }
 
     #[test]
-    fn find_selected_scene_entity_mut_returns_none_for_inactive_scene() {
+    fn find_selected_scene_entity_returns_none_for_inactive_scene() {
         let mut ui_state = EditorUI::new();
         ui_state.scenes.push(Scene::new("Other".to_string()));
         ui_state.active_scene = Some("Other".to_string());
@@ -3705,7 +3806,40 @@ mod tests {
             .expect("missing default scene");
         scene.entities.push(sample_entity_with_id(42));
 
-        assert!(InspectorSystem::find_selected_scene_entity_mut(&mut ui_state, 42).is_none());
+        assert!(InspectorSystem::find_selected_scene_entity(&ui_state, 42).is_none());
+    }
+
+    #[test]
+    fn apply_entity_property_draft_with_undo_round_trips() {
+        let mut ui_state = EditorUI::new();
+        let entity = sample_entity_with_id(7);
+        let scene = ui_state
+            .scenes
+            .iter_mut()
+            .find(|scene| scene.name == "Main Scene")
+            .expect("missing default scene");
+        scene.entities.push(entity.clone());
+
+        let mut draft = EntityPropertyDraft::from_entity(&entity);
+        draft.position_x = 99;
+        draft.position_y = -8;
+        draft.visible = false;
+
+        assert!(InspectorSystem::apply_entity_property_draft_with_undo(
+            &mut ui_state,
+            7,
+            &draft
+        ));
+        let edited = InspectorSystem::find_selected_scene_entity(&ui_state, 7)
+            .expect("entity should still exist");
+        assert_eq!(edited.position, IVec2::new(99, -8));
+        assert!(!edited.attributes.visible);
+
+        assert!(ui_state.undo());
+        let restored = InspectorSystem::find_selected_scene_entity(&ui_state, 7)
+            .expect("entity should still exist");
+        assert_eq!(restored.position, IVec2::new(10, 20));
+        assert!(restored.attributes.visible);
     }
 
     #[test]

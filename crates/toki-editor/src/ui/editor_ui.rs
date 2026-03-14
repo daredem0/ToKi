@@ -2,6 +2,7 @@ use super::inspector::InspectorSystem;
 use super::menus::MenuSystem;
 use super::panels::PanelSystem;
 use super::rule_graph::RuleGraph;
+use super::undo_redo::{EditorCommand, IndexedEntity, UndoRedoHistory};
 use crate::project::SceneGraphLayout;
 use crate::scene::SceneViewport;
 use std::collections::HashMap;
@@ -97,6 +98,7 @@ pub struct EditorUI {
     pub graph_layouts_by_scene: HashMap<String, SceneGraphLayout>, // Persisted scene graph layouts loaded from project
     pub graph_layout_dirty: bool, // Graph layout changed and should be flushed into project metadata
     pub rule_graphs_by_scene: HashMap<String, RuleGraph>, // In-memory scene graph drafts (can contain detached nodes)
+    pub command_history: UndoRedoHistory, // Undo/redo command history for scene mutations
 
     // Multi-entity inspector draft state
     pub multi_entity_render_layer_input: i64,
@@ -157,6 +159,7 @@ impl EditorUI {
             graph_layouts_by_scene: HashMap::new(),
             graph_layout_dirty: false,
             rule_graphs_by_scene: HashMap::new(),
+            command_history: UndoRedoHistory::default(),
             multi_entity_render_layer_input: 0,
             multi_entity_delta_x_input: 0,
             multi_entity_delta_y_input: 0,
@@ -178,6 +181,7 @@ impl EditorUI {
         tracing::info!("Loading {} scenes into UI hierarchy", loaded_scenes.len());
         self.scenes = loaded_scenes;
         self.rule_graphs_by_scene.clear();
+        self.command_history.clear();
 
         // Set the first scene as active if we have scenes and no active scene is set
         if !self.scenes.is_empty() && self.active_scene.is_none() {
@@ -242,6 +246,35 @@ impl EditorUI {
 
     pub fn clear_entity_selection(&mut self) {
         self.clear_selection();
+    }
+
+    pub fn execute_command(&mut self, command: EditorCommand) -> bool {
+        let mut history = std::mem::take(&mut self.command_history);
+        let changed = history.execute(command, self);
+        self.command_history = history;
+        changed
+    }
+
+    pub fn undo(&mut self) -> bool {
+        let mut history = std::mem::take(&mut self.command_history);
+        let undone = history.undo(self);
+        self.command_history = history;
+        undone
+    }
+
+    pub fn redo(&mut self) -> bool {
+        let mut history = std::mem::take(&mut self.command_history);
+        let redone = history.redo(self);
+        self.command_history = history;
+        redone
+    }
+
+    pub fn can_undo(&self) -> bool {
+        self.command_history.can_undo()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        self.command_history.can_redo()
     }
 
     // Entity placement mode management
@@ -390,26 +423,6 @@ impl EditorUI {
         self.graph_layouts_by_scene
             .get(scene_name)
             .and_then(|layout| layout.node_positions.get(node_key).copied())
-    }
-
-    pub fn set_graph_layout_position(
-        &mut self,
-        scene_name: &str,
-        node_key: &str,
-        position: [f32; 2],
-    ) {
-        let layout = self
-            .graph_layouts_by_scene
-            .entry(scene_name.to_string())
-            .or_default();
-        let changed = layout
-            .node_positions
-            .get(node_key)
-            .is_none_or(|existing| *existing != position);
-        if changed {
-            layout.node_positions.insert(node_key.to_string(), position);
-            self.graph_layout_dirty = true;
-        }
     }
 
     pub fn graph_view_for_scene(&self, scene_name: &str) -> (f32, [f32; 2]) {
@@ -638,17 +651,31 @@ impl EditorUI {
 
                     // Process entity removals
                     for (scene_name, entity_id) in entity_removals {
-                        if let Some(scene) = self.scenes.iter_mut().find(|s| s.name == scene_name) {
-                            if let Some(index) = scene.entities.iter().position(|e| e.id == entity_id) {
-                                scene.entities.remove(index);
-                                tracing::info!("Removed entity {} from scene {}", entity_id, scene_name);
+                        let Some(scene_index) =
+                            self.scenes.iter().position(|scene| scene.name == scene_name)
+                        else {
+                            continue;
+                        };
+                        let Some((index, entity)) = self.scenes[scene_index]
+                            .entities
+                            .iter()
+                            .enumerate()
+                            .find(|(_, entity)| entity.id == entity_id)
+                            .map(|(index, entity)| (index, entity.clone()))
+                        else {
+                            continue;
+                        };
 
-                                // Clear selection if it was the removed entity
-                                if matches!(&self.selection, Some(Selection::Entity(id)) if id == &entity_id) {
-                                    self.clear_selection();
-                                }
+                        let removed = self.execute_command(EditorCommand::remove_entities(
+                            scene_name.clone(),
+                            vec![IndexedEntity { index, entity }],
+                        ));
+                        if removed {
+                            tracing::info!("Removed entity {} from scene {}", entity_id, scene_name);
 
-                                self.scene_content_changed = true;
+                            // Clear selection if it was the removed entity
+                            if matches!(&self.selection, Some(Selection::Entity(id)) if id == &entity_id) {
+                                self.clear_selection();
                             }
                         }
                     }
@@ -796,54 +823,65 @@ impl EditorUI {
 
                         // Process entity additions to scenes
                         for (scene_name, entity_name) in entity_additions {
-                            if let Some(target_scene) = self.scenes.iter_mut().find(|s| s.name == scene_name) {
-                                // Try to load and create entity from definition
-                                if let Some(project_path) = config.current_project_path() {
-                                    let entity_file = project_path
-                                        .join("entities")
-                                        .join(format!("{}.json", entity_name));
+                            // Try to load and create entity from definition
+                            if let Some(project_path) = config.current_project_path() {
+                                let entity_file =
+                                    project_path.join("entities").join(format!("{}.json", entity_name));
 
-                                    if entity_file.exists() {
-                                        match std::fs::read_to_string(&entity_file) {
-                                            Ok(content) => {
-                                                match serde_json::from_str::<toki_core::entity::EntityDefinition>(&content) {
-                                                    Ok(entity_def) => {
-                                                        // Generate a new entity ID (simple increment from existing entities)
-                                                        let new_id = target_scene.entities.iter()
-                                                            .map(|e| e.id)
-                                                            .max()
-                                                            .unwrap_or(0) + 1;
+                                if entity_file.exists() {
+                                    match std::fs::read_to_string(&entity_file) {
+                                        Ok(content) => {
+                                            match serde_json::from_str::<toki_core::entity::EntityDefinition>(&content) {
+                                                Ok(entity_def) => {
+                                                    let Some(scene_index) = self
+                                                        .scenes
+                                                        .iter()
+                                                        .position(|scene| scene.name == scene_name)
+                                                    else {
+                                                        continue;
+                                                    };
 
-                                                        // Default position at (100, 100) - user can move it later
-                                                        let default_position = glam::IVec2::new(100, 100);
+                                                    // Generate a new entity ID (simple increment from existing entities)
+                                                    let new_id = self.scenes[scene_index]
+                                                        .entities
+                                                        .iter()
+                                                        .map(|entity| entity.id)
+                                                        .max()
+                                                        .unwrap_or(0)
+                                                        + 1;
 
-                                                        match entity_def.create_entity(default_position, new_id) {
-                                                            Ok(entity) => {
-                                                                target_scene.entities.push(entity);
+                                                    // Default position at (100, 100) - user can move it later
+                                                    let default_position = glam::IVec2::new(100, 100);
+
+                                                    match entity_def.create_entity(default_position, new_id) {
+                                                        Ok(entity) => {
+                                                            if self.execute_command(EditorCommand::add_entity(
+                                                                scene_name.clone(),
+                                                                entity,
+                                                            )) {
                                                                 tracing::info!("Successfully added entity '{}' (ID: {}) to scene '{}' at position ({}, {})",
                                                                     entity_name, new_id, scene_name, default_position.x, default_position.y);
-                                                                self.scene_content_changed = true;
-                                                            }
-                                                            Err(e) => {
-                                                                tracing::error!("Failed to create entity '{}': {}", entity_name, e);
                                                             }
                                                         }
-                                                    }
-                                                    Err(e) => {
-                                                        tracing::error!("Failed to parse entity definition '{}': {}", entity_name, e);
+                                                        Err(e) => {
+                                                            tracing::error!("Failed to create entity '{}': {}", entity_name, e);
+                                                        }
                                                     }
                                                 }
-                                            }
-                                            Err(e) => {
-                                                tracing::error!("Failed to read entity file '{}': {}", entity_name, e);
+                                                Err(e) => {
+                                                    tracing::error!("Failed to parse entity definition '{}': {}", entity_name, e);
+                                                }
                                             }
                                         }
-                                    } else {
-                                        tracing::error!("Entity definition file not found: {:?}", entity_file);
+                                        Err(e) => {
+                                            tracing::error!("Failed to read entity file '{}': {}", entity_name, e);
+                                        }
                                     }
                                 } else {
-                                    tracing::error!("No project path available for entity creation");
+                                    tracing::error!("Entity definition file not found: {:?}", entity_file);
                                 }
+                            } else {
+                                tracing::error!("No project path available for entity creation");
                             }
                         }
                     } else {
@@ -858,12 +896,27 @@ impl EditorUI {
 
 #[cfg(test)]
 mod tests {
+    use glam::{IVec2, UVec2};
+    use toki_core::entity::{EntityAttributes, EntityType};
     use toki_core::rules::{
         Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger,
     };
 
     use super::EditorUI;
     use crate::ui::rule_graph::RuleGraph;
+    use crate::ui::undo_redo::EditorCommand;
+
+    fn sample_entity(id: u32, position: IVec2) -> toki_core::entity::Entity {
+        toki_core::entity::Entity {
+            id,
+            position,
+            size: UVec2::new(16, 16),
+            entity_type: EntityType::Npc,
+            definition_name: Some("npc".to_string()),
+            attributes: EntityAttributes::default(),
+            collision_box: None,
+        }
+    }
 
     #[test]
     fn sync_rule_graph_with_rule_set_preserves_unserializable_existing_draft() {
@@ -938,5 +991,59 @@ mod tests {
         assert_eq!(marquee.start_screen, egui::pos2(10.0, 20.0));
         assert_eq!(marquee.current_screen, egui::pos2(30.0, 40.0));
         assert!(!ui.is_marquee_selection_active());
+    }
+
+    #[test]
+    fn execute_command_undo_and_redo_round_trip_entity_creation() {
+        let mut ui = EditorUI::new();
+        let command = EditorCommand::add_entity("Main Scene", sample_entity(11, IVec2::new(8, 9)));
+
+        assert!(ui.execute_command(command));
+        assert!(ui.can_undo());
+        assert_eq!(
+            ui.scenes
+                .iter()
+                .find(|scene| scene.name == "Main Scene")
+                .expect("main scene should exist")
+                .entities
+                .len(),
+            1
+        );
+
+        assert!(ui.undo());
+        assert!(ui.can_redo());
+        assert!(ui
+            .scenes
+            .iter()
+            .find(|scene| scene.name == "Main Scene")
+            .expect("main scene should exist")
+            .entities
+            .is_empty());
+
+        assert!(ui.redo());
+        assert_eq!(
+            ui.scenes
+                .iter()
+                .find(|scene| scene.name == "Main Scene")
+                .expect("main scene should exist")
+                .entities
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn load_scenes_from_project_clears_undo_redo_history() {
+        let mut ui = EditorUI::new();
+        assert!(ui.execute_command(EditorCommand::add_entity(
+            "Main Scene",
+            sample_entity(1, IVec2::new(0, 0))
+        )));
+        assert!(ui.can_undo());
+
+        ui.load_scenes_from_project(vec![toki_core::Scene::new("Imported".to_string())]);
+
+        assert!(!ui.can_undo());
+        assert!(!ui.can_redo());
     }
 }

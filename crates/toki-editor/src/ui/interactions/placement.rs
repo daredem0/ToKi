@@ -1,6 +1,7 @@
 use super::GridInteraction;
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
+use crate::ui::undo_redo::EditorCommand;
 use crate::ui::EditorUI;
 use std::path::{Path, PathBuf};
 use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
@@ -153,23 +154,23 @@ impl PlacementInteraction {
         tilemap: Option<&TileMap>,
         terrain_atlas: Option<&AtlasMeta>,
     ) -> bool {
-        let Some(active_scene_name) = &ui_state.active_scene else {
+        let Some(active_scene_name) = ui_state.active_scene.clone() else {
             tracing::error!("No active scene for entity placement");
             ui_state.exit_placement_mode();
             return false;
         };
 
-        let Some(target_scene) = ui_state
+        let Some(scene_index) = ui_state
             .scenes
-            .iter_mut()
-            .find(|s| s.name == *active_scene_name)
+            .iter()
+            .position(|s| s.name == active_scene_name)
         else {
             tracing::error!("Active scene '{}' not found", active_scene_name);
             ui_state.exit_placement_mode();
             return false;
         };
 
-        let new_id = Self::next_entity_id(&target_scene.entities);
+        let new_id = Self::next_entity_id(&ui_state.scenes[scene_index].entities);
 
         let entity = match entity_def.create_entity(world_pos_i32, new_id) {
             Ok(entity) => entity,
@@ -183,7 +184,16 @@ impl PlacementInteraction {
         let can_place = Self::can_place_entity(&entity, world_pos_i32, tilemap, terrain_atlas);
 
         if can_place {
-            target_scene.entities.push(entity);
+            let add_command = EditorCommand::add_entity(active_scene_name.clone(), entity);
+            let added = ui_state.execute_command(add_command);
+            if !added {
+                tracing::warn!(
+                    "Skipping placement for entity '{}' in scene '{}' because command application failed",
+                    entity_def_name,
+                    active_scene_name
+                );
+                return false;
+            }
             tracing::info!(
                 "Successfully placed entity '{}' (ID: {}) in scene '{}' at world position ({}, {})",
                 entity_def_name,
@@ -192,7 +202,6 @@ impl PlacementInteraction {
                 world_pos_i32.x,
                 world_pos_i32.y
             );
-            ui_state.scene_content_changed = true;
             true
         } else {
             tracing::warn!("Cannot place entity '{}' at position ({}, {}) - collision detected with solid terrain (staying in placement mode)",
@@ -519,8 +528,25 @@ mod tests {
         assert_eq!(scene.entities[0].entity_type, EntityType::Npc);
         assert_eq!(scene.entities[0].definition_name.as_deref(), Some("sample"));
         assert!(ui_state.scene_content_changed);
+        assert!(ui_state.can_undo());
         // Placement mode exits at a higher level after successful click.
         assert!(ui_state.is_in_placement_mode());
+
+        assert!(ui_state.undo());
+        let scene = ui_state
+            .scenes
+            .iter()
+            .find(|s| s.name == "Main Scene")
+            .expect("missing default scene");
+        assert!(scene.entities.is_empty());
+
+        assert!(ui_state.redo());
+        let scene = ui_state
+            .scenes
+            .iter()
+            .find(|s| s.name == "Main Scene")
+            .expect("missing default scene");
+        assert_eq!(scene.entities.len(), 1);
     }
 
     #[test]
