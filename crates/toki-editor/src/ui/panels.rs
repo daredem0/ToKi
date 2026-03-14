@@ -53,6 +53,36 @@ struct GraphValidationIssue {
     severity: GraphValidationSeverity,
     message: String,
     hint: String,
+    fixes: Vec<GraphValidationFix>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GraphValidationFix {
+    label: String,
+    command: GraphValidationFixCommand,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum GraphValidationFixCommand {
+    DisconnectEdges(Vec<(u64, u64)>),
+    RemoveNode(u64),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum GraphCommand {
+    AddTrigger,
+    ResetLayout,
+    SetTrigger(u64, RuleTrigger),
+    AddConditionNode,
+    AddActionNode,
+    SetCondition(u64, RuleCondition),
+    SetAction(u64, RuleAction),
+    SetNodePosition(u64, [f32; 2]),
+    RemoveNode(u64),
+    Connect(u64, u64),
+    Disconnect(u64, u64),
+    DisconnectMany(Vec<(u64, u64)>),
+    DisconnectNode(u64),
 }
 
 impl PanelSystem {
@@ -206,20 +236,6 @@ impl PanelSystem {
         ui_state: &mut super::EditorUI,
         show_scene_rules: bool,
     ) {
-        enum GraphCommand {
-            AddTrigger,
-            ResetLayout,
-            SetTrigger(u64, RuleTrigger),
-            AddConditionNode,
-            AddActionNode,
-            SetCondition(u64, RuleCondition),
-            SetAction(u64, RuleAction),
-            SetNodePosition(u64, [f32; 2]),
-            RemoveNode(u64),
-            Connect(u64, u64),
-            Disconnect(u64, u64),
-        }
-
         if show_scene_rules {
             ui.heading("Active Scene Rules");
         } else {
@@ -390,7 +406,22 @@ impl PanelSystem {
                 graph.edges.len()
             ));
             let validation_issues = Self::collect_graph_validation_issues(&graph, &node_badges);
-            Self::render_graph_validation_summary(ui, &validation_issues);
+            if pending_command.is_none() {
+                if let Some(fix_command) =
+                    Self::render_graph_validation_summary(ui, &validation_issues)
+                {
+                    pending_command = Some(match fix_command {
+                        GraphValidationFixCommand::DisconnectEdges(edges) => {
+                            GraphCommand::DisconnectMany(edges)
+                        }
+                        GraphValidationFixCommand::RemoveNode(node_id) => {
+                            GraphCommand::RemoveNode(node_id)
+                        }
+                    });
+                }
+            } else {
+                let _ = Self::render_graph_validation_summary(ui, &validation_issues);
+            }
             if !show_scene_rules {
                 if pending_command.is_none() {
                     let (moved_node, clicked_node) = Self::render_graph_canvas(
@@ -410,6 +441,26 @@ impl PanelSystem {
 
                 if graph.nodes.is_empty() {
                     ui.label("No rules in active scene. Add a rule chain to start authoring.");
+                } else if let Some(node_id) = selected_graph_node {
+                    ui.separator();
+                    ui.strong("Selected Node");
+                    if pending_command.is_none() {
+                        pending_command = Self::render_graph_selected_node_editor(
+                            ui,
+                            &graph,
+                            &node_badges,
+                            node_id,
+                            &active_scene_name,
+                        );
+                    } else {
+                        let _ = Self::render_graph_selected_node_editor(
+                            ui,
+                            &graph,
+                            &node_badges,
+                            node_id,
+                            &active_scene_name,
+                        );
+                    }
                 }
             }
 
@@ -473,7 +524,11 @@ impl PanelSystem {
                                                 }
                                                 let mut trigger_value = *trigger;
                                                 let mut kind = Self::graph_trigger_kind(*trigger);
-                                                egui::ComboBox::from_id_salt("graph_trigger_kind")
+                                                egui::ComboBox::from_id_salt((
+                                                    "graph_trigger_kind",
+                                                    &active_scene_name,
+                                                    node_id,
+                                                ))
                                                     .selected_text(Self::graph_trigger_kind_label(kind))
                                                     .show_ui(ui, |ui| {
                                                         for candidate in [
@@ -495,8 +550,14 @@ impl PanelSystem {
                                                     trigger_value = Self::graph_default_trigger(kind);
                                                 }
                                                 if let RuleTrigger::OnKey { key } = &mut trigger_value {
-                                                    let _ =
-                                                        Self::edit_rule_key(ui, key, "graph_trigger_key");
+                                                    let _ = Self::edit_rule_key(
+                                                        ui,
+                                                        key,
+                                                        &format!(
+                                                            "graph_trigger_key::{}::{}",
+                                                            active_scene_name, node_id
+                                                        ),
+                                                    );
                                                 }
                                                 if trigger_value != *trigger {
                                                     pending_command =
@@ -518,7 +579,11 @@ impl PanelSystem {
                                                     selected_graph_node = Some(node_id);
                                                 }
                                                 let mut kind = Self::graph_condition_kind(*condition);
-                                                egui::ComboBox::from_id_salt("graph_condition_kind")
+                                                egui::ComboBox::from_id_salt((
+                                                    "graph_condition_kind",
+                                                    &active_scene_name,
+                                                    node_id,
+                                                ))
                                                     .selected_text(Self::graph_condition_kind_label(kind))
                                                     .show_ui(ui, |ui| {
                                                         for candidate in [
@@ -543,6 +608,10 @@ impl PanelSystem {
                                                     Self::edit_graph_condition_payload(
                                                         ui,
                                                         &mut edited_condition,
+                                                        &format!(
+                                                            "graph_condition_payload::{}::{}",
+                                                            active_scene_name, node_id
+                                                        ),
                                                     );
                                                 if edited_condition != *condition || payload_changed {
                                                     pending_command = Some(GraphCommand::SetCondition(
@@ -571,7 +640,11 @@ impl PanelSystem {
                                                     selected_graph_node = Some(node_id);
                                                 }
                                                 let mut kind = Self::graph_action_kind(action);
-                                                egui::ComboBox::from_id_salt("graph_action_kind")
+                                                egui::ComboBox::from_id_salt((
+                                                    "graph_action_kind",
+                                                    &active_scene_name,
+                                                    node_id,
+                                                ))
                                                     .selected_text(Self::graph_action_kind_label(kind))
                                                     .show_ui(ui, |ui| {
                                                         for candidate in [
@@ -597,6 +670,10 @@ impl PanelSystem {
                                                 let payload_changed = Self::edit_graph_action_payload(
                                                     ui,
                                                     &mut edited_action,
+                                                    &format!(
+                                                        "graph_action_payload::{}::{}",
+                                                        active_scene_name, node_id
+                                                    ),
                                                 );
                                                 if edited_action != *action || payload_changed {
                                                     pending_command = Some(GraphCommand::SetAction(
@@ -716,6 +793,13 @@ impl PanelSystem {
                         graph.disconnect_nodes(from, to);
                         Ok(())
                     }
+                    GraphCommand::DisconnectMany(edges) => {
+                        for (from, to) in edges {
+                            graph.disconnect_nodes(from, to);
+                        }
+                        Ok(())
+                    }
+                    GraphCommand::DisconnectNode(node_id) => graph.disconnect_node(node_id),
                 };
 
                 match command_result {
@@ -870,6 +954,10 @@ impl PanelSystem {
                     severity: GraphValidationSeverity::Warning,
                     message: format!("{node_label} is detached from all trigger chains."),
                     hint: "Connect it into a trigger chain, or delete it if it is no longer needed. Detached nodes stay in editor drafts but are not exported to scene JSON/runtime.".to_string(),
+                    fixes: vec![GraphValidationFix {
+                        label: format!("Delete {}", node_label),
+                        command: GraphValidationFixCommand::RemoveNode(node.id),
+                    }],
                 });
             }
         }
@@ -893,6 +981,7 @@ impl PanelSystem {
                         rule_id, node_label
                     ),
                     hint: "Delete and recreate the affected trigger chain.".to_string(),
+                    fixes: Vec::new(),
                 }
             }
             RuleGraphError::TriggerNodeKindMismatch { rule_id, node_id } => {
@@ -905,6 +994,7 @@ impl PanelSystem {
                         rule_id, node_label
                     ),
                     hint: "Replace the node with a proper trigger node for this chain.".to_string(),
+                    fixes: Vec::new(),
                 }
             }
             RuleGraphError::MissingNode { rule_id, node_id } => {
@@ -915,11 +1005,20 @@ impl PanelSystem {
                     message: format!("Rule '{}' references missing {}.", rule_id, node_label),
                     hint: "Disconnect stale edges or remove/recreate the broken chain segment."
                         .to_string(),
+                    fixes: Vec::new(),
                 }
             }
             RuleGraphError::NonLinearChain { rule_id, node_id } => {
                 let node_label = Self::rule_graph_node_label(graph, node_badges, *node_id)
                     .unwrap_or_else(|| format!("node {}", node_id));
+                let extra_edges = Self::non_linear_extra_edges(graph, *node_id);
+                let mut fixes = Vec::new();
+                if !extra_edges.is_empty() {
+                    fixes.push(GraphValidationFix {
+                        label: format!("Disconnect extra branch edge(s) from {}", node_label),
+                        command: GraphValidationFixCommand::DisconnectEdges(extra_edges),
+                    });
+                }
                 GraphValidationIssue {
                     severity: GraphValidationSeverity::Error,
                     message: format!(
@@ -929,6 +1028,7 @@ impl PanelSystem {
                     hint:
                         "Disconnect extra outgoing edges from this node, or split logic into separate trigger chains."
                             .to_string(),
+                    fixes,
                 }
             }
             RuleGraphError::CycleDetected { rule_id, node_id } => {
@@ -939,18 +1039,51 @@ impl PanelSystem {
                     message: format!("Rule '{}' contains a cycle at {}.", rule_id, node_label),
                     hint: "Disconnect one edge in the loop so each chain has a forward-only path."
                         .to_string(),
+                    fixes: Vec::new(),
                 }
             }
         }
     }
 
-    fn render_graph_validation_summary(ui: &mut egui::Ui, issues: &[GraphValidationIssue]) {
+    fn non_linear_extra_edges(graph: &RuleGraph, node_id: u64) -> Vec<(u64, u64)> {
+        let node_by_id = graph
+            .nodes
+            .iter()
+            .map(|node| (node.id, node))
+            .collect::<HashMap<_, _>>();
+        let mut targets = graph
+            .edges
+            .iter()
+            .filter(|edge| edge.from == node_id)
+            .map(|edge| edge.to)
+            .collect::<Vec<_>>();
+        targets.sort_by_key(|target| {
+            node_by_id
+                .get(target)
+                .map(|node| (Self::graph_node_kind_rank(&node.kind), *target))
+                .unwrap_or((usize::MAX, *target))
+        });
+        if targets.len() <= 1 {
+            return Vec::new();
+        }
+        targets
+            .into_iter()
+            .skip(1)
+            .map(|target| (node_id, target))
+            .collect()
+    }
+
+    fn render_graph_validation_summary(
+        ui: &mut egui::Ui,
+        issues: &[GraphValidationIssue],
+    ) -> Option<GraphValidationFixCommand> {
+        let mut clicked_fix = None;
         if issues.is_empty() {
             ui.colored_label(
                 egui::Color32::from_rgb(150, 210, 150),
                 "Validation: Serializable (runtime/export ready)",
             );
-            return;
+            return None;
         }
 
         let error_count = issues
@@ -986,8 +1119,18 @@ impl PanelSystem {
                 };
                 ui.colored_label(color, format!("{prefix}: {}", issue.message));
                 ui.label(format!("Hint: {}", issue.hint));
+                if !issue.fixes.is_empty() {
+                    ui.horizontal_wrapped(|ui| {
+                        for fix in &issue.fixes {
+                            if ui.small_button(&fix.label).clicked() {
+                                clicked_fix = Some(fix.command.clone());
+                            }
+                        }
+                    });
+                }
             }
         });
+        clicked_fix
     }
 
     fn compute_auto_layout_positions(
@@ -1388,6 +1531,147 @@ impl PanelSystem {
         (moved_node, clicked_node)
     }
 
+    fn render_graph_selected_node_editor(
+        ui: &mut egui::Ui,
+        graph: &RuleGraph,
+        node_badges: &HashMap<u64, String>,
+        node_id: u64,
+        scene_name: &str,
+    ) -> Option<GraphCommand> {
+        let Some(node_kind) = graph
+            .nodes
+            .iter()
+            .find(|node| node.id == node_id)
+            .map(|node| node.kind.clone())
+        else {
+            ui.label("Selected node no longer exists.");
+            return None;
+        };
+
+        let display_label = Self::rule_graph_node_label(graph, node_badges, node_id)
+            .unwrap_or_else(|| format!("node {node_id}"));
+        ui.horizontal(|ui| {
+            ui.monospace(display_label);
+        });
+
+        let mut command = None;
+        ui.horizontal(|ui| {
+            if ui.button("Disconnect All").clicked() {
+                command = Some(GraphCommand::DisconnectNode(node_id));
+            }
+            if ui.button("Delete Node").clicked() {
+                command = Some(GraphCommand::RemoveNode(node_id));
+            }
+        });
+
+        ui.separator();
+
+        match node_kind {
+            RuleGraphNodeKind::Trigger(trigger) => {
+                let mut trigger_value = trigger;
+                let mut kind = Self::graph_trigger_kind(trigger);
+                let kind_salt = format!("graph_canvas_trigger_kind::{scene_name}::{node_id}");
+                egui::ComboBox::from_id_salt(kind_salt)
+                    .selected_text(Self::graph_trigger_kind_label(kind))
+                    .show_ui(ui, |ui| {
+                        for candidate in [
+                            GraphTriggerKind::Start,
+                            GraphTriggerKind::Update,
+                            GraphTriggerKind::PlayerMove,
+                            GraphTriggerKind::Key,
+                            GraphTriggerKind::Collision,
+                            GraphTriggerKind::Trigger,
+                        ] {
+                            ui.selectable_value(
+                                &mut kind,
+                                candidate,
+                                Self::graph_trigger_kind_label(candidate),
+                            );
+                        }
+                    });
+                if kind != Self::graph_trigger_kind(trigger) {
+                    trigger_value = Self::graph_default_trigger(kind);
+                }
+                if let RuleTrigger::OnKey { key } = &mut trigger_value {
+                    let key_salt = format!("graph_canvas_trigger_key::{scene_name}::{node_id}");
+                    let _ = Self::edit_rule_key(ui, key, &key_salt);
+                }
+                if command.is_none() && trigger_value != trigger {
+                    command = Some(GraphCommand::SetTrigger(node_id, trigger_value));
+                }
+            }
+            RuleGraphNodeKind::Condition(condition) => {
+                let mut edited_condition = condition;
+                let mut kind = Self::graph_condition_kind(condition);
+                let kind_salt = format!("graph_canvas_condition_kind::{scene_name}::{node_id}");
+                egui::ComboBox::from_id_salt(kind_salt)
+                    .selected_text(Self::graph_condition_kind_label(kind))
+                    .show_ui(ui, |ui| {
+                        for candidate in [
+                            GraphConditionKind::Always,
+                            GraphConditionKind::TargetExists,
+                            GraphConditionKind::KeyHeld,
+                            GraphConditionKind::EntityActive,
+                        ] {
+                            ui.selectable_value(
+                                &mut kind,
+                                candidate,
+                                Self::graph_condition_kind_label(candidate),
+                            );
+                        }
+                    });
+                if kind != Self::graph_condition_kind(condition) {
+                    edited_condition = Self::graph_default_condition(kind);
+                }
+                let _ = Self::edit_graph_condition_payload(
+                    ui,
+                    &mut edited_condition,
+                    &format!("graph_canvas_condition_payload::{scene_name}::{node_id}"),
+                );
+                if command.is_none() && edited_condition != condition {
+                    command = Some(GraphCommand::SetCondition(node_id, edited_condition));
+                }
+            }
+            RuleGraphNodeKind::Action(action) => {
+                let mut edited_action = action.clone();
+                let mut kind = Self::graph_action_kind(&action);
+                let kind_salt = format!("graph_canvas_action_kind::{scene_name}::{node_id}");
+                egui::ComboBox::from_id_salt(kind_salt)
+                    .selected_text(Self::graph_action_kind_label(kind))
+                    .show_ui(ui, |ui| {
+                        for candidate in [
+                            GraphActionKind::PlaySound,
+                            GraphActionKind::PlayMusic,
+                            GraphActionKind::PlayAnimation,
+                            GraphActionKind::SetVelocity,
+                            GraphActionKind::Spawn,
+                            GraphActionKind::DestroySelf,
+                            GraphActionKind::SwitchScene,
+                        ] {
+                            ui.selectable_value(
+                                &mut kind,
+                                candidate,
+                                Self::graph_action_kind_label(candidate),
+                            );
+                        }
+                    });
+                if kind != Self::graph_action_kind(&action) {
+                    edited_action = Self::graph_default_action(kind);
+                }
+                let _ = Self::edit_graph_action_payload(
+                    ui,
+                    &mut edited_action,
+                    &format!("graph_canvas_action_payload::{scene_name}::{node_id}"),
+                );
+                if command.is_none() && edited_action != action {
+                    command = Some(GraphCommand::SetAction(node_id, edited_action));
+                }
+            }
+        }
+
+        command
+    }
+
     fn graph_edge_points(
         from_rect: egui::Rect,
         to_rect: egui::Rect,
@@ -1740,27 +2024,37 @@ impl PanelSystem {
         }
     }
 
-    fn edit_graph_condition_payload(ui: &mut egui::Ui, condition: &mut RuleCondition) -> bool {
+    fn edit_graph_condition_payload(
+        ui: &mut egui::Ui,
+        condition: &mut RuleCondition,
+        id_prefix: &str,
+    ) -> bool {
         match condition {
             RuleCondition::Always => false,
             RuleCondition::TargetExists { target } => {
-                Self::edit_rule_target(ui, target, "graph_condition_target")
+                Self::edit_rule_target(ui, target, &format!("{id_prefix}::target"))
             }
-            RuleCondition::KeyHeld { key } => Self::edit_rule_key(ui, key, "graph_condition_key"),
+            RuleCondition::KeyHeld { key } => {
+                Self::edit_rule_key(ui, key, &format!("{id_prefix}::key"))
+            }
             RuleCondition::EntityActive { target, is_active } => {
                 let mut changed =
-                    Self::edit_rule_target(ui, target, "graph_condition_entity_target");
+                    Self::edit_rule_target(ui, target, &format!("{id_prefix}::entity_target"));
                 changed |= ui.checkbox(is_active, "Active").changed();
                 changed
             }
         }
     }
 
-    fn edit_graph_action_payload(ui: &mut egui::Ui, action: &mut RuleAction) -> bool {
+    fn edit_graph_action_payload(
+        ui: &mut egui::Ui,
+        action: &mut RuleAction,
+        id_prefix: &str,
+    ) -> bool {
         match action {
             RuleAction::PlaySound { channel, sound_id } => {
                 let mut changed = false;
-                egui::ComboBox::from_id_salt("graph_action_channel")
+                egui::ComboBox::from_id_salt((id_prefix, "channel"))
                     .selected_text(match channel {
                         RuleSoundChannel::Movement => "Movement",
                         RuleSoundChannel::Collision => "Collision",
@@ -1778,8 +2072,9 @@ impl PanelSystem {
             }
             RuleAction::PlayMusic { track_id } => ui.text_edit_singleline(track_id).changed(),
             RuleAction::PlayAnimation { target, state } => {
-                let mut changed = Self::edit_rule_target(ui, target, "graph_action_anim_target");
-                egui::ComboBox::from_id_salt("graph_action_anim_state")
+                let mut changed =
+                    Self::edit_rule_target(ui, target, &format!("{id_prefix}::anim_target"));
+                egui::ComboBox::from_id_salt((id_prefix, "anim_state"))
                     .selected_text(match state {
                         AnimationState::Idle => "Idle",
                         AnimationState::Walk => "Walk",
@@ -1795,7 +2090,8 @@ impl PanelSystem {
                 changed
             }
             RuleAction::SetVelocity { target, velocity } => {
-                let mut changed = Self::edit_rule_target(ui, target, "graph_action_vel_target");
+                let mut changed =
+                    Self::edit_rule_target(ui, target, &format!("{id_prefix}::vel_target"));
                 changed |= ui
                     .add(egui::DragValue::new(&mut velocity[0]).speed(1.0))
                     .changed();
@@ -1809,7 +2105,7 @@ impl PanelSystem {
                 position,
             } => {
                 let mut changed = false;
-                egui::ComboBox::from_id_salt("graph_action_spawn_type")
+                egui::ComboBox::from_id_salt((id_prefix, "spawn_type"))
                     .selected_text(match entity_type {
                         RuleSpawnEntityType::PlayerLikeNpc => "PlayerLikeNpc",
                         RuleSpawnEntityType::Npc => "Npc",
@@ -1849,7 +2145,7 @@ impl PanelSystem {
                 changed
             }
             RuleAction::DestroySelf { target } => {
-                Self::edit_rule_target(ui, target, "graph_action_destroy_target")
+                Self::edit_rule_target(ui, target, &format!("{id_prefix}::destroy_target"))
             }
             RuleAction::SwitchScene { scene_name } => ui.text_edit_singleline(scene_name).changed(),
         }
@@ -1970,7 +2266,7 @@ impl PanelSystem {
 
 #[cfg(test)]
 mod tests {
-    use super::PanelSystem;
+    use super::{GraphValidationFixCommand, PanelSystem};
     use crate::ui::rule_graph::RuleGraph;
     use std::collections::HashMap;
     use toki_core::rules::{
@@ -2147,10 +2443,18 @@ mod tests {
 
         let badges = PanelSystem::rule_graph_node_badges(&graph);
         let issues = PanelSystem::collect_graph_validation_issues(&graph, &badges);
-        assert!(issues.iter().any(|issue| {
-            issue.severity == super::GraphValidationSeverity::Error
-                && issue.message.contains("multiple outgoing edges")
-        }));
+        let issue = issues
+            .iter()
+            .find(|issue| {
+                issue.severity == super::GraphValidationSeverity::Error
+                    && issue.message.contains("multiple outgoing edges")
+            })
+            .expect("non-linear chain issue should be reported");
+        assert!(issue.fixes.iter().any(|fix| matches!(
+            &fix.command,
+            GraphValidationFixCommand::DisconnectEdges(edges)
+                if edges.iter().any(|(from, _)| *from == trigger)
+        )));
     }
 
     #[test]
@@ -2180,10 +2484,16 @@ mod tests {
         let detached_label = PanelSystem::rule_graph_node_label(&graph, &badges, detached)
             .expect("detached node should have a display label");
         let issues = PanelSystem::collect_graph_validation_issues(&graph, &badges);
-        assert!(issues.iter().any(|issue| {
-            issue.severity == super::GraphValidationSeverity::Warning
-                && issue.message.contains(&detached_label)
-                && issue.message.contains("detached")
+        let issue = issues
+            .iter()
+            .find(|issue| {
+                issue.severity == super::GraphValidationSeverity::Warning
+                    && issue.message.contains(&detached_label)
+                    && issue.message.contains("detached")
+            })
+            .expect("detached node warning should be reported");
+        assert!(issue.fixes.iter().any(|fix| {
+            matches!(fix.command, GraphValidationFixCommand::RemoveNode(node_id) if node_id == detached)
         }));
     }
 
