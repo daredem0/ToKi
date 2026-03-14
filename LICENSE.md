@@ -1,57 +1,123 @@
-# ToKi License
+# ToKi Licensing Overview
 
-This repository uses a mixed licensing model.
+ToKi uses a mixed licensing model.
 
-- `toki-core`, `toki-schemas`, and `toki-render` are licensed under `MPL-2.0` as declared in their package manifests.
-- This file governs `toki-runtime` and `toki-editor`, and games or tools that incorporate or depend on those packages, unless a separate written commercial agreement with the copyright holder says otherwise.
+This file is a **simple overview** so you can quickly understand what you can and cannot do.
 
-## 1. Grant of rights for non-commercial use
+For the full legal terms, always check the actual license files.
 
-Subject to the terms of this license, you are granted a worldwide, non-exclusive, revocable license to use, copy, modify, and distribute `toki-runtime` and `toki-editor`, and to create, use, modify, and distribute games or tools built with them, for non-commercial and non-monetized use.
+---
 
-This license does not require you to publish source code for your own game or tool.
+## Use for non commercial products
 
-## 2. Non-commercial use only
+You can use ToKi to:
 
-No fee, royalty, or revenue share is owed for use that is strictly non-commercial and non-monetized.
+- learn
+- experiment
+- prototype
+- make hobby projects
+- make and release **free games**
 
-For this license, "non-commercial" means use that does not generate revenue or other commercial advantage, directly or indirectly.
+If your game is **free** and you are **not making money from it**, you can use ToKi without worrying about royalties or commercial licensing.
 
-## 3. Commercial use requires a separate agreement
+That means you can just build your game and share it without worrying about license or legalities.
 
-You may not use, distribute, or authorize use of `toki-runtime` or `toki-editor`, or of games or tools built with them, for commercial or monetized use unless you have a separate written commercial agreement with the copyright holder.
+---
 
-Commercial or monetized use includes, at minimum:
+## License structure
 
-- selling copies or paid access
-- paid downloadable content, expansions, subscriptions, or in-app purchases
-- advertising, sponsorship, or affiliate revenue tied to the game or tool
-- platform or subscription-service revenue share
-- publisher advances or minimum guarantees tied to the game or tool
-- crowdfunding, donations, or similar funding where access, content, or in-game benefits are provided in return
+### Open components
+These crates are licensed under **MPL-2.0**:
 
-Commercial rights are not granted by this repository alone. See `LICENSE-COMMERCIAL.md` for the commercial licensing notice.
+- `toki-core`
+- `toki-render`
+- `toki-schemas`
 
-## 4. Redistribution conditions
+### ToKi application layer
+These crates are governed by **LICENSE-TOKI.md**:
 
-If you distribute `toki-runtime`, `toki-editor`, or a game or tool built with them under this license, you must:
+- `toki-runtime`
+- `toki-editor`
 
-- preserve existing copyright, license, and attribution notices
-- include a copy of this license or a clear reference to it
-- not imply endorsement by the ToKi project or its copyright holder
+`LICENSE-TOKI.md` contains the terms for:
+- non-commercial use
+- commercial use
+- royalties
+- attribution
+- reporting rules
 
-## 5. Trademarks
+---
 
-This license does not grant any right to use the ToKi name, logo, or other trademarks except for reasonable descriptive reference.
+## Free and non-commercial use
 
-## 6. Termination
+You can use ToKi for free if you are doing things like:
 
-This license terminates automatically if you breach its terms. Upon termination, you must stop using and distributing the covered packages under this license until you cure the breach or obtain separate written permission.
+- learning Rust or game development
+- making hobby games
+- creating prototypes
+- building school or personal projects
+- participating in game jams without monetization
+- releasing a game for free with no paid access, no paid perks, and no monetized features
 
-## 7. No warranty
+In short:
 
-THE COVERED PACKAGES ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+**If you are making a free game and not earning money from it, you can use ToKi normally.**
 
-## 8. Limitation of liability
+No separate agreement is needed for that.
 
-TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE COPYRIGHT HOLDER WILL NOT BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR RELATED TO THE COVERED PACKAGES OR THIS LICENSE.
+---
+
+## Commercial use
+
+If your game or product makes money, or gives you a commercial benefit, then the rules in **LICENSE-TOKI.md** apply.
+
+This includes things like:
+
+- selling the game
+- paid early access
+- DLC or expansions
+- in-app purchases
+- subscriptions
+- ad revenue
+- crowdfunding tied to the game
+- publisher advances
+- paid builds or commercial perks
+
+If that is your case, read **LICENSE-TOKI.md** carefully.
+
+---
+
+## Branding and trademarks
+
+This repository does not grant ownership of the ToKi name, logo, mascot, or branding.
+
+Any use of ToKi branding must follow the terms described in the applicable license.
+
+---
+
+## Third-party software
+
+ToKi may include or depend on third-party software with its own license terms.
+
+Those licenses still apply.
+
+---
+
+## Quick summary
+
+- Free games are fine
+- Hobby use is fine
+- Prototypes are fine
+- Learning is fine
+- Non-commercial jams are fine
+- Open crates use **MPL-2.0**
+- `toki-runtime` and `toki-editor` are governed by **LICENSE-TOKI.md**
+- If you make money with a ToKi-powered product, check **LICENSE-TOKI.md**
+
+---
+
+## Files to read
+
+- `LICENSE.md` → this overview
+- `LICENSE-TOKI.md` → full ToKi usage terms
+- `LICENSE-MPL` or crate headers → MPL-2.0 terms for open components
