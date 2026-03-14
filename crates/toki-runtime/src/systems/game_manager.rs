@@ -138,8 +138,65 @@ impl GameManager {
 #[cfg(test)]
 mod tests {
     use super::GameManager;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
+    use toki_core::assets::tilemap::TileMap;
     use toki_core::GameState;
     use winit::keyboard::KeyCode;
+
+    fn sample_atlas() -> AtlasMeta {
+        let mut tiles = HashMap::new();
+        tiles.insert(
+            "slime/idle_0".to_string(),
+            TileInfo {
+                position: glam::UVec2::new(0, 0),
+                properties: TileProperties::default(),
+            },
+        );
+        tiles.insert(
+            "slime/idle_1".to_string(),
+            TileInfo {
+                position: glam::UVec2::new(1, 0),
+                properties: TileProperties::default(),
+            },
+        );
+        tiles.insert(
+            "solid".to_string(),
+            TileInfo {
+                position: glam::UVec2::new(0, 1),
+                properties: TileProperties {
+                    solid: true,
+                    trigger: false,
+                },
+            },
+        );
+        tiles.insert(
+            "trigger".to_string(),
+            TileInfo {
+                position: glam::UVec2::new(1, 1),
+                properties: TileProperties {
+                    solid: false,
+                    trigger: true,
+                },
+            },
+        );
+
+        AtlasMeta {
+            image: PathBuf::from("creatures.png"),
+            tile_size: glam::UVec2::new(16, 16),
+            tiles,
+        }
+    }
+
+    fn sample_tilemap() -> TileMap {
+        TileMap {
+            size: glam::UVec2::new(2, 1),
+            tile_size: glam::UVec2::new(16, 16),
+            atlas: PathBuf::from("terrain.json"),
+            tiles: vec!["solid".to_string(), "trigger".to_string()],
+        }
+    }
 
     #[test]
     fn debug_toggle_key_is_forwarded_to_core_input() {
@@ -160,5 +217,73 @@ mod tests {
 
         manager.handle_keyboard_input(KeyCode::Space, true);
         assert!(!manager.is_debug_collision_rendering_enabled());
+    }
+
+    #[test]
+    fn wrapper_methods_expose_core_entity_state() {
+        let mut game_state = GameState::new_empty();
+        let player_id = game_state.spawn_player_at(glam::IVec2::new(10, 12));
+        let mut manager = GameManager::new(game_state);
+
+        let npc_id = manager.spawn_player_like_npc(glam::IVec2::new(20, 12));
+        let renderable = manager.get_renderable_entities();
+        let entities_for_camera = manager.entities_for_camera();
+
+        assert_eq!(manager.player_id(), Some(player_id));
+        assert_eq!(manager.player_position(), glam::IVec2::new(10, 12));
+        assert_eq!(manager.sprite_size(), 16);
+        assert_eq!(renderable.len(), 2);
+        assert_eq!(entities_for_camera.len(), 2);
+        assert!(entities_for_camera
+            .iter()
+            .any(|entity| entity.id == player_id));
+        assert!(entities_for_camera.iter().any(|entity| entity.id == npc_id));
+    }
+
+    #[test]
+    fn sprite_frame_wrappers_resolve_from_atlas() {
+        let mut game_state = GameState::new_empty();
+        let player_id = game_state.spawn_player_at(glam::IVec2::new(0, 0));
+        let manager = GameManager::new(game_state);
+        let atlas = sample_atlas();
+        let texture_size = atlas.image_size().expect("atlas image size should exist");
+
+        let entity_frame = manager.get_entity_sprite_frame(player_id, &atlas, texture_size);
+        let entity_frame = entity_frame.expect("player frame should resolve from atlas");
+
+        let current_frame = manager.current_sprite_frame(&atlas, texture_size);
+        assert_eq!(current_frame.u0, entity_frame.u0);
+        assert_eq!(current_frame.v0, entity_frame.v0);
+        assert_eq!(current_frame.u1, entity_frame.u1);
+        assert_eq!(current_frame.v1, entity_frame.v1);
+    }
+
+    #[test]
+    fn debug_collision_wrappers_return_tiles_and_boxes_when_enabled() {
+        let mut game_state = GameState::new_empty();
+        game_state.spawn_player_at(glam::IVec2::new(0, 0));
+        let mut manager = GameManager::new(game_state);
+        let atlas = sample_atlas();
+        let tilemap = sample_tilemap();
+
+        assert!(manager.get_entity_collision_boxes().is_empty());
+        assert!(manager
+            .get_solid_tile_positions(&tilemap, &atlas)
+            .is_empty());
+        assert!(manager
+            .get_trigger_tile_positions(&tilemap, &atlas)
+            .is_empty());
+
+        manager.handle_keyboard_input(KeyCode::F4, true);
+
+        assert!(!manager.get_entity_collision_boxes().is_empty());
+        assert_eq!(
+            manager.get_solid_tile_positions(&tilemap, &atlas),
+            vec![(0, 0)]
+        );
+        assert_eq!(
+            manager.get_trigger_tile_positions(&tilemap, &atlas),
+            vec![(1, 0)]
+        );
     }
 }

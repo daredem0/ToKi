@@ -608,6 +608,15 @@ mod tests {
     }
 
     #[test]
+    fn first_existing_path_returns_none_when_no_candidate_exists() {
+        let dir = make_unique_temp_dir();
+        let missing_a = dir.join("missing_a.txt");
+        let missing_b = dir.join("missing_b.txt");
+        let resolved = first_existing_path(&[missing_a, missing_b]);
+        assert!(resolved.is_none());
+    }
+
+    #[test]
     fn project_texture_paths_prefers_assets_sprites_files() {
         let project_dir = make_unique_temp_dir();
         let sprites_dir = project_dir.join("assets").join("sprites");
@@ -680,6 +689,16 @@ mod tests {
         let error = App::load_project_scene(&project_dir, "Broken")
             .expect_err("invalid scene json should fail");
         assert!(error.contains("Could not parse scene file"));
+    }
+
+    #[test]
+    fn load_project_scene_returns_error_for_missing_scene_file() {
+        let project_dir = make_unique_temp_dir();
+        fs::create_dir_all(project_dir.join("scenes")).expect("scenes dir");
+
+        let error = App::load_project_scene(&project_dir, "DoesNotExist")
+            .expect_err("missing scene file should fail");
+        assert!(error.contains("Could not read scene file"));
     }
 
     #[test]

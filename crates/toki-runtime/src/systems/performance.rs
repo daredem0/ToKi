@@ -197,4 +197,41 @@ mod tests {
         );
         monitor.print_stats_if_needed();
     }
+
+    #[test]
+    fn update_collection_keeps_last_sixty_samples() {
+        let mut samples = Vec::new();
+        for millis in 0..65u64 {
+            PerformanceMonitor::update_collection(&mut samples, Duration::from_millis(millis));
+        }
+
+        assert_eq!(samples.len(), 60);
+        assert_eq!(samples.first(), Some(&Duration::from_millis(5)));
+        assert_eq!(samples.last(), Some(&Duration::from_millis(64)));
+    }
+
+    #[test]
+    fn print_stats_updates_last_print_after_interval() {
+        let mut monitor = PerformanceMonitor::new();
+        monitor.frame_times.push(Duration::from_millis(16));
+        monitor.last_fps_print = Instant::now() - Duration::from_secs(2);
+        let before = monitor.last_fps_print;
+
+        monitor.print_stats_if_needed();
+
+        assert!(monitor.last_fps_print > before);
+    }
+
+    #[test]
+    fn print_stats_is_skipped_when_disabled() {
+        let mut monitor = PerformanceMonitor::new();
+        monitor.frame_times.push(Duration::from_millis(16));
+        monitor.show_fps_stats = false;
+        monitor.last_fps_print = Instant::now() - Duration::from_secs(2);
+        let before = monitor.last_fps_print;
+
+        monitor.print_stats_if_needed();
+
+        assert_eq!(monitor.last_fps_print, before);
+    }
 }

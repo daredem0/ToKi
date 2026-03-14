@@ -88,7 +88,7 @@ fn option_value(args: &[String], value_index: usize) -> Option<&String> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_launch_options;
+    use super::{option_value, parse_launch_options};
     use std::path::PathBuf;
 
     #[test]
@@ -118,5 +118,25 @@ mod tests {
         assert!(options.project_path.is_none());
         assert!(options.scene_name.is_none());
         assert!(options.map_name.is_none());
+    }
+
+    #[test]
+    fn parse_launch_options_ignores_unknown_flags() {
+        let options = parse_launch_options(vec![
+            "--unknown".to_string(),
+            "value".to_string(),
+            "--project".to_string(),
+            "/tmp/project".to_string(),
+        ]);
+
+        assert_eq!(options.project_path, Some(PathBuf::from("/tmp/project")));
+        assert!(options.scene_name.is_none());
+        assert!(options.map_name.is_none());
+    }
+
+    #[test]
+    fn option_value_rejects_next_flag() {
+        let args = vec!["--project".to_string(), "--scene".to_string()];
+        assert_eq!(option_value(&args, 1), None);
     }
 }
