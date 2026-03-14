@@ -15,9 +15,13 @@ impl MenuSystem {
             let panel_rect = ui.max_rect();
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    if ui.button("New Project...").clicked() {
-                        tracing::info!("New Project clicked");
+                    if ui.button("New Empty Project...").clicked() {
+                        tracing::info!("New Empty Project clicked");
                         ui_state.new_project_requested = true;
+                    }
+                    if ui.button("New Top-Down Starter...").clicked() {
+                        tracing::info!("New Top-Down Starter clicked");
+                        ui_state.new_top_down_project_requested = true;
                     }
 
                     // Auto-open the project from config

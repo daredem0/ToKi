@@ -1,0 +1,129 @@
+{
+  "image": "creatures.png",
+  "tile_size": [
+    16,
+    16
+  ],
+  "tiles": {
+    "player/walk_0": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "player/walk_1": {
+      "position": [
+        1,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "player/walk_2": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "player/walk_3": {
+      "position": [
+        3,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "player/idle_0": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "player/idle_1": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "villager/walk_0": {
+      "position": [
+        0,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "villager/walk_1": {
+      "position": [
+        1,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "villager/walk_2": {
+      "position": [
+        2,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "villager/walk_3": {
+      "position": [
+        3,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "villager/idle_0": {
+      "position": [
+        0,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "villager/idle_1": {
+      "position": [
+        2,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    }
+  }
+}

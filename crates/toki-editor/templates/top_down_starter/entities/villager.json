@@ -1,0 +1,71 @@
+{
+  "name": "villager",
+  "display_name": "Villager",
+  "description": "A stationary villager for the top-down starter scene.",
+  "entity_type": "npc",
+  "rendering": {
+    "size": [
+      16,
+      16
+    ],
+    "render_layer": 2,
+    "visible": true
+  },
+  "attributes": {
+    "health": 10,
+    "speed": 1,
+    "solid": true,
+    "active": true,
+    "can_move": false,
+    "has_inventory": false
+  },
+  "collision": {
+    "enabled": true,
+    "offset": [
+      0,
+      0
+    ],
+    "size": [
+      16,
+      16
+    ],
+    "trigger": false
+  },
+  "audio": {
+    "footstep_trigger_distance": 24.0,
+    "movement_sound": "",
+    "collision_sound": null
+  },
+  "animations": {
+    "atlas_name": "creatures.json",
+    "clips": [
+      {
+        "state": "idle",
+        "frame_tiles": [
+          "villager/idle_0",
+          "villager/idle_1"
+        ],
+        "frame_duration_ms": 320.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk",
+        "frame_tiles": [
+          "villager/walk_0",
+          "villager/walk_1",
+          "villager/walk_2",
+          "villager/walk_3"
+        ],
+        "frame_duration_ms": 180.0,
+        "loop_mode": "loop"
+      }
+    ],
+    "default_state": "idle"
+  },
+  "category": "npc",
+  "tags": [
+    "npc",
+    "starter",
+    "town"
+  ]
+}

@@ -17,7 +17,7 @@ use crate::background_tasks::{
 };
 use crate::config::EditorConfig;
 use crate::logging::LogCapture;
-use crate::project::ProjectManager;
+use crate::project::{ProjectManager, ProjectTemplateKind};
 use crate::rendering::WindowRenderer;
 use crate::scene::viewport::DragPreviewSprite;
 use crate::scene::SceneViewport;
@@ -739,8 +739,9 @@ impl EditorApp {
         self.handle_map_requests();
     }
 
-    fn handle_new_project_requested(&mut self) {
+    fn handle_new_project_requested(&mut self, template: ProjectTemplateKind) {
         self.ui.new_project_requested = false;
+        self.ui.new_top_down_project_requested = false;
 
         // Use project_path from config if available, otherwise ask user
         let folder_path = if let Some(config_path) = &self.config.project_path {
@@ -766,11 +767,25 @@ impl EditorApp {
                 counter += 1;
             }
 
-            tracing::info!("Creating project '{}' in {:?}", project_name, parent_path);
-            match self
-                .project_manager
-                .create_new_project(project_name.clone(), parent_path.clone())
-            {
+            tracing::info!(
+                "Creating project '{}' from template '{}' in {:?}",
+                project_name,
+                template.label(),
+                parent_path
+            );
+            let create_result = match template {
+                ProjectTemplateKind::Empty => self
+                    .project_manager
+                    .create_new_project(project_name.clone(), parent_path.clone()),
+                ProjectTemplateKind::TopDownStarter => self
+                    .project_manager
+                    .create_new_project_with_template(
+                        project_name.clone(),
+                        parent_path.clone(),
+                        template,
+                    ),
+            };
+            match create_result {
                 Ok(game_state) => {
                     // Update scene viewport with new game state
                     match SceneViewport::with_game_state(game_state) {
@@ -789,9 +804,33 @@ impl EditorApp {
                                 );
                             }
 
+                            self.ui.set_title(
+                                &self
+                                    .project_manager
+                                    .current_project
+                                    .as_ref()
+                                    .unwrap()
+                                    .name
+                                    .to_string(),
+                            );
+
+                            match self.project_manager.load_scenes() {
+                                Ok(loaded_scenes) => {
+                                    self.ui.load_scenes_from_project(loaded_scenes);
+                                    tracing::info!("Loaded scenes into UI hierarchy");
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to load scenes into UI: {}", e);
+                                }
+                            }
+
                             self.sync_ui_graph_layouts_from_project();
 
-                            tracing::info!("Created new project '{}' successfully", project_name);
+                            tracing::info!(
+                                "Created '{}' project '{}' successfully",
+                                template.label(),
+                                project_name
+                            );
                         }
                         Err(e) => {
                             tracing::error!(
@@ -993,7 +1032,11 @@ impl EditorApp {
         }
 
         if self.ui.new_project_requested {
-            self.handle_new_project_requested();
+            self.handle_new_project_requested(ProjectTemplateKind::Empty);
+        }
+
+        if self.ui.new_top_down_project_requested {
+            self.handle_new_project_requested(ProjectTemplateKind::TopDownStarter);
         }
 
         if self.ui.open_project_requested {

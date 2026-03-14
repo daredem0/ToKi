@@ -80,6 +80,7 @@ pub struct EditorUI {
 
     // Project management flags
     pub new_project_requested: bool,
+    pub new_top_down_project_requested: bool,
     pub open_project_requested: bool,
     pub browse_for_project_requested: bool,
     pub save_project_requested: bool,
@@ -145,6 +146,7 @@ impl EditorUI {
 
             // Project management flags
             new_project_requested: false,
+            new_top_down_project_requested: false,
             open_project_requested: false,
             browse_for_project_requested: false,
             save_project_requested: false,
@@ -202,8 +204,12 @@ impl EditorUI {
         self.rule_graphs_by_scene.clear();
         self.command_history.clear();
 
-        // Set the first scene as active if we have scenes and no active scene is set
-        if !self.scenes.is_empty() && self.active_scene.is_none() {
+        let current_active_missing = self
+            .active_scene
+            .as_ref()
+            .is_none_or(|active| !self.scenes.iter().any(|scene| &scene.name == active));
+
+        if !self.scenes.is_empty() && current_active_missing {
             self.active_scene = Some(self.scenes[0].name.clone());
             tracing::info!("Set '{}' as active scene", self.scenes[0].name);
         }
@@ -1114,5 +1120,15 @@ mod tests {
 
         assert!(!ui.can_undo());
         assert!(!ui.can_redo());
+    }
+
+    #[test]
+    fn load_scenes_from_project_replaces_missing_active_scene_with_first_loaded_scene() {
+        let mut ui = EditorUI::new();
+        ui.active_scene = Some("Missing".to_string());
+
+        ui.load_scenes_from_project(vec![toki_core::Scene::new("main".to_string())]);
+
+        assert_eq!(ui.active_scene.as_deref(), Some("main"));
     }
 }

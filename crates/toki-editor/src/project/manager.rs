@@ -1,4 +1,5 @@
-use crate::project::{Project, ProjectAssets};
+use crate::project::templates::{populate_project_template, top_down_main_scene_bytes};
+use crate::project::{Project, ProjectAssets, ProjectTemplateKind};
 use anyhow::Result;
 use std::fs;
 use std::path::PathBuf;
@@ -36,6 +37,16 @@ impl ProjectManager {
 
     /// Create a new project at the specified location
     pub fn create_new_project(&mut self, name: String, parent_path: PathBuf) -> Result<GameState> {
+        self.create_new_project_with_template(name, parent_path, ProjectTemplateKind::Empty)
+    }
+
+    /// Create a new project at the specified location from a specific template
+    pub fn create_new_project_with_template(
+        &mut self,
+        name: String,
+        parent_path: PathBuf,
+        template: ProjectTemplateKind,
+    ) -> Result<GameState> {
         // Create project folder
         let project_path = parent_path.join(&name);
         if project_path.exists() {
@@ -45,13 +56,21 @@ impl ProjectManager {
             ));
         }
 
-        tracing::info!("Creating new project '{}' at {:?}", name, project_path);
+        tracing::info!(
+            "Creating project '{}' from template '{}' at {:?}",
+            name,
+            template.label(),
+            project_path
+        );
 
         // Create project structure
         self.create_project_structure(&project_path)?;
 
         // Create project data
-        let project = Project::new(name, project_path);
+        let mut project = Project::new(name, project_path);
+        if template == ProjectTemplateKind::TopDownStarter {
+            project.metadata.project.description = template.description().to_string();
+        }
 
         // Save project metadata
         project.save_metadata()?;
@@ -63,9 +82,19 @@ impl ProjectManager {
         let project_path = self.current_project.as_ref().unwrap().path.clone();
         let mut project_assets = ProjectAssets::new(project_path);
 
-        // Create default scene and save it through asset manager
-        let default_scene = Scene::new("main".to_string());
-        project_assets.save_scene(&default_scene)?;
+        populate_project_template(&self.current_project.as_ref().unwrap().path, template)?;
+
+        match template {
+            ProjectTemplateKind::Empty => {
+                let default_scene = Scene::new("main".to_string());
+                project_assets.save_scene(&default_scene)?;
+            }
+            ProjectTemplateKind::TopDownStarter => {
+                let starter_scene: Scene = serde_json::from_slice(top_down_main_scene_bytes())
+                    .map_err(|e| anyhow::anyhow!("Failed to parse built-in top-down scene: {}", e))?;
+                project_assets.save_scene(&starter_scene)?;
+            }
+        }
 
         // Scan for any existing assets
         project_assets.scan_assets()?;
@@ -203,6 +232,7 @@ impl ProjectManager {
         fs::create_dir_all(project_path.join("assets").join("sprites"))?;
         fs::create_dir_all(project_path.join("assets").join("tilemaps"))?;
         fs::create_dir_all(project_path.join("assets").join("audio"))?;
+        fs::create_dir_all(project_path.join("entities"))?;
         fs::create_dir_all(project_path.join("settings"))?;
 
         tracing::debug!("Created project folder structure at {:?}", project_path);
@@ -225,6 +255,7 @@ impl ProjectManager {
 #[cfg(test)]
 mod tests {
     use super::ProjectManager;
+    use crate::project::ProjectTemplateKind;
     use crate::ui::rule_graph::RuleGraph;
     use jsonschema::JSONSchema;
     use serde_json::Value;
@@ -243,6 +274,110 @@ mod tests {
         include_str!("../../tests/fixtures/scene_rules_full_surface.json");
     const ON_PLAYER_MOVE_RUNTIME_FIXTURE: &str =
         include_str!("../../tests/fixtures/scene_rules_on_player_move_runtime.json");
+
+    #[test]
+    fn create_top_down_starter_project_populates_template_content() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let parent = temp_dir.path().to_path_buf();
+
+        let mut manager = ProjectManager::new();
+        manager
+            .create_new_project_with_template(
+                "starter_project".to_string(),
+                parent.clone(),
+                ProjectTemplateKind::TopDownStarter,
+            )
+            .expect("top-down starter project should be created");
+
+        let project_path = parent.join("starter_project");
+        assert!(project_path.join("entities/player.json").exists());
+        assert!(project_path.join("entities/villager.json").exists());
+        assert!(project_path.join("assets/sprites/terrain.png").exists());
+        assert!(project_path.join("assets/sprites/creatures.png").exists());
+        assert!(project_path.join("assets/tilemaps/starter_overworld.json").exists());
+
+        let loaded_scenes = manager.load_scenes().expect("starter scenes should load");
+        assert_eq!(loaded_scenes.len(), 1);
+        let scene = &loaded_scenes[0];
+        assert_eq!(scene.name, "main");
+        assert_eq!(scene.maps, vec!["starter_overworld".to_string()]);
+        assert_eq!(scene.entities.len(), 2);
+
+        let terrain_atlas = toki_core::assets::atlas::AtlasMeta::load_from_file(
+            project_path.join("assets/sprites/terrain.json"),
+        )
+        .expect("starter terrain atlas should load");
+        let creature_atlas = toki_core::assets::atlas::AtlasMeta::load_from_file(
+            project_path.join("assets/sprites/creatures.json"),
+        )
+        .expect("starter creature atlas should load");
+        let tilemap = toki_core::assets::tilemap::TileMap::load_from_file(
+            project_path.join("assets/tilemaps/starter_overworld.json"),
+        )
+        .expect("starter tilemap should load");
+        tilemap.validate().expect("starter tilemap should validate");
+        assert_eq!(terrain_atlas.tile_size, glam::UVec2::new(8, 8));
+        assert_eq!(creature_atlas.tile_size, glam::UVec2::new(16, 16));
+        assert_eq!(tilemap.size, glam::UVec2::new(20, 18));
+    }
+
+    #[test]
+    fn top_down_starter_player_is_loaded_as_runtime_player_and_can_move() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let parent = temp_dir.path().to_path_buf();
+
+        let mut manager = ProjectManager::new();
+        manager
+            .create_new_project_with_template(
+                "starter_project".to_string(),
+                parent.clone(),
+                ProjectTemplateKind::TopDownStarter,
+            )
+            .expect("top-down starter project should be created");
+
+        let project_path = parent.join("starter_project");
+        let mut loaded_scenes = manager.load_scenes().expect("starter scenes should load");
+        let scene = loaded_scenes.pop().expect("starter scene should exist");
+
+        let tilemap = toki_core::assets::tilemap::TileMap::load_from_file(
+            project_path.join("assets/tilemaps/starter_overworld.json"),
+        )
+        .expect("starter tilemap should load");
+        let atlas = toki_core::assets::atlas::AtlasMeta::load_from_file(
+            project_path.join("assets/sprites/terrain.json"),
+        )
+        .expect("starter atlas should load");
+
+        let mut game_state = GameState::new_empty();
+        let scene_name = scene.name.clone();
+        game_state.add_scene(scene);
+        game_state
+            .load_scene(&scene_name)
+            .expect("starter scene should load into runtime game state");
+
+        let player_id = game_state
+            .player_id()
+            .expect("starter scene should provide a player entity");
+        let initial_position = game_state
+            .entity_manager()
+            .get_entity(player_id)
+            .expect("player should exist")
+            .position;
+
+        game_state.handle_key_press(InputKey::Left);
+        let _ = game_state.update(glam::UVec2::new(160, 144), &tilemap, &atlas);
+        game_state.handle_key_release(InputKey::Left);
+
+        let moved_position = game_state
+            .entity_manager()
+            .get_entity(player_id)
+            .expect("player should still exist")
+            .position;
+        assert!(
+            moved_position.x < initial_position.x,
+            "starter player should be able to move left after scene load"
+        );
+    }
 
     #[test]
     fn scene_json_roundtrip_through_editor_persists_rules_and_executes_in_runtime() {

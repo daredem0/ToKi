@@ -1,0 +1,89 @@
+{
+  "image": "terrain.png",
+  "tile_size": [
+    8,
+    8
+  ],
+  "tiles": {
+    "grass": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "path": {
+      "position": [
+        1,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "water": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": true,
+        "trigger": false
+      }
+    },
+    "bush": {
+      "position": [
+        3,
+        0
+      ],
+      "properties": {
+        "solid": true,
+        "trigger": false
+      }
+    },
+    "wall": {
+      "position": [
+        4,
+        0
+      ],
+      "properties": {
+        "solid": true,
+        "trigger": false
+      }
+    },
+    "roof": {
+      "position": [
+        5,
+        0
+      ],
+      "properties": {
+        "solid": true,
+        "trigger": false
+      }
+    },
+    "flower": {
+      "position": [
+        6,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "fence": {
+      "position": [
+        7,
+        0
+      ],
+      "properties": {
+        "solid": true,
+        "trigger": false
+      }
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "name": "player",
+  "display_name": "Player",
+  "description": "The controllable hero for the top-down starter template.",
+  "entity_type": "player",
+  "rendering": {
+    "size": [
+      16,
+      16
+    ],
+    "render_layer": 2,
+    "visible": true
+  },
+  "attributes": {
+    "health": 100,
+    "speed": 2,
+    "solid": true,
+    "active": true,
+    "can_move": true,
+    "has_inventory": true
+  },
+  "collision": {
+    "enabled": true,
+    "offset": [
+      0,
+      0
+    ],
+    "size": [
+      16,
+      16
+    ],
+    "trigger": false
+  },
+  "audio": {
+    "footstep_trigger_distance": 24.0,
+    "movement_sound": "",
+    "collision_sound": null
+  },
+  "animations": {
+    "atlas_name": "creatures.json",
+    "clips": [
+      {
+        "state": "idle",
+        "frame_tiles": [
+          "player/idle_0",
+          "player/idle_1"
+        ],
+        "frame_duration_ms": 260.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk",
+        "frame_tiles": [
+          "player/walk_0",
+          "player/walk_1",
+          "player/walk_2",
+          "player/walk_3"
+        ],
+        "frame_duration_ms": 140.0,
+        "loop_mode": "loop"
+      }
+    ],
+    "default_state": "idle"
+  },
+  "category": "character",
+  "tags": [
+    "player",
+    "starter",
+    "hero"
+  ]
+}
