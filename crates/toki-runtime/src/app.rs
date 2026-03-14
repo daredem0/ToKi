@@ -356,7 +356,10 @@ impl App {
                     // Handle special keys that trigger on press
                     match keycode {
                         KeyCode::F3 => {
-                            self.performance.toggle_display();
+                            self.performance.toggle_hud_display();
+                        }
+                        KeyCode::F7 => {
+                            self.performance.toggle_console_display();
                         }
                         KeyCode::F5 => {
                             if let Err(e) = save_game(&self.game_system.game_state, "savegame.json")

@@ -120,6 +120,12 @@ cargo release 0.0.13 --workspace --no-publish --execute
 - **Scene Hierarchy**: Visual scene management with entity organization
 - **Asset Validation**: Edit → "Validate Project Assets" for schema compliance checking
 
+### ⌨️ Runtime Hotkeys
+- `F3`: Toggle in-window performance HUD text
+- `F7`: Toggle console performance log output
+- `F5`: Save game state to `savegame.json`
+- `F6`: Load game state from `savegame.json`
+
 ### 📚 Documentation
 - `just quality-docs` builds workspace rustdoc with Mermaid support.
 - The `toki_core` rustdoc landing page includes both `README.md` and `docs/SDD_SAD.md`.

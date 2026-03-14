@@ -40,7 +40,8 @@ pub struct PerformanceMonitor {
     // Display state
     last_fps_print: Instant,
     last_frame_time: Instant,
-    show_fps_stats: bool,
+    show_console_stats: bool,
+    show_hud_stats: bool,
 }
 
 impl PerformanceMonitor {
@@ -54,22 +55,37 @@ impl PerformanceMonitor {
             total_frame_times: Vec::new(),
             last_fps_print: Instant::now(),
             last_frame_time: Instant::now(),
-            show_fps_stats: true,
+            show_console_stats: true,
+            show_hud_stats: true,
         }
     }
 
-    /// Toggle the display of performance statistics
-    pub fn toggle_display(&mut self) {
-        self.show_fps_stats = !self.show_fps_stats;
+    /// Toggle the in-window HUD display of performance statistics
+    pub fn toggle_hud_display(&mut self) {
+        self.show_hud_stats = !self.show_hud_stats;
         println!(
-            "FPS stats display: {}",
-            if self.show_fps_stats { "ON" } else { "OFF" }
+            "FPS HUD display: {}",
+            if self.show_hud_stats { "ON" } else { "OFF" }
         );
     }
 
-    /// Check if performance display is enabled
-    pub fn is_display_enabled(&self) -> bool {
-        self.show_fps_stats
+    /// Toggle console printing of performance statistics
+    pub fn toggle_console_display(&mut self) {
+        self.show_console_stats = !self.show_console_stats;
+        println!(
+            "FPS console logging: {}",
+            if self.show_console_stats { "ON" } else { "OFF" }
+        );
+    }
+
+    /// Check if HUD performance display is enabled
+    pub fn is_hud_display_enabled(&self) -> bool {
+        self.show_hud_stats
+    }
+
+    /// Check if console performance logging is enabled
+    pub fn is_console_display_enabled(&self) -> bool {
+        self.show_console_stats
     }
 
     /// Record the time interval between frames
@@ -102,7 +118,7 @@ impl PerformanceMonitor {
 
     /// Print statistics if enough time has passed and display is enabled
     pub fn print_stats_if_needed(&mut self) {
-        if !self.show_fps_stats {
+        if !self.show_console_stats {
             return;
         }
 
@@ -184,7 +200,7 @@ impl PerformanceMonitor {
     }
 
     pub fn stats_line(&self) -> Option<String> {
-        if !self.show_fps_stats {
+        if !self.show_hud_stats {
             return None;
         }
         self.current_stats().map(|stats| stats.format_line())
@@ -203,13 +219,23 @@ mod tests {
     use std::time::{Duration, Instant};
 
     #[test]
-    fn toggle_display_flips_state() {
+    fn toggle_hud_display_flips_state() {
         let mut monitor = PerformanceMonitor::new();
-        assert!(monitor.is_display_enabled());
-        monitor.toggle_display();
-        assert!(!monitor.is_display_enabled());
-        monitor.toggle_display();
-        assert!(monitor.is_display_enabled());
+        assert!(monitor.is_hud_display_enabled());
+        monitor.toggle_hud_display();
+        assert!(!monitor.is_hud_display_enabled());
+        monitor.toggle_hud_display();
+        assert!(monitor.is_hud_display_enabled());
+    }
+
+    #[test]
+    fn toggle_console_display_flips_state() {
+        let mut monitor = PerformanceMonitor::new();
+        assert!(monitor.is_console_display_enabled());
+        monitor.toggle_console_display();
+        assert!(!monitor.is_console_display_enabled());
+        monitor.toggle_console_display();
+        assert!(monitor.is_console_display_enabled());
     }
 
     #[test]
@@ -255,7 +281,7 @@ mod tests {
     fn print_stats_is_skipped_when_disabled() {
         let mut monitor = PerformanceMonitor::new();
         monitor.frame_times.push(Duration::from_millis(16));
-        monitor.show_fps_stats = false;
+        monitor.show_console_stats = false;
         monitor.last_fps_print = Instant::now() - Duration::from_secs(2);
         let before = monitor.last_fps_print;
 
@@ -288,7 +314,7 @@ mod tests {
     fn stats_line_is_none_when_display_disabled() {
         let mut monitor = PerformanceMonitor::new();
         monitor.frame_times.push(Duration::from_millis(16));
-        monitor.show_fps_stats = false;
+        monitor.show_hud_stats = false;
         assert!(monitor.stats_line().is_none());
     }
 }

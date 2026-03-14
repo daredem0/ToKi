@@ -3,6 +3,7 @@ use glyphon::{
     Attrs, Buffer, Cache, Color, Family, FontSystem, Metrics, Resolution, Shaping, Style,
     SwashCache, TextArea, TextAtlas, TextBounds, TextRenderer, Viewport, Weight,
 };
+use std::collections::HashSet;
 use toki_core::text::{TextAnchor, TextBoxStyle, TextItem, TextSlant, TextSpace, TextStyle};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -23,13 +24,29 @@ struct PreparedTextEntry {
     color: Color,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct TextBufferKey {
+    content: String,
+    font_family: String,
+    size_px_bits: u32,
+    weight: toki_core::text::TextWeight,
+    slant: TextSlant,
+    max_width_px: u32,
+    layout_height_px: u32,
+}
+
+struct CachedTextBuffer {
+    key: TextBufferKey,
+    buffer: Buffer,
+}
+
 pub struct GlyphonTextRenderer {
     font_system: FontSystem,
     swash_cache: SwashCache,
     atlas: TextAtlas,
     viewport: Viewport,
     renderer: TextRenderer,
-    buffers: Vec<Buffer>,
+    cached_buffers: Vec<CachedTextBuffer>,
 }
 
 impl GlyphonTextRenderer {
@@ -50,7 +67,7 @@ impl GlyphonTextRenderer {
             atlas,
             viewport,
             renderer,
-            buffers: Vec::new(),
+            cached_buffers: Vec::new(),
         }
     }
 
@@ -71,12 +88,12 @@ impl GlyphonTextRenderer {
             },
         );
 
-        self.buffers.clear();
         let mut sorted_items = items.to_vec();
         sorted_items.sort_by_key(|item| item.layer);
 
         let mut entries = Vec::new();
         let mut backgrounds = Vec::new();
+        let mut used_keys = HashSet::new();
 
         for item in &sorted_items {
             if item.content.is_empty() {
@@ -95,29 +112,12 @@ impl GlyphonTextRenderer {
             let estimated_size = estimate_text_size(item);
             let anchored_pos = apply_anchor(base_pos, estimated_size, item.anchor);
 
-            let mut buffer = Buffer::new(
-                &mut self.font_system,
-                Metrics::new(item.style.size_px, item.style.size_px * 1.25),
-            );
             let max_width = item
                 .max_width
                 .unwrap_or_else(|| (surface_width as f32 - anchored_pos.x).max(1.0));
-            buffer.set_size(
-                &mut self.font_system,
-                Some(max_width.max(1.0)),
-                Some(surface_height as f32),
-            );
-            let attrs = attrs_for_style(&item.style);
-            buffer.set_text(
-                &mut self.font_system,
-                &item.content,
-                &attrs,
-                Shaping::Advanced,
-            );
-            buffer.shape_until_scroll(&mut self.font_system, false);
-            self.buffers.push(buffer);
-
-            let buffer_index = self.buffers.len() - 1;
+            let key = make_buffer_key(item, max_width, surface_height as f32);
+            let buffer_index = self.upsert_buffer(item, max_width, surface_height as f32, &key);
+            used_keys.insert(key);
             entries.push(PreparedTextEntry {
                 buffer_index,
                 left: anchored_pos.x,
@@ -133,7 +133,7 @@ impl GlyphonTextRenderer {
         let text_areas: Vec<TextArea<'_>> = entries
             .iter()
             .map(|entry| TextArea {
-                buffer: &self.buffers[entry.buffer_index],
+                buffer: &self.cached_buffers[entry.buffer_index].buffer,
                 left: entry.left,
                 top: entry.top,
                 scale: 1.0,
@@ -160,6 +160,9 @@ impl GlyphonTextRenderer {
             )
             .map_err(|error| RenderError::Other(format!("text prepare failed: {error}")))?;
 
+        self.cached_buffers
+            .retain(|entry| used_keys.contains(&entry.key));
+
         Ok(backgrounds)
     }
 
@@ -185,6 +188,58 @@ impl GlyphonTextRenderer {
             .map_err(|error| {
                 RenderError::Other(format!("failed to load font '{}': {error}", path.display()))
             })
+    }
+
+    fn upsert_buffer(
+        &mut self,
+        item: &TextItem,
+        max_width: f32,
+        layout_height: f32,
+        key: &TextBufferKey,
+    ) -> usize {
+        if let Some(existing_index) = self
+            .cached_buffers
+            .iter()
+            .position(|entry| &entry.key == key)
+        {
+            return existing_index;
+        }
+
+        let mut buffer = Buffer::new(
+            &mut self.font_system,
+            Metrics::new(item.style.size_px, item.style.size_px * 1.25),
+        );
+        buffer.set_size(
+            &mut self.font_system,
+            Some(max_width.max(1.0)),
+            Some(layout_height.max(1.0)),
+        );
+        let attrs = attrs_for_style(&item.style);
+        let shaping = if item.content.is_ascii() {
+            Shaping::Basic
+        } else {
+            Shaping::Advanced
+        };
+        buffer.set_text(&mut self.font_system, &item.content, &attrs, shaping);
+        buffer.shape_until_scroll(&mut self.font_system, false);
+
+        self.cached_buffers.push(CachedTextBuffer {
+            key: key.clone(),
+            buffer,
+        });
+        self.cached_buffers.len() - 1
+    }
+}
+
+fn make_buffer_key(item: &TextItem, max_width: f32, layout_height: f32) -> TextBufferKey {
+    TextBufferKey {
+        content: item.content.clone(),
+        font_family: item.style.font_family.clone(),
+        size_px_bits: item.style.size_px.to_bits(),
+        weight: item.style.weight,
+        slant: item.style.slant,
+        max_width_px: max_width.round().max(1.0) as u32,
+        layout_height_px: layout_height.round().max(1.0) as u32,
     }
 }
 
@@ -295,7 +350,7 @@ fn color_from_rgba(rgba: [f32; 4]) -> Color {
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_anchor, estimate_text_size, to_screen_position};
+    use super::{apply_anchor, estimate_text_size, make_buffer_key, to_screen_position};
     use toki_core::text::{TextAnchor, TextItem, TextSpace, TextStyle};
 
     #[test]
@@ -339,5 +394,29 @@ mod tests {
         let screen = to_screen_position(&item, glam::Mat4::IDENTITY, 200.0, 100.0)
             .expect("origin should project into viewport");
         assert_eq!(screen, glam::Vec2::new(100.0, 50.0));
+    }
+
+    #[test]
+    fn buffer_key_ignores_position_and_color_for_layout_reuse() {
+        let item_a = TextItem::new_screen(
+            "FPS: 60",
+            glam::Vec2::new(8.0, 8.0),
+            TextStyle {
+                color: [1.0, 1.0, 1.0, 1.0],
+                ..TextStyle::default()
+            },
+        );
+        let item_b = TextItem::new_screen(
+            "FPS: 60",
+            glam::Vec2::new(200.0, 120.0),
+            TextStyle {
+                color: [0.2, 1.0, 0.2, 1.0],
+                ..TextStyle::default()
+            },
+        );
+
+        let key_a = make_buffer_key(&item_a, 180.0, 320.0);
+        let key_b = make_buffer_key(&item_b, 180.0, 320.0);
+        assert_eq!(key_a, key_b);
     }
 }

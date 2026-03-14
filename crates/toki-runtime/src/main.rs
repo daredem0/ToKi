@@ -1,11 +1,20 @@
 use anyhow::Result;
 use std::path::PathBuf;
+use tracing_subscriber::EnvFilter;
 
 use toki_runtime::{run_minimal_window, run_minimal_window_with_options, RuntimeLaunchOptions};
 
 fn main() -> Result<()> {
+    let mut env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug"));
+    for directive in ["cosmic_text=info", "glyphon=info"] {
+        if let Ok(parsed) = directive.parse() {
+            env_filter = env_filter.add_directive(parsed);
+        }
+    }
+
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
+        .with_env_filter(env_filter)
         .with_target(true)
         .with_file(false)
         .with_line_number(true)
