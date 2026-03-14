@@ -160,34 +160,61 @@ impl PanelSystem {
                 }
 
                 // Start entity move drag if dragging began over an entity.
+                let ctrl_pressed = ui.input(|i| i.modifiers.ctrl);
                 if response.drag_started() {
                     if let Some(drag_start_pos) = response.interact_pointer_pos() {
-                        SelectionInteraction::handle_drag_start(
+                        if ctrl_pressed && !ui_state.is_in_placement_mode() {
+                            SelectionInteraction::handle_marquee_drag_start(
+                                ui_state,
+                                drag_start_pos,
+                            );
+                            viewport.stop_camera_drag();
+                        } else {
+                            SelectionInteraction::handle_drag_start(
+                                ui_state,
+                                viewport,
+                                drag_start_pos,
+                                rect,
+                                config.as_deref(),
+                                ctrl_pressed,
+                            );
+                        }
+                    }
+                }
+
+                if ui_state.is_marquee_selection_active() && response.dragged() {
+                    if let Some(drag_pos) = response
+                        .interact_pointer_pos()
+                        .or_else(|| response.hover_pos())
+                    {
+                        SelectionInteraction::handle_marquee_drag_update(ui_state, drag_pos);
+                    }
+                }
+
+                // Handle drag release for entity move operations.
+                if response.drag_stopped() {
+                    if ui_state.is_marquee_selection_active() {
+                        SelectionInteraction::handle_marquee_drag_release(
+                            ui_state, viewport, rect, true,
+                        );
+                        viewport.stop_camera_drag();
+                    } else {
+                        let drop_pos = response
+                            .interact_pointer_pos()
+                            .or_else(|| response.hover_pos());
+                        SelectionInteraction::handle_drag_release(
                             ui_state,
                             viewport,
-                            drag_start_pos,
+                            drop_pos,
                             rect,
                             config.as_deref(),
                         );
                     }
                 }
 
-                // Handle drag release for entity move operations.
-                if response.drag_stopped() {
-                    let drop_pos = response
-                        .interact_pointer_pos()
-                        .or_else(|| response.hover_pos());
-                    SelectionInteraction::handle_drag_release(
-                        ui_state,
-                        viewport,
-                        drop_pos,
-                        rect,
-                        config.as_deref(),
-                    );
-                }
-
                 // Handle camera panning with drag (disabled while moving an entity).
-                if !ui_state.is_entity_move_drag_active() {
+                if !ui_state.is_entity_move_drag_active() && !ui_state.is_marquee_selection_active()
+                {
                     CameraInteraction::handle_drag(viewport, &response, config.as_deref());
                 } else {
                     viewport.stop_camera_drag();
@@ -216,7 +243,13 @@ impl PanelSystem {
                             );
                         } else {
                             // Normal entity selection
-                            SelectionInteraction::handle_click(ui_state, viewport, click_pos, rect);
+                            SelectionInteraction::handle_click(
+                                ui_state,
+                                viewport,
+                                click_pos,
+                                rect,
+                                ctrl_pressed,
+                            );
                         }
                     }
                 }
@@ -227,6 +260,7 @@ impl PanelSystem {
                 if let Some(cfg) = config.as_deref() {
                     Self::paint_viewport_grid_overlay(ui, rect, viewport, cfg);
                 }
+                Self::paint_marquee_selection_overlay(ui, ui_state);
 
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                     ui.horizontal(|ui| {
@@ -314,7 +348,8 @@ impl PanelSystem {
         }
 
         let (viewport_width, viewport_height) = viewport.viewport_size();
-        let display_rect = Self::compute_viewport_display_rect(outer_rect, (viewport_width, viewport_height));
+        let display_rect =
+            Self::compute_viewport_display_rect(outer_rect, (viewport_width, viewport_height));
         let (camera_position, camera_scale) = viewport.camera_state();
         let grid_size = Self::effective_grid_size(viewport, config);
 
@@ -353,6 +388,30 @@ impl PanelSystem {
         }
     }
 
+    fn paint_marquee_selection_overlay(ui: &egui::Ui, ui_state: &super::EditorUI) {
+        let Some(marquee) = ui_state.marquee_selection.as_ref() else {
+            return;
+        };
+
+        let selection_rect = egui::Rect::from_two_pos(marquee.start_screen, marquee.current_screen);
+        if selection_rect.width() <= 0.0 || selection_rect.height() <= 0.0 {
+            return;
+        }
+
+        let painter = ui.painter();
+        painter.rect_filled(
+            selection_rect,
+            0.0,
+            egui::Color32::from_rgba_unmultiplied(88, 166, 255, 36),
+        );
+        painter.rect_stroke(
+            selection_rect,
+            0.0,
+            egui::Stroke::new(1.5, egui::Color32::from_rgb(88, 166, 255)),
+            egui::StrokeKind::Middle,
+        );
+    }
+
     fn render_grid_toolbar(ui: &mut egui::Ui, config: &mut EditorConfig) -> bool {
         let mut changed = false;
         let grid = &mut config.editor_settings.grid;
@@ -361,7 +420,9 @@ impl PanelSystem {
             ui.label("Grid:");
 
             changed |= ui.checkbox(&mut grid.show_grid, "Show Grid").changed();
-            changed |= ui.checkbox(&mut grid.snap_to_grid, "Snap To Grid").changed();
+            changed |= ui
+                .checkbox(&mut grid.snap_to_grid, "Snap To Grid")
+                .changed();
 
             let mut grid_x = grid.grid_size[0] as i32;
             let mut grid_y = grid.grid_size[1] as i32;
@@ -2503,14 +2564,8 @@ mod tests {
 
     #[test]
     fn grid_world_lines_emits_step_aligned_lines_inside_range() {
-        assert_eq!(
-            PanelSystem::grid_world_lines(3, 40, 16),
-            vec![16, 32]
-        );
-        assert_eq!(
-            PanelSystem::grid_world_lines(-20, 20, 16),
-            vec![-16, 0, 16]
-        );
+        assert_eq!(PanelSystem::grid_world_lines(3, 40, 16), vec![16, 32]);
+        assert_eq!(PanelSystem::grid_world_lines(-20, 20, 16), vec![-16, 0, 16]);
     }
 
     #[test]

@@ -39,6 +39,12 @@ pub struct EntityMoveDragState {
     pub grab_offset: glam::Vec2, // Cursor world position offset from entity top-left at drag start
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct MarqueeSelectionState {
+    pub start_screen: egui::Pos2,
+    pub current_screen: egui::Pos2,
+}
+
 /// Manages the editor's UI state and rendering
 pub struct EditorUI {
     // Scene management
@@ -49,6 +55,7 @@ pub struct EditorUI {
 
     // Legacy entity selection (keep for backward compatibility)
     pub selected_entity_id: Option<EntityId>,
+    pub selected_entity_ids: Vec<EntityId>,
 
     // UI Panel visibility
     pub show_hierarchy: bool,
@@ -80,14 +87,21 @@ pub struct EditorUI {
     pub placement_preview_cached_frame: Option<toki_core::sprite::SpriteFrame>, // Cached sprite frame for preview
     pub placement_preview_valid: Option<bool>, // Whether the current preview position is valid for placement
     pub entity_move_drag: Option<EntityMoveDragState>, // Active drag-move operation for existing scene entities
-    pub center_panel_tab: CenterPanelTab,              // Active tab in center workspace
-    pub graph_connect_from_node: Option<u64>,          // Scene graph connect source node
-    pub graph_connect_to_node: Option<u64>,            // Scene graph connect target node
-    pub graph_canvas_zoom: f32,                        // Scene graph canvas zoom factor
+    pub marquee_selection: Option<MarqueeSelectionState>, // Active marquee-selection rectangle in viewport
+    pub center_panel_tab: CenterPanelTab,                 // Active tab in center workspace
+    pub graph_connect_from_node: Option<u64>,             // Scene graph connect source node
+    pub graph_connect_to_node: Option<u64>,               // Scene graph connect target node
+    pub graph_canvas_zoom: f32,                           // Scene graph canvas zoom factor
     pub graph_canvas_pan: [f32; 2], // Scene graph canvas pan offset (screen-space)
     pub graph_layouts_by_scene: HashMap<String, SceneGraphLayout>, // Persisted scene graph layouts loaded from project
     pub graph_layout_dirty: bool, // Graph layout changed and should be flushed into project metadata
     pub rule_graphs_by_scene: HashMap<String, RuleGraph>, // In-memory scene graph drafts (can contain detached nodes)
+
+    // Multi-entity inspector draft state
+    pub multi_entity_render_layer_input: i64,
+    pub multi_entity_delta_x_input: i32,
+    pub multi_entity_delta_y_input: i32,
+    pub multi_entity_inspector_selection_signature: Vec<EntityId>,
 }
 
 impl EditorUI {
@@ -101,6 +115,7 @@ impl EditorUI {
 
             // Legacy fields (keep for backward compatibility)
             selected_entity_id: None,
+            selected_entity_ids: Vec::new(),
 
             // UI Panel visibility
             show_hierarchy: true,
@@ -132,6 +147,7 @@ impl EditorUI {
             placement_preview_cached_frame: None,
             placement_preview_valid: None,
             entity_move_drag: None,
+            marquee_selection: None,
             center_panel_tab: CenterPanelTab::SceneViewport,
             graph_connect_from_node: None,
             graph_connect_to_node: None,
@@ -140,6 +156,10 @@ impl EditorUI {
             graph_layouts_by_scene: HashMap::new(),
             graph_layout_dirty: false,
             rule_graphs_by_scene: HashMap::new(),
+            multi_entity_render_layer_input: 0,
+            multi_entity_delta_x_input: 0,
+            multi_entity_delta_y_input: 0,
+            multi_entity_inspector_selection_signature: Vec::new(),
         }
     }
 
@@ -166,11 +186,61 @@ impl EditorUI {
     }
 
     pub fn set_selection(&mut self, selection: Selection) {
+        if let Selection::Entity(entity_id) = selection {
+            self.selected_entity_id = Some(entity_id);
+            self.selected_entity_ids = vec![entity_id];
+            self.selection = Some(Selection::Entity(entity_id));
+            return;
+        }
+        self.selected_entity_id = None;
+        self.selected_entity_ids.clear();
         self.selection = Some(selection);
     }
 
     pub fn clear_selection(&mut self) {
         self.selection = None;
+        self.selected_entity_id = None;
+        self.selected_entity_ids.clear();
+    }
+
+    pub fn set_single_entity_selection(&mut self, entity_id: EntityId) {
+        self.selected_entity_id = Some(entity_id);
+        self.selected_entity_ids.clear();
+        self.selected_entity_ids.push(entity_id);
+        self.selection = Some(Selection::Entity(entity_id));
+    }
+
+    pub fn toggle_entity_selection(&mut self, entity_id: EntityId) {
+        if let Some(index) = self
+            .selected_entity_ids
+            .iter()
+            .position(|id| *id == entity_id)
+        {
+            self.selected_entity_ids.remove(index);
+            if self.selected_entity_ids.is_empty() {
+                self.clear_selection();
+                return;
+            }
+            if self.selected_entity_id == Some(entity_id) {
+                if let Some(last_selected) = self.selected_entity_ids.last().copied() {
+                    self.selected_entity_id = Some(last_selected);
+                    self.selection = Some(Selection::Entity(last_selected));
+                }
+            }
+            return;
+        }
+
+        self.selected_entity_ids.push(entity_id);
+        self.selected_entity_id = Some(entity_id);
+        self.selection = Some(Selection::Entity(entity_id));
+    }
+
+    pub fn has_multi_entity_selection(&self) -> bool {
+        self.selected_entity_ids.len() > 1
+    }
+
+    pub fn clear_entity_selection(&mut self) {
+        self.clear_selection();
     }
 
     // Entity placement mode management
@@ -193,6 +263,7 @@ impl EditorUI {
         self.placement_preview_cached_frame = None;
         self.placement_preview_valid = None;
         self.entity_move_drag = None;
+        self.marquee_selection = None;
     }
 
     pub fn is_in_placement_mode(&self) -> bool {
@@ -205,6 +276,35 @@ impl EditorUI {
 
     pub fn is_entity_move_drag_active(&self) -> bool {
         self.entity_move_drag.is_some()
+    }
+
+    pub fn start_marquee_selection(&mut self, start: egui::Pos2) {
+        self.marquee_selection = Some(MarqueeSelectionState {
+            start_screen: start,
+            current_screen: start,
+        });
+    }
+
+    pub fn update_marquee_selection(&mut self, current: egui::Pos2) {
+        if let Some(marquee) = self.marquee_selection.as_mut() {
+            marquee.current_screen = current;
+        }
+    }
+
+    pub fn finish_marquee_selection(&mut self) -> Option<MarqueeSelectionState> {
+        self.marquee_selection.take()
+    }
+
+    pub fn is_marquee_selection_active(&self) -> bool {
+        self.marquee_selection.is_some()
+    }
+
+    pub fn add_entity_to_selection(&mut self, entity_id: EntityId) {
+        if !self.selected_entity_ids.contains(&entity_id) {
+            self.selected_entity_ids.push(entity_id);
+        }
+        self.selected_entity_id = Some(entity_id);
+        self.selection = Some(Selection::Entity(entity_id));
     }
 
     /// Render the entire UI
@@ -809,5 +909,33 @@ mod tests {
                 .any(|edge| edge.from == trigger_id && edge.to == detached_target),
             "branching edge should be preserved instead of rebuilding from RuleSet"
         );
+    }
+
+    #[test]
+    fn add_entity_to_selection_preserves_existing_and_avoids_duplicates() {
+        let mut ui = EditorUI::new();
+
+        ui.add_entity_to_selection(1);
+        ui.add_entity_to_selection(2);
+        ui.add_entity_to_selection(1);
+
+        assert_eq!(ui.selected_entity_ids, vec![1, 2]);
+        assert_eq!(ui.selected_entity_id, Some(1));
+    }
+
+    #[test]
+    fn marquee_selection_lifecycle_tracks_start_update_and_finish() {
+        let mut ui = EditorUI::new();
+        assert!(!ui.is_marquee_selection_active());
+
+        ui.start_marquee_selection(egui::pos2(10.0, 20.0));
+        ui.update_marquee_selection(egui::pos2(30.0, 40.0));
+
+        let marquee = ui
+            .finish_marquee_selection()
+            .expect("marquee should be active");
+        assert_eq!(marquee.start_screen, egui::pos2(10.0, 20.0));
+        assert_eq!(marquee.current_screen, egui::pos2(30.0, 40.0));
+        assert!(!ui.is_marquee_selection_active());
     }
 }

@@ -1,7 +1,7 @@
 use super::GridInteraction;
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
-use crate::ui::editor_ui::{EntityMoveDragState, Selection};
+use crate::ui::editor_ui::EntityMoveDragState;
 use crate::ui::EditorUI;
 use std::path::Path;
 use toki_core::entity::{Entity, EntityDefinition, EntityType};
@@ -16,6 +16,7 @@ impl SelectionInteraction {
         viewport: &SceneViewport,
         click_pos: egui::Pos2,
         rect: egui::Rect,
+        ctrl_pressed: bool,
     ) {
         // Ignore plain click-selection while an explicit move drag operation is active.
         if ui_state.is_entity_move_drag_active() {
@@ -23,19 +24,31 @@ impl SelectionInteraction {
         }
 
         let world_pos = viewport.screen_to_world_pos(click_pos, rect);
-        if let Some(entity_id) = viewport.get_entity_at_world_pos(world_pos) {
+        let clicked_entity = viewport.get_entity_at_world_pos(world_pos);
+        Self::apply_click_selection(ui_state, clicked_entity, ctrl_pressed);
+    }
+
+    fn apply_click_selection(
+        ui_state: &mut EditorUI,
+        clicked_entity: Option<toki_core::entity::EntityId>,
+        ctrl_pressed: bool,
+    ) {
+        if let Some(entity_id) = clicked_entity {
             tracing::info!("Selected entity {} via viewport click", entity_id);
-            ui_state.set_selection(Selection::Entity(entity_id));
-            ui_state.selected_entity_id = Some(entity_id);
-        } else {
-            tracing::info!(
-                "Clearing selection - no entity at world position ({:.1}, {:.1})",
-                world_pos.x,
-                world_pos.y
-            );
-            ui_state.clear_selection();
-            ui_state.selected_entity_id = None;
+            if ctrl_pressed {
+                ui_state.toggle_entity_selection(entity_id);
+            } else {
+                ui_state.set_single_entity_selection(entity_id);
+            }
+            return;
         }
+
+        if ctrl_pressed {
+            return;
+        }
+
+        tracing::info!("Clearing selection - no entity under viewport click");
+        ui_state.clear_entity_selection();
     }
 
     /// Handle drag start (click+hold+drag): begin move operation if drag started over an entity.
@@ -45,8 +58,10 @@ impl SelectionInteraction {
         drag_start_pos: egui::Pos2,
         rect: egui::Rect,
         config: Option<&EditorConfig>,
+        ctrl_pressed: bool,
     ) {
-        if ui_state.is_in_placement_mode() || ui_state.is_entity_move_drag_active() {
+        if ui_state.is_in_placement_mode() || ui_state.is_entity_move_drag_active() || ctrl_pressed
+        {
             return;
         }
 
@@ -79,8 +94,7 @@ impl SelectionInteraction {
             entity_def_name
         );
 
-        ui_state.set_selection(Selection::Entity(entity_id));
-        ui_state.selected_entity_id = Some(entity_id);
+        ui_state.set_single_entity_selection(entity_id);
         ui_state.enter_placement_mode(entity_def_name.clone());
         let grab_offset = world_pos - entity.position.as_vec2();
         ui_state.begin_entity_move_drag(EntityMoveDragState {
@@ -89,6 +103,31 @@ impl SelectionInteraction {
             grab_offset,
         });
         viewport.suppress_entity_rendering(entity_id);
+    }
+
+    pub fn handle_marquee_drag_start(ui_state: &mut EditorUI, drag_start_pos: egui::Pos2) {
+        ui_state.start_marquee_selection(drag_start_pos);
+    }
+
+    pub fn handle_marquee_drag_update(ui_state: &mut EditorUI, drag_pos: egui::Pos2) {
+        ui_state.update_marquee_selection(drag_pos);
+    }
+
+    pub fn handle_marquee_drag_release(
+        ui_state: &mut EditorUI,
+        viewport: &SceneViewport,
+        rect: egui::Rect,
+        ctrl_pressed: bool,
+    ) {
+        let Some(marquee) = ui_state.finish_marquee_selection() else {
+            return;
+        };
+
+        let world_start = viewport.screen_to_world_pos(marquee.start_screen, rect);
+        let world_end = viewport.screen_to_world_pos(marquee.current_screen, rect);
+        let selected_entity_ids =
+            Self::collect_scene_entities_in_world_rect(ui_state, world_start, world_end);
+        Self::apply_marquee_selection(ui_state, selected_entity_ids, ctrl_pressed);
     }
 
     /// Handle drag release: try to drop entity at release position.
@@ -133,8 +172,7 @@ impl SelectionInteraction {
             );
             if moved {
                 ui_state.scene_content_changed = true;
-                ui_state.set_selection(Selection::Entity(drag_state.entity.id));
-                ui_state.selected_entity_id = Some(drag_state.entity.id);
+                ui_state.set_single_entity_selection(drag_state.entity.id);
                 tracing::info!(
                     "Dropped entity {} at ({}, {})",
                     drag_state.entity.id,
@@ -187,6 +225,66 @@ impl SelectionInteraction {
             drop_world_pos.x.floor() as i32,
             drop_world_pos.y.floor() as i32,
         )
+    }
+
+    fn collect_scene_entities_in_world_rect(
+        ui_state: &EditorUI,
+        world_start: glam::Vec2,
+        world_end: glam::Vec2,
+    ) -> Vec<toki_core::entity::EntityId> {
+        let Some(active_scene_name) = ui_state.active_scene.as_ref() else {
+            return Vec::new();
+        };
+        let Some(scene) = ui_state
+            .scenes
+            .iter()
+            .find(|s| &s.name == active_scene_name)
+        else {
+            return Vec::new();
+        };
+
+        let min_x = world_start.x.min(world_end.x);
+        let min_y = world_start.y.min(world_end.y);
+        let max_x = world_start.x.max(world_end.x);
+        let max_y = world_start.y.max(world_end.y);
+
+        scene
+            .entities
+            .iter()
+            .filter(|entity| {
+                let entity_min_x = entity.position.x as f32;
+                let entity_min_y = entity.position.y as f32;
+                let entity_max_x = entity_min_x + entity.size.x as f32;
+                let entity_max_y = entity_min_y + entity.size.y as f32;
+
+                entity_min_x < max_x
+                    && entity_max_x > min_x
+                    && entity_min_y < max_y
+                    && entity_max_y > min_y
+            })
+            .map(|entity| entity.id)
+            .collect()
+    }
+
+    fn apply_marquee_selection(
+        ui_state: &mut EditorUI,
+        selected_entity_ids: Vec<toki_core::entity::EntityId>,
+        ctrl_pressed: bool,
+    ) {
+        if selected_entity_ids.is_empty() {
+            if !ctrl_pressed {
+                ui_state.clear_entity_selection();
+            }
+            return;
+        }
+
+        if !ctrl_pressed {
+            ui_state.clear_entity_selection();
+        }
+
+        for entity_id in selected_entity_ids {
+            ui_state.add_entity_to_selection(entity_id);
+        }
     }
 
     fn find_scene_entity(
@@ -549,5 +647,117 @@ mod tests {
         let drop_world = glam::Vec2::new(32.0, 48.0);
         let dropped = SelectionInteraction::drop_world_position_to_entity_position(drop_world);
         assert_eq!(dropped, IVec2::new(32, 48));
+    }
+
+    #[test]
+    fn apply_click_selection_plain_click_replaces_with_single_entity() {
+        let mut ui_state = EditorUI::new();
+        ui_state.set_single_entity_selection(1);
+        ui_state.toggle_entity_selection(2);
+        assert_eq!(ui_state.selected_entity_ids, vec![1, 2]);
+
+        SelectionInteraction::apply_click_selection(&mut ui_state, Some(7), false);
+
+        assert_eq!(ui_state.selected_entity_id, Some(7));
+        assert_eq!(ui_state.selected_entity_ids, vec![7]);
+    }
+
+    #[test]
+    fn apply_click_selection_ctrl_click_toggles_entity_membership() {
+        let mut ui_state = EditorUI::new();
+        ui_state.set_single_entity_selection(3);
+
+        SelectionInteraction::apply_click_selection(&mut ui_state, Some(5), true);
+        assert_eq!(ui_state.selected_entity_ids, vec![3, 5]);
+
+        SelectionInteraction::apply_click_selection(&mut ui_state, Some(3), true);
+        assert_eq!(ui_state.selected_entity_ids, vec![5]);
+        assert_eq!(ui_state.selected_entity_id, Some(5));
+    }
+
+    #[test]
+    fn apply_click_selection_plain_click_on_empty_clears_selection() {
+        let mut ui_state = EditorUI::new();
+        ui_state.set_single_entity_selection(3);
+        SelectionInteraction::apply_click_selection(&mut ui_state, None, false);
+        assert!(ui_state.selection.is_none());
+        assert!(ui_state.selected_entity_ids.is_empty());
+    }
+
+    #[test]
+    fn apply_click_selection_ctrl_click_on_empty_keeps_selection() {
+        let mut ui_state = EditorUI::new();
+        ui_state.set_single_entity_selection(9);
+        ui_state.toggle_entity_selection(10);
+
+        SelectionInteraction::apply_click_selection(&mut ui_state, None, true);
+
+        assert_eq!(ui_state.selected_entity_ids, vec![9, 10]);
+    }
+
+    #[test]
+    fn collect_scene_entities_in_world_rect_returns_intersecting_scene_entities() {
+        let mut ui_state = EditorUI::new();
+        let mut manager = EntityManager::new();
+        let first_id = manager.spawn_entity(
+            EntityType::Npc,
+            IVec2::new(0, 0),
+            UVec2::new(16, 16),
+            EntityAttributes::default(),
+        );
+        let second_id = manager.spawn_entity(
+            EntityType::Npc,
+            IVec2::new(48, 48),
+            UVec2::new(16, 16),
+            EntityAttributes::default(),
+        );
+
+        let scene = ui_state
+            .scenes
+            .iter_mut()
+            .find(|s| s.name == "Main Scene")
+            .expect("missing default scene");
+        scene.entities.push(
+            manager
+                .get_entity(first_id)
+                .expect("first entity should exist")
+                .clone(),
+        );
+        scene.entities.push(
+            manager
+                .get_entity(second_id)
+                .expect("second entity should exist")
+                .clone(),
+        );
+
+        let selected = SelectionInteraction::collect_scene_entities_in_world_rect(
+            &ui_state,
+            glam::Vec2::new(-4.0, -4.0),
+            glam::Vec2::new(20.0, 20.0),
+        );
+        assert_eq!(selected, vec![first_id]);
+    }
+
+    #[test]
+    fn apply_marquee_selection_ctrl_adds_without_duplicate_entries() {
+        let mut ui_state = EditorUI::new();
+        ui_state.set_single_entity_selection(5);
+
+        SelectionInteraction::apply_marquee_selection(&mut ui_state, vec![5, 7], true);
+        assert_eq!(ui_state.selected_entity_ids, vec![5, 7]);
+    }
+
+    #[test]
+    fn apply_marquee_selection_without_ctrl_replaces_and_clears_on_empty() {
+        let mut ui_state = EditorUI::new();
+        ui_state.set_single_entity_selection(2);
+        ui_state.toggle_entity_selection(3);
+
+        SelectionInteraction::apply_marquee_selection(&mut ui_state, vec![10, 11], false);
+        assert_eq!(ui_state.selected_entity_ids, vec![10, 11]);
+
+        SelectionInteraction::apply_marquee_selection(&mut ui_state, Vec::new(), false);
+        assert!(ui_state.selected_entity_ids.is_empty());
+        assert!(ui_state.selection.is_none());
     }
 }

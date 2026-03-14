@@ -1,7 +1,7 @@
 use super::editor_ui::{EditorUI, Selection};
 use super::rule_graph::{RuleGraph, RuleGraphNodeKind};
 use crate::config::EditorConfig;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use toki_core::animation::AnimationState;
 use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
@@ -32,6 +32,33 @@ struct EntityPropertyDraft {
     collision_size_x: i64,
     collision_size_y: i64,
     collision_trigger: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct MultiEntityCommonState {
+    visible: Option<bool>,
+    active: Option<bool>,
+    collision_enabled: Option<bool>,
+    render_layer: Option<i32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct MultiEntityBatchEdit {
+    set_visible: Option<bool>,
+    set_active: Option<bool>,
+    set_collision_enabled: Option<bool>,
+    set_render_layer: Option<i32>,
+    position_delta: Option<glam::IVec2>,
+}
+
+impl MultiEntityBatchEdit {
+    fn is_noop(self) -> bool {
+        self.set_visible.is_none()
+            && self.set_active.is_none()
+            && self.set_collision_enabled.is_none()
+            && self.set_render_layer.is_none()
+            && self.position_delta.is_none()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -247,23 +274,37 @@ impl InspectorSystem {
                             }
 
                             Some(Selection::Entity(entity_id)) => {
-                                ui.heading(format!("👤 Entity {}", entity_id));
-                                ui.separator();
                                 let mut entity_changed = false;
-                                if let Some(scene_entity) =
-                                    Self::find_selected_scene_entity_mut(ui_state, *entity_id)
-                                {
-                                    let mut draft = EntityPropertyDraft::from_entity(scene_entity);
-                                    if Self::render_scene_entity_editor(ui, &mut draft) {
-                                        entity_changed =
-                                            Self::apply_entity_property_draft(scene_entity, &draft);
-                                    }
-                                } else {
-                                    ui.label("Runtime-only entity (read-only)");
+                                if ui_state.has_multi_entity_selection() {
+                                    ui.heading(format!(
+                                        "👥 {} Entities",
+                                        ui_state.selected_entity_ids.len()
+                                    ));
                                     ui.separator();
-                                    Self::render_runtime_entity_read_only(
-                                        ui, game_state, *entity_id,
-                                    );
+                                    entity_changed =
+                                        Self::render_multi_scene_entity_editor(ui, ui_state);
+                                } else {
+                                    ui.separator();
+                                    ui.heading(format!("👤 Entity {}", entity_id));
+                                    ui.separator();
+                                    if let Some(scene_entity) =
+                                        Self::find_selected_scene_entity_mut(ui_state, *entity_id)
+                                    {
+                                        let mut draft =
+                                            EntityPropertyDraft::from_entity(scene_entity);
+                                        if Self::render_scene_entity_editor(ui, &mut draft) {
+                                            entity_changed = Self::apply_entity_property_draft(
+                                                scene_entity,
+                                                &draft,
+                                            );
+                                        }
+                                    } else {
+                                        ui.label("Runtime-only entity (read-only)");
+                                        ui.separator();
+                                        Self::render_runtime_entity_read_only(
+                                            ui, game_state, *entity_id,
+                                        );
+                                    }
                                 }
 
                                 if entity_changed {
@@ -2544,6 +2585,238 @@ impl InspectorSystem {
         changed
     }
 
+    fn render_multi_scene_entity_editor(ui: &mut egui::Ui, ui_state: &mut EditorUI) -> bool {
+        let Some(active_scene_name) = ui_state.active_scene.clone() else {
+            ui.label("No active scene");
+            return false;
+        };
+
+        let Some(scene_index) = ui_state
+            .scenes
+            .iter()
+            .position(|scene| scene.name == active_scene_name)
+        else {
+            ui.label("Active scene not found");
+            return false;
+        };
+
+        let selected_ids = ui_state.selected_entity_ids.clone();
+        let selected_set: HashSet<_> = selected_ids.iter().copied().collect();
+        let selected_entities = {
+            let scene = &ui_state.scenes[scene_index];
+            scene
+                .entities
+                .iter()
+                .filter(|entity| selected_set.contains(&entity.id))
+                .collect::<Vec<_>>()
+        };
+
+        if selected_entities.len() < 2 {
+            ui.label("Select at least two scene entities for batch editing.");
+            return false;
+        }
+
+        let common = Self::collect_multi_entity_common_state(&selected_entities);
+        if ui_state.multi_entity_inspector_selection_signature != selected_ids {
+            ui_state.multi_entity_inspector_selection_signature = selected_ids;
+            ui_state.multi_entity_render_layer_input = common.render_layer.unwrap_or(0) as i64;
+            ui_state.multi_entity_delta_x_input = 0;
+            ui_state.multi_entity_delta_y_input = 0;
+        }
+
+        ui.label("Batch edit selected scene entities");
+        ui.horizontal(|ui| {
+            ui.label("Entities:");
+            ui.label(selected_entities.len().to_string());
+        });
+        ui.separator();
+
+        let mut edit = MultiEntityBatchEdit::default();
+        Self::render_multi_entity_bool_row(
+            ui,
+            "Visible",
+            common.visible,
+            &mut edit.set_visible,
+            "Set Visible",
+            "Set Hidden",
+        );
+        Self::render_multi_entity_bool_row(
+            ui,
+            "Active",
+            common.active,
+            &mut edit.set_active,
+            "Set Active",
+            "Set Inactive",
+        );
+        Self::render_multi_entity_bool_row(
+            ui,
+            "Collision",
+            common.collision_enabled,
+            &mut edit.set_collision_enabled,
+            "Enable Collision",
+            "Disable Collision",
+        );
+
+        ui.horizontal(|ui| {
+            ui.label(format!(
+                "Render Layer: {}",
+                common
+                    .render_layer
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "Mixed".to_string())
+            ));
+            ui.add(egui::DragValue::new(&mut ui_state.multi_entity_render_layer_input).speed(1.0));
+            if ui.button("Apply Layer").clicked() {
+                edit.set_render_layer = Some(
+                    ui_state
+                        .multi_entity_render_layer_input
+                        .clamp(i32::MIN as i64, i32::MAX as i64) as i32,
+                );
+            }
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Position Delta:");
+            ui.add(egui::DragValue::new(&mut ui_state.multi_entity_delta_x_input).speed(1.0));
+            ui.add(egui::DragValue::new(&mut ui_state.multi_entity_delta_y_input).speed(1.0));
+            if ui.button("Apply Delta").clicked() {
+                let delta = glam::IVec2::new(
+                    ui_state.multi_entity_delta_x_input,
+                    ui_state.multi_entity_delta_y_input,
+                );
+                if delta != glam::IVec2::ZERO {
+                    edit.position_delta = Some(delta);
+                }
+                ui_state.multi_entity_delta_x_input = 0;
+                ui_state.multi_entity_delta_y_input = 0;
+            }
+        });
+
+        if edit.is_noop() {
+            return false;
+        }
+
+        let scene = &mut ui_state.scenes[scene_index];
+        let mut selected_entities_mut = scene
+            .entities
+            .iter_mut()
+            .filter(|entity| selected_set.contains(&entity.id))
+            .collect::<Vec<_>>();
+        Self::apply_multi_entity_batch_edit(&mut selected_entities_mut, edit)
+    }
+
+    fn render_multi_entity_bool_row(
+        ui: &mut egui::Ui,
+        label: &str,
+        common_value: Option<bool>,
+        out_edit: &mut Option<bool>,
+        true_button: &str,
+        false_button: &str,
+    ) {
+        ui.horizontal(|ui| {
+            let state_text = match common_value {
+                Some(true) => "true",
+                Some(false) => "false",
+                None => "mixed",
+            };
+            ui.label(format!("{label}: {state_text}"));
+            if ui.button(true_button).clicked() {
+                *out_edit = Some(true);
+            }
+            if ui.button(false_button).clicked() {
+                *out_edit = Some(false);
+            }
+        });
+    }
+
+    fn collect_multi_entity_common_state(
+        entities: &[&toki_core::entity::Entity],
+    ) -> MultiEntityCommonState {
+        fn common_bool(
+            entities: &[&toki_core::entity::Entity],
+            accessor: impl Fn(&toki_core::entity::Entity) -> bool,
+        ) -> Option<bool> {
+            let first = entities.first().map(|entity| accessor(entity))?;
+            if entities.iter().all(|entity| accessor(entity) == first) {
+                Some(first)
+            } else {
+                None
+            }
+        }
+
+        fn common_i32(
+            entities: &[&toki_core::entity::Entity],
+            accessor: impl Fn(&toki_core::entity::Entity) -> i32,
+        ) -> Option<i32> {
+            let first = entities.first().map(|entity| accessor(entity))?;
+            if entities.iter().all(|entity| accessor(entity) == first) {
+                Some(first)
+            } else {
+                None
+            }
+        }
+
+        MultiEntityCommonState {
+            visible: common_bool(entities, |entity| entity.attributes.visible),
+            active: common_bool(entities, |entity| entity.attributes.active),
+            collision_enabled: common_bool(entities, |entity| entity.collision_box.is_some()),
+            render_layer: common_i32(entities, |entity| entity.attributes.render_layer),
+        }
+    }
+
+    fn apply_multi_entity_batch_edit(
+        entities: &mut [&mut toki_core::entity::Entity],
+        edit: MultiEntityBatchEdit,
+    ) -> bool {
+        let mut changed = false;
+
+        for entity in entities.iter_mut() {
+            if let Some(visible) = edit.set_visible {
+                if entity.attributes.visible != visible {
+                    entity.attributes.visible = visible;
+                    changed = true;
+                }
+            }
+
+            if let Some(active) = edit.set_active {
+                if entity.attributes.active != active {
+                    entity.attributes.active = active;
+                    changed = true;
+                }
+            }
+
+            if let Some(render_layer) = edit.set_render_layer {
+                if entity.attributes.render_layer != render_layer {
+                    entity.attributes.render_layer = render_layer;
+                    changed = true;
+                }
+            }
+
+            if let Some(delta) = edit.position_delta {
+                let new_position = entity.position + delta;
+                if entity.position != new_position {
+                    entity.position = new_position;
+                    changed = true;
+                }
+            }
+
+            if let Some(collision_enabled) = edit.set_collision_enabled {
+                if collision_enabled {
+                    if entity.collision_box.is_none() {
+                        entity.collision_box =
+                            Some(toki_core::collision::CollisionBox::solid_box(entity.size));
+                        changed = true;
+                    }
+                } else if entity.collision_box.is_some() {
+                    entity.collision_box = None;
+                    changed = true;
+                }
+            }
+        }
+
+        changed
+    }
+
     fn render_runtime_entity_read_only(
         ui: &mut egui::Ui,
         game_state: Option<&toki_core::GameState>,
@@ -3216,7 +3489,8 @@ impl InspectorSystem {
 #[cfg(test)]
 mod tests {
     use super::{
-        EntityPropertyDraft, InspectorSystem, RuleActionKind, RuleConditionKind, RuleTriggerKind,
+        EntityPropertyDraft, InspectorSystem, MultiEntityBatchEdit, RuleActionKind,
+        RuleConditionKind, RuleTriggerKind,
     };
     use crate::ui::EditorUI;
     use glam::{IVec2, UVec2};
@@ -3335,6 +3609,59 @@ mod tests {
         assert!(changed);
         assert_eq!(entity.attributes.health, None);
         assert!(entity.collision_box.is_none());
+    }
+
+    #[test]
+    fn collect_multi_entity_common_state_reports_mixed_values() {
+        let mut first = sample_entity_with_id(1);
+        let mut second = sample_entity_with_id(2);
+
+        first.attributes.visible = true;
+        second.attributes.visible = false;
+        first.attributes.active = true;
+        second.attributes.active = true;
+        first.attributes.render_layer = 2;
+        second.attributes.render_layer = 2;
+        second.collision_box = None;
+
+        let entities = vec![&first, &second];
+        let common = InspectorSystem::collect_multi_entity_common_state(&entities);
+
+        assert_eq!(common.visible, None);
+        assert_eq!(common.active, Some(true));
+        assert_eq!(common.render_layer, Some(2));
+        assert_eq!(common.collision_enabled, None);
+    }
+
+    #[test]
+    fn apply_multi_entity_batch_edit_updates_all_selected_entities() {
+        let mut first = sample_entity_with_id(1);
+        let mut second = sample_entity_with_id(2);
+        second.collision_box = None;
+
+        let mut entities = vec![&mut first, &mut second];
+        let changed = InspectorSystem::apply_multi_entity_batch_edit(
+            &mut entities,
+            MultiEntityBatchEdit {
+                set_visible: Some(false),
+                set_active: Some(false),
+                set_collision_enabled: Some(true),
+                set_render_layer: Some(7),
+                position_delta: Some(IVec2::new(2, -3)),
+            },
+        );
+
+        assert!(changed);
+        assert!(!first.attributes.visible);
+        assert!(!second.attributes.visible);
+        assert!(!first.attributes.active);
+        assert!(!second.attributes.active);
+        assert_eq!(first.attributes.render_layer, 7);
+        assert_eq!(second.attributes.render_layer, 7);
+        assert_eq!(first.position, IVec2::new(12, 17));
+        assert_eq!(second.position, IVec2::new(12, 17));
+        assert!(first.collision_box.is_some());
+        assert!(second.collision_box.is_some());
     }
 
     #[test]
