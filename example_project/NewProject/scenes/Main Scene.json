@@ -8,8 +8,8 @@
     {
       "id": 1,
       "position": [
-        87,
-        52
+        72,
+        48
       ],
       "size": [
         16,
@@ -55,6 +55,70 @@
         "active": true,
         "can_move": true,
         "has_inventory": true
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": false
+      }
+    },
+    {
+      "id": 2,
+      "position": [
+        40,
+        40
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_type": "Npc",
+      "definition_name": "slime",
+      "attributes": {
+        "health": 50,
+        "speed": 1,
+        "solid": true,
+        "visible": true,
+        "animation_controller": {
+          "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "Walk": {
+              "state": "Walk",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/walk_0",
+                "slime/walk_1",
+                "slime/walk_2",
+                "slime/walk_3"
+              ],
+              "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            }
+          },
+          "current_clip_state": "Walk",
+          "current_frame_index": 0,
+          "frame_timer": 0.0,
+          "is_finished": false
+        },
+        "render_layer": 0,
+        "active": true,
+        "can_move": false,
+        "has_inventory": false
       },
       "collision_box": {
         "offset": [

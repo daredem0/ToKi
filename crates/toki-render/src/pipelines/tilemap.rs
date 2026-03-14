@@ -94,6 +94,12 @@ impl TilemapPipeline {
     }
 
     pub fn update_vertices(&mut self, device: &Device, vertices: &[QuadVertex]) {
+        if vertices.is_empty() {
+            self.vertex_buffer = None;
+            self.vertex_count = 0;
+            return;
+        }
+
         let vertex_data = bytemuck::cast_slice(vertices);
 
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

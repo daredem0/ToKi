@@ -15,6 +15,7 @@ trait RuntimeRenderBackend: std::fmt::Debug {
         texture_path: std::path::PathBuf,
     ) -> Result<(), toki_render::RenderError>;
     fn update_projection(&mut self, mvp: glam::Mat4);
+    fn set_tilemap_render_enabled(&mut self, enabled: bool);
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>);
     fn draw(&mut self);
     fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]);
@@ -65,6 +66,10 @@ impl RuntimeRenderBackend for WgpuRenderBackend {
 
     fn update_projection(&mut self, mvp: glam::Mat4) {
         self.gpu.update_projection(mvp);
+    }
+
+    fn set_tilemap_render_enabled(&mut self, enabled: bool) {
+        self.gpu.set_tilemap_render_enabled(enabled);
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -263,6 +268,12 @@ impl RenderingSystem {
         self.backend.is_some()
     }
 
+    pub fn set_tilemap_render_enabled(&mut self, enabled: bool) {
+        if let Some(backend) = &mut self.backend {
+            backend.set_tilemap_render_enabled(enabled);
+        }
+    }
+
     /// Get current projection parameters
     pub fn projection_params(&self) -> ProjectionParameter {
         self.projection_params
@@ -357,6 +368,7 @@ mod tests {
         projection_updates: Rc<Cell<usize>>,
         draw_calls: Rc<Cell<usize>>,
         resize_calls: Rc<Cell<usize>>,
+        tilemap_render_enabled: Rc<Cell<bool>>,
         tilemap_vertex_counts: Rc<RefCell<Vec<usize>>>,
         sprite_count: Rc<Cell<usize>>,
         debug_rect_count: Rc<Cell<usize>>,
@@ -381,6 +393,10 @@ mod tests {
         fn update_projection(&mut self, _mvp: glam::Mat4) {
             self.projection_updates
                 .set(self.projection_updates.get() + 1);
+        }
+
+        fn set_tilemap_render_enabled(&mut self, enabled: bool) {
+            self.tilemap_render_enabled.set(enabled);
         }
 
         fn resize(&mut self, _new_size: winit::dpi::PhysicalSize<u32>) {
@@ -500,6 +516,7 @@ mod tests {
         let projection_counter = fake.projection_updates.clone();
         let draw_counter = fake.draw_calls.clone();
         let resize_counter = fake.resize_calls.clone();
+        let tilemap_render_enabled = fake.tilemap_render_enabled.clone();
         let tilemap_counts = fake.tilemap_vertex_counts.clone();
         let debug_finalize_counter = fake.finalized_debug.clone();
 
@@ -512,6 +529,8 @@ mod tests {
 
         rendering.update_projection(glam::Mat4::IDENTITY);
         rendering.resize(winit::dpi::PhysicalSize::new(640, 480));
+        rendering.set_tilemap_render_enabled(false);
+        rendering.set_tilemap_render_enabled(true);
         rendering.update_tilemap_vertices(&[
             QuadVertex {
                 position: [0.0, 0.0],
@@ -541,6 +560,7 @@ mod tests {
         assert_eq!(projection_counter.get(), 1);
         assert_eq!(draw_counter.get(), 1);
         assert_eq!(resize_counter.get(), 1);
+        assert!(tilemap_render_enabled.get());
         assert_eq!(tilemap_counts.borrow().as_slice(), &[2]);
         assert_eq!(debug_finalize_counter.get(), 1);
     }

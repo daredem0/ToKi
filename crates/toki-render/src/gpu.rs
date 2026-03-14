@@ -22,6 +22,7 @@ pub struct GpuState {
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
     debug_pipeline: DebugPipeline,
+    tilemap_render_enabled: bool,
 }
 
 fn to_absolute_path<P: AsRef<Path>>(relative: P) -> std::io::Result<PathBuf> {
@@ -92,6 +93,7 @@ impl GpuState {
             tilemap_pipeline,
             sprite_pipeline,
             debug_pipeline,
+            tilemap_render_enabled: true,
         }
     }
 
@@ -149,7 +151,12 @@ impl GpuState {
             tilemap_pipeline,
             sprite_pipeline,
             debug_pipeline,
+            tilemap_render_enabled: true,
         })
+    }
+
+    pub fn set_tilemap_render_enabled(&mut self, enabled: bool) {
+        self.tilemap_render_enabled = enabled;
     }
 
     pub fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
@@ -208,7 +215,9 @@ impl GpuState {
             );
 
             // Render tilemap first (background)
-            self.tilemap_pipeline.render(&mut render_pass);
+            if self.tilemap_render_enabled {
+                self.tilemap_pipeline.render(&mut render_pass);
+            }
 
             // Render sprites on top
             self.sprite_pipeline.render(&mut render_pass);

@@ -6,7 +6,7 @@ use winit::event_loop::{ActiveEventLoop, EventLoop}; // ActiveEventLoop is used 
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::WindowId;
 
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use std::{fs, path::PathBuf};
 
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
@@ -41,6 +41,11 @@ struct App {
     rendering: RenderingSystem,
     timing: TimingSystem,
     launch_options: RuntimeLaunchOptions,
+    splash_active: bool,
+    splash_started_at: Option<Instant>,
+    splash_duration: Duration,
+    splash_logo_path: Option<PathBuf>,
+    post_splash_sprite_texture_path: Option<PathBuf>,
 }
 
 impl App {
@@ -80,6 +85,11 @@ impl App {
             rendering: RenderingSystem::new(),
             timing: TimingSystem::new(),
             launch_options,
+            splash_active: true,
+            splash_started_at: None,
+            splash_duration: Duration::from_millis(1200),
+            splash_logo_path: None,
+            post_splash_sprite_texture_path: None,
         }
     }
 
@@ -393,6 +403,29 @@ impl App {
         // so were just filling it up for now.
         //fill::fill_window(window);
         if self.rendering.has_gpu() {
+            if self.splash_active {
+                let started_at = self.splash_started_at.unwrap_or_else(|| {
+                    let now = Instant::now();
+                    self.splash_started_at = Some(now);
+                    now
+                });
+
+                if started_at.elapsed() < self.splash_duration {
+                    self.render_startup_splash();
+                    return;
+                }
+
+                self.splash_active = false;
+                self.rendering.set_tilemap_render_enabled(true);
+                self.restore_runtime_sprite_texture_after_splash();
+                self.rendering
+                    .update_projection(self.camera_system.view_matrix());
+                self.refresh_tilemap_vertices_for_current_camera();
+                self.tick();
+                self.timing.reset();
+                self.platform.request_redraw();
+            }
+
             if let Some(size) = self.platform.inner_size() {
                 self.rendering.update_window_size(size);
             }
@@ -432,6 +465,98 @@ impl App {
                 total_frame_time,
             );
         }
+    }
+
+    fn render_startup_splash(&mut self) {
+        self.rendering.update_projection(glam::Mat4::IDENTITY);
+        self.rendering.set_tilemap_render_enabled(false);
+        self.rendering.clear_sprites();
+        self.rendering.clear_debug_shapes();
+        self.rendering.finalize_debug_shapes();
+        self.rendering.add_sprite(
+            toki_core::sprite::SpriteFrame {
+                u0: 0.0,
+                v0: 0.0,
+                u1: 1.0,
+                v1: 1.0,
+            },
+            glam::IVec2::new(16, 18),
+            glam::UVec2::new(128, 108),
+        );
+        self.rendering.draw();
+        self.platform.request_redraw();
+    }
+
+    fn restore_runtime_sprite_texture_after_splash(&mut self) {
+        if let Some(path) = &self.post_splash_sprite_texture_path {
+            if let Err(error) = self.rendering.load_sprite_texture(path.clone()) {
+                tracing::warn!(
+                    "Failed to restore sprite texture '{}' after splash: {}",
+                    path.display(),
+                    error
+                );
+            }
+            return;
+        }
+
+        tracing::warn!(
+            "No post-splash sprite texture path available; keeping current sprite texture"
+        );
+    }
+
+    fn refresh_tilemap_vertices_for_current_camera(&mut self) {
+        if !self.rendering.has_gpu() {
+            return;
+        }
+
+        self.camera_system
+            .update_chunk_cache(self.resources.get_tilemap());
+        let atlas_size = self.resources.terrain_image_size().unwrap();
+        let verts = self.resources.get_tilemap().generate_vertices_for_chunks(
+            self.resources.get_terrain_atlas(),
+            atlas_size,
+            self.camera_system.cached_visible_chunks(),
+        );
+        self.rendering.update_tilemap_vertices(&verts);
+    }
+
+    fn resolve_logo_path(launch_options: &RuntimeLaunchOptions) -> Option<PathBuf> {
+        let mut candidates = Vec::new();
+
+        if let Some(project_path) = &launch_options.project_path {
+            candidates.push(project_path.join("assets").join("TokiLogo.png"));
+            if let Some(parent) = project_path.parent() {
+                candidates.push(parent.join("assets").join("TokiLogo.png"));
+                if let Some(grand_parent) = parent.parent() {
+                    candidates.push(grand_parent.join("assets").join("TokiLogo.png"));
+                }
+            }
+        }
+
+        if let Ok(current_dir) = std::env::current_dir() {
+            candidates.push(current_dir.join("assets").join("TokiLogo.png"));
+        }
+
+        candidates
+            .push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/TokiLogo.png"));
+
+        first_existing_path(&candidates)
+    }
+
+    fn resolve_post_splash_sprite_texture_path(
+        launch_options: &RuntimeLaunchOptions,
+    ) -> Option<PathBuf> {
+        if let Some(project_path) = &launch_options.project_path {
+            let (_, sprite_texture) = Self::project_texture_paths(project_path);
+            if sprite_texture.is_some() {
+                return sprite_texture;
+            }
+        }
+
+        first_existing_path(&[
+            PathBuf::from("assets/creatures.png"),
+            PathBuf::from("assets/sprites/creatures.png"),
+        ])
     }
 }
 
@@ -473,6 +598,23 @@ impl ApplicationHandler for App {
             }
         }
 
+        self.splash_logo_path = Self::resolve_logo_path(&self.launch_options);
+        self.post_splash_sprite_texture_path =
+            Self::resolve_post_splash_sprite_texture_path(&self.launch_options);
+        if let Some(path) = &self.splash_logo_path {
+            if let Err(error) = self.rendering.load_sprite_texture(path.clone()) {
+                tracing::warn!(
+                    "Failed to load startup logo texture '{}' (disabling splash): {}",
+                    path.display(),
+                    error
+                );
+                self.splash_active = false;
+            }
+        } else {
+            tracing::warn!("No startup logo found at assets/TokiLogo.png candidate paths");
+            self.splash_active = false;
+        }
+
         // Update rendering size
         if let Some(size) = self.platform.inner_size() {
             self.rendering.update_window_size(size);
@@ -485,18 +627,7 @@ impl ApplicationHandler for App {
         self.platform.request_redraw();
 
         // Load initially visible chunks
-        if self.rendering.has_gpu() {
-            // Generate vertices for chunks visible at startup
-            self.camera_system
-                .update_chunk_cache(self.resources.get_tilemap());
-            let atlas_size = self.resources.terrain_image_size().unwrap();
-            let verts = self.resources.get_tilemap().generate_vertices_for_chunks(
-                self.resources.get_terrain_atlas(),
-                atlas_size,
-                self.camera_system.cached_visible_chunks(),
-            );
-            self.rendering.update_tilemap_vertices(&verts);
-        }
+        self.refresh_tilemap_vertices_for_current_camera();
 
         self.audio_system.list_available_sounds();
         if self.launch_options.scene_name.is_none() {
@@ -507,6 +638,11 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        if self.splash_active && self.rendering.has_gpu() {
+            self.platform.request_redraw();
+            return;
+        }
+
         // Process timing updates manually to avoid borrowing issues
         let mut tick_count = 0;
         while self.timing.should_tick() {
@@ -577,7 +713,7 @@ fn first_existing_path(candidates: &[PathBuf]) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::{first_existing_path, App};
+    use super::{first_existing_path, App, RuntimeLaunchOptions};
     use std::fs;
     use toki_core::rules::{
         Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger,
@@ -736,5 +872,44 @@ mod tests {
             2,
             "fallback state should spawn player and one npc"
         );
+    }
+
+    #[test]
+    fn resolve_logo_path_prefers_project_local_assets_logo() {
+        let project_dir = make_unique_temp_dir()
+            .join("example_project")
+            .join("MyGame");
+        fs::create_dir_all(project_dir.join("assets")).expect("assets dir");
+        let logo_path = project_dir.join("assets").join("TokiLogo.png");
+        fs::write(&logo_path, "logo").expect("logo write");
+
+        let options = RuntimeLaunchOptions {
+            project_path: Some(project_dir),
+            scene_name: None,
+            map_name: None,
+        };
+
+        let resolved = App::resolve_logo_path(&options);
+        assert_eq!(resolved, Some(logo_path));
+    }
+
+    #[test]
+    fn resolve_post_splash_sprite_texture_path_prefers_project_creatures_texture() {
+        let project_dir = make_unique_temp_dir()
+            .join("example_project")
+            .join("MyGame");
+        let sprites_dir = project_dir.join("assets").join("sprites");
+        fs::create_dir_all(&sprites_dir).expect("sprites dir");
+        let creatures_path = sprites_dir.join("creatures.png");
+        fs::write(&creatures_path, "creatures").expect("creatures write");
+
+        let options = RuntimeLaunchOptions {
+            project_path: Some(project_dir),
+            scene_name: None,
+            map_name: None,
+        };
+
+        let resolved = App::resolve_post_splash_sprite_texture_path(&options);
+        assert_eq!(resolved, Some(creatures_path));
     }
 }
