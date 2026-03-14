@@ -78,7 +78,10 @@ pub fn create_texture_bindgroup_from_rgba8(
             texture_label,
             e
         );
-        panic!("Texture creation from decoded image failed for {:?}: {}", texture_label, e);
+        panic!(
+            "Texture creation from decoded image failed for {:?}: {}",
+            texture_label, e
+        );
     });
     create_bind_group(device, texture_bind_group_layout, &texture, uniform_buffer)
 }

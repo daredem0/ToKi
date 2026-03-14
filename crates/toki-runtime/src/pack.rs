@@ -52,12 +52,15 @@ pub fn extract_pak_to_tempdir(pak_path: &Path) -> Result<tempfile::TempDir> {
         file.seek(SeekFrom::Start(entry.offset))?;
         let mut stored_payload = vec![0u8; entry.stored_size_or_size() as usize];
         file.read_exact(&mut stored_payload)?;
-        let payload = entry.compression.decompress(&stored_payload).with_context(|| {
-            format!(
-                "Failed to decompress pak entry '{}' with {:?}",
-                entry.path, entry.compression
-            )
-        })?;
+        let payload = entry
+            .compression
+            .decompress(&stored_payload)
+            .with_context(|| {
+                format!(
+                    "Failed to decompress pak entry '{}' with {:?}",
+                    entry.path, entry.compression
+                )
+            })?;
         if payload.len() as u64 != entry.size {
             return Err(anyhow::anyhow!(
                 "Pak entry '{}' size mismatch: expected {} bytes after decode, got {}",
@@ -204,7 +207,9 @@ mod tests {
 
         let error = extract_pak_to_tempdir(&pak_path).expect_err("malformed manifest should fail");
         assert!(
-            error.to_string().contains("Failed to deserialize pak manifest"),
+            error
+                .to_string()
+                .contains("Failed to deserialize pak manifest"),
             "unexpected error: {error}"
         );
     }

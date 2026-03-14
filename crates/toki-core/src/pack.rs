@@ -182,9 +182,7 @@ mod tests {
     #[test]
     fn zstd_compression_round_trips_payload() {
         let source = br#"{"scene":"Main Scene","entities":[{"id":1}]}"#;
-        let compressed = PackCompression::Zstd
-            .compress(source)
-            .expect("compress");
+        let compressed = PackCompression::Zstd.compress(source).expect("compress");
         assert_ne!(compressed, source);
         let decoded = PackCompression::Zstd
             .decompress(&compressed)

@@ -163,8 +163,7 @@ impl MenuSystem {
         let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
         let image_rect = rect.translate(egui::vec2(0.0, animation.bob_offset));
 
-        let glow_color =
-            egui::Color32::from_rgba_unmultiplied(110, 210, 255, animation.glow_alpha);
+        let glow_color = egui::Color32::from_rgba_unmultiplied(110, 210, 255, animation.glow_alpha);
         let glow_rect = image_rect.expand(animation.glow_spread);
         ui.painter()
             .rect_filled(glow_rect, glow_rect.width() * 0.35, glow_color);

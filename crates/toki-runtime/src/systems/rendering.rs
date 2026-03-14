@@ -147,6 +147,8 @@ impl RuntimeRenderBackend for WgpuRenderBackend {
 pub struct RenderingSystem {
     backend: Option<Box<dyn RuntimeRenderBackend>>,
     projection_params: ProjectionParameter,
+    loaded_tilemap_texture_path: Option<std::path::PathBuf>,
+    loaded_sprite_texture_path: Option<std::path::PathBuf>,
 }
 
 impl Default for RenderingSystem {
@@ -166,6 +168,8 @@ impl RenderingSystem {
                 desired_width: 160,
                 desired_height: 144,
             },
+            loaded_tilemap_texture_path: None,
+            loaded_sprite_texture_path: None,
         }
     }
 
@@ -174,6 +178,8 @@ impl RenderingSystem {
         Self {
             backend: None,
             projection_params,
+            loaded_tilemap_texture_path: None,
+            loaded_sprite_texture_path: None,
         }
     }
 
@@ -203,6 +209,8 @@ impl RenderingSystem {
     ) -> Result<(), toki_render::RenderError> {
         let backend =
             WgpuRenderBackend::new_with_textures(window, tilemap_texture, sprite_texture)?;
+        self.loaded_tilemap_texture_path = None;
+        self.loaded_sprite_texture_path = None;
         self.backend = Some(Box::new(backend));
         Ok(())
     }
@@ -212,8 +220,13 @@ impl RenderingSystem {
         &mut self,
         texture_path: std::path::PathBuf,
     ) -> Result<(), toki_render::RenderError> {
+        if self.loaded_tilemap_texture_path.as_ref() == Some(&texture_path) {
+            return Ok(());
+        }
         if let Some(backend) = &mut self.backend {
-            backend.load_tilemap_texture(texture_path)
+            backend.load_tilemap_texture(texture_path.clone())?;
+            self.loaded_tilemap_texture_path = Some(texture_path);
+            Ok(())
         } else {
             Err(toki_render::RenderError::Other(
                 "GPU not initialized".to_string(),
@@ -226,8 +239,13 @@ impl RenderingSystem {
         &mut self,
         texture_path: std::path::PathBuf,
     ) -> Result<(), toki_render::RenderError> {
+        if self.loaded_sprite_texture_path.as_ref() == Some(&texture_path) {
+            return Ok(());
+        }
         if let Some(backend) = &mut self.backend {
-            backend.load_sprite_texture(texture_path)
+            backend.load_sprite_texture(texture_path.clone())?;
+            self.loaded_sprite_texture_path = Some(texture_path);
+            Ok(())
         } else {
             Err(toki_render::RenderError::Other(
                 "GPU not initialized".to_string(),
@@ -240,7 +258,9 @@ impl RenderingSystem {
         image: &DecodedImage,
     ) -> Result<(), toki_render::RenderError> {
         if let Some(backend) = &mut self.backend {
-            backend.load_sprite_texture_rgba8(image)
+            backend.load_sprite_texture_rgba8(image)?;
+            self.loaded_sprite_texture_path = None;
+            Ok(())
         } else {
             Err(toki_render::RenderError::Other(
                 "GPU not initialized".to_string(),
@@ -472,6 +492,9 @@ mod tests {
         projection_updates: Rc<Cell<usize>>,
         draw_calls: Rc<Cell<usize>>,
         resize_calls: Rc<Cell<usize>>,
+        tilemap_texture_loads: Rc<RefCell<Vec<std::path::PathBuf>>>,
+        sprite_texture_loads: Rc<RefCell<Vec<std::path::PathBuf>>>,
+        sprite_texture_rgba8_loads: Rc<Cell<usize>>,
         tilemap_render_enabled: Rc<Cell<bool>>,
         tilemap_vertex_counts: Rc<RefCell<Vec<usize>>>,
         sprite_count: Rc<Cell<usize>>,
@@ -483,15 +506,17 @@ mod tests {
     impl RuntimeRenderBackend for FakeBackend {
         fn load_tilemap_texture(
             &mut self,
-            _texture_path: std::path::PathBuf,
+            texture_path: std::path::PathBuf,
         ) -> Result<(), toki_render::RenderError> {
+            self.tilemap_texture_loads.borrow_mut().push(texture_path);
             Ok(())
         }
 
         fn load_sprite_texture(
             &mut self,
-            _texture_path: std::path::PathBuf,
+            texture_path: std::path::PathBuf,
         ) -> Result<(), toki_render::RenderError> {
+            self.sprite_texture_loads.borrow_mut().push(texture_path);
             Ok(())
         }
 
@@ -499,6 +524,8 @@ mod tests {
             &mut self,
             _image: &DecodedImage,
         ) -> Result<(), toki_render::RenderError> {
+            self.sprite_texture_rgba8_loads
+                .set(self.sprite_texture_rgba8_loads.get() + 1);
             Ok(())
         }
 
@@ -662,6 +689,8 @@ mod tests {
         let projection_counter = fake.projection_updates.clone();
         let draw_counter = fake.draw_calls.clone();
         let resize_counter = fake.resize_calls.clone();
+        let tilemap_texture_loads = fake.tilemap_texture_loads.clone();
+        let sprite_texture_loads = fake.sprite_texture_loads.clone();
         let tilemap_render_enabled = fake.tilemap_render_enabled.clone();
         let tilemap_counts = fake.tilemap_vertex_counts.clone();
         let text_count = fake.text_count.clone();
@@ -676,6 +705,12 @@ mod tests {
 
         rendering.update_projection(glam::Mat4::IDENTITY);
         rendering.resize(winit::dpi::PhysicalSize::new(640, 480));
+        rendering
+            .load_tilemap_texture(std::path::PathBuf::from("terrain.png"))
+            .expect("tilemap load should work");
+        rendering
+            .load_sprite_texture(std::path::PathBuf::from("creatures.png"))
+            .expect("sprite load should work");
         rendering.set_tilemap_render_enabled(false);
         rendering.set_tilemap_render_enabled(true);
         rendering.update_tilemap_vertices(&[
@@ -713,9 +748,82 @@ mod tests {
         assert_eq!(projection_counter.get(), 1);
         assert_eq!(draw_counter.get(), 1);
         assert_eq!(resize_counter.get(), 1);
+        assert_eq!(
+            tilemap_texture_loads.borrow().as_slice(),
+            &[std::path::PathBuf::from("terrain.png")]
+        );
+        assert_eq!(
+            sprite_texture_loads.borrow().as_slice(),
+            &[std::path::PathBuf::from("creatures.png")]
+        );
         assert!(tilemap_render_enabled.get());
         assert_eq!(tilemap_counts.borrow().as_slice(), &[2]);
         assert_eq!(text_count.get(), 1);
         assert_eq!(debug_finalize_counter.get(), 1);
+    }
+
+    #[test]
+    fn texture_loads_are_cached_by_path() {
+        let fake = FakeBackend::default();
+        let tilemap_texture_loads = fake.tilemap_texture_loads.clone();
+        let sprite_texture_loads = fake.sprite_texture_loads.clone();
+
+        let mut rendering = RenderingSystem::new();
+        rendering.set_backend_for_tests(Box::new(fake));
+
+        rendering
+            .load_tilemap_texture(std::path::PathBuf::from("terrain.png"))
+            .expect("first tilemap load");
+        rendering
+            .load_tilemap_texture(std::path::PathBuf::from("terrain.png"))
+            .expect("cached tilemap load");
+        rendering
+            .load_sprite_texture(std::path::PathBuf::from("creatures.png"))
+            .expect("first sprite load");
+        rendering
+            .load_sprite_texture(std::path::PathBuf::from("creatures.png"))
+            .expect("cached sprite load");
+
+        assert_eq!(
+            tilemap_texture_loads.borrow().as_slice(),
+            &[std::path::PathBuf::from("terrain.png")]
+        );
+        assert_eq!(
+            sprite_texture_loads.borrow().as_slice(),
+            &[std::path::PathBuf::from("creatures.png")]
+        );
+    }
+
+    #[test]
+    fn loading_embedded_sprite_texture_invalidates_path_cache() {
+        let fake = FakeBackend::default();
+        let sprite_texture_loads = fake.sprite_texture_loads.clone();
+        let sprite_texture_rgba8_loads = fake.sprite_texture_rgba8_loads.clone();
+
+        let mut rendering = RenderingSystem::new();
+        rendering.set_backend_for_tests(Box::new(fake));
+
+        rendering
+            .load_sprite_texture(std::path::PathBuf::from("creatures.png"))
+            .expect("initial sprite load");
+        rendering
+            .load_sprite_texture_rgba8(&DecodedImage {
+                width: 1,
+                height: 1,
+                data: vec![255, 255, 255, 255],
+            })
+            .expect("embedded sprite load");
+        rendering
+            .load_sprite_texture(std::path::PathBuf::from("creatures.png"))
+            .expect("restored sprite load");
+
+        assert_eq!(sprite_texture_rgba8_loads.get(), 1);
+        assert_eq!(
+            sprite_texture_loads.borrow().as_slice(),
+            &[
+                std::path::PathBuf::from("creatures.png"),
+                std::path::PathBuf::from("creatures.png")
+            ]
+        );
     }
 }

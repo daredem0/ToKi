@@ -1,6 +1,15 @@
 use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
 use toki_render::RenderError;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedProjectResourcePaths {
+    pub creatures_atlas_path: std::path::PathBuf,
+    pub tilemap_path: std::path::PathBuf,
+    pub terrain_atlas_path: std::path::PathBuf,
+    pub tilemap_texture_path: Option<std::path::PathBuf>,
+    pub sprite_texture_path: Option<std::path::PathBuf>,
+}
+
 /// Resource management system that handles loading and providing access to game assets.
 ///
 /// Centralizes asset loading and provides clean APIs for accessing resources.
@@ -38,79 +47,29 @@ impl ResourceManager {
         project_path: &std::path::Path,
         map_name: Option<&str>,
     ) -> Result<Self, RenderError> {
-        let creatures_atlas_path = first_existing_path(&[
-            project_path
-                .join("assets")
-                .join("sprites")
-                .join("creatures.json"),
-            project_path.join("assets").join("creatures.json"),
-        ])
-        .ok_or_else(|| {
-            RenderError::Other(format!(
-                "Could not find creatures atlas in project '{}'",
-                project_path.display()
-            ))
-        })?;
-
-        let tilemap_path = if let Some(map_name) = map_name {
-            first_existing_path(&[
-                project_path
-                    .join("assets")
-                    .join("tilemaps")
-                    .join(format!("{map_name}.json")),
-                project_path
-                    .join("assets")
-                    .join("maps")
-                    .join(format!("{map_name}.json")),
-            ])
-            .ok_or_else(|| {
-                RenderError::Other(format!(
-                    "Could not find tilemap '{}' in project '{}'",
-                    map_name,
-                    project_path.display()
-                ))
-            })?
-        } else {
-            first_existing_path(&[
-                project_path
-                    .join("assets")
-                    .join("tilemaps")
-                    .join("new_town_map_64x64_crossings.json"),
-                project_path
-                    .join("assets")
-                    .join("maps")
-                    .join("new_town_map_64x64_crossings.json"),
-            ])
-            .or_else(|| find_first_json_file(&project_path.join("assets").join("tilemaps")))
-            .or_else(|| find_first_json_file(&project_path.join("assets").join("maps")))
-            .ok_or_else(|| {
-                RenderError::Other(format!(
-                    "Could not find any tilemap in project '{}'",
-                    project_path.display()
-                ))
-            })?
-        };
-
-        let tilemap = TileMap::load_from_file(&tilemap_path)?;
+        let resolved_paths = resolve_project_resource_paths(project_path, map_name)?;
+        let tilemap = TileMap::load_from_file(&resolved_paths.tilemap_path)?;
         tilemap.validate()?;
-
-        let terrain_atlas_path = resolve_tilemap_atlas_path(project_path, &tilemap_path, &tilemap)
-            .ok_or_else(|| {
-                RenderError::Other(format!(
-                    "Could not resolve tilemap atlas '{}' for map '{}'",
-                    tilemap.atlas.display(),
-                    tilemap_path.display()
-                ))
-            })?;
-
-        let terrain_atlas = AtlasMeta::load_from_file(terrain_atlas_path)?;
-        let creature_atlas = AtlasMeta::load_from_file(creatures_atlas_path)?;
+        let terrain_atlas = AtlasMeta::load_from_file(resolved_paths.terrain_atlas_path)?;
+        let creature_atlas = AtlasMeta::load_from_file(resolved_paths.creatures_atlas_path)?;
 
         Ok(Self {
             terrain_atlas,
             creature_atlas,
             tilemap,
         })
+    }
+
+    pub fn from_preloaded(
+        terrain_atlas: AtlasMeta,
+        creature_atlas: AtlasMeta,
+        tilemap: TileMap,
+    ) -> Self {
+        Self {
+            terrain_atlas,
+            creature_atlas,
+            tilemap,
+        }
     }
 
     /// Get reference to the terrain atlas
@@ -202,10 +161,105 @@ fn resolve_tilemap_atlas_path(
     ])
 }
 
+pub fn resolve_project_resource_paths(
+    project_path: &std::path::Path,
+    map_name: Option<&str>,
+) -> Result<ResolvedProjectResourcePaths, RenderError> {
+    let creatures_atlas_path = first_existing_path(&[
+        project_path
+            .join("assets")
+            .join("sprites")
+            .join("creatures.json"),
+        project_path.join("assets").join("creatures.json"),
+    ])
+    .ok_or_else(|| {
+        RenderError::Other(format!(
+            "Could not find creatures atlas in project '{}'",
+            project_path.display()
+        ))
+    })?;
+
+    let tilemap_path = if let Some(map_name) = map_name {
+        first_existing_path(&[
+            project_path
+                .join("assets")
+                .join("tilemaps")
+                .join(format!("{map_name}.json")),
+            project_path
+                .join("assets")
+                .join("maps")
+                .join(format!("{map_name}.json")),
+        ])
+        .ok_or_else(|| {
+            RenderError::Other(format!(
+                "Could not find tilemap '{}' in project '{}'",
+                map_name,
+                project_path.display()
+            ))
+        })?
+    } else {
+        first_existing_path(&[
+            project_path
+                .join("assets")
+                .join("tilemaps")
+                .join("new_town_map_64x64_crossings.json"),
+            project_path
+                .join("assets")
+                .join("maps")
+                .join("new_town_map_64x64_crossings.json"),
+        ])
+        .or_else(|| find_first_json_file(&project_path.join("assets").join("tilemaps")))
+        .or_else(|| find_first_json_file(&project_path.join("assets").join("maps")))
+        .ok_or_else(|| {
+            RenderError::Other(format!(
+                "Could not find any tilemap in project '{}'",
+                project_path.display()
+            ))
+        })?
+    };
+
+    let tilemap = TileMap::load_from_file(&tilemap_path)?;
+    tilemap.validate()?;
+
+    let terrain_atlas_path = resolve_tilemap_atlas_path(project_path, &tilemap_path, &tilemap)
+        .ok_or_else(|| {
+            RenderError::Other(format!(
+                "Could not resolve tilemap atlas '{}' for map '{}'",
+                tilemap.atlas.display(),
+                tilemap_path.display()
+            ))
+        })?;
+
+    let tilemap_texture_path = resolve_atlas_texture_path(&terrain_atlas_path)?;
+    let sprite_texture_path = resolve_atlas_texture_path(&creatures_atlas_path)?;
+
+    Ok(ResolvedProjectResourcePaths {
+        creatures_atlas_path,
+        tilemap_path,
+        terrain_atlas_path,
+        tilemap_texture_path,
+        sprite_texture_path,
+    })
+}
+
+fn resolve_atlas_texture_path(
+    atlas_path: &std::path::Path,
+) -> Result<Option<std::path::PathBuf>, RenderError> {
+    let atlas = AtlasMeta::load_from_file(atlas_path)?;
+    let atlas_dir = atlas_path.parent().ok_or_else(|| {
+        RenderError::Other(format!(
+            "Atlas path '{}' has no parent directory",
+            atlas_path.display()
+        ))
+    })?;
+    Ok(first_existing_path(&[atlas_dir.join(&atlas.image)]))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        find_first_json_file, first_existing_path, resolve_tilemap_atlas_path, ResourceManager,
+        find_first_json_file, first_existing_path, resolve_project_resource_paths,
+        resolve_tilemap_atlas_path, ResourceManager,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -386,6 +440,32 @@ mod tests {
         assert!(
             error.to_string().contains("Could not find creatures atlas"),
             "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn resolve_project_resource_paths_returns_expected_texture_paths() {
+        let project_dir = make_unique_temp_dir();
+        let sprites_dir = project_dir.join("assets").join("sprites");
+        let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+        fs::create_dir_all(&sprites_dir).expect("sprites dir");
+        fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+
+        write_minimal_atlas(&sprites_dir.join("creatures.json"), "creatures.png");
+        write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
+        write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+        fs::write(sprites_dir.join("creatures.png"), "png").expect("creatures image");
+        fs::write(tilemaps_dir.join("terrain.png"), "png").expect("terrain image");
+
+        let resolved = resolve_project_resource_paths(&project_dir, Some("demo_map"))
+            .expect("project resource paths should resolve");
+        assert_eq!(
+            resolved.tilemap_texture_path,
+            Some(tilemaps_dir.join("terrain.png"))
+        );
+        assert_eq!(
+            resolved.sprite_texture_path,
+            Some(sprites_dir.join("creatures.png"))
         );
     }
 }

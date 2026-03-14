@@ -6,8 +6,8 @@ use winit::event_loop::{ActiveEventLoop, EventLoop}; // ActiveEventLoop is used 
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::WindowId;
 
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use std::{fs, path::PathBuf};
 
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
 use toki_core::graphics::image::load_image_rgba8_from_bytes;
@@ -16,10 +16,11 @@ use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
 use toki_core::{EventHandler, GameState, Scene, TimingSystem};
 use toki_render::RenderError;
 
+use crate::systems::resources::resolve_project_resource_paths;
 use crate::systems::AudioManager;
 use crate::systems::{
-    CameraManager, GameManager, PerformanceMonitor, PlatformSystem, RenderingSystem,
-    ResourceManager,
+    CameraManager, DecodedProjectCache, GameManager, PerformanceMonitor, PlatformSystem,
+    RenderingSystem, ResourceManager, RuntimeAssetLoadPlan,
 };
 use toki_core::serialization::{load_game, save_game};
 
@@ -108,6 +109,9 @@ struct App {
     splash_started_at: Option<Instant>,
     splash_logo_loaded: bool,
     post_splash_sprite_texture_path: Option<PathBuf>,
+    asset_load_plan: RuntimeAssetLoadPlan,
+    #[allow(dead_code)]
+    decoded_project_cache: DecodedProjectCache,
     #[allow(dead_code)]
     pack_mount: Option<tempfile::TempDir>,
 }
@@ -144,7 +148,8 @@ impl App {
     fn new(launch_options: RuntimeLaunchOptions) -> Self {
         let splash_policy = SplashPolicy::Community;
         let splash_config = splash_policy.resolve(&launch_options.splash);
-        let (resources, game_state, pack_mount) = Self::build_startup_state(&launch_options);
+        let (resources, game_state, pack_mount, asset_load_plan, decoded_project_cache) =
+            Self::build_startup_state(&launch_options);
         let game_system = GameManager::new(game_state);
 
         let mut camera = Camera {
@@ -171,8 +176,11 @@ impl App {
             .map(std::path::Path::to_path_buf)
             .or_else(|| std::env::current_dir().ok())
             .expect("Failed to resolve audio root path");
-        let audio_system =
-            AudioManager::new_with_assets_root(audio_root).expect("Failed to initialize audio system");
+        let audio_system = AudioManager::new_with_assets_root_and_preload_names(
+            audio_root,
+            &asset_load_plan.preloaded_sfx_names,
+        )
+        .expect("Failed to initialize audio system");
 
         Self {
             // Core systems
@@ -193,29 +201,43 @@ impl App {
             splash_started_at: None,
             splash_logo_loaded: false,
             post_splash_sprite_texture_path: None,
+            asset_load_plan,
+            decoded_project_cache,
             pack_mount,
         }
     }
 
     fn build_startup_state(
         launch_options: &RuntimeLaunchOptions,
-    ) -> (ResourceManager, GameState, Option<tempfile::TempDir>) {
+    ) -> (
+        ResourceManager,
+        GameState,
+        Option<tempfile::TempDir>,
+        RuntimeAssetLoadPlan,
+        DecodedProjectCache,
+    ) {
         if let Some(pack_path) = &launch_options.pack_path {
-            return Self::build_startup_state_from_pack(launch_options, pack_path)
-                .unwrap_or_else(|error| {
+            return Self::build_startup_state_from_pack(launch_options, pack_path).unwrap_or_else(
+                |error| {
                     panic!(
                         "Failed to initialize runtime from pack '{}': {}",
                         pack_path.display(),
                         error
                     )
-                });
+                },
+            );
         }
 
+        let mut decoded_project_cache = DecodedProjectCache::default();
         if let Some(project_path) = &launch_options.project_path {
-            let scene = launch_options
-                .scene_name
-                .as_deref()
-                .and_then(|scene_name| Self::load_project_scene(project_path, scene_name).ok());
+            let scene = launch_options.scene_name.as_deref().and_then(|scene_name| {
+                Self::load_project_scene_with_cache(
+                    project_path,
+                    scene_name,
+                    &mut decoded_project_cache,
+                )
+                .ok()
+            });
 
             let map_name = launch_options.map_name.clone().or_else(|| {
                 scene
@@ -223,14 +245,25 @@ impl App {
                     .and_then(|loaded_scene| loaded_scene.maps.first().cloned())
             });
 
-            match ResourceManager::load_for_project(project_path, map_name.as_deref()) {
-                Ok(resources) => {
+            match Self::load_project_resources_with_cache(
+                project_path,
+                launch_options.scene_name.as_deref(),
+                map_name.as_deref(),
+                &mut decoded_project_cache,
+            ) {
+                Ok((resources, asset_load_plan)) => {
                     let game_state = if let Some(scene) = scene {
                         Self::game_state_from_scene(scene)
                     } else {
                         Self::fallback_game_state()
                     };
-                    return (resources, game_state, None);
+                    return (
+                        resources,
+                        game_state,
+                        None,
+                        asset_load_plan,
+                        decoded_project_cache,
+                    );
                 }
                 Err(error) => {
                     tracing::error!(
@@ -243,7 +276,21 @@ impl App {
         }
 
         match ResourceManager::load_all() {
-            Ok(resources) => (resources, Self::fallback_game_state(), None),
+            Ok(resources) => (
+                resources,
+                Self::fallback_game_state(),
+                None,
+                RuntimeAssetLoadPlan {
+                    scene_name: launch_options.scene_name.clone(),
+                    map_name: launch_options.map_name.clone(),
+                    tilemap_texture_path: None,
+                    sprite_texture_path: None,
+                    preloaded_sfx_names: crate::systems::asset_loading::common_preloaded_sfx_names(
+                    ),
+                    stream_music: true,
+                },
+                decoded_project_cache,
+            ),
             Err(error) => {
                 panic!("Failed to initialize runtime resources: {error}");
             }
@@ -253,13 +300,26 @@ impl App {
     fn build_startup_state_from_pack(
         launch_options: &RuntimeLaunchOptions,
         pack_path: &std::path::Path,
-    ) -> anyhow::Result<(ResourceManager, GameState, Option<tempfile::TempDir>)> {
+    ) -> anyhow::Result<(
+        ResourceManager,
+        GameState,
+        Option<tempfile::TempDir>,
+        RuntimeAssetLoadPlan,
+        DecodedProjectCache,
+    )> {
         let mount = crate::pack::extract_pak_to_tempdir(pack_path)?;
         let mount_path = mount.path().to_path_buf();
+        let mut decoded_project_cache = DecodedProjectCache::default();
         let scene = launch_options
             .scene_name
             .as_deref()
-            .map(|scene_name| Self::load_project_scene(&mount_path, scene_name))
+            .map(|scene_name| {
+                Self::load_project_scene_with_cache(
+                    &mount_path,
+                    scene_name,
+                    &mut decoded_project_cache,
+                )
+            })
             .transpose()
             .map_err(anyhow::Error::msg)?;
         let map_name = launch_options.map_name.clone().or_else(|| {
@@ -267,36 +327,66 @@ impl App {
                 .as_ref()
                 .and_then(|loaded_scene| loaded_scene.maps.first().cloned())
         });
-        let resources = ResourceManager::load_for_project(&mount_path, map_name.as_deref())?;
+        let (resources, asset_load_plan) = Self::load_project_resources_with_cache(
+            &mount_path,
+            launch_options.scene_name.as_deref(),
+            map_name.as_deref(),
+            &mut decoded_project_cache,
+        )?;
         let game_state = if let Some(scene) = scene {
             Self::game_state_from_scene(scene)
         } else {
             Self::fallback_game_state()
         };
-        Ok((resources, game_state, Some(mount)))
+        Ok((
+            resources,
+            game_state,
+            Some(mount),
+            asset_load_plan,
+            decoded_project_cache,
+        ))
     }
 
+    fn load_project_resources_with_cache(
+        project_path: &std::path::Path,
+        scene_name: Option<&str>,
+        map_name: Option<&str>,
+        decoded_project_cache: &mut DecodedProjectCache,
+    ) -> Result<(ResourceManager, RuntimeAssetLoadPlan), RenderError> {
+        let resolved = resolve_project_resource_paths(project_path, map_name)?;
+        let tilemap = decoded_project_cache.load_tilemap_from_path(&resolved.tilemap_path)?;
+        tilemap.validate()?;
+        let terrain_atlas =
+            decoded_project_cache.load_atlas_from_path(&resolved.terrain_atlas_path)?;
+        let creature_atlas =
+            decoded_project_cache.load_atlas_from_path(&resolved.creatures_atlas_path)?;
+        let resources = ResourceManager::from_preloaded(terrain_atlas, creature_atlas, tilemap);
+        let asset_load_plan = RuntimeAssetLoadPlan::from_resolved_paths(
+            scene_name.map(str::to_string),
+            map_name.map(str::to_string),
+            &resolved,
+        );
+        Ok((resources, asset_load_plan))
+    }
+
+    #[cfg(test)]
     fn load_project_scene(
         project_path: &std::path::Path,
         scene_name: &str,
     ) -> Result<Scene, String> {
+        let mut decoded_project_cache = DecodedProjectCache::default();
+        Self::load_project_scene_with_cache(project_path, scene_name, &mut decoded_project_cache)
+    }
+
+    fn load_project_scene_with_cache(
+        project_path: &std::path::Path,
+        scene_name: &str,
+        decoded_project_cache: &mut DecodedProjectCache,
+    ) -> Result<Scene, String> {
         let scene_path = project_path
             .join("scenes")
             .join(format!("{scene_name}.json"));
-        let json = fs::read_to_string(&scene_path).map_err(|error| {
-            format!(
-                "Could not read scene file '{}': {}",
-                scene_path.display(),
-                error
-            )
-        })?;
-        serde_json::from_str::<Scene>(&json).map_err(|error| {
-            format!(
-                "Could not parse scene file '{}': {}",
-                scene_path.display(),
-                error
-            )
-        })
+        decoded_project_cache.load_scene_from_path(&scene_path)
     }
 
     fn game_state_from_scene(scene: Scene) -> GameState {
@@ -746,22 +836,24 @@ impl ApplicationHandler for App {
 
         // Initialize rendering system (GPU)
         if let Some(window) = self.platform.window_for_gpu() {
-            if let Some(content_root) = content_root.as_deref() {
-                let (tilemap_texture, sprite_texture) = Self::project_texture_paths(content_root);
-                if let Err(error) = self.rendering.initialize_gpu_with_textures(
-                    window.clone(),
-                    tilemap_texture.clone(),
-                    sprite_texture.clone(),
-                ) {
+            if let Err(error) = self.rendering.initialize_gpu_with_textures(
+                window.clone(),
+                self.asset_load_plan.tilemap_texture_path.clone(),
+                self.asset_load_plan.sprite_texture_path.clone(),
+            ) {
+                if let Some(content_root) = content_root.as_deref() {
                     tracing::error!(
-                        "Failed to initialize GPU with project textures from '{}': {}",
+                        "Failed to initialize GPU with runtime asset plan from '{}': {}",
                         content_root.display(),
                         error
                     );
-                    self.rendering.initialize_gpu(window);
+                } else {
+                    tracing::error!("Failed to initialize GPU with runtime asset plan: {error}");
                 }
-            } else {
                 self.rendering.initialize_gpu(window);
+            } else {
+                self.post_splash_sprite_texture_path =
+                    self.asset_load_plan.sprite_texture_path.clone();
             }
         }
 
@@ -777,10 +869,13 @@ impl ApplicationHandler for App {
             }
         }
 
-        self.post_splash_sprite_texture_path = Self::resolve_post_splash_sprite_texture_path(
-            &self.launch_options,
-            content_root.as_deref(),
-        );
+        self.post_splash_sprite_texture_path =
+            self.post_splash_sprite_texture_path.clone().or_else(|| {
+                Self::resolve_post_splash_sprite_texture_path(
+                    &self.launch_options,
+                    content_root.as_deref(),
+                )
+            });
         self.splash_config = self.splash_policy.resolve(&self.launch_options.splash);
         if let Ok(decoded_logo) = load_image_rgba8_from_bytes(COMMUNITY_SPLASH_LOGO_PNG) {
             if let Err(error) = self.rendering.load_sprite_texture_rgba8(&decoded_logo) {
@@ -1128,8 +1223,11 @@ mod tests {
             .join("MyGame");
         let project_sprites_dir = project_dir.join("assets").join("sprites");
         fs::create_dir_all(&project_sprites_dir).expect("project sprites dir");
-        fs::write(project_sprites_dir.join("creatures.png"), "project-creatures")
-            .expect("project sprite write");
+        fs::write(
+            project_sprites_dir.join("creatures.png"),
+            "project-creatures",
+        )
+        .expect("project sprite write");
 
         let mount_dir = make_unique_temp_dir().join("mount");
         let mount_sprites_dir = mount_dir.join("assets").join("sprites");
@@ -1145,8 +1243,7 @@ mod tests {
             splash: RuntimeSplashOptions::default(),
         };
 
-        let resolved =
-            App::resolve_post_splash_sprite_texture_path(&options, Some(&mount_dir));
+        let resolved = App::resolve_post_splash_sprite_texture_path(&options, Some(&mount_dir));
         assert_eq!(resolved, Some(mount_creatures));
     }
 
@@ -1207,7 +1304,8 @@ mod tests {
             splash: RuntimeSplashOptions::default(),
         };
 
-        let (resources, game_state, pack_mount) = App::build_startup_state(&launch_options);
+        let (resources, game_state, pack_mount, asset_load_plan, _) =
+            App::build_startup_state(&launch_options);
 
         assert!(pack_mount.is_some(), "pack mount should be retained");
         assert_eq!(
@@ -1217,6 +1315,7 @@ mod tests {
         assert_eq!(game_state.entity_manager().active_entities().len(), 0);
         assert_eq!(resources.get_tilemap().size, glam::UVec2::new(1, 1));
         assert_eq!(resources.get_tilemap().atlas, terrain_atlas_path);
+        assert_eq!(asset_load_plan.map_name.as_deref(), Some("demo_map"));
     }
 
     #[test]

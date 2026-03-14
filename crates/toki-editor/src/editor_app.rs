@@ -12,11 +12,11 @@ use winit::keyboard::ModifiersState;
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
 
-use crate::config::EditorConfig;
-use crate::logging::LogCapture;
 use crate::background_tasks::{
     BackgroundTaskManager, BackgroundTaskUpdate, ExportBundleJob, ValidateAssetsJob,
 };
+use crate::config::EditorConfig;
+use crate::logging::LogCapture;
 use crate::project::ProjectManager;
 use crate::rendering::WindowRenderer;
 use crate::scene::viewport::DragPreviewSprite;
@@ -105,7 +105,9 @@ impl EditorApp {
 
     fn busy_logo_path() -> Option<std::path::PathBuf> {
         let candidates = [
-            std::env::current_dir().ok().map(|dir| dir.join("assets").join("TokiLogo.png")),
+            std::env::current_dir()
+                .ok()
+                .map(|dir| dir.join("assets").join("TokiLogo.png")),
             Some(Self::workspace_root().join("assets").join("TokiLogo.png")),
         ];
         candidates.into_iter().flatten().find(|path| path.exists())
@@ -137,11 +139,8 @@ impl EditorApp {
             [decoded.width as usize, decoded.height as usize],
             &decoded.data,
         );
-        self.busy_logo_texture = Some(ctx.load_texture(
-            "toki_busy_logo",
-            color_image,
-            egui::TextureOptions::LINEAR,
-        ));
+        self.busy_logo_texture =
+            Some(ctx.load_texture("toki_busy_logo", color_image, egui::TextureOptions::LINEAR));
     }
 
     /// Helper method to initialize a viewport with WGPU context
@@ -1034,7 +1033,10 @@ impl EditorApp {
             BackgroundTaskUpdate::Started { kind, message } => {
                 self.ui.background_task_running = true;
                 self.ui.background_task_status = Some(format!("{}: {}", kind.label(), message));
-                tracing::info!("{}", self.ui.background_task_status.as_deref().unwrap_or(""));
+                tracing::info!(
+                    "{}",
+                    self.ui.background_task_status.as_deref().unwrap_or("")
+                );
             }
             BackgroundTaskUpdate::Progress { kind, message } => {
                 self.ui.background_task_running = true;

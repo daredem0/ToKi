@@ -1,7 +1,7 @@
 use anyhow::Result;
+mod background_tasks;
 mod config;
 mod editor_app;
-mod background_tasks;
 mod logging;
 use logging::LogCapture;
 mod project;

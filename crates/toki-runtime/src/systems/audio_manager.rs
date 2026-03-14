@@ -13,6 +13,8 @@ use toki_core::{
     EventHandler,
 };
 
+use crate::systems::asset_loading::common_preloaded_sfx_names;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlaybackPolicy {
     /// Allow multiple instances of the same sound to play simultaneously
@@ -36,8 +38,9 @@ pub struct AudioManager {
     manager: KiraAudioManager,
     assets_root: PathBuf,
 
-    // Preloaded sounds - all SFX loaded at startup
+    // Cached sounds - hot SFX loaded at startup, cold SFX loaded lazily on first play
     preloaded_sounds: HashMap<String, StaticSoundData>,
+    sfx_paths: HashMap<String, String>,
 
     // Music paths - discovered at startup, loaded on demand
     music_paths: HashMap<String, String>,
@@ -55,23 +58,35 @@ impl AudioManager {
     pub fn new_with_assets_root(
         assets_root: impl Into<PathBuf>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
+        let preload_names = common_preloaded_sfx_names();
+        Self::new_with_assets_root_and_preload_names(assets_root, &preload_names)
+    }
+
+    pub fn new_with_assets_root_and_preload_names(
+        assets_root: impl Into<PathBuf>,
+        preload_names: &[String],
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let manager = KiraAudioManager::new(AudioManagerSettings::default())?;
         let assets_root = assets_root.into();
         let mut system = Self {
             manager,
             assets_root,
             preloaded_sounds: HashMap::new(),
+            sfx_paths: HashMap::new(),
             music_paths: HashMap::new(),
             channels: HashMap::new(),
         };
 
-        system.scan_and_preload_sfx()?;
+        system.scan_and_preload_sfx(preload_names)?;
         system.scan_music_files()?;
 
         Ok(system)
     }
 
-    fn scan_and_preload_sfx(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn scan_and_preload_sfx(
+        &mut self,
+        preload_names: &[String],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let sfx_dir = self.assets_root.join("assets").join("audio").join("sfx");
 
         if !Path::new(&sfx_dir).exists() {
@@ -79,19 +94,27 @@ impl AudioManager {
             return Ok(());
         }
 
-        for (name, path) in discover_ogg_assets(&sfx_dir)? {
+        let inventory = classify_sfx_inventory(&discover_ogg_assets(&sfx_dir)?, preload_names);
+        for (name, path) in inventory.all_paths {
             let path_str = path.to_string_lossy().to_string();
-            if let Err(e) = self.preload_sound(&name, &path_str) {
-                tracing::warn!(
-                    "Failed to preload SFX '{}':
+            self.sfx_paths.insert(name.clone(), path_str.clone());
+            if inventory.preloaded_names.contains(&name) {
+                if let Err(e) = self.preload_sound(&name, &path_str) {
+                    tracing::warn!(
+                        "Failed to preload SFX '{}':
   {}",
-                    name,
-                    e
-                );
+                        name,
+                        e
+                    );
+                }
             }
         }
 
-        tracing::info!("Preloaded {} SFX files", self.preloaded_sounds.len());
+        tracing::info!(
+            "Preloaded {} hot SFX files ({} discovered)",
+            self.preloaded_sounds.len(),
+            self.sfx_paths.len()
+        );
         Ok(())
     }
 
@@ -325,16 +348,17 @@ impl AudioManager {
             return Ok(());
         }
 
-        // Try on-demand music loading as static sound
-        if let Some(path) = self.music_paths.get(name) {
+        if let Some(path) = self.sfx_paths.get(name) {
             let sound_data = StaticSoundData::from_file(path)?;
+            self.preloaded_sounds
+                .insert(name.to_string(), sound_data.clone());
             let handle = self.manager.play(sound_data)?;
             channel_data.active_handles.push(handle);
-            channel_data.last_played = Some(Instant::now()); // Record timestamp
+            channel_data.last_played = Some(Instant::now());
             let new_total =
                 channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
             tracing::trace!(
-                "✓ Played music '{}' on-demand in channel '{}' (active sounds: {})",
+                "✓ Loaded and cached SFX '{}' on-demand in channel '{}' (active sounds: {})",
                 name,
                 channel,
                 new_total
@@ -457,7 +481,7 @@ impl AudioManager {
     pub fn list_available_sounds(&self) {
         tracing::info!(
             "Available SFX: {:?}",
-            self.preloaded_sounds.keys().collect::<Vec<_>>()
+            self.sfx_paths.keys().collect::<Vec<_>>()
         );
         tracing::info!(
             "Available Music: {:?}",
@@ -489,9 +513,32 @@ fn discover_ogg_assets(dir: &Path) -> Result<Vec<(String, PathBuf)>, std::io::Er
     Ok(discovered)
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SfxInventory {
+    all_paths: Vec<(String, PathBuf)>,
+    preloaded_names: Vec<String>,
+}
+
+fn classify_sfx_inventory(
+    discovered: &[(String, PathBuf)],
+    preload_names: &[String],
+) -> SfxInventory {
+    let preload_name_set = preload_names
+        .iter()
+        .collect::<std::collections::HashSet<_>>();
+    let preloaded_names = discovered
+        .iter()
+        .filter_map(|(name, _)| preload_name_set.contains(name).then_some(name.clone()))
+        .collect::<Vec<_>>();
+    SfxInventory {
+        all_paths: discovered.to_vec(),
+        preloaded_names,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::discover_ogg_assets;
+    use super::{classify_sfx_inventory, discover_ogg_assets};
     use std::fs;
 
     #[test]
@@ -528,12 +575,36 @@ mod tests {
         let discovered = discover_ogg_assets(&audio_dir).expect("discover");
         assert!(discovered.is_empty());
     }
+
+    #[test]
+    fn classify_sfx_inventory_only_marks_hot_sounds_for_preload() {
+        let discovered = vec![
+            ("sfx_jump".to_string(), std::path::PathBuf::from("jump.ogg")),
+            (
+                "lavandia".to_string(),
+                std::path::PathBuf::from("lavandia.ogg"),
+            ),
+            (
+                "sfx_select".to_string(),
+                std::path::PathBuf::from("select.ogg"),
+            ),
+        ];
+        let preload_names = vec!["sfx_jump".to_string(), "sfx_select".to_string()];
+
+        let inventory = classify_sfx_inventory(&discovered, &preload_names);
+        assert_eq!(inventory.all_paths, discovered);
+        assert_eq!(
+            inventory.preloaded_names,
+            vec!["sfx_jump".to_string(), "sfx_select".to_string()]
+        );
+    }
 }
 
 impl std::fmt::Debug for AudioManager {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AudioManager")
             .field("preloaded_sounds_count", &self.preloaded_sounds.len())
+            .field("sfx_paths_count", &self.sfx_paths.len())
             .field("music_paths_count", &self.music_paths.len())
             .field("channels_count", &self.channels.len())
             .finish()

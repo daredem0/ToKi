@@ -5,8 +5,8 @@ use std::fs;
 use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use toki_core::pack::{
-    hash_bytes, infer_pack_asset_type, recommended_pack_compression, PakEntry, PakManifest,
-    PackCompression, PAK_MAGIC, PAK_VERSION,
+    hash_bytes, infer_pack_asset_type, recommended_pack_compression, PackCompression, PakEntry,
+    PakManifest, PAK_MAGIC, PAK_VERSION,
 };
 
 #[derive(Debug, Clone)]
@@ -266,7 +266,7 @@ mod tests {
     use crate::project::Project;
     use std::fs;
     use std::io::{Read, Seek, SeekFrom};
-    use toki_core::pack::{PakManifest, PackAssetType, PackCompression, PAK_MAGIC, PAK_VERSION};
+    use toki_core::pack::{PackAssetType, PackCompression, PakManifest, PAK_MAGIC, PAK_VERSION};
 
     #[test]
     fn collect_source_files_returns_sorted_relative_paths() {
@@ -338,7 +338,13 @@ mod tests {
             .map(|entry| entry.file_name().to_string_lossy().to_string())
             .collect::<Vec<_>>();
         assert_eq!(root_entries.len(), 3);
-        assert!(root_entries.contains(&runtime_bin.file_name().unwrap().to_string_lossy().to_string()));
+        assert!(root_entries.contains(
+            &runtime_bin
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .to_string()
+        ));
         assert!(root_entries.contains(&"game.toki.pak".to_string()));
         assert!(root_entries.contains(&"runtime_config.json".to_string()));
 
@@ -365,19 +371,28 @@ mod tests {
         pak_file.read_exact(&mut index_bytes).expect("read index");
         let manifest: PakManifest = serde_json::from_slice(&index_bytes).expect("manifest");
         assert_eq!(manifest.version, PAK_VERSION);
-        assert!(manifest.entries.iter().any(|entry| entry.path == "project.toml"
-            && entry.asset_type == PackAssetType::ProjectConfig
-            && entry.hash.is_some()
-            && entry.stored_size > 0));
-        assert!(manifest.entries.iter().any(|entry| entry.path == "scenes/main.json"
-            && entry.asset_type == PackAssetType::Scene
-            && entry.hash.is_some()
-            && entry.stored_size > 0));
-        assert!(manifest.entries.iter().any(|entry| entry.path == "assets/audio/test.ogg"
-            && entry.compression == PackCompression::Store
-            && entry.asset_type == PackAssetType::Audio
-            && entry.hash.is_some()
-            && entry.stored_size == entry.size));
+        assert!(manifest
+            .entries
+            .iter()
+            .any(|entry| entry.path == "project.toml"
+                && entry.asset_type == PackAssetType::ProjectConfig
+                && entry.hash.is_some()
+                && entry.stored_size > 0));
+        assert!(manifest
+            .entries
+            .iter()
+            .any(|entry| entry.path == "scenes/main.json"
+                && entry.asset_type == PackAssetType::Scene
+                && entry.hash.is_some()
+                && entry.stored_size > 0));
+        assert!(manifest
+            .entries
+            .iter()
+            .any(|entry| entry.path == "assets/audio/test.ogg"
+                && entry.compression == PackCompression::Store
+                && entry.asset_type == PackAssetType::Audio
+                && entry.hash.is_some()
+                && entry.stored_size == entry.size));
 
         let runtime_config: RuntimeBundleConfig =
             serde_json::from_str(&fs::read_to_string(config_path).expect("read config"))
@@ -422,7 +437,11 @@ mod tests {
         let project_root = parent.join("MyGame");
         fs::create_dir_all(project_root.join("assets/sprites")).expect("sprites dir");
         fs::create_dir_all(project_root.join("scenes")).expect("scenes dir");
-        fs::write(project_root.join("project.toml"), "name='MyGame'\nversion='1'").expect("project");
+        fs::write(
+            project_root.join("project.toml"),
+            "name='MyGame'\nversion='1'",
+        )
+        .expect("project");
         let repeated_entities = (0..128)
             .map(|index| format!("{{\"id\":{index},\"type\":\"npc\",\"x\":0,\"y\":0}}"))
             .collect::<Vec<_>>()
@@ -432,8 +451,11 @@ mod tests {
             format!("{{\"name\":\"main\",\"maps\":[],\"entities\":[{repeated_entities}]}}"),
         )
         .expect("scene");
-        fs::write(project_root.join("assets/sprites/a.png"), [137u8, 80, 78, 71, 13, 10, 26, 10])
-            .expect("png");
+        fs::write(
+            project_root.join("assets/sprites/a.png"),
+            [137u8, 80, 78, 71, 13, 10, 26, 10],
+        )
+        .expect("png");
 
         let runtime_bin = parent.join(if cfg!(target_os = "windows") {
             "toki-runtime.exe"

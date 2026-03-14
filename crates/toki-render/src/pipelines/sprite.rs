@@ -104,7 +104,8 @@ impl SpritePipeline {
             Some("Sprite Texture"),
         );
 
-        let render_pipeline = Self::build_render_pipeline(device, surface_format, &bind_group_layout);
+        let render_pipeline =
+            Self::build_render_pipeline(device, surface_format, &bind_group_layout);
 
         // Create initial empty vertex buffer
         let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -151,7 +152,8 @@ impl SpritePipeline {
             Some("Sprite Texture"),
         );
 
-        let render_pipeline = Self::build_render_pipeline(device, surface_format, &bind_group_layout);
+        let render_pipeline =
+            Self::build_render_pipeline(device, surface_format, &bind_group_layout);
 
         // Create initial empty vertex buffer
         let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
