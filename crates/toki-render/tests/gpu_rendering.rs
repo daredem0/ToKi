@@ -112,6 +112,7 @@ fn build_scene_data(visible_chunks: Vec<(u32, u32)>) -> SceneData {
             },
             position: IVec2::new(4, 8),
             size: UVec2::new(16, 16),
+            texture_path: None,
         }],
         debug_shapes: vec![
             DebugShape {

@@ -358,9 +358,22 @@ impl App {
         tilemap.validate()?;
         let terrain_atlas =
             decoded_project_cache.load_atlas_from_path(&resolved.terrain_atlas_path)?;
-        let creature_atlas =
-            decoded_project_cache.load_atlas_from_path(&resolved.creatures_atlas_path)?;
-        let resources = ResourceManager::from_preloaded(terrain_atlas, creature_atlas, tilemap);
+        let mut sprite_atlases = std::collections::HashMap::new();
+        let mut sprite_texture_paths = std::collections::HashMap::new();
+        for atlas_path in &resolved.sprite_atlas_paths {
+            let atlas = decoded_project_cache.load_atlas_from_path(atlas_path)?;
+            let texture_path = crate::systems::resources::resolve_atlas_texture_path(atlas_path)?;
+            if let Some(file_name) = atlas_path.file_name().and_then(|name| name.to_str()) {
+                sprite_atlases.insert(file_name.to_string(), atlas.clone());
+                sprite_texture_paths.insert(file_name.to_string(), texture_path.clone());
+            }
+            if let Some(stem) = atlas_path.file_stem().and_then(|name| name.to_str()) {
+                sprite_atlases.insert(stem.to_string(), atlas);
+                sprite_texture_paths.insert(stem.to_string(), texture_path);
+            }
+        }
+        let resources =
+            ResourceManager::from_preloaded(terrain_atlas, sprite_atlases, sprite_texture_paths, tilemap);
         let asset_load_plan = RuntimeAssetLoadPlan::from_resolved_paths(
             scene_name.map(str::to_string),
             map_name.map(str::to_string),
@@ -478,23 +491,40 @@ impl App {
                     self.rendering.update_tilemap_vertices(&verts);
                 }
             }
-            let creature_atlas = self.resources.get_creature_atlas();
-            let texture_size = creature_atlas
-                .image_size()
-                .unwrap_or(glam::UVec2::new(64, 16)); // fallback
-
             self.rendering.clear_sprites(); // Clear previous frame's sprites
             self.rendering.clear_text_items();
 
             // Render all visible entities with animation controllers
             let renderable_entities = self.game_system.get_renderable_entities();
             for (entity_id, position, size) in renderable_entities {
+                let Some(atlas_name) = self.game_system.get_entity_current_atlas_name(entity_id)
+                else {
+                    continue;
+                };
+                let Some(sprite_atlas) = self.resources.get_sprite_atlas(&atlas_name) else {
+                    tracing::warn!(
+                        "Entity {} requested missing sprite atlas '{}'",
+                        entity_id,
+                        atlas_name
+                    );
+                    continue;
+                };
+                let texture_size = sprite_atlas
+                    .image_size()
+                    .unwrap_or(glam::UVec2::new(64, 16));
                 if let Some(frame) = self.game_system.get_entity_sprite_frame(
                     entity_id,
-                    creature_atlas,
+                    sprite_atlas,
                     texture_size,
                 ) {
-                    self.rendering.add_sprite(frame, position, size);
+                    if let Some(texture_path) =
+                        self.resources.get_sprite_texture_path(&atlas_name).cloned()
+                    {
+                        self.rendering
+                            .add_sprite_with_texture(texture_path, frame, position, size);
+                    } else {
+                        self.rendering.add_sprite(frame, position, size);
+                    }
                 }
             }
 

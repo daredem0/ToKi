@@ -62,6 +62,36 @@ impl MultiEntityBatchEdit {
     }
 }
 
+fn animation_state_label(state: AnimationState) -> &'static str {
+    match state {
+        AnimationState::Idle => "Idle",
+        AnimationState::Walk => "Walk",
+        AnimationState::IdleDown => "Idle Down",
+        AnimationState::IdleUp => "Idle Up",
+        AnimationState::IdleLeft => "Idle Left",
+        AnimationState::IdleRight => "Idle Right",
+        AnimationState::WalkDown => "Walk Down",
+        AnimationState::WalkUp => "Walk Up",
+        AnimationState::WalkLeft => "Walk Left",
+        AnimationState::WalkRight => "Walk Right",
+    }
+}
+
+fn animation_state_options() -> [AnimationState; 10] {
+    [
+        AnimationState::Idle,
+        AnimationState::Walk,
+        AnimationState::IdleDown,
+        AnimationState::IdleUp,
+        AnimationState::IdleLeft,
+        AnimationState::IdleRight,
+        AnimationState::WalkDown,
+        AnimationState::WalkUp,
+        AnimationState::WalkLeft,
+        AnimationState::WalkRight,
+    ]
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RuleActionKind {
     PlaySound,
@@ -1566,17 +1596,17 @@ impl InspectorSystem {
                         "graph_node_anim_state_{}_{}",
                         scene_name, node_key
                     ))
-                    .selected_text(match state {
-                        AnimationState::Idle => "Idle",
-                        AnimationState::Walk => "Walk",
-                    })
+                    .selected_text(animation_state_label(*state))
                     .show_ui(ui, |ui| {
-                        changed |= ui
-                            .selectable_value(state, AnimationState::Idle, "Idle")
-                            .changed();
-                        changed |= ui
-                            .selectable_value(state, AnimationState::Walk, "Walk")
-                            .changed();
+                        for candidate in animation_state_options() {
+                            changed |= ui
+                                .selectable_value(
+                                    state,
+                                    candidate,
+                                    animation_state_label(candidate),
+                                )
+                                .changed();
+                        }
                     });
                 });
             }
@@ -2137,17 +2167,17 @@ impl InspectorSystem {
                         "rule_animation_state_{}_{}_{}",
                         scene_name, rule_index, action_index
                     ))
-                    .selected_text(match state {
-                        AnimationState::Idle => "Idle",
-                        AnimationState::Walk => "Walk",
-                    })
+                    .selected_text(animation_state_label(*state))
                     .show_ui(ui, |ui| {
-                        changed |= ui
-                            .selectable_value(state, AnimationState::Idle, "Idle")
-                            .changed();
-                        changed |= ui
-                            .selectable_value(state, AnimationState::Walk, "Walk")
-                            .changed();
+                        for candidate in animation_state_options() {
+                            changed |= ui
+                                .selectable_value(
+                                    state,
+                                    candidate,
+                                    animation_state_label(candidate),
+                                )
+                                .changed();
+                        }
                     });
                 });
             }

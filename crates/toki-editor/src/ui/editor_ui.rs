@@ -860,20 +860,12 @@ impl EditorUI {
                                         }
                                     }
 
-                                    if !found_maps {
-                                        tracing::info!("No tilemap (.json) files found in assets/tilemaps/");
-                                    }
+                                    let _ = found_maps;
                                 } else {
                                     tracing::warn!("Could not read tilemaps directory");
                                 }
-                            } else {
-                                tracing::info!("No tilemaps directory found, expected: assets/tilemaps/");
                             }
-                        } else {
-                            tracing::info!("No project loaded for Maps panel");
                         }
-                    } else {
-                        tracing::warn!("No project configuration available for Maps panel");
                     }
                 }
 

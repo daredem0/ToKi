@@ -1,6 +1,7 @@
 use crate::pipelines::sprite::SpriteInstance as SpriteRenderInstance;
 use crate::targets::RenderTarget;
 use crate::{DebugPipeline, RenderError, RenderPipeline, SpritePipeline, TilemapPipeline};
+use std::collections::BTreeMap;
 use toki_core::assets::atlas::AtlasMeta;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::sprite::SpriteFrame;
@@ -22,6 +23,7 @@ pub struct SpriteInstance {
     pub frame: SpriteFrame,
     pub position: glam::IVec2,
     pub size: glam::UVec2,
+    pub texture_path: Option<std::path::PathBuf>,
 }
 
 /// Debug shape for rendering
@@ -59,8 +61,10 @@ pub struct SceneRenderer {
     queue: wgpu::Queue,
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
+    sprite_pipelines_by_texture: BTreeMap<std::path::PathBuf, SpritePipeline>,
     debug_pipeline: DebugPipeline,
     current_sprite_texture_path: Option<std::path::PathBuf>, // Cache current sprite texture
+    current_projection: glam::Mat4,
 }
 
 impl SceneRenderer {
@@ -110,8 +114,10 @@ impl SceneRenderer {
             queue,
             tilemap_pipeline,
             sprite_pipeline,
+            sprite_pipelines_by_texture: BTreeMap::new(),
             debug_pipeline,
             current_sprite_texture_path: sprite_texture_cache,
+            current_projection: glam::Mat4::IDENTITY,
         })
     }
 
@@ -151,9 +157,57 @@ impl SceneRenderer {
             wgpu::TextureFormat::Bgra8UnormSrgb, // TODO: Get from render target
             texture_path.clone(),
         );
+        self.sprite_pipelines_by_texture.clear();
         self.current_sprite_texture_path = Some(texture_path);
         tracing::info!("Sprite texture loaded successfully");
         Ok(())
+    }
+
+    fn update_sprite_projection(&mut self, projection: glam::Mat4) {
+        self.sprite_pipeline.update_projection(&self.queue, projection);
+        for pipeline in self.sprite_pipelines_by_texture.values_mut() {
+            pipeline.update_projection(&self.queue, projection);
+        }
+    }
+
+    fn clear_sprite_batches(&mut self) {
+        self.sprite_pipeline.clear_sprites();
+        for pipeline in self.sprite_pipelines_by_texture.values_mut() {
+            pipeline.clear_sprites();
+        }
+    }
+
+    fn add_sprite_instance(&mut self, sprite: &SpriteInstance) {
+        let render_instance = SpriteRenderInstance {
+            frame: sprite.frame,
+            position: sprite.position.as_vec2(),
+            size: sprite.size.as_vec2(),
+        };
+
+        if let Some(texture_path) = &sprite.texture_path {
+            let pipeline = self
+                .sprite_pipelines_by_texture
+                .entry(texture_path.clone())
+                .or_insert_with(|| {
+                    SpritePipeline::new(
+                        &self.device,
+                        &self.queue,
+                        wgpu::TextureFormat::Bgra8UnormSrgb,
+                        texture_path.clone(),
+                    )
+                });
+            pipeline.update_projection(&self.queue, self.current_projection);
+            pipeline.add_sprite(render_instance);
+        } else {
+            self.sprite_pipeline.add_sprite(render_instance);
+        }
+    }
+
+    fn update_sprite_batches(&mut self) {
+        self.sprite_pipeline.update_with_queue(&self.queue);
+        for pipeline in self.sprite_pipelines_by_texture.values_mut() {
+            pipeline.update_with_queue(&self.queue);
+        }
     }
 
     /// Render scene to any render target with custom projection matrix
@@ -207,18 +261,12 @@ impl SceneRenderer {
 
         // Add sprites (same logic as runtime)
         tracing::trace!("Adding {} sprites to pipeline", scene_data.sprites.len());
-        self.sprite_pipeline.clear_sprites();
+        self.clear_sprite_batches();
         for sprite in &scene_data.sprites {
-            let render_instance = SpriteRenderInstance {
-                frame: sprite.frame,
-                position: sprite.position.as_vec2(),
-                size: sprite.size.as_vec2(),
-            };
-            self.sprite_pipeline.add_sprite(render_instance);
+            self.add_sprite_instance(sprite);
         }
 
-        // CRITICAL FIX: Update sprite vertex buffer on GPU (this was missing!)
-        self.sprite_pipeline.update_with_queue(&self.queue);
+        self.update_sprite_batches();
         tracing::trace!("Updated sprite vertex buffer on GPU");
 
         // Add debug shapes
@@ -284,6 +332,9 @@ impl SceneRenderer {
             self.tilemap_pipeline.render(&mut render_pass);
             tracing::trace!("Rendering sprite pipeline");
             self.sprite_pipeline.render(&mut render_pass);
+            for pipeline in self.sprite_pipelines_by_texture.values() {
+                pipeline.render(&mut render_pass);
+            }
             tracing::trace!("Rendering debug pipeline");
             self.debug_pipeline.render(&mut render_pass);
         }
@@ -349,18 +400,12 @@ impl SceneRenderer {
 
         // Add sprites (same logic as runtime)
         tracing::trace!("Adding {} sprites to pipeline", scene_data.sprites.len());
-        self.sprite_pipeline.clear_sprites();
+        self.clear_sprite_batches();
         for sprite in &scene_data.sprites {
-            let render_instance = SpriteRenderInstance {
-                frame: sprite.frame,
-                position: sprite.position.as_vec2(),
-                size: sprite.size.as_vec2(),
-            };
-            self.sprite_pipeline.add_sprite(render_instance);
+            self.add_sprite_instance(sprite);
         }
 
-        // CRITICAL FIX: Update sprite vertex buffer on GPU (this was missing!)
-        self.sprite_pipeline.update_with_queue(&self.queue);
+        self.update_sprite_batches();
         tracing::trace!("Updated sprite vertex buffer on GPU");
 
         // Add debug shapes
@@ -426,6 +471,9 @@ impl SceneRenderer {
             self.tilemap_pipeline.render(&mut render_pass);
             tracing::trace!("Rendering sprite pipeline");
             self.sprite_pipeline.render(&mut render_pass);
+            for pipeline in self.sprite_pipelines_by_texture.values() {
+                pipeline.render(&mut render_pass);
+            }
             tracing::trace!("Rendering debug pipeline");
             self.debug_pipeline.render(&mut render_pass);
         }
@@ -451,10 +499,10 @@ impl SceneRenderer {
     }
 
     fn update_projection(&mut self, projection: glam::Mat4) {
+        self.current_projection = projection;
         self.tilemap_pipeline
             .update_projection(&self.queue, projection);
-        self.sprite_pipeline
-            .update_projection(&self.queue, projection);
+        self.update_sprite_projection(projection);
         self.debug_pipeline.update_camera(&self.queue, projection);
     }
 }

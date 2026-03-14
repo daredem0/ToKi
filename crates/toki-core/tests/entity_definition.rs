@@ -183,6 +183,85 @@ fn test_entity_definition_create_npc_entity() {
 }
 
 #[test]
+fn test_entity_definition_accepts_directional_animation_states() {
+    let entity_def = EntityDefinition {
+        name: "directional_player".to_string(),
+        display_name: "Directional Player".to_string(),
+        description: "Player with directional walk clips".to_string(),
+        entity_type: "player".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 1,
+            visible: true,
+        },
+        attributes: AttributesDef {
+            health: Some(100),
+            speed: 2,
+            solid: true,
+            active: true,
+            can_move: true,
+            has_inventory: true,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            movement_sound: "player_footsteps".to_string(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "players.json".to_string(),
+            clips: vec![
+                AnimationClipDef {
+                    state: "idle_down".to_string(),
+                    frame_tiles: vec!["player/walk_down_a".to_string()],
+                    frame_duration_ms: 300.0,
+                    loop_mode: "loop".to_string(),
+                },
+                AnimationClipDef {
+                    state: "walk_down".to_string(),
+                    frame_tiles: vec![
+                        "player/walk_down_a".to_string(),
+                        "player/walk_down_b".to_string(),
+                    ],
+                    frame_duration_ms: 180.0,
+                    loop_mode: "loop".to_string(),
+                },
+                AnimationClipDef {
+                    state: "walk_right".to_string(),
+                    frame_tiles: vec![
+                        "player/walk_right_a".to_string(),
+                        "player/walk_right_b".to_string(),
+                    ],
+                    frame_duration_ms: 180.0,
+                    loop_mode: "loop".to_string(),
+                },
+            ],
+            default_state: "idle_down".to_string(),
+        },
+        category: "character".to_string(),
+        tags: vec!["player".to_string()],
+    };
+
+    let entity = entity_def
+        .create_entity(IVec2::new(0, 0), 1)
+        .expect("directional definition should parse");
+    let controller = entity
+        .attributes
+        .animation_controller
+        .expect("controller should exist");
+
+    assert!(controller.clips.contains_key(&AnimationState::IdleDown));
+    assert!(controller.clips.contains_key(&AnimationState::WalkDown));
+    assert!(controller.clips.contains_key(&AnimationState::WalkRight));
+    assert_eq!(controller.current_clip_state, AnimationState::IdleDown);
+}
+
+#[test]
 fn test_entity_definition_invalid_entity_type() {
     let entity_def = EntityDefinition {
         name: "invalid".to_string(),

@@ -7,6 +7,14 @@ use std::collections::HashMap;
 pub enum AnimationState {
     Idle,
     Walk,
+    IdleDown,
+    IdleUp,
+    IdleLeft,
+    IdleRight,
+    WalkDown,
+    WalkUp,
+    WalkLeft,
+    WalkRight,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,6 +61,10 @@ impl AnimationController {
     /// Add an animation clip to this controller
     pub fn add_clip(&mut self, clip: AnimationClip) {
         self.clips.insert(clip.state, clip);
+    }
+
+    pub fn has_clip(&self, clip_state: AnimationState) -> bool {
+        self.clips.contains_key(&clip_state)
     }
 
     /// Start playing a specific animation

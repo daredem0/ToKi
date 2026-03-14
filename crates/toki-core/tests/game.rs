@@ -10,6 +10,7 @@ use toki_core::entity::{
     RenderingDef,
 };
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
+use toki_core::animation::AnimationState;
 use toki_core::{game::AudioChannel, game::AudioEvent, GameState, InputKey};
 
 fn create_test_sprite() -> SpriteInstance {
@@ -375,6 +376,79 @@ fn game_state_world_bounds_bottom_boundary() {
     // One more update should not move further
     let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     assert!(!result.player_moved); // Should not report movement when clamped
+}
+
+#[test]
+fn game_state_directional_walk_animation_follows_movement_direction() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleDown,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::WalkDown,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::WalkUp,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_up_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::WalkLeft,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::WalkRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.play(AnimationState::IdleDown);
+
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    game_state.handle_key_press(InputKey::Up);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.handle_key_release(InputKey::Up);
+    let state_after_up = game_state
+        .player_entity()
+        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .map(|controller| controller.current_clip_state);
+    assert_eq!(state_after_up, Some(AnimationState::WalkUp));
+
+    game_state.handle_key_press(InputKey::Right);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.handle_key_release(InputKey::Right);
+    let state_after_right = game_state
+        .player_entity()
+        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .map(|controller| controller.current_clip_state);
+    assert_eq!(state_after_right, Some(AnimationState::WalkRight));
 }
 
 #[test]

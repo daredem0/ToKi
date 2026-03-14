@@ -408,6 +408,22 @@ pub struct AnimationClipDef {
 
 // Conversion implementations
 impl EntityDefinition {
+    fn parse_animation_state(state: &str) -> Result<AnimationState, String> {
+        match state.to_lowercase().as_str() {
+            "idle" => Ok(AnimationState::Idle),
+            "walk" => Ok(AnimationState::Walk),
+            "idle_down" => Ok(AnimationState::IdleDown),
+            "idle_up" => Ok(AnimationState::IdleUp),
+            "idle_left" => Ok(AnimationState::IdleLeft),
+            "idle_right" => Ok(AnimationState::IdleRight),
+            "walk_down" => Ok(AnimationState::WalkDown),
+            "walk_up" => Ok(AnimationState::WalkUp),
+            "walk_left" => Ok(AnimationState::WalkLeft),
+            "walk_right" => Ok(AnimationState::WalkRight),
+            _ => Err(format!("Unknown animation state: {state}")),
+        }
+    }
+
     /// Create an Entity instance from this definition at the given position
     pub fn create_entity(&self, position: IVec2, entity_id: EntityId) -> Result<Entity, String> {
         // Parse entity type
@@ -423,11 +439,7 @@ impl EntityDefinition {
         // Build animation controller
         let mut animation_controller = AnimationController::new();
         for clip_def in &self.animations.clips {
-            let state = match clip_def.state.to_lowercase().as_str() {
-                "idle" => AnimationState::Idle,
-                "walk" => AnimationState::Walk,
-                _ => return Err(format!("Unknown animation state: {}", clip_def.state)),
-            };
+            let state = Self::parse_animation_state(&clip_def.state)?;
 
             let loop_mode = match clip_def.loop_mode.to_lowercase().as_str() {
                 "loop" => LoopMode::Loop,
@@ -447,16 +459,7 @@ impl EntityDefinition {
         }
 
         // Set default animation state
-        let default_state = match self.animations.default_state.to_lowercase().as_str() {
-            "idle" => AnimationState::Idle,
-            "walk" => AnimationState::Walk,
-            _ => {
-                return Err(format!(
-                    "Unknown default animation state: {}",
-                    self.animations.default_state
-                ))
-            }
-        };
+        let default_state = Self::parse_animation_state(&self.animations.default_state)?;
         animation_controller.play(default_state);
 
         // Build attributes

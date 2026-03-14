@@ -13,6 +13,36 @@ use toki_core::rules::{
 /// Handles panel rendering for the editor (viewport and log panels)
 pub struct PanelSystem;
 
+fn animation_state_label(state: AnimationState) -> &'static str {
+    match state {
+        AnimationState::Idle => "Idle",
+        AnimationState::Walk => "Walk",
+        AnimationState::IdleDown => "Idle Down",
+        AnimationState::IdleUp => "Idle Up",
+        AnimationState::IdleLeft => "Idle Left",
+        AnimationState::IdleRight => "Idle Right",
+        AnimationState::WalkDown => "Walk Down",
+        AnimationState::WalkUp => "Walk Up",
+        AnimationState::WalkLeft => "Walk Left",
+        AnimationState::WalkRight => "Walk Right",
+    }
+}
+
+fn animation_state_options() -> [AnimationState; 10] {
+    [
+        AnimationState::Idle,
+        AnimationState::Walk,
+        AnimationState::IdleDown,
+        AnimationState::IdleUp,
+        AnimationState::IdleLeft,
+        AnimationState::IdleRight,
+        AnimationState::WalkDown,
+        AnimationState::WalkUp,
+        AnimationState::WalkLeft,
+        AnimationState::WalkRight,
+    ]
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum GraphConditionKind {
     Always,
@@ -2324,17 +2354,17 @@ impl PanelSystem {
                 let mut changed =
                     Self::edit_rule_target(ui, target, &format!("{id_prefix}::anim_target"));
                 egui::ComboBox::from_id_salt((id_prefix, "anim_state"))
-                    .selected_text(match state {
-                        AnimationState::Idle => "Idle",
-                        AnimationState::Walk => "Walk",
-                    })
+                    .selected_text(animation_state_label(*state))
                     .show_ui(ui, |ui| {
-                        changed |= ui
-                            .selectable_value(state, AnimationState::Idle, "Idle")
-                            .changed();
-                        changed |= ui
-                            .selectable_value(state, AnimationState::Walk, "Walk")
-                            .changed();
+                        for candidate in animation_state_options() {
+                            changed |= ui
+                                .selectable_value(
+                                    state,
+                                    candidate,
+                                    animation_state_label(candidate),
+                                )
+                                .changed();
+                        }
                     });
                 changed
             }

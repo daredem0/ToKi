@@ -1,7 +1,7 @@
 {
   "name": "player",
   "display_name": "Player Character",
-  "description": "The main character controlled by the player",
+  "description": "The main character controlled by the player with directional walk animations",
   "entity_type": "player",
   "rendering": {
     "size": [
@@ -36,30 +36,78 @@
     "movement_sound": "sfx_player_step"
   },
   "animations": {
-    "atlas_name": "creatures.json",
+    "atlas_name": "players.json",
     "clips": [
       {
-        "state": "idle",
+        "state": "idle_down",
         "frame_tiles": [
-          "slime/idle_0",
-          "slime/idle_1"
+          "player/walk_down_a"
         ],
         "frame_duration_ms": 300.0,
         "loop_mode": "loop"
       },
       {
-        "state": "walk",
+        "state": "walk_down",
         "frame_tiles": [
-          "slime/walk_0",
-          "slime/walk_1",
-          "slime/walk_2",
-          "slime/walk_3"
+          "player/walk_down_a",
+          "player/walk_down_b"
         ],
-        "frame_duration_ms": 150.0,
+        "frame_duration_ms": 180.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "idle_up",
+        "frame_tiles": [
+          "player/walk_up_a"
+        ],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_up",
+        "frame_tiles": [
+          "player/walk_up_a",
+          "player/walk_up_b"
+        ],
+        "frame_duration_ms": 180.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "idle_right",
+        "frame_tiles": [
+          "player/walk_right_a"
+        ],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_right",
+        "frame_tiles": [
+          "player/walk_right_a",
+          "player/walk_right_b"
+        ],
+        "frame_duration_ms": 180.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "idle_left",
+        "frame_tiles": [
+          "player/walk_right_a"
+        ],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_left",
+        "frame_tiles": [
+          "player/walk_right_a",
+          "player/walk_right_b"
+        ],
+        "frame_duration_ms": 180.0,
         "loop_mode": "loop"
       }
     ],
-    "default_state": "idle"
+    "default_state": "idle_down"
   },
   "category": "character",
   "tags": [

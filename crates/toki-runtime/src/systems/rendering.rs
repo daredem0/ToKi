@@ -31,6 +31,13 @@ trait RuntimeRenderBackend: std::fmt::Debug {
     fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]);
     fn clear_sprites(&mut self);
     fn add_sprite(&mut self, frame: SpriteFrame, position: glam::IVec2, size: glam::UVec2);
+    fn add_sprite_with_texture(
+        &mut self,
+        texture_path: std::path::PathBuf,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+    );
     fn clear_text_items(&mut self);
     fn add_text_item(&mut self, text: TextItem);
     fn clear_debug_shapes(&mut self);
@@ -116,6 +123,17 @@ impl RuntimeRenderBackend for WgpuRenderBackend {
 
     fn add_sprite(&mut self, frame: SpriteFrame, position: glam::IVec2, size: glam::UVec2) {
         self.gpu.add_sprite(frame, position, size);
+    }
+
+    fn add_sprite_with_texture(
+        &mut self,
+        texture_path: std::path::PathBuf,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+    ) {
+        self.gpu
+            .add_sprite_with_texture(texture_path, frame, position, size);
     }
 
     fn clear_text_items(&mut self) {
@@ -383,6 +401,18 @@ impl RenderingSystem {
         }
     }
 
+    pub fn add_sprite_with_texture(
+        &mut self,
+        texture_path: std::path::PathBuf,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+    ) {
+        if let Some(backend) = &mut self.backend {
+            backend.add_sprite_with_texture(texture_path, frame, position, size);
+        }
+    }
+
     pub fn clear_text_items(&mut self) {
         if let Some(backend) = &mut self.backend {
             backend.clear_text_items();
@@ -562,6 +592,16 @@ mod tests {
         }
 
         fn add_sprite(&mut self, _frame: SpriteFrame, _position: glam::IVec2, _size: glam::UVec2) {
+            self.sprite_count.set(self.sprite_count.get() + 1);
+        }
+
+        fn add_sprite_with_texture(
+            &mut self,
+            _texture_path: std::path::PathBuf,
+            _frame: SpriteFrame,
+            _position: glam::IVec2,
+            _size: glam::UVec2,
+        ) {
             self.sprite_count.set(self.sprite_count.get() + 1);
         }
 

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
@@ -23,6 +24,7 @@ pub struct GpuState {
     queue: Queue,
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
+    sprite_pipelines_by_texture: BTreeMap<PathBuf, SpritePipeline>,
     debug_pipeline: DebugPipeline,
     ui_debug_pipeline: DebugPipeline,
     text_renderer: GlyphonTextRenderer,
@@ -56,8 +58,38 @@ impl GpuState {
         self.sprite_pipeline.add_sprite(instance);
     }
 
+    pub fn add_sprite_with_texture(
+        &mut self,
+        texture_path: PathBuf,
+        frame: SpriteFrame,
+        pos: glam::IVec2,
+        size: glam::UVec2,
+    ) {
+        let instance = SpriteInstance {
+            frame,
+            position: pos.as_vec2(),
+            size: size.as_vec2(),
+        };
+        let pipeline = self
+            .sprite_pipelines_by_texture
+            .entry(texture_path.clone())
+            .or_insert_with(|| {
+                SpritePipeline::new(
+                    &self.device,
+                    &self.queue,
+                    self.config.format,
+                    texture_path,
+                )
+            });
+        pipeline.update_projection(&self.queue, self.current_mvp);
+        pipeline.add_sprite(instance);
+    }
+
     pub fn clear_sprites(&mut self) {
         self.sprite_pipeline.clear_sprites();
+        for pipeline in self.sprite_pipelines_by_texture.values_mut() {
+            pipeline.clear_sprites();
+        }
     }
 
     pub fn clear_text_items(&mut self) {
@@ -115,6 +147,7 @@ impl GpuState {
             queue,
             tilemap_pipeline,
             sprite_pipeline,
+            sprite_pipelines_by_texture: BTreeMap::new(),
             debug_pipeline,
             ui_debug_pipeline,
             text_renderer,
@@ -142,6 +175,7 @@ impl GpuState {
         let new_pipeline =
             SpritePipeline::new(&self.device, &self.queue, self.config.format, texture_path);
         self.sprite_pipeline = new_pipeline;
+        self.sprite_pipelines_by_texture.clear();
         Ok(())
     }
 
@@ -152,6 +186,7 @@ impl GpuState {
         let new_pipeline =
             SpritePipeline::from_rgba8(&self.device, &self.queue, self.config.format, image);
         self.sprite_pipeline = new_pipeline;
+        self.sprite_pipelines_by_texture.clear();
         Ok(())
     }
 
@@ -182,6 +217,7 @@ impl GpuState {
             queue,
             tilemap_pipeline,
             sprite_pipeline,
+            sprite_pipelines_by_texture: BTreeMap::new(),
             debug_pipeline,
             ui_debug_pipeline,
             text_renderer,
@@ -204,6 +240,9 @@ impl GpuState {
         self.current_mvp = mvp;
         self.tilemap_pipeline.update_projection(&self.queue, mvp);
         self.sprite_pipeline.update_projection(&self.queue, mvp);
+        for pipeline in self.sprite_pipelines_by_texture.values_mut() {
+            pipeline.update_projection(&self.queue, mvp);
+        }
         self.debug_pipeline.update_camera(&self.queue, mvp);
     }
 
@@ -211,6 +250,9 @@ impl GpuState {
         // Update pipelines before rendering
         self.tilemap_pipeline.update_with_queue(&self.queue);
         self.sprite_pipeline.update_with_queue(&self.queue);
+        for pipeline in self.sprite_pipelines_by_texture.values_mut() {
+            pipeline.update_with_queue(&self.queue);
+        }
 
         let text_backgrounds = self
             .text_renderer
@@ -274,6 +316,9 @@ impl GpuState {
 
             // Render sprites on top
             self.sprite_pipeline.render(&mut render_pass);
+            for pipeline in self.sprite_pipelines_by_texture.values() {
+                pipeline.render(&mut render_pass);
+            }
 
             // Render debug shapes last (on top of everything)
             self.debug_pipeline.render(&mut render_pass);

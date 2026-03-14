@@ -72,6 +72,13 @@ impl GameManager {
             .get_entity_sprite_frame(entity_id, atlas, texture_size)
     }
 
+    pub fn get_entity_current_atlas_name(
+        &self,
+        entity_id: toki_core::entity::EntityId,
+    ) -> Option<String> {
+        self.game_state.get_entity_current_atlas_name(entity_id)
+    }
+
     /// Spawn an NPC that looks like the player
     pub fn spawn_player_like_npc(&mut self, position: glam::IVec2) -> toki_core::entity::EntityId {
         self.game_state.spawn_player_like_npc(position)

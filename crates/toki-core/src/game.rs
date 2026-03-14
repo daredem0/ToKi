@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::animation::AnimationState;
+use crate::animation::{AnimationController, AnimationState};
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::collision;
@@ -94,6 +94,14 @@ struct RuleRuntimeState {
     frame_collision_detected: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FacingDirection {
+    Down,
+    Up,
+    Left,
+    Right,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum RuleCommand {
     PlaySound {
@@ -124,6 +132,70 @@ enum RuleCommand {
 }
 
 impl GameState {
+    fn facing_from_delta(delta: glam::IVec2) -> Option<FacingDirection> {
+        if delta == glam::IVec2::ZERO {
+            return None;
+        }
+        if delta.x.abs() > delta.y.abs() {
+            if delta.x < 0 {
+                Some(FacingDirection::Left)
+            } else {
+                Some(FacingDirection::Right)
+            }
+        } else if delta.y < 0 {
+            Some(FacingDirection::Up)
+        } else {
+            Some(FacingDirection::Down)
+        }
+    }
+
+    fn facing_from_animation_state(state: AnimationState) -> FacingDirection {
+        match state {
+            AnimationState::IdleUp | AnimationState::WalkUp => FacingDirection::Up,
+            AnimationState::IdleLeft | AnimationState::WalkLeft => FacingDirection::Left,
+            AnimationState::IdleRight | AnimationState::WalkRight => FacingDirection::Right,
+            AnimationState::Idle
+            | AnimationState::Walk
+            | AnimationState::IdleDown
+            | AnimationState::WalkDown => FacingDirection::Down,
+        }
+    }
+
+    fn directional_animation_state(moving: bool, facing: FacingDirection) -> AnimationState {
+        match (moving, facing) {
+            (false, FacingDirection::Down) => AnimationState::IdleDown,
+            (false, FacingDirection::Up) => AnimationState::IdleUp,
+            (false, FacingDirection::Left) => AnimationState::IdleLeft,
+            (false, FacingDirection::Right) => AnimationState::IdleRight,
+            (true, FacingDirection::Down) => AnimationState::WalkDown,
+            (true, FacingDirection::Up) => AnimationState::WalkUp,
+            (true, FacingDirection::Left) => AnimationState::WalkLeft,
+            (true, FacingDirection::Right) => AnimationState::WalkRight,
+        }
+    }
+
+    fn resolve_animation_state(
+        animation_controller: &AnimationController,
+        moving: bool,
+        delta: glam::IVec2,
+    ) -> AnimationState {
+        let fallback = if moving {
+            AnimationState::Walk
+        } else {
+            AnimationState::Idle
+        };
+
+        let facing = Self::facing_from_delta(delta)
+            .unwrap_or_else(|| Self::facing_from_animation_state(animation_controller.current_clip_state));
+        let directional = Self::directional_animation_state(moving, facing);
+
+        if animation_controller.has_clip(directional) {
+            directional
+        } else {
+            fallback
+        }
+    }
+
     /// Create a new GameState with the given player sprite
     pub fn new(player_sprite: SpriteInstance) -> Self {
         let mut entity_manager = EntityManager::new();
@@ -319,6 +391,12 @@ impl GameState {
         let (mut pending_rule_animations, mut pending_scene_switch) =
             self.apply_rule_commands(rule_commands, &mut result);
 
+        let initial_player_position = self
+            .player_id
+            .and_then(|player_id| self.entity_manager.get_entity(player_id))
+            .map(|entity| entity.position)
+            .unwrap_or(glam::IVec2::ZERO);
+
         let input_result = self.process_input(world_bounds, tilemap, atlas);
         result.player_moved = input_result.player_moved;
         result.add_events(input_result.events);
@@ -330,11 +408,12 @@ impl GameState {
         // Pick moving or idle animation
         if let Some(player_entity) = self.entity_manager.get_player_mut() {
             if let Some(animation_controller) = &mut player_entity.attributes.animation_controller {
-                let desired_player_animation = if result.player_moved {
-                    AnimationState::Walk
-                } else {
-                    AnimationState::Idle
-                };
+                let player_delta = player_entity.position - initial_player_position;
+                let desired_player_animation = Self::resolve_animation_state(
+                    animation_controller,
+                    result.player_moved,
+                    player_delta,
+                );
                 if animation_controller.current_clip_state != desired_player_animation {
                     tracing::debug!(
                         "Changing clip from  {:?} to {:?}",
@@ -504,7 +583,10 @@ impl GameState {
             return GameUpdateResult::new();
         };
 
-        for key in &self.keys_held {
+        let mut held_keys = self.keys_held.iter().copied().collect::<Vec<_>>();
+        held_keys.sort_by_key(|key| Self::input_key_order(*key));
+
+        for key in held_keys {
             match key {
                 InputKey::Up => {
                     tracing::trace!("Move forward");
@@ -879,6 +961,13 @@ impl GameState {
             tracing::warn!("Entity {} not found when getting sprite frame", entity_id);
         }
         None
+    }
+
+    pub fn get_entity_current_atlas_name(&self, entity_id: EntityId) -> Option<String> {
+        self.entity_manager
+            .get_entity(entity_id)
+            .and_then(|entity| entity.attributes.animation_controller.as_ref())
+            .and_then(|controller| controller.current_atlas_name().ok())
     }
 
     /// Get all renderable entities (entities that are visible and have animation controllers)

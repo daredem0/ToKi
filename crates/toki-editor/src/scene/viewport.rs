@@ -668,6 +668,10 @@ impl SceneViewport {
             frame,
             position: render_position_i32,
             size,
+            texture_path: atlas_asset
+                .path
+                .parent()
+                .map(|parent| parent.join(&sprite_atlas.image)),
         };
 
         scene_data.sprites.push(sprite_instance);
@@ -740,6 +744,7 @@ impl SceneViewport {
             frame: cached_frame,
             position: render_position_i32,
             size: entity_size,
+            texture_path: None,
         };
 
         scene_data.sprites.push(preview_sprite);
@@ -1135,6 +1140,10 @@ impl SceneViewport {
     pub fn mark_dirty(&mut self) {
         tracing::trace!("Scene viewport marked dirty - will re-render on next frame");
         self.needs_render = true;
+    }
+
+    pub fn needs_render(&self) -> bool {
+        self.needs_render
     }
 
     /// Temporarily suppress rendering for multiple entities.

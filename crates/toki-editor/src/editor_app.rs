@@ -737,6 +737,14 @@ impl EditorApp {
         self.handle_play_scene_request();
         self.handle_active_scene_map_loading();
         self.handle_map_requests();
+
+        if self
+            .scene_viewport
+            .as_ref()
+            .is_some_and(crate::scene::SceneViewport::needs_render)
+        {
+            window.request_redraw();
+        }
     }
 
     fn handle_new_project_requested(&mut self, template: ProjectTemplateKind) {
