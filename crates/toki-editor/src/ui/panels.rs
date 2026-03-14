@@ -1,7 +1,6 @@
-use super::editor_ui::{CenterPanelTab, Selection};
+use super::editor_ui::{CenterPanelTab, SceneRulesGraphCommandData, Selection};
 use super::interactions::{CameraInteraction, PlacementInteraction, SelectionInteraction};
 use super::rule_graph::{RuleGraph, RuleGraphError, RuleGraphNodeKind};
-use super::undo_redo::EditorCommand;
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -1085,26 +1084,18 @@ impl PanelSystem {
 
             let state_changed = graph_changed || scene_changed || layout_changed;
             if state_changed {
-                let mut after_layout = before_layout_snapshot.clone().unwrap_or_default();
-                after_layout.node_positions.clear();
-                for node in &graph.nodes {
-                    let Some(node_key) = graph.stable_node_key(node.id) else {
-                        continue;
-                    };
-                    after_layout.node_positions.insert(node_key, node.position);
-                }
-                after_layout.zoom = graph_zoom;
-                after_layout.pan = graph_pan;
-
-                if !ui_state.execute_command(EditorCommand::update_scene_rules_graph(
-                    active_scene_name.clone(),
-                    before_rule_set.clone(),
-                    after_rule_set,
-                    before_graph_snapshot.clone(),
-                    Some(graph.clone()),
-                    before_layout_snapshot.clone(),
-                    Some(after_layout),
-                )) {
+                if !ui_state.execute_scene_rules_graph_command(
+                    &active_scene_name,
+                    SceneRulesGraphCommandData {
+                        before_rule_set: before_rule_set.clone(),
+                        after_rule_set,
+                        before_graph: before_graph_snapshot.clone(),
+                        after_graph: graph.clone(),
+                        before_layout: before_layout_snapshot.clone(),
+                        zoom: graph_zoom,
+                        pan: graph_pan,
+                    },
+                ) {
                     operation_error =
                         Some("Failed to record scene graph change in undo history.".to_string());
                 }

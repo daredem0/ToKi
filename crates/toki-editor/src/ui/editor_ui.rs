@@ -47,6 +47,17 @@ pub struct MarqueeSelectionState {
     pub current_screen: egui::Pos2,
 }
 
+#[derive(Debug, Clone)]
+pub struct SceneRulesGraphCommandData {
+    pub before_rule_set: RuleSet,
+    pub after_rule_set: RuleSet,
+    pub before_graph: Option<RuleGraph>,
+    pub after_graph: RuleGraph,
+    pub before_layout: Option<SceneGraphLayout>,
+    pub zoom: f32,
+    pub pan: [f32; 2],
+}
+
 /// Manages the editor's UI state and rendering
 pub struct EditorUI {
     // Scene management
@@ -443,6 +454,55 @@ impl EditorUI {
             layout.pan = pan;
             self.graph_layout_dirty = true;
         }
+    }
+
+    pub fn build_scene_graph_layout_snapshot(
+        &self,
+        scene_name: &str,
+        graph: &RuleGraph,
+        zoom: f32,
+        pan: [f32; 2],
+        base_layout: Option<SceneGraphLayout>,
+    ) -> SceneGraphLayout {
+        let mut layout = base_layout.unwrap_or_else(|| {
+            self.graph_layouts_by_scene
+                .get(scene_name)
+                .cloned()
+                .unwrap_or_default()
+        });
+        layout.node_positions.clear();
+        for node in &graph.nodes {
+            let Some(node_key) = graph.stable_node_key(node.id) else {
+                continue;
+            };
+            layout.node_positions.insert(node_key, node.position);
+        }
+        layout.zoom = zoom;
+        layout.pan = pan;
+        layout
+    }
+
+    pub fn execute_scene_rules_graph_command(
+        &mut self,
+        scene_name: &str,
+        data: SceneRulesGraphCommandData,
+    ) -> bool {
+        let after_layout = self.build_scene_graph_layout_snapshot(
+            scene_name,
+            &data.after_graph,
+            data.zoom,
+            data.pan,
+            data.before_layout.clone(),
+        );
+        self.execute_command(EditorCommand::update_scene_rules_graph(
+            scene_name.to_string(),
+            data.before_rule_set,
+            data.after_rule_set,
+            data.before_graph,
+            Some(data.after_graph),
+            data.before_layout,
+            Some(after_layout),
+        ))
     }
 
     pub fn sync_rule_graph_with_rule_set(&mut self, scene_name: &str, rule_set: &RuleSet) {

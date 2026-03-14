@@ -62,6 +62,12 @@ struct EditorApp {
     startup_project_auto_open_done: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EditorShortcutAction {
+    Undo,
+    Redo,
+}
+
 impl EditorApp {
     fn new(log_capture: Option<LogCapture>) -> Self {
         // Load or create config
@@ -129,6 +135,26 @@ impl EditorApp {
         let scene_name = parts.next()?.to_string();
         let project_key = parts.next()?.to_string();
         Some((project_key, scene_name, node_key))
+    }
+
+    fn editor_shortcut_action(
+        logical_key: &winit::keyboard::Key,
+        modifiers: ModifiersState,
+    ) -> Option<EditorShortcutAction> {
+        if !modifiers.control_key() {
+            return None;
+        }
+
+        let winit::keyboard::Key::Character(ch) = logical_key else {
+            return None;
+        };
+        let normalized = ch.to_ascii_lowercase();
+        match normalized.as_str() {
+            "z" if modifiers.shift_key() => Some(EditorShortcutAction::Redo),
+            "z" => Some(EditorShortcutAction::Undo),
+            "y" => Some(EditorShortcutAction::Redo),
+            _ => None,
+        }
     }
 
     fn sync_ui_graph_layouts_from_project(&mut self) {
@@ -414,40 +440,25 @@ impl ApplicationHandler for EditorApp {
                     }
 
                     // Layout-aware editor shortcuts use logical key values.
-                    if self.modifiers.control_key() {
-                        if let winit::keyboard::Key::Character(ch) = &event.logical_key {
-                            let key = ch.to_ascii_lowercase();
-                            match key.as_str() {
-                                "z" if self.modifiers.shift_key() => {
-                                    if self.ui.redo() {
-                                        tracing::info!("Redo applied via Ctrl+Shift+Z");
-                                    }
-                                    if let Some(window) = &self.window {
-                                        window.request_redraw();
-                                    }
-                                    return;
+                    if let Some(shortcut) =
+                        Self::editor_shortcut_action(&event.logical_key, self.modifiers)
+                    {
+                        match shortcut {
+                            EditorShortcutAction::Undo => {
+                                if self.ui.undo() {
+                                    tracing::info!("Undo applied via Ctrl+Z");
                                 }
-                                "z" => {
-                                    if self.ui.undo() {
-                                        tracing::info!("Undo applied via Ctrl+Z");
-                                    }
-                                    if let Some(window) = &self.window {
-                                        window.request_redraw();
-                                    }
-                                    return;
+                            }
+                            EditorShortcutAction::Redo => {
+                                if self.ui.redo() {
+                                    tracing::info!("Redo applied via Ctrl+Y/Ctrl+Shift+Z");
                                 }
-                                "y" => {
-                                    if self.ui.redo() {
-                                        tracing::info!("Redo applied via Ctrl+Y");
-                                    }
-                                    if let Some(window) = &self.window {
-                                        window.request_redraw();
-                                    }
-                                    return;
-                                }
-                                _ => {}
                             }
                         }
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                        return;
                     }
 
                     // Fallback: try physical key for other editor shortcuts
@@ -1406,6 +1417,7 @@ mod tests {
     use toki_core::assets::tilemap::TileMap;
     use toki_core::collision::CollisionBox;
     use toki_core::entity::{Entity, EntityAttributes, EntityType};
+    use winit::keyboard::ModifiersState;
 
     #[test]
     fn resolve_scene_map_to_load_prefers_previously_loaded_map() {
@@ -1444,6 +1456,45 @@ mod tests {
         assert_eq!(parsed.0, "/tmp/project");
         assert_eq!(parsed.1, "Main Scene");
         assert_eq!(parsed.2, "rule_1:action:0");
+    }
+
+    #[test]
+    fn editor_shortcut_action_maps_ctrl_z_to_undo() {
+        let action = EditorApp::editor_shortcut_action(
+            &winit::keyboard::Key::Character("z".into()),
+            ModifiersState::CONTROL,
+        );
+        assert_eq!(action, Some(super::EditorShortcutAction::Undo));
+    }
+
+    #[test]
+    fn editor_shortcut_action_maps_ctrl_y_and_ctrl_shift_z_to_redo() {
+        let redo_y = EditorApp::editor_shortcut_action(
+            &winit::keyboard::Key::Character("y".into()),
+            ModifiersState::CONTROL,
+        );
+        assert_eq!(redo_y, Some(super::EditorShortcutAction::Redo));
+
+        let redo_shift_z = EditorApp::editor_shortcut_action(
+            &winit::keyboard::Key::Character("z".into()),
+            ModifiersState::CONTROL | ModifiersState::SHIFT,
+        );
+        assert_eq!(redo_shift_z, Some(super::EditorShortcutAction::Redo));
+    }
+
+    #[test]
+    fn editor_shortcut_action_ignores_non_ctrl_sequences() {
+        let no_ctrl = EditorApp::editor_shortcut_action(
+            &winit::keyboard::Key::Character("z".into()),
+            ModifiersState::default(),
+        );
+        assert_eq!(no_ctrl, None);
+
+        let other_key = EditorApp::editor_shortcut_action(
+            &winit::keyboard::Key::Character("x".into()),
+            ModifiersState::CONTROL,
+        );
+        assert_eq!(other_key, None);
     }
 
     fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {

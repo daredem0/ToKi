@@ -1,4 +1,4 @@
-use super::editor_ui::{EditorUI, Selection};
+use super::editor_ui::{EditorUI, SceneRulesGraphCommandData, Selection};
 use super::rule_graph::{RuleGraph, RuleGraphNodeKind};
 use super::undo_redo::EditorCommand;
 use crate::config::EditorConfig;
@@ -243,23 +243,23 @@ impl InspectorSystem {
                                     if rules_changed && edited_rules != before_rules {
                                         let before_graph =
                                             ui_state.rule_graph_for_scene(scene_name).cloned();
-                                        let after_graph =
-                                            Some(RuleGraph::from_rule_set(&edited_rules));
+                                        let after_graph = RuleGraph::from_rule_set(&edited_rules);
                                         let before_layout = ui_state
                                             .graph_layouts_by_scene
                                             .get(scene_name)
                                             .cloned();
-                                        let after_layout = before_layout.clone();
-                                        let _ = ui_state.execute_command(
-                                            EditorCommand::update_scene_rules_graph(
-                                                scene_name.clone(),
-                                                before_rules,
-                                                edited_rules,
+                                        let (zoom, pan) = ui_state.graph_view_for_scene(scene_name);
+                                        let _ = ui_state.execute_scene_rules_graph_command(
+                                            scene_name,
+                                            SceneRulesGraphCommandData {
+                                                before_rule_set: before_rules,
+                                                after_rule_set: edited_rules,
                                                 before_graph,
                                                 after_graph,
                                                 before_layout,
-                                                after_layout,
-                                            ),
+                                                zoom,
+                                                pan,
+                                            },
                                         );
                                     }
                                 }
@@ -1168,28 +1168,18 @@ impl InspectorSystem {
         match graph.to_rule_set() {
             Ok(updated_rules) => {
                 let (zoom, pan) = ui_state.graph_view_for_scene(scene_name);
-                let mut after_layout = before_layout.clone().unwrap_or_default();
-                after_layout.node_positions.clear();
-                for node in &graph.nodes {
-                    let Some(stable_key) = graph.stable_node_key(node.id) else {
-                        continue;
-                    };
-                    after_layout
-                        .node_positions
-                        .insert(stable_key, node.position);
-                }
-                after_layout.zoom = zoom;
-                after_layout.pan = pan;
-
-                ui_state.execute_command(EditorCommand::update_scene_rules_graph(
-                    scene_name.to_string(),
-                    before_rules,
-                    updated_rules,
-                    before_graph,
-                    Some(graph),
-                    before_layout,
-                    Some(after_layout),
-                ))
+                ui_state.execute_scene_rules_graph_command(
+                    scene_name,
+                    SceneRulesGraphCommandData {
+                        before_rule_set: before_rules,
+                        after_rule_set: updated_rules,
+                        before_graph,
+                        after_graph: graph,
+                        before_layout,
+                        zoom,
+                        pan,
+                    },
+                )
             }
             Err(error) => {
                 ui.colored_label(
