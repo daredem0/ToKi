@@ -493,6 +493,65 @@ fn game_state_left_direction_requests_horizontal_flip() {
 }
 
 #[test]
+fn game_state_player_is_blocked_by_solid_entity_collision() {
+    let mut game_state = GameState::new_empty();
+    let player_id = game_state.spawn_player_at(IVec2::new(0, 0));
+    let blocker_definition = test_definition("blocker", "npc");
+    game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&blocker_definition, IVec2::new(16, 0))
+        .expect("blocker should spawn");
+
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    game_state.handle_key_press(InputKey::Right);
+    let result = game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.handle_key_release(InputKey::Right);
+
+    assert!(!result.player_moved);
+    assert_eq!(
+        game_state
+            .entity_manager()
+            .get_entity(player_id)
+            .expect("player should exist")
+            .position,
+        IVec2::new(0, 0)
+    );
+}
+
+#[test]
+fn game_state_player_can_move_through_non_solid_entity() {
+    let mut game_state = GameState::new_empty();
+    let player_id = game_state.spawn_player_at(IVec2::new(0, 0));
+    let mut non_solid_definition = test_definition("ghost", "npc");
+    non_solid_definition.attributes.solid = false;
+    game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&non_solid_definition, IVec2::new(16, 0))
+        .expect("ghost should spawn");
+
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    game_state.handle_key_press(InputKey::Right);
+    let result = game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.handle_key_release(InputKey::Right);
+
+    assert!(result.player_moved);
+    assert_eq!(
+        game_state
+            .entity_manager()
+            .get_entity(player_id)
+            .expect("player should exist")
+            .position,
+        IVec2::new(1, 0)
+    );
+}
+
+#[test]
 fn game_state_sprite_animation_updates() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);

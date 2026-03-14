@@ -313,6 +313,51 @@ impl EntityManager {
         self.active_entities.iter().copied().collect()
     }
 
+    pub fn would_collide_with_solid_entity(
+        &self,
+        moving_entity_id: EntityId,
+        new_position: IVec2,
+    ) -> bool {
+        let Some(moving_entity) = self.entities.get(&moving_entity_id) else {
+            return false;
+        };
+        let Some(moving_box) = &moving_entity.collision_box else {
+            return false;
+        };
+        if moving_box.trigger || !moving_entity.attributes.solid {
+            return false;
+        }
+
+        let (moving_pos, moving_size) = moving_box.world_bounds(new_position);
+
+        for other_id in &self.active_entities {
+            if *other_id == moving_entity_id {
+                continue;
+            }
+
+            let Some(other_entity) = self.entities.get(other_id) else {
+                continue;
+            };
+            if !other_entity.attributes.solid {
+                continue;
+            }
+
+            let Some(other_box) = &other_entity.collision_box else {
+                continue;
+            };
+            if other_box.trigger {
+                continue;
+            }
+
+            let (other_pos, other_size) = other_box.world_bounds(other_entity.position);
+            if crate::collision::aabb_overlap(moving_pos, moving_size, other_pos, other_size) {
+                return true;
+            }
+        }
+
+        false
+    }
+
     pub fn visible_entities(&self) -> Vec<EntityId> {
         self.entities
             .iter()
