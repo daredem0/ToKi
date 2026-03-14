@@ -47,6 +47,7 @@ impl Default for RuntimeSplashOptions {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RuntimeLaunchOptions {
     pub project_path: Option<PathBuf>,
+    pub pack_path: Option<PathBuf>,
     pub scene_name: Option<String>,
     pub map_name: Option<String>,
     pub splash: RuntimeSplashOptions,
@@ -106,9 +107,18 @@ struct App {
     splash_logo_path: Option<PathBuf>,
     splash_logo_loaded: bool,
     post_splash_sprite_texture_path: Option<PathBuf>,
+    #[allow(dead_code)]
+    pack_mount: Option<tempfile::TempDir>,
 }
 
 impl App {
+    fn content_root_path(&self) -> Option<&std::path::Path> {
+        self.pack_mount
+            .as_ref()
+            .map(tempfile::TempDir::path)
+            .or(self.launch_options.project_path.as_deref())
+    }
+
     fn projection_view_size(parameters: ProjectionParameter) -> glam::Vec2 {
         let aspect = parameters.width as f32 / parameters.height as f32;
         let desired_aspect = parameters.desired_width as f32 / parameters.desired_height as f32;
@@ -133,7 +143,7 @@ impl App {
     fn new(launch_options: RuntimeLaunchOptions) -> Self {
         let splash_policy = SplashPolicy::Community;
         let splash_config = splash_policy.resolve(&launch_options.splash);
-        let (resources, game_state) = Self::build_startup_state(&launch_options);
+        let (resources, game_state, pack_mount) = Self::build_startup_state(&launch_options);
         let game_system = GameManager::new(game_state);
 
         let mut camera = Camera {
@@ -153,7 +163,15 @@ impl App {
             }
         };
         let camera_system = CameraManager::new(camera, cam_controller);
-        let audio_system = AudioManager::new().expect("Failed to initialize audio system");
+        let audio_root = pack_mount
+            .as_ref()
+            .map(tempfile::TempDir::path)
+            .or(launch_options.project_path.as_deref())
+            .map(std::path::Path::to_path_buf)
+            .or_else(|| std::env::current_dir().ok())
+            .expect("Failed to resolve audio root path");
+        let audio_system =
+            AudioManager::new_with_assets_root(audio_root).expect("Failed to initialize audio system");
 
         Self {
             // Core systems
@@ -175,10 +193,54 @@ impl App {
             splash_logo_path: None,
             splash_logo_loaded: false,
             post_splash_sprite_texture_path: None,
+            pack_mount,
         }
     }
 
-    fn build_startup_state(launch_options: &RuntimeLaunchOptions) -> (ResourceManager, GameState) {
+    fn build_startup_state(
+        launch_options: &RuntimeLaunchOptions,
+    ) -> (ResourceManager, GameState, Option<tempfile::TempDir>) {
+        if let Some(pack_path) = &launch_options.pack_path {
+            match crate::pack::extract_pak_to_tempdir(pack_path) {
+                Ok(mount) => {
+                    let mount_path = mount.path().to_path_buf();
+                    let scene = launch_options.scene_name.as_deref().and_then(|scene_name| {
+                        Self::load_project_scene(&mount_path, scene_name).ok()
+                    });
+                    let map_name = launch_options.map_name.clone().or_else(|| {
+                        scene
+                            .as_ref()
+                            .and_then(|loaded_scene| loaded_scene.maps.first().cloned())
+                    });
+                    match ResourceManager::load_for_project(&mount_path, map_name.as_deref()) {
+                        Ok(resources) => {
+                            let game_state = if let Some(scene) = scene {
+                                Self::game_state_from_scene(scene)
+                            } else {
+                                Self::fallback_game_state()
+                            };
+                            return (resources, game_state, Some(mount));
+                        }
+                        Err(error) => {
+                            tracing::error!(
+                                "Failed to load resources from pack '{}' mounted at '{}': {}",
+                                pack_path.display(),
+                                mount_path.display(),
+                                error
+                            );
+                        }
+                    }
+                }
+                Err(error) => {
+                    tracing::error!(
+                        "Failed to extract pack '{}': {}",
+                        pack_path.display(),
+                        error
+                    );
+                }
+            }
+        }
+
         if let Some(project_path) = &launch_options.project_path {
             let scene = launch_options
                 .scene_name
@@ -198,7 +260,7 @@ impl App {
                     } else {
                         Self::fallback_game_state()
                     };
-                    return (resources, game_state);
+                    return (resources, game_state, None);
                 }
                 Err(error) => {
                     tracing::error!(
@@ -211,7 +273,7 @@ impl App {
         }
 
         match ResourceManager::load_all() {
-            Ok(resources) => (resources, Self::fallback_game_state()),
+            Ok(resources) => (resources, Self::fallback_game_state(), None),
             Err(error) => {
                 panic!("Failed to initialize runtime resources: {error}");
             }
@@ -654,8 +716,18 @@ impl App {
         self.rendering.update_tilemap_vertices(&verts);
     }
 
-    fn resolve_logo_path(launch_options: &RuntimeLaunchOptions) -> Option<PathBuf> {
+    fn resolve_logo_path(
+        launch_options: &RuntimeLaunchOptions,
+        content_root: Option<&std::path::Path>,
+    ) -> Option<PathBuf> {
         let mut candidates = Vec::new();
+
+        if let Some(root) = content_root {
+            candidates.push(root.join("assets").join("TokiLogo.png"));
+            if let Some(parent) = root.parent() {
+                candidates.push(parent.join("assets").join("TokiLogo.png"));
+            }
+        }
 
         if let Some(project_path) = &launch_options.project_path {
             candidates.push(project_path.join("assets").join("TokiLogo.png"));
@@ -679,7 +751,15 @@ impl App {
 
     fn resolve_post_splash_sprite_texture_path(
         launch_options: &RuntimeLaunchOptions,
+        content_root: Option<&std::path::Path>,
     ) -> Option<PathBuf> {
+        if let Some(root) = content_root {
+            let (_, sprite_texture) = Self::project_texture_paths(root);
+            if sprite_texture.is_some() {
+                return sprite_texture;
+            }
+        }
+
         if let Some(project_path) = &launch_options.project_path {
             let (_, sprite_texture) = Self::project_texture_paths(project_path);
             if sprite_texture.is_some() {
@@ -696,13 +776,15 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        let content_root = self.content_root_path().map(std::path::Path::to_path_buf);
+
         // Initialize platform system (window)
         self.platform.initialize_window(event_loop);
 
         // Initialize rendering system (GPU)
         if let Some(window) = self.platform.window_for_gpu() {
-            if let Some(project_path) = &self.launch_options.project_path {
-                let (tilemap_texture, sprite_texture) = Self::project_texture_paths(project_path);
+            if let Some(content_root) = content_root.as_deref() {
+                let (tilemap_texture, sprite_texture) = Self::project_texture_paths(content_root);
                 if let Err(error) = self.rendering.initialize_gpu_with_textures(
                     window.clone(),
                     tilemap_texture.clone(),
@@ -710,7 +792,7 @@ impl ApplicationHandler for App {
                 ) {
                     tracing::error!(
                         "Failed to initialize GPU with project textures from '{}': {}",
-                        project_path.display(),
+                        content_root.display(),
                         error
                     );
                     self.rendering.initialize_gpu(window);
@@ -721,20 +803,23 @@ impl ApplicationHandler for App {
         }
 
         if self.rendering.has_gpu() {
-            if let Some(project_path) = &self.launch_options.project_path {
-                if let Err(error) = self.rendering.load_project_textures(project_path) {
+            if let Some(content_root) = content_root.as_deref() {
+                if let Err(error) = self.rendering.load_project_textures(content_root) {
                     tracing::warn!(
                         "Failed to load project textures from '{}': {}",
-                        project_path.display(),
+                        content_root.display(),
                         error
                     );
                 }
             }
         }
 
-        self.splash_logo_path = Self::resolve_logo_path(&self.launch_options);
-        self.post_splash_sprite_texture_path =
-            Self::resolve_post_splash_sprite_texture_path(&self.launch_options);
+        self.splash_logo_path =
+            Self::resolve_logo_path(&self.launch_options, content_root.as_deref());
+        self.post_splash_sprite_texture_path = Self::resolve_post_splash_sprite_texture_path(
+            &self.launch_options,
+            content_root.as_deref(),
+        );
         self.splash_config = self.splash_policy.resolve(&self.launch_options.splash);
         if let Some(path) = &self.splash_logo_path {
             if let Err(error) = self.rendering.load_sprite_texture(path.clone()) {
@@ -1028,12 +1113,13 @@ mod tests {
 
         let options = RuntimeLaunchOptions {
             project_path: Some(project_dir),
+            pack_path: None,
             scene_name: None,
             map_name: None,
             splash: RuntimeSplashOptions::default(),
         };
 
-        let resolved = App::resolve_logo_path(&options);
+        let resolved = App::resolve_logo_path(&options, None);
         assert_eq!(resolved, Some(logo_path));
     }
 
@@ -1049,13 +1135,43 @@ mod tests {
 
         let options = RuntimeLaunchOptions {
             project_path: Some(project_dir),
+            pack_path: None,
             scene_name: None,
             map_name: None,
             splash: RuntimeSplashOptions::default(),
         };
 
-        let resolved = App::resolve_post_splash_sprite_texture_path(&options);
+        let resolved = App::resolve_post_splash_sprite_texture_path(&options, None);
         assert_eq!(resolved, Some(creatures_path));
+    }
+
+    #[test]
+    fn resolve_post_splash_sprite_texture_path_prefers_content_root_over_project_path() {
+        let project_dir = make_unique_temp_dir()
+            .join("example_project")
+            .join("MyGame");
+        let project_sprites_dir = project_dir.join("assets").join("sprites");
+        fs::create_dir_all(&project_sprites_dir).expect("project sprites dir");
+        fs::write(project_sprites_dir.join("creatures.png"), "project-creatures")
+            .expect("project sprite write");
+
+        let mount_dir = make_unique_temp_dir().join("mount");
+        let mount_sprites_dir = mount_dir.join("assets").join("sprites");
+        fs::create_dir_all(&mount_sprites_dir).expect("mount sprites dir");
+        let mount_creatures = mount_sprites_dir.join("creatures.png");
+        fs::write(&mount_creatures, "mount-creatures").expect("mount sprite write");
+
+        let options = RuntimeLaunchOptions {
+            project_path: Some(project_dir),
+            pack_path: None,
+            scene_name: None,
+            map_name: None,
+            splash: RuntimeSplashOptions::default(),
+        };
+
+        let resolved =
+            App::resolve_post_splash_sprite_texture_path(&options, Some(&mount_dir));
+        assert_eq!(resolved, Some(mount_creatures));
     }
 
     #[test]

@@ -4,6 +4,32 @@ use tracing_subscriber::EnvFilter;
 
 use toki_runtime::{run_minimal_window, run_minimal_window_with_options, RuntimeLaunchOptions};
 
+#[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
+struct RuntimeConfig {
+    version: u32,
+    #[allow(dead_code)]
+    bundle_name: Option<String>,
+    pack: Option<RuntimeConfigPack>,
+    startup: Option<RuntimeConfigStartup>,
+    splash: Option<RuntimeConfigSplash>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
+struct RuntimeConfigPack {
+    path: String,
+    enabled: bool,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
+struct RuntimeConfigStartup {
+    scene: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
+struct RuntimeConfigSplash {
+    duration_ms: Option<u64>,
+}
+
 fn main() -> Result<()> {
     let mut env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug"));
@@ -22,6 +48,9 @@ fn main() -> Result<()> {
 
     let mut launch_options = parse_launch_options(std::env::args().skip(1).collect());
     if launch_options.project_path.is_none() {
+        launch_options = apply_runtime_config_if_present(launch_options);
+    }
+    if launch_options.project_path.is_none() && launch_options.pack_path.is_none() {
         launch_options = auto_detect_project_launch_options(launch_options);
     }
     if let Some(project_path) = &launch_options.project_path {
@@ -101,6 +130,14 @@ fn parse_launch_options(args: Vec<String>) -> RuntimeLaunchOptions {
                 index += 1;
                 continue;
             }
+            "--pack" => {
+                if let Some(value) = option_value(&args, index + 1) {
+                    launch_options.pack_path = Some(PathBuf::from(value));
+                    index += 2;
+                    continue;
+                }
+                tracing::warn!("Ignoring '--pack' without value");
+            }
             unknown => {
                 tracing::warn!("Ignoring unknown runtime argument '{}'", unknown);
             }
@@ -110,6 +147,85 @@ fn parse_launch_options(args: Vec<String>) -> RuntimeLaunchOptions {
     }
 
     launch_options
+}
+
+fn apply_runtime_config_if_present(
+    mut launch_options: RuntimeLaunchOptions,
+) -> RuntimeLaunchOptions {
+    let Some((config, config_dir)) = load_runtime_config() else {
+        return launch_options;
+    };
+    apply_runtime_config(&mut launch_options, config, &config_dir);
+    launch_options
+}
+
+fn apply_runtime_config(
+    launch_options: &mut RuntimeLaunchOptions,
+    config: RuntimeConfig,
+    config_dir: &std::path::Path,
+) {
+    if launch_options.project_path.is_none() {
+        launch_options.project_path = Some(config_dir.to_path_buf());
+    }
+    if launch_options.scene_name.is_none() {
+        launch_options.scene_name = config.startup.and_then(|startup| startup.scene);
+    }
+    if launch_options.pack_path.is_none() {
+        if let Some(pack) = config.pack {
+            if pack.enabled {
+                launch_options.pack_path = Some(config_dir.join(pack.path));
+            }
+        }
+    }
+    if let Some(splash) = config.splash {
+        if let Some(duration_ms) = splash.duration_ms {
+            launch_options.splash.duration_ms = duration_ms;
+        }
+    }
+}
+
+fn load_runtime_config() -> Option<(RuntimeConfig, PathBuf)> {
+    let mut candidates = Vec::new();
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join("runtime_config.json"));
+        }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join("runtime_config.json"));
+    }
+    load_runtime_config_from_candidates(&candidates)
+}
+
+fn load_runtime_config_from_candidates(candidates: &[PathBuf]) -> Option<(RuntimeConfig, PathBuf)> {
+    for path in candidates {
+        if !path.exists() {
+            continue;
+        }
+        match std::fs::read_to_string(path) {
+            Ok(content) => match serde_json::from_str::<RuntimeConfig>(&content) {
+                Ok(config) => {
+                    let dir = path.parent().map(std::path::Path::to_path_buf)?;
+                    return Some((config, dir));
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        "Failed to parse runtime config '{}': {}",
+                        path.display(),
+                        error
+                    );
+                }
+            },
+            Err(error) => {
+                tracing::warn!(
+                    "Failed to read runtime config '{}': {}",
+                    path.display(),
+                    error
+                );
+            }
+        }
+    }
+    None
 }
 
 fn auto_detect_project_launch_options(
@@ -143,7 +259,10 @@ fn detect_first_scene_name(project_path: &std::path::Path) -> Option<String> {
                 .and_then(|ext| ext.to_str())
                 .is_some_and(|ext| ext.eq_ignore_ascii_case("json"))
         })
-        .filter_map(|path| path.file_stem().map(|stem| stem.to_string_lossy().to_string()))
+        .filter_map(|path| {
+            path.file_stem()
+                .map(|stem| stem.to_string_lossy().to_string())
+        })
         .collect::<Vec<_>>();
     scene_file_stems.sort();
     scene_file_stems.into_iter().next()
@@ -160,8 +279,9 @@ fn option_value(args: &[String], value_index: usize) -> Option<&String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        auto_detect_project_launch_options, detect_first_scene_name, option_value,
-        parse_launch_options,
+        apply_runtime_config, auto_detect_project_launch_options, detect_first_scene_name,
+        load_runtime_config_from_candidates, option_value, parse_launch_options, RuntimeConfig,
+        RuntimeConfigPack, RuntimeConfigSplash, RuntimeConfigStartup,
     };
     use std::path::PathBuf;
     use toki_runtime::RuntimeLaunchOptions;
@@ -182,6 +302,7 @@ mod tests {
         assert_eq!(options.map_name.as_deref(), Some("map_01"));
         assert_eq!(options.splash.duration_ms, 3000);
         assert!(options.splash.show_branding);
+        assert!(options.pack_path.is_none());
     }
 
     #[test]
@@ -195,6 +316,7 @@ mod tests {
         assert!(options.project_path.is_none());
         assert!(options.scene_name.is_none());
         assert!(options.map_name.is_none());
+        assert!(options.pack_path.is_none());
     }
 
     #[test]
@@ -210,6 +332,7 @@ mod tests {
         assert!(options.scene_name.is_none());
         assert!(options.map_name.is_none());
         assert!(options.splash.show_branding);
+        assert!(options.pack_path.is_none());
     }
 
     #[test]
@@ -222,6 +345,13 @@ mod tests {
 
         assert_eq!(options.splash.duration_ms, 2750);
         assert!(!options.splash.show_branding);
+    }
+
+    #[test]
+    fn parse_launch_options_reads_pack_flag() {
+        let options =
+            parse_launch_options(vec!["--pack".to_string(), "/tmp/game.toki.pak".to_string()]);
+        assert_eq!(options.pack_path, Some(PathBuf::from("/tmp/game.toki.pak")));
     }
 
     #[test]
@@ -238,6 +368,42 @@ mod tests {
     fn option_value_rejects_next_flag() {
         let args = vec!["--project".to_string(), "--scene".to_string()];
         assert_eq!(option_value(&args, 1), None);
+    }
+
+    #[test]
+    fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let mut options = RuntimeLaunchOptions::default();
+        apply_runtime_config(
+            &mut options,
+            RuntimeConfig {
+                version: 1,
+                bundle_name: Some("Demo".to_string()),
+                pack: Some(RuntimeConfigPack {
+                    path: "game.toki.pak".to_string(),
+                    enabled: true,
+                }),
+                startup: Some(RuntimeConfigStartup {
+                    scene: Some("Main Scene".to_string()),
+                }),
+                splash: Some(RuntimeConfigSplash {
+                    duration_ms: Some(3200),
+                }),
+            },
+            temp.path(),
+        );
+
+        assert_eq!(options.project_path, Some(temp.path().to_path_buf()));
+        assert_eq!(options.pack_path, Some(temp.path().join("game.toki.pak")));
+        assert_eq!(options.scene_name.as_deref(), Some("Main Scene"));
+        assert_eq!(options.splash.duration_ms, 3200);
+    }
+
+    #[test]
+    fn load_runtime_config_returns_none_without_file() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let cfg = load_runtime_config_from_candidates(&[temp.path().join("runtime_config.json")]);
+        assert!(cfg.is_none());
     }
 
     #[test]
@@ -262,7 +428,8 @@ mod tests {
         std::fs::create_dir_all(&scenes).expect("scenes dir");
         std::fs::write(scenes.join("main.json"), "{}").expect("scene");
 
-        let original_dir = std::env::current_dir().expect("cwd");
+        let original_dir =
+            std::env::current_dir().unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")));
         std::env::set_current_dir(dir.path()).expect("set cwd");
         let detected = auto_detect_project_launch_options(RuntimeLaunchOptions::default());
         std::env::set_current_dir(original_dir).expect("restore cwd");

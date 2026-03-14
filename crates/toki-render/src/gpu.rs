@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
@@ -41,8 +40,9 @@ impl std::fmt::Debug for GpuState {
     }
 }
 
-fn to_absolute_path<P: AsRef<Path>>(relative: P) -> std::io::Result<PathBuf> {
-    fs::canonicalize(relative)
+fn default_texture_path() -> PathBuf {
+    // Empty path activates the built-in 1x1 white texture fallback in GpuTexture::from_file.
+    PathBuf::new()
 }
 
 impl GpuState {
@@ -97,19 +97,11 @@ impl GpuState {
     pub fn new(window: Arc<Window>) -> Self {
         let (device, queue, surface, config) = create_device_and_surface(Arc::clone(&window));
 
-        let tilemap_pipeline = TilemapPipeline::new(
-            &device,
-            &queue,
-            config.format,
-            to_absolute_path("./assets/terrain.png").unwrap(),
-        );
+        let tilemap_pipeline =
+            TilemapPipeline::new(&device, &queue, config.format, default_texture_path());
 
-        let sprite_pipeline = SpritePipeline::new(
-            &device,
-            &queue,
-            config.format,
-            to_absolute_path("./assets/creatures.png").unwrap(),
-        );
+        let sprite_pipeline =
+            SpritePipeline::new(&device, &queue, config.format, default_texture_path());
 
         let debug_pipeline = DebugPipeline::new(&device, config.format);
         let ui_debug_pipeline = DebugPipeline::new(&device, config.format);
@@ -160,16 +152,9 @@ impl GpuState {
     ) -> Result<Self, crate::RenderError> {
         let (device, queue, surface, config) = create_device_and_surface(Arc::clone(&window));
 
-        // Use provided textures or fall back to defaults
-        let tilemap_path = tilemap_texture.unwrap_or_else(|| {
-            to_absolute_path("./assets/terrain.png")
-                .unwrap_or_else(|_| PathBuf::from("./assets/terrain.png"))
-        });
-
-        let sprite_path = sprite_texture.unwrap_or_else(|| {
-            to_absolute_path("./assets/creatures.png")
-                .unwrap_or_else(|_| PathBuf::from("./assets/creatures.png"))
-        });
+        // Use provided textures; otherwise fall back to a generated 1x1 white texture.
+        let tilemap_path = tilemap_texture.unwrap_or_else(default_texture_path);
+        let sprite_path = sprite_texture.unwrap_or_else(default_texture_path);
 
         let tilemap_pipeline = TilemapPipeline::new(&device, &queue, config.format, tilemap_path);
 
@@ -322,18 +307,10 @@ impl GpuState {
 
 #[cfg(test)]
 mod tests {
-    use super::to_absolute_path;
+    use super::default_texture_path;
 
     #[test]
-    fn to_absolute_path_resolves_existing_path() {
-        let absolute = to_absolute_path(".").expect("current dir should be canonicalizable");
-        assert!(absolute.is_absolute());
-    }
-
-    #[test]
-    fn to_absolute_path_returns_error_for_missing_path() {
-        let missing = "this/path/should/not/exist/for/toki-render-tests";
-        let err = to_absolute_path(missing).expect_err("missing path should fail");
-        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+    fn default_texture_path_is_empty_to_trigger_generated_texture_fallback() {
+        assert!(default_texture_path().as_os_str().is_empty());
     }
 }

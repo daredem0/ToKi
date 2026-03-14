@@ -25,8 +25,9 @@ winit = { version = "0.30.12", features = ["x11", "wayland", "wayland-dlopen", "
 glam  = "0.30.5"
 kira = "0.10"
 serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+tempfile = "3.21.0"
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
 [dev-dependencies]
-tempfile = "3.21.0"

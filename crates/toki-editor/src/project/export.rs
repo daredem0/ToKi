@@ -27,10 +27,37 @@ struct SourceFile {
     relative_path: PathBuf,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeBundleConfig {
+    pub version: u32,
+    pub bundle_name: String,
+    pub pack: RuntimeBundlePackConfig,
+    pub startup: RuntimeBundleStartupConfig,
+    pub splash: RuntimeBundleSplashConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeBundlePackConfig {
+    pub path: String,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeBundleStartupConfig {
+    pub scene: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeBundleSplashConfig {
+    pub duration_ms: u64,
+}
+
 pub fn export_hybrid_bundle(
     project: &Project,
     runtime_binary_path: &Path,
     export_root: &Path,
+    startup_scene: Option<&str>,
+    splash_duration_ms: u64,
 ) -> Result<PathBuf> {
     if !runtime_binary_path.exists() {
         return Err(anyhow::anyhow!(
@@ -74,30 +101,39 @@ pub fn export_hybrid_bundle(
     })?;
 
     let source_files = collect_source_files(&project.path, Some(&bundle_dir))?;
-    copy_project_files_to_bundle(&bundle_dir, &source_files)?;
 
     let pak_path = bundle_dir.join("game.toki.pak");
     write_project_pak(&pak_path, &source_files)?;
+    write_runtime_bundle_config(
+        &bundle_dir,
+        &RuntimeBundleConfig {
+            version: 1,
+            bundle_name: project.name.clone(),
+            pack: RuntimeBundlePackConfig {
+                path: "game.toki.pak".to_string(),
+                enabled: true,
+            },
+            startup: RuntimeBundleStartupConfig {
+                scene: startup_scene.map(str::to_string),
+            },
+            splash: RuntimeBundleSplashConfig {
+                duration_ms: splash_duration_ms,
+            },
+        },
+    )?;
 
     Ok(bundle_dir)
 }
 
-fn copy_project_files_to_bundle(bundle_dir: &Path, source_files: &[SourceFile]) -> Result<()> {
-    for source in source_files {
-        let destination = bundle_dir.join(&source.relative_path);
-        if let Some(parent) = destination.parent() {
-            fs::create_dir_all(parent).with_context(|| {
-                format!("Failed to create bundle directory '{}'", parent.display())
-            })?;
-        }
-        fs::copy(&source.absolute_path, &destination).with_context(|| {
-            format!(
-                "Failed to copy '{}' to '{}'",
-                source.absolute_path.display(),
-                destination.display()
-            )
-        })?;
-    }
+fn write_runtime_bundle_config(bundle_dir: &Path, config: &RuntimeBundleConfig) -> Result<()> {
+    let config_path = bundle_dir.join("runtime_config.json");
+    let content = serde_json::to_vec_pretty(config)?;
+    fs::write(&config_path, content).with_context(|| {
+        format!(
+            "Failed to write runtime bundle config '{}'",
+            config_path.display()
+        )
+    })?;
     Ok(())
 }
 
@@ -202,7 +238,7 @@ fn collect_source_files_recursive(
 
 #[cfg(test)]
 mod tests {
-    use super::{collect_source_files, export_hybrid_bundle, PAK_MAGIC};
+    use super::{collect_source_files, export_hybrid_bundle, RuntimeBundleConfig, PAK_MAGIC};
     use crate::project::Project;
     use std::fs;
     use std::io::{Read, Seek, SeekFrom};
@@ -254,14 +290,32 @@ mod tests {
         let export_root = parent.join("exports");
         fs::create_dir_all(&export_root).expect("exports dir");
 
-        let bundle_dir =
-            export_hybrid_bundle(&project, &runtime_bin, &export_root).expect("bundle export");
+        let bundle_dir = export_hybrid_bundle(
+            &project,
+            &runtime_bin,
+            &export_root,
+            Some("Main Scene"),
+            3000,
+        )
+        .expect("bundle export");
         assert!(bundle_dir.join(runtime_bin.file_name().unwrap()).exists());
-        assert!(bundle_dir.join("project.toml").exists());
-        assert!(bundle_dir.join("scenes/main.json").exists());
-        assert!(bundle_dir.join("assets/audio/test.ogg").exists());
+        assert!(!bundle_dir.join("project.toml").exists());
+        assert!(!bundle_dir.join("scenes/main.json").exists());
+        assert!(!bundle_dir.join("assets/audio/test.ogg").exists());
         let pak_path = bundle_dir.join("game.toki.pak");
         assert!(pak_path.exists());
+        let config_path = bundle_dir.join("runtime_config.json");
+        assert!(config_path.exists());
+
+        let root_entries = fs::read_dir(&bundle_dir)
+            .expect("read bundle root")
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(root_entries.len(), 3);
+        assert!(root_entries.contains(&runtime_bin.file_name().unwrap().to_string_lossy().to_string()));
+        assert!(root_entries.contains(&"game.toki.pak".to_string()));
+        assert!(root_entries.contains(&"runtime_config.json".to_string()));
 
         let mut pak_file = fs::File::open(&pak_path).expect("open pak");
         let mut magic = [0u8; 8];
@@ -288,6 +342,15 @@ mod tests {
         assert!(index_text.contains("\"project.toml\""));
         assert!(index_text.contains("\"scenes/main.json\""));
         assert!(index_text.contains("\"assets/audio/test.ogg\""));
+
+        let runtime_config: RuntimeBundleConfig =
+            serde_json::from_str(&fs::read_to_string(config_path).expect("read config"))
+                .expect("parse config");
+        assert_eq!(runtime_config.version, 1);
+        assert_eq!(runtime_config.pack.path, "game.toki.pak");
+        assert!(runtime_config.pack.enabled);
+        assert_eq!(runtime_config.startup.scene.as_deref(), Some("Main Scene"));
+        assert_eq!(runtime_config.splash.duration_ms, 3000);
     }
 
     #[test]
@@ -308,7 +371,8 @@ mod tests {
 
         let project = Project::new("MyGame".to_string(), project_root.clone());
         let bundle_dir =
-            export_hybrid_bundle(&project, &runtime_bin, parent).expect("bundle export");
+            export_hybrid_bundle(&project, &runtime_bin, parent, Some("Main Scene"), 3000)
+                .expect("bundle export");
 
         assert_eq!(bundle_dir, parent.join("MyGame-bundle"));
         assert!(project_root.join("project.toml").exists());

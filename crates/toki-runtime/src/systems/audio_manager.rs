@@ -6,7 +6,7 @@ use kira::{
 };
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use toki_core::{
     game::{AudioChannel as AudioEventChannel, AudioEvent},
@@ -34,6 +34,7 @@ struct AudioChannel {
 
 pub struct AudioManager {
     manager: KiraAudioManager,
+    assets_root: PathBuf,
 
     // Preloaded sounds - all SFX loaded at startup
     preloaded_sounds: HashMap<String, StaticSoundData>,
@@ -47,9 +48,18 @@ pub struct AudioManager {
 
 impl AudioManager {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        let current_dir = std::env::current_dir()?;
+        Self::new_with_assets_root(current_dir)
+    }
+
+    pub fn new_with_assets_root(
+        assets_root: impl Into<PathBuf>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let manager = KiraAudioManager::new(AudioManagerSettings::default())?;
+        let assets_root = assets_root.into();
         let mut system = Self {
             manager,
+            assets_root,
             preloaded_sounds: HashMap::new(),
             music_paths: HashMap::new(),
             channels: HashMap::new(),
@@ -62,14 +72,14 @@ impl AudioManager {
     }
 
     fn scan_and_preload_sfx(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let sfx_dir = "assets/audio/sfx";
+        let sfx_dir = self.assets_root.join("assets").join("audio").join("sfx");
 
-        if !Path::new(sfx_dir).exists() {
-            tracing::warn!("SFX directory not found: {}", sfx_dir);
+        if !Path::new(&sfx_dir).exists() {
+            tracing::warn!("SFX directory not found: {}", sfx_dir.display());
             return Ok(());
         }
 
-        let entries = fs::read_dir(sfx_dir)?;
+        let entries = fs::read_dir(&sfx_dir)?;
 
         for entry in entries {
             let entry = entry?;
@@ -79,7 +89,7 @@ impl AudioManager {
                 if extension == "ogg" {
                     if let Some(file_stem) = path.file_stem() {
                         if let Some(name) = file_stem.to_str() {
-                            let path_str = path.to_string_lossy();
+                            let path_str = path.to_string_lossy().to_string();
                             if let Err(e) = self.preload_sound(name, &path_str) {
                                 tracing::warn!(
                                     "Failed to preload SFX '{}':
@@ -99,14 +109,14 @@ impl AudioManager {
     }
 
     fn scan_music_files(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let music_dir = "assets/audio/music";
+        let music_dir = self.assets_root.join("assets").join("audio").join("music");
 
-        if !Path::new(music_dir).exists() {
-            tracing::warn!("Music directory not found: {}", music_dir);
+        if !Path::new(&music_dir).exists() {
+            tracing::warn!("Music directory not found: {}", music_dir.display());
             return Ok(());
         }
 
-        let entries = fs::read_dir(music_dir)?;
+        let entries = fs::read_dir(&music_dir)?;
 
         for entry in entries {
             let entry = entry?;

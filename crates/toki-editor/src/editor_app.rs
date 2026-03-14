@@ -1065,10 +1065,20 @@ impl EditorApp {
             }
         };
 
-        match self
+        let startup_scene = self.ui.active_scene.as_deref();
+        let splash_duration_ms = self
             .project_manager
-            .export_current_project_bundle(&runtime_binary_path, &export_root)
-        {
+            .current_project
+            .as_ref()
+            .map(|project| project.metadata.runtime.splash.duration_ms)
+            .unwrap_or(3000);
+
+        match self.project_manager.export_current_project_bundle(
+            &runtime_binary_path,
+            &export_root,
+            startup_scene,
+            splash_duration_ms,
+        ) {
             Ok(bundle_dir) => {
                 tracing::info!("Exported hybrid bundle to '{}'", bundle_dir.display());
             }
