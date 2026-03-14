@@ -30,6 +30,9 @@ pub struct ProjectMetadata {
     pub scenes: HashMap<String, String>,
     /// Asset configuration
     pub assets: AssetConfig,
+    /// Runtime-specific settings
+    #[serde(default)]
+    pub runtime: RuntimeSettings,
     /// Editor-specific settings
     #[serde(default)]
     pub editor: EditorSettings,
@@ -62,6 +65,34 @@ pub struct AssetConfig {
     pub tilemaps: String,
     /// Audio directory relative to project root
     pub audio: String,
+}
+
+/// Runtime-specific settings
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RuntimeSettings {
+    /// Splash screen settings for runtime startup
+    #[serde(default)]
+    pub splash: RuntimeSplashSettings,
+}
+
+/// Runtime splash settings (community-safe subset)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeSplashSettings {
+    /// Splash duration in milliseconds
+    #[serde(default = "default_runtime_splash_duration_ms")]
+    pub duration_ms: u64,
+}
+
+impl Default for RuntimeSplashSettings {
+    fn default() -> Self {
+        Self {
+            duration_ms: default_runtime_splash_duration_ms(),
+        }
+    }
+}
+
+fn default_runtime_splash_duration_ms() -> u64 {
+    3000
 }
 
 /// Editor-specific settings
@@ -155,6 +186,7 @@ impl Project {
                 scenes
             },
             assets: AssetConfig::default(),
+            runtime: RuntimeSettings::default(),
             editor: EditorSettings::default(),
         };
 
@@ -210,5 +242,44 @@ impl Project {
         })?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ProjectMetadata, RuntimeSettings};
+
+    #[test]
+    fn project_metadata_deserialization_defaults_runtime_settings() {
+        let toml = r#"
+[project]
+name = "Demo"
+version = "1.0.0"
+created = "2026-01-01T00:00:00Z"
+modified = "2026-01-01T00:00:00Z"
+toki_editor_version = "0.0.14"
+description = ""
+
+[scenes]
+main = "scenes/main.json"
+
+[assets]
+sprites = "assets/sprites/"
+tilemaps = "assets/tilemaps/"
+audio = "assets/audio/"
+
+[editor]
+recent_files = []
+"#;
+
+        let metadata: ProjectMetadata =
+            toml::from_str(toml).expect("metadata without runtime section should deserialize");
+        assert_eq!(metadata.runtime.splash.duration_ms, 3000);
+    }
+
+    #[test]
+    fn runtime_settings_default_to_community_splash_duration() {
+        let runtime = RuntimeSettings::default();
+        assert_eq!(runtime.splash.duration_ms, 3000);
     }
 }

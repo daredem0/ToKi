@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use std::{fs, path::PathBuf};
 
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
+use toki_core::math::projection::ProjectionParameter;
 use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
 use toki_core::{EventHandler, GameState, Scene, TimingSystem};
 use toki_render::RenderError;
@@ -21,11 +22,67 @@ use crate::systems::{
 };
 use toki_core::serialization::{load_game, save_game};
 
-#[derive(Debug, Clone, Default)]
+const COMMUNITY_SPLASH_MIN_DURATION_MS: u64 = 3000;
+const COMMUNITY_SPLASH_MAX_DURATION_MS: u64 = 4000;
+const COMMUNITY_SPLASH_DEFAULT_DURATION_MS: u64 = 3000;
+const COMMUNITY_SPLASH_BRANDING_TEXT: &str = "Powered by ToKi";
+const SPLASH_LOGO_WIDTH: u32 = 128;
+const SPLASH_LOGO_HEIGHT: u32 = 108;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuntimeSplashOptions {
+    pub duration_ms: u64,
+    pub show_branding: bool,
+}
+
+impl Default for RuntimeSplashOptions {
+    fn default() -> Self {
+        Self {
+            duration_ms: COMMUNITY_SPLASH_DEFAULT_DURATION_MS,
+            show_branding: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RuntimeLaunchOptions {
     pub project_path: Option<PathBuf>,
     pub scene_name: Option<String>,
     pub map_name: Option<String>,
+    pub splash: RuntimeSplashOptions,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SplashPolicy {
+    Community,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ResolvedSplashConfig {
+    duration: Duration,
+    show_branding: bool,
+}
+
+impl SplashPolicy {
+    fn resolve(self, requested: &RuntimeSplashOptions) -> ResolvedSplashConfig {
+        match self {
+            Self::Community => {
+                if !requested.show_branding {
+                    tracing::warn!(
+                        "Splash branding cannot be disabled in Community bundle; forcing branding ON"
+                    );
+                }
+                let clamped_duration = requested.duration_ms.clamp(
+                    COMMUNITY_SPLASH_MIN_DURATION_MS,
+                    COMMUNITY_SPLASH_MAX_DURATION_MS,
+                );
+                ResolvedSplashConfig {
+                    duration: Duration::from_millis(clamped_duration),
+                    show_branding: true,
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -42,15 +99,40 @@ struct App {
     rendering: RenderingSystem,
     timing: TimingSystem,
     launch_options: RuntimeLaunchOptions,
+    splash_policy: SplashPolicy,
+    splash_config: ResolvedSplashConfig,
     splash_active: bool,
     splash_started_at: Option<Instant>,
-    splash_duration: Duration,
     splash_logo_path: Option<PathBuf>,
+    splash_logo_loaded: bool,
     post_splash_sprite_texture_path: Option<PathBuf>,
 }
 
 impl App {
+    fn projection_view_size(parameters: ProjectionParameter) -> glam::Vec2 {
+        let aspect = parameters.width as f32 / parameters.height as f32;
+        let desired_aspect = parameters.desired_width as f32 / parameters.desired_height as f32;
+
+        if aspect > desired_aspect {
+            let height = parameters.desired_height as f32;
+            let width = height * aspect;
+            glam::Vec2::new(width, height)
+        } else {
+            let width = parameters.desired_width as f32;
+            let height = width / aspect;
+            glam::Vec2::new(width, height)
+        }
+    }
+
+    fn centered_logo_origin_for_view(view_size: glam::Vec2, logo_size: glam::UVec2) -> glam::IVec2 {
+        let x = ((view_size.x - logo_size.x as f32) * 0.5).floor() as i32;
+        let y = ((view_size.y - logo_size.y as f32) * 0.5).floor() as i32;
+        glam::IVec2::new(x, y)
+    }
+
     fn new(launch_options: RuntimeLaunchOptions) -> Self {
+        let splash_policy = SplashPolicy::Community;
+        let splash_config = splash_policy.resolve(&launch_options.splash);
         let (resources, game_state) = Self::build_startup_state(&launch_options);
         let game_system = GameManager::new(game_state);
 
@@ -86,10 +168,12 @@ impl App {
             rendering: RenderingSystem::new(),
             timing: TimingSystem::new(),
             launch_options,
+            splash_policy,
+            splash_config,
             splash_active: true,
             splash_started_at: None,
-            splash_duration: Duration::from_millis(1200),
             splash_logo_path: None,
+            splash_logo_loaded: false,
             post_splash_sprite_texture_path: None,
         }
     }
@@ -429,7 +513,7 @@ impl App {
                     now
                 });
 
-                if started_at.elapsed() < self.splash_duration {
+                if started_at.elapsed() < self.splash_config.duration {
                     self.render_startup_splash();
                     return;
                 }
@@ -487,21 +571,52 @@ impl App {
     }
 
     fn render_startup_splash(&mut self) {
+        let logo_size = glam::UVec2::new(SPLASH_LOGO_WIDTH, SPLASH_LOGO_HEIGHT);
+        let view_size = Self::projection_view_size(self.rendering.projection_params());
+        let logo_origin = Self::centered_logo_origin_for_view(view_size, logo_size);
         self.rendering.update_projection(glam::Mat4::IDENTITY);
         self.rendering.set_tilemap_render_enabled(false);
         self.rendering.clear_sprites();
+        self.rendering.clear_text_items();
         self.rendering.clear_debug_shapes();
         self.rendering.finalize_debug_shapes();
-        self.rendering.add_sprite(
-            toki_core::sprite::SpriteFrame {
-                u0: 0.0,
-                v0: 0.0,
-                u1: 1.0,
-                v1: 1.0,
-            },
-            glam::IVec2::new(16, 18),
-            glam::UVec2::new(128, 108),
-        );
+        if self.splash_logo_loaded {
+            self.rendering.add_sprite(
+                toki_core::sprite::SpriteFrame {
+                    u0: 0.0,
+                    v0: 0.0,
+                    u1: 1.0,
+                    v1: 1.0,
+                },
+                logo_origin,
+                logo_size,
+            );
+        }
+        if self.splash_config.show_branding {
+            let branding_style = TextStyle {
+                font_family: "Sans".to_string(),
+                size_px: 16.0,
+                weight: TextWeight::Bold,
+                ..TextStyle::default()
+            };
+            let branding_position = if self.splash_logo_loaded {
+                glam::Vec2::new(
+                    view_size.x * 0.5,
+                    (logo_origin.y as f32 + logo_size.y as f32 + 8.0).min(view_size.y - 4.0),
+                )
+            } else {
+                glam::Vec2::new(view_size.x * 0.5, view_size.y * 0.5)
+            };
+            self.rendering.add_text_item(
+                TextItem::new_screen(
+                    COMMUNITY_SPLASH_BRANDING_TEXT,
+                    branding_position,
+                    branding_style,
+                )
+                .with_anchor(TextAnchor::TopCenter)
+                .with_layer(10),
+            );
+        }
         self.rendering.draw();
         self.platform.request_redraw();
     }
@@ -620,18 +735,23 @@ impl ApplicationHandler for App {
         self.splash_logo_path = Self::resolve_logo_path(&self.launch_options);
         self.post_splash_sprite_texture_path =
             Self::resolve_post_splash_sprite_texture_path(&self.launch_options);
+        self.splash_config = self.splash_policy.resolve(&self.launch_options.splash);
         if let Some(path) = &self.splash_logo_path {
             if let Err(error) = self.rendering.load_sprite_texture(path.clone()) {
                 tracing::warn!(
-                    "Failed to load startup logo texture '{}' (disabling splash): {}",
+                    "Failed to load startup logo texture '{}' (splash will render branding-only): {}",
                     path.display(),
                     error
                 );
-                self.splash_active = false;
+                self.splash_logo_loaded = false;
+            } else {
+                self.splash_logo_loaded = true;
             }
         } else {
-            tracing::warn!("No startup logo found at assets/TokiLogo.png candidate paths");
-            self.splash_active = false;
+            tracing::warn!(
+                "No startup logo found at assets/TokiLogo.png candidate paths; splash will render branding-only"
+            );
+            self.splash_logo_loaded = false;
         }
 
         // Update rendering size
@@ -732,8 +852,12 @@ fn first_existing_path(candidates: &[PathBuf]) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::{first_existing_path, App, RuntimeLaunchOptions};
+    use super::{
+        first_existing_path, App, RuntimeLaunchOptions, RuntimeSplashOptions, SplashPolicy,
+    };
     use std::fs;
+    use std::time::Duration;
+    use toki_core::math::projection::ProjectionParameter;
     use toki_core::rules::{
         Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger,
     };
@@ -906,6 +1030,7 @@ mod tests {
             project_path: Some(project_dir),
             scene_name: None,
             map_name: None,
+            splash: RuntimeSplashOptions::default(),
         };
 
         let resolved = App::resolve_logo_path(&options);
@@ -926,9 +1051,77 @@ mod tests {
             project_path: Some(project_dir),
             scene_name: None,
             map_name: None,
+            splash: RuntimeSplashOptions::default(),
         };
 
         let resolved = App::resolve_post_splash_sprite_texture_path(&options);
         assert_eq!(resolved, Some(creatures_path));
+    }
+
+    #[test]
+    fn community_splash_policy_forces_branding_on() {
+        let requested = RuntimeSplashOptions {
+            duration_ms: 1200,
+            show_branding: false,
+        };
+        let resolved = SplashPolicy::Community.resolve(&requested);
+        assert!(resolved.show_branding);
+    }
+
+    #[test]
+    fn community_splash_policy_clamps_duration_bounds() {
+        let below_min = SplashPolicy::Community.resolve(&RuntimeSplashOptions {
+            duration_ms: 200,
+            show_branding: true,
+        });
+        assert_eq!(
+            below_min.duration,
+            Duration::from_millis(super::COMMUNITY_SPLASH_MIN_DURATION_MS)
+        );
+
+        let above_max = SplashPolicy::Community.resolve(&RuntimeSplashOptions {
+            duration_ms: 9_999,
+            show_branding: true,
+        });
+        assert_eq!(
+            above_max.duration,
+            Duration::from_millis(super::COMMUNITY_SPLASH_MAX_DURATION_MS)
+        );
+    }
+
+    #[test]
+    fn centered_logo_origin_matches_previous_default_layout() {
+        let view = App::projection_view_size(ProjectionParameter {
+            width: 160,
+            height: 144,
+            desired_width: 160,
+            desired_height: 144,
+        });
+        let origin = App::centered_logo_origin_for_view(view, glam::UVec2::new(128, 108));
+        assert_eq!(origin, glam::IVec2::new(16, 18));
+    }
+
+    #[test]
+    fn centered_logo_origin_is_centered_for_wide_window() {
+        let view = App::projection_view_size(ProjectionParameter {
+            width: 320,
+            height: 144,
+            desired_width: 160,
+            desired_height: 144,
+        });
+        let origin = App::centered_logo_origin_for_view(view, glam::UVec2::new(128, 108));
+        assert_eq!(origin, glam::IVec2::new(96, 18));
+    }
+
+    #[test]
+    fn centered_logo_origin_is_centered_for_tall_window() {
+        let view = App::projection_view_size(ProjectionParameter {
+            width: 160,
+            height: 320,
+            desired_width: 160,
+            desired_height: 144,
+        });
+        let origin = App::centered_logo_origin_for_view(view, glam::UVec2::new(128, 108));
+        assert_eq!(origin, glam::IVec2::new(16, 106));
     }
 }

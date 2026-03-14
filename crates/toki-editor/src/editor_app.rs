@@ -987,9 +987,18 @@ impl EditorApp {
                     .or_else(|| scene.maps.first().cloned())
             });
 
-        if let Err(error) =
-            Self::launch_runtime_process(&project_path, &active_scene_name, map_name.as_deref())
-        {
+        let splash_duration_ms = self
+            .project_manager
+            .current_project
+            .as_ref()
+            .map(|project| project.metadata.runtime.splash.duration_ms);
+
+        if let Err(error) = Self::launch_runtime_process(
+            &project_path,
+            &active_scene_name,
+            map_name.as_deref(),
+            splash_duration_ms,
+        ) {
             tracing::error!(
                 "Failed to launch runtime for scene '{}' from '{}': {}",
                 active_scene_name,
@@ -1081,17 +1090,10 @@ impl EditorApp {
         project_path: &std::path::Path,
         scene_name: &str,
         map_name: Option<&str>,
+        splash_duration_ms: Option<u64>,
     ) -> Result<()> {
-        let mut runtime_args = vec![
-            "--project".to_string(),
-            project_path.display().to_string(),
-            "--scene".to_string(),
-            scene_name.to_string(),
-        ];
-        if let Some(map_name) = map_name {
-            runtime_args.push("--map".to_string());
-            runtime_args.push(map_name.to_string());
-        }
+        let runtime_args =
+            Self::build_runtime_launch_args(project_path, scene_name, map_name, splash_duration_ms);
 
         let mut cargo_command = Command::new("cargo");
         cargo_command
@@ -1124,6 +1126,29 @@ impl EditorApp {
 
         Command::new(runtime_bin_path).args(&runtime_args).spawn()?;
         Ok(())
+    }
+
+    fn build_runtime_launch_args(
+        project_path: &std::path::Path,
+        scene_name: &str,
+        map_name: Option<&str>,
+        splash_duration_ms: Option<u64>,
+    ) -> Vec<String> {
+        let mut runtime_args = vec![
+            "--project".to_string(),
+            project_path.display().to_string(),
+            "--scene".to_string(),
+            scene_name.to_string(),
+        ];
+        if let Some(map_name) = map_name {
+            runtime_args.push("--map".to_string());
+            runtime_args.push(map_name.to_string());
+        }
+        if let Some(duration_ms) = splash_duration_ms {
+            runtime_args.push("--splash-duration-ms".to_string());
+            runtime_args.push(duration_ms.to_string());
+        }
+        runtime_args
     }
 
     fn workspace_root() -> std::path::PathBuf {
@@ -1495,6 +1520,45 @@ mod tests {
             ModifiersState::CONTROL,
         );
         assert_eq!(other_key, None);
+    }
+
+    #[test]
+    fn build_runtime_launch_args_includes_optional_map_and_splash_duration() {
+        let args = EditorApp::build_runtime_launch_args(
+            std::path::Path::new("/tmp/project"),
+            "Main Scene",
+            Some("main_map"),
+            Some(2600),
+        );
+
+        assert_eq!(
+            args,
+            vec![
+                "--project",
+                "/tmp/project",
+                "--scene",
+                "Main Scene",
+                "--map",
+                "main_map",
+                "--splash-duration-ms",
+                "2600",
+            ]
+        );
+    }
+
+    #[test]
+    fn build_runtime_launch_args_omits_absent_optional_values() {
+        let args = EditorApp::build_runtime_launch_args(
+            std::path::Path::new("/tmp/project"),
+            "Main Scene",
+            None,
+            None,
+        );
+
+        assert_eq!(
+            args,
+            vec!["--project", "/tmp/project", "--scene", "Main Scene",]
+        );
     }
 
     fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {

@@ -31,10 +31,7 @@ fn main() -> Result<()> {
         }
     }
 
-    let run_result = if launch_options.project_path.is_some()
-        || launch_options.scene_name.is_some()
-        || launch_options.map_name.is_some()
-    {
+    let run_result = if launch_options != RuntimeLaunchOptions::default() {
         run_minimal_window_with_options(launch_options)
     } else {
         run_minimal_window()
@@ -76,6 +73,31 @@ fn parse_launch_options(args: Vec<String>) -> RuntimeLaunchOptions {
                 }
                 tracing::warn!("Ignoring '--map' without value");
             }
+            "--splash-duration-ms" => {
+                if let Some(value) = option_value(&args, index + 1) {
+                    match value.parse::<u64>() {
+                        Ok(duration_ms) => {
+                            launch_options.splash.duration_ms = duration_ms;
+                            index += 2;
+                            continue;
+                        }
+                        Err(error) => {
+                            tracing::warn!(
+                                "Ignoring '--splash-duration-ms' invalid value '{}': {}",
+                                value,
+                                error
+                            );
+                        }
+                    }
+                } else {
+                    tracing::warn!("Ignoring '--splash-duration-ms' without value");
+                }
+            }
+            "--splash-hide-branding" => {
+                launch_options.splash.show_branding = false;
+                index += 1;
+                continue;
+            }
             unknown => {
                 tracing::warn!("Ignoring unknown runtime argument '{}'", unknown);
             }
@@ -114,6 +136,8 @@ mod tests {
         assert_eq!(options.project_path, Some(PathBuf::from("/tmp/project")));
         assert_eq!(options.scene_name.as_deref(), Some("Main Scene"));
         assert_eq!(options.map_name.as_deref(), Some("map_01"));
+        assert_eq!(options.splash.duration_ms, 3000);
+        assert!(options.splash.show_branding);
     }
 
     #[test]
@@ -141,6 +165,29 @@ mod tests {
         assert_eq!(options.project_path, Some(PathBuf::from("/tmp/project")));
         assert!(options.scene_name.is_none());
         assert!(options.map_name.is_none());
+        assert!(options.splash.show_branding);
+    }
+
+    #[test]
+    fn parse_launch_options_reads_splash_flags() {
+        let options = parse_launch_options(vec![
+            "--splash-duration-ms".to_string(),
+            "2750".to_string(),
+            "--splash-hide-branding".to_string(),
+        ]);
+
+        assert_eq!(options.splash.duration_ms, 2750);
+        assert!(!options.splash.show_branding);
+    }
+
+    #[test]
+    fn parse_launch_options_ignores_invalid_splash_duration() {
+        let options = parse_launch_options(vec![
+            "--splash-duration-ms".to_string(),
+            "not-a-number".to_string(),
+        ]);
+
+        assert_eq!(options.splash.duration_ms, 3000);
     }
 
     #[test]
