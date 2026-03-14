@@ -340,6 +340,7 @@ mod tests {
                 solid: true,
                 active: true,
                 can_move: false,
+                ai_behavior: toki_core::entity::AiBehavior::Wander,
                 has_inventory: false,
             },
             collision: CollisionDef {

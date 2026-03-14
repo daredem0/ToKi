@@ -20,6 +20,7 @@ fn test_entity_definition_create_entity_basic() {
             solid: true,
             active: true,
             can_move: true,
+            ai_behavior: AiBehavior::None,
             has_inventory: true,
         },
         collision: CollisionDef {
@@ -131,6 +132,7 @@ fn test_entity_definition_create_npc_entity() {
             solid: true,
             active: true,
             can_move: false,
+            ai_behavior: AiBehavior::Wander,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -176,10 +178,69 @@ fn test_entity_definition_create_npc_entity() {
     // Check attributes specific to NPC
     assert!(!entity.attributes.can_move);
     assert!(!entity.attributes.has_inventory);
+    assert_eq!(entity.attributes.ai_behavior, AiBehavior::Wander);
     assert_eq!(entity.attributes.speed, 1);
 
     // Check no collision since disabled
     assert!(entity.collision_box.is_none());
+}
+
+#[test]
+fn test_entity_definition_missing_ai_behavior_defaults_to_wander() {
+    let entity_json = r#"
+    {
+      "name": "legacy_npc",
+      "display_name": "Legacy NPC",
+      "description": "Old NPC without ai_behavior",
+      "entity_type": "npc",
+      "rendering": {
+        "size": [16, 16],
+        "render_layer": 0,
+        "visible": true
+      },
+      "attributes": {
+        "health": 10,
+        "speed": 1,
+        "solid": true,
+        "active": true,
+        "can_move": false,
+        "has_inventory": false
+      },
+      "collision": {
+        "enabled": true,
+        "offset": [0, 0],
+        "size": [16, 16],
+        "trigger": false
+      },
+      "audio": {
+        "footstep_trigger_distance": 32.0,
+        "movement_sound": "npc_step"
+      },
+      "animations": {
+        "atlas_name": "creatures",
+        "clips": [
+          {
+            "state": "idle",
+            "frame_tiles": ["slime/idle_0"],
+            "frame_duration_ms": 200.0,
+            "loop_mode": "loop"
+          }
+        ],
+        "default_state": "idle"
+      },
+      "category": "npc",
+      "tags": []
+    }
+    "#;
+
+    let entity_def: EntityDefinition =
+        serde_json::from_str(entity_json).expect("legacy entity json should deserialize");
+    assert_eq!(entity_def.attributes.ai_behavior, AiBehavior::Wander);
+
+    let entity = entity_def
+        .create_entity(IVec2::ZERO, 1)
+        .expect("legacy entity should still instantiate");
+    assert_eq!(entity.attributes.ai_behavior, AiBehavior::Wander);
 }
 
 #[test]
@@ -200,6 +261,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
             solid: true,
             active: true,
             can_move: true,
+            ai_behavior: AiBehavior::None,
             has_inventory: true,
         },
         collision: CollisionDef {
@@ -279,6 +341,7 @@ fn test_entity_definition_invalid_entity_type() {
             solid: false,
             active: true,
             can_move: false,
+            ai_behavior: AiBehavior::None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -324,6 +387,7 @@ fn test_entity_definition_invalid_animation_state() {
             solid: false,
             active: true,
             can_move: false,
+            ai_behavior: AiBehavior::None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -374,6 +438,7 @@ fn test_entity_definition_invalid_loop_mode() {
             solid: false,
             active: true,
             can_move: false,
+            ai_behavior: AiBehavior::None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -424,6 +489,7 @@ fn test_entity_definition_serialization() {
             solid: false,
             active: false,
             can_move: false,
+            ai_behavior: AiBehavior::None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -487,6 +553,7 @@ fn test_entity_definition_create_audio_component() {
             solid: true,
             active: true,
             can_move: true,
+            ai_behavior: AiBehavior::None,
             has_inventory: false,
         },
         collision: CollisionDef {

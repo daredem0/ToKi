@@ -55,6 +55,7 @@
         "render_layer": 1,
         "active": true,
         "can_move": true,
+        "ai_behavior": "wander",
         "has_inventory": true
       },
       "collision_box": {

@@ -55,6 +55,14 @@ pub enum EntityType {
     Trigger,
 }
 
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AiBehavior {
+    None,
+    #[default]
+    Wander,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityAttributes {
     // Core gameplay
@@ -70,6 +78,8 @@ pub struct EntityAttributes {
     // Behavior flags
     pub active: bool,
     pub can_move: bool, // Can we be moved by the player
+    #[serde(default)]
+    pub ai_behavior: AiBehavior,
 
     // Extended attributes for entity definitions
     #[serde(default)]
@@ -87,6 +97,7 @@ impl Default for EntityAttributes {
             render_layer: 0,
             active: true,
             can_move: true,
+            ai_behavior: AiBehavior::default(),
             has_inventory: false,
         }
     }
@@ -417,6 +428,8 @@ pub struct AttributesDef {
     pub solid: bool,
     pub active: bool,
     pub can_move: bool,
+    #[serde(default)]
+    pub ai_behavior: AiBehavior,
     pub has_inventory: bool,
 }
 
@@ -517,6 +530,7 @@ impl EntityDefinition {
             render_layer: self.rendering.render_layer,
             active: self.attributes.active,
             can_move: self.attributes.can_move,
+            ai_behavior: self.attributes.ai_behavior,
             has_inventory: self.attributes.has_inventory,
         };
 

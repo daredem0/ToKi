@@ -4,6 +4,7 @@ use super::undo_redo::EditorCommand;
 use crate::config::EditorConfig;
 use std::collections::{HashMap, HashSet};
 use toki_core::animation::AnimationState;
+use toki_core::entity::{AiBehavior, EntityType};
 use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
     RuleTarget, RuleTrigger,
@@ -14,6 +15,7 @@ pub struct InspectorSystem;
 
 #[derive(Debug, Clone)]
 struct EntityPropertyDraft {
+    entity_type: EntityType,
     position_x: i32,
     position_y: i32,
     size_x: i64,
@@ -22,6 +24,7 @@ struct EntityPropertyDraft {
     active: bool,
     solid: bool,
     can_move: bool,
+    ai_behavior: AiBehavior,
     has_inventory: bool,
     speed: i64,
     render_layer: i32,
@@ -183,6 +186,7 @@ impl EntityPropertyDraft {
         };
 
         Self {
+            entity_type: entity.entity_type.clone(),
             position_x: entity.position.x,
             position_y: entity.position.y,
             size_x: entity.size.x as i64,
@@ -191,6 +195,7 @@ impl EntityPropertyDraft {
             active: entity.attributes.active,
             solid: entity.attributes.solid,
             can_move: entity.attributes.can_move,
+            ai_behavior: entity.attributes.ai_behavior,
             has_inventory: entity.attributes.has_inventory,
             speed: entity.attributes.speed as i64,
             render_layer: entity.attributes.render_layer,
@@ -203,6 +208,13 @@ impl EntityPropertyDraft {
             collision_size_y,
             collision_trigger,
         }
+    }
+}
+
+fn ai_behavior_label(ai_behavior: AiBehavior) -> &'static str {
+    match ai_behavior {
+        AiBehavior::None => "None",
+        AiBehavior::Wander => "Wander",
     }
 }
 
@@ -2579,6 +2591,25 @@ impl InspectorSystem {
         changed |= ui.checkbox(&mut draft.active, "Active").changed();
         changed |= ui.checkbox(&mut draft.solid, "Solid").changed();
         changed |= ui.checkbox(&mut draft.can_move, "Can Move").changed();
+        if matches!(draft.entity_type, EntityType::Npc) {
+            ui.horizontal(|ui| {
+                ui.label("AI:");
+                egui::ComboBox::from_id_salt("entity_ai_behavior")
+                    .selected_text(ai_behavior_label(draft.ai_behavior))
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(&mut draft.ai_behavior, AiBehavior::None, "None")
+                            .changed();
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.ai_behavior,
+                                AiBehavior::Wander,
+                                "Wander",
+                            )
+                            .changed();
+                    });
+            });
+        }
         changed |= ui
             .checkbox(&mut draft.has_inventory, "Has Inventory")
             .changed();
@@ -2959,6 +2990,12 @@ impl InspectorSystem {
                         ui.label("Yes");
                     });
                 }
+                if matches!(entity.entity_type, EntityType::Npc) {
+                    ui.horizontal(|ui| {
+                        ui.label("AI:");
+                        ui.label(ai_behavior_label(entity.attributes.ai_behavior));
+                    });
+                }
 
                 if let Some(collision_box) = &entity.collision_box {
                     ui.separator();
@@ -3092,6 +3129,7 @@ impl InspectorSystem {
         changed |= set_if_changed(&mut entity.attributes.active, draft.active);
         changed |= set_if_changed(&mut entity.attributes.solid, draft.solid);
         changed |= set_if_changed(&mut entity.attributes.can_move, draft.can_move);
+        changed |= set_if_changed(&mut entity.attributes.ai_behavior, draft.ai_behavior);
         changed |= set_if_changed(&mut entity.attributes.has_inventory, draft.has_inventory);
         changed |= set_if_changed(
             &mut entity.attributes.speed,
@@ -3623,7 +3661,7 @@ impl InspectorSystem {
 #[cfg(test)]
 mod tests {
     use super::{
-        EntityPropertyDraft, InspectorSystem, MultiEntityBatchEdit, RuleActionKind,
+        AiBehavior, EntityPropertyDraft, InspectorSystem, MultiEntityBatchEdit, RuleActionKind,
         RuleConditionKind, RuleTriggerKind,
     };
     use crate::ui::EditorUI;
@@ -3653,6 +3691,7 @@ mod tests {
                 render_layer: 1,
                 active: true,
                 can_move: true,
+                ai_behavior: AiBehavior::Wander,
                 has_inventory: false,
             },
         );
@@ -3696,6 +3735,7 @@ mod tests {
         draft.active = false;
         draft.solid = false;
         draft.can_move = false;
+        draft.ai_behavior = AiBehavior::None;
         draft.has_inventory = true;
         draft.speed = -10;
         draft.render_layer = 8;
@@ -3717,6 +3757,7 @@ mod tests {
         assert!(!entity.attributes.active);
         assert!(!entity.attributes.solid);
         assert!(!entity.attributes.can_move);
+        assert_eq!(entity.attributes.ai_behavior, AiBehavior::None);
         assert!(entity.attributes.has_inventory);
         assert_eq!(entity.attributes.speed, 0);
         assert_eq!(entity.attributes.render_layer, 8);

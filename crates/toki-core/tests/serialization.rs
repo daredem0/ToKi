@@ -23,6 +23,11 @@ fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
             solid: true,
             active: true,
             can_move: true,
+            ai_behavior: if entity_type == "npc" {
+                AiBehavior::Wander
+            } else {
+                AiBehavior::None
+            },
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -71,6 +76,7 @@ fn create_test_entity() -> Entity {
         render_layer: 2,
         active: true,
         can_move: true,
+        ai_behavior: AiBehavior::None,
         has_inventory: true,
     };
 

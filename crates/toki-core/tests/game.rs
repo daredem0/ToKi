@@ -102,6 +102,11 @@ fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
             solid: true,
             active: true,
             can_move: true,
+            ai_behavior: if entity_type == "npc" {
+                toki_core::entity::AiBehavior::Wander
+            } else {
+                toki_core::entity::AiBehavior::None
+            },
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -548,6 +553,67 @@ fn game_state_player_can_move_through_non_solid_entity() {
             .expect("player should exist")
             .position,
         IVec2::new(1, 0)
+    );
+}
+
+#[test]
+fn game_state_only_updates_npcs_with_wander_ai() {
+    fastrand::seed(7);
+
+    let mut game_state = GameState::new_empty();
+    let mut wandering_npc = test_definition("wandering_npc", "npc");
+    wandering_npc.attributes.ai_behavior = toki_core::entity::AiBehavior::Wander;
+    let wandering_npc_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&wandering_npc, IVec2::new(32, 32))
+        .expect("wandering npc should spawn");
+
+    let mut idle_npc = test_definition("idle_npc", "npc");
+    idle_npc.attributes.ai_behavior = toki_core::entity::AiBehavior::None;
+    let idle_npc_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&idle_npc, IVec2::new(96, 96))
+        .expect("idle npc should spawn");
+
+    let initial_wandering_position = game_state
+        .entity_manager()
+        .get_entity(wandering_npc_id)
+        .expect("wandering npc exists")
+        .position;
+    let initial_idle_position = game_state
+        .entity_manager()
+        .get_entity(idle_npc_id)
+        .expect("idle npc exists")
+        .position;
+
+    let mut wandering_npc_moved = false;
+    for _ in 0..(60 * 12) {
+        game_state.update(
+            UVec2::new(512, 512),
+            &create_test_tilemap(),
+            &create_test_atlas(),
+        );
+        if game_state
+            .entity_manager()
+            .get_entity(wandering_npc_id)
+            .expect("wandering npc exists")
+            .position
+            != initial_wandering_position
+        {
+            wandering_npc_moved = true;
+            break;
+        }
+    }
+
+    assert!(wandering_npc_moved, "wander npc should eventually move");
+    assert_eq!(
+        game_state
+            .entity_manager()
+            .get_entity(idle_npc_id)
+            .expect("idle npc exists")
+            .position,
+        initial_idle_position,
+        "npc with ai_behavior = none should remain stationary"
     );
 }
 

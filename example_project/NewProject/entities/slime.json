@@ -17,6 +17,7 @@
     "solid": true,
     "active": true,
     "can_move": false,
+    "ai_behavior": "wander",
     "has_inventory": false
   },
   "collision": {

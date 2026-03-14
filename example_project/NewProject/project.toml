@@ -7,9 +7,9 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-"Scene 2" = "scenes/scene2.json"
 "Main Scene" = "scenes/mainscene.json"
 main = "scenes/main.json"
+"Scene 2" = "scenes/scene2.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -32,36 +32,48 @@ pan = [
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
-"node:5" = [
-    579.13037109375,
-    128.6315155029297,
-]
-"node:6" = [
-    296.5447082519531,
-    162.4777374267578,
-]
 "node:3" = [
-    220.7003631591797,
-    47.67403030395508,
+    430.0,
+    50.0,
 ]
-"node:1" = [
-    11.024928092956543,
-    28.250852584838867,
+"node:9" = [
+    509.1368713378906,
+    180.75457763671875,
+]
+"node:7" = [
+    60.0,
+    162.0,
 ]
 "node:2" = [
-    440.640625,
-    64.328125,
+    800.0,
+    50.0,
+]
+"node:6" = [
+    430.0,
+    106.0,
+]
+"node:8" = [
+    235.4000701904297,
+    170.1680908203125,
 ]
 "node:4" = [
-    8.566792488098145,
-    179.10220336914063,
+    60.0,
+    106.0,
+]
+"node:1" = [
+    60.0,
+    50.0,
+]
+"node:5" = [
+    800.0,
+    106.0,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 1
 position = [
-    11.024928092956543,
-    28.250852584838867,
+    60.0,
+    50.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -70,8 +82,8 @@ Trigger = "OnStart"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 2
 position = [
-    440.640625,
-    64.328125,
+    800.0,
+    50.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlayMusic]
@@ -80,8 +92,8 @@ track_id = "lavandia"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 3
 position = [
-    220.7003631591797,
-    47.67403030395508,
+    430.0,
+    50.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -90,8 +102,8 @@ Condition = "Always"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 4
 position = [
-    8.566792488098145,
-    179.10220336914063,
+    60.0,
+    106.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -100,8 +112,8 @@ Trigger = "OnCollision"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 5
 position = [
-    579.13037109375,
-    128.6315155029297,
+    800.0,
+    106.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlaySound]
@@ -111,12 +123,43 @@ sound_id = "sfx_hit"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 6
 position = [
-    296.5447082519531,
-    162.4777374267578,
+    430.0,
+    106.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
 Condition = "Always"
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 7
+position = [
+    60.0,
+    162.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind]
+Trigger = "OnPlayerMove"
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 8
+position = [
+    235.4000701904297,
+    170.1680908203125,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind]
+Condition = "Always"
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 9
+position = [
+    509.1368713378906,
+    180.75457763671875,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlaySound]
+channel = "Movement"
+sound_id = "sfx_step"
 
 [[editor.rule_graph_drafts."Main Scene".edges]]
 from = 3
@@ -134,6 +177,14 @@ to = 5
 from = 4
 to = 6
 
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 7
+to = 8
+
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 8
+to = 9
+
 [[editor.rule_graph_drafts."Main Scene".chains]]
 rule_id = "rule_1"
 enabled = true
@@ -147,3 +198,10 @@ enabled = true
 priority = 0
 once = false
 trigger_node_id = 4
+
+[[editor.rule_graph_drafts."Main Scene".chains]]
+rule_id = "rule_3"
+enabled = true
+priority = 0
+once = false
+trigger_node_id = 7

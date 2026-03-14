@@ -6,7 +6,7 @@ use crate::animation::{AnimationController, AnimationState};
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::collision;
-use crate::entity::{Entity, EntityAttributes, EntityId, EntityManager, EntityType};
+use crate::entity::{AiBehavior, Entity, EntityAttributes, EntityId, EntityManager, EntityType};
 use crate::events::{GameEvent, GameUpdateResult};
 use crate::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
@@ -293,6 +293,7 @@ impl GameState {
                 solid: true,
                 active: true,
                 can_move: true,
+                ai_behavior: crate::entity::AiBehavior::None,
                 has_inventory: false,
             },
             collision: crate::entity::CollisionDef {
@@ -351,6 +352,7 @@ impl GameState {
                 solid: true,
                 active: true,
                 can_move: false,
+                ai_behavior: crate::entity::AiBehavior::Wander,
                 has_inventory: false,
             },
             collision: crate::entity::CollisionDef {
@@ -507,7 +509,9 @@ impl GameState {
                         return None;
                     }
                     // Only process NPCs
-                    if matches!(entity.entity_type, crate::entity::EntityType::Npc) {
+                    if matches!(entity.entity_type, crate::entity::EntityType::Npc)
+                        && matches!(entity.attributes.ai_behavior, AiBehavior::Wander)
+                    {
                         return Some(entity_id);
                     }
                 }
@@ -1486,6 +1490,7 @@ impl GameState {
                 EntityAttributes {
                     solid: false,
                     can_move: false,
+                    ai_behavior: crate::entity::AiBehavior::None,
                     ..EntityAttributes::default()
                 },
             ),
@@ -1496,6 +1501,7 @@ impl GameState {
                 EntityAttributes {
                     solid: false,
                     can_move: false,
+                    ai_behavior: crate::entity::AiBehavior::None,
                     ..EntityAttributes::default()
                 },
             ),
@@ -1507,6 +1513,7 @@ impl GameState {
                     solid: false,
                     can_move: false,
                     visible: false,
+                    ai_behavior: crate::entity::AiBehavior::None,
                     ..EntityAttributes::default()
                 },
             ),
