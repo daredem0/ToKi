@@ -3,7 +3,7 @@ use super::interactions::{CameraInteraction, PlacementInteraction, SelectionInte
 use super::rule_graph::{RuleGraph, RuleGraphError, RuleGraphNodeKind};
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use toki_core::animation::AnimationState;
 use toki_core::rules::{
     RuleAction, RuleCondition, RuleKey, RuleSoundChannel, RuleSpawnEntityType, RuleTarget,
@@ -681,13 +681,8 @@ impl PanelSystem {
                 let command_result = match command {
                     GraphCommand::AddTrigger => graph.add_trigger_chain().map(|_| ()),
                     GraphCommand::ResetLayout => {
-                        let auto_layout_graph = RuleGraph::from_rule_set(&scene_rules);
-                        let auto_node_badges = Self::rule_graph_node_badges(&auto_layout_graph);
-                        let auto_positions = Self::compute_auto_layout_positions(
-                            ui,
-                            &auto_layout_graph,
-                            &auto_node_badges,
-                        );
+                        let auto_positions =
+                            Self::compute_auto_layout_positions(ui, &graph, &node_badges);
                         auto_positions
                             .into_iter()
                             .try_for_each(|(node_id, position)| {
@@ -1000,65 +995,229 @@ impl PanelSystem {
         graph: &RuleGraph,
         node_badges: &HashMap<u64, String>,
     ) -> HashMap<u64, [f32; 2]> {
+        let mut node_sizes = HashMap::<u64, egui::Vec2>::new();
+        for node in &graph.nodes {
+            let badge = node_badges
+                .get(&node.id)
+                .cloned()
+                .unwrap_or_else(|| "?".to_string());
+            let label = format!(
+                "{}: {}",
+                badge,
+                Self::rule_graph_node_kind_compact_label(&node.kind)
+            );
+            node_sizes.insert(node.id, Self::graph_node_size_for_label(ui, &label, 1.0));
+        }
+        Self::compute_auto_layout_positions_from_sizes(graph, &node_sizes)
+    }
+
+    fn compute_auto_layout_positions_from_sizes(
+        graph: &RuleGraph,
+        node_sizes: &HashMap<u64, egui::Vec2>,
+    ) -> HashMap<u64, [f32; 2]> {
         let node_by_id = graph
             .nodes
             .iter()
             .map(|node| (node.id, node))
             .collect::<HashMap<_, _>>();
+        let mut node_ids = graph.nodes.iter().map(|node| node.id).collect::<Vec<_>>();
+        node_ids.sort_by_key(|node_id| {
+            (
+                Self::graph_node_kind_rank(&node_by_id[node_id].kind),
+                *node_id,
+            )
+        });
 
-        let mut positions = HashMap::<u64, [f32; 2]>::new();
-        let mut y = RuleGraph::auto_layout_start_y();
-
-        for chain in &graph.chains {
-            let Ok(sequence) = graph.chain_node_sequence(chain.trigger_node_id) else {
-                continue;
-            };
-            if sequence.is_empty() {
+        let mut incoming_count = HashMap::<u64, usize>::new();
+        let mut outgoing = HashMap::<u64, Vec<u64>>::new();
+        let mut incoming = HashMap::<u64, Vec<u64>>::new();
+        for node_id in &node_ids {
+            incoming_count.insert(*node_id, 0);
+            outgoing.insert(*node_id, Vec::new());
+            incoming.insert(*node_id, Vec::new());
+        }
+        for edge in &graph.edges {
+            if !node_by_id.contains_key(&edge.from) || !node_by_id.contains_key(&edge.to) {
                 continue;
             }
+            outgoing.entry(edge.from).or_default().push(edge.to);
+            incoming.entry(edge.to).or_default().push(edge.from);
+            *incoming_count.entry(edge.to).or_default() += 1;
+        }
 
-            let mut node_sizes = Vec::<egui::Vec2>::with_capacity(sequence.len());
-            for node_id in &sequence {
-                let Some(node) = node_by_id.get(node_id) else {
-                    node_sizes.push(egui::vec2(
-                        RuleGraph::auto_layout_node_width(),
-                        RuleGraph::auto_layout_node_height(),
-                    ));
-                    continue;
-                };
-                let badge = node_badges
-                    .get(node_id)
-                    .cloned()
-                    .unwrap_or_else(|| "?".to_string());
-                let label = format!(
-                    "{}: {}",
-                    badge,
-                    Self::rule_graph_node_kind_compact_label(&node.kind)
-                );
-                node_sizes.push(Self::graph_node_size_for_label(ui, &label, 1.0));
+        for targets in outgoing.values_mut() {
+            targets.sort_by_key(|node_id| {
+                (
+                    Self::graph_node_kind_rank(&node_by_id[node_id].kind),
+                    *node_id,
+                )
+            });
+        }
+
+        let mut ready = node_ids
+            .iter()
+            .copied()
+            .filter(|node_id| incoming_count.get(node_id).copied().unwrap_or_default() == 0)
+            .collect::<Vec<_>>();
+        ready.sort_by_key(|node_id| {
+            (
+                Self::graph_node_kind_rank(&node_by_id[node_id].kind),
+                *node_id,
+            )
+        });
+        ready.reverse();
+
+        let mut layer = node_ids
+            .iter()
+            .copied()
+            .map(|node_id| (node_id, 0_usize))
+            .collect::<HashMap<_, _>>();
+        let mut processed = HashSet::<u64>::new();
+        let mut topo_order = HashMap::<u64, usize>::new();
+        let mut topo_index = 0_usize;
+
+        while let Some(node_id) = ready.pop() {
+            if !processed.insert(node_id) {
+                continue;
             }
+            topo_order.insert(node_id, topo_index);
+            topo_index += 1;
 
-            let row_height = node_sizes
-                .iter()
-                .map(|size| size.y)
-                .fold(0.0_f32, f32::max)
-                .max(RuleGraph::auto_layout_node_height());
-
-            let mut x = RuleGraph::auto_layout_start_x();
-            for (index, node_id) in sequence.iter().enumerate() {
-                positions.insert(*node_id, [x, y]);
-                if let Some(next_size) = node_sizes.get(index + 1) {
-                    let current_size = node_sizes[index];
-                    x += current_size.x * 0.5
-                        + RuleGraph::auto_layout_horizontal_edge_spacing()
-                        + next_size.x * 0.5;
+            let current_layer = layer.get(&node_id).copied().unwrap_or_default();
+            let targets = outgoing.get(&node_id).cloned().unwrap_or_default();
+            for to in targets {
+                let next_layer = current_layer + 1;
+                let layer_entry = layer.entry(to).or_default();
+                if *layer_entry < next_layer {
+                    *layer_entry = next_layer;
+                }
+                if let Some(incoming) = incoming_count.get_mut(&to) {
+                    *incoming = incoming.saturating_sub(1);
+                    if *incoming == 0 {
+                        ready.push(to);
+                    }
                 }
             }
+            ready.sort_by_key(|candidate| {
+                (
+                    Self::graph_node_kind_rank(&node_by_id[candidate].kind),
+                    *candidate,
+                )
+            });
+            ready.reverse();
+        }
 
-            y += row_height + RuleGraph::auto_layout_vertical_edge_spacing();
+        for node_id in node_ids.iter().copied() {
+            if processed.contains(&node_id) {
+                continue;
+            }
+            topo_order.insert(node_id, topo_index);
+            topo_index += 1;
+            processed.insert(node_id);
+        }
+
+        let mut layers = BTreeMap::<usize, Vec<u64>>::new();
+        for node_id in node_ids {
+            let node_layer = layer.get(&node_id).copied().unwrap_or_default();
+            layers.entry(node_layer).or_default().push(node_id);
+        }
+        for layer_nodes in layers.values_mut() {
+            layer_nodes.sort_by_key(|node_id| topo_order[node_id]);
+        }
+
+        let default_size = egui::vec2(
+            RuleGraph::auto_layout_node_width(),
+            RuleGraph::auto_layout_node_height(),
+        );
+        let mut positions = HashMap::<u64, [f32; 2]>::new();
+        for (_layer_index, layer_nodes) in layers {
+            let mut y_top = RuleGraph::auto_layout_start_y();
+            for node_id in layer_nodes {
+                let size = node_sizes.get(&node_id).copied().unwrap_or(default_size);
+                let center_y = y_top + size.y * 0.5;
+                positions.insert(node_id, [RuleGraph::auto_layout_start_x(), center_y]);
+                y_top += size.y + RuleGraph::auto_layout_vertical_edge_spacing();
+            }
+        }
+
+        let mut topo_nodes = graph.nodes.iter().map(|node| node.id).collect::<Vec<_>>();
+        topo_nodes.sort_by_key(|node_id| topo_order[node_id]);
+
+        let horizontal_gap = RuleGraph::auto_layout_horizontal_edge_spacing();
+        for node_id in &topo_nodes {
+            let node_size = node_sizes.get(node_id).copied().unwrap_or(default_size);
+            let predecessors = incoming.get(node_id).cloned().unwrap_or_default();
+            let x = if predecessors.is_empty() {
+                RuleGraph::auto_layout_start_x()
+            } else {
+                predecessors
+                    .into_iter()
+                    .filter_map(|from| {
+                        let from_pos = positions.get(&from).copied()?;
+                        let from_size = node_sizes.get(&from).copied().unwrap_or(default_size);
+                        Some(from_pos[0] + from_size.x * 0.5 + horizontal_gap + node_size.x * 0.5)
+                    })
+                    .fold(RuleGraph::auto_layout_start_x(), f32::max)
+            };
+            if let Some(position) = positions.get_mut(node_id) {
+                position[0] = x;
+            }
+        }
+
+        // Enforce non-overlap strictly for node pairs that overlap vertically.
+        let max_passes = topo_nodes.len().max(1).pow(2);
+        for _ in 0..max_passes {
+            let mut changed = false;
+            for left_index in 0..topo_nodes.len() {
+                for right_index in (left_index + 1)..topo_nodes.len() {
+                    let left_id = topo_nodes[left_index];
+                    let right_id = topo_nodes[right_index];
+                    let Some(left_pos) = positions.get(&left_id).copied() else {
+                        continue;
+                    };
+                    let Some(right_pos) = positions.get(&right_id).copied() else {
+                        continue;
+                    };
+                    let left_size = node_sizes.get(&left_id).copied().unwrap_or(default_size);
+                    let right_size = node_sizes.get(&right_id).copied().unwrap_or(default_size);
+
+                    let required_dy = left_size.y * 0.5 + right_size.y * 0.5;
+                    let actual_dy = (right_pos[1] - left_pos[1]).abs();
+                    if actual_dy >= required_dy {
+                        continue;
+                    }
+
+                    let (right_id, left_pos, right_pos, left_size, right_size) =
+                        if left_pos[0] <= right_pos[0] {
+                            (right_id, left_pos, right_pos, left_size, right_size)
+                        } else {
+                            (left_id, right_pos, left_pos, right_size, left_size)
+                        };
+                    let required_dx = left_size.x * 0.5 + right_size.x * 0.5 + horizontal_gap;
+                    let actual_dx = right_pos[0] - left_pos[0];
+                    if actual_dx >= required_dx {
+                        continue;
+                    }
+                    if let Some(right_pos_mut) = positions.get_mut(&right_id) {
+                        right_pos_mut[0] += required_dx - actual_dx;
+                        changed = true;
+                    }
+                }
+            }
+            if !changed {
+                break;
+            }
         }
 
         positions
+    }
+
+    fn graph_node_kind_rank(kind: &RuleGraphNodeKind) -> usize {
+        match kind {
+            RuleGraphNodeKind::Trigger(_) => 0,
+            RuleGraphNodeKind::Condition(_) => 1,
+            RuleGraphNodeKind::Action(_) => 2,
+        }
     }
 
     fn render_graph_canvas(
@@ -1813,6 +1972,7 @@ impl PanelSystem {
 mod tests {
     use super::PanelSystem;
     use crate::ui::rule_graph::RuleGraph;
+    use std::collections::HashMap;
     use toki_core::rules::{
         Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleTarget,
         RuleTrigger,
@@ -2025,5 +2185,125 @@ mod tests {
                 && issue.message.contains(&detached_label)
                 && issue.message.contains("detached")
         }));
+    }
+
+    #[test]
+    fn auto_layout_uses_edge_direction_and_positions_all_nodes() {
+        let rules = RuleSet {
+            rules: vec![Rule {
+                id: "rule_1".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                trigger: RuleTrigger::OnStart,
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::PlayMusic {
+                    track_id: "bgm_1".to_string(),
+                }],
+            }],
+        };
+        let mut graph = RuleGraph::from_rule_set(&rules);
+        let detached_action = graph
+            .add_action_node(RuleAction::PlayMusic {
+                track_id: "bgm_2".to_string(),
+            })
+            .expect("detached node should be addable");
+        let trigger = graph.chains[0].trigger_node_id;
+        graph
+            .connect_nodes(detached_action, trigger)
+            .expect("detached action should be connectable to trigger");
+
+        let node_sizes = graph
+            .nodes
+            .iter()
+            .map(|node| (node.id, egui::vec2(180.0, 36.0)))
+            .collect::<HashMap<_, _>>();
+        let positions = PanelSystem::compute_auto_layout_positions_from_sizes(&graph, &node_sizes);
+        assert_eq!(
+            positions.len(),
+            graph.nodes.len(),
+            "auto-layout should position all nodes, including detached/editor-only nodes"
+        );
+
+        for edge in &graph.edges {
+            let from = positions
+                .get(&edge.from)
+                .expect("edge source must have a position");
+            let to = positions
+                .get(&edge.to)
+                .expect("edge target must have a position");
+            assert!(
+                from[0] < to[0],
+                "edge direction should move left-to-right in auto-layout ({} -> {})",
+                edge.from,
+                edge.to
+            );
+        }
+    }
+
+    #[test]
+    fn auto_layout_prevents_node_overlap() {
+        let rules = RuleSet {
+            rules: vec![Rule {
+                id: "rule_1".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                trigger: RuleTrigger::OnStart,
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::PlayMusic {
+                    track_id: "bgm_1".to_string(),
+                }],
+            }],
+        };
+        let mut graph = RuleGraph::from_rule_set(&rules);
+        for i in 0..6 {
+            graph
+                .add_action_node(RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: format!("sfx_{i}"),
+                })
+                .expect("standalone action should be addable");
+        }
+
+        let mut node_sizes = HashMap::<u64, egui::Vec2>::new();
+        for (index, node) in graph.nodes.iter().enumerate() {
+            let width = 140.0 + (index as f32 * 11.0);
+            let height = 28.0 + ((index % 3) as f32 * 6.0);
+            node_sizes.insert(node.id, egui::vec2(width, height));
+        }
+
+        let positions = PanelSystem::compute_auto_layout_positions_from_sizes(&graph, &node_sizes);
+        let node_ids = graph.nodes.iter().map(|node| node.id).collect::<Vec<_>>();
+        for left_index in 0..node_ids.len() {
+            for right_index in (left_index + 1)..node_ids.len() {
+                let left_id = node_ids[left_index];
+                let right_id = node_ids[right_index];
+                let left_pos = positions
+                    .get(&left_id)
+                    .expect("left node should have a computed position");
+                let right_pos = positions
+                    .get(&right_id)
+                    .expect("right node should have a computed position");
+                let left_size = node_sizes
+                    .get(&left_id)
+                    .expect("left node should have a known size");
+                let right_size = node_sizes
+                    .get(&right_id)
+                    .expect("right node should have a known size");
+
+                let overlaps_x =
+                    (left_pos[0] - right_pos[0]).abs() < (left_size.x * 0.5 + right_size.x * 0.5);
+                let overlaps_y =
+                    (left_pos[1] - right_pos[1]).abs() < (left_size.y * 0.5 + right_size.y * 0.5);
+
+                assert!(
+                    !(overlaps_x && overlaps_y),
+                    "auto-layout should never overlap nodes ({} and {})",
+                    left_id,
+                    right_id
+                );
+            }
+        }
     }
 }

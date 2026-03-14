@@ -7,9 +7,9 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-"Main Scene" = "scenes/mainscene.json"
-"Scene 2" = "scenes/scene2.json"
 main = "scenes/main.json"
+"Scene 2" = "scenes/scene2.json"
+"Main Scene" = "scenes/mainscene.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -22,40 +22,28 @@ recent_files = []
 [editor.camera_settings]
 
 [editor.graph_layouts."Main Scene"]
-zoom = 0.7194348573684692
+zoom = 0.791378378868103
 pan = [
-    81.8575439453125,
-    54.2265625,
+    89.1378402709961,
+    16.0,
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
-"rule_5:action:0" = [
-    410.0,
-    354.0,
-]
-"node:10" = [
-    60.0,
-    278.0,
-]
-"rule_1:trigger" = [
-    60.0,
-    50.0,
-]
-"rule_4:condition:0" = [
-    410.0,
-    278.0,
+"node:3" = [
+    237.359375,
+    64.328125,
 ]
 "node:5" = [
-    459.0914306640625,
-    229.18429565429688,
+    469.625,
+    112.984375,
+]
+"node:1" = [
+    60.0,
+    64.328125,
 ]
 "node:7" = [
     60.0,
     202.0,
-]
-"node:3" = [
-    217.359375,
-    50.0,
 ]
 "rule_4:action:0" = [
     410.0,
@@ -65,104 +53,116 @@ pan = [
     60.0,
     354.0,
 ]
-"node:4" = [
+"rule_4:trigger" = [
     60.0,
+    278.0,
+]
+"rule_3:trigger" = [
+    42.84765625,
+    225.66015625,
+]
+"detached:8" = [
+    495.62109375,
+    217.7734375,
+]
+"node:9" = [
+    226.0,
+    202.0,
+]
+"rule_1:condition:0" = [
+    217.359375,
+    50.0,
+]
+"rule_3:action:0" = [
+    461.44921875,
+    256.48828125,
+]
+"node:8" = [
+    429.625,
+    202.0,
+]
+"rule_2:action:0" = [
+    459.171875,
     126.0,
+]
+"rule_4:condition:0" = [
+    410.0,
+    278.0,
+]
+"rule_6:trigger" = [
+    60.0,
+    430.0,
 ]
 "rule_1:action:1" = [
     711.1526489257813,
     49.724422454833984,
 ]
-"rule_1:condition:0" = [
-    217.359375,
+"rule_1:trigger" = [
+    60.0,
     50.0,
 ]
 "detached:11" = [
     454.25390625,
     341.29296875,
 ]
-"rule_2:trigger" = [
-    60.0,
-    126.0,
-]
-"node:1" = [
-    60.0,
-    50.0,
-]
 "rule_4:action:1" = [
     408.16015625,
     330.32421875,
-]
-"node:9" = [
-    226.0,
-    202.0,
 ]
 "rule_1:action:0" = [
     400.640625,
     50.0,
 ]
-"node:2" = [
-    400.640625,
-    50.0,
-]
-"rule_5:condition:0" = [
+"rule_5:action:0" = [
     410.0,
     354.0,
-]
-"rule_2:action:0" = [
-    459.171875,
-    126.0,
-]
-"rule_4:trigger" = [
-    60.0,
-    278.0,
-]
-"rule_3:action:0" = [
-    461.44921875,
-    256.48828125,
-]
-"node:6" = [
-    336.6065673828125,
-    134.20411682128906,
-]
-"node:8" = [
-    429.625,
-    202.0,
-]
-"detached:8" = [
-    495.62109375,
-    217.7734375,
-]
-"detached:10" = [
-    502.36328125,
-    211.51953125,
-]
-"rule_3:trigger" = [
-    42.84765625,
-    225.66015625,
 ]
 "rule_6:action:0" = [
     410.0,
     430.0,
 ]
-"rule_2:condition:0" = [
-    223.21875,
+"rule_2:trigger" = [
+    60.0,
     126.0,
 ]
-"rule_6:trigger" = [
+"rule_5:condition:0" = [
+    410.0,
+    354.0,
+]
+"node:4" = [
     60.0,
-    430.0,
+    112.984375,
 ]
 "rule_3:condition:0" = [
     226.0,
     202.0,
+]
+"node:2" = [
+    440.640625,
+    64.328125,
+]
+"detached:10" = [
+    502.36328125,
+    211.51953125,
+]
+"rule_2:condition:0" = [
+    223.21875,
+    126.0,
+]
+"node:10" = [
+    60.0,
+    278.0,
+]
+"node:6" = [
+    246.0,
+    112.984375,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 1
 position = [
     60.0,
-    50.0,
+    64.328125,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -171,8 +171,8 @@ Trigger = "OnStart"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 2
 position = [
-    400.640625,
-    50.0,
+    440.640625,
+    64.328125,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlayMusic]
@@ -181,8 +181,8 @@ track_id = "lavandia"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 3
 position = [
-    217.359375,
-    50.0,
+    237.359375,
+    64.328125,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -192,7 +192,7 @@ Condition = "Always"
 id = 4
 position = [
     60.0,
-    126.0,
+    112.984375,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -201,8 +201,8 @@ Trigger = "OnCollision"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 5
 position = [
-    459.0914306640625,
-    229.18429565429688,
+    469.625,
+    112.984375,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlaySound]
@@ -212,22 +212,12 @@ sound_id = "sfx_hit"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 6
 position = [
-    336.6065673828125,
-    134.20411682128906,
+    246.0,
+    112.984375,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
 Condition = "Always"
-
-[[editor.rule_graph_drafts."Main Scene".nodes]]
-id = 7
-position = [
-    60.0,
-    202.0,
-]
-
-[editor.rule_graph_drafts."Main Scene".nodes.kind]
-Trigger = "OnUpdate"
 
 [[editor.rule_graph_drafts."Main Scene".edges]]
 from = 3
@@ -258,10 +248,3 @@ enabled = true
 priority = 0
 once = false
 trigger_node_id = 4
-
-[[editor.rule_graph_drafts."Main Scene".chains]]
-rule_id = "rule_3"
-enabled = true
-priority = 0
-once = false
-trigger_node_id = 7

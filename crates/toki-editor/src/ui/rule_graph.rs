@@ -74,9 +74,9 @@ pub enum RuleGraphEditError {
 }
 
 impl RuleGraph {
-    // Auto-layout spacing between node edges (not centers).
-    const H_SPACING: f32 = 30.0;
-    const V_SPACING: f32 = 40.0;
+    // Auto-layout spacing between node edges.
+    const H_SPACING: f32 = 50.0;
+    const V_SPACING: f32 = 20.0;
     // Keep in sync with graph canvas max node size at 100% zoom.
     const AUTO_LAYOUT_NODE_WIDTH: f32 = 320.0;
     const AUTO_LAYOUT_NODE_HEIGHT: f32 = 36.0;
@@ -1470,8 +1470,9 @@ mod tests {
 
         let center_spacing = second_trigger_node.position[1] - first_trigger_node.position[1];
         let edge_spacing = center_spacing - super::RuleGraph::auto_layout_node_height();
+        let spacing_epsilon = 0.01_f32;
         assert!(
-            edge_spacing >= super::RuleGraph::auto_layout_vertical_edge_spacing(),
+            edge_spacing + spacing_epsilon >= super::RuleGraph::auto_layout_vertical_edge_spacing(),
             "vertical edge spacing should keep chains visually separated"
         );
 
@@ -1492,7 +1493,8 @@ mod tests {
             let center_spacing = right.position[0] - left.position[0];
             let edge_spacing = center_spacing - super::RuleGraph::auto_layout_node_width();
             assert!(
-                edge_spacing >= super::RuleGraph::auto_layout_horizontal_edge_spacing(),
+                edge_spacing + spacing_epsilon
+                    >= super::RuleGraph::auto_layout_horizontal_edge_spacing(),
                 "horizontal edge spacing should keep consecutive nodes visually separated"
             );
         }
