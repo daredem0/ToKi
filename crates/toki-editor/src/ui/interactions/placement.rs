@@ -108,8 +108,9 @@ impl PlacementInteraction {
 
         let sprite_size =
             glam::UVec2::new(entity_def.rendering.size[0], entity_def.rendering.size[1]);
+        let snap_to_grid = config.editor_settings.grid.snap_to_grid;
         let world_pos_i32 =
-            Self::centered_world_position_from_sprite_center(world_pos, sprite_size);
+            Self::placement_world_position_to_entity_position(world_pos, sprite_size, snap_to_grid);
 
         Self::create_entity_in_scene(
             ui_state,
@@ -223,8 +224,9 @@ impl PlacementInteraction {
 
         let sprite_size =
             glam::UVec2::new(entity_def.rendering.size[0], entity_def.rendering.size[1]);
+        let snap_to_grid = config.editor_settings.grid.snap_to_grid;
         let world_pos_i32 =
-            Self::centered_world_position_from_sprite_center(world_pos, sprite_size);
+            Self::placement_world_position_to_entity_position(world_pos, sprite_size, snap_to_grid);
 
         let collision_box = entity_def.get_collision_box();
         if let Some(tilemap) = viewport.scene_manager().tilemap() {
@@ -247,6 +249,18 @@ impl PlacementInteraction {
         let half_size = glam::Vec2::new(sprite_size.x as f32 / 2.0, sprite_size.y as f32 / 2.0);
         let centered_world_pos = world_pos - half_size;
         glam::IVec2::new(centered_world_pos.x as i32, centered_world_pos.y as i32)
+    }
+
+    fn placement_world_position_to_entity_position(
+        world_pos: glam::Vec2,
+        sprite_size: glam::UVec2,
+        snap_to_grid: bool,
+    ) -> glam::IVec2 {
+        if snap_to_grid {
+            glam::IVec2::new(world_pos.x.floor() as i32, world_pos.y.floor() as i32)
+        } else {
+            Self::centered_world_position_from_sprite_center(world_pos, sprite_size)
+        }
     }
 
     fn next_entity_id(entities: &[Entity]) -> toki_core::entity::EntityId {
@@ -438,6 +452,26 @@ mod tests {
             UVec2::new(16, 16),
         );
         assert_eq!(centered, IVec2::new(56, 40));
+    }
+
+    #[test]
+    fn placement_world_position_to_entity_position_uses_top_left_when_snap_enabled() {
+        let placed = PlacementInteraction::placement_world_position_to_entity_position(
+            Vec2::new(64.0, 48.0),
+            UVec2::new(16, 16),
+            true,
+        );
+        assert_eq!(placed, IVec2::new(64, 48));
+    }
+
+    #[test]
+    fn placement_world_position_to_entity_position_uses_center_offset_when_snap_disabled() {
+        let placed = PlacementInteraction::placement_world_position_to_entity_position(
+            Vec2::new(64.0, 48.0),
+            UVec2::new(16, 16),
+            false,
+        );
+        assert_eq!(placed, IVec2::new(56, 40));
     }
 
     #[test]

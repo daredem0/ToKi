@@ -91,7 +91,7 @@ impl PanelSystem {
         ui_state: &mut super::EditorUI,
         ctx: &egui::Context,
         scene_viewport: Option<&mut SceneViewport>,
-        config: Option<&mut EditorConfig>,
+        mut config: Option<&mut EditorConfig>,
         renderer: Option<&mut egui_wgpu::Renderer>,
     ) {
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -138,6 +138,13 @@ impl PanelSystem {
                 // Update the viewport systems
                 if let Err(e) = viewport.update() {
                     tracing::error!("Scene viewport update error: {e}");
+                }
+
+                if let Some(cfg) = config.as_deref_mut() {
+                    if Self::render_grid_toolbar(ui, cfg) {
+                        viewport.mark_dirty();
+                    }
+                    ui.separator();
                 }
 
                 // Handle viewport interactions
@@ -235,6 +242,56 @@ impl PanelSystem {
                     .on_hover_text("Scene viewport not initialized");
             }
         });
+    }
+
+    fn sanitize_grid_size_axis(value: i32) -> u32 {
+        value.max(1) as u32
+    }
+
+    fn render_grid_toolbar(ui: &mut egui::Ui, config: &mut EditorConfig) -> bool {
+        let mut changed = false;
+        let grid = &mut config.editor_settings.grid;
+
+        ui.horizontal(|ui| {
+            ui.label("Grid:");
+
+            changed |= ui.checkbox(&mut grid.show_grid, "Show Grid").changed();
+            changed |= ui.checkbox(&mut grid.snap_to_grid, "Snap To Grid").changed();
+
+            let mut grid_x = grid.grid_size[0] as i32;
+            let mut grid_y = grid.grid_size[1] as i32;
+
+            ui.label("Grid Size");
+            let x_changed = ui
+                .add(
+                    egui::DragValue::new(&mut grid_x)
+                        .prefix("x:")
+                        .range(1..=512)
+                        .speed(1),
+                )
+                .changed();
+            let y_changed = ui
+                .add(
+                    egui::DragValue::new(&mut grid_y)
+                        .prefix("y:")
+                        .range(1..=512)
+                        .speed(1),
+                )
+                .changed();
+
+            if x_changed || y_changed {
+                let new_size = [
+                    Self::sanitize_grid_size_axis(grid_x),
+                    Self::sanitize_grid_size_axis(grid_y),
+                ];
+                if grid.grid_size != new_size {
+                    grid.grid_size = new_size;
+                    changed = true;
+                }
+            }
+        });
+
+        changed
     }
 
     fn render_scene_graph(
@@ -2321,6 +2378,13 @@ mod tests {
             }),
             "PlayMusic(bgm_forest)"
         );
+    }
+
+    #[test]
+    fn sanitize_grid_size_axis_clamps_to_minimum_one() {
+        assert_eq!(PanelSystem::sanitize_grid_size_axis(-32), 1);
+        assert_eq!(PanelSystem::sanitize_grid_size_axis(0), 1);
+        assert_eq!(PanelSystem::sanitize_grid_size_axis(24), 24);
     }
 
     #[test]
