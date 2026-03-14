@@ -36,6 +36,7 @@ pub(crate) enum CenterPanelTab {
 pub struct EntityMoveDragState {
     pub scene_name: String,
     pub entity: Entity,
+    pub grab_offset: glam::Vec2, // Cursor world position offset from entity top-left at drag start
 }
 
 /// Manages the editor's UI state and rendering

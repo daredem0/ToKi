@@ -82,9 +82,11 @@ impl SelectionInteraction {
         ui_state.set_selection(Selection::Entity(entity_id));
         ui_state.selected_entity_id = Some(entity_id);
         ui_state.enter_placement_mode(entity_def_name.clone());
+        let grab_offset = world_pos - entity.position.as_vec2();
         ui_state.begin_entity_move_drag(EntityMoveDragState {
             scene_name: active_scene_name,
             entity,
+            grab_offset,
         });
         viewport.suppress_entity_rendering(entity_id);
     }
@@ -113,8 +115,9 @@ impl SelectionInteraction {
             return;
         };
 
-        let drop_world_pos = GridInteraction::maybe_snap_world_position(
+        let drop_world_pos = GridInteraction::drag_target_world_position(
             viewport.screen_to_world_pos_raw(drop_pos, rect),
+            drag_state.grab_offset,
             viewport.scene_manager().tilemap(),
             config,
         );

@@ -20,8 +20,15 @@ impl PlacementInteraction {
     ) {
         if ui_state.is_in_placement_mode() {
             if let Some(hover_pos) = response.hover_pos() {
-                let world_pos = GridInteraction::maybe_snap_world_position(
-                    viewport.screen_to_world_pos_raw(hover_pos, rect),
+                let cursor_world = viewport.screen_to_world_pos_raw(hover_pos, rect);
+                let grab_offset = ui_state
+                    .entity_move_drag
+                    .as_ref()
+                    .map(|drag| drag.grab_offset)
+                    .unwrap_or(glam::Vec2::ZERO);
+                let world_pos = GridInteraction::drag_target_world_position(
+                    cursor_world,
+                    grab_offset,
                     viewport.scene_manager().tilemap(),
                     config,
                 );
