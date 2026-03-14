@@ -224,6 +224,9 @@ impl PanelSystem {
                 // Render the scene content
                 let project_path = config.as_deref().and_then(|c| c.current_project_path());
                 viewport.render(ui, rect, project_path.map(|p| p.as_path()), renderer);
+                if let Some(cfg) = config.as_deref() {
+                    Self::paint_viewport_grid_overlay(ui, rect, viewport, cfg);
+                }
 
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                     ui.horizontal(|ui| {
@@ -246,6 +249,108 @@ impl PanelSystem {
 
     fn sanitize_grid_size_axis(value: i32) -> u32 {
         value.max(1) as u32
+    }
+
+    fn first_grid_line_at_or_before(value: i32, step: i32) -> i32 {
+        let safe_step = step.max(1);
+        value - value.rem_euclid(safe_step)
+    }
+
+    fn grid_world_lines(min_inclusive: i32, max_inclusive: i32, step: i32) -> Vec<i32> {
+        if max_inclusive < min_inclusive {
+            return Vec::new();
+        }
+
+        let safe_step = step.max(1);
+        let mut current = Self::first_grid_line_at_or_before(min_inclusive, safe_step);
+        let mut lines = Vec::new();
+        while current <= max_inclusive {
+            if current >= min_inclusive {
+                lines.push(current);
+            }
+            current += safe_step;
+        }
+        lines
+    }
+
+    fn compute_viewport_display_rect(
+        outer_rect: egui::Rect,
+        viewport_size: (u32, u32),
+    ) -> egui::Rect {
+        let viewport_aspect = viewport_size.0 as f32 / viewport_size.1 as f32;
+        let available_size = outer_rect.size();
+        let available_aspect = available_size.x / available_size.y;
+
+        let display_size = if available_aspect > viewport_aspect {
+            egui::Vec2::new(available_size.y * viewport_aspect, available_size.y)
+        } else {
+            egui::Vec2::new(available_size.x, available_size.x / viewport_aspect)
+        };
+        let offset = (available_size - display_size) * 0.5;
+        egui::Rect::from_min_size(outer_rect.min + offset, display_size)
+    }
+
+    fn effective_grid_size(viewport: &SceneViewport, config: &EditorConfig) -> glam::UVec2 {
+        viewport.scene_manager().tilemap().map_or_else(
+            || {
+                glam::UVec2::new(
+                    config.editor_settings.grid.grid_size[0],
+                    config.editor_settings.grid.grid_size[1],
+                )
+                .max(glam::UVec2::ONE)
+            },
+            |tilemap| tilemap.tile_size.max(glam::UVec2::ONE),
+        )
+    }
+
+    fn paint_viewport_grid_overlay(
+        ui: &egui::Ui,
+        outer_rect: egui::Rect,
+        viewport: &SceneViewport,
+        config: &EditorConfig,
+    ) {
+        if !config.editor_settings.grid.show_grid {
+            return;
+        }
+
+        let (viewport_width, viewport_height) = viewport.viewport_size();
+        let display_rect = Self::compute_viewport_display_rect(outer_rect, (viewport_width, viewport_height));
+        let (camera_position, camera_scale) = viewport.camera_state();
+        let grid_size = Self::effective_grid_size(viewport, config);
+
+        let world_min_x = camera_position.x;
+        let world_min_y = camera_position.y;
+        let world_span_x = viewport_width as i32 * camera_scale as i32;
+        let world_span_y = viewport_height as i32 * camera_scale as i32;
+        let world_max_x = world_min_x + world_span_x;
+        let world_max_y = world_min_y + world_span_y;
+
+        let stroke = egui::Stroke::new(1.0, egui::Color32::from_white_alpha(34));
+        let painter = ui.painter();
+
+        for world_x in Self::grid_world_lines(world_min_x, world_max_x, grid_size.x as i32) {
+            let t = (world_x - world_min_x) as f32 / world_span_x as f32;
+            let screen_x = egui::lerp(display_rect.left()..=display_rect.right(), t);
+            painter.line_segment(
+                [
+                    egui::pos2(screen_x, display_rect.top()),
+                    egui::pos2(screen_x, display_rect.bottom()),
+                ],
+                stroke,
+            );
+        }
+
+        for world_y in Self::grid_world_lines(world_min_y, world_max_y, grid_size.y as i32) {
+            let t = (world_y - world_min_y) as f32 / world_span_y as f32;
+            let screen_y = egui::lerp(display_rect.top()..=display_rect.bottom(), t);
+            painter.line_segment(
+                [
+                    egui::pos2(display_rect.left(), screen_y),
+                    egui::pos2(display_rect.right(), screen_y),
+                ],
+                stroke,
+            );
+        }
     }
 
     fn render_grid_toolbar(ui: &mut egui::Ui, config: &mut EditorConfig) -> bool {
@@ -2385,6 +2490,37 @@ mod tests {
         assert_eq!(PanelSystem::sanitize_grid_size_axis(-32), 1);
         assert_eq!(PanelSystem::sanitize_grid_size_axis(0), 1);
         assert_eq!(PanelSystem::sanitize_grid_size_axis(24), 24);
+    }
+
+    #[test]
+    fn first_grid_line_at_or_before_handles_negative_coordinates() {
+        assert_eq!(PanelSystem::first_grid_line_at_or_before(0, 16), 0);
+        assert_eq!(PanelSystem::first_grid_line_at_or_before(15, 16), 0);
+        assert_eq!(PanelSystem::first_grid_line_at_or_before(16, 16), 16);
+        assert_eq!(PanelSystem::first_grid_line_at_or_before(-1, 16), -16);
+        assert_eq!(PanelSystem::first_grid_line_at_or_before(-17, 16), -32);
+    }
+
+    #[test]
+    fn grid_world_lines_emits_step_aligned_lines_inside_range() {
+        assert_eq!(
+            PanelSystem::grid_world_lines(3, 40, 16),
+            vec![16, 32]
+        );
+        assert_eq!(
+            PanelSystem::grid_world_lines(-20, 20, 16),
+            vec![-16, 0, 16]
+        );
+    }
+
+    #[test]
+    fn compute_viewport_display_rect_keeps_aspect_and_centers() {
+        let outer = egui::Rect::from_min_size(egui::Pos2::new(0.0, 0.0), egui::vec2(320.0, 144.0));
+        let display = PanelSystem::compute_viewport_display_rect(outer, (160, 144));
+        assert_eq!(display.width(), 160.0);
+        assert_eq!(display.height(), 144.0);
+        assert_eq!(display.left(), 80.0);
+        assert_eq!(display.right(), 240.0);
     }
 
     #[test]

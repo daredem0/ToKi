@@ -223,7 +223,8 @@ impl SceneViewport {
             {
                 if let Some(texture_id) = _target.egui_texture_id {
                     // Calculate aspect ratio preserving viewport size
-                    let viewport_aspect = 160.0 / 144.0; // Native aspect ratio (10:9)
+                    let viewport_aspect =
+                        self.viewport_size.0 as f32 / self.viewport_size.1 as f32;
                     let available_size = rect.size();
                     let available_aspect = available_size.x / available_size.y;
 
@@ -317,6 +318,14 @@ impl SceneViewport {
     pub fn selected_entity(&self) -> Option<u32> {
         // TODO: Implement with unified renderer
         None
+    }
+
+    pub fn camera_state(&self) -> (glam::IVec2, u32) {
+        (self.camera.position, self.camera.scale)
+    }
+
+    pub fn viewport_size(&self) -> (u32, u32) {
+        self.viewport_size
     }
 
     /// Find entity at world position for hit detection
