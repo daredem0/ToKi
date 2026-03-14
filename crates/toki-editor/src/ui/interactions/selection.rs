@@ -110,7 +110,13 @@ impl SelectionInteraction {
             dragged_entities,
             grab_offset,
         });
-        viewport.suppress_entity_rendering(entity_id);
+        viewport.suppress_entity_rendering_many(
+            ui_state
+                .entity_move_drag
+                .as_ref()
+                .into_iter()
+                .flat_map(|drag| drag.dragged_entities.iter().map(|entity| entity.id)),
+        );
     }
 
     pub fn handle_marquee_drag_start(ui_state: &mut EditorUI, drag_start_pos: egui::Pos2) {

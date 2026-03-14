@@ -75,11 +75,8 @@ mod tests {
             snap_to_grid: false,
         };
 
-        let world = GridInteraction::maybe_snap_world_position(
-            Vec2::new(13.7, 9.3),
-            None,
-            Some(&config),
-        );
+        let world =
+            GridInteraction::maybe_snap_world_position(Vec2::new(13.7, 9.3), None, Some(&config));
         assert_eq!(world, Vec2::new(13.7, 9.3));
     }
 
@@ -92,11 +89,8 @@ mod tests {
             snap_to_grid: true,
         };
 
-        let world = GridInteraction::maybe_snap_world_position(
-            Vec2::new(13.7, 25.9),
-            None,
-            Some(&config),
-        );
+        let world =
+            GridInteraction::maybe_snap_world_position(Vec2::new(13.7, 25.9), None, Some(&config));
         assert_eq!(world, Vec2::new(8.0, 24.0));
     }
 
@@ -127,11 +121,8 @@ mod tests {
             snap_to_grid: true,
         };
 
-        let world = GridInteraction::maybe_snap_world_position(
-            Vec2::new(-1.0, -17.2),
-            None,
-            Some(&config),
-        );
+        let world =
+            GridInteraction::maybe_snap_world_position(Vec2::new(-1.0, -17.2), None, Some(&config));
         assert_eq!(world, Vec2::new(-16.0, -32.0));
     }
 

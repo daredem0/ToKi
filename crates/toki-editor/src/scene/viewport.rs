@@ -68,6 +68,13 @@ fn point_in_entity_bounds(
         && point_world.y < entity_max.y
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct DragPreviewSprite {
+    pub entity_id: toki_core::entity::EntityId,
+    pub world_position: glam::IVec2,
+    pub is_valid: bool,
+}
+
 /// Handles the scene viewport - integration between scene data and rendering
 pub struct SceneViewport {
     scene_manager: SceneManager,
@@ -83,8 +90,8 @@ pub struct SceneViewport {
     // Mouse interaction state
     last_mouse_pos: Option<glam::Vec2>, // For camera panning
     is_dragging_camera: bool,
-    // Hide one entity while it is being interactively dragged in editor UI.
-    suppressed_entity_id: Option<toki_core::entity::EntityId>,
+    // Hide entities while they are being interactively dragged in editor UI.
+    suppressed_entity_ids: std::collections::HashSet<toki_core::entity::EntityId>,
     // Sprite atlas caching to prevent redundant loads
     loaded_sprite_atlases: std::collections::HashMap<String, toki_core::assets::atlas::AtlasMeta>,
 }
@@ -113,7 +120,7 @@ impl SceneViewport {
             camera,
             last_mouse_pos: None,
             is_dragging_camera: false,
-            suppressed_entity_id: None,
+            suppressed_entity_ids: std::collections::HashSet::new(),
             loaded_sprite_atlases: std::collections::HashMap::new(),
         })
     }
@@ -166,6 +173,7 @@ impl SceneViewport {
         project_assets: &ProjectAssets,
         renderer: &mut egui_wgpu::Renderer,
         preview_data: Option<(&str, glam::Vec2, toki_core::sprite::SpriteFrame, bool)>,
+        drag_preview_data: Option<&[DragPreviewSprite]>,
     ) -> Result<()> {
         if !self.is_initialized {
             return Ok(()); // Skip if not initialized
@@ -179,7 +187,12 @@ impl SceneViewport {
         tracing::trace!("Scene needs re-rendering, proceeding with render");
 
         // Prepare scene data
-        let scene_data = self.prepare_scene_data(Some(project_path), project_assets, preview_data);
+        let scene_data = self.prepare_scene_data(
+            Some(project_path),
+            project_assets,
+            preview_data,
+            drag_preview_data,
+        );
 
         // Render to offscreen target
         if let (Some(scene_renderer), Some(target)) =
@@ -239,8 +252,7 @@ impl SceneViewport {
             {
                 if let Some(texture_id) = _target.egui_texture_id {
                     // Calculate aspect ratio preserving viewport size
-                    let viewport_aspect =
-                        self.viewport_size.0 as f32 / self.viewport_size.1 as f32;
+                    let viewport_aspect = self.viewport_size.0 as f32 / self.viewport_size.1 as f32;
                     let available_size = rect.size();
                     let available_aspect = available_size.x / available_size.y;
 
@@ -398,6 +410,7 @@ impl SceneViewport {
         project_path: Option<&std::path::Path>,
         project_assets: &ProjectAssets,
         preview_data: Option<(&str, glam::Vec2, toki_core::sprite::SpriteFrame, bool)>,
+        drag_preview_data: Option<&[DragPreviewSprite]>,
     ) -> SceneData {
         tracing::trace!("Preparing scene data for rendering...");
 
@@ -410,6 +423,12 @@ impl SceneViewport {
             project_path,
             project_assets,
             preview_data,
+        );
+        self.prepare_drag_preview_sprite_data(
+            &mut scene_data,
+            project_path,
+            project_assets,
+            drag_preview_data,
         );
         self.prepare_debug_shapes(&mut scene_data);
 
@@ -489,7 +508,7 @@ impl SceneViewport {
         }
 
         for (entity_id, position, size) in renderable_entities {
-            if self.suppressed_entity_id == Some(entity_id) {
+            if self.suppressed_entity_ids.contains(&entity_id) {
                 continue;
             }
             self.process_entity_sprite(
@@ -744,6 +763,63 @@ impl SceneViewport {
         tracing::trace!("Added preview sprite for '{}' at render position ({}, {}) with size {}x{} and {} outline",
                        entity_def_name, render_position_i32.x, render_position_i32.y, entity_size.x, entity_size.y,
                        if is_valid { "green" } else { "red" });
+    }
+
+    fn prepare_drag_preview_sprite_data(
+        &mut self,
+        scene_data: &mut SceneData,
+        project_path: Option<&std::path::Path>,
+        project_assets: &ProjectAssets,
+        drag_preview_data: Option<&[DragPreviewSprite]>,
+    ) {
+        let Some(drag_preview_data) = drag_preview_data else {
+            return;
+        };
+
+        for preview in drag_preview_data {
+            let Some(entity) = self
+                .scene_manager
+                .game_state()
+                .entity_manager()
+                .get_entity(preview.entity_id)
+            else {
+                continue;
+            };
+
+            let entity_size = entity.size;
+            let Some(animation_controller) = &entity.attributes.animation_controller else {
+                continue;
+            };
+
+            let Ok(atlas_name) = animation_controller.current_atlas_name() else {
+                continue;
+            };
+            let atlas_name = atlas_name.to_string();
+
+            self.load_and_create_sprite_instance(
+                scene_data,
+                preview.entity_id,
+                preview.world_position,
+                entity_size,
+                &atlas_name,
+                (project_assets, project_path),
+            );
+
+            let outline_color = if preview.is_valid {
+                [0.0, 1.0, 0.0, 1.0]
+            } else {
+                [1.0, 0.0, 0.0, 1.0]
+            };
+            scene_data.debug_shapes.push(toki_render::DebugShape {
+                shape_type: toki_render::DebugShapeType::Rectangle,
+                position: glam::Vec2::new(
+                    preview.world_position.x as f32,
+                    preview.world_position.y as f32,
+                ),
+                size: glam::Vec2::new(entity_size.x as f32, entity_size.y as f32),
+                color: outline_color,
+            });
+        }
     }
 
     /// Prepare debug shapes for collision visualization
@@ -1061,17 +1137,26 @@ impl SceneViewport {
         self.needs_render = true;
     }
 
-    /// Temporarily suppress rendering for one entity (used during drag-move preview).
-    pub fn suppress_entity_rendering(&mut self, entity_id: toki_core::entity::EntityId) {
-        if self.suppressed_entity_id != Some(entity_id) {
-            self.suppressed_entity_id = Some(entity_id);
+    /// Temporarily suppress rendering for multiple entities.
+    pub fn suppress_entity_rendering_many(
+        &mut self,
+        entity_ids: impl IntoIterator<Item = toki_core::entity::EntityId>,
+    ) {
+        let mut changed = false;
+        for entity_id in entity_ids {
+            if self.suppressed_entity_ids.insert(entity_id) {
+                changed = true;
+            }
+        }
+        if changed {
             self.mark_dirty();
         }
     }
 
     /// Clear temporary entity render suppression.
     pub fn clear_suppressed_entity_rendering(&mut self) {
-        if self.suppressed_entity_id.take().is_some() {
+        if !self.suppressed_entity_ids.is_empty() {
+            self.suppressed_entity_ids.clear();
             self.mark_dirty();
         }
     }
@@ -1344,7 +1429,8 @@ mod tests {
 
     #[test]
     fn screen_to_world_uses_camera_and_has_no_hardcoded_tile_offset() {
-        let display = egui::Rect::from_min_size(egui::Pos2::new(0.0, 0.0), egui::vec2(160.0, 144.0));
+        let display =
+            egui::Rect::from_min_size(egui::Pos2::new(0.0, 0.0), egui::vec2(160.0, 144.0));
         let world = screen_to_world_from_camera(
             egui::Pos2::new(0.0, 0.0),
             display,
@@ -1357,7 +1443,8 @@ mod tests {
 
     #[test]
     fn screen_to_world_clamps_letterbox_sides_to_viewport_bounds() {
-        let display = egui::Rect::from_min_size(egui::Pos2::new(0.0, 0.0), egui::vec2(320.0, 144.0));
+        let display =
+            egui::Rect::from_min_size(egui::Pos2::new(0.0, 0.0), egui::vec2(320.0, 144.0));
 
         // In this setup, logical viewport is centered with 80px left/right letterboxes.
         let left_letterbox = screen_to_world_from_camera(

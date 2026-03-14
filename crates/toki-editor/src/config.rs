@@ -313,8 +313,7 @@ mod tests {
             snap_to_grid: false,
         };
 
-        let json =
-            serde_json::to_string(&config).expect("editor config should serialize to json");
+        let json = serde_json::to_string(&config).expect("editor config should serialize to json");
         assert!(json.contains("\"grid_size\":[8,12]"));
     }
 }

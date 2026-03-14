@@ -16,6 +16,7 @@ use crate::config::EditorConfig;
 use crate::logging::LogCapture;
 use crate::project::ProjectManager;
 use crate::rendering::WindowRenderer;
+use crate::scene::viewport::DragPreviewSprite;
 use crate::scene::SceneViewport;
 use crate::ui::editor_ui::CenterPanelTab;
 use crate::ui::EditorUI;
@@ -523,13 +524,17 @@ impl EditorApp {
                 if let Some(project_assets) = self.project_manager.get_project_assets() {
                     // Prepare preview data for entity placement
                     let preview_data = if self.ui.is_in_placement_mode() {
-                        if let (Some(entity_def), Some(position), Some(cached_frame)) = (
-                            &self.ui.placement_entity_definition,
-                            &self.ui.placement_preview_position,
-                            &self.ui.placement_preview_cached_frame,
-                        ) {
-                            let is_valid = self.ui.placement_preview_valid.unwrap_or(true);
-                            Some((entity_def.as_str(), *position, *cached_frame, is_valid))
+                        if self.ui.entity_move_drag.is_none() {
+                            if let (Some(entity_def), Some(position), Some(cached_frame)) = (
+                                &self.ui.placement_entity_definition,
+                                &self.ui.placement_preview_position,
+                                &self.ui.placement_preview_cached_frame,
+                            ) {
+                                let is_valid = self.ui.placement_preview_valid.unwrap_or(true);
+                                Some((entity_def.as_str(), *position, *cached_frame, is_valid))
+                            } else {
+                                None
+                            }
                         } else {
                             None
                         }
@@ -537,11 +542,32 @@ impl EditorApp {
                         None
                     };
 
+                    let drag_preview_data = self.ui.entity_move_drag.as_ref().and_then(|drag| {
+                        self.ui.placement_preview_position.map(|preview_position| {
+                            let anchor_preview = glam::IVec2::new(
+                                preview_position.x.floor() as i32,
+                                preview_position.y.floor() as i32,
+                            );
+                            let delta = anchor_preview - drag.entity.position;
+                            let is_valid = self.ui.placement_preview_valid.unwrap_or(true);
+
+                            drag.dragged_entities
+                                .iter()
+                                .map(|entity| DragPreviewSprite {
+                                    entity_id: entity.id,
+                                    world_position: entity.position + delta,
+                                    is_valid,
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                    });
+
                     match scene_viewport.render_to_texture(
                         project_path.as_path(),
                         project_assets,
                         renderer.egui_renderer_mut(),
                         preview_data,
+                        drag_preview_data.as_deref(),
                     ) {
                         Ok(()) => {
                             // Reduce log spam - render_to_texture already handles its own logging

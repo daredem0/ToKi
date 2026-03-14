@@ -429,15 +429,17 @@ mod tests {
 
     #[test]
     fn placement_world_position_to_entity_position_uses_top_left_floored_coordinates() {
-        let placed =
-            PlacementInteraction::placement_world_position_to_entity_position(Vec2::new(64.9, 48.1));
+        let placed = PlacementInteraction::placement_world_position_to_entity_position(Vec2::new(
+            64.9, 48.1,
+        ));
         assert_eq!(placed, IVec2::new(64, 48));
     }
 
     #[test]
     fn placement_world_position_to_entity_position_handles_negative_values_with_floor() {
-        let placed =
-            PlacementInteraction::placement_world_position_to_entity_position(Vec2::new(-0.1, -16.1));
+        let placed = PlacementInteraction::placement_world_position_to_entity_position(Vec2::new(
+            -0.1, -16.1,
+        ));
         assert_eq!(placed, IVec2::new(-1, -17));
     }
 
