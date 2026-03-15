@@ -448,7 +448,9 @@ impl EntityManager {
     }
 
     /// Add an existing entity to the manager (used for scene-to-gamestate conversion)
-    pub fn add_existing_entity(&mut self, entity: Entity) -> EntityId {
+    pub fn add_existing_entity(&mut self, mut entity: Entity) -> EntityId {
+        entity.attributes.ensure_legacy_health_stat();
+
         let id = entity.id;
         let entity_kind = entity.entity_kind.clone();
 

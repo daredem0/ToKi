@@ -252,6 +252,38 @@ fn test_add_existing_entity_tracks_explicit_player_character_role() {
 }
 
 #[test]
+fn test_add_existing_entity_seeds_generic_health_stat_from_legacy_health() {
+    let mut manager = EntityManager::new();
+    let entity = Entity {
+        id: 13,
+        position: IVec2::new(8, 9),
+        size: UVec2::new(16, 16),
+        entity_kind: EntityKind::Npc,
+        category: "creature".to_string(),
+        definition_name: Some("slime".to_string()),
+        control_role: ControlRole::None,
+        audio: EntityAudioSettings::default(),
+        attributes: EntityAttributes {
+            health: Some(25),
+            stats: EntityStats::default(),
+            ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::None,
+            ..EntityAttributes::default()
+        },
+        collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
+    };
+
+    let entity_id = manager.add_existing_entity(entity);
+    let loaded = manager
+        .get_entity(entity_id)
+        .expect("existing entity should be stored");
+
+    assert_eq!(loaded.attributes.health, Some(25));
+    assert_eq!(loaded.attributes.current_stat(HEALTH_STAT_ID), Some(25));
+    assert_eq!(loaded.attributes.base_stat(HEALTH_STAT_ID), Some(25));
+}
+
+#[test]
 fn test_spawn_multiple_entities() {
     let mut manager = EntityManager::new();
 

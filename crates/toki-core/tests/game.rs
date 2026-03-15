@@ -962,6 +962,74 @@ fn game_state_primary_action_despawns_target_when_health_reaches_zero() {
 }
 
 #[test]
+fn game_state_primary_action_damages_scene_loaded_legacy_health_target() {
+    let mut game_state = GameState::new_empty();
+
+    let hero_id = 5;
+    let mut hero = test_definition("hero", "human")
+        .create_entity(IVec2::new(50, 60), hero_id)
+        .expect("hero entity should instantiate");
+    hero.control_role = ControlRole::PlayerCharacter;
+    hero.entity_kind = toki_core::entity::EntityKind::Player;
+    let controller = hero
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("hero animation controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 120.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    let mut target_definition = test_definition("scene_target", "creature");
+    target_definition.attributes.health = Some(25);
+    let mut target = target_definition
+        .create_entity(IVec2::new(66, 60), 6)
+        .expect("target entity should instantiate");
+    target.attributes.stats = toki_core::entity::EntityStats::default();
+
+    let scene = Scene {
+        name: "Legacy Arena".to_string(),
+        description: None,
+        maps: Vec::new(),
+        entities: vec![hero, target],
+        rules: Default::default(),
+        camera_position: None,
+        camera_scale: None,
+    };
+
+    game_state.add_scene(scene);
+    game_state
+        .load_scene("Legacy Arena")
+        .expect("scene should load successfully");
+
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    game_state.update(
+        UVec2::new(128, 128),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    let target = game_state
+        .entity_manager()
+        .get_entity(6)
+        .expect("legacy health target should still exist after non-lethal hit");
+    assert_eq!(target.attributes.health, Some(15));
+    assert_eq!(target.attributes.current_stat("health"), Some(15));
+}
+
+#[test]
 fn game_state_player_is_blocked_by_solid_entity_collision() {
     let mut game_state = GameState::new_empty();
     let player_id = game_state.spawn_player_at(IVec2::new(0, 0));
