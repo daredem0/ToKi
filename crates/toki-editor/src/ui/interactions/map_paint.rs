@@ -4,6 +4,24 @@ use toki_core::assets::tilemap::TileMap;
 pub struct MapPaintInteraction;
 
 impl MapPaintInteraction {
+    pub fn brush_footprint_bounds(
+        tilemap: &TileMap,
+        center_tile_pos: UVec2,
+        brush_size_tiles: u32,
+    ) -> Option<(UVec2, UVec2)> {
+        if center_tile_pos.x >= tilemap.size.x || center_tile_pos.y >= tilemap.size.y {
+            return None;
+        }
+
+        let brush_size = brush_size_tiles.max(1);
+        let radius = (brush_size - 1) / 2;
+        let start_x = center_tile_pos.x.saturating_sub(radius);
+        let start_y = center_tile_pos.y.saturating_sub(radius);
+        let end_x = (start_x + brush_size).min(tilemap.size.x);
+        let end_y = (start_y + brush_size).min(tilemap.size.y);
+        Some((UVec2::new(start_x, start_y), UVec2::new(end_x, end_y)))
+    }
+
     pub fn tile_position_at_world(tilemap: &TileMap, world_pos: Vec2) -> Option<UVec2> {
         if world_pos.x < 0.0 || world_pos.y < 0.0 {
             return None;
@@ -47,20 +65,15 @@ impl MapPaintInteraction {
         tile_name: &str,
         brush_size_tiles: u32,
     ) -> bool {
-        if center_tile_pos.x >= tilemap.size.x || center_tile_pos.y >= tilemap.size.y {
+        let Some((start, end)) =
+            Self::brush_footprint_bounds(tilemap, center_tile_pos, brush_size_tiles)
+        else {
             return false;
-        }
-
-        let brush_size = brush_size_tiles.max(1);
-        let radius = (brush_size - 1) / 2;
-        let start_x = center_tile_pos.x.saturating_sub(radius);
-        let start_y = center_tile_pos.y.saturating_sub(radius);
-        let end_x = (start_x + brush_size).min(tilemap.size.x);
-        let end_y = (start_y + brush_size).min(tilemap.size.y);
+        };
 
         let mut changed = false;
-        for y in start_y..end_y {
-            for x in start_x..end_x {
+        for y in start.y..end.y {
+            for x in start.x..end.x {
                 changed |= Self::paint_tile(tilemap, UVec2::new(x, y), tile_name);
             }
         }
@@ -165,6 +178,20 @@ mod tests {
         assert_eq!(tilemap.tiles[5], "bush");
         assert_eq!(tilemap.tiles[0], "grass");
         assert_eq!(tilemap.tiles[3], "water");
+    }
+
+    #[test]
+    fn brush_footprint_bounds_clips_to_tilemap_edges() {
+        let tilemap = sample_tilemap();
+
+        assert_eq!(
+            MapPaintInteraction::brush_footprint_bounds(&tilemap, UVec2::new(1, 0), 2),
+            Some((UVec2::new(1, 0), UVec2::new(3, 2)))
+        );
+        assert_eq!(
+            MapPaintInteraction::brush_footprint_bounds(&tilemap, UVec2::new(0, 0), 3),
+            Some((UVec2::new(0, 0), UVec2::new(3, 2)))
+        );
     }
 
     #[test]
