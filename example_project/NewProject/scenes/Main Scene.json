@@ -2,7 +2,8 @@
   "name": "Main Scene",
   "description": null,
   "maps": [
-    "new_town_map_64x64_crossings"
+    "new_town_map_64x64_crossings",
+    "MapEditor_Test_B"
   ],
   "entities": [
     {
@@ -127,20 +128,11 @@
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
-            "IdleDown": {
-              "state": "IdleDown",
+            "IdleLeft": {
+              "state": "IdleLeft",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_down_a"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "IdleUp": {
-              "state": "IdleUp",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_up_a"
+                "player/walk_right_a"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
@@ -155,11 +147,20 @@
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
-            "IdleLeft": {
-              "state": "IdleLeft",
+            "IdleUp": {
+              "state": "IdleUp",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_right_a"
+                "player/walk_up_a"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "IdleDown": {
+              "state": "IdleDown",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_down_a"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"

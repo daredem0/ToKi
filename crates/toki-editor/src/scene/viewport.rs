@@ -91,27 +91,25 @@ fn request_viewport_size_state(
     }
 }
 
-const MIN_EDITOR_ZOOM_SCALE: f32 = 0.25;
-const MAX_EDITOR_ZOOM_SCALE: f32 = 8.0;
+const EDITOR_ZOOM_LEVELS: &[f32] = &[
+    0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0,
+];
 
 fn next_zoom_in_scale(current_scale: f32) -> f32 {
-    if current_scale > 1.0 {
-        (current_scale - 1.0).max(1.0)
-    } else if current_scale > MIN_EDITOR_ZOOM_SCALE {
-        (current_scale * 0.5).max(MIN_EDITOR_ZOOM_SCALE)
-    } else {
-        current_scale
-    }
+    EDITOR_ZOOM_LEVELS
+        .iter()
+        .rev()
+        .copied()
+        .find(|level| *level < current_scale - f32::EPSILON)
+        .unwrap_or(current_scale)
 }
 
 fn next_zoom_out_scale(current_scale: f32) -> f32 {
-    if current_scale < 1.0 {
-        (current_scale * 2.0).min(1.0)
-    } else if current_scale < MAX_EDITOR_ZOOM_SCALE {
-        (current_scale + 1.0).min(MAX_EDITOR_ZOOM_SCALE)
-    } else {
-        current_scale
-    }
+    EDITOR_ZOOM_LEVELS
+        .iter()
+        .copied()
+        .find(|level| *level > current_scale + f32::EPSILON)
+        .unwrap_or(current_scale)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1620,17 +1618,24 @@ mod tests {
 
     #[test]
     fn zoom_in_progresses_below_native_scale() {
-        assert_eq!(next_zoom_in_scale(2.0), 1.0);
-        assert_eq!(next_zoom_in_scale(1.0), 0.5);
-        assert_eq!(next_zoom_in_scale(0.5), 0.25);
-        assert_eq!(next_zoom_in_scale(0.25), 0.25);
+        assert_eq!(next_zoom_in_scale(2.0), 1.5);
+        assert_eq!(next_zoom_in_scale(1.5), 1.0);
+        assert_eq!(next_zoom_in_scale(1.0), 0.8);
+        assert_eq!(next_zoom_in_scale(0.8), 0.6);
+        assert_eq!(next_zoom_in_scale(0.6), 0.4);
+        assert_eq!(next_zoom_in_scale(0.2), 0.1);
+        assert_eq!(next_zoom_in_scale(0.1), 0.1);
     }
 
     #[test]
     fn zoom_out_returns_fractional_zoom_to_native_then_outward() {
-        assert_eq!(next_zoom_out_scale(0.25), 0.5);
-        assert_eq!(next_zoom_out_scale(0.5), 1.0);
-        assert_eq!(next_zoom_out_scale(1.0), 2.0);
+        assert_eq!(next_zoom_out_scale(0.1), 0.2);
+        assert_eq!(next_zoom_out_scale(0.2), 0.4);
+        assert_eq!(next_zoom_out_scale(0.4), 0.6);
+        assert_eq!(next_zoom_out_scale(0.6), 0.8);
+        assert_eq!(next_zoom_out_scale(0.8), 1.0);
+        assert_eq!(next_zoom_out_scale(1.0), 1.5);
+        assert_eq!(next_zoom_out_scale(1.5), 2.0);
         assert_eq!(next_zoom_out_scale(8.0), 8.0);
     }
 

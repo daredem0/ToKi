@@ -178,6 +178,15 @@ impl EditorApp {
         })
     }
 
+    fn tilemap_to_save_for_map_editor_draft(
+        draft: &MapEditorDraft,
+        viewport_tilemap: Option<&TileMap>,
+    ) -> TileMap {
+        viewport_tilemap
+            .cloned()
+            .unwrap_or_else(|| draft.tilemap.clone())
+    }
+
     fn ensure_busy_logo_texture(&mut self, ctx: &egui::Context) {
         if self.busy_logo_texture.is_some() {
             return;
@@ -1704,9 +1713,14 @@ impl EditorApp {
         }
 
         if let Some(draft) = self.ui.map_editor_draft.clone() {
+            let live_tilemap = self
+                .map_editor_viewport
+                .as_ref()
+                .and_then(|viewport| viewport.scene_manager().tilemap());
+            let tilemap_to_save = Self::tilemap_to_save_for_map_editor_draft(&draft, live_tilemap);
             match self
                 .project_manager
-                .save_tilemap_asset(&draft.name, &draft.tilemap)
+                .save_tilemap_asset(&draft.name, &tilemap_to_save)
             {
                 Ok(_) => {
                     tracing::info!("Saved map editor draft '{}'", draft.name);
@@ -1954,7 +1968,7 @@ impl EditorApp {
 mod tests {
     use super::EditorApp;
     use crate::project::ProjectAssets;
-    use crate::ui::editor_ui::EntityMoveDragState;
+    use crate::ui::editor_ui::{EntityMoveDragState, MapEditorDraft};
     use glam::{IVec2, UVec2, Vec2};
     use std::collections::HashMap;
     use std::fs;
@@ -2131,6 +2145,52 @@ mod tests {
         assert_eq!(draft.tilemap.atlas, PathBuf::from("terrain.json"));
         assert_eq!(draft.tilemap.tiles.len(), 20);
         assert!(draft.tilemap.tiles.iter().all(|tile| tile == "grass"));
+    }
+
+    #[test]
+    fn tilemap_to_save_for_map_editor_draft_prefers_live_viewport_tilemap() {
+        let draft = MapEditorDraft {
+            name: "draft_map".to_string(),
+            tilemap: TileMap {
+                size: UVec2::new(2, 2),
+                tile_size: UVec2::new(8, 8),
+                atlas: PathBuf::from("terrain.json"),
+                tiles: vec!["grass".to_string(); 4],
+            },
+        };
+        let live_tilemap = TileMap {
+            size: UVec2::new(2, 2),
+            tile_size: UVec2::new(8, 8),
+            atlas: PathBuf::from("terrain.json"),
+            tiles: vec![
+                "water".to_string(),
+                "grass".to_string(),
+                "grass".to_string(),
+                "grass".to_string(),
+            ],
+        };
+
+        let saved = EditorApp::tilemap_to_save_for_map_editor_draft(&draft, Some(&live_tilemap));
+
+        assert_eq!(saved.tiles[0], "water");
+        assert_eq!(saved.tiles, live_tilemap.tiles);
+    }
+
+    #[test]
+    fn tilemap_to_save_for_map_editor_draft_falls_back_to_original_draft_when_viewport_missing() {
+        let draft = MapEditorDraft {
+            name: "draft_map".to_string(),
+            tilemap: TileMap {
+                size: UVec2::new(2, 2),
+                tile_size: UVec2::new(8, 8),
+                atlas: PathBuf::from("terrain.json"),
+                tiles: vec!["grass".to_string(); 4],
+            },
+        };
+
+        let saved = EditorApp::tilemap_to_save_for_map_editor_draft(&draft, None);
+
+        assert_eq!(saved, draft.tilemap);
     }
 
     fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {
