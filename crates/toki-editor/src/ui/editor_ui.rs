@@ -46,6 +46,16 @@ pub(crate) enum RightPanelTab {
 pub(crate) enum MapEditorTool {
     Drag,
     Brush,
+    Fill,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MapEditorTileInfo {
+    pub tile_x: u32,
+    pub tile_y: u32,
+    pub tile_name: String,
+    pub solid: bool,
+    pub trigger: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -132,6 +142,7 @@ pub struct EditorUI {
     pub map_editor_brush_size_tiles: u32,
     pub map_editor_brush_preview_image_path: Option<PathBuf>,
     pub map_editor_brush_preview_texture: Option<egui::TextureHandle>,
+    pub map_editor_selected_tile_info: Option<MapEditorTileInfo>,
     pub map_editor_show_new_map_dialog: bool,
     pub map_editor_new_map_name: String,
     pub map_editor_new_map_width: u32,
@@ -214,6 +225,7 @@ impl EditorUI {
             map_editor_brush_size_tiles: 1,
             map_editor_brush_preview_image_path: None,
             map_editor_brush_preview_texture: None,
+            map_editor_selected_tile_info: None,
             map_editor_show_new_map_dialog: false,
             map_editor_new_map_name: "new_map".to_string(),
             map_editor_new_map_width: 32,
@@ -1477,5 +1489,6 @@ mod tests {
         let ui = EditorUI::new();
         assert_eq!(ui.map_editor_tool, super::MapEditorTool::Drag);
         assert_eq!(ui.map_editor_brush_size_tiles, 1);
+        assert!(ui.map_editor_selected_tile_info.is_none());
     }
 }

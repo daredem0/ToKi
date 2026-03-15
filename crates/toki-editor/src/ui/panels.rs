@@ -414,6 +414,7 @@ impl PanelSystem {
             ui.label(match ui_state.map_editor_tool {
                 super::editor_ui::MapEditorTool::Drag => "Drag",
                 super::editor_ui::MapEditorTool::Brush => "Brush",
+                super::editor_ui::MapEditorTool::Fill => "Fill",
             });
         });
         ui.separator();
@@ -492,6 +493,9 @@ impl PanelSystem {
             super::editor_ui::MapEditorTool::Brush => {
                 Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
             }
+            super::editor_ui::MapEditorTool::Fill => {
+                Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
+            }
         }
 
         viewport.render(ui, rect, project_path.as_deref(), renderer);
@@ -499,17 +503,39 @@ impl PanelSystem {
             Self::paint_viewport_grid_overlay(ui, rect, viewport, cfg);
         }
 
-        if ui_state.map_editor_tool == super::editor_ui::MapEditorTool::Brush {
-            if let Some(selected_tile) = ui_state.map_editor_selected_tile.as_deref() {
-                if Self::handle_map_editor_brush_paint(
-                    ui,
-                    viewport,
-                    &response,
-                    rect,
-                    selected_tile,
-                    ui_state.map_editor_brush_size_tiles,
-                ) {
-                    ui_state.mark_map_editor_dirty();
+        match ui_state.map_editor_tool {
+            super::editor_ui::MapEditorTool::Drag => {
+                if let Some(project_path) = project_path.as_deref() {
+                    if let Some(tile_info) = Self::handle_map_editor_tile_inspect(
+                        ui,
+                        viewport,
+                        &response,
+                        rect,
+                        project_path,
+                    ) {
+                        ui_state.map_editor_selected_tile_info = tile_info;
+                    }
+                }
+            }
+            super::editor_ui::MapEditorTool::Brush => {
+                if let Some(selected_tile) = ui_state.map_editor_selected_tile.as_deref() {
+                    if Self::handle_map_editor_brush_paint(
+                        ui,
+                        viewport,
+                        &response,
+                        rect,
+                        selected_tile,
+                        ui_state.map_editor_brush_size_tiles,
+                    ) {
+                        ui_state.mark_map_editor_dirty();
+                    }
+                }
+            }
+            super::editor_ui::MapEditorTool::Fill => {
+                if let Some(selected_tile) = ui_state.map_editor_selected_tile.as_deref() {
+                    if Self::handle_map_editor_fill_paint(ui, viewport, &response, selected_tile) {
+                        ui_state.mark_map_editor_dirty();
+                    }
                 }
             }
         }
@@ -580,10 +606,88 @@ impl PanelSystem {
         false
     }
 
+    fn handle_map_editor_fill_paint(
+        ui: &egui::Ui,
+        viewport: &mut SceneViewport,
+        response: &egui::Response,
+        selected_tile: &str,
+    ) -> bool {
+        let wants_fill = response.hovered() && ui.input(|input| input.pointer.primary_clicked());
+        if !wants_fill {
+            return false;
+        }
+
+        let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
+            return false;
+        };
+
+        if MapPaintInteraction::fill_all(tilemap, selected_tile) {
+            viewport.mark_dirty();
+            return true;
+        }
+
+        false
+    }
+
+    fn handle_map_editor_tile_inspect(
+        ui: &egui::Ui,
+        viewport: &mut SceneViewport,
+        response: &egui::Response,
+        rect: egui::Rect,
+        project_path: &std::path::Path,
+    ) -> Option<Option<super::editor_ui::MapEditorTileInfo>> {
+        let clicked = response.hovered() && ui.input(|input| input.pointer.primary_clicked());
+        if !clicked {
+            return None;
+        }
+
+        let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {
+            return Some(None);
+        };
+        let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
+        let Some(tilemap) = viewport.scene_manager().tilemap() else {
+            return Some(None);
+        };
+        let Some(tile_pos) = MapPaintInteraction::tile_position_at_world(tilemap, world_pos) else {
+            return Some(None);
+        };
+        let Some(tile_name) = tilemap
+            .get_tile_name(tile_pos.x, tile_pos.y)
+            .ok()
+            .map(ToString::to_string)
+        else {
+            return Some(None);
+        };
+        let Some(atlas) = Self::load_map_editor_atlas(project_path, tilemap).ok() else {
+            return Some(None);
+        };
+        let Some(properties) = atlas.get_tile_properties(&tile_name) else {
+            return Some(None);
+        };
+
+        Some(Some(super::editor_ui::MapEditorTileInfo {
+            tile_x: tile_pos.x,
+            tile_y: tile_pos.y,
+            tile_name,
+            solid: properties.solid,
+            trigger: properties.trigger,
+        }))
+    }
+
     fn load_map_editor_tile_names(
         project_path: &std::path::Path,
         tilemap: &TileMap,
     ) -> anyhow::Result<Vec<String>> {
+        let atlas = Self::load_map_editor_atlas(project_path, tilemap)?;
+        let mut tile_names = atlas.tiles.keys().cloned().collect::<Vec<_>>();
+        tile_names.sort();
+        Ok(tile_names)
+    }
+
+    fn load_map_editor_atlas(
+        project_path: &std::path::Path,
+        tilemap: &TileMap,
+    ) -> anyhow::Result<AtlasMeta> {
         let atlas_path = {
             let tilemaps_path = project_path
                 .join("assets")
@@ -598,12 +702,8 @@ impl PanelSystem {
                     .join(&tilemap.atlas)
             }
         };
-        let atlas = AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
-            anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e)
-        })?;
-        let mut tile_names = atlas.tiles.keys().cloned().collect::<Vec<_>>();
-        tile_names.sort();
-        Ok(tile_names)
+        AtlasMeta::load_from_file(&atlas_path)
+            .map_err(|e| anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e))
     }
 
     fn sanitize_grid_size_axis(value: i32) -> u32 {

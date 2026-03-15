@@ -501,15 +501,42 @@ impl InspectorSystem {
         ui.horizontal(|ui| {
             ui.selectable_value(&mut ui_state.map_editor_tool, MapEditorTool::Drag, "Drag");
             ui.selectable_value(&mut ui_state.map_editor_tool, MapEditorTool::Brush, "Brush");
+            ui.selectable_value(&mut ui_state.map_editor_tool, MapEditorTool::Fill, "Fill");
         });
         ui.separator();
 
         match ui_state.map_editor_tool {
             MapEditorTool::Drag => {
                 ui.label("Primary drag pans the map editor camera.");
+                if let Some(tile_info) = &ui_state.map_editor_selected_tile_info {
+                    ui.separator();
+                    ui.label("Tile Info");
+                    ui.horizontal(|ui| {
+                        ui.label("Tile:");
+                        ui.label(&tile_info.tile_name);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Position:");
+                        ui.label(format!("{}, {}", tile_info.tile_x, tile_info.tile_y));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Solid:");
+                        ui.label(if tile_info.solid { "Yes" } else { "No" });
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Trigger:");
+                        ui.label(if tile_info.trigger { "Yes" } else { "No" });
+                    });
+                } else {
+                    ui.label("Click a tile to inspect it.");
+                }
             }
-            MapEditorTool::Brush => {
-                ui.label("Primary click/drag paints tiles.");
+            MapEditorTool::Brush | MapEditorTool::Fill => {
+                ui.label(match ui_state.map_editor_tool {
+                    MapEditorTool::Brush => "Primary click/drag paints tiles.",
+                    MapEditorTool::Fill => "Primary click fills the whole map.",
+                    MapEditorTool::Drag => unreachable!(),
+                });
                 if let Some((tile_names, atlas, texture_path)) =
                     Self::load_map_editor_brush_source(ui_state, config)
                 {
@@ -534,13 +561,15 @@ impl InspectorSystem {
                             });
                     });
                     ui.horizontal(|ui| {
-                        ui.label("Brush Size:");
-                        ui.add(
-                            egui::DragValue::new(&mut ui_state.map_editor_brush_size_tiles)
-                                .range(1..=32)
-                                .speed(1),
-                        );
-                        ui.label("tiles");
+                        if ui_state.map_editor_tool == MapEditorTool::Brush {
+                            ui.label("Brush Size:");
+                            ui.add(
+                                egui::DragValue::new(&mut ui_state.map_editor_brush_size_tiles)
+                                    .range(1..=32)
+                                    .speed(1),
+                            );
+                            ui.label("tiles");
+                        }
                     });
 
                     if let Some(tile_name) = ui_state.map_editor_selected_tile.clone() {
@@ -561,7 +590,11 @@ impl InspectorSystem {
                 } else {
                     ui.label("No atlas tiles available for the current map.");
                 }
-                ui.label("Secondary drag pans the camera.");
+                ui.label(match ui_state.map_editor_tool {
+                    MapEditorTool::Brush => "Secondary drag pans the camera.",
+                    MapEditorTool::Fill => "Secondary drag pans the camera.",
+                    MapEditorTool::Drag => unreachable!(),
+                });
             }
         }
 

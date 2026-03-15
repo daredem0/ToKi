@@ -67,6 +67,17 @@ impl MapPaintInteraction {
 
         changed
     }
+
+    pub fn fill_all(tilemap: &mut TileMap, tile_name: &str) -> bool {
+        let mut changed = false;
+        for slot in &mut tilemap.tiles {
+            if slot != tile_name {
+                *slot = tile_name.to_string();
+                changed = true;
+            }
+        }
+        changed
+    }
 }
 
 #[cfg(test)]
@@ -154,5 +165,14 @@ mod tests {
         assert_eq!(tilemap.tiles[5], "bush");
         assert_eq!(tilemap.tiles[0], "grass");
         assert_eq!(tilemap.tiles[3], "water");
+    }
+
+    #[test]
+    fn fill_all_replaces_every_tile_and_reports_changes() {
+        let mut tilemap = sample_tilemap();
+
+        assert!(MapPaintInteraction::fill_all(&mut tilemap, "bush"));
+        assert!(tilemap.tiles.iter().all(|tile| tile == "bush"));
+        assert!(!MapPaintInteraction::fill_all(&mut tilemap, "bush"));
     }
 }
