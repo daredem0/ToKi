@@ -316,7 +316,7 @@ impl InspectorSystem {
                     .show(ui, |ui| match ui_state.right_panel_tab {
                         super::editor_ui::RightPanelTab::Inspector => {
                             Self::render_selection_inspector_contents(
-                                ui_state, ui, game_state, config,
+                                ui_state, ui, ctx, game_state, config,
                             );
                         }
                         super::editor_ui::RightPanelTab::Project => {
@@ -329,11 +329,12 @@ impl InspectorSystem {
     fn render_selection_inspector_contents(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
+        ctx: &egui::Context,
         game_state: Option<&toki_core::GameState>,
         config: Option<&EditorConfig>,
     ) {
         if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::MapEditor {
-            Self::render_map_editor_command_palette(ui_state, ui);
+            Self::render_map_editor_command_palette(ui_state, ui, ctx, config);
             return;
         }
 
@@ -488,7 +489,12 @@ impl InspectorSystem {
         }
     }
 
-    fn render_map_editor_command_palette(ui_state: &mut EditorUI, ui: &mut egui::Ui) {
+    fn render_map_editor_command_palette(
+        ui_state: &mut EditorUI,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        config: Option<&EditorConfig>,
+    ) {
         ui.heading("Map Tools");
         ui.separator();
         ui.label("Command Palette");
@@ -504,10 +510,56 @@ impl InspectorSystem {
             }
             MapEditorTool::Brush => {
                 ui.label("Primary click/drag paints tiles.");
-                if let Some(tile_name) = ui_state.map_editor_selected_tile.as_deref() {
-                    ui.label(format!("Selected Tile: {}", tile_name));
+                if let Some((tile_names, atlas, texture_path)) =
+                    Self::load_map_editor_brush_source(ui_state, config)
+                {
+                    ui_state.sync_map_editor_brush_selection(&tile_names);
+                    ui.horizontal(|ui| {
+                        ui.label("Tile:");
+                        egui::ComboBox::from_id_salt("inspector_map_editor_brush_tile_selector")
+                            .selected_text(
+                                ui_state
+                                    .map_editor_selected_tile
+                                    .as_deref()
+                                    .unwrap_or("No tile selected"),
+                            )
+                            .show_ui(ui, |ui| {
+                                for tile_name in &tile_names {
+                                    let is_selected = ui_state.map_editor_selected_tile.as_deref()
+                                        == Some(tile_name.as_str());
+                                    if ui.selectable_label(is_selected, tile_name).clicked() {
+                                        ui_state.map_editor_selected_tile = Some(tile_name.clone());
+                                    }
+                                }
+                            });
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Brush Size:");
+                        ui.add(
+                            egui::DragValue::new(&mut ui_state.map_editor_brush_size_tiles)
+                                .range(1..=32)
+                                .speed(1),
+                        );
+                        ui.label("tiles");
+                    });
+
+                    if let Some(tile_name) = ui_state.map_editor_selected_tile.clone() {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("Selected Tile: {}", tile_name));
+                            Self::render_map_editor_selected_tile_preview(
+                                ui_state,
+                                ui,
+                                ctx,
+                                &atlas,
+                                &texture_path,
+                                &tile_name,
+                            );
+                        });
+                    } else {
+                        ui.label("Selected Tile: none");
+                    }
                 } else {
-                    ui.label("Selected Tile: none");
+                    ui.label("No atlas tiles available for the current map.");
                 }
                 ui.label("Secondary drag pans the camera.");
             }
@@ -517,6 +569,121 @@ impl InspectorSystem {
             ui.separator();
             ui.label("Map editor has unsaved changes.");
         }
+    }
+
+    fn load_map_editor_brush_source(
+        ui_state: &EditorUI,
+        config: Option<&EditorConfig>,
+    ) -> Option<(
+        Vec<String>,
+        toki_core::assets::atlas::AtlasMeta,
+        std::path::PathBuf,
+    )> {
+        let project_path = config?.current_project_path()?;
+
+        let tilemap = if let Some(draft) = &ui_state.map_editor_draft {
+            draft.tilemap.clone()
+        } else {
+            let active_map = ui_state.map_editor_active_map.as_ref()?;
+            toki_core::assets::tilemap::TileMap::load_from_file(
+                project_path
+                    .join("assets")
+                    .join("tilemaps")
+                    .join(format!("{}.json", active_map)),
+            )
+            .ok()?
+        };
+
+        let atlas_path = {
+            let tilemaps_path = project_path
+                .join("assets")
+                .join("tilemaps")
+                .join(&tilemap.atlas);
+            if tilemaps_path.exists() {
+                tilemaps_path
+            } else {
+                project_path
+                    .join("assets")
+                    .join("sprites")
+                    .join(&tilemap.atlas)
+            }
+        };
+        let atlas = toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_path).ok()?;
+        let texture_path = atlas_path.parent()?.join(&atlas.image);
+        let mut tile_names = atlas.tiles.keys().cloned().collect::<Vec<_>>();
+        tile_names.sort();
+        Some((tile_names, atlas, texture_path))
+    }
+
+    fn render_map_editor_selected_tile_preview(
+        ui_state: &mut EditorUI,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        atlas: &toki_core::assets::atlas::AtlasMeta,
+        texture_path: &std::path::Path,
+        tile_name: &str,
+    ) {
+        let Some(texture) =
+            Self::ensure_map_editor_brush_preview_texture(ui_state, ctx, texture_path)
+        else {
+            return;
+        };
+        let Some(texture_size) = atlas.image_size() else {
+            return;
+        };
+        let Some(rect_px) = atlas.get_tile_rect(tile_name) else {
+            return;
+        };
+
+        let uv_rect = egui::Rect::from_min_max(
+            egui::pos2(
+                rect_px[0] as f32 / texture_size.x as f32,
+                rect_px[1] as f32 / texture_size.y as f32,
+            ),
+            egui::pos2(
+                (rect_px[0] + rect_px[2]) as f32 / texture_size.x as f32,
+                (rect_px[1] + rect_px[3]) as f32 / texture_size.y as f32,
+            ),
+        );
+
+        let preview_size = egui::vec2(48.0, 48.0);
+        let (rect, response) = ui.allocate_exact_size(preview_size, egui::Sense::hover());
+        ui.painter().rect_stroke(
+            rect,
+            2.0,
+            egui::Stroke::new(1.0, egui::Color32::GRAY),
+            egui::StrokeKind::Outside,
+        );
+        ui.painter().image(
+            texture.id(),
+            rect.shrink(2.0),
+            uv_rect,
+            egui::Color32::WHITE,
+        );
+        response.on_hover_text(tile_name);
+    }
+
+    fn ensure_map_editor_brush_preview_texture(
+        ui_state: &mut EditorUI,
+        ctx: &egui::Context,
+        texture_path: &std::path::Path,
+    ) -> Option<egui::TextureHandle> {
+        if ui_state.map_editor_brush_preview_image_path.as_deref() == Some(texture_path)
+            && ui_state.map_editor_brush_preview_texture.is_some()
+        {
+            return ui_state.map_editor_brush_preview_texture.clone();
+        }
+
+        let decoded = toki_core::graphics::image::load_image_rgba8(texture_path).ok()?;
+        let color_image = egui::ColorImage::from_rgba_unmultiplied(
+            [decoded.width as usize, decoded.height as usize],
+            &decoded.data,
+        );
+        let key = format!("map_editor_brush_preview:{}", texture_path.display());
+        let texture = ctx.load_texture(key, color_image, egui::TextureOptions::NEAREST);
+        ui_state.map_editor_brush_preview_image_path = Some(texture_path.to_path_buf());
+        ui_state.map_editor_brush_preview_texture = Some(texture.clone());
+        Some(texture)
     }
 
     fn render_project_settings_panel(

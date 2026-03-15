@@ -415,33 +415,6 @@ impl PanelSystem {
                 super::editor_ui::MapEditorTool::Drag => "Drag",
                 super::editor_ui::MapEditorTool::Brush => "Brush",
             });
-            ui.separator();
-            ui.add_enabled_ui(
-                ui_state.map_editor_tool == super::editor_ui::MapEditorTool::Brush,
-                |ui| {
-                    ui.label("Brush:");
-                    egui::ComboBox::from_id_salt("map_editor_brush_tile_selector")
-                        .selected_text(
-                            ui_state
-                                .map_editor_selected_tile
-                                .as_deref()
-                                .unwrap_or("No tile selected"),
-                        )
-                        .show_ui(ui, |ui| {
-                            if available_tiles.is_empty() {
-                                ui.label("No atlas tiles available");
-                                return;
-                            }
-                            for tile_name in &available_tiles {
-                                let is_selected = ui_state.map_editor_selected_tile.as_deref()
-                                    == Some(tile_name.as_str());
-                                if ui.selectable_label(is_selected, tile_name).clicked() {
-                                    ui_state.map_editor_selected_tile = Some(tile_name.clone());
-                                }
-                            }
-                        });
-                },
-            );
         });
         ui.separator();
 
@@ -528,8 +501,14 @@ impl PanelSystem {
 
         if ui_state.map_editor_tool == super::editor_ui::MapEditorTool::Brush {
             if let Some(selected_tile) = ui_state.map_editor_selected_tile.as_deref() {
-                if Self::handle_map_editor_brush_paint(ui, viewport, &response, rect, selected_tile)
-                {
+                if Self::handle_map_editor_brush_paint(
+                    ui,
+                    viewport,
+                    &response,
+                    rect,
+                    selected_tile,
+                    ui_state.map_editor_brush_size_tiles,
+                ) {
                     ui_state.mark_map_editor_dirty();
                 }
             }
@@ -573,6 +552,7 @@ impl PanelSystem {
         response: &egui::Response,
         rect: egui::Rect,
         selected_tile: &str,
+        brush_size_tiles: u32,
     ) -> bool {
         let wants_paint = response.hovered()
             && ui.input(|input| input.pointer.primary_down() || input.pointer.primary_pressed());
@@ -592,7 +572,7 @@ impl PanelSystem {
             return false;
         };
 
-        if MapPaintInteraction::paint_tile(tilemap, tile_pos, selected_tile) {
+        if MapPaintInteraction::paint_brush(tilemap, tile_pos, selected_tile, brush_size_tiles) {
             viewport.mark_dirty();
             return true;
         }

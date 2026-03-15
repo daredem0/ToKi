@@ -6,6 +6,7 @@ use super::undo_redo::{EditorCommand, IndexedEntity, UndoRedoHistory};
 use crate::project::SceneGraphLayout;
 use crate::scene::SceneViewport;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use toki_core::{
     assets::tilemap::TileMap,
     entity::{Entity, EntityId},
@@ -128,6 +129,9 @@ pub struct EditorUI {
     pub map_editor_dirty: bool,
     pub map_editor_selected_tile: Option<String>,
     pub map_editor_tool: MapEditorTool,
+    pub map_editor_brush_size_tiles: u32,
+    pub map_editor_brush_preview_image_path: Option<PathBuf>,
+    pub map_editor_brush_preview_texture: Option<egui::TextureHandle>,
     pub map_editor_show_new_map_dialog: bool,
     pub map_editor_new_map_name: String,
     pub map_editor_new_map_width: u32,
@@ -207,6 +211,9 @@ impl EditorUI {
             map_editor_dirty: false,
             map_editor_selected_tile: None,
             map_editor_tool: MapEditorTool::Drag,
+            map_editor_brush_size_tiles: 1,
+            map_editor_brush_preview_image_path: None,
+            map_editor_brush_preview_texture: None,
             map_editor_show_new_map_dialog: false,
             map_editor_new_map_name: "new_map".to_string(),
             map_editor_new_map_width: 32,
@@ -1469,5 +1476,6 @@ mod tests {
     fn map_editor_defaults_to_drag_tool() {
         let ui = EditorUI::new();
         assert_eq!(ui.map_editor_tool, super::MapEditorTool::Drag);
+        assert_eq!(ui.map_editor_brush_size_tiles, 1);
     }
 }

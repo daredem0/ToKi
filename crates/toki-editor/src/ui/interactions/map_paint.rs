@@ -40,6 +40,33 @@ impl MapPaintInteraction {
 
         false
     }
+
+    pub fn paint_brush(
+        tilemap: &mut TileMap,
+        center_tile_pos: UVec2,
+        tile_name: &str,
+        brush_size_tiles: u32,
+    ) -> bool {
+        if center_tile_pos.x >= tilemap.size.x || center_tile_pos.y >= tilemap.size.y {
+            return false;
+        }
+
+        let brush_size = brush_size_tiles.max(1);
+        let radius = (brush_size - 1) / 2;
+        let start_x = center_tile_pos.x.saturating_sub(radius);
+        let start_y = center_tile_pos.y.saturating_sub(radius);
+        let end_x = (start_x + brush_size).min(tilemap.size.x);
+        let end_y = (start_y + brush_size).min(tilemap.size.y);
+
+        let mut changed = false;
+        for y in start_y..end_y {
+            for x in start_x..end_x {
+                changed |= Self::paint_tile(tilemap, UVec2::new(x, y), tile_name);
+            }
+        }
+
+        changed
+    }
 }
 
 #[cfg(test)]
@@ -108,5 +135,24 @@ mod tests {
             UVec2::new(1, 0),
             "bush"
         ));
+    }
+
+    #[test]
+    fn paint_brush_paints_square_area_and_clips_to_map_bounds() {
+        let mut tilemap = sample_tilemap();
+
+        assert!(MapPaintInteraction::paint_brush(
+            &mut tilemap,
+            UVec2::new(1, 0),
+            "bush",
+            2
+        ));
+
+        assert_eq!(tilemap.tiles[1], "bush");
+        assert_eq!(tilemap.tiles[2], "bush");
+        assert_eq!(tilemap.tiles[4], "bush");
+        assert_eq!(tilemap.tiles[5], "bush");
+        assert_eq!(tilemap.tiles[0], "grass");
+        assert_eq!(tilemap.tiles[3], "water");
     }
 }
