@@ -671,6 +671,94 @@ fn game_state_legacy_default_player_profile_still_moves() {
 }
 
 #[test]
+fn game_state_non_player_entity_with_player_wasd_profile_moves_from_input() {
+    let mut game_state = GameState::new_empty();
+    let player_id = game_state.spawn_player_at(IVec2::new(0, 0));
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .expect("player should exist")
+        .attributes
+        .movement_profile = MovementProfile::None;
+
+    let mut controlled_npc = test_definition("controlled_npc", "npc");
+    controlled_npc.attributes.movement_profile = MovementProfile::PlayerWasd;
+    let npc_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&controlled_npc, IVec2::new(32, 32))
+        .expect("controlled npc should spawn");
+
+    game_state.handle_key_press(InputKey::Right);
+    let result = game_state.update(
+        UVec2::new(512, 512),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(!result.player_moved);
+    assert_eq!(
+        game_state
+            .entity_manager()
+            .get_entity(player_id)
+            .expect("player should exist")
+            .position,
+        IVec2::new(0, 0)
+    );
+    assert_eq!(
+        game_state
+            .entity_manager()
+            .get_entity(npc_id)
+            .expect("npc should exist")
+            .position,
+        IVec2::new(33, 32)
+    );
+}
+
+#[test]
+fn game_state_multiple_player_wasd_entities_move_together() {
+    let mut game_state = GameState::new_empty();
+
+    let mut first = test_definition("first", "npc");
+    first.attributes.movement_profile = MovementProfile::PlayerWasd;
+    let first_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&first, IVec2::new(10, 10))
+        .expect("first controlled entity should spawn");
+
+    let mut second = test_definition("second", "npc");
+    second.attributes.movement_profile = MovementProfile::PlayerWasd;
+    let second_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&second, IVec2::new(40, 10))
+        .expect("second controlled entity should spawn");
+
+    game_state.handle_key_press(InputKey::Down);
+    game_state.handle_key_press(InputKey::Right);
+    game_state.update(
+        UVec2::new(512, 512),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert_eq!(
+        game_state
+            .entity_manager()
+            .get_entity(first_id)
+            .expect("first entity should exist")
+            .position,
+        IVec2::new(11, 11)
+    );
+    assert_eq!(
+        game_state
+            .entity_manager()
+            .get_entity(second_id)
+            .expect("second entity should exist")
+            .position,
+        IVec2::new(41, 11)
+    );
+}
+
+#[test]
 fn game_state_sprite_animation_updates() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);

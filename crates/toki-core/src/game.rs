@@ -141,6 +141,101 @@ impl GameState {
             .resolved_for_entity_type(&entity.entity_type)
     }
 
+    fn controlled_input_entity_ids(&self) -> Vec<EntityId> {
+        let mut entity_ids = self
+            .entity_manager
+            .active_entities()
+            .iter()
+            .filter_map(|&entity_id| {
+                let entity = self.entity_manager.get_entity(entity_id)?;
+                if matches!(
+                    Self::effective_movement_profile(entity),
+                    MovementProfile::PlayerWasd
+                ) {
+                    Some(entity_id)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        entity_ids.sort_unstable();
+        entity_ids
+    }
+
+    fn candidate_input_position(
+        &self,
+        current_position: glam::IVec2,
+        key: InputKey,
+        world_bounds: glam::UVec2,
+    ) -> glam::IVec2 {
+        match key {
+            InputKey::Up => glam::IVec2::new(current_position.x, (current_position.y - self.movement_step).max(0)),
+            InputKey::Left => glam::IVec2::new((current_position.x - self.movement_step).max(0), current_position.y),
+            InputKey::Down => glam::IVec2::new(
+                current_position.x,
+                (current_position.y + self.movement_step)
+                    .min(world_bounds.y as i32 - self.sprite_size as i32),
+            ),
+            InputKey::Right => glam::IVec2::new(
+                (current_position.x + self.movement_step)
+                    .min(world_bounds.x as i32 - self.sprite_size as i32),
+                current_position.y,
+            ),
+            InputKey::DebugToggle => current_position,
+        }
+    }
+
+    fn apply_input_to_entity(
+        &mut self,
+        entity_id: EntityId,
+        key: InputKey,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+        result: &mut GameUpdateResult<AudioEvent>,
+    ) {
+        if matches!(key, InputKey::DebugToggle) {
+            return;
+        }
+
+        let Some(current_position) = self
+            .entity_manager
+            .get_entity(entity_id)
+            .map(|entity| entity.position)
+        else {
+            return;
+        };
+
+        let new_position = self.candidate_input_position(current_position, key, world_bounds);
+        if new_position == current_position {
+            return;
+        }
+
+        if self.can_entity_move_to_position(entity_id, new_position, tilemap, atlas) {
+            if let Some((entity, entity_audio)) = self.entity_manager.get_entity_with_audio_mut(entity_id) {
+                entity.position = new_position;
+                entity_audio.last_collision_state = false;
+            }
+        } else {
+            if let Some(entity_audio) = self.entity_manager.audio_component_mut(entity_id) {
+                if !entity_audio.last_collision_state {
+                    if let Some(collision_sound) = entity_audio
+                        .collision_sound
+                        .as_deref()
+                        .filter(|sound_id| !sound_id.is_empty())
+                    {
+                        result.add_event(AudioEvent::PlaySound {
+                            channel: AudioChannel::Collision,
+                            sound_id: collision_sound.to_string(),
+                        });
+                    }
+                }
+                entity_audio.last_collision_state = true;
+            }
+            self.rule_runtime.frame_collision_detected = true;
+        }
+    }
+
     fn can_entity_move_to_position(
         &self,
         entity_id: EntityId,
@@ -605,212 +700,81 @@ impl GameState {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> GameUpdateResult<AudioEvent> {
-        let Some(player_id) = self.player_id else {
-            return GameUpdateResult::new(); // No player entity to move
-        };
-
-        let Some(player_entity) = self.entity_manager.get_entity(player_id) else {
-            return GameUpdateResult::new(); // Player entity doesn't exist
-        };
-        if !matches!(
-            Self::effective_movement_profile(player_entity),
-            MovementProfile::PlayerWasd
-        ) {
+        let controlled_entity_ids = self.controlled_input_entity_ids();
+        if controlled_entity_ids.is_empty() {
             return GameUpdateResult::new();
         }
 
-        let initial_position = player_entity.position;
+        let initial_positions = controlled_entity_ids
+            .iter()
+            .filter_map(|&entity_id| {
+                self.entity_manager
+                    .get_entity(entity_id)
+                    .map(|entity| (entity_id, entity.position))
+            })
+            .collect::<HashMap<_, _>>();
         let mut result = GameUpdateResult::new();
 
         let mut held_keys = self.keys_held.iter().copied().collect::<Vec<_>>();
         held_keys.sort_by_key(|key| Self::input_key_order(*key));
 
         for key in held_keys {
-            let Some(current_position) = self
-                .entity_manager
-                .get_entity(player_id)
-                .map(|entity| entity.position)
-            else {
-                break;
-            };
-
-            match key {
-                InputKey::Up => {
-                    tracing::trace!("Move forward");
-                    let new_y = (current_position.y - self.movement_step).max(0);
-                    let new_position = glam::IVec2::new(current_position.x, new_y);
-                    if self.can_entity_move_to_position(player_id, new_position, tilemap, atlas) {
-                        if let Some((player_entity, player_audio)) =
-                            self.entity_manager.get_entity_with_audio_mut(player_id)
-                        {
-                            player_entity.position.y = new_y;
-                            player_audio.last_collision_state = false;
-                        }
-                    } else {
-                        // Only trigger audio on state change
-                        if let Some(player_audio) =
-                            self.entity_manager.audio_component_mut(player_id)
-                        {
-                            if !player_audio.last_collision_state {
-                                if let Some(collision_sound) = player_audio
-                                    .collision_sound
-                                    .as_deref()
-                                    .filter(|s| !s.is_empty())
-                                {
-                                    result.add_event(AudioEvent::PlaySound {
-                                        channel: AudioChannel::Collision,
-                                        sound_id: collision_sound.to_string(),
-                                    });
-                                }
-                            }
-                            player_audio.last_collision_state = true;
-                        }
-                        self.rule_runtime.frame_collision_detected = true;
-                    }
-                }
-                InputKey::Left => {
-                    tracing::trace!("Move left");
-                    let new_x = (current_position.x - self.movement_step).max(0);
-                    let new_position = glam::IVec2::new(new_x, current_position.y);
-                    if self.can_entity_move_to_position(player_id, new_position, tilemap, atlas) {
-                        if let Some((player_entity, player_audio)) =
-                            self.entity_manager.get_entity_with_audio_mut(player_id)
-                        {
-                            player_entity.position.x = new_x;
-                            player_audio.last_collision_state = false;
-                        }
-                    } else {
-                        // Only trigger audio on state change
-                        if let Some(player_audio) =
-                            self.entity_manager.audio_component_mut(player_id)
-                        {
-                            if !player_audio.last_collision_state {
-                                if let Some(collision_sound) = player_audio
-                                    .collision_sound
-                                    .as_deref()
-                                    .filter(|s| !s.is_empty())
-                                {
-                                    result.add_event(AudioEvent::PlaySound {
-                                        channel: AudioChannel::Collision,
-                                        sound_id: collision_sound.to_string(),
-                                    });
-                                }
-                            }
-                            player_audio.last_collision_state = true;
-                        }
-                        self.rule_runtime.frame_collision_detected = true;
-                    }
-                }
-                InputKey::Down => {
-                    tracing::trace!("Move backward");
-                    let new_y = (current_position.y + self.movement_step)
-                        .min(world_bounds.y as i32 - self.sprite_size as i32);
-                    let new_position = glam::IVec2::new(current_position.x, new_y);
-                    if self.can_entity_move_to_position(player_id, new_position, tilemap, atlas) {
-                        if let Some((player_entity, player_audio)) =
-                            self.entity_manager.get_entity_with_audio_mut(player_id)
-                        {
-                            player_entity.position.y = new_y;
-                            player_audio.last_collision_state = false;
-                        }
-                    } else {
-                        // Only trigger audio on state change
-                        if let Some(player_audio) =
-                            self.entity_manager.audio_component_mut(player_id)
-                        {
-                            if !player_audio.last_collision_state {
-                                if let Some(collision_sound) = player_audio
-                                    .collision_sound
-                                    .as_deref()
-                                    .filter(|s| !s.is_empty())
-                                {
-                                    result.add_event(AudioEvent::PlaySound {
-                                        channel: AudioChannel::Collision,
-                                        sound_id: collision_sound.to_string(),
-                                    });
-                                }
-                            }
-                            player_audio.last_collision_state = true;
-                        }
-                        self.rule_runtime.frame_collision_detected = true;
-                    }
-                }
-                InputKey::Right => {
-                    tracing::trace!("Move right");
-                    let new_x = (current_position.x + self.movement_step)
-                        .min(world_bounds.x as i32 - self.sprite_size as i32);
-                    let new_position = glam::IVec2::new(new_x, current_position.y);
-                    if self.can_entity_move_to_position(player_id, new_position, tilemap, atlas) {
-                        if let Some((player_entity, player_audio)) =
-                            self.entity_manager.get_entity_with_audio_mut(player_id)
-                        {
-                            player_entity.position.x = new_x;
-                            player_audio.last_collision_state = false;
-                        }
-                    } else {
-                        // Only trigger audio on state change
-                        if let Some(player_audio) =
-                            self.entity_manager.audio_component_mut(player_id)
-                        {
-                            if !player_audio.last_collision_state {
-                                if let Some(collision_sound) = player_audio
-                                    .collision_sound
-                                    .as_deref()
-                                    .filter(|s| !s.is_empty())
-                                {
-                                    result.add_event(AudioEvent::PlaySound {
-                                        channel: AudioChannel::Collision,
-                                        sound_id: collision_sound.to_string(),
-                                    });
-                                }
-                            }
-                            player_audio.last_collision_state = true;
-                        }
-                        self.rule_runtime.frame_collision_detected = true;
-                    }
-                }
-                InputKey::DebugToggle => {
-                    // Debug toggle is handled in key press event, not as held key
-                }
+            for &entity_id in &controlled_entity_ids {
+                self.apply_input_to_entity(entity_id, key, world_bounds, tilemap, atlas, &mut result);
             }
         }
 
-        // Check if position actually changed
-        let final_position = self
-            .entity_manager
-            .get_entity(player_id)
-            .map(|entity| entity.position)
-            .unwrap_or(initial_position);
-        let player_moved = final_position != initial_position;
-        result.player_moved = player_moved;
+        for &entity_id in &controlled_entity_ids {
+            let Some(initial_position) = initial_positions.get(&entity_id).copied() else {
+                continue;
+            };
+            let Some(final_entity) = self.entity_manager.get_entity(entity_id) else {
+                continue;
+            };
+            let final_position = final_entity.position;
+            let entity_moved = final_position != initial_position;
 
-        // Distance-based footstep tracking
-        if player_moved {
-            // Calculate distance moved
-            let distance_moved = (((final_position.x - initial_position.x).pow(2)
-                + (final_position.y - initial_position.y).pow(2))
-                as f32)
-                .sqrt();
+            if Some(entity_id) == self.player_id {
+                result.player_moved = entity_moved;
+            }
 
-            if let Some(player_audio) = self.entity_manager.audio_component_mut(player_id) {
-                player_audio.footstep_distance_accumulator += distance_moved;
+            if let Some(animation_controller) = self
+                .entity_manager
+                .get_entity_mut(entity_id)
+                .and_then(|entity| entity.attributes.animation_controller.as_mut())
+            {
+                let delta = final_position - initial_position;
+                let desired_animation =
+                    Self::resolve_animation_state(animation_controller, entity_moved, delta);
+                if animation_controller.current_clip_state != desired_animation {
+                    animation_controller.play(desired_animation);
+                }
+            }
 
-                // Trigger footstep when accumulated distance exceeds threshold
-                if player_audio.footstep_distance_accumulator
-                    >= player_audio.footstep_trigger_distance
-                {
-                    if let Some(movement_sound) = player_audio
-                        .movement_sound
-                        .as_deref()
-                        .filter(|s| !s.is_empty())
+            if entity_moved {
+                let distance_moved = (((final_position.x - initial_position.x).pow(2)
+                    + (final_position.y - initial_position.y).pow(2))
+                    as f32)
+                    .sqrt();
+
+                if let Some(entity_audio) = self.entity_manager.audio_component_mut(entity_id) {
+                    entity_audio.footstep_distance_accumulator += distance_moved;
+                    if entity_audio.footstep_distance_accumulator
+                        >= entity_audio.footstep_trigger_distance
                     {
-                        result.add_event(AudioEvent::PlaySound {
-                            channel: AudioChannel::Movement,
-                            sound_id: movement_sound.to_string(),
-                        });
+                        if let Some(movement_sound) = entity_audio
+                            .movement_sound
+                            .as_deref()
+                            .filter(|sound_id| !sound_id.is_empty())
+                        {
+                            result.add_event(AudioEvent::PlaySound {
+                                channel: AudioChannel::Movement,
+                                sound_id: movement_sound.to_string(),
+                            });
+                        }
+                        entity_audio.footstep_distance_accumulator -=
+                            entity_audio.footstep_trigger_distance;
                     }
-                    player_audio.footstep_distance_accumulator -=
-                        player_audio.footstep_trigger_distance;
                 }
             }
         }
