@@ -2,12 +2,11 @@ use glam::{IVec2, UVec2};
 use toki_core::collision::CollisionBox;
 use toki_core::entity::*;
 
-fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
+fn test_definition(name: &str, category: &str) -> EntityDefinition {
     EntityDefinition {
         name: name.to_string(),
         display_name: format!("Display {name}"),
         description: format!("Definition for {name}"),
-        entity_type: entity_type.to_string(),
         rendering: RenderingDef {
             size: [16, 16],
             render_layer: 0,
@@ -19,12 +18,12 @@ fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
             solid: true,
             active: true,
             can_move: true,
-            ai_behavior: if entity_type == "npc" {
+            ai_behavior: if category == "creature" {
                 AiBehavior::Wander
             } else {
                 AiBehavior::None
             },
-            movement_profile: if entity_type == "player" {
+            movement_profile: if category == "human" {
                 MovementProfile::PlayerWasd
             } else {
                 MovementProfile::None
@@ -52,13 +51,13 @@ fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
             }],
             default_state: "idle".to_string(),
         },
-        category: "test".to_string(),
+        category: category.to_string(),
         tags: vec!["test".to_string()],
     }
 }
 
 fn player_definition() -> EntityDefinition {
-    let mut def = test_definition("player", "player");
+    let mut def = test_definition("player", "human");
     def.attributes.health = Some(100);
     def.attributes.speed = 2;
     def.attributes.solid = true;
@@ -67,7 +66,7 @@ fn player_definition() -> EntityDefinition {
 }
 
 fn npc_definition(animation_name: &str) -> EntityDefinition {
-    let mut def = test_definition("npc", "npc");
+    let mut def = test_definition("npc", "creature");
     def.attributes.health = Some(50);
     def.attributes.speed = 1;
     def.attributes.solid = true;
@@ -109,7 +108,7 @@ fn item_definition(item_name: &str) -> EntityDefinition {
 }
 
 fn decoration_definition(decoration_name: &str) -> EntityDefinition {
-    let mut def = test_definition("decoration", "decoration");
+    let mut def = test_definition("decoration", "building");
     def.attributes.health = None;
     def.attributes.solid = false;
     def.attributes.can_move = false;
@@ -139,8 +138,13 @@ trait DefinitionSpawnExt {
 
 impl DefinitionSpawnExt for EntityManager {
     fn spawn_player(&mut self, position: IVec2) -> EntityId {
-        self.spawn_from_definition(&player_definition(), position)
-            .expect("player definition spawn should succeed")
+        let id = self.next_entity_id_for_test();
+        let mut entity = player_definition()
+            .create_entity(position, id)
+            .expect("player definition spawn should succeed");
+        entity.control_role = ControlRole::PlayerCharacter;
+        entity.entity_type = EntityType::Player;
+        self.add_existing_entity(entity)
     }
 
     fn spawn_npc(&mut self, position: IVec2, animation_name: &str) -> EntityId {
@@ -156,6 +160,20 @@ impl DefinitionSpawnExt for EntityManager {
     fn spawn_decoration(&mut self, position: IVec2, decoration_name: &str) -> EntityId {
         self.spawn_from_definition(&decoration_definition(decoration_name), position)
             .expect("decoration definition spawn should succeed")
+    }
+}
+
+trait EntityManagerTestExt {
+    fn next_entity_id_for_test(&self) -> EntityId;
+}
+
+impl EntityManagerTestExt for EntityManager {
+    fn next_entity_id_for_test(&self) -> EntityId {
+        self.active_entities()
+            .into_iter()
+            .max()
+            .unwrap_or(0)
+            .saturating_add(1)
     }
 }
 
@@ -407,9 +425,10 @@ fn test_multiple_players_not_allowed() {
     let first_player = manager.spawn_player(IVec2::new(0, 0));
     let second_player = manager.spawn_player(IVec2::new(100, 100));
 
-    // Only the second player should be tracked as THE player
-    assert_eq!(manager.get_player_id(), Some(second_player));
-    assert_ne!(manager.get_player_id(), Some(first_player));
+    // The first explicit player-character stays tracked until a higher-level scene/editor
+    // workflow deliberately reassigns the role.
+    assert_eq!(manager.get_player_id(), Some(first_player));
+    assert_ne!(manager.get_player_id(), Some(second_player));
 
     // But both should exist as entities
     assert!(manager.get_entity(first_player).is_some());
@@ -442,9 +461,9 @@ fn test_entity_position_and_size() {
 }
 
 #[test]
-fn test_spawn_from_definition_sets_definition_name_and_player_tracking() {
+fn test_spawn_from_definition_sets_definition_name_without_assigning_player_role() {
     let mut manager = EntityManager::new();
-    let definition = test_definition("player", "player");
+    let definition = test_definition("player", "human");
 
     let entity_id = manager
         .spawn_from_definition(&definition, IVec2::new(12, 34))
@@ -452,15 +471,16 @@ fn test_spawn_from_definition_sets_definition_name_and_player_tracking() {
 
     let entity = manager.get_entity(entity_id).expect("entity should exist");
     assert_eq!(entity.definition_name.as_deref(), Some("player"));
-    assert_eq!(entity.entity_type, EntityType::Player);
+    assert_eq!(entity.entity_type, EntityType::Npc);
     assert_eq!(entity.position, IVec2::new(12, 34));
-    assert_eq!(manager.get_player_id(), Some(entity_id));
+    assert_eq!(entity.effective_control_role(), ControlRole::None);
+    assert_eq!(manager.get_player_id(), None);
 }
 
 #[test]
 fn test_spawn_from_definition_registers_audio_component() {
     let mut manager = EntityManager::new();
-    let definition = test_definition("audio_player", "player");
+    let definition = test_definition("audio_player", "human");
 
     let entity_id = manager
         .spawn_from_definition(&definition, IVec2::new(0, 0))

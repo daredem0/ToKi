@@ -16,7 +16,9 @@
         16
       ],
       "entity_type": "Player",
+      "category": "human",
       "definition_name": "player",
+      "control_role": "player_character",
       "attributes": {
         "health": 100,
         "speed": 2,
@@ -80,7 +82,9 @@
         16
       ],
       "entity_type": "Npc",
+      "category": "human",
       "definition_name": "villager",
+      "control_role": "none",
       "attributes": {
         "health": 10,
         "speed": 1,

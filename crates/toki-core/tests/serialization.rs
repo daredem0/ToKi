@@ -6,12 +6,11 @@ use toki_core::entity::*;
 use toki_core::serialization::*;
 use toki_core::{GameState, InputKey};
 
-fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
+fn test_definition(name: &str, category: &str) -> EntityDefinition {
     EntityDefinition {
         name: name.to_string(),
         display_name: format!("Display {name}"),
         description: format!("Definition for {name}"),
-        entity_type: entity_type.to_string(),
         rendering: RenderingDef {
             size: [16, 16],
             render_layer: 0,
@@ -23,12 +22,12 @@ fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
             solid: true,
             active: true,
             can_move: true,
-            ai_behavior: if entity_type == "npc" {
+            ai_behavior: if category == "creature" {
                 AiBehavior::Wander
             } else {
                 AiBehavior::None
             },
-            movement_profile: if entity_type == "player" {
+            movement_profile: if category == "human" {
                 MovementProfile::PlayerWasd
             } else {
                 MovementProfile::None
@@ -56,7 +55,7 @@ fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
             }],
             default_state: "idle".to_string(),
         },
-        category: "test".to_string(),
+        category: category.to_string(),
         tags: vec!["test".to_string()],
     }
 }
@@ -101,14 +100,20 @@ fn create_test_entity() -> Entity {
 
 fn create_test_entity_manager() -> EntityManager {
     let mut manager = EntityManager::new();
-    let player_def = test_definition("player", "player");
-    let npc_def = test_definition("npc", "npc");
-    let _player_id = manager
-        .spawn_from_definition(&player_def, IVec2::new(100, 200))
-        .expect("player spawn from definition should succeed");
+    let npc_def = test_definition("npc", "creature");
+    let player_id = manager.add_existing_entity(create_test_entity());
     let npc_id = manager
         .spawn_from_definition(&npc_def, IVec2::new(50, 75))
         .expect("npc spawn from definition should succeed");
+
+    if let Some(player) = manager.get_entity_mut(player_id) {
+        player.position = IVec2::new(100, 200);
+    }
+    if let Some(audio) = manager.audio_component_mut(player_id) {
+        audio.footstep_trigger_distance = 32.0;
+        audio.movement_sound = Some("sfx_step".to_string());
+        audio.collision_sound = Some("sfx_hit2".to_string());
+    }
 
     // Modify some state to test preservation
     manager.set_entity_active(npc_id, false);

@@ -135,10 +135,7 @@ enum RuleCommand {
 
 impl GameState {
     fn effective_movement_profile(entity: &Entity) -> MovementProfile {
-        entity
-            .attributes
-            .movement_profile
-            .resolved_for_entity_type(&entity.entity_type)
+        entity.effective_movement_profile()
     }
 
     fn controlled_input_entity_ids(&self) -> Vec<EntityId> {
@@ -331,6 +328,10 @@ impl GameState {
         let player_id = entity_manager
             .spawn_from_definition(&player_def, player_sprite.position)
             .expect("default player definition should always be valid");
+        entity_manager.set_control_role(player_id, crate::entity::ControlRole::PlayerCharacter);
+        if let Some(player) = entity_manager.get_entity_mut(player_id) {
+            player.entity_type = crate::entity::EntityType::Player;
+        }
 
         Self {
             scene_manager: SceneManager::new(),
@@ -369,6 +370,11 @@ impl GameState {
             .entity_manager
             .spawn_from_definition(&player_def, position)
             .expect("default player definition should always be valid");
+        self.entity_manager
+            .set_control_role(player_id, crate::entity::ControlRole::PlayerCharacter);
+        if let Some(player) = self.entity_manager.get_entity_mut(player_id) {
+            player.entity_type = crate::entity::EntityType::Player;
+        }
         self.player_id = Some(player_id);
         player_id
     }
@@ -386,7 +392,6 @@ impl GameState {
             name: "player".to_string(),
             display_name: "Player".to_string(),
             description: "Default player entity".to_string(),
-            entity_type: "player".to_string(),
             rendering: crate::entity::RenderingDef {
                 size: [16, 16],
                 render_layer: 0,
@@ -446,7 +451,6 @@ impl GameState {
             name: "player_like_npc".to_string(),
             display_name: "Player-like NPC".to_string(),
             description: "NPC using the player visual style".to_string(),
-            entity_type: "npc".to_string(),
             rendering: crate::entity::RenderingDef {
                 size: [16, 16],
                 render_layer: 0,

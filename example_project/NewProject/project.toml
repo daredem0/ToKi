@@ -7,9 +7,9 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-main = "scenes/main.json"
 "Scene 2" = "scenes/scene2.json"
 "Main Scene" = "scenes/mainscene.json"
+main = "scenes/main.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -36,6 +36,14 @@ pan = [
     235.4000701904297,
     170.1680908203125,
 ]
+"node:3" = [
+    430.0,
+    50.0,
+]
+"node:9" = [
+    509.1368713378906,
+    180.75457763671875,
+]
 "node:2" = [
     800.0,
     50.0,
@@ -44,28 +52,20 @@ pan = [
     60.0,
     50.0,
 ]
-"node:6" = [
-    430.0,
-    106.0,
-]
-"node:3" = [
-    430.0,
-    50.0,
-]
 "node:5" = [
     800.0,
+    106.0,
+]
+"node:4" = [
+    60.0,
     106.0,
 ]
 "node:7" = [
     60.0,
     162.0,
 ]
-"node:9" = [
-    509.1368713378906,
-    180.75457763671875,
-]
-"node:4" = [
-    60.0,
+"node:6" = [
+    430.0,
     106.0,
 ]
 

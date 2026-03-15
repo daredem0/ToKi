@@ -2,7 +2,6 @@
   "name": "player",
   "display_name": "Player",
   "description": "The controllable hero for the top-down starter template.",
-  "entity_type": "player",
   "rendering": {
     "size": [
       16,

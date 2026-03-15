@@ -320,7 +320,7 @@ mod tests {
     use toki_core::assets::tilemap::TileMap;
     use toki_core::entity::{
         AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
-        EntityType, RenderingDef,
+        RenderingDef,
     };
 
     fn sample_entity_definition(name: &str) -> EntityDefinition {
@@ -328,7 +328,6 @@ mod tests {
             name: name.to_string(),
             display_name: "Sample Entity".to_string(),
             description: "Entity used for placement tests".to_string(),
-            entity_type: "npc".to_string(),
             rendering: RenderingDef {
                 size: [16, 16],
                 render_layer: 0,
@@ -365,7 +364,7 @@ mod tests {
                 }],
                 default_state: "idle".to_string(),
             },
-            category: "test".to_string(),
+            category: "creature".to_string(),
             tags: vec!["placement".to_string()],
         }
     }
@@ -482,7 +481,7 @@ mod tests {
         let loaded = PlacementInteraction::load_entity_definition(&project_dir, "valid_entity")
             .expect("expected valid entity definition to load");
         assert_eq!(loaded.name, "valid_entity");
-        assert_eq!(loaded.entity_type, "npc");
+        assert_eq!(loaded.category, "creature");
     }
 
     #[test]
@@ -527,7 +526,7 @@ mod tests {
             .expect("missing default scene");
         assert_eq!(scene.entities.len(), 1);
         assert_eq!(scene.entities[0].position, IVec2::new(32, 48));
-        assert_eq!(scene.entities[0].entity_type, EntityType::Npc);
+        assert_eq!(scene.entities[0].category, "creature");
         assert_eq!(scene.entities[0].definition_name.as_deref(), Some("sample"));
         assert!(ui_state.scene_content_changed);
         assert!(ui_state.can_undo());

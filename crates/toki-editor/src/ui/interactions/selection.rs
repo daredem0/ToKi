@@ -483,7 +483,7 @@ impl SelectionInteraction {
 
     fn definition_match_score(entity: &Entity, definition: &EntityDefinition) -> Option<i32> {
         if !definition
-            .entity_type
+            .category
             .eq_ignore_ascii_case(Self::entity_type_name(&entity.entity_type))
         {
             return None;
@@ -533,8 +533,8 @@ impl SelectionInteraction {
 
     fn entity_type_name(entity_type: &EntityType) -> &'static str {
         match entity_type {
-            EntityType::Player => "player",
-            EntityType::Npc => "npc",
+            EntityType::Player => "human",
+            EntityType::Npc => "creature",
             EntityType::Item => "item",
             EntityType::Decoration => "decoration",
             EntityType::Trigger => "trigger",
@@ -569,12 +569,11 @@ mod tests {
         dir
     }
 
-    fn sample_entity_definition(name: &str, entity_type: &str, size: [u32; 2]) -> EntityDefinition {
+    fn sample_entity_definition(name: &str, category: &str, size: [u32; 2]) -> EntityDefinition {
         EntityDefinition {
             name: name.to_string(),
             display_name: format!("Display {name}"),
             description: format!("Definition for {name}"),
-            entity_type: entity_type.to_string(),
             rendering: RenderingDef {
                 size,
                 render_layer: 0,
@@ -611,7 +610,7 @@ mod tests {
                 }],
                 default_state: "idle".to_string(),
             },
-            category: "test".to_string(),
+            category: category.to_string(),
             tags: vec!["selection".to_string()],
         }
     }
@@ -648,8 +647,8 @@ mod tests {
     fn resolve_entity_definition_name_uses_project_lookup_for_legacy_entities() {
         let project_dir = unique_temp_project_dir();
 
-        let small = sample_entity_definition("small_npc", "npc", [16, 16]);
-        let large = sample_entity_definition("large_npc", "npc", [32, 32]);
+        let small = sample_entity_definition("small_creature", "creature", [16, 16]);
+        let large = sample_entity_definition("large_creature", "creature", [32, 32]);
         write_entity_definition_file(&project_dir, &small);
         write_entity_definition_file(&project_dir, &large);
 
@@ -662,7 +661,7 @@ mod tests {
             &legacy_entity,
             Some(project_dir.as_path()),
         );
-        assert_eq!(resolved, Some("large_npc".to_string()));
+        assert_eq!(resolved, Some("large_creature".to_string()));
     }
 
     #[test]
@@ -680,7 +679,7 @@ mod tests {
             .clone();
 
         let resolved = SelectionInteraction::resolve_entity_definition_name(&entity, None);
-        assert_eq!(resolved, Some("player".to_string()));
+        assert_eq!(resolved, Some("human".to_string()));
     }
 
     #[test]

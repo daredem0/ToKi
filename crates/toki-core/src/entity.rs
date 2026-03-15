@@ -69,15 +69,9 @@ pub enum ControlRole {
 }
 
 impl ControlRole {
-    pub fn resolved_for_entity_type(self, entity_type: &EntityType) -> Self {
+    pub fn resolved(self) -> Self {
         match self {
-            Self::LegacyDefault => {
-                if matches!(entity_type, EntityType::Player) {
-                    Self::PlayerCharacter
-                } else {
-                    Self::None
-                }
-            }
+            Self::LegacyDefault => Self::None,
             explicit => explicit,
         }
     }
@@ -105,15 +99,12 @@ pub enum MovementProfile {
 }
 
 impl MovementProfile {
-    pub fn resolved_for_entity_type(self, entity_type: &EntityType) -> Self {
+    pub fn resolved_for_control_role(self, control_role: ControlRole) -> Self {
         match self {
-            Self::LegacyDefault => {
-                if matches!(entity_type, EntityType::Player) {
-                    Self::PlayerWasd
-                } else {
-                    Self::None
-                }
-            }
+            Self::LegacyDefault => match control_role.resolved() {
+                ControlRole::PlayerCharacter => Self::PlayerWasd,
+                ControlRole::LegacyDefault | ControlRole::None => Self::None,
+            },
             explicit => explicit,
         }
     }
@@ -164,7 +155,13 @@ impl Default for EntityAttributes {
 
 impl Entity {
     pub fn effective_control_role(&self) -> ControlRole {
-        self.control_role.resolved_for_entity_type(&self.entity_type)
+        self.control_role.resolved()
+    }
+
+    pub fn effective_movement_profile(&self) -> MovementProfile {
+        self.attributes
+            .movement_profile
+            .resolved_for_control_role(self.effective_control_role())
     }
 }
 
@@ -192,8 +189,8 @@ impl EntityManager {
 
     fn legacy_category_for_type(entity_type: &EntityType) -> &'static str {
         match entity_type {
-            EntityType::Player => "player",
-            EntityType::Npc => "npc",
+            EntityType::Player => "human",
+            EntityType::Npc => "creature",
             EntityType::Item => "item",
             EntityType::Decoration => "decoration",
             EntityType::Trigger => "trigger",
@@ -362,6 +359,20 @@ impl EntityManager {
         self.entities.get_mut(&id)
     }
 
+    pub fn set_control_role(&mut self, id: EntityId, control_role: ControlRole) -> bool {
+        let Some(entity) = self.entities.get_mut(&id) else {
+            return false;
+        };
+
+        entity.control_role = control_role;
+        if matches!(entity.effective_control_role(), ControlRole::PlayerCharacter) {
+            self.player_id = Some(id);
+        } else if self.player_id == Some(id) {
+            self.player_id = None;
+        }
+        true
+    }
+
     pub fn audio_component(&self, id: EntityId) -> Option<&EntityAudioComponent> {
         self.audio_components.get(&id)
     }
@@ -485,12 +496,12 @@ pub struct EntityDefinition {
     pub name: String,
     pub display_name: String,
     pub description: String,
-    pub entity_type: String, // "player", "npc", "item", "decoration", "trigger"
     pub rendering: RenderingDef,
     pub attributes: AttributesDef,
     pub collision: CollisionDef,
     pub audio: AudioDef,
     pub animations: AnimationsDef,
+    #[serde(alias = "entity_type")]
     pub category: String,
     pub tags: Vec<String>,
 }
@@ -549,6 +560,17 @@ pub struct AnimationClipDef {
 
 // Conversion implementations
 impl EntityDefinition {
+    fn runtime_entity_type_for_category(category: &str) -> EntityType {
+        match category.trim().to_ascii_lowercase().as_str() {
+            "item" | "items" => EntityType::Item,
+            "trigger" | "triggers" => EntityType::Trigger,
+            "decoration" | "decorations" | "building" | "buildings" | "plant" | "plants" => {
+                EntityType::Decoration
+            }
+            _ => EntityType::Npc,
+        }
+    }
+
     fn parse_animation_state(state: &str) -> Result<AnimationState, String> {
         match state.to_lowercase().as_str() {
             "idle" => Ok(AnimationState::Idle),
@@ -567,15 +589,7 @@ impl EntityDefinition {
 
     /// Create an Entity instance from this definition at the given position
     pub fn create_entity(&self, position: IVec2, entity_id: EntityId) -> Result<Entity, String> {
-        // Parse entity type
-        let entity_type = match self.entity_type.to_lowercase().as_str() {
-            "player" => EntityType::Player,
-            "npc" => EntityType::Npc,
-            "item" => EntityType::Item,
-            "decoration" => EntityType::Decoration,
-            "trigger" => EntityType::Trigger,
-            _ => return Err(format!("Unknown entity type: {}", self.entity_type)),
-        };
+        let entity_type = Self::runtime_entity_type_for_category(&self.category);
 
         // Build animation controller
         let mut animation_controller = AnimationController::new();

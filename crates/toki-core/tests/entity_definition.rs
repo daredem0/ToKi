@@ -8,7 +8,6 @@ fn test_entity_definition_create_entity_basic() {
         name: "test_player".to_string(),
         display_name: "Test Player".to_string(),
         description: "A test player entity".to_string(),
-        entity_type: "player".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
             render_layer: 1,
@@ -58,7 +57,7 @@ fn test_entity_definition_create_entity_basic() {
             ],
             default_state: "idle".to_string(),
         },
-        category: "character".to_string(),
+        category: "human".to_string(),
         tags: vec!["player".to_string(), "hero".to_string()],
     };
 
@@ -75,10 +74,10 @@ fn test_entity_definition_create_entity_basic() {
     assert_eq!(entity.position, position);
     assert_eq!(entity.size.x, 16);
     assert_eq!(entity.size.y, 16);
-    assert_eq!(entity.entity_type, EntityType::Player);
-    assert_eq!(entity.category, "character");
+    assert_eq!(entity.entity_type, EntityType::Npc);
+    assert_eq!(entity.category, "human");
     assert_eq!(entity.control_role, ControlRole::LegacyDefault);
-    assert_eq!(entity.effective_control_role(), ControlRole::PlayerCharacter);
+    assert_eq!(entity.effective_control_role(), ControlRole::None);
 
     // Check attributes
     assert_eq!(entity.attributes.health, Some(100));
@@ -128,7 +127,6 @@ fn test_entity_definition_create_npc_entity() {
         name: "test_npc".to_string(),
         display_name: "Test NPC".to_string(),
         description: "A test NPC entity".to_string(),
-        entity_type: "npc".to_string(),
         rendering: RenderingDef {
             size: [32, 32],
             render_layer: 0,
@@ -165,7 +163,7 @@ fn test_entity_definition_create_npc_entity() {
             }],
             default_state: "idle".to_string(),
         },
-        category: "npc".to_string(),
+        category: "creature".to_string(),
         tags: vec!["friendly".to_string()],
     };
 
@@ -183,7 +181,7 @@ fn test_entity_definition_create_npc_entity() {
     assert_eq!(entity.size.x, 32);
     assert_eq!(entity.size.y, 32);
     assert_eq!(entity.entity_type, EntityType::Npc);
-    assert_eq!(entity.category, "npc");
+    assert_eq!(entity.category, "creature");
     assert_eq!(entity.effective_control_role(), ControlRole::None);
 
     // Check attributes specific to NPC
@@ -207,7 +205,6 @@ fn test_entity_definition_missing_ai_behavior_defaults_to_wander() {
       "name": "legacy_npc",
       "display_name": "Legacy NPC",
       "description": "Old NPC without ai_behavior",
-      "entity_type": "npc",
       "rendering": {
         "size": [16, 16],
         "render_layer": 0,
@@ -243,7 +240,7 @@ fn test_entity_definition_missing_ai_behavior_defaults_to_wander() {
         ],
         "default_state": "idle"
       },
-      "category": "npc",
+      "category": "creature",
       "tags": []
     }
     "#;
@@ -268,7 +265,6 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
         name: "hero_creature".to_string(),
         display_name: "Hero Creature".to_string(),
         description: "Generic creature whose player role comes from the scene".to_string(),
-        entity_type: "npc".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
             render_layer: 0,
@@ -324,7 +320,6 @@ fn test_entity_definition_supports_explicit_player_wasd_movement_profile() {
       "name": "configured_player",
       "display_name": "Configured Player",
       "description": "Player with explicit movement profile",
-      "entity_type": "player",
       "rendering": {
         "size": [16, 16],
         "render_layer": 0,
@@ -361,7 +356,7 @@ fn test_entity_definition_supports_explicit_player_wasd_movement_profile() {
         ],
         "default_state": "idle"
       },
-      "category": "player",
+      "category": "human",
       "tags": []
     }
     "#;
@@ -388,7 +383,6 @@ fn test_entity_definition_accepts_directional_animation_states() {
         name: "directional_player".to_string(),
         display_name: "Directional Player".to_string(),
         description: "Player with directional walk clips".to_string(),
-        entity_type: "player".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
             render_layer: 1,
@@ -445,7 +439,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
             ],
             default_state: "idle_down".to_string(),
         },
-        category: "character".to_string(),
+        category: "human".to_string(),
         tags: vec!["player".to_string()],
     };
 
@@ -464,12 +458,11 @@ fn test_entity_definition_accepts_directional_animation_states() {
 }
 
 #[test]
-fn test_entity_definition_invalid_entity_type() {
+fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type() {
     let entity_def = EntityDefinition {
         name: "invalid".to_string(),
         display_name: "Invalid".to_string(),
         description: "Invalid entity type".to_string(),
-        entity_type: "invalid_type".to_string(), // Invalid type
         rendering: RenderingDef {
             size: [16, 16],
             render_layer: 0,
@@ -501,13 +494,15 @@ fn test_entity_definition_invalid_entity_type() {
             clips: vec![],
             default_state: "idle".to_string(),
         },
-        category: "test".to_string(),
+        category: "mystery".to_string(),
         tags: vec![],
     };
 
-    let result = entity_def.create_entity(IVec2::ZERO, 1);
-    assert!(result.is_err());
-    assert!(result.unwrap_err().contains("Unknown entity type"));
+    let entity = entity_def
+        .create_entity(IVec2::ZERO, 1)
+        .expect("unknown generic category should still instantiate");
+    assert_eq!(entity.entity_type, EntityType::Npc);
+    assert_eq!(entity.category, "mystery");
 }
 
 #[test]
@@ -516,7 +511,6 @@ fn test_entity_definition_invalid_animation_state() {
         name: "invalid_anim".to_string(),
         display_name: "Invalid Animation".to_string(),
         description: "Invalid animation state".to_string(),
-        entity_type: "player".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
             render_layer: 0,
@@ -568,7 +562,6 @@ fn test_entity_definition_invalid_loop_mode() {
         name: "invalid_loop".to_string(),
         display_name: "Invalid Loop Mode".to_string(),
         description: "Invalid loop mode".to_string(),
-        entity_type: "player".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
             render_layer: 0,
@@ -620,7 +613,6 @@ fn test_entity_definition_serialization() {
         name: "serialize_test".to_string(),
         display_name: "Serialize Test".to_string(),
         description: "Test serialization".to_string(),
-        entity_type: "item".to_string(),
         rendering: RenderingDef {
             size: [8, 8],
             render_layer: -1,
@@ -663,7 +655,6 @@ fn test_entity_definition_serialization() {
     // Check that important fields are preserved
     assert_eq!(entity_def.name, deserialized.name);
     assert_eq!(entity_def.display_name, deserialized.display_name);
-    assert_eq!(entity_def.entity_type, deserialized.entity_type);
     assert_eq!(entity_def.rendering.size, deserialized.rendering.size);
     assert_eq!(entity_def.attributes.speed, deserialized.attributes.speed);
     assert_eq!(entity_def.collision.enabled, deserialized.collision.enabled);
@@ -685,7 +676,6 @@ fn test_entity_definition_create_audio_component() {
         name: "audio_test".to_string(),
         display_name: "Audio Test".to_string(),
         description: "Audio component extraction".to_string(),
-        entity_type: "player".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
             render_layer: 0,

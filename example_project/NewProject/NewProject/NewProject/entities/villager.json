@@ -2,7 +2,6 @@
   "name": "villager",
   "display_name": "Villager",
   "description": "A stationary villager for the top-down starter scene.",
-  "entity_type": "npc",
   "rendering": {
     "size": [
       16,

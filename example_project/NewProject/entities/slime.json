@@ -2,7 +2,6 @@
   "name": "slime",
   "display_name": "Green Slime",
   "description": "A bouncy green slime that wanders around",
-  "entity_type": "npc",
   "rendering": {
     "size": [
       16,

@@ -4,7 +4,7 @@
   "title": "ToKi Entity Definition",
   "description": "A reusable entity definition template for the ToKi game engine",
   "type": "object",
-  "required": ["name", "display_name", "entity_type", "rendering", "attributes", "collision", "audio", "animations"],
+  "required": ["name", "display_name", "rendering", "attributes", "collision", "audio", "animations", "category"],
   "properties": {
     "name": {
       "type": "string",
@@ -17,11 +17,6 @@
     "description": {
       "type": "string",
       "description": "Description of the entity"
-    },
-    "entity_type": {
-      "type": "string",
-      "enum": ["player", "npc", "item", "decoration", "trigger"],
-      "description": "Type category of the entity"
     },
     "rendering": {
       "$ref": "#/definitions/rendering"
@@ -40,7 +35,7 @@
     },
     "category": {
       "type": "string",
-      "description": "Category for organization (character, item, etc.)"
+      "description": "Generic category for organization and authoring (human, creature, building, item, etc.)"
     },
     "tags": {
       "type": "array",

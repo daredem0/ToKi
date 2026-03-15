@@ -4,7 +4,7 @@ use super::undo_redo::EditorCommand;
 use crate::config::EditorConfig;
 use std::collections::{HashMap, HashSet};
 use toki_core::animation::AnimationState;
-use toki_core::entity::{AiBehavior, ControlRole, EntityType, MovementProfile};
+use toki_core::entity::{AiBehavior, ControlRole, MovementProfile};
 use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
     RuleTarget, RuleTrigger,
@@ -15,7 +15,6 @@ pub struct InspectorSystem;
 
 #[derive(Debug, Clone)]
 struct EntityPropertyDraft {
-    entity_type: EntityType,
     control_role: ControlRole,
     position_x: i32,
     position_y: i32,
@@ -188,7 +187,6 @@ impl EntityPropertyDraft {
         };
 
         Self {
-            entity_type: entity.entity_type.clone(),
             control_role: entity.control_role,
             position_x: entity.position.x,
             position_y: entity.position.y,
@@ -230,10 +228,10 @@ fn control_role_label(control_role: ControlRole) -> &'static str {
 }
 
 fn movement_profile_label(
-    entity_type: EntityType,
+    control_role: ControlRole,
     movement_profile: MovementProfile,
 ) -> &'static str {
-    match movement_profile.resolved_for_entity_type(&entity_type) {
+    match movement_profile.resolved_for_control_role(control_role) {
         MovementProfile::LegacyDefault => "Legacy Default",
         MovementProfile::None => "None",
         MovementProfile::PlayerWasd => "Player WASD",
@@ -2634,7 +2632,7 @@ impl InspectorSystem {
             ui.label("Movement:");
             egui::ComboBox::from_id_salt("entity_movement_profile")
                 .selected_text(movement_profile_label(
-                    draft.entity_type.clone(),
+                    draft.control_role,
                     draft.movement_profile,
                 ))
                 .show_ui(ui, |ui| {
@@ -3063,7 +3061,7 @@ impl InspectorSystem {
                 ui.horizontal(|ui| {
                     ui.label("Movement:");
                     ui.label(movement_profile_label(
-                        entity.entity_type.clone(),
+                        entity.control_role,
                         entity.attributes.movement_profile,
                     ));
                 });

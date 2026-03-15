@@ -85,12 +85,11 @@ fn create_solid_test_atlas() -> AtlasMeta {
     }
 }
 
-fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
+fn test_definition(name: &str, category: &str) -> EntityDefinition {
     EntityDefinition {
         name: name.to_string(),
         display_name: format!("Display {name}"),
         description: format!("Definition for {name}"),
-        entity_type: entity_type.to_string(),
         rendering: RenderingDef {
             size: [16, 16],
             render_layer: 0,
@@ -102,12 +101,12 @@ fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
             solid: true,
             active: true,
             can_move: true,
-            ai_behavior: if entity_type == "npc" {
+            ai_behavior: if category == "creature" {
                 toki_core::entity::AiBehavior::Wander
             } else {
                 toki_core::entity::AiBehavior::None
             },
-            movement_profile: if entity_type == "player" {
+            movement_profile: if category == "human" {
                 MovementProfile::PlayerWasd
             } else {
                 MovementProfile::None
@@ -135,7 +134,7 @@ fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
             }],
             default_state: "idle".to_string(),
         },
-        category: "test".to_string(),
+        category: category.to_string(),
         tags: vec!["test".to_string()],
     }
 }
@@ -506,7 +505,7 @@ fn game_state_left_direction_requests_horizontal_flip() {
 fn game_state_player_is_blocked_by_solid_entity_collision() {
     let mut game_state = GameState::new_empty();
     let player_id = game_state.spawn_player_at(IVec2::new(0, 0));
-    let blocker_definition = test_definition("blocker", "npc");
+    let blocker_definition = test_definition("blocker", "creature");
     game_state
         .entity_manager_mut()
         .spawn_from_definition(&blocker_definition, IVec2::new(16, 0))
@@ -535,7 +534,7 @@ fn game_state_player_is_blocked_by_solid_entity_collision() {
 fn game_state_player_can_move_through_non_solid_entity() {
     let mut game_state = GameState::new_empty();
     let player_id = game_state.spawn_player_at(IVec2::new(0, 0));
-    let mut non_solid_definition = test_definition("ghost", "npc");
+    let mut non_solid_definition = test_definition("ghost", "creature");
     non_solid_definition.attributes.solid = false;
     game_state
         .entity_manager_mut()
@@ -566,14 +565,14 @@ fn game_state_only_updates_npcs_with_wander_ai() {
     fastrand::seed(7);
 
     let mut game_state = GameState::new_empty();
-    let mut wandering_npc = test_definition("wandering_npc", "npc");
+    let mut wandering_npc = test_definition("wandering_npc", "creature");
     wandering_npc.attributes.ai_behavior = toki_core::entity::AiBehavior::Wander;
     let wandering_npc_id = game_state
         .entity_manager_mut()
         .spawn_from_definition(&wandering_npc, IVec2::new(32, 32))
         .expect("wandering npc should spawn");
 
-    let mut idle_npc = test_definition("idle_npc", "npc");
+    let mut idle_npc = test_definition("idle_npc", "creature");
     idle_npc.attributes.ai_behavior = toki_core::entity::AiBehavior::None;
     let idle_npc_id = game_state
         .entity_manager_mut()
@@ -681,7 +680,7 @@ fn game_state_non_player_entity_with_player_wasd_profile_moves_from_input() {
         .attributes
         .movement_profile = MovementProfile::None;
 
-    let mut controlled_npc = test_definition("controlled_npc", "npc");
+    let mut controlled_npc = test_definition("controlled_npc", "creature");
     controlled_npc.attributes.movement_profile = MovementProfile::PlayerWasd;
     let npc_id = game_state
         .entity_manager_mut()
@@ -718,14 +717,14 @@ fn game_state_non_player_entity_with_player_wasd_profile_moves_from_input() {
 fn game_state_multiple_player_wasd_entities_move_together() {
     let mut game_state = GameState::new_empty();
 
-    let mut first = test_definition("first", "npc");
+    let mut first = test_definition("first", "creature");
     first.attributes.movement_profile = MovementProfile::PlayerWasd;
     let first_id = game_state
         .entity_manager_mut()
         .spawn_from_definition(&first, IVec2::new(10, 10))
         .expect("first controlled entity should spawn");
 
-    let mut second = test_definition("second", "npc");
+    let mut second = test_definition("second", "creature");
     second.attributes.movement_profile = MovementProfile::PlayerWasd;
     let second_id = game_state
         .entity_manager_mut()
@@ -761,7 +760,7 @@ fn game_state_multiple_player_wasd_entities_move_together() {
 #[test]
 fn game_state_load_scene_uses_control_role_for_player_identity() {
     let mut game_state = GameState::new_empty();
-    let mut hero_definition = test_definition("hero_slime", "npc");
+    let mut hero_definition = test_definition("hero_slime", "creature");
     hero_definition.attributes.movement_profile = MovementProfile::PlayerWasd;
     let mut hero = hero_definition
         .create_entity(IVec2::new(20, 24), 7)
@@ -884,7 +883,7 @@ fn game_state_entity_manager_access() {
     // Should be able to spawn additional entities
     let entity_manager = game_state.entity_manager_mut();
     let npc_id = entity_manager
-        .spawn_from_definition(&test_definition("npc", "npc"), IVec2::new(100, 100))
+        .spawn_from_definition(&test_definition("npc", "creature"), IVec2::new(100, 100))
         .expect("npc spawn from definition should succeed");
     let item_id = entity_manager
         .spawn_from_definition(&test_definition("item", "item"), IVec2::new(200, 200))
