@@ -27,7 +27,7 @@ impl MapObjectInteraction {
             position: world_anchor,
             size_px,
             visible: true,
-            solid: false,
+            solid: true,
         };
         tilemap.objects.push(instance);
         true
@@ -45,6 +45,9 @@ impl MapObjectInteraction {
             .enumerate()
             .rev()
             .find(|(_, object)| {
+                if !object.visible {
+                    return false;
+                }
                 let object_pos = object.position.as_ivec2();
                 toki_core::collision::aabb_overlap(
                     world_point,
@@ -64,6 +67,14 @@ impl MapObjectInteraction {
             return false;
         }
         object.position = world_anchor;
+        true
+    }
+
+    pub fn delete_object(tilemap: &mut TileMap, object_index: usize) -> bool {
+        if object_index >= tilemap.objects.len() {
+            return false;
+        }
+        tilemap.objects.remove(object_index);
         true
     }
 }
@@ -116,7 +127,7 @@ mod tests {
                 position: UVec2::new(16, 32),
                 size_px: UVec2::new(16, 16),
                 visible: true,
-                solid: false,
+                solid: true,
             }]
         );
     }
@@ -131,7 +142,7 @@ mod tests {
                 position: UVec2::new(16, 16),
                 size_px: UVec2::new(16, 16),
                 visible: true,
-                solid: false,
+                solid: true,
             },
             MapObjectInstance {
                 sheet: PathBuf::from("fauna.json"),
@@ -139,7 +150,7 @@ mod tests {
                 position: UVec2::new(16, 16),
                 size_px: UVec2::new(16, 16),
                 visible: true,
-                solid: false,
+                solid: true,
             },
         ];
 
@@ -166,5 +177,38 @@ mod tests {
             UVec2::new(32, 16)
         ));
         assert_eq!(tilemap.objects[0].position, UVec2::new(32, 16));
+    }
+
+    #[test]
+    fn object_index_at_world_ignores_invisible_objects() {
+        let mut tilemap = sample_tilemap();
+        tilemap.objects = vec![MapObjectInstance {
+            sheet: PathBuf::from("fauna.json"),
+            object_name: "hidden".to_string(),
+            position: UVec2::new(16, 16),
+            size_px: UVec2::new(16, 16),
+            visible: false,
+            solid: true,
+        }];
+
+        assert_eq!(
+            MapObjectInteraction::object_index_at_world(&tilemap, glam::Vec2::new(20.0, 20.0)),
+            None
+        );
+    }
+
+    #[test]
+    fn delete_object_removes_object_at_index() {
+        let mut tilemap = sample_tilemap();
+        MapObjectInteraction::place_object(
+            &mut tilemap,
+            UVec2::new(16, 16),
+            "fauna.json",
+            "fauna_a",
+            UVec2::new(16, 16),
+        );
+
+        assert!(MapObjectInteraction::delete_object(&mut tilemap, 0));
+        assert!(tilemap.objects.is_empty());
     }
 }

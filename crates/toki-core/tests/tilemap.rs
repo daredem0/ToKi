@@ -407,7 +407,7 @@ fn tilemap_deserialization_defaults_object_visibility_solidity_and_size() {
     assert_eq!(tilemap.objects.len(), 1);
     assert_eq!(tilemap.objects[0].size_px, UVec2::new(16, 16));
     assert!(tilemap.objects[0].visible);
-    assert!(!tilemap.objects[0].solid);
+    assert!(tilemap.objects[0].solid);
 }
 
 #[test]

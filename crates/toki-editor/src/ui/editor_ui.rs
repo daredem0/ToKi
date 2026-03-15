@@ -49,6 +49,7 @@ pub(crate) enum MapEditorTool {
     Fill,
     PickTile,
     PlaceObject,
+    DeleteObject,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

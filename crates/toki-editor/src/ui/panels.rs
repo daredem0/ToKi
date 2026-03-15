@@ -418,6 +418,7 @@ impl PanelSystem {
                 super::editor_ui::MapEditorTool::Fill => "Fill",
                 super::editor_ui::MapEditorTool::PickTile => "Pick Tile",
                 super::editor_ui::MapEditorTool::PlaceObject => "Place Object",
+                super::editor_ui::MapEditorTool::DeleteObject => "Delete",
             });
         });
         ui.separator();
@@ -542,6 +543,10 @@ impl PanelSystem {
                 ui_state.cancel_map_editor_edit();
                 Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
             }
+            super::editor_ui::MapEditorTool::DeleteObject => {
+                ui_state.cancel_map_editor_edit();
+                Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
+            }
         }
 
         viewport.render(ui, rect, project_path.as_deref(), renderer);
@@ -632,6 +637,11 @@ impl PanelSystem {
                     rect,
                     project_path.as_deref(),
                 ) {
+                    ui_state.mark_map_editor_dirty();
+                }
+            }
+            super::editor_ui::MapEditorTool::DeleteObject => {
+                if Self::handle_map_editor_object_delete(ui, ui_state, viewport, &response, rect) {
                     ui_state.mark_map_editor_dirty();
                 }
             }
@@ -910,6 +920,42 @@ impl PanelSystem {
             ),
         ) {
             ui_state.finish_map_editor_edit(tilemap);
+            viewport.mark_dirty();
+            return true;
+        }
+
+        ui_state.cancel_map_editor_edit();
+        false
+    }
+
+    fn handle_map_editor_object_delete(
+        ui: &egui::Ui,
+        ui_state: &mut super::EditorUI,
+        viewport: &mut SceneViewport,
+        response: &egui::Response,
+        rect: egui::Rect,
+    ) -> bool {
+        let clicked = response.hovered() && ui.input(|input| input.pointer.primary_clicked());
+        if !clicked {
+            return false;
+        }
+
+        let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {
+            return false;
+        };
+        let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
+        let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
+            return false;
+        };
+        let Some(object_index) = MapObjectInteraction::object_index_at_world(tilemap, world_pos)
+        else {
+            return false;
+        };
+
+        ui_state.begin_map_editor_edit(tilemap);
+        if MapObjectInteraction::delete_object(tilemap, object_index) {
+            ui_state.finish_map_editor_edit(tilemap);
+            ui_state.clear_map_editor_object_selection();
             viewport.mark_dirty();
             return true;
         }

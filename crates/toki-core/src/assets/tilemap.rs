@@ -18,7 +18,7 @@ pub struct MapObjectInstance {
     pub size_px: UVec2,
     #[serde(default = "default_map_object_visible")]
     pub visible: bool,
-    #[serde(default)]
+    #[serde(default = "default_map_object_solid")]
     pub solid: bool,
 }
 
@@ -37,6 +37,10 @@ fn default_map_object_size_px() -> UVec2 {
 }
 
 fn default_map_object_visible() -> bool {
+    true
+}
+
+fn default_map_object_solid() -> bool {
     true
 }
 

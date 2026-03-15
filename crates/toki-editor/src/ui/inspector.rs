@@ -513,6 +513,11 @@ impl InspectorSystem {
                 MapEditorTool::PlaceObject,
                 "Place Object",
             );
+            ui.selectable_value(
+                &mut ui_state.map_editor_tool,
+                MapEditorTool::DeleteObject,
+                "Delete",
+            );
         });
         ui.separator();
 
@@ -585,7 +590,8 @@ impl InspectorSystem {
                     MapEditorTool::Fill => "Primary click fills the whole map.",
                     MapEditorTool::Drag
                     | MapEditorTool::PickTile
-                    | MapEditorTool::PlaceObject => unreachable!(),
+                    | MapEditorTool::PlaceObject
+                    | MapEditorTool::DeleteObject => unreachable!(),
                 });
                 if let Some((tile_names, atlas, texture_path)) =
                     Self::load_map_editor_brush_source(ui_state, config)
@@ -656,7 +662,8 @@ impl InspectorSystem {
                     MapEditorTool::Fill => "Secondary drag pans the camera.",
                     MapEditorTool::Drag
                     | MapEditorTool::PickTile
-                    | MapEditorTool::PlaceObject => unreachable!(),
+                    | MapEditorTool::PlaceObject
+                    | MapEditorTool::DeleteObject => unreachable!(),
                 });
             }
             MapEditorTool::PickTile => {
@@ -756,6 +763,10 @@ impl InspectorSystem {
                 } else {
                     ui.label("No object sheets available in assets/sprites.");
                 }
+            }
+            MapEditorTool::DeleteObject => {
+                ui.label("Primary click deletes the clicked visible object from the map.");
+                ui.label("Secondary drag pans the camera.");
             }
         }
 
