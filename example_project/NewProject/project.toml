@@ -32,41 +32,29 @@ pan = [
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
-"node:3" = [
-    430.0,
-    50.0,
-]
-"node:1" = [
-    60.0,
-    50.0,
-]
-"node:9" = [
-    509.1368713378906,
-    180.75457763671875,
-]
-"node:8" = [
-    235.4000701904297,
-    170.1680908203125,
-]
-"node:5" = [
-    800.0,
-    106.0,
-]
 "node:2" = [
     800.0,
+    50.0,
+]
+"node:3" = [
+    430.0,
     50.0,
 ]
 "node:4" = [
     60.0,
     106.0,
 ]
-"node:7" = [
-    60.0,
-    162.0,
+"node:5" = [
+    800.0,
+    106.0,
 ]
 "node:6" = [
     430.0,
     106.0,
+]
+"node:1" = [
+    60.0,
+    50.0,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]
@@ -130,37 +118,6 @@ position = [
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
 Condition = "Always"
 
-[[editor.rule_graph_drafts."Main Scene".nodes]]
-id = 7
-position = [
-    60.0,
-    162.0,
-]
-
-[editor.rule_graph_drafts."Main Scene".nodes.kind]
-Trigger = "OnPlayerMove"
-
-[[editor.rule_graph_drafts."Main Scene".nodes]]
-id = 8
-position = [
-    235.4000701904297,
-    170.1680908203125,
-]
-
-[editor.rule_graph_drafts."Main Scene".nodes.kind]
-Condition = "Always"
-
-[[editor.rule_graph_drafts."Main Scene".nodes]]
-id = 9
-position = [
-    509.1368713378906,
-    180.75457763671875,
-]
-
-[editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlaySound]
-channel = "Movement"
-sound_id = "sfx_step"
-
 [[editor.rule_graph_drafts."Main Scene".edges]]
 from = 3
 to = 2
@@ -177,14 +134,6 @@ to = 5
 from = 4
 to = 6
 
-[[editor.rule_graph_drafts."Main Scene".edges]]
-from = 7
-to = 8
-
-[[editor.rule_graph_drafts."Main Scene".edges]]
-from = 8
-to = 9
-
 [[editor.rule_graph_drafts."Main Scene".chains]]
 rule_id = "rule_1"
 enabled = true
@@ -198,10 +147,3 @@ enabled = true
 priority = 0
 once = false
 trigger_node_id = 4
-
-[[editor.rule_graph_drafts."Main Scene".chains]]
-rule_id = "rule_3"
-enabled = true
-priority = 0
-once = false
-trigger_node_id = 7

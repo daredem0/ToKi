@@ -18,6 +18,11 @@
       "entity_kind": "Npc",
       "category": "",
       "definition_name": "slime",
+      "audio": {
+        "footstep_trigger_distance": 32.0,
+        "movement_sound": "sfx_slime_bounce",
+        "collision_sound": null
+      },
       "attributes": {
         "health": 50,
         "speed": 1,
@@ -25,6 +30,16 @@
         "visible": true,
         "animation_controller": {
           "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -35,16 +50,6 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -86,6 +91,11 @@
       "category": "",
       "definition_name": "player",
       "control_role": "player_character",
+      "audio": {
+        "footstep_trigger_distance": 20.0,
+        "movement_sound": "sfx_step",
+        "collision_sound": null
+      },
       "attributes": {
         "health": 100,
         "speed": 1,
@@ -93,23 +103,32 @@
         "visible": true,
         "animation_controller": {
           "clips": {
-            "WalkLeft": {
-              "state": "WalkLeft",
+            "IdleLeft": {
+              "state": "IdleLeft",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_right_a",
-                "player/walk_right_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Loop"
-            },
-            "IdleUp": {
-              "state": "IdleUp",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_up_a"
+                "player/walk_right_a"
               ],
               "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "IdleRight": {
+              "state": "IdleRight",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_right_a"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkUp": {
+              "state": "WalkUp",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_up_a",
+                "player/walk_up_b"
+              ],
+              "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
             "WalkRight": {
@@ -132,39 +151,30 @@
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
-            "IdleRight": {
-              "state": "IdleRight",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_right_a"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "WalkUp": {
-              "state": "WalkUp",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_up_a",
-                "player/walk_up_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Loop"
-            },
-            "IdleLeft": {
-              "state": "IdleLeft",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_right_a"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "IdleDown": {
               "state": "IdleDown",
               "atlas_name": "players.json",
               "frame_tile_names": [
                 "player/walk_down_a"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkLeft": {
+              "state": "WalkLeft",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_right_a",
+                "player/walk_right_b"
+              ],
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Loop"
+            },
+            "IdleUp": {
+              "state": "IdleUp",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_up_a"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
@@ -208,6 +218,11 @@
       "category": "",
       "definition_name": "slime",
       "control_role": "none",
+      "audio": {
+        "footstep_trigger_distance": 32.0,
+        "movement_sound": "sfx_slime_bounce",
+        "collision_sound": null
+      },
       "attributes": {
         "health": 50,
         "speed": 1,
@@ -247,7 +262,7 @@
         "active": true,
         "can_move": false,
         "ai_behavior": "wander",
-        "movement_profile": "player_wasd",
+        "movement_profile": "none",
         "has_inventory": false
       },
       "collision_box": {
@@ -296,24 +311,6 @@
             "PlaySound": {
               "channel": "Collision",
               "sound_id": "sfx_hit"
-            }
-          }
-        ]
-      },
-      {
-        "id": "rule_3",
-        "enabled": true,
-        "priority": 0,
-        "once": false,
-        "trigger": "OnPlayerMove",
-        "conditions": [
-          "Always"
-        ],
-        "actions": [
-          {
-            "PlaySound": {
-              "channel": "Movement",
-              "sound_id": "sfx_step"
             }
           }
         ]

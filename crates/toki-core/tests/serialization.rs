@@ -93,6 +93,11 @@ fn create_test_entity() -> Entity {
         category: "human".to_string(),
         definition_name: Some("player".to_string()),
         control_role: ControlRole::PlayerCharacter,
+        audio: EntityAudioSettings {
+            footstep_trigger_distance: 32.0,
+            movement_sound: Some("sfx_step".to_string()),
+            collision_sound: Some("sfx_hit2".to_string()),
+        },
         attributes,
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
     }
@@ -154,6 +159,7 @@ fn test_entity_minimal_fields() {
         category: "item".to_string(),
         definition_name: None,
         control_role: ControlRole::None,
+        audio: EntityAudioSettings::default(),
         attributes: EntityAttributes::default(),
         collision_box: None,
     };
@@ -306,9 +312,10 @@ fn test_json_structure() {
     assert!(json.contains("\"id\": 42"));
     assert!(json.contains("\"position\""));
     assert!(json.contains("\"entity_kind\": \"Player\""));
+    assert!(json.contains("\"footstep_trigger_distance\": 32.0"));
+    assert!(json.contains("\"movement_sound\": \"sfx_step\""));
     assert!(!json.contains("\"footstep_distance_accumulator\""));
     assert!(!json.contains("\"last_collision_state\""));
-    assert!(!json.contains("\"footstep_trigger_distance\""));
 }
 
 #[test]

@@ -21,6 +21,8 @@ pub struct Entity {
     pub definition_name: Option<String>,
     #[serde(default, skip_serializing_if = "ControlRole::is_legacy_default")]
     pub control_role: ControlRole,
+    #[serde(default, skip_serializing_if = "EntityAudioSettings::is_default")]
+    pub audio: EntityAudioSettings,
     pub attributes: EntityAttributes,
     pub collision_box: Option<CollisionBox>,
 }
@@ -47,6 +49,41 @@ impl Default for EntityAudioComponent {
             last_collision_state: false,
             movement_sound: None,
             collision_sound: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct EntityAudioSettings {
+    pub footstep_trigger_distance: f32,
+    #[serde(default)]
+    pub movement_sound: Option<String>,
+    #[serde(default)]
+    pub collision_sound: Option<String>,
+}
+
+impl Default for EntityAudioSettings {
+    fn default() -> Self {
+        Self {
+            footstep_trigger_distance: 32.0,
+            movement_sound: None,
+            collision_sound: None,
+        }
+    }
+}
+
+impl EntityAudioSettings {
+    pub fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
+
+    pub fn to_component(&self) -> EntityAudioComponent {
+        EntityAudioComponent {
+            footstep_distance_accumulator: 0.0,
+            footstep_trigger_distance: self.footstep_trigger_distance,
+            last_collision_state: false,
+            movement_sound: self.movement_sound.clone(),
+            collision_sound: self.collision_sound.clone(),
         }
     }
 }
@@ -245,6 +282,7 @@ impl EntityManager {
             category: Self::legacy_category_for_kind(&entity_kind).to_string(),
             definition_name: None,
             control_role: ControlRole::LegacyDefault,
+            audio: EntityAudioSettings::default(),
             attributes,
             collision_box,
         };
@@ -324,7 +362,7 @@ impl EntityManager {
             .insert(id);
 
         self.active_entities.insert(id);
-        self.audio_components.entry(id).or_default();
+        self.audio_components.insert(id, entity.audio.to_component());
 
         // Store the entity
         self.entities.insert(id, entity);
@@ -650,6 +688,22 @@ impl EntityDefinition {
             None
         };
 
+        let movement_sound = {
+            let trimmed = self.audio.movement_sound.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        };
+        let collision_sound = self
+            .audio
+            .collision_sound
+            .as_ref()
+            .map(|value| value.trim())
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string);
+
         // Create entity
         Ok(Entity {
             id: entity_id,
@@ -659,6 +713,11 @@ impl EntityDefinition {
             category: self.category.clone(),
             definition_name: Some(self.name.clone()),
             control_role: ControlRole::LegacyDefault,
+            audio: EntityAudioSettings {
+                footstep_trigger_distance: self.audio.footstep_trigger_distance,
+                movement_sound,
+                collision_sound,
+            },
             attributes,
             collision_box,
         })

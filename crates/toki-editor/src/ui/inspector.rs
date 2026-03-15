@@ -26,6 +26,8 @@ struct EntityPropertyDraft {
     can_move: bool,
     ai_behavior: AiBehavior,
     movement_profile: MovementProfile,
+    footstep_trigger_distance: f32,
+    movement_sound: String,
     has_inventory: bool,
     speed: i64,
     render_layer: i32,
@@ -198,6 +200,8 @@ impl EntityPropertyDraft {
             can_move: entity.attributes.can_move,
             ai_behavior: entity.attributes.ai_behavior,
             movement_profile: entity.attributes.movement_profile,
+            footstep_trigger_distance: entity.audio.footstep_trigger_distance,
+            movement_sound: entity.audio.movement_sound.clone().unwrap_or_default(),
             has_inventory: entity.attributes.has_inventory,
             speed: entity.attributes.speed as i64,
             render_layer: entity.attributes.render_layer,
@@ -379,7 +383,7 @@ impl InspectorSystem {
                                     {
                                         let mut draft =
                                             EntityPropertyDraft::from_entity(&scene_entity);
-                                        if Self::render_scene_entity_editor(ui, &mut draft) {
+                                        if Self::render_scene_entity_editor(ui, &mut draft, config) {
                                             entity_changed =
                                                 Self::apply_entity_property_draft_with_undo(
                                                     ui_state, *entity_id, &draft,
@@ -843,6 +847,16 @@ impl InspectorSystem {
         names.sort();
         names.dedup();
         names
+    }
+
+    fn save_entity_definition(
+        definition: &toki_core::entity::EntityDefinition,
+        path: &std::path::Path,
+    ) -> Result<(), String> {
+        let content = serde_json::to_string_pretty(definition)
+            .map_err(|err| format!("failed to serialize entity definition: {err}"))?;
+        std::fs::write(path, content)
+            .map_err(|err| format!("failed to write entity definition '{}': {err}", path.display()))
     }
 
     fn render_scene_rules_editor(
@@ -2556,7 +2570,11 @@ impl InspectorSystem {
         changed
     }
 
-    fn render_scene_entity_editor(ui: &mut egui::Ui, draft: &mut EntityPropertyDraft) -> bool {
+    fn render_scene_entity_editor(
+        ui: &mut egui::Ui,
+        draft: &mut EntityPropertyDraft,
+        config: Option<&EditorConfig>,
+    ) -> bool {
         let mut changed = false;
 
         ui.label("Scene Entity Properties");
@@ -2669,6 +2687,55 @@ impl InspectorSystem {
         changed |= ui
             .checkbox(&mut draft.has_inventory, "Has Inventory")
             .changed();
+
+        ui.separator();
+        ui.label("Audio");
+        ui.horizontal(|ui| {
+            ui.label("Footstep Distance:");
+            changed |= ui
+                .add(
+                    egui::DragValue::new(&mut draft.footstep_trigger_distance)
+                        .speed(0.5)
+                        .range(0.0..=f32::MAX),
+                )
+                .changed();
+        });
+        ui.horizontal(|ui| {
+            ui.label("Movement Sound:");
+            let mut sfx_names = config
+                .and_then(|cfg| cfg.current_project_path())
+                .map(|project_path| {
+                    Self::discover_audio_asset_names(project_path.join("assets/audio/sfx").as_path())
+                })
+                .unwrap_or_default();
+            if !draft.movement_sound.trim().is_empty()
+                && !sfx_names.iter().any(|name| name == &draft.movement_sound)
+            {
+                sfx_names.push(draft.movement_sound.clone());
+                sfx_names.sort();
+                sfx_names.dedup();
+            }
+            egui::ComboBox::from_id_salt("entity_movement_sound")
+                .selected_text(if draft.movement_sound.trim().is_empty() {
+                    "None".to_string()
+                } else {
+                    draft.movement_sound.clone()
+                })
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(&mut draft.movement_sound, String::new(), "None")
+                        .changed();
+                    for sound_name in &sfx_names {
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.movement_sound,
+                                sound_name.clone(),
+                                sound_name,
+                            )
+                            .changed();
+                    }
+                });
+        });
 
         ui.separator();
         ui.label("Health");
@@ -3228,6 +3295,19 @@ impl InspectorSystem {
             &mut entity.attributes.movement_profile,
             draft.movement_profile,
         );
+        changed |= set_if_changed(
+            &mut entity.audio.footstep_trigger_distance,
+            draft.footstep_trigger_distance.max(0.0),
+        );
+        let new_movement_sound = {
+            let trimmed = draft.movement_sound.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        };
+        changed |= set_if_changed(&mut entity.audio.movement_sound, new_movement_sound);
         changed |= set_if_changed(&mut entity.attributes.has_inventory, draft.has_inventory);
         changed |= set_if_changed(
             &mut entity.attributes.speed,
@@ -3409,6 +3489,91 @@ impl InspectorSystem {
                     // Try to read the entity definition file
                     match std::fs::read_to_string(&entity_file) {
                         Ok(content) => {
+                            if let Ok(mut definition) =
+                                serde_json::from_str::<toki_core::entity::EntityDefinition>(&content)
+                            {
+                                ui.separator();
+                                ui.label("Audio Settings:");
+
+                                ui.horizontal(|ui| {
+                                    ui.label("Footstep Distance:");
+                                    let changed = ui
+                                        .add(
+                                            egui::DragValue::new(
+                                                &mut definition.audio.footstep_trigger_distance,
+                                            )
+                                            .speed(0.5)
+                                            .range(0.0..=f32::MAX),
+                                        )
+                                        .changed();
+                                    if changed {
+                                        definition.audio.footstep_trigger_distance =
+                                            definition.audio.footstep_trigger_distance.max(0.0);
+                                        if let Err(err) =
+                                            Self::save_entity_definition(&definition, &entity_file)
+                                        {
+                                            tracing::error!("{}", err);
+                                            ui.colored_label(egui::Color32::RED, err);
+                                        }
+                                    }
+                                });
+
+                                let mut movement_sound_options = Self::discover_audio_asset_names(
+                                    project_path.join("assets/audio/sfx").as_path(),
+                                );
+                                if !definition.audio.movement_sound.trim().is_empty()
+                                    && !movement_sound_options
+                                        .iter()
+                                        .any(|name| name == &definition.audio.movement_sound)
+                                {
+                                    movement_sound_options
+                                        .push(definition.audio.movement_sound.clone());
+                                    movement_sound_options.sort();
+                                    movement_sound_options.dedup();
+                                }
+
+                                ui.horizontal(|ui| {
+                                    ui.label("Movement Sound:");
+                                    let selected_text = if definition.audio.movement_sound.trim().is_empty() {
+                                        "None".to_string()
+                                    } else {
+                                        definition.audio.movement_sound.clone()
+                                    };
+                                    let mut changed = false;
+                                    egui::ComboBox::from_id_salt(format!(
+                                        "entity_def_movement_sound_{}",
+                                        entity_name
+                                    ))
+                                    .selected_text(selected_text)
+                                    .show_ui(ui, |ui| {
+                                        changed |= ui
+                                            .selectable_value(
+                                                &mut definition.audio.movement_sound,
+                                                String::new(),
+                                                "None",
+                                            )
+                                            .changed();
+                                        for sound_name in &movement_sound_options {
+                                            changed |= ui
+                                                .selectable_value(
+                                                    &mut definition.audio.movement_sound,
+                                                    sound_name.clone(),
+                                                    sound_name,
+                                                )
+                                                .changed();
+                                        }
+                                    });
+                                    if changed {
+                                        if let Err(err) =
+                                            Self::save_entity_definition(&definition, &entity_file)
+                                        {
+                                            tracing::error!("{}", err);
+                                            ui.colored_label(egui::Color32::RED, err);
+                                        }
+                                    }
+                                });
+                            }
+
                             // Try to parse as JSON to show detailed info
                             match serde_json::from_str::<serde_json::Value>(&content) {
                                 Ok(json) => {
@@ -3839,6 +4004,8 @@ mod tests {
         draft.control_role = ControlRole::PlayerCharacter;
         draft.ai_behavior = AiBehavior::None;
         draft.movement_profile = MovementProfile::PlayerWasd;
+        draft.footstep_trigger_distance = -5.0;
+        draft.movement_sound = "sfx_custom_step".to_string();
         draft.has_inventory = true;
         draft.speed = -10;
         draft.render_layer = 8;
@@ -3866,6 +4033,8 @@ mod tests {
             entity.attributes.movement_profile,
             MovementProfile::PlayerWasd
         );
+        assert_eq!(entity.audio.footstep_trigger_distance, 0.0);
+        assert_eq!(entity.audio.movement_sound.as_deref(), Some("sfx_custom_step"));
         assert!(entity.attributes.has_inventory);
         assert_eq!(entity.attributes.speed, 0);
         assert_eq!(entity.attributes.render_layer, 8);
@@ -4448,5 +4617,61 @@ mod tests {
 
         let names = InspectorSystem::discover_audio_asset_names(temp_dir.path());
         assert_eq!(names, vec!["ambience", "battle_theme", "impact"]);
+    }
+
+    #[test]
+    fn save_entity_definition_persists_audio_updates() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let entity_file = temp_dir.path().join("player.json");
+
+        let definition = toki_core::entity::EntityDefinition {
+            name: "player".to_string(),
+            display_name: "Player".to_string(),
+            description: "desc".to_string(),
+            rendering: toki_core::entity::RenderingDef {
+                size: [16, 16],
+                render_layer: 0,
+                visible: true,
+            },
+            attributes: toki_core::entity::AttributesDef {
+                health: Some(100),
+                speed: 2,
+                solid: true,
+                active: true,
+                can_move: true,
+                ai_behavior: AiBehavior::None,
+                movement_profile: MovementProfile::PlayerWasd,
+                has_inventory: false,
+            },
+            collision: toki_core::entity::CollisionDef {
+                enabled: true,
+                offset: [0, 0],
+                size: [16, 16],
+                trigger: false,
+            },
+            audio: toki_core::entity::AudioDef {
+                footstep_trigger_distance: 42.0,
+                movement_sound: "sfx_step".to_string(),
+                collision_sound: None,
+            },
+            animations: toki_core::entity::AnimationsDef {
+                atlas_name: "players".to_string(),
+                clips: vec![],
+                default_state: "idle".to_string(),
+            },
+            category: "human".to_string(),
+            tags: vec![],
+        };
+
+        InspectorSystem::save_entity_definition(&definition, &entity_file)
+            .expect("entity definition should save");
+
+        let content =
+            fs::read_to_string(&entity_file).expect("saved entity definition should be readable");
+        let reloaded: toki_core::entity::EntityDefinition =
+            serde_json::from_str(&content).expect("saved entity definition should parse");
+
+        assert_eq!(reloaded.audio.footstep_trigger_distance, 42.0);
+        assert_eq!(reloaded.audio.movement_sound, "sfx_step");
     }
 }

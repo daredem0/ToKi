@@ -26,6 +26,7 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
         category: "human".to_string(),
         definition_name: None,
         control_role: ControlRole::PlayerCharacter,
+        audio: toki_core::entity::EntityAudioSettings::default(),
         attributes: EntityAttributes {
             health: Some(100),
             speed: 2,

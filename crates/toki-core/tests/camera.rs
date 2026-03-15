@@ -1,6 +1,6 @@
 use glam::{IVec2, UVec2};
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
-use toki_core::entity::{Entity, EntityAttributes, EntityId, EntityKind};
+use toki_core::entity::{Entity, EntityAttributes, EntityAudioSettings, EntityId, EntityKind};
 
 fn create_test_entity(id: EntityId, position: IVec2) -> Entity {
     Entity {
@@ -11,6 +11,7 @@ fn create_test_entity(id: EntityId, position: IVec2) -> Entity {
         category: "human".to_string(),
         definition_name: None,
         control_role: toki_core::entity::ControlRole::PlayerCharacter,
+        audio: EntityAudioSettings::default(),
         attributes: EntityAttributes::default(),
         collision_box: None,
     }

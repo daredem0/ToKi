@@ -227,6 +227,7 @@ fn test_add_existing_entity_tracks_explicit_player_character_role() {
         category: "creature".to_string(),
         definition_name: Some("slime".to_string()),
         control_role: ControlRole::PlayerCharacter,
+        audio: EntityAudioSettings::default(),
         attributes: EntityAttributes {
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::PlayerWasd,
@@ -497,4 +498,23 @@ fn test_spawn_from_definition_registers_audio_component() {
     assert!(!audio.last_collision_state);
     assert_eq!(audio.movement_sound.as_deref(), Some("sfx_step"));
     assert_eq!(audio.collision_sound.as_deref(), Some("sfx_hit2"));
+}
+
+#[test]
+fn test_add_existing_entity_uses_scene_audio_settings_for_component() {
+    let mut manager = EntityManager::new();
+    let mut entity = test_definition("audio_override", "creature")
+        .create_entity(IVec2::new(4, 8), 77)
+        .expect("definition entity should be created");
+    entity.audio.footstep_trigger_distance = 7.5;
+    entity.audio.movement_sound = Some("sfx_custom_step".to_string());
+
+    let entity_id = manager.add_existing_entity(entity);
+
+    let audio = manager
+        .audio_component(entity_id)
+        .expect("audio component should be initialized from scene entity");
+    assert_eq!(audio.footstep_trigger_distance, 7.5);
+    assert_eq!(audio.movement_sound.as_deref(), Some("sfx_custom_step"));
+    assert_eq!(audio.footstep_distance_accumulator, 0.0);
 }

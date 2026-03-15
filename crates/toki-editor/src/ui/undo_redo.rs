@@ -456,6 +456,7 @@ mod tests {
             category: "creature".to_string(),
             definition_name: Some("npc".to_string()),
             control_role: toki_core::entity::ControlRole::None,
+            audio: toki_core::entity::EntityAudioSettings::default(),
             attributes: EntityAttributes::default(),
             collision_box: None,
         }

@@ -152,6 +152,7 @@ mod tests {
             entity_kind: EntityKind::Player,
             category: "human".to_string(),
             control_role: toki_core::entity::ControlRole::PlayerCharacter,
+            audio: toki_core::entity::EntityAudioSettings::default(),
             attributes: EntityAttributes::default(),
             collision_box: None,
             definition_name: None,

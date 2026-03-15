@@ -245,6 +245,7 @@ mod tests {
             category: "creature".to_string(),
             definition_name: Some("test".to_string()),
             control_role: crate::entity::ControlRole::None,
+            audio: crate::entity::EntityAudioSettings::default(),
             attributes: EntityAttributes::default(),
             collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
         }
