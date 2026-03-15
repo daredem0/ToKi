@@ -621,6 +621,67 @@ fn amplitude_to_decibels(amplitude: f32) -> Decibels {
     Decibels((20.0 * amplitude.log10()).max(Decibels::SILENCE.0))
 }
 
+impl std::fmt::Debug for AudioManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AudioManager")
+            .field("preloaded_sounds_count", &self.preloaded_sounds.len())
+            .field("sfx_paths_count", &self.sfx_paths.len())
+            .field("music_paths_count", &self.music_paths.len())
+            .field("channels_count", &self.channels.len())
+            .field("master_volume_percent", &self.master_volume_percent)
+            .field("channel_volume_percents", &self.channel_volume_percents)
+            .finish()
+    }
+}
+
+impl EventHandler<AudioEvent> for AudioManager {
+    fn handle(&mut self, event: &AudioEvent) {
+        match event {
+            AudioEvent::PlaySound {
+                channel,
+                sound_id,
+                source_position,
+                hearing_radius,
+            } => {
+                let (channel_name, policy) = match channel {
+                    AudioEventChannel::Movement => ("movement", PlaybackPolicy::Overlap),
+                    AudioEventChannel::Collision => ("collision", PlaybackPolicy::Exclusive),
+                };
+
+                if !self.channels.contains_key(channel_name) {
+                    self.set_channel_policy(channel_name, policy);
+                    tracing::trace!(
+                        "Initialized '{}' channel with {:?} policy",
+                        channel_name,
+                        policy
+                    );
+                }
+
+                let Some(gain) =
+                    spatial_attenuation(self.listener_position, *source_position, *hearing_radius)
+                else {
+                    return;
+                };
+
+                if let Err(e) = self.play_sound_in_channel_with_gain(channel_name, sound_id, gain) {
+                    tracing::warn!(
+                        "Failed to play sound '{}' in '{}' channel: {}",
+                        sound_id,
+                        channel_name,
+                        e
+                    );
+                }
+            }
+            AudioEvent::BackgroundMusic(name) => {
+                // Background music uses Exclusive by default (only one track at a time)
+                if let Err(e) = self.play_background_music_in_channel("music", name, 0.3) {
+                    tracing::warn!("Failed to play background music '{}': {}", name, e);
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -734,66 +795,5 @@ mod tests {
         .expect("attenuation should exist");
         assert!(attenuation > 0.0);
         assert!(attenuation < 1.0);
-    }
-}
-
-impl std::fmt::Debug for AudioManager {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AudioManager")
-            .field("preloaded_sounds_count", &self.preloaded_sounds.len())
-            .field("sfx_paths_count", &self.sfx_paths.len())
-            .field("music_paths_count", &self.music_paths.len())
-            .field("channels_count", &self.channels.len())
-            .field("master_volume_percent", &self.master_volume_percent)
-            .field("channel_volume_percents", &self.channel_volume_percents)
-            .finish()
-    }
-}
-
-impl EventHandler<AudioEvent> for AudioManager {
-    fn handle(&mut self, event: &AudioEvent) {
-        match event {
-            AudioEvent::PlaySound {
-                channel,
-                sound_id,
-                source_position,
-                hearing_radius,
-            } => {
-                let (channel_name, policy) = match channel {
-                    AudioEventChannel::Movement => ("movement", PlaybackPolicy::Overlap),
-                    AudioEventChannel::Collision => ("collision", PlaybackPolicy::Exclusive),
-                };
-
-                if !self.channels.contains_key(channel_name) {
-                    self.set_channel_policy(channel_name, policy);
-                    tracing::trace!(
-                        "Initialized '{}' channel with {:?} policy",
-                        channel_name,
-                        policy
-                    );
-                }
-
-                let Some(gain) =
-                    spatial_attenuation(self.listener_position, *source_position, *hearing_radius)
-                else {
-                    return;
-                };
-
-                if let Err(e) = self.play_sound_in_channel_with_gain(channel_name, sound_id, gain) {
-                    tracing::warn!(
-                        "Failed to play sound '{}' in '{}' channel: {}",
-                        sound_id,
-                        channel_name,
-                        e
-                    );
-                }
-            }
-            AudioEvent::BackgroundMusic(name) => {
-                // Background music uses Exclusive by default (only one track at a time)
-                if let Err(e) = self.play_background_music_in_channel("music", name, 0.3) {
-                    tracing::warn!("Failed to play background music '{}': {}", name, e);
-                }
-            }
-        }
     }
 }

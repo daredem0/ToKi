@@ -291,7 +291,9 @@ fn classify_sprite_metadata_file(
     Ok(SpriteMetadataFileKind::Unknown)
 }
 
-fn find_sprite_atlas_json_files(dir: &std::path::Path) -> Result<Vec<std::path::PathBuf>, RenderError> {
+fn find_sprite_atlas_json_files(
+    dir: &std::path::Path,
+) -> Result<Vec<std::path::PathBuf>, RenderError> {
     let mut atlas_files = Vec::new();
 
     for path in find_json_files(dir) {
@@ -384,7 +386,9 @@ pub fn resolve_object_sheet_texture_path(
             object_sheet_path.display()
         ))
     })?;
-    Ok(first_existing_path(&[object_sheet_dir.join(&object_sheet.image)]))
+    Ok(first_existing_path(&[
+        object_sheet_dir.join(&object_sheet.image)
+    ]))
 }
 
 fn load_object_sheet_registry(
@@ -412,7 +416,8 @@ pub fn resolve_project_resource_paths(
     project_path: &std::path::Path,
     map_name: Option<&str>,
 ) -> Result<ResolvedProjectResourcePaths, RenderError> {
-    let sprite_atlas_paths = find_sprite_atlas_json_files(&project_path.join("assets").join("sprites"))?;
+    let sprite_atlas_paths =
+        find_sprite_atlas_json_files(&project_path.join("assets").join("sprites"))?;
     let object_sheet_paths =
         find_object_sheet_json_files(&project_path.join("assets").join("sprites"))?;
     if sprite_atlas_paths.is_empty() {
@@ -503,8 +508,8 @@ pub fn resolve_atlas_texture_path(
 mod tests {
     use super::{
         classify_sprite_metadata_file, find_first_json_file, first_existing_path,
-        resolve_project_resource_paths, SpriteMetadataFileKind,
-        resolve_tilemap_atlas_path, ResourceManager,
+        resolve_project_resource_paths, resolve_tilemap_atlas_path, ResourceManager,
+        SpriteMetadataFileKind,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -812,7 +817,9 @@ mod tests {
 
         assert_eq!(resolved.sprite_atlas_paths.len(), 1);
         assert_eq!(
-            resolved.sprite_atlas_paths[0].file_name().and_then(|name| name.to_str()),
+            resolved.sprite_atlas_paths[0]
+                .file_name()
+                .and_then(|name| name.to_str()),
             Some("creatures.json")
         );
     }

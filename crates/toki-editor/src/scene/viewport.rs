@@ -2,7 +2,9 @@ use crate::project::assets::{ObjectSheetAsset, SpriteAtlasAsset};
 use crate::project::ProjectAssets;
 use crate::scene::SceneManager;
 use anyhow::Result;
-use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::MapObjectInstance};
+use toki_core::assets::{
+    atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::MapObjectInstance,
+};
 use toki_core::Camera;
 use toki_render::{OffscreenTarget, SceneData, SceneRenderer};
 

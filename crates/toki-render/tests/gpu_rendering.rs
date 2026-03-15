@@ -91,6 +91,7 @@ fn build_scene_data(visible_chunks: Vec<(u32, u32)>) -> SceneData {
             "floor".to_string(),
             "floor".to_string(),
         ],
+        objects: vec![],
     };
     let atlas = AtlasMeta {
         image: PathBuf::from("terrain.png"),

@@ -59,7 +59,11 @@ impl MapObjectInteraction {
             .map(|(index, _)| index)
     }
 
-    pub fn move_object(tilemap: &mut TileMap, object_index: usize, world_anchor: glam::UVec2) -> bool {
+    pub fn move_object(
+        tilemap: &mut TileMap,
+        object_index: usize,
+        world_anchor: glam::UVec2,
+    ) -> bool {
         let Some(object) = tilemap.objects.get_mut(object_index) else {
             return false;
         };

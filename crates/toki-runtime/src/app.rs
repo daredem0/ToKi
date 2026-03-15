@@ -654,8 +654,7 @@ impl App {
                 let texture_size = object_sheet
                     .image_size()
                     .unwrap_or(glam::UVec2::new(16, 16));
-                let Some(uv_rect) =
-                    object_sheet.get_object_uvs(&object.object_name, texture_size)
+                let Some(uv_rect) = object_sheet.get_object_uvs(&object.object_name, texture_size)
                 else {
                     tracing::warn!(
                         "Map object '{}' missing from object sheet '{}'",
@@ -678,8 +677,13 @@ impl App {
                 if let Some(texture_path) =
                     self.resources.get_object_texture_path(sheet_name).cloned()
                 {
-                    self.rendering
-                        .add_sprite_with_texture(texture_path, frame, position, size, false);
+                    self.rendering.add_sprite_with_texture(
+                        texture_path,
+                        frame,
+                        position,
+                        size,
+                        false,
+                    );
                 } else {
                     self.rendering.add_sprite(frame, position, size, false);
                 }

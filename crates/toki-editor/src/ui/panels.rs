@@ -1020,7 +1020,8 @@ impl PanelSystem {
         let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {
             return;
         };
-        let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect) - drag_state.grab_offset;
+        let world_pos =
+            viewport.screen_to_world_pos_raw(pointer_pos, rect) - drag_state.grab_offset;
         let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
             return;
         };
@@ -1199,10 +1200,10 @@ impl PanelSystem {
             return None;
         }
 
-        let screen_min_x =
-            display_rect.min.x + (world_top_left.x as f32 - camera_position.x as f32) / camera_scale;
-        let screen_min_y =
-            display_rect.min.y + (world_top_left.y as f32 - camera_position.y as f32) / camera_scale;
+        let screen_min_x = display_rect.min.x
+            + (world_top_left.x as f32 - camera_position.x as f32) / camera_scale;
+        let screen_min_y = display_rect.min.y
+            + (world_top_left.y as f32 - camera_position.y as f32) / camera_scale;
         let screen_size = egui::vec2(
             world_size.x as f32 / camera_scale,
             world_size.y as f32 / camera_scale,

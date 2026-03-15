@@ -683,53 +683,47 @@ impl InspectorSystem {
                     ui_state.sync_map_editor_object_sheet_selection(&sheet_names);
                     ui.horizontal(|ui| {
                         ui.label("Object Sheet:");
-                        egui::ComboBox::from_id_salt(
-                            "inspector_map_editor_object_sheet_selector",
-                        )
-                        .selected_text(
-                            ui_state
-                                .map_editor_selected_object_sheet
-                                .as_deref()
-                                .unwrap_or("No object sheet selected"),
-                        )
-                        .show_ui(ui, |ui| {
-                            for sheet_name in &sheet_names {
-                                let is_selected = ui_state
+                        egui::ComboBox::from_id_salt("inspector_map_editor_object_sheet_selector")
+                            .selected_text(
+                                ui_state
                                     .map_editor_selected_object_sheet
                                     .as_deref()
-                                    == Some(sheet_name.as_str());
-                                if ui.selectable_label(is_selected, sheet_name).clicked() {
-                                    ui_state.map_editor_selected_object_sheet =
-                                        Some(sheet_name.clone());
-                                    ui_state.map_editor_selected_object_name = None;
+                                    .unwrap_or("No object sheet selected"),
+                            )
+                            .show_ui(ui, |ui| {
+                                for sheet_name in &sheet_names {
+                                    let is_selected =
+                                        ui_state.map_editor_selected_object_sheet.as_deref()
+                                            == Some(sheet_name.as_str());
+                                    if ui.selectable_label(is_selected, sheet_name).clicked() {
+                                        ui_state.map_editor_selected_object_sheet =
+                                            Some(sheet_name.clone());
+                                        ui_state.map_editor_selected_object_name = None;
+                                    }
                                 }
-                            }
-                        });
+                            });
                     });
                     ui_state.sync_map_editor_object_selection(&object_names);
                     ui.horizontal(|ui| {
                         ui.label("Object:");
-                        egui::ComboBox::from_id_salt(
-                            "inspector_map_editor_object_selector",
-                        )
-                        .selected_text(
-                            ui_state
-                                .map_editor_selected_object_name
-                                .as_deref()
-                                .unwrap_or("No object selected"),
-                        )
-                        .show_ui(ui, |ui| {
-                            for object_name in &object_names {
-                                let is_selected = ui_state
+                        egui::ComboBox::from_id_salt("inspector_map_editor_object_selector")
+                            .selected_text(
+                                ui_state
                                     .map_editor_selected_object_name
                                     .as_deref()
-                                    == Some(object_name.as_str());
-                                if ui.selectable_label(is_selected, object_name).clicked() {
-                                    ui_state.map_editor_selected_object_name =
-                                        Some(object_name.clone());
+                                    .unwrap_or("No object selected"),
+                            )
+                            .show_ui(ui, |ui| {
+                                for object_name in &object_names {
+                                    let is_selected =
+                                        ui_state.map_editor_selected_object_name.as_deref()
+                                            == Some(object_name.as_str());
+                                    if ui.selectable_label(is_selected, object_name).clicked() {
+                                        ui_state.map_editor_selected_object_name =
+                                            Some(object_name.clone());
+                                    }
                                 }
-                            }
-                        });
+                            });
                     });
 
                     if let Some(object_name) = ui_state.map_editor_selected_object_name.clone() {
@@ -823,7 +817,12 @@ impl InspectorSystem {
     fn load_map_editor_object_sheet_source(
         ui_state: &EditorUI,
         config: Option<&EditorConfig>,
-    ) -> Option<(Vec<String>, Vec<String>, ObjectSheetMeta, std::path::PathBuf)> {
+    ) -> Option<(
+        Vec<String>,
+        Vec<String>,
+        ObjectSheetMeta,
+        std::path::PathBuf,
+    )> {
         let project_path = config?.current_project_path()?;
         let sprites_dir = project_path.join("assets").join("sprites");
         let mut object_sheets = Vec::new();
@@ -868,7 +867,9 @@ impl InspectorSystem {
                     .ok()?
                     .filter_map(Result::ok)
                     .map(|entry| entry.path())
-                    .filter(|path| path.is_file() && path.extension().is_some_and(|ext| ext == "json"))
+                    .filter(|path| {
+                        path.is_file() && path.extension().is_some_and(|ext| ext == "json")
+                    })
                     .filter_map(|path| {
                         let object_sheet = ObjectSheetMeta::load_from_file(&path).ok()?;
                         let stem = path.file_stem()?.to_str()?.to_string();

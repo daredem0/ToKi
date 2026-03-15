@@ -500,12 +500,16 @@ mod tests {
     #[test]
     fn apply_runtime_config_keeps_existing_paths_and_scene_but_updates_splash_duration() {
         let temp = tempfile::tempdir().expect("temp dir");
-        let mut options = RuntimeLaunchOptions::default();
-        options.project_path = Some(PathBuf::from("/cli/project"));
-        options.pack_path = Some(PathBuf::from("/cli/game.toki.pak"));
-        options.scene_name = Some("CLI Scene".to_string());
-        options.splash.duration_ms = 2500;
-        options.splash.show_branding = false;
+        let mut options = RuntimeLaunchOptions {
+            project_path: Some(PathBuf::from("/cli/project")),
+            pack_path: Some(PathBuf::from("/cli/game.toki.pak")),
+            scene_name: Some("CLI Scene".to_string()),
+            splash: toki_runtime::app::RuntimeSplashOptions {
+                duration_ms: 2500,
+                show_branding: false,
+            },
+            ..RuntimeLaunchOptions::default()
+        };
 
         apply_runtime_config(
             &mut options,

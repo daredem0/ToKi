@@ -1833,7 +1833,10 @@ mod tests {
             "props".to_string(),
         ]);
 
-        assert_eq!(ui.map_editor_selected_object_sheet.as_deref(), Some("fauna"));
+        assert_eq!(
+            ui.map_editor_selected_object_sheet.as_deref(),
+            Some("fauna")
+        );
     }
 
     #[test]
