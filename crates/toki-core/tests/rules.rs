@@ -138,6 +138,7 @@ fn on_start_rule_runs_once() {
         AudioEvent::PlaySound {
             channel: AudioChannel::Movement,
             ref sound_id,
+            ..
         } if sound_id == "sfx_start"
     ));
     assert!(second.events.is_empty());
@@ -1352,6 +1353,7 @@ fn load_scene_applies_scene_rules() {
         AudioEvent::PlaySound {
             channel: AudioChannel::Movement,
             ref sound_id,
+            ..
         } if sound_id == "scene_start"
     ));
     assert!(second.events.is_empty());

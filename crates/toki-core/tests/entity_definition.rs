@@ -31,6 +31,7 @@ fn test_entity_definition_create_entity_basic() {
         },
         audio: AudioDef {
             footstep_trigger_distance: 16.0,
+            hearing_radius: 192,
             movement_sound_trigger: MovementSoundTrigger::Distance,
             movement_sound: "player_footsteps".to_string(),
             collision_sound: Some("player_collision".to_string()),
@@ -155,6 +156,7 @@ fn test_entity_definition_create_npc_entity() {
         },
         audio: AudioDef {
             footstep_trigger_distance: 32.0,
+            hearing_radius: 192,
             movement_sound_trigger: MovementSoundTrigger::Distance,
             movement_sound: "npc_footsteps".to_string(),
             collision_sound: Some("npc_collision".to_string()),
@@ -294,6 +296,7 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
         },
         audio: AudioDef {
             footstep_trigger_distance: 16.0,
+            hearing_radius: 192,
             movement_sound_trigger: MovementSoundTrigger::Distance,
             movement_sound: "step".to_string(),
             collision_sound: None,
@@ -413,6 +416,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
         },
         audio: AudioDef {
             footstep_trigger_distance: 16.0,
+            hearing_radius: 192,
             movement_sound_trigger: MovementSoundTrigger::Distance,
             movement_sound: "player_footsteps".to_string(),
             collision_sound: None,
@@ -494,6 +498,7 @@ fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type()
         },
         audio: AudioDef {
             footstep_trigger_distance: 32.0,
+            hearing_radius: 192,
             movement_sound_trigger: MovementSoundTrigger::Distance,
             movement_sound: "test".to_string(),
             collision_sound: None,
@@ -543,6 +548,7 @@ fn test_entity_definition_invalid_animation_state() {
         },
         audio: AudioDef {
             footstep_trigger_distance: 32.0,
+            hearing_radius: 192,
             movement_sound_trigger: MovementSoundTrigger::Distance,
             movement_sound: "test".to_string(),
             collision_sound: None,
@@ -595,6 +601,7 @@ fn test_entity_definition_invalid_loop_mode() {
         },
         audio: AudioDef {
             footstep_trigger_distance: 32.0,
+            hearing_radius: 192,
             movement_sound_trigger: MovementSoundTrigger::Distance,
             movement_sound: "test".to_string(),
             collision_sound: None,
@@ -647,6 +654,7 @@ fn test_entity_definition_serialization() {
         },
         audio: AudioDef {
             footstep_trigger_distance: 0.0,
+            hearing_radius: 192,
             movement_sound_trigger: MovementSoundTrigger::Distance,
             movement_sound: "".to_string(),
             collision_sound: None,
@@ -711,6 +719,7 @@ fn test_entity_definition_create_audio_component() {
         },
         audio: AudioDef {
             footstep_trigger_distance: 24.0,
+            hearing_radius: 192,
             movement_sound_trigger: MovementSoundTrigger::AnimationLoop,
             movement_sound: "sfx_custom_step".to_string(),
             collision_sound: Some("sfx_custom_hit".to_string()),

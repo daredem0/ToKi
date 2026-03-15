@@ -30,6 +30,7 @@ struct EntityPropertyDraft {
     movement_profile: MovementProfile,
     movement_sound_trigger: MovementSoundTrigger,
     footstep_trigger_distance: f32,
+    hearing_radius: u32,
     movement_sound: String,
     has_inventory: bool,
     speed: i64,
@@ -217,6 +218,7 @@ impl EntityPropertyDraft {
             movement_profile: entity.attributes.movement_profile,
             movement_sound_trigger: entity.audio.movement_sound_trigger,
             footstep_trigger_distance: entity.audio.footstep_trigger_distance,
+            hearing_radius: entity.audio.hearing_radius,
             movement_sound: entity.audio.movement_sound.clone().unwrap_or_default(),
             has_inventory: entity.attributes.has_inventory,
             speed: entity.attributes.speed as i64,
@@ -2991,6 +2993,16 @@ impl InspectorSystem {
                     }
                 });
         });
+        ui.horizontal(|ui| {
+            ui.label("Hearing Radius:");
+            changed |= ui
+                .add(
+                    egui::DragValue::new(&mut draft.hearing_radius)
+                        .speed(1.0)
+                        .range(0..=u32::MAX),
+                )
+                .changed();
+        });
 
         ui.separator();
         ui.label("Health");
@@ -3558,6 +3570,7 @@ impl InspectorSystem {
             &mut entity.audio.footstep_trigger_distance,
             draft.footstep_trigger_distance.max(0.0),
         );
+        changed |= set_if_changed(&mut entity.audio.hearing_radius, draft.hearing_radius);
         let new_movement_sound = {
             let trimmed = draft.movement_sound.trim();
             if trimmed.is_empty() {
@@ -3814,6 +3827,28 @@ impl InspectorSystem {
                                     if changed {
                                         definition.audio.footstep_trigger_distance =
                                             definition.audio.footstep_trigger_distance.max(0.0);
+                                        if let Err(err) =
+                                            Self::save_entity_definition(&definition, &entity_file)
+                                        {
+                                            tracing::error!("{}", err);
+                                            ui.colored_label(egui::Color32::RED, err);
+                                        }
+                                    }
+                                });
+
+                                ui.horizontal(|ui| {
+                                    ui.label("Hearing Radius:");
+                                    let mut changed = false;
+                                    changed |= ui
+                                        .add(
+                                            egui::DragValue::new(
+                                                &mut definition.audio.hearing_radius,
+                                            )
+                                            .speed(1.0)
+                                            .range(0..=u32::MAX),
+                                        )
+                                        .changed();
+                                    if changed {
                                         if let Err(err) =
                                             Self::save_entity_definition(&definition, &entity_file)
                                         {
@@ -4996,6 +5031,7 @@ mod tests {
             },
             audio: toki_core::entity::AudioDef {
                 footstep_trigger_distance: 42.0,
+                hearing_radius: 144,
                 movement_sound_trigger: MovementSoundTrigger::AnimationLoop,
                 movement_sound: "sfx_step".to_string(),
                 collision_sound: None,
@@ -5018,6 +5054,7 @@ mod tests {
             serde_json::from_str(&content).expect("saved entity definition should parse");
 
         assert_eq!(reloaded.audio.footstep_trigger_distance, 42.0);
+        assert_eq!(reloaded.audio.hearing_radius, 144);
         assert_eq!(
             reloaded.audio.movement_sound_trigger,
             MovementSoundTrigger::AnimationLoop

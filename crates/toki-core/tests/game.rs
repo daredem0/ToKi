@@ -122,6 +122,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
         },
         audio: AudioDef {
             footstep_trigger_distance: 32.0,
+            hearing_radius: 192,
             movement_sound_trigger: MovementSoundTrigger::Distance,
             movement_sound: "sfx_step".to_string(),
             collision_sound: Some("sfx_hit2".to_string()),
@@ -961,6 +962,8 @@ fn game_state_emits_movement_audio_event_with_component_sound_id() {
             AudioEvent::PlaySound {
                 channel: AudioChannel::Movement,
                 sound_id,
+                source_position: Some(_),
+                hearing_radius: Some(_),
             } if sound_id == "sfx_custom_step"
         )
     }));
@@ -1008,6 +1011,8 @@ fn game_state_emits_movement_audio_on_animation_loop_when_configured() {
             AudioEvent::PlaySound {
                 channel: AudioChannel::Movement,
                 sound_id,
+                source_position: Some(_),
+                hearing_radius: Some(_),
             } if sound_id == "sfx_anim_step"
         )
     }));
@@ -1046,6 +1051,8 @@ fn game_state_emits_movement_audio_for_wander_ai_movement() {
                 AudioEvent::PlaySound {
                     channel: AudioChannel::Movement,
                     sound_id,
+                    source_position: Some(_),
+                    hearing_radius: Some(_),
                 } if sound_id == "sfx_wander_step"
             )
         }) {
@@ -1112,6 +1119,8 @@ fn game_state_emits_movement_audio_for_rule_velocity_movement() {
             AudioEvent::PlaySound {
                 channel: AudioChannel::Movement,
                 sound_id,
+                source_position: Some(_),
+                hearing_radius: Some(_),
             } if sound_id == "sfx_rule_step"
         )
     }));
@@ -1149,6 +1158,8 @@ fn game_state_emits_collision_audio_event_with_component_sound_id() {
             AudioEvent::PlaySound {
                 channel: AudioChannel::Collision,
                 sound_id,
+                source_position: Some(_),
+                hearing_radius: Some(_),
             } if sound_id == "sfx_custom_collision"
         )
     }));

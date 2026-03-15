@@ -277,6 +277,8 @@ fn audio_event_implements_game_event() {
     let event = AudioEvent::PlaySound {
         channel: AudioChannel::Movement,
         sound_id: "sfx_step".to_string(),
+        source_position: None,
+        hearing_radius: None,
     };
     // Test that AudioEvent implements GameEvent by using it in generic functions
     let mut queue = EventQueue::new();
@@ -291,10 +293,14 @@ fn audio_event_in_game_update_result() {
     result.add_event(AudioEvent::PlaySound {
         channel: AudioChannel::Movement,
         sound_id: "sfx_step".to_string(),
+        source_position: None,
+        hearing_radius: None,
     });
     result.add_event(AudioEvent::PlaySound {
         channel: AudioChannel::Collision,
         sound_id: "sfx_hit2".to_string(),
+        source_position: None,
+        hearing_radius: None,
     });
     result.add_event(AudioEvent::BackgroundMusic("test_music".to_string()));
 
@@ -323,10 +329,14 @@ fn audio_event_queue_operations() {
     queue.push(AudioEvent::PlaySound {
         channel: AudioChannel::Movement,
         sound_id: "sfx_step".to_string(),
+        source_position: None,
+        hearing_radius: None,
     });
     queue.push(AudioEvent::PlaySound {
         channel: AudioChannel::Collision,
         sound_id: "sfx_hit2".to_string(),
+        source_position: None,
+        hearing_radius: None,
     });
 
     assert_eq!(queue.len(), 2);

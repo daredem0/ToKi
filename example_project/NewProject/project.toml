@@ -8,8 +8,8 @@ description = ""
 
 [scenes]
 main = "scenes/main.json"
-"Main Scene" = "scenes/mainscene.json"
 "Scene 2" = "scenes/scene2.json"
+"Main Scene" = "scenes/mainscene.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -38,8 +38,16 @@ pan = [
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
+"node:6" = [
+    430.0,
+    106.0,
+]
 "node:3" = [
     430.0,
+    50.0,
+]
+"node:2" = [
+    800.0,
     50.0,
 ]
 "node:5" = [
@@ -52,14 +60,6 @@ pan = [
 ]
 "node:4" = [
     60.0,
-    106.0,
-]
-"node:2" = [
-    800.0,
-    50.0,
-]
-"node:6" = [
-    430.0,
     106.0,
 ]
 

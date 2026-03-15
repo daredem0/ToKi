@@ -36,6 +36,8 @@ pub enum AudioEvent {
     PlaySound {
         channel: AudioChannel,
         sound_id: String,
+        source_position: Option<glam::IVec2>,
+        hearing_radius: Option<u32>,
     },
     /// Start background music
     BackgroundMusic(String),
@@ -223,6 +225,10 @@ impl GameState {
                 entity_audio.last_collision_state = false;
             }
         } else {
+            let source_position = self
+                .entity_manager
+                .get_entity(entity_id)
+                .map(|entity| entity.position);
             if let Some(entity_audio) = self.entity_manager.audio_component_mut(entity_id) {
                 if !entity_audio.last_collision_state {
                     if let Some(collision_sound) = entity_audio
@@ -233,6 +239,8 @@ impl GameState {
                         result.add_event(AudioEvent::PlaySound {
                             channel: AudioChannel::Collision,
                             sound_id: collision_sound.to_string(),
+                            source_position,
+                            hearing_radius: Some(entity_audio.hearing_radius),
                         });
                     }
                 }
@@ -274,6 +282,10 @@ impl GameState {
             return;
         }
 
+        let source_position = self
+            .entity_manager
+            .get_entity(entity_id)
+            .map(|entity| entity.position);
         let Some(entity_audio) = self.entity_manager.audio_component_mut(entity_id) else {
             return;
         };
@@ -293,6 +305,8 @@ impl GameState {
                     result.add_event(AudioEvent::PlaySound {
                         channel: AudioChannel::Movement,
                         sound_id: movement_sound.to_string(),
+                        source_position,
+                        hearing_radius: Some(entity_audio.hearing_radius),
                     });
                 }
                 return;
@@ -308,6 +322,8 @@ impl GameState {
                     result.add_event(AudioEvent::PlaySound {
                         channel: AudioChannel::Movement,
                         sound_id: movement_sound.to_string(),
+                        source_position,
+                        hearing_radius: Some(entity_audio.hearing_radius),
                     });
                 }
                 entity_audio.footstep_distance_accumulator -=
@@ -326,6 +342,10 @@ impl GameState {
             return;
         }
 
+        let source_position = self
+            .entity_manager
+            .get_entity(entity_id)
+            .map(|entity| entity.position);
         let Some(entity_audio) = self.entity_manager.audio_component_mut(entity_id) else {
             return;
         };
@@ -351,6 +371,8 @@ impl GameState {
             result.add_event(AudioEvent::PlaySound {
                 channel: AudioChannel::Movement,
                 sound_id: movement_sound.to_string(),
+                source_position,
+                hearing_radius: Some(entity_audio.hearing_radius),
             });
         }
         entity_audio.footstep_distance_accumulator = 0.0;
@@ -521,6 +543,7 @@ impl GameState {
             },
             audio: crate::entity::AudioDef {
                 footstep_trigger_distance: 32.0,
+                hearing_radius: 192,
                 movement_sound_trigger: crate::entity::MovementSoundTrigger::Distance,
                 movement_sound: "sfx_slime_bounce".to_string(),
                 collision_sound: Some("sfx_hit2".to_string()),
@@ -581,6 +604,7 @@ impl GameState {
             },
             audio: crate::entity::AudioDef {
                 footstep_trigger_distance: 32.0,
+                hearing_radius: 192,
                 movement_sound_trigger: crate::entity::MovementSoundTrigger::Distance,
                 movement_sound: "sfx_slime_bounce".to_string(),
                 collision_sound: Some("sfx_hit2".to_string()),
@@ -1507,7 +1531,12 @@ impl GameState {
         for command in commands {
             match command {
                 RuleCommand::PlaySound { channel, sound_id } => {
-                    result.add_event(AudioEvent::PlaySound { channel, sound_id });
+                    result.add_event(AudioEvent::PlaySound {
+                        channel,
+                        sound_id,
+                        source_position: None,
+                        hearing_radius: None,
+                    });
                 }
                 RuleCommand::PlayMusic { track_id } => {
                     result.add_event(AudioEvent::BackgroundMusic(track_id));

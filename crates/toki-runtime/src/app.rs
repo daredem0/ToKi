@@ -491,6 +491,12 @@ impl App {
             self.resources.get_terrain_atlas(),
         );
 
+        let listener_position = self
+            .game_system
+            .player_id()
+            .map(|_| self.game_system.player_position());
+        self.audio_system.set_listener_position(listener_position);
+
         // Process audio events
         for event in &game_result.events {
             self.audio_system.handle(event);

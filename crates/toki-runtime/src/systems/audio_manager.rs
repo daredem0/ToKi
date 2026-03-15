@@ -50,6 +50,7 @@ pub struct AudioManager {
     channels: HashMap<String, AudioChannel>,
     master_volume_percent: u8,
     channel_volume_percents: HashMap<String, u8>,
+    listener_position: Option<glam::IVec2>,
 }
 
 impl AudioManager {
@@ -80,6 +81,7 @@ impl AudioManager {
             channels: HashMap::new(),
             master_volume_percent: 100,
             channel_volume_percents: HashMap::new(),
+            listener_position: None,
         };
 
         system.scan_and_preload_sfx(preload_names)?;
@@ -169,6 +171,10 @@ impl AudioManager {
 
     pub fn set_master_volume_percent(&mut self, percent: u8) {
         self.master_volume_percent = percent.min(100);
+    }
+
+    pub fn set_listener_position(&mut self, listener_position: Option<glam::IVec2>) {
+        self.listener_position = listener_position;
     }
 
     /// Set a cooldown duration for a channel to prevent rapid-fire sounds
@@ -266,6 +272,18 @@ impl AudioManager {
         channel: &str,
         name: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        self.play_sound_in_channel_with_gain(channel, name, 1.0)
+    }
+
+    pub fn play_sound_in_channel_with_gain(
+        &mut self,
+        channel: &str,
+        name: &str,
+        gain: f32,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if gain <= 0.0 {
+            return Ok(());
+        }
         self.cleanup_finished_sounds();
 
         // Get or create channel with default Overlap policy
@@ -277,7 +295,7 @@ impl AudioManager {
             self.set_channel_policy(channel, PlaybackPolicy::Overlap);
         }
 
-        let channel_gain = self.channel_volume_for(channel);
+        let channel_gain = self.channel_volume_for(channel) + amplitude_to_decibels(gain);
         let channel_data = self.channels.get_mut(channel).unwrap();
         let active_count =
             channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
@@ -519,6 +537,31 @@ impl AudioManager {
     }
 }
 
+fn spatial_attenuation(
+    listener_position: Option<glam::IVec2>,
+    source_position: Option<glam::IVec2>,
+    hearing_radius: Option<u32>,
+) -> Option<f32> {
+    let (Some(listener), Some(source), Some(radius)) =
+        (listener_position, source_position, hearing_radius)
+    else {
+        return Some(1.0);
+    };
+
+    if radius == 0 {
+        return None;
+    }
+
+    let distance = (source - listener).as_vec2().length();
+    let normalized = (distance / radius as f32).clamp(0.0, 1.0);
+    if normalized >= 1.0 {
+        return None;
+    }
+
+    let smoothstep = normalized * normalized * (3.0 - 2.0 * normalized);
+    Some(1.0 - smoothstep)
+}
+
 fn discover_ogg_assets(dir: &Path) -> Result<Vec<(String, PathBuf)>, std::io::Error> {
     let mut discovered = Vec::new();
     for entry in fs::read_dir(dir)? {
@@ -583,6 +626,7 @@ fn amplitude_to_decibels(amplitude: f32) -> Decibels {
 mod tests {
     use super::{
         amplitude_to_decibels, classify_sfx_inventory, discover_ogg_assets, percent_to_decibels,
+        spatial_attenuation,
     };
     use std::fs;
 
@@ -660,6 +704,38 @@ mod tests {
     fn amplitude_to_decibels_combines_master_and_channel_gain_multiplicatively() {
         assert!((amplitude_to_decibels(0.8 * 0.5).0 - (-7.9588)).abs() < 0.02);
     }
+
+    #[test]
+    fn spatial_attenuation_is_full_at_listener_and_zero_outside_radius() {
+        assert_eq!(
+            spatial_attenuation(
+                Some(glam::IVec2::new(0, 0)),
+                Some(glam::IVec2::new(0, 0)),
+                Some(100)
+            ),
+            Some(1.0)
+        );
+        assert_eq!(
+            spatial_attenuation(
+                Some(glam::IVec2::new(0, 0)),
+                Some(glam::IVec2::new(100, 0)),
+                Some(100)
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn spatial_attenuation_falls_off_smoothly_inside_radius() {
+        let attenuation = spatial_attenuation(
+            Some(glam::IVec2::new(0, 0)),
+            Some(glam::IVec2::new(50, 0)),
+            Some(100),
+        )
+        .expect("attenuation should exist");
+        assert!(attenuation > 0.0);
+        assert!(attenuation < 1.0);
+    }
 }
 
 impl std::fmt::Debug for AudioManager {
@@ -678,7 +754,12 @@ impl std::fmt::Debug for AudioManager {
 impl EventHandler<AudioEvent> for AudioManager {
     fn handle(&mut self, event: &AudioEvent) {
         match event {
-            AudioEvent::PlaySound { channel, sound_id } => {
+            AudioEvent::PlaySound {
+                channel,
+                sound_id,
+                source_position,
+                hearing_radius,
+            } => {
                 let (channel_name, policy) = match channel {
                     AudioEventChannel::Movement => ("movement", PlaybackPolicy::Overlap),
                     AudioEventChannel::Collision => ("collision", PlaybackPolicy::Exclusive),
@@ -693,7 +774,14 @@ impl EventHandler<AudioEvent> for AudioManager {
                     );
                 }
 
-                if let Err(e) = self.play_sound_in_channel(channel_name, sound_id) {
+                let Some(gain) =
+                    spatial_attenuation(self.listener_position, *source_position, *hearing_radius)
+                else {
+                    return;
+                };
+
+                if let Err(e) = self.play_sound_in_channel_with_gain(channel_name, sound_id, gain)
+                {
                     tracing::warn!(
                         "Failed to play sound '{}' in '{}' channel: {}",
                         sound_id,

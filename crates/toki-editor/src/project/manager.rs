@@ -475,7 +475,8 @@ mod tests {
                 event,
                 AudioEvent::PlaySound {
                     channel: AudioChannel::Movement,
-                    sound_id
+                    sound_id,
+                    ..
                 } if sound_id == "sfx_slime_bounce"
             )
         }));
@@ -595,7 +596,8 @@ mod tests {
                 event,
                 AudioEvent::PlaySound {
                     channel: AudioChannel::Movement,
-                    sound_id
+                    sound_id,
+                    ..
                 } if sound_id == "sfx_move_tick"
             )
         }));

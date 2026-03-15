@@ -34,6 +34,8 @@ pub struct Entity {
 pub struct EntityAudioComponent {
     pub footstep_distance_accumulator: f32,
     pub footstep_trigger_distance: f32,
+    #[serde(default = "default_hearing_radius")]
+    pub hearing_radius: u32,
     #[serde(default)]
     pub movement_sound_trigger: MovementSoundTrigger,
     pub last_collision_state: bool,
@@ -48,6 +50,7 @@ impl Default for EntityAudioComponent {
         Self {
             footstep_distance_accumulator: 0.0,
             footstep_trigger_distance: 32.0,
+            hearing_radius: default_hearing_radius(),
             movement_sound_trigger: MovementSoundTrigger::default(),
             last_collision_state: false,
             movement_sound: None,
@@ -67,6 +70,8 @@ pub enum MovementSoundTrigger {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EntityAudioSettings {
     pub footstep_trigger_distance: f32,
+    #[serde(default = "default_hearing_radius")]
+    pub hearing_radius: u32,
     #[serde(default)]
     pub movement_sound_trigger: MovementSoundTrigger,
     #[serde(default)]
@@ -79,6 +84,7 @@ impl Default for EntityAudioSettings {
     fn default() -> Self {
         Self {
             footstep_trigger_distance: 32.0,
+            hearing_radius: default_hearing_radius(),
             movement_sound_trigger: MovementSoundTrigger::default(),
             movement_sound: None,
             collision_sound: None,
@@ -95,12 +101,17 @@ impl EntityAudioSettings {
         EntityAudioComponent {
             footstep_distance_accumulator: 0.0,
             footstep_trigger_distance: self.footstep_trigger_distance,
+            hearing_radius: self.hearing_radius,
             movement_sound_trigger: self.movement_sound_trigger,
             last_collision_state: false,
             movement_sound: self.movement_sound.clone(),
             collision_sound: self.collision_sound.clone(),
         }
     }
+}
+
+fn default_hearing_radius() -> u32 {
+    192
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
@@ -603,6 +614,8 @@ pub struct CollisionDef {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioDef {
     pub footstep_trigger_distance: f32,
+    #[serde(default = "default_hearing_radius")]
+    pub hearing_radius: u32,
     #[serde(default)]
     pub movement_sound_trigger: MovementSoundTrigger,
     pub movement_sound: String,
@@ -737,6 +750,7 @@ impl EntityDefinition {
             control_role: ControlRole::LegacyDefault,
             audio: EntityAudioSettings {
                 footstep_trigger_distance: self.audio.footstep_trigger_distance,
+                hearing_radius: self.audio.hearing_radius,
                 movement_sound_trigger: self.audio.movement_sound_trigger,
                 movement_sound,
                 collision_sound,
@@ -767,6 +781,7 @@ impl EntityDefinition {
         EntityAudioComponent {
             footstep_distance_accumulator: 0.0,
             footstep_trigger_distance: self.audio.footstep_trigger_distance,
+            hearing_radius: self.audio.hearing_radius,
             movement_sound_trigger: self.audio.movement_sound_trigger,
             last_collision_state: false,
             movement_sound,
