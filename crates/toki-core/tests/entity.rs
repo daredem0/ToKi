@@ -38,6 +38,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
         },
         audio: AudioDef {
             footstep_trigger_distance: 32.0,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
             movement_sound: "sfx_step".to_string(),
             collision_sound: Some("sfx_hit2".to_string()),
         },

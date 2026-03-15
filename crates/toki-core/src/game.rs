@@ -8,6 +8,7 @@ use crate::assets::tilemap::TileMap;
 use crate::collision;
 use crate::entity::{
     AiBehavior, Entity, EntityAttributes, EntityId, EntityKind, EntityManager, MovementProfile,
+    MovementSoundTrigger,
 };
 use crate::events::{GameEvent, GameUpdateResult};
 use crate::rules::{
@@ -277,34 +278,82 @@ impl GameState {
             return;
         };
 
-        if entity_audio.footstep_trigger_distance <= 0.0 {
-            if let Some(movement_sound) = entity_audio
-                .movement_sound
-                .as_deref()
-                .filter(|sound_id| !sound_id.is_empty())
-            {
-                result.add_event(AudioEvent::PlaySound {
-                    channel: AudioChannel::Movement,
-                    sound_id: movement_sound.to_string(),
-                });
+        entity_audio.footstep_distance_accumulator += distance_moved;
+
+        if matches!(
+            entity_audio.movement_sound_trigger,
+            MovementSoundTrigger::Distance
+        ) {
+            if entity_audio.footstep_trigger_distance <= 0.0 {
+                if let Some(movement_sound) = entity_audio
+                    .movement_sound
+                    .as_deref()
+                    .filter(|sound_id| !sound_id.is_empty())
+                {
+                    result.add_event(AudioEvent::PlaySound {
+                        channel: AudioChannel::Movement,
+                        sound_id: movement_sound.to_string(),
+                    });
+                }
+                return;
             }
+
+            while entity_audio.footstep_distance_accumulator >= entity_audio.footstep_trigger_distance
+            {
+                if let Some(movement_sound) = entity_audio
+                    .movement_sound
+                    .as_deref()
+                    .filter(|sound_id| !sound_id.is_empty())
+                {
+                    result.add_event(AudioEvent::PlaySound {
+                        channel: AudioChannel::Movement,
+                        sound_id: movement_sound.to_string(),
+                    });
+                }
+                entity_audio.footstep_distance_accumulator -=
+                    entity_audio.footstep_trigger_distance;
+            }
+        }
+    }
+
+    fn emit_animation_loop_movement_audio(
+        &mut self,
+        entity_id: EntityId,
+        completed_loops: u32,
+        result: &mut GameUpdateResult<AudioEvent>,
+    ) {
+        if completed_loops == 0 {
             return;
         }
 
-        entity_audio.footstep_distance_accumulator += distance_moved;
-        while entity_audio.footstep_distance_accumulator >= entity_audio.footstep_trigger_distance {
-            if let Some(movement_sound) = entity_audio
-                .movement_sound
-                .as_deref()
-                .filter(|sound_id| !sound_id.is_empty())
-            {
-                result.add_event(AudioEvent::PlaySound {
-                    channel: AudioChannel::Movement,
-                    sound_id: movement_sound.to_string(),
-                });
-            }
-            entity_audio.footstep_distance_accumulator -= entity_audio.footstep_trigger_distance;
+        let Some(entity_audio) = self.entity_manager.audio_component_mut(entity_id) else {
+            return;
+        };
+
+        if !matches!(
+            entity_audio.movement_sound_trigger,
+            MovementSoundTrigger::AnimationLoop
+        ) || entity_audio.footstep_distance_accumulator <= 0.0
+        {
+            return;
         }
+
+        let Some(movement_sound) = entity_audio
+            .movement_sound
+            .as_deref()
+            .filter(|sound_id| !sound_id.is_empty())
+        else {
+            entity_audio.footstep_distance_accumulator = 0.0;
+            return;
+        };
+
+        for _ in 0..completed_loops {
+            result.add_event(AudioEvent::PlaySound {
+                channel: AudioChannel::Movement,
+                sound_id: movement_sound.to_string(),
+            });
+        }
+        entity_audio.footstep_distance_accumulator = 0.0;
     }
 
     fn facing_from_delta(delta: glam::IVec2) -> Option<FacingDirection> {
@@ -472,6 +521,7 @@ impl GameState {
             },
             audio: crate::entity::AudioDef {
                 footstep_trigger_distance: 32.0,
+                movement_sound_trigger: crate::entity::MovementSoundTrigger::Distance,
                 movement_sound: "sfx_slime_bounce".to_string(),
                 collision_sound: Some("sfx_hit2".to_string()),
             },
@@ -531,6 +581,7 @@ impl GameState {
             },
             audio: crate::entity::AudioDef {
                 footstep_trigger_distance: 32.0,
+                movement_sound_trigger: crate::entity::MovementSoundTrigger::Distance,
                 movement_sound: "sfx_slime_bounce".to_string(),
                 collision_sound: Some("sfx_hit2".to_string()),
             },
@@ -647,8 +698,11 @@ impl GameState {
 
         self.apply_rule_animations(pending_rule_animations);
 
-        // Update entity animation timing
-        self.entity_manager.update_animations(17.0);
+        // Update entity animation timing and emit animation-loop-based movement sounds.
+        let completed_animation_loops = self.entity_manager.update_animations(17.0);
+        for (entity_id, completed_loops) in completed_animation_loops {
+            self.emit_animation_loop_movement_audio(entity_id, completed_loops, &mut result);
+        }
 
         if let Some(scene_name) = pending_scene_switch {
             self.apply_rule_scene_switch(&scene_name);

@@ -134,6 +134,11 @@
           "minimum": 0,
           "description": "Distance entity must move to trigger footstep sound"
         },
+        "movement_sound_trigger": {
+          "type": "string",
+          "enum": ["distance", "animation_loop"],
+          "description": "How movement sound timing is driven"
+        },
         "movement_sound": {
           "type": ["string", "null"],
           "description": "Sound ID to play when entity moves"

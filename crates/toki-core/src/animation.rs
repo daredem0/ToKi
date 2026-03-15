@@ -82,11 +82,12 @@ impl AnimationController {
     }
 
     /// Update animation timing (call this every frame)
-    pub fn update(&mut self, delta_time_ms: f32) {
+    pub fn update(&mut self, delta_time_ms: f32) -> u32 {
         let current_clip = match self.clips.get(&self.current_clip_state) {
             Some(clip) => clip,
-            None => return, // No current animation
+            None => return 0, // No current animation
         };
+        let mut completed_loops = 0;
         self.frame_timer += delta_time_ms;
         while (self.frame_timer >= current_clip.frame_duration_ms) && !self.is_finished {
             self.frame_timer -= current_clip.frame_duration_ms;
@@ -95,12 +96,19 @@ impl AnimationController {
 
             if self.current_frame_index >= current_clip.frame_tile_names.len() {
                 match current_clip.loop_mode {
-                    LoopMode::Loop => self.current_frame_index = 0,
+                    LoopMode::Loop => {
+                        self.current_frame_index = 0;
+                        completed_loops += 1;
+                    }
                     LoopMode::Once => self.is_finished = true,
-                    LoopMode::PingPong => self.current_frame_index = 0, //TODO we still have to implement that one
+                    LoopMode::PingPong => {
+                        self.current_frame_index = 0; //TODO we still have to implement that one
+                        completed_loops += 1;
+                    }
                 }
             }
         }
+        completed_loops
     }
 
     /// Get the current tile name for rendering

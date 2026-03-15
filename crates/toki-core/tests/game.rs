@@ -8,7 +8,7 @@ use toki_core::assets::{
 };
 use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, ControlRole,
-    EntityDefinition, MovementProfile, RenderingDef,
+    EntityDefinition, MovementProfile, MovementSoundTrigger, RenderingDef,
 };
 use toki_core::rules::{Rule, RuleAction, RuleSet, RuleTarget, RuleTrigger};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
@@ -122,6 +122,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
         },
         audio: AudioDef {
             footstep_trigger_distance: 32.0,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
             movement_sound: "sfx_step".to_string(),
             collision_sound: Some("sfx_hit2".to_string()),
         },
@@ -961,6 +962,53 @@ fn game_state_emits_movement_audio_event_with_component_sound_id() {
                 channel: AudioChannel::Movement,
                 sound_id,
             } if sound_id == "sfx_custom_step"
+        )
+    }));
+}
+
+#[test]
+fn game_state_emits_movement_audio_on_animation_loop_when_configured() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player_id = game_state.player_id().expect("player should exist");
+
+    {
+        let player_audio = game_state
+            .entity_manager_mut()
+            .audio_component_mut(player_id)
+            .expect("player audio component should exist");
+        player_audio.footstep_trigger_distance = 9999.0;
+        player_audio.movement_sound = Some("sfx_anim_step".to_string());
+        player_audio.movement_sound_trigger = MovementSoundTrigger::AnimationLoop;
+    }
+
+    let controller = game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .and_then(|entity| entity.attributes.animation_controller.as_mut())
+        .expect("player animation controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::Walk,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 1.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+
+    game_state.handle_key_press(InputKey::Right);
+    let result = game_state.update(
+        UVec2::new(1000, 1000),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(result.events.iter().any(|event| {
+        matches!(
+            event,
+            AudioEvent::PlaySound {
+                channel: AudioChannel::Movement,
+                sound_id,
+            } if sound_id == "sfx_anim_step"
         )
     }));
 }

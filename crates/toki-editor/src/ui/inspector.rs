@@ -4,7 +4,7 @@ use super::undo_redo::EditorCommand;
 use crate::config::EditorConfig;
 use std::collections::{HashMap, HashSet};
 use toki_core::animation::AnimationState;
-use toki_core::entity::{AiBehavior, ControlRole, MovementProfile};
+use toki_core::entity::{AiBehavior, ControlRole, MovementProfile, MovementSoundTrigger};
 use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
     RuleTarget, RuleTrigger,
@@ -26,6 +26,7 @@ struct EntityPropertyDraft {
     can_move: bool,
     ai_behavior: AiBehavior,
     movement_profile: MovementProfile,
+    movement_sound_trigger: MovementSoundTrigger,
     footstep_trigger_distance: f32,
     movement_sound: String,
     has_inventory: bool,
@@ -200,6 +201,7 @@ impl EntityPropertyDraft {
             can_move: entity.attributes.can_move,
             ai_behavior: entity.attributes.ai_behavior,
             movement_profile: entity.attributes.movement_profile,
+            movement_sound_trigger: entity.audio.movement_sound_trigger,
             footstep_trigger_distance: entity.audio.footstep_trigger_distance,
             movement_sound: entity.audio.movement_sound.clone().unwrap_or_default(),
             has_inventory: entity.attributes.has_inventory,
@@ -239,6 +241,13 @@ fn movement_profile_label(
         MovementProfile::LegacyDefault => "Legacy Default",
         MovementProfile::None => "None",
         MovementProfile::PlayerWasd => "Player WASD",
+    }
+}
+
+fn movement_sound_trigger_label(trigger: MovementSoundTrigger) -> &'static str {
+    match trigger {
+        MovementSoundTrigger::Distance => "Distance",
+        MovementSoundTrigger::AnimationLoop => "Animation Loop",
     }
 }
 
@@ -2691,14 +2700,41 @@ impl InspectorSystem {
         ui.separator();
         ui.label("Audio");
         ui.horizontal(|ui| {
+            ui.label("Movement Trigger:");
+            egui::ComboBox::from_id_salt("entity_movement_sound_trigger")
+                .selected_text(movement_sound_trigger_label(draft.movement_sound_trigger))
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(
+                            &mut draft.movement_sound_trigger,
+                            MovementSoundTrigger::Distance,
+                            "Distance",
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut draft.movement_sound_trigger,
+                            MovementSoundTrigger::AnimationLoop,
+                            "Animation Loop",
+                        )
+                        .changed();
+                });
+        });
+        let uses_distance_trigger = matches!(
+            draft.movement_sound_trigger,
+            MovementSoundTrigger::Distance
+        );
+        ui.horizontal(|ui| {
             ui.label("Footstep Distance:");
-            changed |= ui
-                .add(
-                    egui::DragValue::new(&mut draft.footstep_trigger_distance)
-                        .speed(0.5)
-                        .range(0.0..=f32::MAX),
-                )
-                .changed();
+            ui.add_enabled_ui(uses_distance_trigger, |ui| {
+                changed |= ui
+                    .add(
+                        egui::DragValue::new(&mut draft.footstep_trigger_distance)
+                            .speed(0.5)
+                            .range(0.0..=f32::MAX),
+                    )
+                    .changed();
+            });
         });
         ui.horizontal(|ui| {
             ui.label("Movement Sound:");
@@ -3296,6 +3332,10 @@ impl InspectorSystem {
             draft.movement_profile,
         );
         changed |= set_if_changed(
+            &mut entity.audio.movement_sound_trigger,
+            draft.movement_sound_trigger,
+        );
+        changed |= set_if_changed(
             &mut entity.audio.footstep_trigger_distance,
             draft.footstep_trigger_distance.max(0.0),
         );
@@ -3496,16 +3536,62 @@ impl InspectorSystem {
                                 ui.label("Audio Settings:");
 
                                 ui.horizontal(|ui| {
-                                    ui.label("Footstep Distance:");
-                                    let changed = ui
-                                        .add(
-                                            egui::DragValue::new(
-                                                &mut definition.audio.footstep_trigger_distance,
+                                    ui.label("Movement Trigger:");
+                                    let mut changed = false;
+                                    egui::ComboBox::from_id_salt(format!(
+                                        "entity_def_movement_trigger_{}",
+                                        entity_name
+                                    ))
+                                    .selected_text(movement_sound_trigger_label(
+                                        definition.audio.movement_sound_trigger,
+                                    ))
+                                    .show_ui(ui, |ui| {
+                                        changed |= ui
+                                            .selectable_value(
+                                                &mut definition.audio.movement_sound_trigger,
+                                                MovementSoundTrigger::Distance,
+                                                "Distance",
                                             )
-                                            .speed(0.5)
-                                            .range(0.0..=f32::MAX),
-                                        )
-                                        .changed();
+                                            .changed();
+                                        changed |= ui
+                                            .selectable_value(
+                                                &mut definition.audio.movement_sound_trigger,
+                                                MovementSoundTrigger::AnimationLoop,
+                                                "Animation Loop",
+                                            )
+                                            .changed();
+                                    });
+                                    if changed {
+                                        if let Err(err) =
+                                            Self::save_entity_definition(&definition, &entity_file)
+                                        {
+                                            tracing::error!("{}", err);
+                                            ui.colored_label(egui::Color32::RED, err);
+                                        }
+                                    }
+                                });
+
+                                ui.horizontal(|ui| {
+                                    ui.label("Footstep Distance:");
+                                    let mut changed = false;
+                                    ui.add_enabled_ui(
+                                        matches!(
+                                            definition.audio.movement_sound_trigger,
+                                            MovementSoundTrigger::Distance
+                                        ),
+                                        |ui| {
+                                            changed |= ui
+                                                .add(
+                                                    egui::DragValue::new(
+                                                        &mut definition.audio
+                                                            .footstep_trigger_distance,
+                                                    )
+                                                    .speed(0.5)
+                                                    .range(0.0..=f32::MAX),
+                                                )
+                                                .changed();
+                                        },
+                                    );
                                     if changed {
                                         definition.audio.footstep_trigger_distance =
                                             definition.audio.footstep_trigger_distance.max(0.0);
@@ -3932,7 +4018,9 @@ mod tests {
     use std::fs;
     use toki_core::animation::AnimationState;
     use toki_core::collision::CollisionBox;
-    use toki_core::entity::{ControlRole, EntityAttributes, EntityKind, EntityManager};
+    use toki_core::entity::{
+        ControlRole, EntityAttributes, EntityKind, EntityManager, MovementSoundTrigger,
+    };
     use toki_core::rules::{
         Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
         RuleTarget, RuleTrigger,
@@ -4004,6 +4092,7 @@ mod tests {
         draft.control_role = ControlRole::PlayerCharacter;
         draft.ai_behavior = AiBehavior::None;
         draft.movement_profile = MovementProfile::PlayerWasd;
+        draft.movement_sound_trigger = MovementSoundTrigger::AnimationLoop;
         draft.footstep_trigger_distance = -5.0;
         draft.movement_sound = "sfx_custom_step".to_string();
         draft.has_inventory = true;
@@ -4032,6 +4121,10 @@ mod tests {
         assert_eq!(
             entity.attributes.movement_profile,
             MovementProfile::PlayerWasd
+        );
+        assert_eq!(
+            entity.audio.movement_sound_trigger,
+            MovementSoundTrigger::AnimationLoop
         );
         assert_eq!(entity.audio.footstep_trigger_distance, 0.0);
         assert_eq!(entity.audio.movement_sound.as_deref(), Some("sfx_custom_step"));
@@ -4651,6 +4744,7 @@ mod tests {
             },
             audio: toki_core::entity::AudioDef {
                 footstep_trigger_distance: 42.0,
+                movement_sound_trigger: MovementSoundTrigger::AnimationLoop,
                 movement_sound: "sfx_step".to_string(),
                 collision_sound: None,
             },
@@ -4672,6 +4766,10 @@ mod tests {
             serde_json::from_str(&content).expect("saved entity definition should parse");
 
         assert_eq!(reloaded.audio.footstep_trigger_distance, 42.0);
+        assert_eq!(
+            reloaded.audio.movement_sound_trigger,
+            MovementSoundTrigger::AnimationLoop
+        );
         assert_eq!(reloaded.audio.movement_sound, "sfx_step");
     }
 }

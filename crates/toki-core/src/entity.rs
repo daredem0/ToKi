@@ -34,6 +34,8 @@ pub struct Entity {
 pub struct EntityAudioComponent {
     pub footstep_distance_accumulator: f32,
     pub footstep_trigger_distance: f32,
+    #[serde(default)]
+    pub movement_sound_trigger: MovementSoundTrigger,
     pub last_collision_state: bool,
     #[serde(default)]
     pub movement_sound: Option<String>,
@@ -46,6 +48,7 @@ impl Default for EntityAudioComponent {
         Self {
             footstep_distance_accumulator: 0.0,
             footstep_trigger_distance: 32.0,
+            movement_sound_trigger: MovementSoundTrigger::default(),
             last_collision_state: false,
             movement_sound: None,
             collision_sound: None,
@@ -53,9 +56,19 @@ impl Default for EntityAudioComponent {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum MovementSoundTrigger {
+    #[default]
+    Distance,
+    AnimationLoop,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EntityAudioSettings {
     pub footstep_trigger_distance: f32,
+    #[serde(default)]
+    pub movement_sound_trigger: MovementSoundTrigger,
     #[serde(default)]
     pub movement_sound: Option<String>,
     #[serde(default)]
@@ -66,6 +79,7 @@ impl Default for EntityAudioSettings {
     fn default() -> Self {
         Self {
             footstep_trigger_distance: 32.0,
+            movement_sound_trigger: MovementSoundTrigger::default(),
             movement_sound: None,
             collision_sound: None,
         }
@@ -81,6 +95,7 @@ impl EntityAudioSettings {
         EntityAudioComponent {
             footstep_distance_accumulator: 0.0,
             footstep_trigger_distance: self.footstep_trigger_distance,
+            movement_sound_trigger: self.movement_sound_trigger,
             last_collision_state: false,
             movement_sound: self.movement_sound.clone(),
             collision_sound: self.collision_sound.clone(),
@@ -250,12 +265,17 @@ impl EntityManager {
     }
 
     /// Update animations for all entities
-    pub fn update_animations(&mut self, delta_time_ms: f32) {
-        for entity in self.entities.values_mut() {
+    pub fn update_animations(&mut self, delta_time_ms: f32) -> HashMap<EntityId, u32> {
+        let mut completed_loops = HashMap::new();
+        for (entity_id, entity) in &mut self.entities {
             if let Some(animation_controller) = &mut entity.attributes.animation_controller {
-                animation_controller.update(delta_time_ms);
+                let loop_count = animation_controller.update(delta_time_ms);
+                if loop_count > 0 {
+                    completed_loops.insert(*entity_id, loop_count);
+                }
             }
         }
+        completed_loops
     }
 
     pub fn spawn_entity(
@@ -583,6 +603,8 @@ pub struct CollisionDef {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioDef {
     pub footstep_trigger_distance: f32,
+    #[serde(default)]
+    pub movement_sound_trigger: MovementSoundTrigger,
     pub movement_sound: String,
     #[serde(default)]
     pub collision_sound: Option<String>,
@@ -715,6 +737,7 @@ impl EntityDefinition {
             control_role: ControlRole::LegacyDefault,
             audio: EntityAudioSettings {
                 footstep_trigger_distance: self.audio.footstep_trigger_distance,
+                movement_sound_trigger: self.audio.movement_sound_trigger,
                 movement_sound,
                 collision_sound,
             },
@@ -744,6 +767,7 @@ impl EntityDefinition {
         EntityAudioComponent {
             footstep_distance_accumulator: 0.0,
             footstep_trigger_distance: self.audio.footstep_trigger_distance,
+            movement_sound_trigger: self.audio.movement_sound_trigger,
             last_collision_state: false,
             movement_sound,
             collision_sound,

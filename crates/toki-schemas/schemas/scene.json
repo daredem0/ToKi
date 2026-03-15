@@ -444,6 +444,11 @@
           "minimum": 0,
           "description": "Distance required to trigger footstep sound"
         },
+        "movement_sound_trigger": {
+          "type": "string",
+          "enum": ["distance", "animation_loop"],
+          "description": "How movement sound timing is driven"
+        },
         "last_collision_state": {
           "type": "boolean",
           "description": "Last collision state of the entity"
