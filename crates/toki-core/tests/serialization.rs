@@ -75,6 +75,7 @@ fn create_test_entity() -> Entity {
 
     let attributes = EntityAttributes {
         health: Some(100),
+        stats: toki_core::entity::EntityStats::from_legacy_health(Some(100)),
         speed: 5,
         solid: true,
         visible: true,

@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 pub type EntityId = u32;
+pub const HEALTH_STAT_ID: &str = "health";
+pub const ATTACK_POWER_STAT_ID: &str = "attack_power";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entity {
@@ -178,6 +180,8 @@ impl MovementProfile {
 pub struct EntityAttributes {
     // Core gameplay
     pub health: Option<u32>,
+    #[serde(default, skip_serializing_if = "EntityStats::is_empty")]
+    pub stats: EntityStats,
     pub speed: u32,  // We only move in full pixels
     pub solid: bool, // Can we collide with other entities
 
@@ -199,10 +203,57 @@ pub struct EntityAttributes {
     pub has_inventory: bool, // Can this entity carry items
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct EntityStats {
+    #[serde(default)]
+    pub base: HashMap<String, i32>,
+    #[serde(default)]
+    pub current: HashMap<String, i32>,
+}
+
+impl EntityStats {
+    pub fn is_empty(&self) -> bool {
+        self.base.is_empty() && self.current.is_empty()
+    }
+
+    pub fn from_legacy_health(health: Option<u32>) -> Self {
+        let mut stats = Self::default();
+        if let Some(health) = health {
+            let health = health as i32;
+            stats.base.insert(HEALTH_STAT_ID.to_string(), health);
+            stats.current.insert(HEALTH_STAT_ID.to_string(), health);
+        }
+        stats
+    }
+
+    pub fn current(&self, stat_id: &str) -> Option<i32> {
+        self.current
+            .get(stat_id)
+            .copied()
+            .or_else(|| self.base.get(stat_id).copied())
+    }
+
+    pub fn base(&self, stat_id: &str) -> Option<i32> {
+        self.base.get(stat_id).copied()
+    }
+
+    pub fn ensure_stat(&mut self, stat_id: &str, value: i32) {
+        self.base.entry(stat_id.to_string()).or_insert(value);
+        self.current.entry(stat_id.to_string()).or_insert(value);
+    }
+
+    pub fn apply_delta(&mut self, stat_id: &str, delta: i32) -> Option<i32> {
+        let current = self.current.get_mut(stat_id)?;
+        *current = (*current + delta).max(0);
+        Some(*current)
+    }
+}
+
 impl Default for EntityAttributes {
     fn default() -> Self {
         Self {
             health: None,
+            stats: EntityStats::default(),
             speed: 2,
             solid: true,
             visible: true,
@@ -226,6 +277,30 @@ impl Entity {
         self.attributes
             .movement_profile
             .resolved_for_control_role(self.effective_control_role())
+    }
+}
+
+impl EntityAttributes {
+    pub fn ensure_legacy_health_stat(&mut self) {
+        if let Some(health) = self.health {
+            self.stats.ensure_stat(HEALTH_STAT_ID, health as i32);
+        }
+    }
+
+    pub fn current_stat(&self, stat_id: &str) -> Option<i32> {
+        self.stats.current(stat_id)
+    }
+
+    pub fn base_stat(&self, stat_id: &str) -> Option<i32> {
+        self.stats.base(stat_id)
+    }
+
+    pub fn apply_stat_delta(&mut self, stat_id: &str, delta: i32) -> Option<i32> {
+        let new_value = self.stats.apply_delta(stat_id, delta)?;
+        if stat_id == HEALTH_STAT_ID {
+            self.health = u32::try_from(new_value).ok();
+        }
+        Some(new_value)
     }
 }
 
@@ -294,8 +369,9 @@ impl EntityManager {
         entity_kind: EntityKind,
         position: IVec2,
         size: UVec2,
-        attributes: EntityAttributes,
+        mut attributes: EntityAttributes,
     ) -> EntityId {
+        attributes.ensure_legacy_health_stat();
         let id = self.next_id;
         self.next_id += 1;
         // Create a default collision box for solid entities
@@ -704,8 +780,9 @@ impl EntityDefinition {
         animation_controller.play(default_state);
 
         // Build attributes
-        let attributes = EntityAttributes {
+        let mut attributes = EntityAttributes {
             health: self.attributes.health,
+            stats: EntityStats::from_legacy_health(self.attributes.health),
             speed: self.attributes.speed,
             solid: self.attributes.solid,
             visible: self.rendering.visible,
@@ -717,6 +794,7 @@ impl EntityDefinition {
             movement_profile: self.attributes.movement_profile,
             has_inventory: self.attributes.has_inventory,
         };
+        attributes.ensure_legacy_health_stat();
 
         // Build collision box if enabled
         let collision_box = if self.collision.enabled {

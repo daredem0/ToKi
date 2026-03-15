@@ -558,6 +558,63 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
 }
 
 #[test]
+fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
+    let entity_def = EntityDefinition {
+        name: "slime".to_string(),
+        display_name: "Slime".to_string(),
+        description: "Stat-seeded slime".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+        },
+        attributes: AttributesDef {
+            health: Some(25),
+            speed: 1,
+            solid: true,
+            active: true,
+            can_move: true,
+            ai_behavior: AiBehavior::Wander,
+            movement_profile: MovementProfile::None,
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: "sfx_slime".to_string(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "creatures.json".to_string(),
+            clips: vec![AnimationClipDef {
+                state: "idle".to_string(),
+                frame_tiles: vec!["slime/idle_0".to_string()],
+                frame_duration_ms: 150.0,
+                loop_mode: "loop".to_string(),
+            }],
+            default_state: "idle".to_string(),
+        },
+        category: "creature".to_string(),
+        tags: vec![],
+    };
+
+    let entity = entity_def
+        .create_entity(IVec2::new(0, 0), 1)
+        .expect("definition should create entity");
+
+    assert_eq!(entity.attributes.health, Some(25));
+    assert_eq!(entity.attributes.current_stat("health"), Some(25));
+    assert_eq!(entity.attributes.base_stat("health"), Some(25));
+}
+
+#[test]
 fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type() {
     let entity_def = EntityDefinition {
         name: "invalid".to_string(),

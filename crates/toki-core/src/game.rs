@@ -8,7 +8,7 @@ use crate::assets::tilemap::TileMap;
 use crate::collision;
 use crate::entity::{
     AiBehavior, Entity, EntityAttributes, EntityId, EntityKind, EntityManager, MovementProfile,
-    MovementSoundTrigger,
+    MovementSoundTrigger, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
 };
 use crate::events::{GameEvent, GameUpdateResult};
 use crate::rules::{
@@ -107,6 +107,10 @@ pub struct GameState {
     /// Runtime-only rule execution state.
     #[serde(skip, default)]
     rule_runtime: RuleRuntimeState,
+
+    /// Pending generic stat changes gathered during update and resolved centrally.
+    #[serde(skip, default)]
+    pending_stat_changes: Vec<StatChangeRequest>,
 }
 
 #[derive(Debug, Default)]
@@ -154,6 +158,14 @@ enum RuleCommand {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct StatChangeRequest {
+    target_entity_id: EntityId,
+    stat_id: String,
+    delta: i32,
+    source_entity_id: Option<EntityId>,
+}
+
 impl GameState {
     fn effective_movement_profile(entity: &Entity) -> MovementProfile {
         entity.effective_movement_profile()
@@ -198,6 +210,20 @@ impl GameState {
         let mut held_keys = held_keys.into_iter().collect::<Vec<_>>();
         held_keys.sort_by_key(|key| Self::input_key_order(*key));
         held_keys
+    }
+
+    fn movement_delta_from_keys(keys: &[InputKey]) -> glam::IVec2 {
+        let mut delta = glam::IVec2::ZERO;
+        for key in keys {
+            match key {
+                InputKey::Up => delta.y -= 1,
+                InputKey::Down => delta.y += 1,
+                InputKey::Left => delta.x -= 1,
+                InputKey::Right => delta.x += 1,
+                InputKey::DebugToggle => {}
+            }
+        }
+        delta
     }
 
     fn candidate_input_position(
@@ -263,29 +289,41 @@ impl GameState {
                 entity_audio.last_collision_state = false;
             }
         } else {
-            let source_position = self
-                .entity_manager
-                .get_entity(entity_id)
-                .map(|entity| entity.position);
-            if let Some(entity_audio) = self.entity_manager.audio_component_mut(entity_id) {
-                if !entity_audio.last_collision_state {
-                    if let Some(collision_sound) = entity_audio
-                        .collision_sound
-                        .as_deref()
-                        .filter(|sound_id| !sound_id.is_empty())
-                    {
-                        result.add_event(AudioEvent::PlaySound {
-                            channel: AudioChannel::Collision,
-                            sound_id: collision_sound.to_string(),
-                            source_position,
-                            hearing_radius: Some(entity_audio.hearing_radius),
-                        });
-                    }
-                }
-                entity_audio.last_collision_state = true;
+            self.handle_entity_collision_blocked(entity_id, result);
+        }
+    }
+
+    fn handle_entity_collision_blocked(
+        &mut self,
+        entity_id: EntityId,
+        result: &mut GameUpdateResult<AudioEvent>,
+    ) {
+        let source_position = self
+            .entity_manager
+            .get_entity(entity_id)
+            .map(|entity| entity.position);
+        let Some(entity_audio) = self.entity_manager.audio_component_mut(entity_id) else {
+            self.rule_runtime.frame_collision_detected = true;
+            return;
+        };
+
+        let collision_started = !entity_audio.last_collision_state;
+        if collision_started {
+            if let Some(collision_sound) = entity_audio
+                .collision_sound
+                .as_deref()
+                .filter(|sound_id| !sound_id.is_empty())
+            {
+                result.add_event(AudioEvent::PlaySound {
+                    channel: AudioChannel::Collision,
+                    sound_id: collision_sound.to_string(),
+                    source_position,
+                    hearing_radius: Some(entity_audio.hearing_radius),
+                });
             }
             self.rule_runtime.frame_collision_detected = true;
         }
+        entity_audio.last_collision_state = true;
     }
 
     fn can_entity_move_to_position(
@@ -499,26 +537,183 @@ impl GameState {
             && !animation_controller.is_finished
     }
 
-    fn trigger_entity_primary_action(&mut self, entity_id: EntityId) -> bool {
-        let Some(animation_controller) = self
-            .entity_manager
-            .get_entity_mut(entity_id)
-            .and_then(|entity| entity.attributes.animation_controller.as_mut())
-        else {
-            return false;
-        };
+    fn primary_action_damage_for_entity(entity: &Entity) -> i32 {
+        entity
+            .attributes
+            .current_stat(ATTACK_POWER_STAT_ID)
+            .or_else(|| entity.attributes.base_stat(ATTACK_POWER_STAT_ID))
+            .unwrap_or(10)
+    }
 
-        let facing = Self::facing_from_animation_state(animation_controller.current_clip_state);
-        let directional_attack = Self::directional_attack_state(facing);
-        let next_state = if animation_controller.has_clip(directional_attack) {
-            directional_attack
-        } else if animation_controller.has_clip(AnimationState::Attack) {
-            AnimationState::Attack
+    fn entity_bounds_for_stat_interaction(entity: &Entity) -> (glam::IVec2, glam::UVec2) {
+        if let Some(collision_box) = &entity.collision_box {
+            collision_box.world_bounds(entity.position)
         } else {
+            (entity.position, entity.size)
+        }
+    }
+
+    fn primary_action_hitbox(
+        entity: &Entity,
+        facing: FacingDirection,
+    ) -> (glam::IVec2, glam::UVec2) {
+        let (origin, size) = Self::entity_bounds_for_stat_interaction(entity);
+        match facing {
+            FacingDirection::Down => (glam::IVec2::new(origin.x, origin.y + size.y as i32), size),
+            FacingDirection::Up => (glam::IVec2::new(origin.x, origin.y - size.y as i32), size),
+            FacingDirection::Left => (glam::IVec2::new(origin.x - size.x as i32, origin.y), size),
+            FacingDirection::Right => (glam::IVec2::new(origin.x + size.x as i32, origin.y), size),
+        }
+    }
+
+    fn collect_primary_action_stat_changes(
+        &self,
+        attacker_id: EntityId,
+        facing: FacingDirection,
+    ) -> Vec<StatChangeRequest> {
+        let Some(attacker) = self.entity_manager.get_entity(attacker_id) else {
+            return Vec::new();
+        };
+
+        let damage = Self::primary_action_damage_for_entity(attacker);
+        if damage <= 0 {
+            return Vec::new();
+        }
+
+        let (hitbox_pos, hitbox_size) = Self::primary_action_hitbox(attacker, facing);
+        let mut target_ids = self.entity_manager.active_entities();
+        target_ids.sort_unstable();
+
+        let changes = target_ids
+            .into_iter()
+            .filter(|&target_id| target_id != attacker_id)
+            .filter_map(|target_id| {
+                let target = self.entity_manager.get_entity(target_id)?;
+                if !target.attributes.active
+                    || target.attributes.current_stat(HEALTH_STAT_ID).is_none()
+                {
+                    return None;
+                }
+                let (target_pos, target_size) = Self::entity_bounds_for_stat_interaction(target);
+                if !collision::aabb_overlap(hitbox_pos, hitbox_size, target_pos, target_size) {
+                    return None;
+                }
+                Some(StatChangeRequest {
+                    target_entity_id: target_id,
+                    stat_id: HEALTH_STAT_ID.to_string(),
+                    delta: -damage,
+                    source_entity_id: Some(attacker_id),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        if changes.is_empty() {
+            tracing::debug!(
+                "Primary action from entity {} facing {:?} produced no damage targets",
+                attacker_id,
+                facing
+            );
+        } else {
+            for change in &changes {
+                tracing::debug!(
+                    "Primary action from entity {} queued {} change {} for target {}",
+                    attacker_id,
+                    change.stat_id,
+                    change.delta,
+                    change.target_entity_id
+                );
+            }
+        }
+
+        changes
+    }
+
+    fn resolve_pending_stat_changes(&mut self) {
+        let pending_stat_changes = std::mem::take(&mut self.pending_stat_changes);
+        if pending_stat_changes.is_empty() {
+            return;
+        }
+
+        let mut despawn_ids = Vec::new();
+        for change in pending_stat_changes {
+            let Some(entity) = self.entity_manager.get_entity_mut(change.target_entity_id) else {
+                continue;
+            };
+            let previous_value = entity.attributes.current_stat(&change.stat_id);
+            let Some(new_value) = entity
+                .attributes
+                .apply_stat_delta(&change.stat_id, change.delta)
+            else {
+                continue;
+            };
+
+            tracing::debug!(
+                "Applied stat change: source={:?} target={} stat={} delta={} previous={:?} new={}",
+                change.source_entity_id,
+                change.target_entity_id,
+                change.stat_id,
+                change.delta,
+                previous_value,
+                new_value
+            );
+
+            if change.stat_id == HEALTH_STAT_ID && new_value <= 0 {
+                tracing::info!(
+                    "Entity {} reached zero {} and will be despawned",
+                    change.target_entity_id,
+                    change.stat_id
+                );
+                despawn_ids.push(change.target_entity_id);
+            }
+        }
+
+        despawn_ids.sort_unstable();
+        despawn_ids.dedup();
+        for entity_id in despawn_ids {
+            self.entity_manager.despawn_entity(entity_id);
+        }
+    }
+
+    fn trigger_entity_primary_action(&mut self, entity_id: EntityId) -> bool {
+        let triggered_facing = {
+            let Some(animation_controller) = self
+                .entity_manager
+                .get_entity_mut(entity_id)
+                .and_then(|entity| entity.attributes.animation_controller.as_mut())
+            else {
+                return false;
+            };
+
+            let facing = Self::facing_from_animation_state(animation_controller.current_clip_state);
+            let directional_attack = Self::directional_attack_state(facing);
+            let next_state = if animation_controller.has_clip(directional_attack) {
+                directional_attack
+            } else if animation_controller.has_clip(AnimationState::Attack) {
+                AnimationState::Attack
+            } else {
+                return false;
+            };
+
+            if animation_controller.play(next_state) {
+                Some(facing)
+            } else {
+                None
+            }
+        };
+
+        let Some(facing) = triggered_facing else {
             return false;
         };
 
-        animation_controller.play(next_state)
+        tracing::debug!(
+            "Entity {} triggered primary action facing {:?}",
+            entity_id,
+            facing
+        );
+
+        self.pending_stat_changes
+            .extend(self.collect_primary_action_stat_changes(entity_id, facing));
+        true
     }
 
     fn process_profile_actions(&mut self) {
@@ -599,6 +794,7 @@ impl GameState {
             npc_ai_frame_counter: 0,
             rules: RuleSet::default(),
             rule_runtime: RuleRuntimeState::default(),
+            pending_stat_changes: Vec::new(),
         }
     }
 
@@ -618,6 +814,7 @@ impl GameState {
             npc_ai_frame_counter: 0,
             rules: RuleSet::default(),
             rule_runtime: RuleRuntimeState::default(),
+            pending_stat_changes: Vec::new(),
         }
     }
 
@@ -801,11 +998,23 @@ impl GameState {
             result.player_moved = true;
         }
 
+        let intended_player_delta = self
+            .player_id
+            .and_then(|player_id| self.entity_manager.get_entity(player_id))
+            .map(|entity| self.held_keys_for_profile(Self::effective_movement_profile(entity)))
+            .map(|keys| Self::movement_delta_from_keys(&keys))
+            .unwrap_or(glam::IVec2::ZERO);
+
         // Pick moving or idle animation
         if let Some(player_entity) = self.entity_manager.get_player_mut() {
             if let Some(animation_controller) = &mut player_entity.attributes.animation_controller {
                 if !Self::action_animation_locks_locomotion(animation_controller) {
-                    let player_delta = player_entity.position - initial_player_position;
+                    let actual_player_delta = player_entity.position - initial_player_position;
+                    let player_delta = if actual_player_delta == glam::IVec2::ZERO {
+                        intended_player_delta
+                    } else {
+                        actual_player_delta
+                    };
                     let desired_player_animation = Self::resolve_animation_state(
                         animation_controller,
                         result.player_moved,
@@ -824,6 +1033,7 @@ impl GameState {
         }
 
         self.process_profile_actions();
+        self.resolve_pending_stat_changes();
 
         // Update NPC AI
         self.update_npc_ai(world_bounds, tilemap, atlas, &mut result);
@@ -986,6 +1196,7 @@ impl GameState {
             return GameUpdateResult::new();
         }
 
+        let mut intended_deltas = HashMap::new();
         let initial_positions = controlled_entity_ids
             .iter()
             .filter_map(|&entity_id| {
@@ -1001,6 +1212,7 @@ impl GameState {
                 continue;
             };
             let held_keys = self.held_keys_for_profile(Self::effective_movement_profile(entity));
+            intended_deltas.insert(entity_id, Self::movement_delta_from_keys(&held_keys));
             for key in held_keys {
                 self.apply_input_to_entity(
                     entity_id,
@@ -1033,7 +1245,15 @@ impl GameState {
                 .and_then(|entity| entity.attributes.animation_controller.as_mut())
             {
                 if !Self::action_animation_locks_locomotion(animation_controller) {
-                    let delta = final_position - initial_position;
+                    let actual_delta = final_position - initial_position;
+                    let delta = if actual_delta == glam::IVec2::ZERO {
+                        intended_deltas
+                            .get(&entity_id)
+                            .copied()
+                            .unwrap_or(glam::IVec2::ZERO)
+                    } else {
+                        actual_delta
+                    };
                     let desired_animation =
                         Self::resolve_animation_state(animation_controller, entity_moved, delta);
                     if animation_controller.current_clip_state != desired_animation {
@@ -1183,6 +1403,7 @@ impl GameState {
         self.profile_keys_held.clear();
         self.profile_actions_held.clear();
         self.pending_profile_actions.clear();
+        self.pending_stat_changes.clear();
         self.set_rules(scene.rules.clone());
 
         // Load entities from scene
@@ -1871,12 +2092,15 @@ impl GameState {
             }
 
             if !self.can_entity_move_to_position(entity_id, candidate_position, tilemap, atlas) {
-                self.rule_runtime.frame_collision_detected = true;
+                self.handle_entity_collision_blocked(entity_id, result);
                 continue;
             }
 
-            if let Some(entity) = self.entity_manager.get_entity_mut(entity_id) {
+            if let Some((entity, entity_audio)) =
+                self.entity_manager.get_entity_with_audio_mut(entity_id)
+            {
                 entity.position = candidate_position;
+                entity_audio.last_collision_state = false;
                 if Some(entity_id) == self.player_id {
                     moved_player = true;
                 }

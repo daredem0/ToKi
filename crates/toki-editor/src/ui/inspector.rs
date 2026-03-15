@@ -4850,6 +4850,7 @@ mod tests {
             UVec2::new(16, 16),
             EntityAttributes {
                 health: Some(25),
+                stats: toki_core::entity::EntityStats::from_legacy_health(Some(25)),
                 speed: 3,
                 solid: true,
                 visible: true,

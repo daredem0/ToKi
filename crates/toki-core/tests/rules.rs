@@ -188,6 +188,53 @@ fn on_collision_rule_runs_when_movement_is_blocked() {
 }
 
 #[test]
+fn on_collision_rule_only_fires_once_for_sustained_blocked_input() {
+    let mut state = GameState::new_empty();
+    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    state
+        .entity_manager_mut()
+        .audio_component_mut(player_id)
+        .expect("player audio should exist")
+        .collision_sound = None;
+
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "collision-rule",
+            RuleTrigger::OnCollision,
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Collision,
+                sound_id: "rule_collision".to_string(),
+            }],
+        )],
+    });
+
+    state.handle_key_press(InputKey::Right);
+    let first_blocked = state.update(
+        UVec2::new(256, 256),
+        &create_collision_test_tilemap(),
+        &create_collision_test_atlas(),
+    );
+    assert!(first_blocked.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "rule_collision"
+    )));
+
+    let sustained_blocked = state.update(
+        UVec2::new(256, 256),
+        &create_collision_test_tilemap(),
+        &create_collision_test_atlas(),
+    );
+    assert!(
+        !sustained_blocked.events.iter().any(|event| matches!(
+            event,
+            AudioEvent::PlaySound { sound_id, .. } if sound_id == "rule_collision"
+        )),
+        "sustained blocked input should not retrigger OnCollision every frame"
+    );
+}
+
+#[test]
 fn on_trigger_rule_runs_when_entity_overlaps_trigger_tile() {
     let mut state = GameState::new_empty();
     state.spawn_player_at(IVec2::new(0, 0));
