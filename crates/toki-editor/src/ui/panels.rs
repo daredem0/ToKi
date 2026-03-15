@@ -491,6 +491,12 @@ impl PanelSystem {
         if let Err(error) = viewport.update() {
             tracing::error!("Map editor viewport update error: {error}");
         }
+        if let Some(tilemap) = viewport.scene_manager().tilemap() {
+            ui_state.sync_selected_map_editor_object_from_tilemap(tilemap);
+        }
+        if Self::apply_pending_map_editor_object_edit(ui_state, viewport) {
+            viewport.mark_dirty();
+        }
 
         let (rect, response) =
             ui.allocate_exact_size(available_size, egui::Sense::click_and_drag());
@@ -498,7 +504,28 @@ impl PanelSystem {
         match ui_state.map_editor_tool {
             super::editor_ui::MapEditorTool::Drag => {
                 ui_state.cancel_map_editor_edit();
-                Self::handle_map_editor_primary_drag(viewport, &response, config.as_deref());
+                if response.drag_started() {
+                    if let Some(drag_start_pos) = response.interact_pointer_pos() {
+                        Self::handle_map_editor_object_drag_start(
+                            ui_state,
+                            viewport,
+                            drag_start_pos,
+                            rect,
+                        );
+                    }
+                }
+
+                if ui_state.is_map_object_move_drag_active() {
+                    Self::handle_map_editor_object_drag_update(ui, ui_state, viewport, rect);
+                    if response.drag_stopped()
+                        && Self::handle_map_editor_object_drag_release(ui_state, viewport)
+                    {
+                        ui_state.mark_map_editor_dirty();
+                    }
+                    viewport.stop_camera_drag();
+                } else {
+                    Self::handle_map_editor_primary_drag(viewport, &response, config.as_deref());
+                }
             }
             super::editor_ui::MapEditorTool::Brush => {
                 Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
@@ -528,15 +555,28 @@ impl PanelSystem {
 
         match ui_state.map_editor_tool {
             super::editor_ui::MapEditorTool::Drag => {
-                if let Some(project_path) = project_path.as_deref() {
-                    if let Some(tile_info) = Self::handle_map_editor_tile_inspect(
-                        ui,
-                        viewport,
-                        &response,
-                        rect,
-                        project_path,
-                    ) {
-                        ui_state.map_editor_selected_tile_info = tile_info;
+                if response.clicked() {
+                    if let Some(selected_object_index) =
+                        Self::handle_map_editor_object_select(ui, viewport, &response, rect)
+                    {
+                        if let Some(tilemap) = viewport.scene_manager().tilemap() {
+                            if let Some(object) = tilemap.objects.get(selected_object_index) {
+                                ui_state.select_map_editor_object(selected_object_index, object);
+                            }
+                        }
+                    } else if let Some(project_path) = project_path.as_deref() {
+                        ui_state.clear_map_editor_object_selection();
+                        if let Some(tile_info) = Self::handle_map_editor_tile_inspect(
+                            ui,
+                            viewport,
+                            &response,
+                            rect,
+                            project_path,
+                        ) {
+                            ui_state.map_editor_selected_tile_info = tile_info;
+                        }
+                    } else {
+                        ui_state.clear_map_editor_object_selection();
                     }
                 }
             }
@@ -590,6 +630,7 @@ impl PanelSystem {
                     viewport,
                     &response,
                     rect,
+                    project_path.as_deref(),
                 ) {
                     ui_state.mark_map_editor_dirty();
                 }
@@ -603,6 +644,34 @@ impl PanelSystem {
         config: Option<&EditorConfig>,
     ) {
         CameraInteraction::handle_drag(viewport, response, config);
+    }
+
+    fn apply_pending_map_editor_object_edit(
+        ui_state: &mut super::EditorUI,
+        viewport: &mut SceneViewport,
+    ) -> bool {
+        let Some(edit) = ui_state.take_map_editor_object_property_edit_request() else {
+            return false;
+        };
+        let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
+            return false;
+        };
+        let Some(object) = tilemap.objects.get(edit.object_index) else {
+            return false;
+        };
+        if object.visible == edit.visible && object.solid == edit.solid {
+            return false;
+        }
+
+        ui_state.begin_map_editor_edit(tilemap);
+        let Some(object) = tilemap.objects.get_mut(edit.object_index) else {
+            ui_state.cancel_map_editor_edit();
+            return false;
+        };
+        object.visible = edit.visible;
+        object.solid = edit.solid;
+        ui_state.finish_map_editor_edit(tilemap);
+        true
     }
 
     fn handle_map_editor_secondary_drag(
@@ -788,6 +857,7 @@ impl PanelSystem {
         viewport: &mut SceneViewport,
         response: &egui::Response,
         rect: egui::Rect,
+        project_path: Option<&std::path::Path>,
     ) -> bool {
         let clicked = response.hovered() && ui.input(|input| input.pointer.primary_clicked());
         if !clicked {
@@ -811,6 +881,17 @@ impl PanelSystem {
         else {
             return false;
         };
+        let Some(project_path) = project_path else {
+            return false;
+        };
+        let Some((object_sheet, _texture_path)) =
+            Self::load_map_editor_object_preview_assets(project_path, &object_sheet_name).ok()
+        else {
+            return false;
+        };
+        let Some(object_info) = object_sheet.objects.get(&object_name) else {
+            return false;
+        };
         let object_sheet_file = if object_sheet_name.ends_with(".json") {
             object_sheet_name
         } else {
@@ -818,8 +899,16 @@ impl PanelSystem {
         };
 
         ui_state.begin_map_editor_edit(tilemap);
-        if MapObjectInteraction::place_object(tilemap, world_anchor, &object_sheet_file, &object_name)
-        {
+        if MapObjectInteraction::place_object(
+            tilemap,
+            world_anchor,
+            &object_sheet_file,
+            &object_name,
+            glam::UVec2::new(
+                object_info.size_tiles.x * object_sheet.tile_size.x,
+                object_info.size_tiles.y * object_sheet.tile_size.y,
+            ),
+        ) {
             ui_state.finish_map_editor_edit(tilemap);
             viewport.mark_dirty();
             return true;
@@ -827,6 +916,95 @@ impl PanelSystem {
 
         ui_state.cancel_map_editor_edit();
         false
+    }
+
+    fn handle_map_editor_object_select(
+        ui: &egui::Ui,
+        viewport: &SceneViewport,
+        response: &egui::Response,
+        rect: egui::Rect,
+    ) -> Option<usize> {
+        let clicked = response.hovered() && ui.input(|input| input.pointer.primary_clicked());
+        if !clicked {
+            return None;
+        }
+
+        let pointer_pos = ui.input(|input| input.pointer.interact_pos())?;
+        let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
+        let tilemap = viewport.scene_manager().tilemap()?;
+        MapObjectInteraction::object_index_at_world(tilemap, world_pos)
+    }
+
+    fn handle_map_editor_object_drag_start(
+        ui_state: &mut super::EditorUI,
+        viewport: &mut SceneViewport,
+        drag_start_pos: egui::Pos2,
+        rect: egui::Rect,
+    ) {
+        if ui_state.is_map_object_move_drag_active() {
+            return;
+        }
+
+        let world_pos = viewport.screen_to_world_pos_raw(drag_start_pos, rect);
+        let Some(tilemap) = viewport.scene_manager().tilemap() else {
+            return;
+        };
+        let Some(object_index) = MapObjectInteraction::object_index_at_world(tilemap, world_pos)
+        else {
+            return;
+        };
+        let Some(object) = tilemap.objects.get(object_index) else {
+            return;
+        };
+
+        ui_state.begin_map_editor_edit(tilemap);
+        ui_state.select_map_editor_object(object_index, object);
+        ui_state.begin_map_object_move_drag(object_index, world_pos - object.position.as_vec2());
+    }
+
+    fn handle_map_editor_object_drag_update(
+        ui: &egui::Ui,
+        ui_state: &mut super::EditorUI,
+        viewport: &mut SceneViewport,
+        rect: egui::Rect,
+    ) {
+        let Some(drag_state) = ui_state.map_object_move_drag else {
+            return;
+        };
+        let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {
+            return;
+        };
+        let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect) - drag_state.grab_offset;
+        let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
+            return;
+        };
+        let Some(world_anchor) = MapObjectInteraction::object_anchor_at_world(tilemap, world_pos)
+        else {
+            return;
+        };
+        if MapObjectInteraction::move_object(tilemap, drag_state.object_index, world_anchor) {
+            if let Some(object) = tilemap.objects.get(drag_state.object_index) {
+                ui_state.select_map_editor_object(drag_state.object_index, object);
+            }
+            viewport.mark_dirty();
+        }
+    }
+
+    fn handle_map_editor_object_drag_release(
+        ui_state: &mut super::EditorUI,
+        viewport: &mut SceneViewport,
+    ) -> bool {
+        ui_state.finish_map_object_move_drag();
+        let Some(tilemap) = viewport.scene_manager().tilemap() else {
+            ui_state.cancel_map_editor_edit();
+            return false;
+        };
+        let changed = ui_state.finish_map_editor_edit(tilemap);
+        if !changed {
+            ui_state.cancel_map_editor_edit();
+        }
+        viewport.mark_dirty();
+        changed
     }
 
     fn paint_map_editor_object_preview(

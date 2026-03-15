@@ -50,6 +50,18 @@
             "items": {"type": "integer", "minimum": 0},
             "minItems": 2,
             "maxItems": 2
+          },
+          "size_px": {
+            "type": "array",
+            "items": {"type": "integer", "minimum": 1},
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "solid": {
+            "type": "boolean"
           }
         }
       }

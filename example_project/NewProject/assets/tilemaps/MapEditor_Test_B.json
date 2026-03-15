@@ -593,7 +593,13 @@
       "position": [
         72,
         0
-      ]
+      ],
+      "size_px": [
+        16,
+        16
+      ],
+      "visible": true,
+      "solid": true
     },
     {
       "sheet": "fauna.json",
@@ -601,7 +607,13 @@
       "position": [
         72,
         24
-      ]
+      ],
+      "size_px": [
+        16,
+        16
+      ],
+      "visible": true,
+      "solid": true
     },
     {
       "sheet": "fauna.json",
@@ -609,7 +621,13 @@
       "position": [
         72,
         40
-      ]
+      ],
+      "size_px": [
+        16,
+        16
+      ],
+      "visible": true,
+      "solid": true
     },
     {
       "sheet": "fauna.json",
@@ -617,7 +635,13 @@
       "position": [
         72,
         56
-      ]
+      ],
+      "size_px": [
+        16,
+        16
+      ],
+      "visible": true,
+      "solid": false
     }
   ]
 }

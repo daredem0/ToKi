@@ -19,13 +19,51 @@ impl MapObjectInteraction {
         world_anchor: glam::UVec2,
         sheet: &str,
         object_name: &str,
+        size_px: glam::UVec2,
     ) -> bool {
         let instance = MapObjectInstance {
             sheet: std::path::PathBuf::from(sheet),
             object_name: object_name.to_string(),
             position: world_anchor,
+            size_px,
+            visible: true,
+            solid: false,
         };
         tilemap.objects.push(instance);
+        true
+    }
+
+    pub fn object_index_at_world(tilemap: &TileMap, world_pos: glam::Vec2) -> Option<usize> {
+        if world_pos.x < 0.0 || world_pos.y < 0.0 {
+            return None;
+        }
+
+        let world_point = glam::IVec2::new(world_pos.x.floor() as i32, world_pos.y.floor() as i32);
+        tilemap
+            .objects
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(_, object)| {
+                let object_pos = object.position.as_ivec2();
+                toki_core::collision::aabb_overlap(
+                    world_point,
+                    glam::UVec2::new(1, 1),
+                    object_pos,
+                    object.size_px,
+                )
+            })
+            .map(|(index, _)| index)
+    }
+
+    pub fn move_object(tilemap: &mut TileMap, object_index: usize, world_anchor: glam::UVec2) -> bool {
+        let Some(object) = tilemap.objects.get_mut(object_index) else {
+            return false;
+        };
+        if object.position == world_anchor {
+            return false;
+        }
+        object.position = world_anchor;
         true
     }
 }
@@ -61,8 +99,13 @@ mod tests {
     fn place_object_appends_map_object_instance() {
         let mut tilemap = sample_tilemap();
 
-        let changed =
-            MapObjectInteraction::place_object(&mut tilemap, UVec2::new(16, 32), "fauna.json", "fauna_a");
+        let changed = MapObjectInteraction::place_object(
+            &mut tilemap,
+            UVec2::new(16, 32),
+            "fauna.json",
+            "fauna_a",
+            UVec2::new(16, 16),
+        );
 
         assert!(changed);
         assert_eq!(
@@ -71,7 +114,57 @@ mod tests {
                 sheet: PathBuf::from("fauna.json"),
                 object_name: "fauna_a".to_string(),
                 position: UVec2::new(16, 32),
+                size_px: UVec2::new(16, 16),
+                visible: true,
+                solid: false,
             }]
         );
+    }
+
+    #[test]
+    fn object_index_at_world_prefers_last_placed_object() {
+        let mut tilemap = sample_tilemap();
+        tilemap.objects = vec![
+            MapObjectInstance {
+                sheet: PathBuf::from("fauna.json"),
+                object_name: "first".to_string(),
+                position: UVec2::new(16, 16),
+                size_px: UVec2::new(16, 16),
+                visible: true,
+                solid: false,
+            },
+            MapObjectInstance {
+                sheet: PathBuf::from("fauna.json"),
+                object_name: "second".to_string(),
+                position: UVec2::new(16, 16),
+                size_px: UVec2::new(16, 16),
+                visible: true,
+                solid: false,
+            },
+        ];
+
+        assert_eq!(
+            MapObjectInteraction::object_index_at_world(&tilemap, glam::Vec2::new(20.0, 20.0)),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn move_object_updates_selected_map_object_position() {
+        let mut tilemap = sample_tilemap();
+        MapObjectInteraction::place_object(
+            &mut tilemap,
+            UVec2::new(16, 16),
+            "fauna.json",
+            "fauna_a",
+            UVec2::new(16, 16),
+        );
+
+        assert!(MapObjectInteraction::move_object(
+            &mut tilemap,
+            0,
+            UVec2::new(32, 16)
+        ));
+        assert_eq!(tilemap.objects[0].position, UVec2::new(32, 16));
     }
 }

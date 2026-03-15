@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use toki_core::animation::AnimationState;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
-    tilemap::TileMap,
+    tilemap::{MapObjectInstance, TileMap},
 };
 use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, ControlRole,
@@ -561,6 +561,36 @@ fn game_state_player_can_move_through_non_solid_entity() {
             .expect("player should exist")
             .position,
         IVec2::new(1, 0)
+    );
+}
+
+#[test]
+fn game_state_player_is_blocked_by_solid_map_object_collision() {
+    let mut game_state = GameState::new_empty();
+    let player_id = game_state.spawn_player_at(IVec2::new(0, 0));
+    let mut tilemap = create_test_tilemap();
+    tilemap.objects.push(MapObjectInstance {
+        sheet: PathBuf::from("fauna.json"),
+        object_name: "bush".to_string(),
+        position: UVec2::new(16, 0),
+        size_px: UVec2::new(16, 16),
+        visible: true,
+        solid: true,
+    });
+    let atlas = create_test_atlas();
+
+    game_state.handle_key_press(InputKey::Right);
+    let result = game_state.update(UVec2::new(128, 128), &tilemap, &atlas);
+    game_state.handle_key_release(InputKey::Right);
+
+    assert!(!result.player_moved);
+    assert_eq!(
+        game_state
+            .entity_manager()
+            .get_entity(player_id)
+            .expect("player should exist")
+            .position,
+        IVec2::new(0, 0)
     );
 }
 

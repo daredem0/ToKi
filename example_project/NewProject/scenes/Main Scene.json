@@ -33,16 +33,6 @@
         "visible": true,
         "animation_controller": {
           "clips": {
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -53,6 +43,16 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -117,11 +117,11 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "IdleLeft": {
-              "state": "IdleLeft",
+            "IdleDown": {
+              "state": "IdleDown",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_right_a"
+                "player/walk_down_a"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
@@ -136,15 +136,6 @@
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
-            "IdleUp": {
-              "state": "IdleUp",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_up_a"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "WalkRight": {
               "state": "WalkRight",
               "atlas_name": "players.json",
@@ -155,11 +146,11 @@
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
-            "IdleDown": {
-              "state": "IdleDown",
+            "IdleLeft": {
+              "state": "IdleLeft",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_down_a"
+                "player/walk_right_a"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
@@ -182,6 +173,15 @@
                 "player/walk_down_b"
               ],
               "frame_duration_ms": 180.0,
+              "loop_mode": "Loop"
+            },
+            "IdleUp": {
+              "state": "IdleUp",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_up_a"
+              ],
+              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },

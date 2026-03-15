@@ -14,6 +14,12 @@ pub struct MapObjectInstance {
     pub sheet: PathBuf,
     pub object_name: String,
     pub position: UVec2,
+    #[serde(default = "default_map_object_size_px")]
+    pub size_px: UVec2,
+    #[serde(default = "default_map_object_visible")]
+    pub visible: bool,
+    #[serde(default)]
+    pub solid: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -24,6 +30,14 @@ pub struct TileMap {
     pub tiles: Vec<String>, // row-major list of tile names
     #[serde(default)]
     pub objects: Vec<MapObjectInstance>,
+}
+
+fn default_map_object_size_px() -> UVec2 {
+    UVec2::new(16, 16)
+}
+
+fn default_map_object_visible() -> bool {
+    true
 }
 
 impl TileMap {

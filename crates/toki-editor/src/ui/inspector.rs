@@ -519,7 +519,44 @@ impl InspectorSystem {
         match ui_state.map_editor_tool {
             MapEditorTool::Drag => {
                 ui.label("Primary drag pans the map editor camera.");
-                if let Some(tile_info) = &ui_state.map_editor_selected_tile_info {
+                if let Some(selected_object) = ui_state.map_editor_selected_object_info.clone() {
+                    ui.separator();
+                    ui.label("Object Info");
+                    ui.horizontal(|ui| {
+                        ui.label("Sheet:");
+                        ui.label(selected_object.sheet.display().to_string());
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Object:");
+                        ui.label(&selected_object.object_name);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Position:");
+                        ui.label(format!(
+                            "{}, {}",
+                            selected_object.position.x, selected_object.position.y
+                        ));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Size:");
+                        ui.label(format!(
+                            "{}x{} px",
+                            selected_object.size_px.x, selected_object.size_px.y
+                        ));
+                    });
+
+                    let mut visible = selected_object.visible;
+                    let mut solid = selected_object.solid;
+                    let visible_changed = ui.checkbox(&mut visible, "Visible").changed();
+                    let solid_changed = ui.checkbox(&mut solid, "Solid").changed();
+                    if visible_changed || solid_changed {
+                        ui_state.queue_map_editor_object_property_edit(
+                            selected_object.index,
+                            visible,
+                            solid,
+                        );
+                    }
+                } else if let Some(tile_info) = &ui_state.map_editor_selected_tile_info {
                     ui.separator();
                     ui.label("Tile Info");
                     ui.horizontal(|ui| {
@@ -539,7 +576,7 @@ impl InspectorSystem {
                         ui.label(if tile_info.trigger { "Yes" } else { "No" });
                     });
                 } else {
-                    ui.label("Click a tile to inspect it.");
+                    ui.label("Click a tile or object to inspect it.");
                 }
             }
             MapEditorTool::Brush | MapEditorTool::Fill => {

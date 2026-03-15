@@ -386,6 +386,31 @@ fn tilemap_deserialization_defaults_objects_for_legacy_maps() {
 }
 
 #[test]
+fn tilemap_deserialization_defaults_object_visibility_solidity_and_size() {
+    let tilemap: TileMap = serde_json::from_str(
+        r#"{
+            "size": [1, 1],
+            "tile_size": [16, 16],
+            "atlas": "terrain.json",
+            "tiles": ["grass"],
+            "objects": [
+                {
+                    "sheet": "fauna.json",
+                    "object_name": "bush",
+                    "position": [16, 32]
+                }
+            ]
+        }"#,
+    )
+    .expect("legacy object instance should parse");
+
+    assert_eq!(tilemap.objects.len(), 1);
+    assert_eq!(tilemap.objects[0].size_px, UVec2::new(16, 16));
+    assert!(tilemap.objects[0].visible);
+    assert!(!tilemap.objects[0].solid);
+}
+
+#[test]
 fn tilemap_serialization_round_trips_object_instances() {
     let tilemap = TileMap {
         size: UVec2::new(1, 1),
@@ -396,6 +421,9 @@ fn tilemap_serialization_round_trips_object_instances() {
             sheet: PathBuf::from("fauna.json"),
             object_name: "fauna_a".to_string(),
             position: UVec2::new(16, 32),
+            size_px: UVec2::new(16, 16),
+            visible: false,
+            solid: true,
         }],
     };
 

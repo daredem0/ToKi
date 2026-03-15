@@ -8,7 +8,7 @@ use crate::scene::SceneViewport;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use toki_core::{
-    assets::tilemap::TileMap,
+    assets::tilemap::{MapObjectInstance, TileMap},
     entity::{Entity, EntityId},
     rules::RuleSet,
     Scene,
@@ -58,6 +58,30 @@ pub struct MapEditorTileInfo {
     pub tile_name: String,
     pub solid: bool,
     pub trigger: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MapEditorObjectInfo {
+    pub index: usize,
+    pub sheet: PathBuf,
+    pub object_name: String,
+    pub position: glam::UVec2,
+    pub size_px: glam::UVec2,
+    pub visible: bool,
+    pub solid: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MapObjectMoveDragState {
+    pub object_index: usize,
+    pub grab_offset: glam::Vec2,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MapEditorObjectPropertyEditRequest {
+    pub object_index: usize,
+    pub visible: bool,
+    pub solid: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -215,6 +239,7 @@ pub struct EditorUI {
     pub map_editor_brush_preview_image_path: Option<PathBuf>,
     pub map_editor_brush_preview_texture: Option<egui::TextureHandle>,
     pub map_editor_selected_tile_info: Option<MapEditorTileInfo>,
+    pub map_editor_selected_object_info: Option<MapEditorObjectInfo>,
     pub map_editor_show_new_map_dialog: bool,
     pub map_editor_new_map_name: String,
     pub map_editor_new_map_width: u32,
@@ -224,6 +249,8 @@ pub struct EditorUI {
     pub map_editor_history: MapEditorHistory,
     pub map_editor_pending_tilemap_sync: Option<TileMap>,
     pub map_editor_edit_before: Option<TileMap>,
+    pub map_object_move_drag: Option<MapObjectMoveDragState>,
+    pub map_editor_object_edit_requested: Option<MapEditorObjectPropertyEditRequest>,
 
     // Asset validation
     pub validate_assets_requested: bool,
@@ -303,6 +330,7 @@ impl EditorUI {
             map_editor_brush_preview_image_path: None,
             map_editor_brush_preview_texture: None,
             map_editor_selected_tile_info: None,
+            map_editor_selected_object_info: None,
             map_editor_show_new_map_dialog: false,
             map_editor_new_map_name: "new_map".to_string(),
             map_editor_new_map_width: 32,
@@ -312,6 +340,8 @@ impl EditorUI {
             map_editor_history: MapEditorHistory::default(),
             map_editor_pending_tilemap_sync: None,
             map_editor_edit_before: None,
+            map_object_move_drag: None,
+            map_editor_object_edit_requested: None,
 
             // Asset validation
             validate_assets_requested: false,
@@ -485,6 +515,9 @@ impl EditorUI {
         self.map_editor_history.clear();
         self.map_editor_pending_tilemap_sync = None;
         self.map_editor_edit_before = None;
+        self.map_editor_selected_object_info = None;
+        self.map_editor_object_edit_requested = None;
+        self.map_object_move_drag = None;
     }
 
     pub fn map_editor_selected_label(&self) -> String {
@@ -595,6 +628,81 @@ impl EditorUI {
         self.map_editor_history.clear();
         self.map_editor_pending_tilemap_sync = None;
         self.map_editor_edit_before = None;
+    }
+
+    pub fn select_map_editor_object(&mut self, index: usize, object: &MapObjectInstance) {
+        self.map_editor_selected_object_info = Some(MapEditorObjectInfo {
+            index,
+            sheet: object.sheet.clone(),
+            object_name: object.object_name.clone(),
+            position: object.position,
+            size_px: object.size_px,
+            visible: object.visible,
+            solid: object.solid,
+        });
+        self.map_editor_selected_tile_info = None;
+    }
+
+    pub fn clear_map_editor_object_selection(&mut self) {
+        self.map_editor_selected_object_info = None;
+        self.map_object_move_drag = None;
+        self.map_editor_object_edit_requested = None;
+    }
+
+    pub fn sync_selected_map_editor_object_from_tilemap(&mut self, tilemap: &TileMap) {
+        let Some(selected) = self.map_editor_selected_object_info.as_mut() else {
+            return;
+        };
+        let Some(object) = tilemap.objects.get(selected.index) else {
+            self.clear_map_editor_object_selection();
+            return;
+        };
+        selected.sheet = object.sheet.clone();
+        selected.object_name = object.object_name.clone();
+        selected.position = object.position;
+        selected.size_px = object.size_px;
+        selected.visible = object.visible;
+        selected.solid = object.solid;
+    }
+
+    pub fn begin_map_object_move_drag(&mut self, object_index: usize, grab_offset: glam::Vec2) {
+        self.map_object_move_drag = Some(MapObjectMoveDragState {
+            object_index,
+            grab_offset,
+        });
+    }
+
+    pub fn is_map_object_move_drag_active(&self) -> bool {
+        self.map_object_move_drag.is_some()
+    }
+
+    pub fn finish_map_object_move_drag(&mut self) {
+        self.map_object_move_drag = None;
+    }
+
+    pub fn queue_map_editor_object_property_edit(
+        &mut self,
+        object_index: usize,
+        visible: bool,
+        solid: bool,
+    ) {
+        self.map_editor_object_edit_requested = Some(MapEditorObjectPropertyEditRequest {
+            object_index,
+            visible,
+            solid,
+        });
+        if let Some(selected) = self.map_editor_selected_object_info.as_mut() {
+            if selected.index == object_index {
+                selected.visible = visible;
+                selected.solid = solid;
+            }
+        }
+    }
+
+    pub fn take_map_editor_object_property_edit_request(
+        &mut self,
+    ) -> Option<MapEditorObjectPropertyEditRequest> {
+        self.map_editor_object_edit_requested.take()
     }
 
     pub fn begin_map_editor_edit(&mut self, before: &TileMap) {
@@ -1749,6 +1857,84 @@ mod tests {
 
         assert_eq!(ui.map_editor_selected_tile.as_deref(), Some("water"));
         assert_eq!(ui.map_editor_tool, super::MapEditorTool::Brush);
+    }
+
+    #[test]
+    fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
+        let mut ui = EditorUI::new();
+        ui.map_editor_selected_tile_info = Some(super::MapEditorTileInfo {
+            tile_x: 1,
+            tile_y: 2,
+            tile_name: "grass".to_string(),
+            solid: false,
+            trigger: false,
+        });
+        let object = toki_core::assets::tilemap::MapObjectInstance {
+            sheet: std::path::PathBuf::from("fauna.json"),
+            object_name: "bush".to_string(),
+            position: glam::UVec2::new(16, 32),
+            size_px: glam::UVec2::new(16, 16),
+            visible: true,
+            solid: false,
+        };
+
+        ui.select_map_editor_object(0, &object);
+        assert!(ui.map_editor_selected_tile_info.is_none());
+        assert_eq!(
+            ui.map_editor_selected_object_info
+                .as_ref()
+                .map(|selected| selected.object_name.as_str()),
+            Some("bush")
+        );
+
+        let tilemap = toki_core::assets::tilemap::TileMap {
+            size: glam::UVec2::new(2, 2),
+            tile_size: glam::UVec2::new(16, 16),
+            atlas: std::path::PathBuf::from("terrain.json"),
+            tiles: vec!["grass".to_string(); 4],
+            objects: vec![toki_core::assets::tilemap::MapObjectInstance {
+                solid: true,
+                position: glam::UVec2::new(32, 32),
+                ..object.clone()
+            }],
+        };
+
+        ui.sync_selected_map_editor_object_from_tilemap(&tilemap);
+        let selected = ui
+            .map_editor_selected_object_info
+            .as_ref()
+            .expect("selected object should remain");
+        assert_eq!(selected.position, glam::UVec2::new(32, 32));
+        assert!(selected.solid);
+    }
+
+    #[test]
+    fn queue_map_editor_object_property_edit_updates_selected_object_info() {
+        let mut ui = EditorUI::new();
+        let object = toki_core::assets::tilemap::MapObjectInstance {
+            sheet: std::path::PathBuf::from("fauna.json"),
+            object_name: "bush".to_string(),
+            position: glam::UVec2::new(16, 16),
+            size_px: glam::UVec2::new(16, 16),
+            visible: true,
+            solid: false,
+        };
+        ui.select_map_editor_object(2, &object);
+
+        ui.queue_map_editor_object_property_edit(2, false, true);
+
+        let selected = ui
+            .map_editor_selected_object_info
+            .as_ref()
+            .expect("selected object should exist");
+        assert!(!selected.visible);
+        assert!(selected.solid);
+        let request = ui
+            .take_map_editor_object_property_edit_request()
+            .expect("edit request should exist");
+        assert_eq!(request.object_index, 2);
+        assert!(!request.visible);
+        assert!(request.solid);
     }
 
     #[test]

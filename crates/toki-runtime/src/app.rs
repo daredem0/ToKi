@@ -636,6 +636,9 @@ impl App {
             }
 
             for object in &self.resources.get_tilemap().objects {
+                if !object.visible {
+                    continue;
+                }
                 let sheet_name = object
                     .sheet
                     .file_name()

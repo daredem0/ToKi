@@ -110,6 +110,10 @@ pub fn can_entity_move_to_position(
         }
     }
 
+    if collides_with_solid_map_object(tilemap, box_pos, box_size) {
+        return false;
+    }
+
     true
 }
 
@@ -173,14 +177,24 @@ pub fn can_place_collision_box_at_position(
         }
     }
 
+    if collides_with_solid_map_object(tilemap, box_pos, box_size) {
+        return false;
+    }
+
     true
+}
+
+fn collides_with_solid_map_object(tilemap: &TileMap, box_pos: IVec2, box_size: UVec2) -> bool {
+    tilemap.objects.iter().any(|object| {
+        object.solid && aabb_overlap(box_pos, box_size, object.position.as_ivec2(), object.size_px)
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::{can_entity_move_to_position, can_place_collision_box_at_position, CollisionBox};
     use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
-    use crate::assets::tilemap::TileMap;
+    use crate::assets::tilemap::{MapObjectInstance, TileMap};
     use crate::entity::{Entity, EntityAttributes, EntityKind};
     use glam::{IVec2, UVec2};
     use std::collections::HashMap;
@@ -310,6 +324,48 @@ mod tests {
         assert!(can_entity_move_to_position(
             &entity,
             IVec2::new(16, 0),
+            &tilemap,
+            &atlas,
+        ));
+    }
+
+    #[test]
+    fn can_place_collision_box_rejects_overlap_with_solid_map_object() {
+        let (mut tilemap, atlas) = collision_assets_with_center_solid_tile();
+        tilemap.objects.push(MapObjectInstance {
+            sheet: PathBuf::from("fauna.json"),
+            object_name: "bush".to_string(),
+            position: UVec2::new(16, 16),
+            size_px: UVec2::new(16, 16),
+            visible: true,
+            solid: true,
+        });
+        let collision_box = CollisionBox::solid_box(UVec2::new(16, 16));
+
+        assert!(!can_place_collision_box_at_position(
+            Some(&collision_box),
+            IVec2::new(16, 16),
+            &tilemap,
+            &atlas,
+        ));
+    }
+
+    #[test]
+    fn can_place_collision_box_ignores_non_solid_map_object() {
+        let (mut tilemap, atlas) = collision_assets_with_center_solid_tile();
+        tilemap.objects.push(MapObjectInstance {
+            sheet: PathBuf::from("fauna.json"),
+            object_name: "bush".to_string(),
+            position: UVec2::new(0, 0),
+            size_px: UVec2::new(16, 16),
+            visible: true,
+            solid: false,
+        });
+        let collision_box = CollisionBox::solid_box(UVec2::new(16, 16));
+
+        assert!(can_place_collision_box_at_position(
+            Some(&collision_box),
+            IVec2::new(0, 0),
             &tilemap,
             &atlas,
         ));

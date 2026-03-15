@@ -591,6 +591,9 @@ impl SceneViewport {
         }
 
         for object in &tilemap.objects {
+            if !object.visible {
+                continue;
+            }
             let Some(sprite_instance) =
                 self.build_map_object_sprite_instance(project_assets, object)
             else {
