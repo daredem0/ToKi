@@ -1,4 +1,4 @@
-use super::editor_ui::{EditorUI, SceneRulesGraphCommandData, Selection};
+use super::editor_ui::{EditorUI, MapEditorTool, SceneRulesGraphCommandData, Selection};
 use super::rule_graph::{RuleGraph, RuleGraphNodeKind};
 use super::undo_redo::EditorCommand;
 use crate::config::EditorConfig;
@@ -332,6 +332,11 @@ impl InspectorSystem {
         game_state: Option<&toki_core::GameState>,
         config: Option<&EditorConfig>,
     ) {
+        if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::MapEditor {
+            Self::render_map_editor_command_palette(ui_state, ui);
+            return;
+        }
+
         let current_selection = ui_state.selection.clone();
         match current_selection.as_ref() {
             Some(Selection::Scene(scene_name)) => {
@@ -480,6 +485,37 @@ impl InspectorSystem {
                 ui.separator();
                 ui.label("Click on an item in the hierarchy to inspect it.");
             }
+        }
+    }
+
+    fn render_map_editor_command_palette(ui_state: &mut EditorUI, ui: &mut egui::Ui) {
+        ui.heading("Map Tools");
+        ui.separator();
+        ui.label("Command Palette");
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut ui_state.map_editor_tool, MapEditorTool::Drag, "Drag");
+            ui.selectable_value(&mut ui_state.map_editor_tool, MapEditorTool::Brush, "Brush");
+        });
+        ui.separator();
+
+        match ui_state.map_editor_tool {
+            MapEditorTool::Drag => {
+                ui.label("Primary drag pans the map editor camera.");
+            }
+            MapEditorTool::Brush => {
+                ui.label("Primary click/drag paints tiles.");
+                if let Some(tile_name) = ui_state.map_editor_selected_tile.as_deref() {
+                    ui.label(format!("Selected Tile: {}", tile_name));
+                } else {
+                    ui.label("Selected Tile: none");
+                }
+                ui.label("Secondary drag pans the camera.");
+            }
+        }
+
+        if ui_state.has_unsaved_map_editor_changes() {
+            ui.separator();
+            ui.label("Map editor has unsaved changes.");
         }
     }
 

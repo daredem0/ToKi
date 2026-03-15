@@ -1703,23 +1703,52 @@ impl EditorApp {
             return;
         }
 
-        let Some(draft) = self.ui.map_editor_draft.clone() else {
+        if let Some(draft) = self.ui.map_editor_draft.clone() {
+            match self
+                .project_manager
+                .save_tilemap_asset(&draft.name, &draft.tilemap)
+            {
+                Ok(_) => {
+                    tracing::info!("Saved map editor draft '{}'", draft.name);
+                    self.ui.finalize_saved_map_editor_draft(draft.name);
+                }
+                Err(error) => {
+                    tracing::error!(
+                        "Failed to save map editor draft '{}': {}",
+                        draft.name,
+                        error
+                    );
+                    self.ui.map_editor_save_requested = false;
+                }
+            }
+            return;
+        }
+
+        let Some(active_map_name) = self.ui.map_editor_active_map.clone() else {
+            self.ui.map_editor_save_requested = false;
+            return;
+        };
+        let Some(tilemap) = self
+            .map_editor_viewport
+            .as_ref()
+            .and_then(|viewport| viewport.scene_manager().tilemap().cloned())
+        else {
             self.ui.map_editor_save_requested = false;
             return;
         };
 
         match self
             .project_manager
-            .save_tilemap_asset(&draft.name, &draft.tilemap)
+            .save_tilemap_asset(&active_map_name, &tilemap)
         {
             Ok(_) => {
-                tracing::info!("Saved map editor draft '{}'", draft.name);
-                self.ui.finalize_saved_map_editor_draft(draft.name);
+                tracing::info!("Saved map editor asset '{}'", active_map_name);
+                self.ui.finalize_saved_existing_map();
             }
             Err(error) => {
                 tracing::error!(
-                    "Failed to save map editor draft '{}': {}",
-                    draft.name,
+                    "Failed to save map editor asset '{}': {}",
+                    active_map_name,
                     error
                 );
                 self.ui.map_editor_save_requested = false;
@@ -1763,6 +1792,7 @@ impl EditorApp {
             Ok(()) => {
                 tracing::info!("Loaded map '{}' into map editor viewport", map_name);
                 self.ui.map_editor_active_map = Some(map_name);
+                self.ui.clear_map_editor_dirty();
                 viewport.mark_dirty();
             }
             Err(e) => {

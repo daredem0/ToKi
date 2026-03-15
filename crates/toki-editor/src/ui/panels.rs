@@ -1,10 +1,13 @@
 use super::editor_ui::{CenterPanelTab, SceneRulesGraphCommandData, Selection};
-use super::interactions::{CameraInteraction, PlacementInteraction, SelectionInteraction};
+use super::interactions::{
+    CameraInteraction, MapPaintInteraction, PlacementInteraction, SelectionInteraction,
+};
 use super::rule_graph::{RuleGraph, RuleGraphError, RuleGraphNodeKind};
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use toki_core::animation::AnimationState;
+use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
 use toki_core::rules::{
     RuleAction, RuleCondition, RuleKey, RuleSoundChannel, RuleSpawnEntityType, RuleTarget,
     RuleTrigger,
@@ -344,6 +347,21 @@ impl PanelSystem {
             ui_state.sync_map_editor_selection(&[]);
         }
 
+        let project_path = config
+            .as_deref()
+            .and_then(|cfg| cfg.current_project_path())
+            .cloned();
+        let available_tiles = project_path
+            .as_deref()
+            .and_then(|path| {
+                map_editor_viewport
+                    .as_ref()
+                    .and_then(|viewport| viewport.scene_manager().tilemap())
+                    .and_then(|tilemap| Self::load_map_editor_tile_names(path, tilemap).ok())
+            })
+            .unwrap_or_default();
+        ui_state.sync_map_editor_brush_selection(&available_tiles);
+
         ui.horizontal(|ui| {
             ui.heading("Map Editor");
             ui.separator();
@@ -352,7 +370,7 @@ impl PanelSystem {
             }
             if ui
                 .add_enabled(
-                    ui_state.has_unsaved_map_editor_draft(),
+                    ui_state.has_unsaved_map_editor_changes(),
                     egui::Button::new("Save Map"),
                 )
                 .clicked()
@@ -367,7 +385,7 @@ impl PanelSystem {
                 .selected_text(selected_label)
                 .show_ui(ui, |ui| {
                     if let Some(map_names) = &available_map_names {
-                        if ui_state.has_unsaved_map_editor_draft() {
+                        if ui_state.has_unsaved_map_editor_changes() {
                             ui.label("Save the current draft before switching maps.");
                             return;
                         }
@@ -385,9 +403,45 @@ impl PanelSystem {
 
             if ui_state.has_unsaved_map_editor_draft() {
                 ui.label("Unsaved draft");
+            } else if ui_state.map_editor_dirty {
+                ui.label("Unsaved changes");
             } else if let Some(active_map) = ui_state.map_editor_active_map.as_deref() {
                 ui.label(format!("Editing asset: {}", active_map));
             }
+        });
+        ui.horizontal(|ui| {
+            ui.label("Tool:");
+            ui.label(match ui_state.map_editor_tool {
+                super::editor_ui::MapEditorTool::Drag => "Drag",
+                super::editor_ui::MapEditorTool::Brush => "Brush",
+            });
+            ui.separator();
+            ui.add_enabled_ui(
+                ui_state.map_editor_tool == super::editor_ui::MapEditorTool::Brush,
+                |ui| {
+                    ui.label("Brush:");
+                    egui::ComboBox::from_id_salt("map_editor_brush_tile_selector")
+                        .selected_text(
+                            ui_state
+                                .map_editor_selected_tile
+                                .as_deref()
+                                .unwrap_or("No tile selected"),
+                        )
+                        .show_ui(ui, |ui| {
+                            if available_tiles.is_empty() {
+                                ui.label("No atlas tiles available");
+                                return;
+                            }
+                            for tile_name in &available_tiles {
+                                let is_selected = ui_state.map_editor_selected_tile.as_deref()
+                                    == Some(tile_name.as_str());
+                                if ui.selectable_label(is_selected, tile_name).clicked() {
+                                    ui_state.map_editor_selected_tile = Some(tile_name.clone());
+                                }
+                            }
+                        });
+                },
+            );
         });
         ui.separator();
 
@@ -455,21 +509,121 @@ impl PanelSystem {
         }
 
         let available_size = ui.available_size();
-        let (rect, response) = ui.allocate_exact_size(
-            available_size,
-            egui::Sense::drag().union(egui::Sense::hover()),
-        );
+        let (rect, response) =
+            ui.allocate_exact_size(available_size, egui::Sense::click_and_drag());
 
-        CameraInteraction::handle_drag(viewport, &response, config.as_deref());
+        match ui_state.map_editor_tool {
+            super::editor_ui::MapEditorTool::Drag => {
+                Self::handle_map_editor_primary_drag(viewport, &response, config.as_deref());
+            }
+            super::editor_ui::MapEditorTool::Brush => {
+                Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
+            }
+        }
 
-        let project_path = config
-            .as_deref()
-            .and_then(|cfg| cfg.current_project_path())
-            .map(|path| path.as_path());
-        viewport.render(ui, rect, project_path, renderer);
+        viewport.render(ui, rect, project_path.as_deref(), renderer);
         if let Some(cfg) = config.as_deref() {
             Self::paint_viewport_grid_overlay(ui, rect, viewport, cfg);
         }
+
+        if ui_state.map_editor_tool == super::editor_ui::MapEditorTool::Brush {
+            if let Some(selected_tile) = ui_state.map_editor_selected_tile.as_deref() {
+                if Self::handle_map_editor_brush_paint(ui, viewport, &response, rect, selected_tile)
+                {
+                    ui_state.mark_map_editor_dirty();
+                }
+            }
+        }
+    }
+
+    fn handle_map_editor_primary_drag(
+        viewport: &mut SceneViewport,
+        response: &egui::Response,
+        config: Option<&EditorConfig>,
+    ) {
+        CameraInteraction::handle_drag(viewport, response, config);
+    }
+
+    fn handle_map_editor_secondary_drag(
+        ui: &egui::Ui,
+        viewport: &mut SceneViewport,
+        response: &egui::Response,
+        config: Option<&EditorConfig>,
+    ) {
+        let pan_speed = config
+            .map(|c| c.editor_settings.camera.pan_speed)
+            .unwrap_or(1.0);
+
+        if response.hovered() && ui.input(|input| input.pointer.secondary_pressed()) {
+            if let Some(start_pos) = ui.input(|input| input.pointer.interact_pos()) {
+                viewport.start_camera_drag(glam::Vec2::new(start_pos.x, start_pos.y));
+            }
+        } else if response.hovered() && ui.input(|input| input.pointer.secondary_down()) {
+            if let Some(drag_pos) = ui.input(|input| input.pointer.interact_pos()) {
+                viewport.update_camera_drag(glam::Vec2::new(drag_pos.x, drag_pos.y), pan_speed);
+            }
+        } else if ui.input(|input| input.pointer.secondary_released()) {
+            viewport.stop_camera_drag();
+        }
+    }
+
+    fn handle_map_editor_brush_paint(
+        ui: &egui::Ui,
+        viewport: &mut SceneViewport,
+        response: &egui::Response,
+        rect: egui::Rect,
+        selected_tile: &str,
+    ) -> bool {
+        let wants_paint = response.hovered()
+            && ui.input(|input| input.pointer.primary_down() || input.pointer.primary_pressed());
+        if !wants_paint {
+            return false;
+        }
+
+        let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {
+            return false;
+        };
+
+        let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
+        let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
+            return false;
+        };
+        let Some(tile_pos) = MapPaintInteraction::tile_position_at_world(tilemap, world_pos) else {
+            return false;
+        };
+
+        if MapPaintInteraction::paint_tile(tilemap, tile_pos, selected_tile) {
+            viewport.mark_dirty();
+            return true;
+        }
+
+        false
+    }
+
+    fn load_map_editor_tile_names(
+        project_path: &std::path::Path,
+        tilemap: &TileMap,
+    ) -> anyhow::Result<Vec<String>> {
+        let atlas_path = {
+            let tilemaps_path = project_path
+                .join("assets")
+                .join("tilemaps")
+                .join(&tilemap.atlas);
+            if tilemaps_path.exists() {
+                tilemaps_path
+            } else {
+                project_path
+                    .join("assets")
+                    .join("sprites")
+                    .join(&tilemap.atlas)
+            }
+        };
+        let atlas = AtlasMeta::load_from_file(&atlas_path).map_err(|e| {
+            anyhow::anyhow!("Failed to load atlas '{}': {}", atlas_path.display(), e)
+        })?;
+        let mut tile_names = atlas.tiles.keys().cloned().collect::<Vec<_>>();
+        tile_names.sort();
+        Ok(tile_names)
     }
 
     fn sanitize_grid_size_axis(value: i32) -> u32 {

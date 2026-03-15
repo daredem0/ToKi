@@ -72,6 +72,10 @@ impl SceneManager {
         self.tilemap.as_ref()
     }
 
+    pub fn tilemap_mut(&mut self) -> Option<&mut TileMap> {
+        self.tilemap.as_mut()
+    }
+
     /// Set the current tilemap directly without loading from disk.
     pub fn set_tilemap(&mut self, tilemap: TileMap) -> Result<()> {
         tilemap

@@ -41,6 +41,12 @@ pub(crate) enum RightPanelTab {
     Project,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MapEditorTool {
+    Drag,
+    Brush,
+}
+
 #[derive(Debug, Clone)]
 pub struct EntityMoveDragState {
     pub scene_name: String,
@@ -119,6 +125,9 @@ pub struct EditorUI {
     pub map_editor_active_map: Option<String>,
     pub map_editor_map_load_requested: Option<String>,
     pub map_editor_draft: Option<MapEditorDraft>,
+    pub map_editor_dirty: bool,
+    pub map_editor_selected_tile: Option<String>,
+    pub map_editor_tool: MapEditorTool,
     pub map_editor_show_new_map_dialog: bool,
     pub map_editor_new_map_name: String,
     pub map_editor_new_map_width: u32,
@@ -195,6 +204,9 @@ impl EditorUI {
             map_editor_active_map: None,
             map_editor_map_load_requested: None,
             map_editor_draft: None,
+            map_editor_dirty: false,
+            map_editor_selected_tile: None,
+            map_editor_tool: MapEditorTool::Drag,
             map_editor_show_new_map_dialog: false,
             map_editor_new_map_name: "new_map".to_string(),
             map_editor_new_map_width: 32,
@@ -315,7 +327,7 @@ impl EditorUI {
     }
 
     pub fn sync_map_editor_selection(&mut self, available_map_names: &[String]) {
-        if self.map_editor_draft.is_some() {
+        if self.has_unsaved_map_editor_changes() {
             self.map_editor_map_load_requested = None;
             return;
         }
@@ -370,6 +382,7 @@ impl EditorUI {
         self.map_editor_active_map = Some(draft.name.clone());
         self.map_editor_map_load_requested = None;
         self.map_editor_draft = Some(draft);
+        self.map_editor_dirty = true;
     }
 
     pub fn map_editor_selected_label(&self) -> String {
@@ -386,10 +399,47 @@ impl EditorUI {
         self.map_editor_draft.is_some()
     }
 
+    pub fn has_unsaved_map_editor_changes(&self) -> bool {
+        self.map_editor_dirty || self.map_editor_draft.is_some()
+    }
+
+    pub fn sync_map_editor_brush_selection(&mut self, tile_names: &[String]) {
+        if tile_names.is_empty() {
+            self.map_editor_selected_tile = None;
+            return;
+        }
+
+        if self
+            .map_editor_selected_tile
+            .as_ref()
+            .is_some_and(|selected| tile_names.iter().any(|name| name == selected))
+        {
+            return;
+        }
+
+        let mut sorted_names = tile_names.to_vec();
+        sorted_names.sort();
+        self.map_editor_selected_tile = Some(sorted_names[0].clone());
+    }
+
+    pub fn mark_map_editor_dirty(&mut self) {
+        self.map_editor_dirty = true;
+    }
+
+    pub fn clear_map_editor_dirty(&mut self) {
+        self.map_editor_dirty = false;
+    }
+
     pub fn finalize_saved_map_editor_draft(&mut self, saved_name: String) {
         self.map_editor_draft = None;
+        self.map_editor_dirty = false;
         self.map_editor_active_map = Some(saved_name.clone());
         self.map_editor_map_load_requested = Some(saved_name);
+        self.map_editor_save_requested = false;
+    }
+
+    pub fn finalize_saved_existing_map(&mut self) {
+        self.map_editor_dirty = false;
         self.map_editor_save_requested = false;
     }
 
@@ -1382,10 +1432,42 @@ mod tests {
         ui.finalize_saved_map_editor_draft("draft_map".to_string());
 
         assert!(!ui.has_unsaved_map_editor_draft());
+        assert!(!ui.has_unsaved_map_editor_changes());
         assert_eq!(ui.map_editor_active_map.as_deref(), Some("draft_map"));
         assert_eq!(
             ui.map_editor_map_load_requested.as_deref(),
             Some("draft_map")
         );
+    }
+
+    #[test]
+    fn sync_map_editor_selection_preserves_dirty_loaded_map() {
+        let mut ui = EditorUI::new();
+        ui.map_editor_active_map = Some("middle".to_string());
+        ui.mark_map_editor_dirty();
+
+        ui.sync_map_editor_selection(&["alpha".to_string(), "middle".to_string()]);
+
+        assert_eq!(ui.map_editor_active_map.as_deref(), Some("middle"));
+        assert!(ui.map_editor_map_load_requested.is_none());
+    }
+
+    #[test]
+    fn sync_map_editor_brush_selection_picks_first_sorted_tile() {
+        let mut ui = EditorUI::new();
+
+        ui.sync_map_editor_brush_selection(&[
+            "water".to_string(),
+            "grass".to_string(),
+            "bush".to_string(),
+        ]);
+
+        assert_eq!(ui.map_editor_selected_tile.as_deref(), Some("bush"));
+    }
+
+    #[test]
+    fn map_editor_defaults_to_drag_tool() {
+        let ui = EditorUI::new();
+        assert_eq!(ui.map_editor_tool, super::MapEditorTool::Drag);
     }
 }
