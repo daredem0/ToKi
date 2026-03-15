@@ -3,120 +3,138 @@
 
 ## 1. Purpose
 
-This document describes the implemented design of `ToKi` for engineering and maintenance audiences. It is written as a development-facing architecture description, with explicit attention to layering, ownership boundaries, and the difference between design-time editor data and runtime game state.
+This document describes the implemented architecture of `ToKi` for engineering and maintenance work. It is grounded in the current repository state, not just the roadmap material. The focus is on clear ownership boundaries, especially the split between:
 
-The main readers are:
+- authored project data
+- shared simulation logic
+- rendering infrastructure
+- runtime orchestration
+- editor orchestration
 
-- developers extending engine systems, renderer behavior, or editor workflows
-- maintainers reviewing refactors for architectural consistency
-- contributors aligning roadmap documents with the actual repository state
+This revision reflects the codebase after the map-editor, object-sheet, multi-atlas, audio-mixer, and control-role refactors that are being prepared for the `0.1.0` release.
 
-The core promise of `ToKi` is that a Game Boy-style 2D workflow can be built from a small set of explicit layers:
+Primary readers:
 
-- schema-owned asset definitions
-- shared core domain models and simulation logic
-- a reusable renderer
-- a runtime shell
-- an editor shell
-
-This document is intentionally split into a static view and a dynamic view:
-
-- static view: crates, modules, boundaries, models, and architectural invariants
-- dynamic view: runtime loop behavior, editor workflows, and state transitions
-
-The document reflects the repository state as of `0.0.12`, not just the planning material in `toki_orga`.
+- engine contributors extending simulation, rendering, or runtime bootstrap
+- editor contributors extending project, scene, or map-authoring workflows
+- maintainers reviewing whether new work respects existing layer boundaries
 
 ## 2. System Context
 
-`ToKi` is a local-first 2D game-engine workspace for authoring and running Game Boy-style top-down games. It currently exposes two primary executable surfaces:
+`ToKi` is a local-first 2D game-engine workspace for authoring and running Game Boy-style top-down games. It currently exposes two executable products:
 
-- `toki-editor`: GUI project editor, scene hierarchy, viewport, inspector, asset validation
-- `toki-runtime`: runtime window and game loop for engine behavior and renderer integration
+- `toki-editor`: design-time GUI application for project, scene, map, entity, and object authoring
+- `toki-runtime`: runtime application for loading a project or packed game, running the simulation, and presenting audio/video output
 
 Supporting crates provide the shared substrate:
 
-- `toki-core`: domain models, simulation, assets, collision, animation, scene management
-- `toki-render`: WGPU pipelines, render targets, scene rendering abstractions
-- `toki-schemas`: canonical JSON schemas for scenes, entities, atlases, and tilemaps
+- `toki-schemas`: canonical JSON schema payloads
+- `toki-core`: domain models, asset models, simulation, collision, scene/rule logic, serialization
+- `toki-render`: reusable WGPU rendering infrastructure and text rendering
 
-High-level workflow:
+High-level context:
 
 ```mermaid
 flowchart LR
-    USER[Developer]
+    USER[Developer or Player]
     EDITOR[toki-editor]
+    RUNTIME[toki-runtime]
     PROJECT[[Project Directory]]
+    PACK[[.toki.pak bundle]]
     SCHEMAS[toki-schemas]
     CORE[toki-core]
     RENDER[toki-render]
-    RUNTIME[toki-runtime]
 
     USER --> EDITOR
+    USER --> RUNTIME
     EDITOR --> PROJECT
     EDITOR --> SCHEMAS
     EDITOR --> CORE
     EDITOR --> RENDER
     PROJECT --> RUNTIME
+    PACK --> RUNTIME
     RUNTIME --> CORE
     RUNTIME --> RENDER
 ```
 
-Primary asset and project surfaces:
+Main persisted surfaces:
 
-- `project.toml`: project metadata and editor settings
-- `scenes/*.json`: design-time scene definitions
-- `assets/tilemaps/*.json`: tilemap definitions
-- `assets/sprites/*.json`: sprite atlas metadata
-- `entities/*.json`: entity definitions used for placement/spawning
-- `assets/audio/**/*`: music and sound effects discovered by the editor
-- `toki_editor_config.json`: editor-local UI and project-path configuration
+- `project.toml`: project metadata, runtime settings, editor settings, mixer configuration
+- `scenes/*.json`: scene documents referencing maps and containing scene entities and rules
+- `entities/*.json`: entity definitions used for placement and spawning
+- `assets/tilemaps/*.json`: tilemap assets with tile grid plus map-owned object instances
+- `assets/sprites/*.json`: sprite atlases and object sheets
+- `assets/audio/**/*`: music and sound effects
+- `toki_editor_config.json`: editor-local configuration outside project scope
 
-Current product boundary:
+## 3. Architectural Overview
 
-- project creation, opening, saving, asset scanning, manual validation, scene loading, viewport rendering, entity placement, move-drag, and inspector-based property editing are implemented
-- export/distribution tooling and visual scripting are still roadmap items
-- runtime startup is still demo-oriented rather than fully project-driven
+The codebase follows a layered architecture with an explicit design-time/runtime split. The most important rule is that authority flows downward:
 
-## 3. Architectural Style
+- schemas define valid serialized shapes
+- project files define authored content
+- core defines simulation meaning
+- render defines GPU execution
+- runtime and editor translate external events into core/render calls
 
-The implementation follows a layered style with a strong design-time/runtime split. Data definitions live at the bottom, rendering infrastructure sits above shared domain logic, and application-specific orchestration lives in runtime and editor shells.
+### 3.1 Layer stack
 
-Architectural characteristics:
+```mermaid
+flowchart TD
+    L1[Schema Layer\ntoki-schemas]
+    L2[Project and Persistence Layer\nproject.toml, scenes, entities, tilemaps, atlases, object sheets]
+    L3[Core Domain Layer\ntoki-core]
+    L4[Render Infrastructure Layer\ntoki-render]
+    L5[Runtime Shell\ntoki-runtime]
+    L6[Editor Shell\ntoki-editor]
 
-- explicit separation between persisted scene data (`Scene`, `ProjectAssets`) and live runtime state (`GameState`, `EntityManager`)
-- JSON-first asset model with schema ownership isolated in `toki-schemas`
-- reusable rendering primitives shared between editor and runtime
-- deterministic update order in runtime systems
-- editor interaction logic separated into focused modules (`selection`, `placement`, `camera`)
-- local filesystem as the primary persistence and asset-discovery boundary
+    L1 --> L2
+    L2 --> L3
+    L3 --> L4
+    L3 --> L5
+    L3 --> L6
+    L4 --> L5
+    L4 --> L6
+```
 
-### 3.1 Quality attributes and acceptance criteria
+### 3.2 Layer responsibilities
 
-| Quality attribute | Operational interpretation | Acceptance criteria | Primary evidence |
+| Layer | Main artifacts | Responsibility | Must not own |
 |---|---|---|---|
-| Pixel-accurate rendering | World state is rendered with integer-aligned coordinates and nearest-neighbor presentation | camera, sprite placement, and projection logic preserve 160x144-native behavior | `crates/toki-core/src/camera.rs`, `crates/toki-core/src/math/projection.rs`, `crates/toki-render/src/*` |
-| Shared engine reuse | Editor and runtime consume the same core models instead of duplicating gameplay logic | scene entities, collisions, animation, and sprite frames come from `toki-core` | `crates/toki-core/src/game.rs`, `crates/toki-editor/src/scene/viewport.rs`, `crates/toki-runtime/src/systems/game_manager.rs` |
-| Editor safety | Editing operations mutate design-time scene data intentionally and can be re-synced into runtime state | inspector edits, entity placement, and drag-move affect scene definitions and trigger viewport reloads | `crates/toki-editor/src/ui/inspector.rs`, `crates/toki-editor/src/ui/interactions/*`, `crates/toki-editor/src/editor_app.rs` |
-| Asset validity | Asset formats are centrally defined and validated against canonical schemas | validator compiles schemas from a single source of truth and checks project assets by type | `crates/toki-schemas/src/lib.rs`, `crates/toki-editor/src/validation.rs` |
-| Modularity and testability | Major concerns can be reasoned about and tested in isolation | core logic and editor interactions have focused tests and module boundaries | `crates/toki-core/tests/*`, in-module tests in editor interaction/inspector/app modules |
-| Release hygiene | Builds, checks, coverage, packaging, and release flow are standardized at workspace level | `just`, CI, changelog, package-crate, and release config all operate at workspace scope | `Justfile`, `.github/workflows/rust.yml`, `Cargo.toml`, `CHANGELOG.md` |
+| Schema | `crates/toki-schemas/schemas/*.json` | Canonical document shapes | editor flow, runtime simulation |
+| Project and persistence | `project.toml`, scene/entity/map/atlas/object-sheet JSON | Authored game content and settings | GPU logic, platform lifecycle |
+| Core domain | `toki-core` | Asset models, runtime state, rules, collision, animation, serialization | egui, winit, WGPU orchestration |
+| Render infrastructure | `toki-render` | Render targets, pipelines, scene snapshots, text layout | gameplay rules, project scanning |
+| Runtime shell | `toki-runtime` | startup, resource loading, pack extraction, per-frame execution, audio dispatch | authoring workflows |
+| Editor shell | `toki-editor` | project IO, asset scanning, inspector, scene viewport, map editor, validation | authoritative gameplay semantics |
 
-### 3.2 Key architecture decisions and trade-offs
+### 3.3 Design-time/runtime split
 
-| Decision | Why this was chosen | Trade-off accepted | Current consequence |
-|---|---|---|---|
-| Separate `Scene` from `GameState` | Editor persistence and runtime execution have different lifecycle needs | explicit conversion/reload steps are required | active-scene loading copies entities from scene data into runtime state |
-| Keep schema payloads in `toki-schemas` | asset validation must have a single source of truth | one more crate in workspace | editor validation is packaging-safe and schema drift is avoided |
-| Use a custom entity manager instead of a generic ECS framework | data model stays explicit and small for current engine scope | less generic query composition than a full ECS | entity/type/audio handling stays straightforward but hand-managed |
-| Share rendering concepts but keep two rendering entrypoints | editor needs offscreen texture rendering while runtime still uses a direct window path | `SceneRenderer` and `GpuState` coexist | renderer layering is usable but not yet fully consolidated |
-| Put editor interaction logic into dedicated modules | click, drag, move, and placement rules needed to stay testable and readable | more coordination code between UI state and viewport state | selection, placement, and camera behavior are easier to extend without monolithic UI code |
-| Load assets from filesystem paths at application edges | engine/editor remain local-first and transparent | runtime bootstrap still depends on hardcoded/default paths | project-driven runtime startup is not complete yet |
+The key architectural distinction is between authored content and executable state.
+
+Design-time examples:
+
+- `ProjectMetadata`
+- `Scene`
+- `EntityDefinition`
+- `TileMap`
+- `AtlasMeta`
+- `ObjectSheetMeta`
+
+Runtime examples:
+
+- `GameState`
+- `EntityManager`
+- `Entity`
+- runtime audio components
+- camera follow state
+- render snapshots (`SceneData`, `SpriteInstance`, debug shapes)
+
+The editor frequently converts design-time state into runtime-style state for preview and inspection, but the editor does not become the source of truth for simulation semantics. `toki-core` remains authoritative.
 
 ## 4. Static View
 
-The static view captures compile-time structure across the workspace. The important boundary is not just crate-to-crate dependency; it is authority: schemas define valid documents, core owns game-state truth, render owns GPU execution, runtime owns OS-loop coordination, and editor owns design-time workflows.
-
-### 4.1 High-level dependency graph
+### 4.1 Workspace dependency view
 
 ```mermaid
 flowchart TD
@@ -126,578 +144,502 @@ flowchart TD
     RUNTIME[crates/toki-runtime]
     EDITOR[crates/toki-editor]
 
-    SCHEMAS --> EDITOR
     CORE --> RENDER
     CORE --> RUNTIME
     CORE --> EDITOR
     RENDER --> RUNTIME
     RENDER --> EDITOR
+    SCHEMAS --> EDITOR
 ```
 
-Implementation note:
+Practical note:
 
-- the editor manifest currently depends on `toki-runtime`, but source-level editor code primarily talks directly to `toki-core`, `toki-render`, and `toki-schemas`
-- this means the conceptual layering is cleaner than the manifest graph suggests
+- the editor depends conceptually on `toki-core`, `toki-render`, and `toki-schemas`
+- the runtime depends on `toki-core` and `toki-render`
+- project files and schema payloads are the shared contract between both applications
 
-### 4.2 Layered decomposition by authority
-
-| Layer | Crates and main files | Responsibility | Boundary |
-|---|---|---|---|
-| Schema layer | `crates/toki-schemas/src/lib.rs`, `crates/toki-schemas/schemas/*.json` | canonical JSON schema ownership | defines valid document structure; no runtime/editor orchestration |
-| Core domain layer | `crates/toki-core/src/{game,entity,scene,scene_manager,collision,animation,resources,serialization}.rs` | asset models, entity definitions, runtime state, simulation, collision, scene conversion, persistence helpers | authoritative gameplay/data semantics |
-| Render infrastructure layer | `crates/toki-render/src/{scene,gpu,targets,pipelines/*}.rs` | WGPU setup, render pipelines, offscreen/window targets, scene rendering | GPU execution and render-specific data transformation only |
-| Runtime application layer | `crates/toki-runtime/src/{app.rs,systems/*}` | OS event loop, system coordination, demo bootstrap, frame timing, audio and camera integration | translates platform events into core/runtime behavior |
-| Editor application layer | `crates/toki-editor/src/{editor_app.rs,project/*,scene/*,ui/*,validation.rs}` | project IO, asset scanning, viewport orchestration, selection/placement/inspector workflows, schema validation | design-time user workflows and persistence |
-
-### 4.3 Crate-level responsibilities
+### 4.2 Crate-level decomposition
 
 #### `toki-schemas`
 
-`toki-schemas` is intentionally small. It embeds the canonical schema payloads with `include_str!` and exposes them as constants through `SCHEMA_FILES`.
+Responsibilities:
 
-Responsibility:
+- embed canonical schema payloads with `include_str!`
+- expose `SCHEMA_FILES` for editor validation
+- define the valid serialized shapes for:
+  - `scene`
+  - `entity`
+  - `atlas`
+  - `map`
+  - `object_sheet`
 
-- own schema source-of-truth for `scene`, `entity`, `atlas`, and `map`
-- provide packaging-safe schema access for tools and editor validation
+It intentionally does not:
 
-It does not:
-
+- scan a project
 - validate files itself
-- perform project scanning
-- own any runtime/editor logic
+- know runtime/editor-specific workflows
 
 #### `toki-core`
 
-`toki-core` is the main domain crate. It contains both persisted models and live runtime models.
+`toki-core` is the authoritative domain layer.
 
-Key modules:
+Key areas:
 
-| File | Responsibility |
+| File/module | Responsibility |
 |---|---|
-| `src/entity.rs` | `Entity`, `EntityManager`, `EntityDefinition`, audio components, definition-to-entity conversion |
-| `src/game.rs` | `GameState`, input handling, scene loading, entity sync, renderable entity queries, debug data extraction |
-| `src/scene.rs` | design-time scene document model |
-| `src/scene_manager.rs` | scene registry and active-scene selection |
-| `src/collision.rs` | tile/entity collision utilities and placement checks |
-| `src/animation.rs`, `src/sprite.rs` | clip/state/frame selection logic |
-| `src/camera.rs` | camera state, follow behavior, projection, bounds clamping |
-| `src/resources.rs` | shared/default asset loading utilities |
-| `src/serialization.rs` | save/load helpers for entities, scenes, and game state |
-| `src/assets/{atlas,tilemap}.rs` | asset formats, validation, vertex generation support |
+| `src/entity.rs` | runtime `Entity`, `EntityManager`, `EntityDefinition`, control roles, AI behavior, movement profiles, entity audio settings |
+| `src/game.rs` | `GameState`, input processing, scene loading, rule execution, movement/collision gating, audio event emission |
+| `src/scene.rs` | persisted scene document |
+| `src/scene_manager.rs` | loaded scene registry and active-scene selection |
+| `src/collision.rs` | tile, entity, and map-object collision helpers |
+| `src/animation.rs`, `src/sprite.rs` | animation selection, sprite frame selection, flip state |
+| `src/assets/atlas.rs` | sprite atlas format and tile metadata |
+| `src/assets/tilemap.rs` | tilemap format, tile grid, map-owned object instances |
+| `src/assets/object_sheet.rs` | named placeable static object definitions |
+| `src/serialization.rs` | save/load helpers for runtime and authored data |
+| `src/pack.rs` | bundle-manifest and pack-format helpers shared with runtime |
 
-Authority rules:
+Important authority rules:
 
-- `EntityDefinition` owns transformation from JSON definition to runtime `Entity`
-- `GameState` owns scene-to-runtime entity materialization
-- collision helpers in core are reused by both runtime movement and editor placement validation
+- `EntityDefinition` defines default entity behavior and presentation
+- `Scene` defines scene composition and control-role assignment
+- `TileMap` defines map tiles and map-owned objects
+- `GameState` owns live runtime truth and is the only authoritative simulation surface
 
 #### `toki-render`
 
-`toki-render` owns WGPU-specific concerns and render-target abstraction.
+`toki-render` owns WGPU-specific rendering infrastructure.
 
-Key modules:
+Key areas:
 
-| File | Responsibility |
+| File/module | Responsibility |
 |---|---|
-| `src/scene.rs` | `SceneRenderer`, `SceneData`, debug-shape and sprite-scene projection |
-| `src/targets.rs` | `RenderTarget`, `WindowTarget`, `OffscreenTarget` |
-| `src/gpu.rs` | direct runtime-oriented GPU state (`GpuState`) |
-| `src/pipelines/{tilemap,sprite,debug}.rs` | concrete render pipelines |
-| `src/wgpu_utils.rs` | device/surface setup helpers |
+| `src/scene.rs` | `SceneRenderer`, `SceneData`, sprite/debug-shape scene submission |
+| `src/gpu.rs` | runtime-oriented `GpuState` orchestration |
+| `src/targets.rs` | window and offscreen targets |
+| `src/pipelines/*` | sprite, tilemap, and debug pipelines |
+| `src/text.rs` | glyph-based text layout and anchoring |
+| `src/draw.rs` | low-level sprite draw helpers including flip handling |
 
-Important current condition:
+Current architectural state:
 
-- `SceneRenderer` is the reusable abstraction used by the editor viewport
-- `GpuState` is still the direct renderer used by runtime systems
-- that is a valid transitional architecture, but it means render ownership is split between a newer target-agnostic path and an older direct state path
+- `SceneRenderer` is the reusable editor-side rendering abstraction and can render mixed textures/atlases
+- `GpuState` remains the direct runtime rendering path
+- both are valid current entrypoints, but render orchestration is still split between them
 
 #### `toki-runtime`
 
-`toki-runtime` is the runtime shell around `toki-core` and `toki-render`.
+`toki-runtime` is the runtime shell. It turns project or pack data into a running simulation.
 
-Key modules:
+Key areas:
 
-| File | Responsibility |
+| File/module | Responsibility |
 |---|---|
-| `src/app.rs` | winit app lifecycle, startup/bootstrap, per-frame tick and render loop |
-| `src/systems/game_manager.rs` | translation between platform key input and core `GameState` |
-| `src/systems/camera_manager.rs` | camera following and visible-chunk caching |
-| `src/systems/rendering.rs` | runtime render coordination and projection updates |
-| `src/systems/audio_manager.rs` | audio event consumption |
-| `src/systems/performance.rs` | frame/performance statistics |
-| `src/systems/platform.rs` | window/platform lifecycle handling |
-| `src/systems/resources.rs` | runtime-local asset loading wrapper |
+| `src/main.rs` | CLI parsing, runtime config loading, derived-version startup log |
+| `src/app.rs` | winit lifecycle, splash flow, startup-state construction, frame update/render loop |
+| `src/pack.rs` | `.toki.pak` extraction and validation |
+| `src/systems/resources.rs` | runtime resource loading for atlases, object sheets, tilemaps, and textures |
+| `src/systems/game_manager.rs` | key translation and bridge into `GameState` |
+| `src/systems/camera_manager.rs` | follow camera and visible-chunk updates |
+| `src/systems/rendering.rs` | render submission and projection updates |
+| `src/systems/audio_manager.rs` | mixer, preload policy, channel routing, spatial attenuation |
+| `src/systems/asset_loading.rs` | preload planning and decoded-project caching |
+| `src/systems/platform.rs` | platform/window hooks |
+| `src/systems/performance.rs` | HUD/console/frame stats |
 
 Current runtime boundary:
 
-- runtime starts from hardcoded/default resources and spawns a player plus demo NPC in `App::new`
-- it does not yet boot from a saved editor project or selected scene file
+- runtime can start from a project directory or a packed bundle
+- runtime loads a chosen scene/map instead of only a demo bootstrap
+- runtime renders multi-atlas entities and map-owned object-sheet instances
+- runtime applies project-level audio mix and community splash/version policy
 
 #### `toki-editor`
 
-`toki-editor` is the design-time application shell. It owns persistence, project structure, UI state, viewport workflows, and manual validation.
+`toki-editor` is the design-time shell.
 
-Key modules:
+Key areas:
 
-| File | Responsibility |
+| File/module | Responsibility |
 |---|---|
-| `src/editor_app.rs` | top-level editor orchestration, event loop, project requests, active-scene loading, viewport coordination |
-| `src/project/manager.rs` | project create/open/save workflow |
-| `src/project/assets.rs` | project asset discovery and asset inventory |
-| `src/project/project_data.rs` | `project.toml` metadata model |
-| `src/scene/manager.rs` | editor-side scene/game-state/tilemap wrapper |
-| `src/scene/viewport.rs` | bridge from scene/game state to offscreen rendering, picking, preview rendering, dirty-state control |
-| `src/ui/editor_ui.rs` | UI state model and panel orchestration |
-| `src/ui/hierarchy.rs` | hierarchy/maps/entity palette presentation |
-| `src/ui/inspector.rs` | scene/entity/map inspection and property editing |
-| `src/ui/interactions/{selection,placement,camera}.rs` | click-select, drag-move, placement-preview, viewport-camera input logic |
-| `src/validation.rs` | schema validation over discovered project assets |
-| `src/config.rs` | editor-local config file handling |
+| `src/main.rs` | editor bootstrap and logging setup |
+| `src/editor_app.rs` | top-level orchestration, viewport creation, project requests, scene/map synchronization |
+| `src/project/project_data.rs` | `project.toml` model, runtime settings, project-level audio mixer settings |
+| `src/project/manager.rs` | create/open/save project, save tilemaps, load assets |
+| `src/project/assets.rs` | discovery of scenes, tilemaps, sprite atlases, object sheets, audio, entities |
+| `src/scene/viewport.rs` | offscreen viewport, scene/map rendering bridge, preview overlays |
+| `src/ui/editor_ui.rs` | editor UI state including scene tab, map editor tab, project panel, map-editor history |
+| `src/ui/inspector.rs` | scene/entity/map/project inspectors and map-editor tool palette |
+| `src/ui/panels.rs` | central panel rendering and viewport interaction routing |
+| `src/ui/hierarchy.rs` | left navigation for scenes, maps, and entity palette |
+| `src/ui/interactions/selection.rs` | scene-entity selection and drag-move |
+| `src/ui/interactions/placement.rs` | entity placement previews and placement validation |
+| `src/ui/interactions/map_paint.rs` | map brush/fill/pick logic |
+| `src/ui/interactions/map_objects.rs` | map-object placement, hit-testing, movement, and deletion |
+| `src/validation.rs` | schema validation against project assets |
 
-### 4.4 Concrete model decomposition
+Current editor boundary:
 
-The central model split is between persisted design data and executable runtime state.
+- scene composition and map editing are separate workflows
+- project settings, including audio mixer settings, are edited in the right-side project panel
+- the map editor is now an independent asset editor rather than a scene-dependent mode
+
+## 5. Domain Model Decomposition
+
+### 5.1 Project and asset model
 
 ```mermaid
 flowchart TD
-    P[Project metadata and asset index]
-    S[Scene]
+    PM[ProjectMetadata]
+    PA[ProjectAssets]
+    SCN[Scene]
     ED[EntityDefinition]
-    GS[GameState]
-    EM[EntityManager]
-    SD[SceneData]
-    SR[SceneRenderer]
+    TM[TileMap]
+    AT[AtlasMeta]
+    OS[ObjectSheetMeta]
 
-    P --> S
-    P --> ED
-    S --> GS
-    ED --> EM
-    GS --> EM
-    GS --> SD
-    SD --> SR
+    PM --> PA
+    PA --> SCN
+    PA --> ED
+    PA --> TM
+    PA --> AT
+    PA --> OS
 ```
 
-Main model roles:
+Key authored asset meanings:
 
-| Model | Layer | Role |
+| Model | Meaning |
+|---|---|
+| `ProjectMetadata` | project-level metadata, runtime splash and audio mix, editor recents/layouts |
+| `ProjectAssets` | discovered asset inventory used by editor tooling |
+| `Scene` | scene composition: map references, scene entities, scene rules, optional camera overrides |
+| `EntityDefinition` | reusable entity archetype: category, visuals, defaults, audio defaults |
+| `TileMap` | tile grid plus persisted map-owned object instances |
+| `AtlasMeta` | named tile metadata including solid/trigger flags and UV layout |
+| `ObjectSheetMeta` | named placeable static object definitions extracted from a sprite sheet |
+
+### 5.2 Entity model
+
+The entity model is no longer based on the old authored `player` vs `npc` split.
+
+Important concepts:
+
+| Concept | Owned by | Meaning |
 |---|---|---|
-| `Project` / `ProjectMetadata` | editor | persists project-level settings and scene path map |
-| `ProjectAssets` | editor | discovered asset inventory keyed by asset type |
-| `Scene` | core/editor | persisted scene document with maps, entities, and camera overrides |
-| `EntityDefinition` | core | JSON-authored definition that creates runtime entities and audio/collision data |
-| `Entity` / `EntityManager` | core | live runtime entities and typed/runtime lookup tables |
-| `GameState` | core | active simulation state plus current-scene registry |
-| `SceneData` | render | renderer-ready snapshot of tilemap, sprites, debug shapes, and visible chunks |
+| `category` | `EntityDefinition` / `Entity` | generic authored taxonomy such as human or creature |
+| `EntityKind` | runtime `Entity` | internal runtime mechanics classification |
+| `control_role` | scene entity / runtime `Entity` | whether a placed entity is the current player character |
+| `movement_profile` | entity attributes | how an entity responds to input |
+| `ai_behavior` | entity attributes | autonomous behavior such as wander |
 
-### 4.5 Project artifact model
+This separation matters:
 
-The editor works against a project directory rather than an internal database.
+- a creature can be player-controlled
+- a human can be AI-controlled
+- movement behavior is not equivalent to player identity
+- runtime player semantics derive from `control_role`, not from authored category
 
-Expected project structure:
+### 5.3 Map model
 
-```text
-<project>/
-  project.toml
-  scenes/
-    *.json
-  entities/
-    *.json
-  assets/
-    sprites/
-      *.json
-      *.png
-    tilemaps/
-      *.json
-      *.png
-    audio/
-      music/*
-      sfx/*
-  settings/
+`TileMap` now owns both terrain tiles and static map objects.
+
+```mermaid
+flowchart LR
+    TM[TileMap]
+    T[tiles: Vec<String>]
+    MO[objects: Vec<MapObjectInstance>]
+    AT[AtlasMeta]
+    OS[ObjectSheetMeta]
+
+    TM --> T
+    TM --> MO
+    T --> AT
+    MO --> OS
 ```
 
-Artifact semantics:
+`MapObjectInstance` currently stores:
 
-- scenes reference maps by name, not by embedded map payload
-- maps are loaded separately into the editor viewport
-- entity definitions are separate authored assets used for placement and spawning
-- schema validation is opt-in/manual, triggered from the editor
-- the editor expects an `entities/` directory for definition discovery, but current new-project scaffolding does not create that directory yet
+- `sheet`
+- `object_name`
+- `position`
+- `size_px`
+- `visible`
+- `solid`
 
-### 4.6 Layering rules and current boundary conditions
+This means map objects are persisted as part of the map asset, not as scene entities.
 
-The layering is mostly coherent, but the current codebase still shows a few transitional seams that matter for future work.
+### 5.4 Audio model
 
-Clean boundaries:
+Audio has three layers of control:
 
-- schema definitions live in one place only
-- simulation logic lives in `toki-core`
-- editor-specific interaction state is not pushed down into core
-- render pipelines do not own gameplay logic
+| Layer | Examples |
+|---|---|
+| project-wide mix | master, music, movement, collision |
+| entity defaults | movement sound, collision sound, hearing radius, trigger mode |
+| scene/map runtime events | actual `AudioEvent::PlaySound` or `BackgroundMusic` dispatch |
 
-Transitional boundaries:
+Movement audio is no longer tied only to input. It can be emitted from:
 
-- `toki-core::ResourceManager` and `toki-runtime::systems::resources::ResourceManager` overlap in responsibility
-- `toki-render::GpuState` and `toki-render::SceneRenderer` overlap in render orchestration level
-- runtime bootstrap is still hardcoded/demo-oriented instead of project-scene-oriented
-- build scripts inject `TOKI_VERSION`, but current application code does not visibly surface that value yet
+- direct input-driven movement
+- AI wander movement
+- rule-driven velocity movement
+- animation-loop-triggered locomotion events
 
-These are not correctness bugs by themselves, but they are architectural debt that should be kept explicit.
+Spatial attenuation is listener-relative and currently uses the current player position as the listener.
 
-## 5. Dynamic View
+## 6. Dynamic View
 
-The dynamic view focuses on implemented flows: runtime update/render, editor startup, project loading, inspector editing, entity placement/movement, and asset validation.
+### 6.1 Runtime startup
 
-### 5.1 Runtime boot and frame loop
-
-Runtime startup sequence:
+Runtime now supports both project-directory and packed-bundle startup.
 
 ```mermaid
 sequenceDiagram
     participant M as main
-    participant A as runtime::App
+    participant A as App
+    participant P as pack/runtime config
     participant R as ResourceManager
-    participant G as GameManager
-    participant C as CameraManager
+    participant G as GameState
+    participant AU as AudioManager
     participant RS as RenderingSystem
 
-    M->>A: run_minimal_window()
-    A->>R: load_all()
-    A->>G: create empty GameState and spawn demo entities
-    A->>C: create follow-camera controller
-    A->>RS: create rendering system
+    M->>A: run_minimal_window_with_options(options)
+    A->>P: resolve project or pack startup inputs
+    alt pack startup
+        A->>P: extract .toki.pak to temp dir
+    end
+    A->>R: load sprite atlases, object sheets, tilemap, textures
+    A->>G: load selected scene into runtime state
+    A->>AU: apply master/channel audio mix
+    A->>RS: initialize renderer and splash state
 ```
 
-Per-frame runtime behavior:
+Important runtime properties:
+
+- startup is scene/map driven, not only demo-driven
+- object sheets are loaded separately from sprite atlases
+- derived `TOKI_VERSION` is logged at startup and shown on the splash screen
+
+### 6.2 Runtime frame loop
 
 ```mermaid
 sequenceDiagram
     participant W as winit
     participant A as App
-    participant G as GameManager
+    participant G as GameManager/GameState
     participant AU as AudioManager
     participant C as CameraManager
     participant RS as RenderingSystem
 
-    W->>A: keyboard/window events
-    A->>G: translate platform input to InputKey state
-    A->>G: update(world_bounds, tilemap, atlas)
+    W->>A: platform input / redraw events
+    A->>G: translate physical keys to abstract input and movement-profile input
+    A->>G: update simulation
     G-->>A: GameUpdateResult<AudioEvent>
-    A->>AU: handle generated audio events
-    A->>C: update camera from runtime entities
-    A->>RS: update projection / visible chunks / sprite buffers
-    W->>A: redraw requested
-    A->>RS: draw()
+    A->>AU: dispatch music and sound events with channel mix and distance attenuation
+    A->>C: update follow camera and visible chunks
+    A->>RS: submit tilemap, entities, map objects, text, debug overlays
+    A->>RS: draw frame
 ```
 
 Behavioral notes:
 
-- runtime updates gameplay first, then camera, then render data
-- debug collision rendering is generated from `GameState` queries and rendered as overlay shapes
-- save/load shortcuts (`F5`, `F6`) serialize `GameState` directly
+- all movement paths use shared collision gates
+- solid map objects, solid entities, and solid tiles all participate in blocking
+- left-facing directional animation uses render-time flip state rather than duplicated art
+- map-owned object-sheet instances render in runtime as part of the map
 
-### 5.2 Editor startup and viewport initialization
-
-Editor startup sequence:
-
-```mermaid
-sequenceDiagram
-    participant M as main
-    participant EA as EditorApp
-    participant CFG as EditorConfig
-    participant WR as WindowRenderer
-    participant SV as SceneViewport
-
-    M->>CFG: load or create config
-    M->>EA: run_editor()
-    EA->>WR: create window and WGPU/egui renderer
-    EA->>SV: create SceneViewport with empty GameState
-    EA->>SV: initialize offscreen renderer
-```
-
-Important runtime/editor split:
-
-- the editor does not simulate the game continuously like runtime
-- the viewport only re-renders when marked dirty
-- offscreen rendering is performed before egui panel composition, then displayed as a texture in the viewport panel
-
-### 5.3 Project open and active-scene synchronization
-
-Project-open and scene-load flow:
+### 6.3 Editor project-open flow
 
 ```mermaid
 sequenceDiagram
-    participant UI as Editor UI
+    participant U as User
     participant EA as EditorApp
     participant PM as ProjectManager
     participant PA as ProjectAssets
+    participant UI as EditorUI
     participant SV as SceneViewport
-    participant GS as GameState
 
-    UI->>EA: open project
+    U->>EA: Open Project
     EA->>PM: open_project(path)
-    PM->>PA: scan_assets()
-    EA->>PM: load_scenes()
-    PM-->>EA: Vec<Scene>
-    EA->>UI: load scenes into hierarchy
-    UI->>EA: choose active scene / load map
-    EA->>GS: add_scene(scene)
-    EA->>GS: load_scene(scene_name)
-    EA->>SV: load tilemap(map_path)
-    EA->>SV: mark_dirty()
+    PM->>PA: scan assets
+    PM-->>EA: project metadata plus discovered assets
+    EA->>UI: populate hierarchy, entity palette, project panel
+    EA->>SV: initialize scene viewport and map editor viewport
 ```
 
-Architectural meaning:
+### 6.4 Scene workflow
 
-- scene documents are loaded into editor UI state first
-- the active scene is then copied into `GameState` for runtime-style rendering and picking
-- tilemaps are managed separately from scene entity loading
+The scene workflow is scene-centric.
 
-This separation is intentional, but it means scene changes must be propagated explicitly. The code does that through `scene_content_changed`, `last_loaded_active_scene`, and viewport dirty-state tracking.
+Main responsibilities:
 
-### 5.4 Inspector property editing sequence
+- choose active scene
+- choose maps referenced by that scene
+- place and move scene entities
+- edit entity/scene properties and rules
+- preview runtime-style rendering through the scene viewport
 
-Inspector editing flow:
+Scene flow:
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant VP as Viewport/Hierarchy
     participant UI as EditorUI
-    participant I as InspectorSystem
     participant EA as EditorApp
+    participant GS as GameState
     participant SV as SceneViewport
 
-    U->>VP: select scene/map/entity
-    VP->>UI: update Selection
-    UI->>I: render selection-specific inspector
-    alt scene entity selected
-        I->>I: build EntityPropertyDraft
-        U->>I: edit fields
-        I->>UI: apply draft back to active-scene entity
-        UI->>EA: scene_content_changed = true
-        EA->>SV: reload active scene and mark dirty
-    else runtime-only entity selected
-        I-->>U: read-only data
-    end
+    UI->>EA: select active scene
+    EA->>GS: load scene into runtime-style state
+    EA->>SV: load referenced map and entities
+    EA->>SV: mark dirty and render offscreen
 ```
 
-Current inspector behavior:
+### 6.5 Map editor workflow
 
-- scene entities are editable
-- runtime-only entities are shown read-only
-- edited properties include position, size, visibility, active/solid flags, movement, inventory, speed, render layer, optional health, and collision-box fields
+The map editor is asset-centric and intentionally independent of the active scene.
 
-This satisfies the current "property editing (inspector)" milestone in a scene-authoring sense, but not yet as a fully generic property-grid framework.
+Main responsibilities:
 
-### 5.5 Entity placement and drag-move sequence
-
-Placement and move behavior is one of the clearest examples of editor/runtime model cooperation.
-
-Placement flow:
+- create map drafts in memory
+- load existing map assets directly
+- paint/fill/pick tiles
+- place, move, inspect, and delete map-owned objects
+- save back to `assets/tilemaps/*.json`
+- maintain its own undo/redo history
 
 ```mermaid
 sequenceDiagram
     participant U as User
     participant UI as EditorUI
-    participant PI as PlacementInteraction
-    participant VP as SceneViewport
-    participant DEF as EntityDefinition
-    participant SC as Active Scene
-
-    U->>UI: choose entity definition from palette
-    UI->>UI: enter placement mode
-    U->>VP: move cursor in viewport
-    VP->>PI: hover position
-    PI->>DEF: load definition and collision box
-    PI->>VP: validate placement against tilemap collision
-    PI->>UI: update preview position and validity
-    U->>VP: click to place
-    PI->>DEF: create_entity(position, next_id)
-    PI->>SC: append entity on valid placement
-    PI->>UI: scene_content_changed = true
-```
-
-Move-drag flow:
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant SI as SelectionInteraction
-    participant UI as EditorUI
-    participant VP as SceneViewport
-    participant SC as Active Scene
-
-    U->>VP: click
-    SI->>UI: select entity
-    U->>VP: click-hold-drag
-    SI->>UI: begin EntityMoveDragState
-    SI->>VP: suppress original entity rendering
-    U->>VP: release
-    SI->>VP: validate drop position
-    alt valid
-        SI->>SC: update entity position
-        SI->>UI: scene_content_changed = true
-    else invalid
-        SI-->>U: snap back to original position
-    end
-    SI->>VP: clear suppression and mark dirty
-```
-
-Implemented interaction rule:
-
-- single click selects and updates the inspector
-- click-hold-drag starts move mode if the drag began on an entity
-- release attempts drop
-- invalid drop snaps back to original position and exits drag mode
-
-### 5.6 Asset validation flow
-
-Validation sequence:
-
-```mermaid
-sequenceDiagram
-    participant U as User
     participant EA as EditorApp
-    participant AV as AssetValidator
-    participant TS as toki-schemas
-    participant PA as ProjectAssets
+    participant MV as MapEditorViewport
+    participant TM as TileMap
 
-    U->>EA: validate project assets
-    EA->>AV: new()
-    AV->>TS: load canonical schema strings
-    EA->>PA: enumerate discovered assets
-    AV->>AV: validate scene/entity/atlas/map files by schema type
-    AV-->>U: log success/failure per file
+    U->>UI: open Map Editor tab
+    UI->>EA: request map load or new map draft
+    EA->>MV: load tilemap into dedicated viewport
+    U->>MV: brush/fill/pick/place object/delete/drag object
+    MV->>UI: record edit transaction and mark dirty
+    U->>UI: Save Map
+    UI->>EA: persist current tilemap to assets/tilemaps/*.json
 ```
 
-This is schema validation only. It does not yet perform deeper semantic consistency checks across assets, such as verifying that every scene-referenced map or every animation atlas name resolves to a discovered asset.
+Current map-editor tools:
 
-## 6. UI Interaction Model
+- `Drag`
+- `Brush`
+- `Fill`
+- `Pick Tile`
+- `Place Object`
+- `Delete`
 
-The editor UI is a stateful egui shell with explicit panels and selection state.
+### 6.6 Inspector and project panel workflow
 
-Major surfaces:
+The right-side panel has two distinct responsibilities:
 
-- hierarchy/maps/entity palette panel
-- central viewport panel
-- inspector panel
-- console/log panel
-- top menu
+- `Inspector`: selection-driven editing
+- `Project`: project-wide settings such as metadata, splash duration, and audio mixer
 
-Primary selection states:
+This is an important layering improvement. Project-level settings no longer have to masquerade as scene or entity settings.
 
-- `Scene`
-- `Map(scene, map)`
-- `Entity`
-- `StandaloneMap`
-- `EntityDefinition`
+## 7. Layering Rules and Architectural Invariants
 
-Important interaction properties:
+### 7.1 Layering rules
 
-- `F1` toggles hierarchy
-- `F2` toggles inspector
-- `F4` toggles collision debug rendering in viewport/game state
-- `Escape` exits the editor
-- viewport click selects entities by bounds hit-testing
-- viewport drag pans camera unless an entity move-drag is active
-- placement mode shows a preview sprite plus validity outline
+1. Schemas define serialized shape only.
+2. Project assets define authored content only.
+3. `toki-core` defines runtime meaning and simulation rules.
+4. `toki-render` consumes prepared render data, not raw project files.
+5. Runtime and editor may orchestrate core/render differently, but they must not redefine core semantics.
+6. Scene composition and map editing are separate workflows even when they share rendering code.
 
-Current UI-state machine, simplified:
-
-```mermaid
-stateDiagram-v2
-    [*] --> Idle
-    Idle --> Selected: click entity or hierarchy item
-    Selected --> Editing: inspector field change
-    Selected --> DragMove: drag starts on selected entity
-    Idle --> Placement: choose entity definition
-    Placement --> Placement: hover updates preview
-    Placement --> Idle: successful placement
-    DragMove --> Idle: valid drop
-    DragMove --> Selected: invalid drop snap-back
-```
-
-## 7. Guarantees and Current Limits
-
-### 7.1 Guarantees
-
-- schemas are defined in a single dedicated crate and consumed by the validator without duplication
-- scene entities can be authored, placed, moved, selected, and edited through the editor
-- collision placement checks are shared between runtime movement rules and editor placement rules
-- editor viewport rendering and runtime rendering share pipeline concepts and core sprite/tilemap data
-- active-scene loading into `GameState` is explicit and test-covered for map-selection edge cases
-- workspace-level CI, clippy, formatting, testing, coverage, license checks, packaging, and release flow are in place
-
-### 7.2 Current limits
-
-- runtime startup is still sample/demo oriented, not yet a full project runner
-- resource loading responsibility is duplicated between `toki-core` and `toki-runtime`
-- render orchestration exists in both `GpuState` and `SceneRenderer`
-- schema validation is manual and file-structural; it is not yet a full semantic validation pipeline
-- property editing currently targets scene entities, not an extensible reflection-style property system
-- entity picking is bounds-based, not render-buffer/GPU-based
-- project scaffolding is not yet fully aligned with all later editor expectations (`entities/` is assumed by discovery and placement flows)
-- export/build-for-game distribution remains a future feature
-- build scripts compute `TOKI_VERSION`, but the applications do not yet prominently surface it
-
-### 7.3 Architectural invariants
+### 7.2 Invariants
 
 | Invariant | Definition | Enforced by |
 |---|---|---|
-| I1 | canonical asset schemas come from one source only | `toki-schemas` plus `AssetValidator` |
-| I2 | runtime entity truth lives in `GameState` / `EntityManager`, not in renderer or UI | `toki-core/src/game.rs`, `toki-core/src/entity.rs` |
-| I3 | design-time scene edits must propagate by explicit scene reload/dirty-state logic | `editor_app.rs`, `scene/viewport.rs`, `ui/inspector.rs` |
-| I4 | placement and move validation use the same collision semantics as runtime movement | `toki-core/src/collision.rs`, editor interaction modules |
-| I5 | renderer consumes prepared scene snapshots, not raw project files directly | `SceneViewport::prepare_scene_data`, `toki-render::SceneRenderer` |
-| I6 | project persistence is filesystem-backed and transparent | `project/manager.rs`, `project/assets.rs`, `project/project_data.rs` |
+| I1 | canonical JSON schemas come from one place only | `toki-schemas` |
+| I2 | runtime truth lives in `GameState` / `EntityManager`, not in UI or renderer | `toki-core/src/game.rs`, `toki-core/src/entity.rs` |
+| I3 | player identity derives from `control_role`, not authored category | scene loading and entity manager player tracking |
+| I4 | movement behavior derives from `movement_profile`, not player identity | `GameState` input routing |
+| I5 | autonomous behavior derives from `ai_behavior`, not category alone | `GameState::update_npc_ai` path |
+| I6 | map objects belong to the map asset, not to the scene entity list | `TileMap::objects`, map-editor persistence |
+| I7 | editor placement/drag validation uses the same collision semantics as runtime movement | `toki-core/src/collision.rs`, editor interaction modules |
+| I8 | runtime/editor rendering consume renderer-ready snapshots and metadata, not raw project documents directly | `SceneViewport`, runtime rendering system |
 
-## 8. Build, Test, and Release Architecture
+## 8. Known Seams and Current Debt
 
-The repository is organized as a workspace-first build and release system.
+The architecture is coherent, but a few seams are still visible and should remain explicit.
 
-Build/test surfaces:
+### 8.1 Resource loading overlap
 
-- `just build`
-- `just run-editor`
-- `just run-runtime`
-- `just test`
-- `just fmt-check`
-- `just clippy`
+There is still overlap between:
+
+- `toki-core::resources`
+- `toki-runtime::systems::resources`
+- editor-side project asset discovery
+
+The system works, but asset-resolution responsibilities are split across layers more than ideal.
+
+### 8.2 Render entrypoint split
+
+Rendering is still shared across two orchestration styles:
+
+- `SceneRenderer` for editor/offscreen composition
+- `GpuState` for runtime-direct rendering
+
+This is acceptable, but it is still a consolidation target.
+
+### 8.3 Validation depth
+
+Schema validation exists and is useful, but deeper semantic validation remains limited. Examples of future semantic checks:
+
+- missing atlas tile names referenced by maps
+- missing object-sheet object names referenced by map objects
+- stale entity definition references in scenes
+- cross-asset validation of animation clip frame names
+
+### 8.4 Runtime/editor object editing asymmetry
+
+Map objects are fully editable in the map editor and render in runtime, but scene-viewport editing of map objects is still behind scene-entity editing in ergonomics.
+
+## 9. Build, Test, and Release Architecture
+
+The workspace is built and released as a coordinated multi-crate system.
+
+Primary quality surfaces:
+
+- `cargo fmt --all --check`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo test --workspace`
 - `just coverage`
-- `just quality-licenses-check`
-- `just quality-licenses-generate`
+- CI workflows in `.github/workflows`
 
-Release architecture:
+Release structure:
 
-- shared workspace version in root `Cargo.toml`
-- `cargo-release` drives version bump, `v`-prefixed tag creation, and push behavior
-- CI mirrors the `git-sync` multi-job structure with build, test, fmt, clippy, coverage, docs, package-crate, release, and pages deployment jobs
-- `.crate` packaging is workspace-aware to support inter-crate path/version coupling
+- shared workspace versioning in root `Cargo.toml`
+- changelog-driven release prep in `CHANGELOG.md`
+- build scripts in editor/runtime derive `TOKI_VERSION`
+- runtime and editor now surface derived version information in UX/logging instead of only computing it invisibly
 
-Version/build notes:
+## 10. Architecture Summary
 
-- workspace crates share version `0.0.12`
-- `toki-editor` and `toki-runtime` build scripts derive `TOKI_VERSION` from `TOKI_VERSION_OVERRIDE`, `git describe`, or `CARGO_PKG_VERSION`
-- project metadata stores `toki_editor_version` using `CARGO_PKG_VERSION`
+`ToKi` is no longer just a minimal scene/entity editor with a demo runtime. The current implemented architecture has six visible layers:
 
-Current state note:
+1. schema ownership
+2. authored project assets and persistence
+3. shared core simulation and asset semantics
+4. reusable render infrastructure
+5. runtime orchestration
+6. editor orchestration
 
-- version injection infrastructure is present, but version display is not yet a prominent runtime/editor UX feature
+That layering is now visible in the codebase and should stay visible in future work.
 
-## 9. Architecture Summary
+The strongest current architectural moves are:
 
-`ToKi` currently has a sound high-level shape:
+- explicit separation of control role, movement profile, AI behavior, and category
+- independent map-asset editing rather than overloading scene editing
+- distinct asset types for tile atlases versus object sheets
+- project-level audio and runtime configuration separated from scene/entity settings
+- runtime startup that can load a project directory or a packaged game
 
-- schema ownership is centralized
-- core domain logic is shared
-- the editor and runtime are separated cleanly at application level
-- the editor's recent work on selection, drag-move, and inspector editing fits the existing design rather than fighting it
-
-The main architectural work still remaining is consolidation, not reinvention:
-
-- unify overlapping resource-loading paths
-- converge renderer entrypoints
-- replace demo runtime bootstrap with project-driven startup
-- deepen validation from schema-level correctness to cross-asset semantic correctness
-
-That is a good sign. The current repository is past the "invent the architecture" phase and into the "tighten and simplify the architecture" phase.
+The main remaining work is consolidation and semantic hardening, not architectural reinvention.
