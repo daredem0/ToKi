@@ -613,12 +613,24 @@ impl EditorUI {
                                         );
 
                                         ui.horizontal(|ui| {
-                                            let entity_display = match entity.entity_type {
-                                                toki_core::entity::EntityType::Player => format!("👤 Player (ID: {})", entity.id),
-                                                toki_core::entity::EntityType::Npc => format!("🧙 NPC (ID: {})", entity.id),
-                                                toki_core::entity::EntityType::Item => format!("📦 Item (ID: {})", entity.id),
-                                                toki_core::entity::EntityType::Decoration => format!("🎨 Decoration (ID: {})", entity.id),
-                                                toki_core::entity::EntityType::Trigger => format!("⚡ Trigger (ID: {})", entity.id),
+                                            let kind_label = entity
+                                                .definition_name
+                                                .clone()
+                                                .or_else(|| {
+                                                    if entity.category.is_empty() {
+                                                        None
+                                                    } else {
+                                                        Some(entity.category.clone())
+                                                    }
+                                                })
+                                                .unwrap_or_else(|| format!("{:?}", entity.entity_type));
+                                            let entity_display = if matches!(
+                                                entity.effective_control_role(),
+                                                toki_core::entity::ControlRole::PlayerCharacter
+                                            ) {
+                                                format!("👤 {} (Player Character, ID: {})", kind_label, entity.id)
+                                            } else {
+                                                format!("🧩 {} (ID: {})", kind_label, entity.id)
                                             };
 
                                             let response = ui.selectable_label(is_selected, entity_display);
@@ -979,7 +991,9 @@ mod tests {
             position,
             size: UVec2::new(16, 16),
             entity_type: EntityType::Npc,
+            category: "creature".to_string(),
             definition_name: Some("npc".to_string()),
+            control_role: toki_core::entity::ControlRole::None,
             attributes: EntityAttributes::default(),
             collision_box: None,
         }

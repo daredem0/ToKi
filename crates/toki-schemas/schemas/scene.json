@@ -415,9 +415,18 @@
           "type": "string",
           "description": "Type of entity (Player, NPC, Item, etc.)"
         },
+        "category": {
+          "type": "string",
+          "description": "Generic category used for editor grouping and authoring"
+        },
         "definition_name": {
           "type": ["string", "null"],
           "description": "Source entity definition name used to instantiate this runtime entity"
+        },
+        "control_role": {
+          "type": "string",
+          "enum": ["none", "player_character"],
+          "description": "Scene-level control role for this entity"
         },
         "attributes": {
           "$ref": "#/definitions/entityAttributes"

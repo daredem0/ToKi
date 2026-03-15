@@ -76,6 +76,9 @@ fn test_entity_definition_create_entity_basic() {
     assert_eq!(entity.size.x, 16);
     assert_eq!(entity.size.y, 16);
     assert_eq!(entity.entity_type, EntityType::Player);
+    assert_eq!(entity.category, "character");
+    assert_eq!(entity.control_role, ControlRole::LegacyDefault);
+    assert_eq!(entity.effective_control_role(), ControlRole::PlayerCharacter);
 
     // Check attributes
     assert_eq!(entity.attributes.health, Some(100));
@@ -180,6 +183,8 @@ fn test_entity_definition_create_npc_entity() {
     assert_eq!(entity.size.x, 32);
     assert_eq!(entity.size.y, 32);
     assert_eq!(entity.entity_type, EntityType::Npc);
+    assert_eq!(entity.category, "npc");
+    assert_eq!(entity.effective_control_role(), ControlRole::None);
 
     // Check attributes specific to NPC
     assert!(!entity.attributes.can_move);
@@ -255,6 +260,61 @@ fn test_entity_definition_missing_ai_behavior_defaults_to_wander() {
         entity.attributes.movement_profile,
         MovementProfile::LegacyDefault
     );
+}
+
+#[test]
+fn test_entity_definition_non_player_type_can_still_become_player_via_control_role_later() {
+    let entity_def = EntityDefinition {
+        name: "hero_creature".to_string(),
+        display_name: "Hero Creature".to_string(),
+        description: "Generic creature whose player role comes from the scene".to_string(),
+        entity_type: "npc".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+        },
+        attributes: AttributesDef {
+            health: Some(25),
+            speed: 2,
+            solid: true,
+            active: true,
+            can_move: true,
+            ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::PlayerWasd,
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            movement_sound: "step".to_string(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "creatures".to_string(),
+            clips: vec![AnimationClipDef {
+                state: "idle".to_string(),
+                frame_tiles: vec!["creature/idle_0".to_string()],
+                frame_duration_ms: 200.0,
+                loop_mode: "loop".to_string(),
+            }],
+            default_state: "idle".to_string(),
+        },
+        category: "creature".to_string(),
+        tags: vec![],
+    };
+
+    let entity = entity_def
+        .create_entity(IVec2::ZERO, 5)
+        .expect("entity should instantiate");
+
+    assert_eq!(entity.category, "creature");
+    assert_eq!(entity.effective_control_role(), ControlRole::None);
 }
 
 #[test]

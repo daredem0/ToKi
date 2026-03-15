@@ -242,7 +242,9 @@ mod tests {
             position: IVec2::ZERO,
             size: UVec2::new(16, 16),
             entity_type: EntityType::Npc,
+            category: "creature".to_string(),
             definition_name: Some("test".to_string()),
+            control_role: crate::entity::ControlRole::None,
             attributes: EntityAttributes::default(),
             collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
         }

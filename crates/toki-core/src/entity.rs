@@ -12,10 +12,14 @@ pub struct Entity {
     pub position: glam::IVec2,
     pub size: glam::UVec2,
     pub entity_type: EntityType,
+    #[serde(default)]
+    pub category: String,
     /// Source entity definition name used to instantiate this entity.
     /// This lets editor workflows (e.g. drag-to-move) re-enter placement mode without guessing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub definition_name: Option<String>,
+    #[serde(default, skip_serializing_if = "ControlRole::is_legacy_default")]
+    pub control_role: ControlRole,
     pub attributes: EntityAttributes,
     pub collision_box: Option<CollisionBox>,
 }
@@ -53,6 +57,34 @@ pub enum EntityType {
     Item,
     Decoration,
     Trigger,
+}
+
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlRole {
+    #[default]
+    LegacyDefault,
+    None,
+    PlayerCharacter,
+}
+
+impl ControlRole {
+    pub fn resolved_for_entity_type(self, entity_type: &EntityType) -> Self {
+        match self {
+            Self::LegacyDefault => {
+                if matches!(entity_type, EntityType::Player) {
+                    Self::PlayerCharacter
+                } else {
+                    Self::None
+                }
+            }
+            explicit => explicit,
+        }
+    }
+
+    pub fn is_legacy_default(&self) -> bool {
+        matches!(self, Self::LegacyDefault)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize, Default)]
@@ -130,6 +162,12 @@ impl Default for EntityAttributes {
     }
 }
 
+impl Entity {
+    pub fn effective_control_role(&self) -> ControlRole {
+        self.control_role.resolved_for_entity_type(&self.entity_type)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EntityManager {
     entities: HashMap<EntityId, Entity>,
@@ -148,6 +186,20 @@ pub struct EntityManager {
 }
 
 impl EntityManager {
+    fn tracks_player_role(entity: &Entity) -> bool {
+        matches!(entity.effective_control_role(), ControlRole::PlayerCharacter)
+    }
+
+    fn legacy_category_for_type(entity_type: &EntityType) -> &'static str {
+        match entity_type {
+            EntityType::Player => "player",
+            EntityType::Npc => "npc",
+            EntityType::Item => "item",
+            EntityType::Decoration => "decoration",
+            EntityType::Trigger => "trigger",
+        }
+    }
+
     pub fn new() -> Self {
         Self {
             entities: HashMap::new(),
@@ -189,7 +241,9 @@ impl EntityManager {
             position,
             size,
             entity_type: entity_type.clone(),
+            category: Self::legacy_category_for_type(&entity_type).to_string(),
             definition_name: None,
+            control_role: ControlRole::LegacyDefault,
             attributes,
             collision_box,
         };
@@ -200,7 +254,7 @@ impl EntityManager {
         self.entities.insert(id, entity);
 
         // Update lookup tables
-        if matches!(entity_type, EntityType::Player) {
+        if Self::tracks_player_role(self.entities.get(&id).unwrap()) {
             self.player_id = Some(id);
         }
 
@@ -229,7 +283,7 @@ impl EntityManager {
         let entity_type = entity.entity_type.clone();
         let audio_component = definition.create_audio_component();
 
-        if matches!(entity_type, EntityType::Player) {
+        if Self::tracks_player_role(&entity) {
             self.player_id = Some(id);
         }
 
@@ -258,7 +312,7 @@ impl EntityManager {
         }
 
         // Track player entity
-        if matches!(entity_type, EntityType::Player) && self.player_id.is_none() {
+        if Self::tracks_player_role(&entity) && self.player_id.is_none() {
             self.player_id = Some(id);
         }
 
@@ -581,7 +635,9 @@ impl EntityDefinition {
             position,
             size: UVec2::new(self.rendering.size[0], self.rendering.size[1]),
             entity_type,
+            category: self.category.clone(),
             definition_name: Some(self.name.clone()),
+            control_role: ControlRole::LegacyDefault,
             attributes,
             collision_box,
         })

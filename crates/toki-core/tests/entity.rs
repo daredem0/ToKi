@@ -1,4 +1,5 @@
 use glam::{IVec2, UVec2};
+use toki_core::collision::CollisionBox;
 use toki_core::entity::*;
 
 fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
@@ -180,6 +181,7 @@ fn test_spawn_player() {
     let player = manager.get_player().unwrap();
     assert_eq!(player.position, position);
     assert_eq!(player.entity_type, EntityType::Player);
+    assert_eq!(player.effective_control_role(), ControlRole::PlayerCharacter);
     assert_eq!(player.attributes.health, Some(100));
     assert_eq!(player.attributes.speed, 2);
     assert!(player.attributes.active);
@@ -191,6 +193,38 @@ fn test_spawn_player() {
         vec![player_id]
     );
     assert_eq!(manager.active_entities(), vec![player_id]);
+}
+
+#[test]
+fn test_add_existing_entity_tracks_explicit_player_character_role() {
+    let mut manager = EntityManager::new();
+    let entity = Entity {
+        id: 11,
+        position: IVec2::new(5, 6),
+        size: UVec2::new(16, 16),
+        entity_type: EntityType::Npc,
+        category: "creature".to_string(),
+        definition_name: Some("slime".to_string()),
+        control_role: ControlRole::PlayerCharacter,
+        attributes: EntityAttributes {
+            ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::PlayerWasd,
+            ..EntityAttributes::default()
+        },
+        collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
+    };
+
+    let entity_id = manager.add_existing_entity(entity);
+
+    assert_eq!(entity_id, 11);
+    assert_eq!(manager.get_player_id(), Some(11));
+    assert_eq!(
+        manager
+            .get_player()
+            .expect("player-role entity should be tracked")
+            .category,
+        "creature"
+    );
 }
 
 #[test]

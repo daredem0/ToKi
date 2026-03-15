@@ -91,7 +91,9 @@ fn create_test_entity() -> Entity {
         position: IVec2::new(10, 20),
         size: UVec2::new(16, 16),
         entity_type: EntityType::Player,
+        category: "human".to_string(),
         definition_name: Some("player".to_string()),
+        control_role: ControlRole::PlayerCharacter,
         attributes,
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
     }
@@ -144,7 +146,9 @@ fn test_entity_minimal_fields() {
         position: IVec2::ZERO,
         size: UVec2::new(1, 1),
         entity_type: EntityType::Item,
+        category: "item".to_string(),
         definition_name: None,
+        control_role: ControlRole::None,
         attributes: EntityAttributes::default(),
         collision_box: None,
     };

@@ -615,9 +615,7 @@ impl GameState {
                     if Some(entity_id) == self.player_id {
                         return None;
                     }
-                    // Only process NPCs
-                    if matches!(entity.entity_type, crate::entity::EntityType::Npc)
-                        && matches!(entity.attributes.ai_behavior, AiBehavior::Wander)
+                    if matches!(entity.attributes.ai_behavior, AiBehavior::Wander)
                     {
                         return Some(entity_id);
                     }
@@ -869,13 +867,9 @@ impl GameState {
 
         // Load entities from scene
         for entity in scene.entities {
-            let entity_id = self.entity_manager.add_existing_entity(entity.clone());
-
-            // Track player entity
-            if matches!(entity.entity_type, crate::entity::EntityType::Player) {
-                self.player_id = Some(entity_id);
-            }
+            self.entity_manager.add_existing_entity(entity);
         }
+        self.player_id = self.entity_manager.get_player_id();
 
         Ok(())
     }

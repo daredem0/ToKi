@@ -7,11 +7,11 @@ use toki_core::assets::{
     tilemap::TileMap,
 };
 use toki_core::entity::{
-    AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
-    MovementProfile, RenderingDef,
+    AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, ControlRole,
+    EntityDefinition, MovementProfile, RenderingDef,
 };
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
-use toki_core::{game::AudioChannel, game::AudioEvent, GameState, InputKey};
+use toki_core::{game::AudioChannel, game::AudioEvent, scene::Scene, GameState, InputKey};
 
 fn create_test_sprite() -> SpriteInstance {
     let animation = Animation {
@@ -755,6 +755,42 @@ fn game_state_multiple_player_wasd_entities_move_together() {
             .expect("second entity should exist")
             .position,
         IVec2::new(41, 11)
+    );
+}
+
+#[test]
+fn game_state_load_scene_uses_control_role_for_player_identity() {
+    let mut game_state = GameState::new_empty();
+    let mut hero_definition = test_definition("hero_slime", "npc");
+    hero_definition.attributes.movement_profile = MovementProfile::PlayerWasd;
+    let mut hero = hero_definition
+        .create_entity(IVec2::new(20, 24), 7)
+        .expect("hero entity should instantiate");
+    hero.control_role = ControlRole::PlayerCharacter;
+    hero.category = "creature".to_string();
+
+    let scene = Scene {
+        name: "Arena".to_string(),
+        description: None,
+        maps: Vec::new(),
+        entities: vec![hero],
+        rules: Default::default(),
+        camera_position: None,
+        camera_scale: None,
+    };
+
+    game_state.add_scene(scene);
+    game_state
+        .load_scene("Arena")
+        .expect("scene should load successfully");
+
+    assert_eq!(game_state.player_id(), Some(7));
+    assert_eq!(
+        game_state
+            .player_entity()
+            .expect("player-character entity should be resolved")
+            .category,
+        "creature"
     );
 }
 

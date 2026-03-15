@@ -16,6 +16,7 @@
         16
       ],
       "entity_type": "Npc",
+      "category": "",
       "definition_name": "slime",
       "attributes": {
         "health": 50,
@@ -82,7 +83,9 @@
         16
       ],
       "entity_type": "Player",
+      "category": "",
       "definition_name": "player",
+      "control_role": "player_character",
       "attributes": {
         "health": 100,
         "speed": 1,
@@ -90,12 +93,12 @@
         "visible": true,
         "animation_controller": {
           "clips": {
-            "WalkDown": {
-              "state": "WalkDown",
+            "WalkRight": {
+              "state": "WalkRight",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_down_a",
-                "player/walk_down_b"
+                "player/walk_right_a",
+                "player/walk_right_b"
               ],
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
@@ -109,11 +112,40 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "IdleDown": {
-              "state": "IdleDown",
+            "IdleLeft": {
+              "state": "IdleLeft",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_down_a"
+                "player/walk_right_a"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkDown": {
+              "state": "WalkDown",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_down_a",
+                "player/walk_down_b"
+              ],
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Loop"
+            },
+            "WalkLeft": {
+              "state": "WalkLeft",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_right_a",
+                "player/walk_right_b"
+              ],
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Loop"
+            },
+            "IdleUp": {
+              "state": "IdleUp",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_up_a"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
@@ -128,42 +160,13 @@
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
-            "IdleLeft": {
-              "state": "IdleLeft",
+            "IdleDown": {
+              "state": "IdleDown",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_right_a"
+                "player/walk_down_a"
               ],
               "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "IdleUp": {
-              "state": "IdleUp",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_up_a"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "WalkRight": {
-              "state": "WalkRight",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_right_a",
-                "player/walk_right_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Loop"
-            },
-            "WalkLeft": {
-              "state": "WalkLeft",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_right_a",
-                "player/walk_right_b"
-              ],
-              "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             }
           },
@@ -202,7 +205,9 @@
         16
       ],
       "entity_type": "Npc",
+      "category": "",
       "definition_name": "slime",
+      "control_role": "none",
       "attributes": {
         "health": 50,
         "speed": 1,

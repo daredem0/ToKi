@@ -4,7 +4,7 @@ use super::undo_redo::EditorCommand;
 use crate::config::EditorConfig;
 use std::collections::{HashMap, HashSet};
 use toki_core::animation::AnimationState;
-use toki_core::entity::{AiBehavior, EntityType, MovementProfile};
+use toki_core::entity::{AiBehavior, ControlRole, EntityType, MovementProfile};
 use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
     RuleTarget, RuleTrigger,
@@ -16,6 +16,7 @@ pub struct InspectorSystem;
 #[derive(Debug, Clone)]
 struct EntityPropertyDraft {
     entity_type: EntityType,
+    control_role: ControlRole,
     position_x: i32,
     position_y: i32,
     size_x: i64,
@@ -188,6 +189,7 @@ impl EntityPropertyDraft {
 
         Self {
             entity_type: entity.entity_type.clone(),
+            control_role: entity.control_role,
             position_x: entity.position.x,
             position_y: entity.position.y,
             size_x: entity.size.x as i64,
@@ -217,6 +219,13 @@ fn ai_behavior_label(ai_behavior: AiBehavior) -> &'static str {
     match ai_behavior {
         AiBehavior::None => "None",
         AiBehavior::Wander => "Wander",
+    }
+}
+
+fn control_role_label(control_role: ControlRole) -> &'static str {
+    match control_role {
+        ControlRole::LegacyDefault | ControlRole::None => "None",
+        ControlRole::PlayerCharacter => "Player Character",
     }
 }
 
@@ -2605,6 +2614,23 @@ impl InspectorSystem {
         changed |= ui.checkbox(&mut draft.solid, "Solid").changed();
         changed |= ui.checkbox(&mut draft.can_move, "Can Move").changed();
         ui.horizontal(|ui| {
+            ui.label("Control Role:");
+            egui::ComboBox::from_id_salt("entity_control_role")
+                .selected_text(control_role_label(draft.control_role))
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(&mut draft.control_role, ControlRole::None, "None")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut draft.control_role,
+                            ControlRole::PlayerCharacter,
+                            "Player Character",
+                        )
+                        .changed();
+                });
+        });
+        ui.horizontal(|ui| {
             ui.label("Movement:");
             egui::ComboBox::from_id_salt("entity_movement_profile")
                 .selected_text(movement_profile_label(
@@ -2628,21 +2654,19 @@ impl InspectorSystem {
                         .changed();
                 });
         });
-        if matches!(draft.entity_type, EntityType::Npc) {
-            ui.horizontal(|ui| {
-                ui.label("AI:");
-                egui::ComboBox::from_id_salt("entity_ai_behavior")
-                    .selected_text(ai_behavior_label(draft.ai_behavior))
-                    .show_ui(ui, |ui| {
-                        changed |= ui
-                            .selectable_value(&mut draft.ai_behavior, AiBehavior::None, "None")
-                            .changed();
-                        changed |= ui
-                            .selectable_value(&mut draft.ai_behavior, AiBehavior::Wander, "Wander")
-                            .changed();
-                    });
-            });
-        }
+        ui.horizontal(|ui| {
+            ui.label("AI:");
+            egui::ComboBox::from_id_salt("entity_ai_behavior")
+                .selected_text(ai_behavior_label(draft.ai_behavior))
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(&mut draft.ai_behavior, AiBehavior::None, "None")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(&mut draft.ai_behavior, AiBehavior::Wander, "Wander")
+                        .changed();
+                });
+        });
         changed |= ui
             .checkbox(&mut draft.has_inventory, "Has Inventory")
             .changed();
@@ -2997,7 +3021,16 @@ impl InspectorSystem {
 
                 ui.horizontal(|ui| {
                     ui.label("Type:");
-                    ui.label(format!("{:?}", entity.entity_type));
+                    if entity.category.is_empty() {
+                        ui.label(format!("{:?}", entity.entity_type));
+                    } else {
+                        ui.label(entity.category.as_str());
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Control Role:");
+                    ui.label(control_role_label(entity.control_role));
                 });
 
                 ui.horizontal(|ui| {
@@ -3023,12 +3056,10 @@ impl InspectorSystem {
                         ui.label("Yes");
                     });
                 }
-                if matches!(entity.entity_type, EntityType::Npc) {
-                    ui.horizontal(|ui| {
-                        ui.label("AI:");
-                        ui.label(ai_behavior_label(entity.attributes.ai_behavior));
-                    });
-                }
+                ui.horizontal(|ui| {
+                    ui.label("AI:");
+                    ui.label(ai_behavior_label(entity.attributes.ai_behavior));
+                });
                 ui.horizontal(|ui| {
                     ui.label("Movement:");
                     ui.label(movement_profile_label(
@@ -3122,14 +3153,37 @@ impl InspectorSystem {
 
         let before = ui_state.scenes[scene_index].entities[entity_index].clone();
         let mut after = before.clone();
-        if !Self::apply_entity_property_draft(&mut after, draft) {
+        let mut changed = Self::apply_entity_property_draft(&mut after, draft);
+
+        let mut before_entities = vec![before];
+        let mut after_entities = vec![after.clone()];
+
+        if matches!(after.control_role, ControlRole::PlayerCharacter) {
+            for other in ui_state.scenes[scene_index].entities.iter() {
+                if other.id == entity_id {
+                    continue;
+                }
+                if matches!(
+                    other.effective_control_role(),
+                    toki_core::entity::ControlRole::PlayerCharacter
+                ) {
+                    let mut demoted = other.clone();
+                    demoted.control_role = ControlRole::None;
+                    before_entities.push(other.clone());
+                    after_entities.push(demoted);
+                    changed = true;
+                }
+            }
+        }
+
+        if !changed {
             return false;
         }
 
         ui_state.execute_command(EditorCommand::update_entities(
             active_scene_name,
-            vec![before],
-            vec![after],
+            before_entities,
+            after_entities,
         ))
     }
 
@@ -3169,6 +3223,7 @@ impl InspectorSystem {
         changed |= set_if_changed(&mut entity.attributes.active, draft.active);
         changed |= set_if_changed(&mut entity.attributes.solid, draft.solid);
         changed |= set_if_changed(&mut entity.attributes.can_move, draft.can_move);
+        changed |= set_if_changed(&mut entity.control_role, draft.control_role);
         changed |= set_if_changed(&mut entity.attributes.ai_behavior, draft.ai_behavior);
         changed |= set_if_changed(
             &mut entity.attributes.movement_profile,
@@ -3713,7 +3768,7 @@ mod tests {
     use std::fs;
     use toki_core::animation::AnimationState;
     use toki_core::collision::CollisionBox;
-    use toki_core::entity::{EntityAttributes, EntityManager, EntityType};
+    use toki_core::entity::{ControlRole, EntityAttributes, EntityManager, EntityType};
     use toki_core::rules::{
         Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
         RuleTarget, RuleTrigger,
@@ -3745,6 +3800,8 @@ mod tests {
             .expect("missing spawned entity")
             .clone();
         entity.id = id;
+        entity.category = "creature".to_string();
+        entity.control_role = ControlRole::None;
         entity.collision_box = Some(CollisionBox::new(
             IVec2::new(0, 0),
             UVec2::new(16, 16),
@@ -3780,6 +3837,7 @@ mod tests {
         draft.active = false;
         draft.solid = false;
         draft.can_move = false;
+        draft.control_role = ControlRole::PlayerCharacter;
         draft.ai_behavior = AiBehavior::None;
         draft.movement_profile = MovementProfile::PlayerWasd;
         draft.has_inventory = true;
@@ -3803,6 +3861,7 @@ mod tests {
         assert!(!entity.attributes.active);
         assert!(!entity.attributes.solid);
         assert!(!entity.attributes.can_move);
+        assert_eq!(entity.control_role, ControlRole::PlayerCharacter);
         assert_eq!(entity.attributes.ai_behavior, AiBehavior::None);
         assert_eq!(
             entity.attributes.movement_profile,
@@ -3951,6 +4010,49 @@ mod tests {
             .expect("entity should still exist");
         assert_eq!(restored.position, IVec2::new(10, 20));
         assert!(restored.attributes.visible);
+    }
+
+    #[test]
+    fn apply_entity_property_draft_with_undo_enforces_single_player_character() {
+        let mut ui_state = EditorUI::new();
+        let mut first = sample_entity_with_id(1);
+        first.control_role = ControlRole::PlayerCharacter;
+        let second = sample_entity_with_id(2);
+        let scene = ui_state
+            .scenes
+            .iter_mut()
+            .find(|scene| scene.name == "Main Scene")
+            .expect("missing default scene");
+        scene.entities.push(first);
+        scene.entities.push(second.clone());
+
+        let mut draft = EntityPropertyDraft::from_entity(&second);
+        draft.control_role = ControlRole::PlayerCharacter;
+
+        assert!(InspectorSystem::apply_entity_property_draft_with_undo(
+            &mut ui_state,
+            2,
+            &draft,
+        ));
+
+        let scene = ui_state
+            .scenes
+            .iter()
+            .find(|scene| scene.name == "Main Scene")
+            .expect("missing default scene");
+        let first = scene
+            .entities
+            .iter()
+            .find(|entity| entity.id == 1)
+            .expect("first entity should exist");
+        let second = scene
+            .entities
+            .iter()
+            .find(|entity| entity.id == 2)
+            .expect("second entity should exist");
+
+        assert_eq!(first.control_role, ControlRole::None);
+        assert_eq!(second.control_role, ControlRole::PlayerCharacter);
     }
 
     #[test]
