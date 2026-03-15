@@ -2,6 +2,8 @@ use super::editor_ui::{EditorUI, SceneRulesGraphCommandData, Selection};
 use super::rule_graph::{RuleGraph, RuleGraphNodeKind};
 use super::undo_redo::EditorCommand;
 use crate::config::EditorConfig;
+use crate::project::Project;
+use chrono::Utc;
 use std::collections::{HashMap, HashSet};
 use toki_core::animation::AnimationState;
 use toki_core::entity::{AiBehavior, ControlRole, MovementProfile, MovementSoundTrigger};
@@ -40,6 +42,14 @@ struct EntityPropertyDraft {
     collision_size_x: i64,
     collision_size_y: i64,
     collision_trigger: bool,
+}
+
+#[derive(Debug, Clone)]
+struct ProjectSettingsDraft {
+    name: String,
+    version: String,
+    description: String,
+    splash_duration_ms: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -219,6 +229,17 @@ impl EntityPropertyDraft {
     }
 }
 
+impl ProjectSettingsDraft {
+    fn from_project(project: &Project) -> Self {
+        Self {
+            name: project.metadata.project.name.clone(),
+            version: project.metadata.project.version.clone(),
+            description: project.metadata.project.description.clone(),
+            splash_duration_ms: project.metadata.runtime.splash.duration_ms,
+        }
+    }
+}
+
 fn ai_behavior_label(ai_behavior: AiBehavior) -> &'static str {
     match ai_behavior {
         AiBehavior::None => "None",
@@ -257,13 +278,25 @@ impl InspectorSystem {
         ui_state: &mut EditorUI,
         ctx: &egui::Context,
         game_state: Option<&toki_core::GameState>,
+        project: Option<&mut Project>,
         config: Option<&EditorConfig>,
     ) {
         egui::SidePanel::right("inspector_panel")
             .resizable(true)
             .default_width(300.0)
             .show(ctx, |ui| {
-                ui.heading("🔍 Inspector");
+                ui.horizontal(|ui| {
+                    ui.selectable_value(
+                        &mut ui_state.right_panel_tab,
+                        super::editor_ui::RightPanelTab::Inspector,
+                        "Inspector",
+                    );
+                    ui.selectable_value(
+                        &mut ui_state.right_panel_tab,
+                        super::editor_ui::RightPanelTab::Project,
+                        "Project",
+                    );
+                });
                 ui.separator();
 
                 // Wrap all inspector content in a scrollable area
@@ -271,177 +304,312 @@ impl InspectorSystem {
                     .auto_shrink([false, true])
                     .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
                     .show(ui, |ui| {
-                        let current_selection = ui_state.selection.clone();
-                        match current_selection.as_ref() {
-                            Some(Selection::Scene(scene_name)) => {
-                                ui.heading(format!("🎬 {}", scene_name));
-                                ui.separator();
-
-                                if let Some(scene) = ui_state.get_scene(scene_name) {
-                                    ui.horizontal(|ui| {
-                                        ui.label("Maps:");
-                                        ui.label(format!("{}", scene.maps.len()));
-                                    });
-
-                                    ui.horizontal(|ui| {
-                                        ui.label("Entities:");
-                                        ui.label(format!("{}", scene.entities.len()));
-                                    });
-
-                                    ui.separator();
-                                    ui.label("Scene Actions:");
-
-                                    if ui.button("🗺️ Add Map").clicked() {
-                                        tracing::info!("Add Map to scene: {}", scene_name);
-                                        // Maps are added via the hierarchy panel, this could open a dialog
-                                    }
-
-                                    if ui.button("👤 Add Entity").clicked() {
-                                        tracing::info!("Add Entity to scene: {}", scene_name);
-                                        // TODO: Entity creation
-                                    }
-                                }
-
-                                if let Some(scene_index) = ui_state
-                                    .scenes
-                                    .iter()
-                                    .position(|scene| scene.name == *scene_name)
-                                {
-                                    ui.separator();
-                                    let before_rules = ui_state.scenes[scene_index].rules.clone();
-                                    let mut edited_rules = before_rules.clone();
-                                    let rules_changed = Self::render_scene_rules_editor(
-                                        ui,
-                                        scene_name,
-                                        &mut edited_rules,
-                                        config,
-                                    );
-                                    if rules_changed && edited_rules != before_rules {
-                                        let before_graph =
-                                            ui_state.rule_graph_for_scene(scene_name).cloned();
-                                        let after_graph = RuleGraph::from_rule_set(&edited_rules);
-                                        let before_layout = ui_state
-                                            .graph_layouts_by_scene
-                                            .get(scene_name)
-                                            .cloned();
-                                        let (zoom, pan) = ui_state.graph_view_for_scene(scene_name);
-                                        let _ = ui_state.execute_scene_rules_graph_command(
-                                            scene_name,
-                                            SceneRulesGraphCommandData {
-                                                before_rule_set: before_rules,
-                                                after_rule_set: edited_rules,
-                                                before_graph,
-                                                after_graph,
-                                                before_layout,
-                                                zoom,
-                                                pan,
-                                            },
-                                        );
-                                    }
-                                }
-                            }
-
-                            Some(Selection::RuleGraphNode {
-                                scene_name,
-                                node_key,
-                            }) => {
-                                ui.heading("🧩 Scene Rule Node");
-                                ui.label(format!("Scene: {}", scene_name));
-                                ui.monospace(node_key);
-                                ui.separator();
-
-                                let changed = Self::render_selected_rule_graph_node_editor(
-                                    ui, ui_state, scene_name, node_key, config,
-                                );
-
-                                if changed {
-                                    ui_state.scene_content_changed = true;
-                                }
-                            }
-
-                            Some(Selection::Map(scene_name, map_name)) => {
-                                ui.heading(format!("🗺️ {}", map_name));
-                                ui.label(format!("Scene: {}", scene_name));
-                                ui.separator();
-
-                                Self::render_map_details(
-                                    ui,
-                                    map_name,
-                                    config,
-                                    Some(scene_name),
-                                    &mut ui_state.map_load_requested,
+                        match ui_state.right_panel_tab {
+                            super::editor_ui::RightPanelTab::Inspector => {
+                                Self::render_selection_inspector_contents(
+                                    ui_state, ui, game_state, config,
                                 );
                             }
-
-                            Some(Selection::Entity(entity_id)) => {
-                                let mut entity_changed = false;
-                                if ui_state.has_multi_entity_selection() {
-                                    ui.heading(format!(
-                                        "👥 {} Entities",
-                                        ui_state.selected_entity_ids.len()
-                                    ));
-                                    ui.separator();
-                                    entity_changed =
-                                        Self::render_multi_scene_entity_editor(ui, ui_state);
-                                } else {
-                                    ui.separator();
-                                    ui.heading(format!("👤 Entity {}", entity_id));
-                                    ui.separator();
-                                    if let Some(scene_entity) =
-                                        Self::find_selected_scene_entity(ui_state, *entity_id)
-                                    {
-                                        let mut draft =
-                                            EntityPropertyDraft::from_entity(&scene_entity);
-                                        if Self::render_scene_entity_editor(ui, &mut draft, config) {
-                                            entity_changed =
-                                                Self::apply_entity_property_draft_with_undo(
-                                                    ui_state, *entity_id, &draft,
-                                                );
-                                        }
-                                    } else {
-                                        ui.label("Runtime-only entity (read-only)");
-                                        ui.separator();
-                                        Self::render_runtime_entity_read_only(
-                                            ui, game_state, *entity_id,
-                                        );
-                                    }
-                                }
-
-                                if entity_changed {
-                                    ui_state.scene_content_changed = true;
-                                }
-                            }
-
-                            Some(Selection::StandaloneMap(map_name)) => {
-                                ui.heading(format!("🗺️ {}", map_name));
-                                ui.label("(Standalone map - not in scene)");
-                                ui.separator();
-
-                                Self::render_map_details(
-                                    ui,
-                                    map_name,
-                                    config,
-                                    None,
-                                    &mut ui_state.map_load_requested,
+                            super::editor_ui::RightPanelTab::Project => {
+                                Self::render_project_settings_panel(
+                                    ui_state, ui, project, config,
                                 );
-                            }
-
-                            Some(Selection::EntityDefinition(entity_name)) => {
-                                ui.heading(format!("🤖 {}", entity_name));
-                                ui.label("Entity Definition");
-                                ui.separator();
-
-                                Self::render_entity_definition_details(ui, entity_name, config);
-                            }
-
-                            None => {
-                                ui.label("No selection");
-                                ui.separator();
-                                ui.label("Click on an item in the hierarchy to inspect it.");
                             }
                         }
                     });
             });
+    }
+
+    fn render_selection_inspector_contents(
+        ui_state: &mut EditorUI,
+        ui: &mut egui::Ui,
+        game_state: Option<&toki_core::GameState>,
+        config: Option<&EditorConfig>,
+    ) {
+        let current_selection = ui_state.selection.clone();
+        match current_selection.as_ref() {
+            Some(Selection::Scene(scene_name)) => {
+                ui.heading(format!("🎬 {}", scene_name));
+                ui.separator();
+
+                if let Some(scene) = ui_state.get_scene(scene_name) {
+                    ui.horizontal(|ui| {
+                        ui.label("Maps:");
+                        ui.label(format!("{}", scene.maps.len()));
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.label("Entities:");
+                        ui.label(format!("{}", scene.entities.len()));
+                    });
+
+                    ui.separator();
+                    ui.label("Scene Actions:");
+
+                    if ui.button("🗺️ Add Map").clicked() {
+                        tracing::info!("Add Map to scene: {}", scene_name);
+                    }
+
+                    if ui.button("👤 Add Entity").clicked() {
+                        tracing::info!("Add Entity to scene: {}", scene_name);
+                    }
+                }
+
+                if let Some(scene_index) = ui_state
+                    .scenes
+                    .iter()
+                    .position(|scene| scene.name == *scene_name)
+                {
+                    ui.separator();
+                    let before_rules = ui_state.scenes[scene_index].rules.clone();
+                    let mut edited_rules = before_rules.clone();
+                    let rules_changed =
+                        Self::render_scene_rules_editor(ui, scene_name, &mut edited_rules, config);
+                    if rules_changed && edited_rules != before_rules {
+                        let before_graph = ui_state.rule_graph_for_scene(scene_name).cloned();
+                        let after_graph = RuleGraph::from_rule_set(&edited_rules);
+                        let before_layout =
+                            ui_state.graph_layouts_by_scene.get(scene_name).cloned();
+                        let (zoom, pan) = ui_state.graph_view_for_scene(scene_name);
+                        let _ = ui_state.execute_scene_rules_graph_command(
+                            scene_name,
+                            SceneRulesGraphCommandData {
+                                before_rule_set: before_rules,
+                                after_rule_set: edited_rules,
+                                before_graph,
+                                after_graph,
+                                before_layout,
+                                zoom,
+                                pan,
+                            },
+                        );
+                    }
+                }
+            }
+            Some(Selection::RuleGraphNode {
+                scene_name,
+                node_key,
+            }) => {
+                ui.heading("🧩 Scene Rule Node");
+                ui.label(format!("Scene: {}", scene_name));
+                ui.monospace(node_key);
+                ui.separator();
+
+                let changed =
+                    Self::render_selected_rule_graph_node_editor(ui, ui_state, scene_name, node_key, config);
+
+                if changed {
+                    ui_state.scene_content_changed = true;
+                }
+            }
+            Some(Selection::Map(scene_name, map_name)) => {
+                ui.heading(format!("🗺️ {}", map_name));
+                ui.label(format!("Scene: {}", scene_name));
+                ui.separator();
+
+                Self::render_map_details(
+                    ui,
+                    map_name,
+                    config,
+                    Some(scene_name),
+                    &mut ui_state.map_load_requested,
+                );
+            }
+            Some(Selection::Entity(entity_id)) => {
+                let mut entity_changed = false;
+                if ui_state.has_multi_entity_selection() {
+                    ui.heading(format!("👥 {} Entities", ui_state.selected_entity_ids.len()));
+                    ui.separator();
+                    entity_changed = Self::render_multi_scene_entity_editor(ui, ui_state);
+                } else {
+                    ui.separator();
+                    ui.heading(format!("👤 Entity {}", entity_id));
+                    ui.separator();
+                    if let Some(scene_entity) = Self::find_selected_scene_entity(ui_state, *entity_id)
+                    {
+                        let mut draft = EntityPropertyDraft::from_entity(&scene_entity);
+                        if Self::render_scene_entity_editor(ui, &mut draft, config) {
+                            entity_changed = Self::apply_entity_property_draft_with_undo(
+                                ui_state, *entity_id, &draft,
+                            );
+                        }
+                    } else {
+                        ui.label("Runtime-only entity (read-only)");
+                        ui.separator();
+                        Self::render_runtime_entity_read_only(ui, game_state, *entity_id);
+                    }
+                }
+
+                if entity_changed {
+                    ui_state.scene_content_changed = true;
+                }
+            }
+            Some(Selection::StandaloneMap(map_name)) => {
+                ui.heading(format!("🗺️ {}", map_name));
+                ui.label("(Standalone map - not in scene)");
+                ui.separator();
+
+                Self::render_map_details(
+                    ui,
+                    map_name,
+                    config,
+                    None,
+                    &mut ui_state.map_load_requested,
+                );
+            }
+            Some(Selection::EntityDefinition(entity_name)) => {
+                ui.heading(format!("🤖 {}", entity_name));
+                ui.label("Entity Definition");
+                ui.separator();
+
+                Self::render_entity_definition_details(ui, entity_name, config);
+            }
+            None => {
+                ui.label("No selection");
+                ui.separator();
+                ui.label("Click on an item in the hierarchy to inspect it.");
+            }
+        }
+    }
+
+    fn render_project_settings_panel(
+        ui_state: &mut EditorUI,
+        ui: &mut egui::Ui,
+        project: Option<&mut Project>,
+        _config: Option<&EditorConfig>,
+    ) {
+        let Some(project) = project else {
+            ui.heading("Project");
+            ui.separator();
+            ui.label("No project open.");
+            ui.label("Open or create a project to edit project-wide settings.");
+            return;
+        };
+
+        ui.heading("Project");
+        ui.separator();
+
+        let mut draft = ProjectSettingsDraft::from_project(project);
+        let mut changed = false;
+
+        ui.collapsing("General", |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Name:");
+                changed |= ui.text_edit_singleline(&mut draft.name).changed();
+            });
+            ui.horizontal(|ui| {
+                ui.label("Version:");
+                changed |= ui.text_edit_singleline(&mut draft.version).changed();
+            });
+            ui.label("Description:");
+            changed |= ui
+                .add(
+                    egui::TextEdit::multiline(&mut draft.description)
+                        .desired_rows(4)
+                        .desired_width(f32::INFINITY),
+                )
+                .changed();
+        });
+
+        ui.separator();
+        ui.collapsing("Runtime", |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Splash Duration (ms):");
+                changed |= ui
+                    .add(
+                        egui::DragValue::new(&mut draft.splash_duration_ms)
+                            .speed(25.0)
+                            .range(0..=u64::MAX),
+                    )
+                    .changed();
+            });
+        });
+
+        ui.separator();
+        ui.collapsing("Audio", |ui| {
+            ui.label("Global mixer settings will live here.");
+            ui.label("Current runtime channels:");
+            ui.horizontal(|ui| {
+                ui.label("•");
+                ui.label("Music");
+            });
+            ui.horizontal(|ui| {
+                ui.label("•");
+                ui.label("Movement");
+            });
+            ui.horizontal(|ui| {
+                ui.label("•");
+                ui.label("Collision");
+            });
+        });
+
+        ui.separator();
+        ui.collapsing("Asset Paths", |ui| {
+            ui.label("These are currently fixed conventions in the editor/runtime.");
+            ui.horizontal(|ui| {
+                ui.label("Sprites:");
+                ui.monospace(&project.metadata.assets.sprites);
+            });
+            ui.horizontal(|ui| {
+                ui.label("Tilemaps:");
+                ui.monospace(&project.metadata.assets.tilemaps);
+            });
+            ui.horizontal(|ui| {
+                ui.label("Audio:");
+                ui.monospace(&project.metadata.assets.audio);
+            });
+        });
+
+        ui.separator();
+        ui.collapsing("Metadata", |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Created:");
+                ui.monospace(project.metadata.project.created.to_rfc3339());
+            });
+            ui.horizontal(|ui| {
+                ui.label("Modified:");
+                ui.monospace(project.metadata.project.modified.to_rfc3339());
+            });
+            ui.horizontal(|ui| {
+                ui.label("Editor Version:");
+                ui.monospace(&project.metadata.project.toki_editor_version);
+            });
+        });
+
+        if changed && Self::apply_project_settings_draft(project, &draft) {
+            ui_state.set_title(&project.name);
+        }
+    }
+
+    fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettingsDraft) -> bool {
+        let trimmed_name = draft.name.trim();
+        let trimmed_version = draft.version.trim();
+
+        let mut changed = false;
+        if !trimmed_name.is_empty() && project.metadata.project.name != trimmed_name {
+            project.metadata.project.name = trimmed_name.to_string();
+            project.name = trimmed_name.to_string();
+            changed = true;
+        }
+        if !trimmed_version.is_empty() && project.metadata.project.version != trimmed_version {
+            project.metadata.project.version = trimmed_version.to_string();
+            changed = true;
+        }
+        if project.metadata.project.description != draft.description {
+            project.metadata.project.description = draft.description.clone();
+            changed = true;
+        }
+        if project.metadata.runtime.splash.duration_ms != draft.splash_duration_ms {
+            project.metadata.runtime.splash.duration_ms = draft.splash_duration_ms;
+            changed = true;
+        }
+
+        if changed {
+            project.metadata.project.modified = Utc::now();
+            project.is_dirty = true;
+        }
+
+        changed
     }
 
     fn next_rule_id(rule_set: &RuleSet) -> String {
@@ -4011,8 +4179,9 @@ impl InspectorSystem {
 mod tests {
     use super::{
         AiBehavior, EntityPropertyDraft, InspectorSystem, MovementProfile, MultiEntityBatchEdit,
-        RuleActionKind, RuleConditionKind, RuleTriggerKind,
+        ProjectSettingsDraft, RuleActionKind, RuleConditionKind, RuleTriggerKind,
     };
+    use crate::project::Project;
     use crate::ui::EditorUI;
     use glam::{IVec2, UVec2};
     use std::fs;
@@ -4154,6 +4323,30 @@ mod tests {
         assert!(changed);
         assert_eq!(entity.attributes.health, None);
         assert!(entity.collision_box.is_none());
+    }
+
+    #[test]
+    fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let mut project = Project::new("Demo".to_string(), temp_dir.path().join("Demo"));
+        let original_modified = project.metadata.project.modified;
+        let draft = ProjectSettingsDraft {
+            name: "Renamed Demo".to_string(),
+            version: "2.0.0".to_string(),
+            description: "Updated description".to_string(),
+            splash_duration_ms: 4500,
+        };
+
+        let changed = InspectorSystem::apply_project_settings_draft(&mut project, &draft);
+
+        assert!(changed);
+        assert_eq!(project.name, "Renamed Demo");
+        assert_eq!(project.metadata.project.name, "Renamed Demo");
+        assert_eq!(project.metadata.project.version, "2.0.0");
+        assert_eq!(project.metadata.project.description, "Updated description");
+        assert_eq!(project.metadata.runtime.splash.duration_ms, 4500);
+        assert!(project.is_dirty);
+        assert!(project.metadata.project.modified >= original_modified);
     }
 
     #[test]

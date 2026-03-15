@@ -694,6 +694,7 @@ impl EditorApp {
             self.ui.render(
                 ctx,
                 self.scene_viewport.as_mut(),
+                self.project_manager.current_project.as_mut(),
                 Some(&mut self.config),
                 self.log_capture.as_ref(),
                 None, // Can't pass renderer due to borrow issues

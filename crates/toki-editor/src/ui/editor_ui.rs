@@ -33,6 +33,12 @@ pub(crate) enum CenterPanelTab {
     SceneRules,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RightPanelTab {
+    Inspector,
+    Project,
+}
+
 #[derive(Debug, Clone)]
 pub struct EntityMoveDragState {
     pub scene_name: String,
@@ -91,6 +97,7 @@ pub struct EditorUI {
     pub background_task_running: bool,
     pub background_task_status: Option<String>,
     pub cancel_background_task_requested: bool,
+    pub right_panel_tab: RightPanelTab,
 
     // Map loading request
     pub map_load_requested: Option<(String, String)>, // (scene_name, map_name)
@@ -157,6 +164,7 @@ impl EditorUI {
             background_task_running: false,
             background_task_status: None,
             cancel_background_task_requested: false,
+            right_panel_tab: RightPanelTab::Inspector,
 
             // Map loading request
             map_load_requested: None,
@@ -367,10 +375,12 @@ impl EditorUI {
     }
 
     /// Render the entire UI
+    #[allow(clippy::too_many_arguments)]
     pub fn render(
         &mut self,
         ctx: &egui::Context,
         scene_viewport: Option<&mut SceneViewport>,
+        project: Option<&mut crate::project::Project>,
         config: Option<&mut crate::config::EditorConfig>,
         log_capture: Option<&crate::logging::LogCapture>,
         renderer: Option<&mut egui_wgpu::Renderer>,
@@ -399,7 +409,13 @@ impl EditorUI {
         }
 
         if self.show_inspector {
-            InspectorSystem::render_inspector_panel(self, ctx, game_state, config_readonly);
+            InspectorSystem::render_inspector_panel(
+                self,
+                ctx,
+                game_state,
+                project,
+                config_readonly,
+            );
         }
 
         // Render viewport last (mutable access)
