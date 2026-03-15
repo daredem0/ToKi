@@ -258,6 +258,55 @@ impl GameState {
                 .would_collide_with_solid_entity(entity_id, new_position)
     }
 
+    fn movement_distance(from: glam::IVec2, to: glam::IVec2) -> f32 {
+        let delta = to - from;
+        ((delta.x.pow(2) + delta.y.pow(2)) as f32).sqrt()
+    }
+
+    fn emit_entity_movement_audio(
+        &mut self,
+        entity_id: EntityId,
+        distance_moved: f32,
+        result: &mut GameUpdateResult<AudioEvent>,
+    ) {
+        if distance_moved <= 0.0 {
+            return;
+        }
+
+        let Some(entity_audio) = self.entity_manager.audio_component_mut(entity_id) else {
+            return;
+        };
+
+        if entity_audio.footstep_trigger_distance <= 0.0 {
+            if let Some(movement_sound) = entity_audio
+                .movement_sound
+                .as_deref()
+                .filter(|sound_id| !sound_id.is_empty())
+            {
+                result.add_event(AudioEvent::PlaySound {
+                    channel: AudioChannel::Movement,
+                    sound_id: movement_sound.to_string(),
+                });
+            }
+            return;
+        }
+
+        entity_audio.footstep_distance_accumulator += distance_moved;
+        while entity_audio.footstep_distance_accumulator >= entity_audio.footstep_trigger_distance {
+            if let Some(movement_sound) = entity_audio
+                .movement_sound
+                .as_deref()
+                .filter(|sound_id| !sound_id.is_empty())
+            {
+                result.add_event(AudioEvent::PlaySound {
+                    channel: AudioChannel::Movement,
+                    sound_id: movement_sound.to_string(),
+                });
+            }
+            entity_audio.footstep_distance_accumulator -= entity_audio.footstep_trigger_distance;
+        }
+    }
+
     fn facing_from_delta(delta: glam::IVec2) -> Option<FacingDirection> {
         if delta == glam::IVec2::ZERO {
             return None;
@@ -543,7 +592,7 @@ impl GameState {
         result.player_moved = input_result.player_moved;
         result.add_events(input_result.events);
 
-        if self.apply_rule_velocities(world_bounds, tilemap, atlas) {
+        if self.apply_rule_velocities(world_bounds, tilemap, atlas, &mut result) {
             result.player_moved = true;
         }
 
@@ -568,7 +617,7 @@ impl GameState {
         }
 
         // Update NPC AI
-        self.update_npc_ai(world_bounds, tilemap, atlas);
+        self.update_npc_ai(world_bounds, tilemap, atlas, &mut result);
 
         let mut reactive_rule_commands = Vec::new();
         if result.player_moved {
@@ -609,7 +658,13 @@ impl GameState {
     }
 
     /// Update NPC AI - makes NPCs move randomly every few frames
-    fn update_npc_ai(&mut self, world_bounds: glam::UVec2, tilemap: &TileMap, atlas: &AtlasMeta) {
+    fn update_npc_ai(
+        &mut self,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+        result: &mut GameUpdateResult<AudioEvent>,
+    ) {
         self.npc_ai_frame_counter += 1;
 
         // Only update NPC AI every 60 frames (roughly once per second at 60fps)
@@ -675,6 +730,11 @@ impl GameState {
                     if let Some(npc_entity) = self.entity_manager.get_entity_mut(npc_id) {
                         npc_entity.position = new_position;
                     }
+                    self.emit_entity_movement_audio(
+                        npc_id,
+                        Self::movement_distance(current_position, new_position),
+                        result,
+                    );
                     true
                 } else {
                     false
@@ -768,30 +828,11 @@ impl GameState {
             }
 
             if entity_moved {
-                let distance_moved = (((final_position.x - initial_position.x).pow(2)
-                    + (final_position.y - initial_position.y).pow(2))
-                    as f32)
-                    .sqrt();
-
-                if let Some(entity_audio) = self.entity_manager.audio_component_mut(entity_id) {
-                    entity_audio.footstep_distance_accumulator += distance_moved;
-                    if entity_audio.footstep_distance_accumulator
-                        >= entity_audio.footstep_trigger_distance
-                    {
-                        if let Some(movement_sound) = entity_audio
-                            .movement_sound
-                            .as_deref()
-                            .filter(|sound_id| !sound_id.is_empty())
-                        {
-                            result.add_event(AudioEvent::PlaySound {
-                                channel: AudioChannel::Movement,
-                                sound_id: movement_sound.to_string(),
-                            });
-                        }
-                        entity_audio.footstep_distance_accumulator -=
-                            entity_audio.footstep_trigger_distance;
-                    }
-                }
+                self.emit_entity_movement_audio(
+                    entity_id,
+                    Self::movement_distance(initial_position, final_position),
+                    &mut result,
+                );
             }
         }
 
@@ -1530,6 +1571,7 @@ impl GameState {
         world_bounds: glam::UVec2,
         tilemap: &TileMap,
         atlas: &AtlasMeta,
+        result: &mut GameUpdateResult<AudioEvent>,
     ) -> bool {
         let mut velocities = self
             .rule_runtime
@@ -1572,6 +1614,11 @@ impl GameState {
                     moved_player = true;
                 }
             }
+            self.emit_entity_movement_audio(
+                entity_id,
+                Self::movement_distance(current_entity.position, candidate_position),
+                result,
+            );
         }
 
         moved_player

@@ -10,6 +10,7 @@ use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, ControlRole,
     EntityDefinition, MovementProfile, RenderingDef,
 };
+use toki_core::rules::{Rule, RuleAction, RuleSet, RuleTarget, RuleTrigger};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{game::AudioChannel, game::AudioEvent, scene::Scene, GameState, InputKey};
 
@@ -962,6 +963,118 @@ fn game_state_emits_movement_audio_event_with_component_sound_id() {
             } if sound_id == "sfx_custom_step"
         )
     }));
+}
+
+#[test]
+fn game_state_emits_movement_audio_for_wander_ai_movement() {
+    fastrand::seed(7);
+
+    let mut game_state = GameState::new_empty();
+    let mut wandering_npc = test_definition("wandering_npc", "creature");
+    wandering_npc.audio.footstep_trigger_distance = 1.0;
+    wandering_npc.audio.movement_sound = "sfx_wander_step".to_string();
+    let wandering_npc_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&wandering_npc, IVec2::new(32, 32))
+        .expect("wandering npc should spawn");
+
+    let initial_position = game_state
+        .entity_manager()
+        .get_entity(wandering_npc_id)
+        .expect("wandering npc should exist")
+        .position;
+
+    let mut moved = false;
+    let mut emitted_sound = false;
+    for _ in 0..(60 * 12) {
+        let result = game_state.update(
+            UVec2::new(512, 512),
+            &create_test_tilemap(),
+            &create_test_atlas(),
+        );
+        if result.events.iter().any(|event| {
+            matches!(
+                event,
+                AudioEvent::PlaySound {
+                    channel: AudioChannel::Movement,
+                    sound_id,
+                } if sound_id == "sfx_wander_step"
+            )
+        }) {
+            emitted_sound = true;
+        }
+        if game_state
+            .entity_manager()
+            .get_entity(wandering_npc_id)
+            .expect("wandering npc should exist")
+            .position
+            != initial_position
+        {
+            moved = true;
+        }
+
+        if moved && emitted_sound {
+            break;
+        }
+    }
+
+    assert!(moved, "wander npc should eventually move");
+    assert!(
+        emitted_sound,
+        "wander npc movement should emit its configured movement sound"
+    );
+}
+
+#[test]
+fn game_state_emits_movement_audio_for_rule_velocity_movement() {
+    let mut game_state = GameState::new_empty();
+    let mut mover = test_definition("rule_mover", "creature");
+    mover.attributes.ai_behavior = toki_core::entity::AiBehavior::None;
+    mover.audio.footstep_trigger_distance = 1.0;
+    mover.audio.movement_sound = "sfx_rule_step".to_string();
+    let mover_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&mover, IVec2::new(16, 16))
+        .expect("rule mover should spawn");
+
+    game_state.set_rules(RuleSet {
+        rules: vec![Rule {
+            id: "move_rule_mover".to_string(),
+            enabled: true,
+            priority: 0,
+            once: false,
+            trigger: RuleTrigger::OnUpdate,
+            conditions: vec![],
+            actions: vec![RuleAction::SetVelocity {
+                target: RuleTarget::Entity(mover_id),
+                velocity: [1, 0],
+            }],
+        }],
+    });
+
+    let result = game_state.update(
+        UVec2::new(512, 512),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(result.events.iter().any(|event| {
+        matches!(
+            event,
+            AudioEvent::PlaySound {
+                channel: AudioChannel::Movement,
+                sound_id,
+            } if sound_id == "sfx_rule_step"
+        )
+    }));
+    assert_eq!(
+        game_state
+            .entity_manager()
+            .get_entity(mover_id)
+            .expect("rule mover should exist")
+            .position,
+        IVec2::new(17, 16)
+    );
 }
 
 #[test]
