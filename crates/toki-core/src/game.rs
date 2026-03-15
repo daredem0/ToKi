@@ -29,6 +29,12 @@ pub enum InputKey {
                  // Can extend with more keys as needed
 }
 
+/// Profile-scoped action buttons that can be mapped independently from movement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum InputAction {
+    Primary,
+}
+
 /// Audio events that can be triggered by game logic
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AudioEvent {
@@ -73,6 +79,14 @@ pub struct GameState {
     /// Runtime-held movement input scoped by movement profile.
     #[serde(skip, default)]
     profile_keys_held: HashMap<MovementProfile, HashSet<InputKey>>,
+
+    /// Held profile-scoped action buttons used to debounce edge-triggered actions.
+    #[serde(skip, default)]
+    profile_actions_held: HashMap<MovementProfile, HashSet<InputAction>>,
+
+    /// Pending one-shot profile-scoped action requests to be consumed during update.
+    #[serde(skip, default)]
+    pending_profile_actions: HashMap<MovementProfile, HashSet<InputAction>>,
 
     /// Game configuration constants
     movement_step: i32,
@@ -422,13 +436,21 @@ impl GameState {
 
     fn facing_from_animation_state(state: AnimationState) -> FacingDirection {
         match state {
-            AnimationState::IdleUp | AnimationState::WalkUp => FacingDirection::Up,
-            AnimationState::IdleLeft | AnimationState::WalkLeft => FacingDirection::Left,
-            AnimationState::IdleRight | AnimationState::WalkRight => FacingDirection::Right,
+            AnimationState::IdleUp | AnimationState::WalkUp | AnimationState::AttackUp => {
+                FacingDirection::Up
+            }
+            AnimationState::IdleLeft | AnimationState::WalkLeft | AnimationState::AttackLeft => {
+                FacingDirection::Left
+            }
+            AnimationState::IdleRight | AnimationState::WalkRight | AnimationState::AttackRight => {
+                FacingDirection::Right
+            }
             AnimationState::Idle
             | AnimationState::Walk
+            | AnimationState::Attack
             | AnimationState::IdleDown
-            | AnimationState::WalkDown => FacingDirection::Down,
+            | AnimationState::WalkDown
+            | AnimationState::AttackDown => FacingDirection::Down,
         }
     }
 
@@ -446,7 +468,84 @@ impl GameState {
     }
 
     fn animation_state_flip_x(state: AnimationState) -> bool {
-        matches!(state, AnimationState::IdleLeft | AnimationState::WalkLeft)
+        matches!(
+            state,
+            AnimationState::IdleLeft | AnimationState::WalkLeft | AnimationState::AttackLeft
+        )
+    }
+
+    fn directional_attack_state(facing: FacingDirection) -> AnimationState {
+        match facing {
+            FacingDirection::Down => AnimationState::AttackDown,
+            FacingDirection::Up => AnimationState::AttackUp,
+            FacingDirection::Left => AnimationState::AttackLeft,
+            FacingDirection::Right => AnimationState::AttackRight,
+        }
+    }
+
+    fn is_action_animation_state(state: AnimationState) -> bool {
+        matches!(
+            state,
+            AnimationState::Attack
+                | AnimationState::AttackDown
+                | AnimationState::AttackUp
+                | AnimationState::AttackLeft
+                | AnimationState::AttackRight
+        )
+    }
+
+    fn action_animation_locks_locomotion(animation_controller: &AnimationController) -> bool {
+        Self::is_action_animation_state(animation_controller.current_clip_state)
+            && !animation_controller.is_finished
+    }
+
+    fn trigger_entity_primary_action(&mut self, entity_id: EntityId) -> bool {
+        let Some(animation_controller) = self
+            .entity_manager
+            .get_entity_mut(entity_id)
+            .and_then(|entity| entity.attributes.animation_controller.as_mut())
+        else {
+            return false;
+        };
+
+        let facing = Self::facing_from_animation_state(animation_controller.current_clip_state);
+        let directional_attack = Self::directional_attack_state(facing);
+        let next_state = if animation_controller.has_clip(directional_attack) {
+            directional_attack
+        } else if animation_controller.has_clip(AnimationState::Attack) {
+            AnimationState::Attack
+        } else {
+            return false;
+        };
+
+        animation_controller.play(next_state)
+    }
+
+    fn process_profile_actions(&mut self) {
+        let pending_actions = std::mem::take(&mut self.pending_profile_actions);
+        if pending_actions.is_empty() {
+            return;
+        }
+
+        let controlled_entity_ids = self.controlled_input_entity_ids();
+        if controlled_entity_ids.is_empty() {
+            return;
+        }
+
+        for (profile, actions) in pending_actions {
+            if !actions.contains(&InputAction::Primary) {
+                continue;
+            }
+            for &entity_id in &controlled_entity_ids {
+                let Some(entity) = self.entity_manager.get_entity(entity_id) else {
+                    continue;
+                };
+                if Self::effective_movement_profile(entity) != profile {
+                    continue;
+                }
+                self.trigger_entity_primary_action(entity_id);
+            }
+        }
     }
 
     fn resolve_animation_state(
@@ -492,6 +591,8 @@ impl GameState {
             player_id: Some(player_id),
             keys_held: HashSet::new(),
             profile_keys_held: HashMap::new(),
+            profile_actions_held: HashMap::new(),
+            pending_profile_actions: HashMap::new(),
             movement_step: 1, // Move exactly 1 pixel per frame
             sprite_size: 16,  // Sprite is 16×16 pixels
             debug_collision_rendering: false,
@@ -509,6 +610,8 @@ impl GameState {
             player_id: None,
             keys_held: HashSet::new(),
             profile_keys_held: HashMap::new(),
+            profile_actions_held: HashMap::new(),
+            pending_profile_actions: HashMap::new(),
             movement_step: 1,
             sprite_size: 16,
             debug_collision_rendering: false,
@@ -701,22 +804,26 @@ impl GameState {
         // Pick moving or idle animation
         if let Some(player_entity) = self.entity_manager.get_player_mut() {
             if let Some(animation_controller) = &mut player_entity.attributes.animation_controller {
-                let player_delta = player_entity.position - initial_player_position;
-                let desired_player_animation = Self::resolve_animation_state(
-                    animation_controller,
-                    result.player_moved,
-                    player_delta,
-                );
-                if animation_controller.current_clip_state != desired_player_animation {
-                    tracing::debug!(
-                        "Changing clip from  {:?} to {:?}",
-                        animation_controller.current_clip_state,
-                        desired_player_animation
+                if !Self::action_animation_locks_locomotion(animation_controller) {
+                    let player_delta = player_entity.position - initial_player_position;
+                    let desired_player_animation = Self::resolve_animation_state(
+                        animation_controller,
+                        result.player_moved,
+                        player_delta,
                     );
-                    animation_controller.play(desired_player_animation);
+                    if animation_controller.current_clip_state != desired_player_animation {
+                        tracing::debug!(
+                            "Changing clip from  {:?} to {:?}",
+                            animation_controller.current_clip_state,
+                            desired_player_animation
+                        );
+                        animation_controller.play(desired_player_animation);
+                    }
                 }
             }
         }
+
+        self.process_profile_actions();
 
         // Update NPC AI
         self.update_npc_ai(world_bounds, tilemap, atlas, &mut result);
@@ -925,11 +1032,13 @@ impl GameState {
                 .get_entity_mut(entity_id)
                 .and_then(|entity| entity.attributes.animation_controller.as_mut())
             {
-                let delta = final_position - initial_position;
-                let desired_animation =
-                    Self::resolve_animation_state(animation_controller, entity_moved, delta);
-                if animation_controller.current_clip_state != desired_animation {
-                    animation_controller.play(desired_animation);
+                if !Self::action_animation_locks_locomotion(animation_controller) {
+                    let delta = final_position - initial_position;
+                    let desired_animation =
+                        Self::resolve_animation_state(animation_controller, entity_moved, delta);
+                    if animation_controller.current_clip_state != desired_animation {
+                        animation_controller.play(desired_animation);
+                    }
                 }
             }
 
@@ -984,6 +1093,27 @@ impl GameState {
             keys.remove(&key);
             if keys.is_empty() {
                 self.profile_keys_held.remove(&profile);
+            }
+        }
+    }
+
+    /// Handle profile-scoped action press events.
+    pub fn handle_profile_action_press(&mut self, profile: MovementProfile, action: InputAction) {
+        let held_actions = self.profile_actions_held.entry(profile).or_default();
+        if held_actions.insert(action) {
+            self.pending_profile_actions
+                .entry(profile)
+                .or_default()
+                .insert(action);
+        }
+    }
+
+    /// Handle profile-scoped action release events.
+    pub fn handle_profile_action_release(&mut self, profile: MovementProfile, action: InputAction) {
+        if let Some(actions) = self.profile_actions_held.get_mut(&profile) {
+            actions.remove(&action);
+            if actions.is_empty() {
+                self.profile_actions_held.remove(&profile);
             }
         }
     }
@@ -1051,6 +1181,8 @@ impl GameState {
         self.entity_manager = EntityManager::new();
         self.player_id = None;
         self.profile_keys_held.clear();
+        self.profile_actions_held.clear();
+        self.pending_profile_actions.clear();
         self.set_rules(scene.rules.clone());
 
         // Load entities from scene

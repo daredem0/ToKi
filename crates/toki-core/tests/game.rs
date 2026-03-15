@@ -12,7 +12,9 @@ use toki_core::entity::{
 };
 use toki_core::rules::{Rule, RuleAction, RuleSet, RuleTarget, RuleTrigger};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
-use toki_core::{game::AudioChannel, game::AudioEvent, scene::Scene, GameState, InputKey};
+use toki_core::{
+    game::AudioChannel, game::AudioEvent, game::InputAction, scene::Scene, GameState, InputKey,
+};
 
 fn create_test_sprite() -> SpriteInstance {
     let animation = Animation {
@@ -503,6 +505,309 @@ fn game_state_left_direction_requests_horizontal_flip() {
 
     let player_id = game_state.player_id().expect("player id should exist");
     assert!(game_state.get_entity_sprite_flip_x(player_id));
+}
+
+#[test]
+fn game_state_attack_left_requests_horizontal_flip() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackLeft,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::AttackLeft);
+
+    let player_id = game_state.player_id().expect("player id should exist");
+    assert!(game_state.get_entity_sprite_flip_x(player_id));
+}
+
+#[test]
+fn game_state_primary_action_plays_attack_clip_when_present() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleDown,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackDown,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_down_a".to_string()],
+        frame_duration_ms: 120.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleDown);
+
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+    game_state.update(world_bounds, &tilemap, &atlas);
+
+    let current_state = game_state
+        .player_entity()
+        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .map(|controller| controller.current_clip_state);
+    assert_eq!(current_state, Some(AnimationState::AttackDown));
+}
+
+#[test]
+fn game_state_primary_action_is_ignored_without_attack_clip() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleDown,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.play(AnimationState::IdleDown);
+
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+    game_state.update(world_bounds, &tilemap, &atlas);
+
+    let current_state = game_state
+        .player_entity()
+        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .map(|controller| controller.current_clip_state);
+    assert_eq!(current_state, Some(AnimationState::IdleDown));
+}
+
+#[test]
+fn game_state_attack_animation_persists_while_clip_is_unfinished() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleDown,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackDown,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_down_a".to_string()],
+        frame_duration_ms: 100.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleDown);
+
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.update(world_bounds, &tilemap, &atlas);
+
+    let controller = game_state
+        .player_entity()
+        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .expect("player controller should exist");
+    assert_eq!(controller.current_clip_state, AnimationState::AttackDown);
+    assert!(!controller.is_finished);
+}
+
+#[test]
+fn game_state_returns_to_locomotion_after_attack_animation_finishes() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleDown,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackDown,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_down_a".to_string()],
+        frame_duration_ms: 20.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleDown);
+
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.update(world_bounds, &tilemap, &atlas);
+
+    let controller = game_state
+        .player_entity()
+        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .expect("player controller should exist");
+    assert_eq!(controller.current_clip_state, AnimationState::IdleDown);
+    assert!(!controller.is_finished);
+}
+
+#[test]
+fn game_state_attack_animation_overrides_walk_while_movement_is_held() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::WalkRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 100.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    game_state.handle_profile_key_press(MovementProfile::PlayerWasd, InputKey::Right);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.update(world_bounds, &tilemap, &atlas);
+
+    let controller = game_state
+        .player_entity()
+        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .expect("player controller should exist");
+    assert_eq!(controller.current_clip_state, AnimationState::AttackRight);
+    assert!(!controller.is_finished);
+}
+
+#[test]
+fn game_state_returns_to_walk_after_attack_animation_finishes_with_movement_held() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::WalkRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 20.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    game_state.handle_profile_key_press(MovementProfile::PlayerWasd, InputKey::Right);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.update(world_bounds, &tilemap, &atlas);
+
+    let controller = game_state
+        .player_entity()
+        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .expect("player controller should exist");
+    assert_eq!(controller.current_clip_state, AnimationState::WalkRight);
+    assert!(!controller.is_finished);
 }
 
 #[test]

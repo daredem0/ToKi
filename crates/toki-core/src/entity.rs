@@ -656,6 +656,7 @@ impl EntityDefinition {
         match state.to_lowercase().as_str() {
             "idle" => Ok(AnimationState::Idle),
             "walk" => Ok(AnimationState::Walk),
+            "attack" => Ok(AnimationState::Attack),
             "idle_down" => Ok(AnimationState::IdleDown),
             "idle_up" => Ok(AnimationState::IdleUp),
             "idle_left" => Ok(AnimationState::IdleLeft),
@@ -664,6 +665,10 @@ impl EntityDefinition {
             "walk_up" => Ok(AnimationState::WalkUp),
             "walk_left" => Ok(AnimationState::WalkLeft),
             "walk_right" => Ok(AnimationState::WalkRight),
+            "attack_down" => Ok(AnimationState::AttackDown),
+            "attack_up" => Ok(AnimationState::AttackUp),
+            "attack_left" => Ok(AnimationState::AttackLeft),
+            "attack_right" => Ok(AnimationState::AttackRight),
             _ => Err(format!("Unknown animation state: {state}")),
         }
     }

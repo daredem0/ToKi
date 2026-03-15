@@ -1,8 +1,8 @@
 use toki_core::entity::MovementProfile;
 use toki_core::game::AudioEvent;
 use toki_core::{
-    assets::atlas::AtlasMeta, assets::tilemap::TileMap, entity::Entity, sprite::SpriteFrame,
-    GameState, GameUpdateResult, InputKey,
+    assets::atlas::AtlasMeta, assets::tilemap::TileMap, entity::Entity, game::InputAction,
+    sprite::SpriteFrame, GameState, GameUpdateResult, InputKey,
 };
 use winit::keyboard::KeyCode;
 
@@ -21,6 +21,10 @@ enum KeyboardBinding {
     Profile {
         profile: MovementProfile,
         input_key: InputKey,
+    },
+    ProfileAction {
+        profile: MovementProfile,
+        action: InputAction,
     },
 }
 
@@ -60,6 +64,14 @@ impl GameManager {
                             .handle_profile_key_release(profile, input_key);
                     }
                 }
+                KeyboardBinding::ProfileAction { profile, action } => {
+                    if pressed {
+                        self.game_state.handle_profile_action_press(profile, action);
+                    } else {
+                        self.game_state
+                            .handle_profile_action_release(profile, action);
+                    }
+                }
             }
         }
     }
@@ -82,6 +94,10 @@ impl GameManager {
             KeyCode::KeyD => Some(KeyboardBinding::Profile {
                 profile: MovementProfile::PlayerWasd,
                 input_key: InputKey::Right,
+            }),
+            KeyCode::Space => Some(KeyboardBinding::ProfileAction {
+                profile: MovementProfile::PlayerWasd,
+                action: InputAction::Primary,
             }),
             KeyCode::F4 => Some(KeyboardBinding::Direct(InputKey::DebugToggle)),
             _ => None,
@@ -388,6 +404,55 @@ mod tests {
                 .expect("player should exist")
                 .position,
             glam::IVec2::new(1, 0)
+        );
+    }
+
+    #[test]
+    fn player_wasd_space_triggers_primary_action_attack_when_clip_exists() {
+        let mut game_state = GameState::new_empty();
+        let player_id = game_state.spawn_player_at(glam::IVec2::new(0, 0));
+        let player = game_state
+            .entity_manager_mut()
+            .get_player_mut()
+            .expect("player should exist");
+        let controller = player
+            .attributes
+            .animation_controller
+            .as_mut()
+            .expect("player controller should exist");
+        controller.add_clip(toki_core::animation::AnimationClip {
+            state: toki_core::animation::AnimationState::IdleDown,
+            atlas_name: "players.json".to_string(),
+            frame_tile_names: vec!["player/walk_down_a".to_string()],
+            frame_duration_ms: 180.0,
+            loop_mode: toki_core::animation::LoopMode::Loop,
+        });
+        controller.add_clip(toki_core::animation::AnimationClip {
+            state: toki_core::animation::AnimationState::AttackDown,
+            atlas_name: "players.json".to_string(),
+            frame_tile_names: vec!["player/attack_down_a".to_string()],
+            frame_duration_ms: 120.0,
+            loop_mode: toki_core::animation::LoopMode::Once,
+        });
+        controller.play(toki_core::animation::AnimationState::IdleDown);
+
+        let mut manager = GameManager::new(game_state);
+        let atlas = sample_atlas();
+        let tilemap = walkable_tilemap();
+
+        manager.handle_keyboard_input(KeyCode::Space, true);
+        manager.update(glam::UVec2::new(128, 128), &tilemap, &atlas);
+        manager.handle_keyboard_input(KeyCode::Space, false);
+
+        let current_state = manager
+            .game_state
+            .entity_manager()
+            .get_entity(player_id)
+            .and_then(|entity| entity.attributes.animation_controller.as_ref())
+            .map(|controller| controller.current_clip_state);
+        assert_eq!(
+            current_state,
+            Some(toki_core::animation::AnimationState::AttackDown)
         );
     }
 }

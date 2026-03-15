@@ -7,6 +7,7 @@ use std::collections::HashMap;
 pub enum AnimationState {
     Idle,
     Walk,
+    Attack,
     IdleDown,
     IdleUp,
     IdleLeft,
@@ -15,6 +16,10 @@ pub enum AnimationState {
     WalkUp,
     WalkLeft,
     WalkRight,
+    AttackDown,
+    AttackUp,
+    AttackLeft,
+    AttackRight,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

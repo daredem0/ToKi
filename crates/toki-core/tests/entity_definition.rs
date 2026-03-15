@@ -470,6 +470,94 @@ fn test_entity_definition_accepts_directional_animation_states() {
 }
 
 #[test]
+fn test_entity_definition_accepts_optional_attack_animation_states() {
+    let entity_def = EntityDefinition {
+        name: "player".to_string(),
+        display_name: "Player".to_string(),
+        description: "Player with optional attack clips".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 1,
+            visible: true,
+        },
+        attributes: AttributesDef {
+            health: Some(100),
+            speed: 2,
+            solid: true,
+            active: true,
+            can_move: true,
+            ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::PlayerWasd,
+            has_inventory: true,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: "player_footsteps".to_string(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "players.json".to_string(),
+            clips: vec![
+                AnimationClipDef {
+                    state: "idle_down".to_string(),
+                    frame_tiles: vec!["player/walk_down_a".to_string()],
+                    frame_duration_ms: 300.0,
+                    loop_mode: "loop".to_string(),
+                },
+                AnimationClipDef {
+                    state: "attack_down".to_string(),
+                    frame_tiles: vec![
+                        "player/attack_down_a".to_string(),
+                        "player/attack_down_b".to_string(),
+                    ],
+                    frame_duration_ms: 120.0,
+                    loop_mode: "once".to_string(),
+                },
+                AnimationClipDef {
+                    state: "attack_left".to_string(),
+                    frame_tiles: vec![
+                        "player/attack_right_a".to_string(),
+                        "player/attack_right_b".to_string(),
+                    ],
+                    frame_duration_ms: 120.0,
+                    loop_mode: "once".to_string(),
+                },
+                AnimationClipDef {
+                    state: "attack".to_string(),
+                    frame_tiles: vec!["player/attack_down_a".to_string()],
+                    frame_duration_ms: 120.0,
+                    loop_mode: "once".to_string(),
+                },
+            ],
+            default_state: "idle_down".to_string(),
+        },
+        category: "human".to_string(),
+        tags: vec!["player".to_string()],
+    };
+
+    let entity = entity_def
+        .create_entity(IVec2::new(0, 0), 1)
+        .expect("attack-capable definition should parse");
+    let controller = entity
+        .attributes
+        .animation_controller
+        .expect("controller should exist");
+
+    assert!(controller.clips.contains_key(&AnimationState::Attack));
+    assert!(controller.clips.contains_key(&AnimationState::AttackDown));
+    assert!(controller.clips.contains_key(&AnimationState::AttackLeft));
+    assert_eq!(controller.current_clip_state, AnimationState::IdleDown);
+}
+
+#[test]
 fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type() {
     let entity_def = EntityDefinition {
         name: "invalid".to_string(),

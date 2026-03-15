@@ -64,6 +64,66 @@
         "solid": false,
         "trigger": false
       }
+    },
+    "player/attack_down_a": {
+      "position": [
+        0,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "player/attack_down_b": {
+      "position": [
+        1,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "player/attack_up_a": {
+      "position": [
+        2,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "player/attack_up_b": {
+      "position": [
+        3,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "player/attack_right_a": {
+      "position": [
+        4,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "player/attack_right_b": {
+      "position": [
+        5,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
     }
   }
 }

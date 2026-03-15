@@ -89,6 +89,7 @@ fn animation_state_label(state: AnimationState) -> &'static str {
     match state {
         AnimationState::Idle => "Idle",
         AnimationState::Walk => "Walk",
+        AnimationState::Attack => "Attack",
         AnimationState::IdleDown => "Idle Down",
         AnimationState::IdleUp => "Idle Up",
         AnimationState::IdleLeft => "Idle Left",
@@ -97,13 +98,18 @@ fn animation_state_label(state: AnimationState) -> &'static str {
         AnimationState::WalkUp => "Walk Up",
         AnimationState::WalkLeft => "Walk Left",
         AnimationState::WalkRight => "Walk Right",
+        AnimationState::AttackDown => "Attack Down",
+        AnimationState::AttackUp => "Attack Up",
+        AnimationState::AttackLeft => "Attack Left",
+        AnimationState::AttackRight => "Attack Right",
     }
 }
 
-fn animation_state_options() -> [AnimationState; 10] {
+fn animation_state_options() -> [AnimationState; 15] {
     [
         AnimationState::Idle,
         AnimationState::Walk,
+        AnimationState::Attack,
         AnimationState::IdleDown,
         AnimationState::IdleUp,
         AnimationState::IdleLeft,
@@ -112,6 +118,10 @@ fn animation_state_options() -> [AnimationState; 10] {
         AnimationState::WalkUp,
         AnimationState::WalkLeft,
         AnimationState::WalkRight,
+        AnimationState::AttackDown,
+        AnimationState::AttackUp,
+        AnimationState::AttackLeft,
+        AnimationState::AttackRight,
     ]
 }
 
@@ -5578,6 +5588,20 @@ mod tests {
         assert_eq!(
             InspectorSystem::selected_map_editor_tile_metadata(&atlas, "missing"),
             None
+        );
+    }
+
+    #[test]
+    fn animation_state_options_include_attack_states() {
+        let options = super::animation_state_options();
+        assert!(options.contains(&AnimationState::Attack));
+        assert!(options.contains(&AnimationState::AttackDown));
+        assert!(options.contains(&AnimationState::AttackUp));
+        assert!(options.contains(&AnimationState::AttackLeft));
+        assert!(options.contains(&AnimationState::AttackRight));
+        assert_eq!(
+            super::animation_state_label(AnimationState::AttackLeft),
+            "Attack Left"
         );
     }
 

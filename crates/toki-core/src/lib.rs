@@ -31,7 +31,7 @@ pub mod events;
 pub use events::{EventHandler, EventQueue, GameEvent, GameUpdateResult};
 
 pub mod game;
-pub use game::{GameState, InputKey};
+pub use game::{GameState, InputAction, InputKey};
 
 pub mod timing;
 pub use timing::{TimestepIterator, TimingSystem};
