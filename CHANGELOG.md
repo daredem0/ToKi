@@ -7,6 +7,51 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-03-15
+
+### Added
+- Added planned runtime asset loading with hot-asset caching and pack-path support for project-backed and exported-game startup flows.
+- Added a top-down starter template and example project content to give ToKi a reusable baseline for top-down games.
+- Added directional character animation support across core/runtime/editor, including multi-atlas sprite loading and horizontal sprite mirroring for left-facing movement.
+- Added solid-entity collision so movement blocking now works against other solid actors instead of only solid terrain.
+- Added configurable AI behavior selection with a first `Wander` mode exposed in the editor inspector.
+- Added explicit movement profiles with `PlayerWASD` as the first implemented scheme and support for multiple input-controlled entities moving from the same profile.
+- Added scene-level `control_role` semantics so player-character identity is authored per placed scene entity instead of being hardcoded in shared definitions.
+- Added generic `category`-driven authoring semantics and updated the editor palette to group definitions by reusable categories such as `human` and `creature`.
+- Added editor support for entity-definition and scene-level audio controls, including movement sound, footstep distance, trigger mode, and hearing radius.
+- Added a right-side Project panel in the editor for project-wide settings and introduced an audio mixer with master, music, movement, and collision channel sliders.
+- Added derived-version presentation in editor and runtime, including runtime startup logging and splash-screen version display.
+- Added an independent Map Editor tab with in-memory map drafts, explicit save, tile brush/fill/pick tools, brush previews, responsive viewport sizing, fine-grained zoom, and undo/redo for map edits.
+- Added typed object-sheet assets for placeable map sprites and first-pass map-object placement, selection, dragging, visibility, solidity, and deletion in the map editor.
+- Added runtime rendering for map-owned object-sheet instances so placed map objects now appear in-game.
+
+### Changed
+- Changed runtime/editor sprite loading to discover project atlases dynamically instead of depending on a single hardcoded creature atlas.
+- Changed authored player/NPC semantics to a cleaner split between `category`, `control_role`, `movement_profile`, and `ai_behavior`.
+- Renamed the internal runtime entity enum from `EntityType` to `EntityKind` to match the new authoring model.
+- Changed movement sound handling from input-coupled playback to generic movement-driven playback with configurable trigger policies (`distance` or `animation_loop`).
+- Changed scene-level audio settings so placed entities can override definition defaults for locomotion/collision behavior within a scene.
+- Changed text anchoring and splash layout so derived version strings center correctly and fit narrow runtime views.
+- Changed the map editor workflow from scene-coupled map loading to independent asset editing with its own viewport state and save flow.
+- Changed map-object authoring so placed objects now persist their size, visibility, and solidity as part of the tilemap asset.
+- Changed newly placed map objects to default to `solid = true`.
+
+### Fixed
+- Fixed editor/runtime multi-texture rendering regressions so mixed atlases such as `players.json`, `creatures.json`, and object sheets can coexist without overwriting each other.
+- Fixed editor viewport startup redraw/projection issues that previously hid sprites until the camera was moved.
+- Fixed runtime sprite rendering for texture-specific pipelines by propagating projection state to all atlas batches.
+- Fixed map save behavior for unsaved draft maps so painted changes are written from the live viewport state instead of being reset to the initial fill tile.
+- Fixed runtime resource loading to ignore object-sheet JSON files when building the sprite atlas registry.
+- Fixed splash branding/version overlap and centering issues in the runtime startup screen.
+- Fixed movement audio so non-player movement sources such as wander AI and rule-driven velocity now emit sound correctly.
+- Fixed editor logging spam from per-frame missing-directory messages in the map panel.
+
+### Tests
+- Added broad regression coverage for the new movement-profile, control-role, audio-mixer, object-sheet, map-editor, and runtime resource-loading workflows.
+- Added schema tests for the new object-sheet and map-object formats.
+- Added persistence and collision tests for painted maps and solid map objects.
+- Expanded editor interaction tests around map painting, object placement, object selection/dragging/deletion, and map-editor undo/redo behavior.
+
 ## [0.0.14] - 2026-03-13
 
 ### Added
@@ -238,7 +283,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Fixed camera/map-bound movement and projection distortion on resize.
 - Improved tilemap upload strategy and window/surface resize handling.
 
-[Unreleased]: https://github.com/daredem0/ToKi/compare/v0.0.14...HEAD
+[Unreleased]: https://github.com/daredem0/ToKi/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/daredem0/ToKi/compare/v0.0.14...v0.1.0
 [0.0.14]: https://github.com/daredem0/ToKi/compare/v0.0.13...v0.0.14
 [0.0.13]: https://github.com/daredem0/ToKi/compare/0.0.12...v0.0.13
 [0.0.12]: https://github.com/daredem0/ToKi/compare/0.0.11...0.0.12
