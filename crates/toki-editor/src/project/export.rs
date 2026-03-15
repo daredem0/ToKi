@@ -23,6 +23,7 @@ pub struct RuntimeBundleConfig {
     pub startup: RuntimeBundleStartupConfig,
     pub splash: RuntimeBundleSplashConfig,
     pub audio: RuntimeBundleAudioConfig,
+    pub display: RuntimeBundleDisplayConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -47,6 +48,11 @@ pub struct RuntimeBundleAudioConfig {
     pub music_percent: u8,
     pub movement_percent: u8,
     pub collision_percent: u8,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeBundleDisplayConfig {
+    pub show_entity_health_bars: bool,
 }
 
 pub fn export_hybrid_bundle(
@@ -122,6 +128,9 @@ pub fn export_hybrid_bundle(
                 music_percent: project.metadata.runtime.audio.music_percent,
                 movement_percent: project.metadata.runtime.audio.movement_percent,
                 collision_percent: project.metadata.runtime.audio.collision_percent,
+            },
+            display: RuntimeBundleDisplayConfig {
+                show_entity_health_bars: project.metadata.runtime.display.show_entity_health_bars,
             },
         },
     )?;
@@ -354,6 +363,7 @@ mod tests {
         project.metadata.runtime.audio.music_percent = 65;
         project.metadata.runtime.audio.movement_percent = 40;
         project.metadata.runtime.audio.collision_percent = 25;
+        project.metadata.runtime.display.show_entity_health_bars = true;
         let export_root = parent.join("exports");
         fs::create_dir_all(&export_root).expect("exports dir");
 
@@ -454,6 +464,7 @@ mod tests {
         assert_eq!(runtime_config.audio.music_percent, 65);
         assert_eq!(runtime_config.audio.movement_percent, 40);
         assert_eq!(runtime_config.audio.collision_percent, 25);
+        assert!(runtime_config.display.show_entity_health_bars);
     }
 
     #[test]

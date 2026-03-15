@@ -4,5 +4,5 @@ pub mod systems;
 
 pub use app::{
     run_minimal_window, run_minimal_window_with_options, RuntimeAudioMixOptions,
-    RuntimeLaunchOptions,
+    RuntimeDisplayOptions, RuntimeLaunchOptions,
 };

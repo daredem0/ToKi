@@ -76,6 +76,9 @@ pub struct RuntimeSettings {
     /// Global channel mixer settings
     #[serde(default)]
     pub audio: RuntimeAudioMixSettings,
+    /// Project-wide display toggles for runtime presentation
+    #[serde(default)]
+    pub display: RuntimeDisplaySettings,
 }
 
 /// Runtime audio mixer settings
@@ -100,6 +103,13 @@ impl Default for RuntimeAudioMixSettings {
             collision_percent: default_runtime_audio_mix_percent(),
         }
     }
+}
+
+/// Runtime display settings
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct RuntimeDisplaySettings {
+    #[serde(default)]
+    pub show_entity_health_bars: bool,
 }
 
 /// Runtime splash settings (community-safe subset)
@@ -311,6 +321,7 @@ recent_files = []
         assert_eq!(metadata.runtime.audio.music_percent, 100);
         assert_eq!(metadata.runtime.audio.movement_percent, 100);
         assert_eq!(metadata.runtime.audio.collision_percent, 100);
+        assert!(!metadata.runtime.display.show_entity_health_bars);
     }
 
     #[test]
@@ -321,6 +332,7 @@ recent_files = []
         assert_eq!(runtime.audio.music_percent, 100);
         assert_eq!(runtime.audio.movement_percent, 100);
         assert_eq!(runtime.audio.collision_percent, 100);
+        assert!(!runtime.display.show_entity_health_bars);
     }
 
     #[test]
@@ -347,6 +359,9 @@ master_percent = 85
 music_percent = 70
 movement_percent = 55
 collision_percent = 40
+
+[runtime.display]
+show_entity_health_bars = true
 "#;
 
         let metadata: ProjectMetadata =
@@ -355,6 +370,7 @@ collision_percent = 40
         assert_eq!(metadata.runtime.audio.music_percent, 70);
         assert_eq!(metadata.runtime.audio.movement_percent, 55);
         assert_eq!(metadata.runtime.audio.collision_percent, 40);
+        assert!(metadata.runtime.display.show_entity_health_bars);
     }
 
     #[test]

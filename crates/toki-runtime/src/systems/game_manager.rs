@@ -1,8 +1,12 @@
 use toki_core::entity::MovementProfile;
 use toki_core::game::AudioEvent;
 use toki_core::{
-    assets::atlas::AtlasMeta, assets::tilemap::TileMap, entity::Entity, game::InputAction,
-    sprite::SpriteFrame, GameState, GameUpdateResult, InputKey,
+    assets::atlas::AtlasMeta,
+    assets::tilemap::TileMap,
+    entity::Entity,
+    game::{EntityHealthBar, InputAction},
+    sprite::SpriteFrame,
+    GameState, GameUpdateResult, InputKey,
 };
 use winit::keyboard::KeyCode;
 
@@ -131,6 +135,10 @@ impl GameManager {
 
     pub fn get_entity_sprite_flip_x(&self, entity_id: toki_core::entity::EntityId) -> bool {
         self.game_state.get_entity_sprite_flip_x(entity_id)
+    }
+
+    pub fn get_entity_health_bars(&self) -> Vec<EntityHealthBar> {
+        self.game_state.get_entity_health_bars()
     }
 
     /// Spawn an NPC that looks like the player

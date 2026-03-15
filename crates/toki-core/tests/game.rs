@@ -1030,6 +1030,30 @@ fn game_state_primary_action_damages_scene_loaded_legacy_health_target() {
 }
 
 #[test]
+fn game_state_entity_health_bars_include_visible_damageable_entities() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+
+    let mut target_definition = test_definition("health_bar_target", "creature");
+    target_definition.attributes.health = Some(25);
+    let target_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&target_definition, IVec2::new(66, 60))
+        .expect("target should spawn");
+
+    let health_bars = game_state.get_entity_health_bars();
+    let target_bar = health_bars
+        .into_iter()
+        .find(|bar| bar.entity_id == target_id)
+        .expect("visible target should produce health bar data");
+
+    assert_eq!(target_bar.position, IVec2::new(66, 60));
+    assert_eq!(target_bar.size, UVec2::new(16, 16));
+    assert_eq!(target_bar.current, 25);
+    assert_eq!(target_bar.max, 25);
+}
+
+#[test]
 fn game_state_player_is_blocked_by_solid_entity_collision() {
     let mut game_state = GameState::new_empty();
     let player_id = game_state.spawn_player_at(IVec2::new(0, 0));

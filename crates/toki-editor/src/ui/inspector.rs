@@ -52,6 +52,7 @@ struct ProjectSettingsDraft {
     version: String,
     description: String,
     splash_duration_ms: u64,
+    show_entity_health_bars: bool,
     master_mix_percent: u8,
     music_mix_percent: u8,
     movement_mix_percent: u8,
@@ -253,6 +254,7 @@ impl ProjectSettingsDraft {
             version: project.metadata.project.version.clone(),
             description: project.metadata.project.description.clone(),
             splash_duration_ms: project.metadata.runtime.splash.duration_ms,
+            show_entity_health_bars: project.metadata.runtime.display.show_entity_health_bars,
             master_mix_percent: project.metadata.runtime.audio.master_percent,
             music_mix_percent: project.metadata.runtime.audio.music_percent,
             movement_mix_percent: project.metadata.runtime.audio.movement_percent,
@@ -1082,6 +1084,12 @@ impl InspectorSystem {
                     )
                     .changed();
             });
+            changed |= ui
+                .checkbox(
+                    &mut draft.show_entity_health_bars,
+                    "Show Entity Health Bars",
+                )
+                .changed();
         });
 
         ui.separator();
@@ -1191,6 +1199,12 @@ impl InspectorSystem {
         }
         if project.metadata.runtime.splash.duration_ms != draft.splash_duration_ms {
             project.metadata.runtime.splash.duration_ms = draft.splash_duration_ms;
+            changed = true;
+        }
+        if project.metadata.runtime.display.show_entity_health_bars != draft.show_entity_health_bars
+        {
+            project.metadata.runtime.display.show_entity_health_bars =
+                draft.show_entity_health_bars;
             changed = true;
         }
         if project.metadata.runtime.audio.master_percent != draft.master_mix_percent {
@@ -4985,6 +4999,7 @@ mod tests {
             version: "2.0.0".to_string(),
             description: "Updated description".to_string(),
             splash_duration_ms: 4500,
+            show_entity_health_bars: true,
             master_mix_percent: 85,
             music_mix_percent: 70,
             movement_mix_percent: 55,
@@ -4999,6 +5014,7 @@ mod tests {
         assert_eq!(project.metadata.project.version, "2.0.0");
         assert_eq!(project.metadata.project.description, "Updated description");
         assert_eq!(project.metadata.runtime.splash.duration_ms, 4500);
+        assert!(project.metadata.runtime.display.show_entity_health_bars);
         assert_eq!(project.metadata.runtime.audio.master_percent, 85);
         assert_eq!(project.metadata.runtime.audio.music_percent, 70);
         assert_eq!(project.metadata.runtime.audio.movement_percent, 55);

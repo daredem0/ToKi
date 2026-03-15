@@ -151,6 +151,19 @@ impl GpuState {
         self.debug_pipeline.add_rect(x, y, width, height, color);
     }
 
+    /// Add a filled debug rectangle
+    pub fn add_filled_debug_rect(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        color: [f32; 4],
+    ) {
+        self.debug_pipeline
+            .add_filled_rect(x, y, width, height, color);
+    }
+
     /// Finalize debug shapes for rendering (call after adding all shapes)
     pub fn finalize_debug_shapes(&mut self) {
         self.debug_pipeline.update_vertices(&self.device);

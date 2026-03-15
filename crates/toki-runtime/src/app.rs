@@ -72,6 +72,11 @@ impl Default for RuntimeAudioMixOptions {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct RuntimeDisplayOptions {
+    pub show_entity_health_bars: bool,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RuntimeLaunchOptions {
     pub project_path: Option<PathBuf>,
@@ -80,6 +85,7 @@ pub struct RuntimeLaunchOptions {
     pub map_name: Option<String>,
     pub splash: RuntimeSplashOptions,
     pub audio_mix: RuntimeAudioMixOptions,
+    pub display: RuntimeDisplayOptions,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -691,6 +697,9 @@ impl App {
 
             // Add debug collision rendering
             self.rendering.clear_debug_shapes();
+            if self.launch_options.display.show_entity_health_bars {
+                self.render_entity_health_bars();
+            }
             if self.game_system.is_debug_collision_rendering_enabled() {
                 // Get debug data from game system
                 let entity_boxes = self.game_system.get_entity_collision_boxes();
@@ -769,6 +778,51 @@ impl App {
         }
 
         self.platform.request_redraw();
+    }
+
+    fn render_entity_health_bars(&mut self) {
+        for health_bar in self.game_system.get_entity_health_bars() {
+            let bar_width = health_bar.size.x.max(16) as f32;
+            let bar_height = 3.0;
+            let bar_x = health_bar.position.x as f32;
+            let bar_y = health_bar.position.y as f32 - 6.0;
+            let fill_ratio = (health_bar.current as f32 / health_bar.max as f32).clamp(0.0, 1.0);
+            let fill_color = Self::health_bar_fill_color(fill_ratio);
+
+            self.rendering.add_filled_debug_rect(
+                bar_x,
+                bar_y,
+                bar_width,
+                bar_height,
+                [0.1, 0.1, 0.1, 0.8],
+            );
+            if fill_ratio > 0.0 {
+                self.rendering.add_filled_debug_rect(
+                    bar_x,
+                    bar_y,
+                    (bar_width * fill_ratio).max(1.0),
+                    bar_height,
+                    fill_color,
+                );
+            }
+            self.rendering.add_debug_rect(
+                bar_x,
+                bar_y,
+                bar_width,
+                bar_height,
+                [0.0, 0.0, 0.0, 1.0],
+            );
+        }
+    }
+
+    fn health_bar_fill_color(fill_ratio: f32) -> [f32; 4] {
+        if fill_ratio > 0.6 {
+            [0.2, 0.85, 0.25, 0.95]
+        } else if fill_ratio > 0.3 {
+            [0.95, 0.8, 0.2, 0.95]
+        } else {
+            [0.9, 0.2, 0.2, 0.95]
+        }
     }
 
     fn handle_keyboard_input_event(&mut self, event: winit::event::KeyEvent) {
@@ -1197,8 +1251,8 @@ fn first_existing_path(candidates: &[PathBuf]) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::{
-        first_existing_path, App, RuntimeAudioMixOptions, RuntimeLaunchOptions,
-        RuntimeSplashOptions, SplashPolicy, COMMUNITY_SPLASH_VERSION_TEXT,
+        first_existing_path, App, RuntimeAudioMixOptions, RuntimeDisplayOptions,
+        RuntimeLaunchOptions, RuntimeSplashOptions, SplashPolicy, COMMUNITY_SPLASH_VERSION_TEXT,
         SPLASH_BRANDING_VERSION_GAP_PX, SPLASH_TEXT_HORIZONTAL_PADDING_PX,
         SPLASH_TEXT_LINE_HEIGHT_MULTIPLIER, SPLASH_VERSION_DEFAULT_SIZE_PX,
         SPLASH_VERSION_MIN_SIZE_PX,
@@ -1420,6 +1474,7 @@ mod tests {
             map_name: None,
             splash: RuntimeSplashOptions::default(),
             audio_mix: RuntimeAudioMixOptions::default(),
+            display: RuntimeDisplayOptions::default(),
         };
 
         let resolved = App::resolve_post_splash_sprite_texture_path(&options, None);
@@ -1452,6 +1507,7 @@ mod tests {
             map_name: None,
             splash: RuntimeSplashOptions::default(),
             audio_mix: RuntimeAudioMixOptions::default(),
+            display: RuntimeDisplayOptions::default(),
         };
 
         let resolved = App::resolve_post_splash_sprite_texture_path(&options, Some(&mount_dir));
@@ -1514,6 +1570,7 @@ mod tests {
             map_name: None,
             splash: RuntimeSplashOptions::default(),
             audio_mix: RuntimeAudioMixOptions::default(),
+            display: RuntimeDisplayOptions::default(),
         };
 
         let (resources, game_state, pack_mount, asset_load_plan, _) =
@@ -1554,6 +1611,7 @@ mod tests {
             map_name: None,
             splash: RuntimeSplashOptions::default(),
             audio_mix: RuntimeAudioMixOptions::default(),
+            display: RuntimeDisplayOptions::default(),
         };
 
         let error = App::build_startup_state_from_pack(&launch_options, &pack_path)

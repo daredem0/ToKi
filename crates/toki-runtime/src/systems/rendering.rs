@@ -49,6 +49,7 @@ trait RuntimeRenderBackend: std::fmt::Debug {
     fn add_text_item(&mut self, text: TextItem);
     fn clear_debug_shapes(&mut self);
     fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
+    fn add_filled_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
     fn finalize_debug_shapes(&mut self);
 }
 
@@ -164,6 +165,10 @@ impl RuntimeRenderBackend for WgpuRenderBackend {
 
     fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
         self.gpu.add_debug_rect(x, y, width, height, color);
+    }
+
+    fn add_filled_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+        self.gpu.add_filled_debug_rect(x, y, width, height, color);
     }
 
     fn finalize_debug_shapes(&mut self) {
@@ -458,6 +463,19 @@ impl RenderingSystem {
         }
     }
 
+    pub fn add_filled_debug_rect(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        color: [f32; 4],
+    ) {
+        if let Some(backend) = &mut self.backend {
+            backend.add_filled_debug_rect(x, y, width, height, color);
+        }
+    }
+
     pub fn finalize_debug_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
             backend.finalize_debug_shapes();
@@ -656,6 +674,17 @@ mod tests {
             self.debug_rect_count.set(self.debug_rect_count.get() + 1);
         }
 
+        fn add_filled_debug_rect(
+            &mut self,
+            _x: f32,
+            _y: f32,
+            _width: f32,
+            _height: f32,
+            _color: [f32; 4],
+        ) {
+            self.debug_rect_count.set(self.debug_rect_count.get() + 1);
+        }
+
         fn finalize_debug_shapes(&mut self) {
             self.finalized_debug.set(self.finalized_debug.get() + 1);
         }
@@ -762,6 +791,7 @@ mod tests {
         let tilemap_render_enabled = fake.tilemap_render_enabled.clone();
         let tilemap_counts = fake.tilemap_vertex_counts.clone();
         let text_count = fake.text_count.clone();
+        let debug_rect_count = fake.debug_rect_count.clone();
         let debug_finalize_counter = fake.finalized_debug.clone();
 
         let mut rendering = RenderingSystem::new();
@@ -811,6 +841,7 @@ mod tests {
         ));
         rendering.clear_debug_shapes();
         rendering.add_debug_rect(0.0, 0.0, 16.0, 16.0, [1.0, 0.0, 0.0, 1.0]);
+        rendering.add_filled_debug_rect(1.0, 1.0, 14.0, 14.0, [0.0, 1.0, 0.0, 1.0]);
         rendering.finalize_debug_shapes();
         rendering.draw();
 
@@ -828,6 +859,7 @@ mod tests {
         assert!(tilemap_render_enabled.get());
         assert_eq!(tilemap_counts.borrow().as_slice(), &[2]);
         assert_eq!(text_count.get(), 1);
+        assert_eq!(debug_rect_count.get(), 2);
         assert_eq!(debug_finalize_counter.get(), 1);
     }
 

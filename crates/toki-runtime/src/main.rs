@@ -4,7 +4,7 @@ use tracing_subscriber::EnvFilter;
 
 use toki_runtime::{
     run_minimal_window, run_minimal_window_with_options, RuntimeAudioMixOptions,
-    RuntimeLaunchOptions,
+    RuntimeDisplayOptions, RuntimeLaunchOptions,
 };
 
 #[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
@@ -16,6 +16,7 @@ struct RuntimeConfig {
     startup: Option<RuntimeConfigStartup>,
     splash: Option<RuntimeConfigSplash>,
     audio: Option<RuntimeConfigAudio>,
+    display: Option<RuntimeConfigDisplay>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
@@ -40,6 +41,11 @@ struct RuntimeConfigAudio {
     music_percent: Option<u8>,
     movement_percent: Option<u8>,
     collision_percent: Option<u8>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
+struct RuntimeConfigDisplay {
+    show_entity_health_bars: Option<bool>,
 }
 
 fn main() -> Result<()> {
@@ -67,7 +73,7 @@ fn main() -> Result<()> {
     if launch_options.project_path.is_none() && launch_options.pack_path.is_none() {
         launch_options = auto_detect_project_launch_options(launch_options);
     }
-    launch_options = apply_project_audio_mix_from_project_file_if_present(launch_options);
+    launch_options = apply_project_runtime_settings_from_project_file_if_present(launch_options);
     if let Some(project_path) = &launch_options.project_path {
         if let Err(error) = std::env::set_current_dir(project_path) {
             tracing::warn!(
@@ -211,6 +217,11 @@ fn apply_runtime_config(
             launch_options.audio_mix.collision_percent = collision_percent.min(100);
         }
     }
+    if let Some(display) = config.display {
+        if let Some(show_entity_health_bars) = display.show_entity_health_bars {
+            launch_options.display.show_entity_health_bars = show_entity_health_bars;
+        }
+    }
 }
 
 fn load_runtime_config() -> Option<(RuntimeConfig, PathBuf)> {
@@ -286,6 +297,8 @@ struct ProjectRuntimeMetadata {
 struct ProjectRuntimeSettings {
     #[serde(default)]
     audio: ProjectRuntimeAudioSettings,
+    #[serde(default)]
+    display: ProjectRuntimeDisplaySettings,
 }
 
 #[derive(Debug, serde::Deserialize, Default)]
@@ -300,14 +313,22 @@ struct ProjectRuntimeAudioSettings {
     collision_percent: u8,
 }
 
+#[derive(Debug, serde::Deserialize, Default)]
+struct ProjectRuntimeDisplaySettings {
+    #[serde(default)]
+    show_entity_health_bars: bool,
+}
+
 fn default_project_audio_percent() -> u8 {
     100
 }
 
-fn apply_project_audio_mix_from_project_file_if_present(
+fn apply_project_runtime_settings_from_project_file_if_present(
     mut launch_options: RuntimeLaunchOptions,
 ) -> RuntimeLaunchOptions {
-    if launch_options.audio_mix != RuntimeAudioMixOptions::default() {
+    let should_apply_audio = launch_options.audio_mix == RuntimeAudioMixOptions::default();
+    let should_apply_display = launch_options.display == RuntimeDisplayOptions::default();
+    if !should_apply_audio && !should_apply_display {
         return launch_options;
     }
 
@@ -326,10 +347,18 @@ fn apply_project_audio_mix_from_project_file_if_present(
         return launch_options;
     };
 
-    launch_options.audio_mix.music_percent = metadata.runtime.audio.music_percent.min(100);
-    launch_options.audio_mix.master_percent = metadata.runtime.audio.master_percent.min(100);
-    launch_options.audio_mix.movement_percent = metadata.runtime.audio.movement_percent.min(100);
-    launch_options.audio_mix.collision_percent = metadata.runtime.audio.collision_percent.min(100);
+    if should_apply_audio {
+        launch_options.audio_mix.music_percent = metadata.runtime.audio.music_percent.min(100);
+        launch_options.audio_mix.master_percent = metadata.runtime.audio.master_percent.min(100);
+        launch_options.audio_mix.movement_percent =
+            metadata.runtime.audio.movement_percent.min(100);
+        launch_options.audio_mix.collision_percent =
+            metadata.runtime.audio.collision_percent.min(100);
+    }
+    if should_apply_display {
+        launch_options.display.show_entity_health_bars =
+            metadata.runtime.display.show_entity_health_bars;
+    }
     launch_options
 }
 
@@ -365,13 +394,14 @@ fn option_value(args: &[String], value_index: usize) -> Option<&String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_project_audio_mix_from_project_file_if_present, apply_runtime_config,
+        apply_project_runtime_settings_from_project_file_if_present, apply_runtime_config,
         auto_detect_project_launch_options, detect_first_scene_name,
         load_runtime_config_from_candidates, option_value, parse_launch_options, RuntimeConfig,
-        RuntimeConfigAudio, RuntimeConfigPack, RuntimeConfigSplash, RuntimeConfigStartup,
+        RuntimeConfigAudio, RuntimeConfigDisplay, RuntimeConfigPack, RuntimeConfigSplash,
+        RuntimeConfigStartup,
     };
     use std::path::PathBuf;
-    use toki_runtime::{RuntimeAudioMixOptions, RuntimeLaunchOptions};
+    use toki_runtime::{RuntimeAudioMixOptions, RuntimeDisplayOptions, RuntimeLaunchOptions};
 
     #[test]
     fn parse_launch_options_reads_project_scene_and_map() {
@@ -391,6 +421,7 @@ mod tests {
         assert!(options.splash.show_branding);
         assert!(options.pack_path.is_none());
         assert_eq!(options.audio_mix, RuntimeAudioMixOptions::default());
+        assert_eq!(options.display, RuntimeDisplayOptions::default());
     }
 
     #[test]
@@ -483,6 +514,9 @@ mod tests {
                     movement_percent: Some(45),
                     collision_percent: Some(25),
                 }),
+                display: Some(RuntimeConfigDisplay {
+                    show_entity_health_bars: Some(true),
+                }),
             },
             temp.path(),
         );
@@ -495,6 +529,7 @@ mod tests {
         assert_eq!(options.audio_mix.music_percent, 65);
         assert_eq!(options.audio_mix.movement_percent, 45);
         assert_eq!(options.audio_mix.collision_percent, 25);
+        assert!(options.display.show_entity_health_bars);
     }
 
     #[test]
@@ -532,6 +567,9 @@ mod tests {
                     movement_percent: Some(60),
                     collision_percent: Some(40),
                 }),
+                display: Some(RuntimeConfigDisplay {
+                    show_entity_health_bars: Some(true),
+                }),
             },
             temp.path(),
         );
@@ -545,6 +583,7 @@ mod tests {
         assert_eq!(options.audio_mix.music_percent, 80);
         assert_eq!(options.audio_mix.movement_percent, 60);
         assert_eq!(options.audio_mix.collision_percent, 40);
+        assert!(options.display.show_entity_health_bars);
     }
 
     #[test]
@@ -565,6 +604,7 @@ mod tests {
                 }),
                 splash: None,
                 audio: None,
+                display: None,
             },
             temp.path(),
         );
@@ -654,7 +694,7 @@ mod tests {
     }
 
     #[test]
-    fn apply_project_audio_mix_from_project_file_reads_runtime_audio_settings() {
+    fn apply_project_runtime_settings_from_project_file_reads_audio_and_display_settings() {
         let dir = tempfile::tempdir().expect("temp dir");
         std::fs::write(
             dir.path().join("project.toml"),
@@ -679,6 +719,9 @@ master_percent = 91
 music_percent = 72
 movement_percent = 58
 collision_percent = 31
+
+[runtime.display]
+show_entity_health_bars = true
 "#,
         )
         .expect("project");
@@ -687,20 +730,21 @@ collision_percent = 31
             project_path: Some(dir.path().to_path_buf()),
             ..RuntimeLaunchOptions::default()
         };
-        let updated = apply_project_audio_mix_from_project_file_if_present(options);
+        let updated = apply_project_runtime_settings_from_project_file_if_present(options);
 
         assert_eq!(updated.audio_mix.master_percent, 91);
         assert_eq!(updated.audio_mix.music_percent, 72);
         assert_eq!(updated.audio_mix.movement_percent, 58);
         assert_eq!(updated.audio_mix.collision_percent, 31);
+        assert!(updated.display.show_entity_health_bars);
     }
 
     #[test]
-    fn apply_project_audio_mix_does_not_override_existing_launch_audio_mix() {
+    fn apply_project_runtime_settings_do_not_override_existing_launch_audio_mix() {
         let dir = tempfile::tempdir().expect("temp dir");
         std::fs::write(
             dir.path().join("project.toml"),
-            "[runtime.audio]\nmusic_percent=10\nmovement_percent=20\ncollision_percent=30\n",
+            "[runtime.audio]\nmusic_percent=10\nmovement_percent=20\ncollision_percent=30\n[runtime.display]\nshow_entity_health_bars=true\n",
         )
         .expect("project");
 
@@ -712,13 +756,17 @@ collision_percent = 31
                 movement_percent: 80,
                 collision_percent: 70,
             },
+            display: RuntimeDisplayOptions {
+                show_entity_health_bars: false,
+            },
             ..RuntimeLaunchOptions::default()
         };
-        let updated = apply_project_audio_mix_from_project_file_if_present(options);
+        let updated = apply_project_runtime_settings_from_project_file_if_present(options);
 
         assert_eq!(updated.audio_mix.master_percent, 95);
         assert_eq!(updated.audio_mix.music_percent, 90);
         assert_eq!(updated.audio_mix.movement_percent, 80);
         assert_eq!(updated.audio_mix.collision_percent, 70);
+        assert!(updated.display.show_entity_health_bars);
     }
 }

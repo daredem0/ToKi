@@ -35,6 +35,15 @@ pub enum InputAction {
     Primary,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EntityHealthBar {
+    pub entity_id: EntityId,
+    pub position: glam::IVec2,
+    pub size: glam::UVec2,
+    pub current: i32,
+    pub max: i32,
+}
+
 /// Audio events that can be triggered by game logic
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AudioEvent {
@@ -1590,6 +1599,35 @@ impl GameState {
             active_entities.len()
         );
         renderable
+    }
+
+    /// Get world-space health bar data for visible, active entities with health stats.
+    pub fn get_entity_health_bars(&self) -> Vec<EntityHealthBar> {
+        self.entity_manager
+            .active_entities()
+            .iter()
+            .filter_map(|&entity_id| {
+                let entity = self.entity_manager.get_entity(entity_id)?;
+                if !entity.attributes.visible || !entity.attributes.active {
+                    return None;
+                }
+
+                let current = entity.attributes.current_stat(HEALTH_STAT_ID)?;
+                let max = entity
+                    .attributes
+                    .base_stat(HEALTH_STAT_ID)
+                    .or(Some(current))
+                    .filter(|value| *value > 0)?;
+
+                Some(EntityHealthBar {
+                    entity_id,
+                    position: entity.position,
+                    size: entity.size,
+                    current: current.clamp(0, max),
+                    max,
+                })
+            })
+            .collect()
     }
 
     /// Get the current sprite frame for rendering with proper atlas lookup (legacy method for player)
