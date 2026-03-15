@@ -64,7 +64,9 @@ fn top_down_starter_files() -> [(&'static str, &'static [u8]); 7] {
         ),
         (
             "assets/tilemaps/starter_overworld.json",
-            include_bytes!("../../templates/top_down_starter/assets/tilemaps/starter_overworld.json"),
+            include_bytes!(
+                "../../templates/top_down_starter/assets/tilemaps/starter_overworld.json"
+            ),
         ),
         (
             "entities/player.json",

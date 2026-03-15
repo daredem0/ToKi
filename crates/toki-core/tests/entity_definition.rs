@@ -21,6 +21,7 @@ fn test_entity_definition_create_entity_basic() {
             active: true,
             can_move: true,
             ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::LegacyDefault,
             has_inventory: true,
         },
         collision: CollisionDef {
@@ -84,6 +85,10 @@ fn test_entity_definition_create_entity_basic() {
     assert_eq!(entity.attributes.render_layer, 1);
     assert!(entity.attributes.active);
     assert!(entity.attributes.can_move);
+    assert_eq!(
+        entity.attributes.movement_profile,
+        MovementProfile::LegacyDefault
+    );
     assert!(entity.attributes.has_inventory);
 
     // Check collision
@@ -133,6 +138,7 @@ fn test_entity_definition_create_npc_entity() {
             active: true,
             can_move: false,
             ai_behavior: AiBehavior::Wander,
+            movement_profile: MovementProfile::LegacyDefault,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -179,6 +185,10 @@ fn test_entity_definition_create_npc_entity() {
     assert!(!entity.attributes.can_move);
     assert!(!entity.attributes.has_inventory);
     assert_eq!(entity.attributes.ai_behavior, AiBehavior::Wander);
+    assert_eq!(
+        entity.attributes.movement_profile,
+        MovementProfile::LegacyDefault
+    );
     assert_eq!(entity.attributes.speed, 1);
 
     // Check no collision since disabled
@@ -241,6 +251,75 @@ fn test_entity_definition_missing_ai_behavior_defaults_to_wander() {
         .create_entity(IVec2::ZERO, 1)
         .expect("legacy entity should still instantiate");
     assert_eq!(entity.attributes.ai_behavior, AiBehavior::Wander);
+    assert_eq!(
+        entity.attributes.movement_profile,
+        MovementProfile::LegacyDefault
+    );
+}
+
+#[test]
+fn test_entity_definition_supports_explicit_player_wasd_movement_profile() {
+    let entity_json = r#"
+    {
+      "name": "configured_player",
+      "display_name": "Configured Player",
+      "description": "Player with explicit movement profile",
+      "entity_type": "player",
+      "rendering": {
+        "size": [16, 16],
+        "render_layer": 0,
+        "visible": true
+      },
+      "attributes": {
+        "health": 100,
+        "speed": 2,
+        "solid": true,
+        "active": true,
+        "can_move": true,
+        "movement_profile": "player_wasd",
+        "has_inventory": false
+      },
+      "collision": {
+        "enabled": true,
+        "offset": [0, 0],
+        "size": [16, 16],
+        "trigger": false
+      },
+      "audio": {
+        "footstep_trigger_distance": 16.0,
+        "movement_sound": "step"
+      },
+      "animations": {
+        "atlas_name": "creatures",
+        "clips": [
+          {
+            "state": "idle",
+            "frame_tiles": ["slime/idle_0"],
+            "frame_duration_ms": 200.0,
+            "loop_mode": "loop"
+          }
+        ],
+        "default_state": "idle"
+      },
+      "category": "player",
+      "tags": []
+    }
+    "#;
+
+    let entity_def: EntityDefinition =
+        serde_json::from_str(entity_json).expect("entity json should deserialize");
+    assert_eq!(
+        entity_def.attributes.movement_profile,
+        MovementProfile::PlayerWasd
+    );
+
+    let entity = entity_def
+        .create_entity(IVec2::ZERO, 1)
+        .expect("entity should instantiate");
+    assert_eq!(
+        entity.attributes.movement_profile,
+        MovementProfile::PlayerWasd
+    );
 }
 
 #[test]
@@ -262,6 +341,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
             active: true,
             can_move: true,
             ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::LegacyDefault,
             has_inventory: true,
         },
         collision: CollisionDef {
@@ -342,6 +422,7 @@ fn test_entity_definition_invalid_entity_type() {
             active: true,
             can_move: false,
             ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::LegacyDefault,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -388,6 +469,7 @@ fn test_entity_definition_invalid_animation_state() {
             active: true,
             can_move: false,
             ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::LegacyDefault,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -439,6 +521,7 @@ fn test_entity_definition_invalid_loop_mode() {
             active: true,
             can_move: false,
             ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::LegacyDefault,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -490,6 +573,7 @@ fn test_entity_definition_serialization() {
             active: false,
             can_move: false,
             ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::LegacyDefault,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -554,6 +638,7 @@ fn test_entity_definition_create_audio_component() {
             active: true,
             can_move: true,
             ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::LegacyDefault,
             has_inventory: false,
         },
         collision: CollisionDef {

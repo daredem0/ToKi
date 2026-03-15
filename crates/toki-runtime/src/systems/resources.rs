@@ -1,6 +1,6 @@
+use std::collections::HashMap;
 use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
 use toki_render::RenderError;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedProjectResourcePaths {
@@ -530,7 +530,9 @@ mod tests {
         let error = ResourceManager::load_for_project(&project_dir, Some("demo_map"))
             .expect_err("missing sprite atlas should fail");
         assert!(
-            error.to_string().contains("Could not find any sprite atlas"),
+            error
+                .to_string()
+                .contains("Could not find any sprite atlas"),
             "unexpected error: {error}"
         );
     }

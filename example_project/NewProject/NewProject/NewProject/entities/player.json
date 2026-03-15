@@ -17,6 +17,7 @@
     "solid": true,
     "active": true,
     "can_move": true,
+    "movement_profile": "player_wasd",
     "has_inventory": true
   },
   "collision": {

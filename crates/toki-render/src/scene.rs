@@ -165,7 +165,8 @@ impl SceneRenderer {
     }
 
     fn update_sprite_projection(&mut self, projection: glam::Mat4) {
-        self.sprite_pipeline.update_projection(&self.queue, projection);
+        self.sprite_pipeline
+            .update_projection(&self.queue, projection);
         for pipeline in self.sprite_pipelines_by_texture.values_mut() {
             pipeline.update_projection(&self.queue, projection);
         }

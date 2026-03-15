@@ -4,7 +4,7 @@ use super::undo_redo::EditorCommand;
 use crate::config::EditorConfig;
 use std::collections::{HashMap, HashSet};
 use toki_core::animation::AnimationState;
-use toki_core::entity::{AiBehavior, EntityType};
+use toki_core::entity::{AiBehavior, EntityType, MovementProfile};
 use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
     RuleTarget, RuleTrigger,
@@ -25,6 +25,7 @@ struct EntityPropertyDraft {
     solid: bool,
     can_move: bool,
     ai_behavior: AiBehavior,
+    movement_profile: MovementProfile,
     has_inventory: bool,
     speed: i64,
     render_layer: i32,
@@ -196,6 +197,7 @@ impl EntityPropertyDraft {
             solid: entity.attributes.solid,
             can_move: entity.attributes.can_move,
             ai_behavior: entity.attributes.ai_behavior,
+            movement_profile: entity.attributes.movement_profile,
             has_inventory: entity.attributes.has_inventory,
             speed: entity.attributes.speed as i64,
             render_layer: entity.attributes.render_layer,
@@ -215,6 +217,17 @@ fn ai_behavior_label(ai_behavior: AiBehavior) -> &'static str {
     match ai_behavior {
         AiBehavior::None => "None",
         AiBehavior::Wander => "Wander",
+    }
+}
+
+fn movement_profile_label(
+    entity_type: EntityType,
+    movement_profile: MovementProfile,
+) -> &'static str {
+    match movement_profile.resolved_for_entity_type(&entity_type) {
+        MovementProfile::LegacyDefault => "Legacy Default",
+        MovementProfile::None => "None",
+        MovementProfile::PlayerWasd => "Player WASD",
     }
 }
 
@@ -2591,6 +2604,30 @@ impl InspectorSystem {
         changed |= ui.checkbox(&mut draft.active, "Active").changed();
         changed |= ui.checkbox(&mut draft.solid, "Solid").changed();
         changed |= ui.checkbox(&mut draft.can_move, "Can Move").changed();
+        ui.horizontal(|ui| {
+            ui.label("Movement:");
+            egui::ComboBox::from_id_salt("entity_movement_profile")
+                .selected_text(movement_profile_label(
+                    draft.entity_type.clone(),
+                    draft.movement_profile,
+                ))
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(
+                            &mut draft.movement_profile,
+                            MovementProfile::None,
+                            "None",
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut draft.movement_profile,
+                            MovementProfile::PlayerWasd,
+                            "Player WASD",
+                        )
+                        .changed();
+                });
+        });
         if matches!(draft.entity_type, EntityType::Npc) {
             ui.horizontal(|ui| {
                 ui.label("AI:");
@@ -2601,11 +2638,7 @@ impl InspectorSystem {
                             .selectable_value(&mut draft.ai_behavior, AiBehavior::None, "None")
                             .changed();
                         changed |= ui
-                            .selectable_value(
-                                &mut draft.ai_behavior,
-                                AiBehavior::Wander,
-                                "Wander",
-                            )
+                            .selectable_value(&mut draft.ai_behavior, AiBehavior::Wander, "Wander")
                             .changed();
                     });
             });
@@ -2996,6 +3029,13 @@ impl InspectorSystem {
                         ui.label(ai_behavior_label(entity.attributes.ai_behavior));
                     });
                 }
+                ui.horizontal(|ui| {
+                    ui.label("Movement:");
+                    ui.label(movement_profile_label(
+                        entity.entity_type.clone(),
+                        entity.attributes.movement_profile,
+                    ));
+                });
 
                 if let Some(collision_box) = &entity.collision_box {
                     ui.separator();
@@ -3130,6 +3170,10 @@ impl InspectorSystem {
         changed |= set_if_changed(&mut entity.attributes.solid, draft.solid);
         changed |= set_if_changed(&mut entity.attributes.can_move, draft.can_move);
         changed |= set_if_changed(&mut entity.attributes.ai_behavior, draft.ai_behavior);
+        changed |= set_if_changed(
+            &mut entity.attributes.movement_profile,
+            draft.movement_profile,
+        );
         changed |= set_if_changed(&mut entity.attributes.has_inventory, draft.has_inventory);
         changed |= set_if_changed(
             &mut entity.attributes.speed,
@@ -3661,8 +3705,8 @@ impl InspectorSystem {
 #[cfg(test)]
 mod tests {
     use super::{
-        AiBehavior, EntityPropertyDraft, InspectorSystem, MultiEntityBatchEdit, RuleActionKind,
-        RuleConditionKind, RuleTriggerKind,
+        AiBehavior, EntityPropertyDraft, InspectorSystem, MovementProfile, MultiEntityBatchEdit,
+        RuleActionKind, RuleConditionKind, RuleTriggerKind,
     };
     use crate::ui::EditorUI;
     use glam::{IVec2, UVec2};
@@ -3692,6 +3736,7 @@ mod tests {
                 active: true,
                 can_move: true,
                 ai_behavior: AiBehavior::Wander,
+                movement_profile: MovementProfile::LegacyDefault,
                 has_inventory: false,
             },
         );
@@ -3736,6 +3781,7 @@ mod tests {
         draft.solid = false;
         draft.can_move = false;
         draft.ai_behavior = AiBehavior::None;
+        draft.movement_profile = MovementProfile::PlayerWasd;
         draft.has_inventory = true;
         draft.speed = -10;
         draft.render_layer = 8;
@@ -3758,6 +3804,10 @@ mod tests {
         assert!(!entity.attributes.solid);
         assert!(!entity.attributes.can_move);
         assert_eq!(entity.attributes.ai_behavior, AiBehavior::None);
+        assert_eq!(
+            entity.attributes.movement_profile,
+            MovementProfile::PlayerWasd
+        );
         assert!(entity.attributes.has_inventory);
         assert_eq!(entity.attributes.speed, 0);
         assert_eq!(entity.attributes.render_layer, 8);

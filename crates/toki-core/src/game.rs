@@ -6,7 +6,9 @@ use crate::animation::{AnimationController, AnimationState};
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::collision;
-use crate::entity::{AiBehavior, Entity, EntityAttributes, EntityId, EntityManager, EntityType};
+use crate::entity::{
+    AiBehavior, Entity, EntityAttributes, EntityId, EntityManager, EntityType, MovementProfile,
+};
 use crate::events::{GameEvent, GameUpdateResult};
 use crate::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
@@ -132,6 +134,13 @@ enum RuleCommand {
 }
 
 impl GameState {
+    fn effective_movement_profile(entity: &Entity) -> MovementProfile {
+        entity
+            .attributes
+            .movement_profile
+            .resolved_for_entity_type(&entity.entity_type)
+    }
+
     fn can_entity_move_to_position(
         &self,
         entity_id: EntityId,
@@ -206,8 +215,9 @@ impl GameState {
             AnimationState::Idle
         };
 
-        let facing = Self::facing_from_delta(delta)
-            .unwrap_or_else(|| Self::facing_from_animation_state(animation_controller.current_clip_state));
+        let facing = Self::facing_from_delta(delta).unwrap_or_else(|| {
+            Self::facing_from_animation_state(animation_controller.current_clip_state)
+        });
         let directional = Self::directional_animation_state(moving, facing);
 
         if animation_controller.has_clip(directional) {
@@ -294,6 +304,7 @@ impl GameState {
                 active: true,
                 can_move: true,
                 ai_behavior: crate::entity::AiBehavior::None,
+                movement_profile: crate::entity::MovementProfile::PlayerWasd,
                 has_inventory: false,
             },
             collision: crate::entity::CollisionDef {
@@ -353,6 +364,7 @@ impl GameState {
                 active: true,
                 can_move: false,
                 ai_behavior: crate::entity::AiBehavior::Wander,
+                movement_profile: crate::entity::MovementProfile::None,
                 has_inventory: false,
             },
             collision: crate::entity::CollisionDef {
@@ -600,6 +612,12 @@ impl GameState {
         let Some(player_entity) = self.entity_manager.get_entity(player_id) else {
             return GameUpdateResult::new(); // Player entity doesn't exist
         };
+        if !matches!(
+            Self::effective_movement_profile(player_entity),
+            MovementProfile::PlayerWasd
+        ) {
+            return GameUpdateResult::new();
+        }
 
         let initial_position = player_entity.position;
         let mut result = GameUpdateResult::new();
@@ -630,7 +648,8 @@ impl GameState {
                         }
                     } else {
                         // Only trigger audio on state change
-                        if let Some(player_audio) = self.entity_manager.audio_component_mut(player_id)
+                        if let Some(player_audio) =
+                            self.entity_manager.audio_component_mut(player_id)
                         {
                             if !player_audio.last_collision_state {
                                 if let Some(collision_sound) = player_audio
@@ -662,7 +681,8 @@ impl GameState {
                         }
                     } else {
                         // Only trigger audio on state change
-                        if let Some(player_audio) = self.entity_manager.audio_component_mut(player_id)
+                        if let Some(player_audio) =
+                            self.entity_manager.audio_component_mut(player_id)
                         {
                             if !player_audio.last_collision_state {
                                 if let Some(collision_sound) = player_audio
@@ -695,7 +715,8 @@ impl GameState {
                         }
                     } else {
                         // Only trigger audio on state change
-                        if let Some(player_audio) = self.entity_manager.audio_component_mut(player_id)
+                        if let Some(player_audio) =
+                            self.entity_manager.audio_component_mut(player_id)
                         {
                             if !player_audio.last_collision_state {
                                 if let Some(collision_sound) = player_audio
@@ -728,7 +749,8 @@ impl GameState {
                         }
                     } else {
                         // Only trigger audio on state change
-                        if let Some(player_audio) = self.entity_manager.audio_component_mut(player_id)
+                        if let Some(player_audio) =
+                            self.entity_manager.audio_component_mut(player_id)
                         {
                             if !player_audio.last_collision_state {
                                 if let Some(collision_sound) = player_audio

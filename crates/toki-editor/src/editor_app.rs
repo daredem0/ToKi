@@ -785,13 +785,13 @@ impl EditorApp {
                 ProjectTemplateKind::Empty => self
                     .project_manager
                     .create_new_project(project_name.clone(), parent_path.clone()),
-                ProjectTemplateKind::TopDownStarter => self
-                    .project_manager
-                    .create_new_project_with_template(
+                ProjectTemplateKind::TopDownStarter => {
+                    self.project_manager.create_new_project_with_template(
                         project_name.clone(),
                         parent_path.clone(),
                         template,
-                    ),
+                    )
+                }
             };
             match create_result {
                 Ok(game_state) => {

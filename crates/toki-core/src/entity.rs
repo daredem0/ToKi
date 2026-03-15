@@ -63,6 +63,30 @@ pub enum AiBehavior {
     Wander,
 }
 
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum MovementProfile {
+    #[default]
+    LegacyDefault,
+    None,
+    PlayerWasd,
+}
+
+impl MovementProfile {
+    pub fn resolved_for_entity_type(self, entity_type: &EntityType) -> Self {
+        match self {
+            Self::LegacyDefault => {
+                if matches!(entity_type, EntityType::Player) {
+                    Self::PlayerWasd
+                } else {
+                    Self::None
+                }
+            }
+            explicit => explicit,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityAttributes {
     // Core gameplay
@@ -80,6 +104,8 @@ pub struct EntityAttributes {
     pub can_move: bool, // Can we be moved by the player
     #[serde(default)]
     pub ai_behavior: AiBehavior,
+    #[serde(default)]
+    pub movement_profile: MovementProfile,
 
     // Extended attributes for entity definitions
     #[serde(default)]
@@ -98,6 +124,7 @@ impl Default for EntityAttributes {
             active: true,
             can_move: true,
             ai_behavior: AiBehavior::default(),
+            movement_profile: MovementProfile::default(),
             has_inventory: false,
         }
     }
@@ -430,6 +457,8 @@ pub struct AttributesDef {
     pub can_move: bool,
     #[serde(default)]
     pub ai_behavior: AiBehavior,
+    #[serde(default)]
+    pub movement_profile: MovementProfile,
     pub has_inventory: bool,
 }
 
@@ -531,6 +560,7 @@ impl EntityDefinition {
             active: self.attributes.active,
             can_move: self.attributes.can_move,
             ai_behavior: self.attributes.ai_behavior,
+            movement_profile: self.attributes.movement_profile,
             has_inventory: self.attributes.has_inventory,
         };
 

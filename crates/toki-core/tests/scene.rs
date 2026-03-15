@@ -1,6 +1,6 @@
 use glam::{IVec2, UVec2};
 use toki_core::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
-use toki_core::entity::{AiBehavior, Entity, EntityAttributes, EntityType};
+use toki_core::entity::{AiBehavior, Entity, EntityAttributes, EntityType, MovementProfile};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::scene::Scene;
 
@@ -32,6 +32,7 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
             active: true,
             can_move: true,
             ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::PlayerWasd,
             has_inventory: false,
         },
         collision_box: None,

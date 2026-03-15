@@ -1,16 +1,16 @@
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use toki_core::animation::AnimationState;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
     tilemap::TileMap,
 };
 use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
-    RenderingDef,
+    MovementProfile, RenderingDef,
 };
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
-use toki_core::animation::AnimationState;
 use toki_core::{game::AudioChannel, game::AudioEvent, GameState, InputKey};
 
 fn create_test_sprite() -> SpriteInstance {
@@ -106,6 +106,11 @@ fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
                 toki_core::entity::AiBehavior::Wander
             } else {
                 toki_core::entity::AiBehavior::None
+            },
+            movement_profile: if entity_type == "player" {
+                MovementProfile::PlayerWasd
+            } else {
+                MovementProfile::None
             },
             has_inventory: false,
         },
@@ -615,6 +620,54 @@ fn game_state_only_updates_npcs_with_wander_ai() {
         initial_idle_position,
         "npc with ai_behavior = none should remain stationary"
     );
+}
+
+#[test]
+fn game_state_player_input_requires_player_wasd_movement_profile() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player_id = game_state.player_id().expect("player id should exist");
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .expect("player should exist")
+        .attributes
+        .movement_profile = MovementProfile::None;
+
+    let initial_position = game_state.player_position();
+    game_state.handle_key_press(InputKey::Right);
+    let result = game_state.update(
+        UVec2::new(1000, 1000),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(!result.player_moved);
+    assert_eq!(game_state.player_position(), initial_position);
+}
+
+#[test]
+fn game_state_legacy_default_player_profile_still_moves() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player_id = game_state.player_id().expect("player id should exist");
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .expect("player should exist")
+        .attributes
+        .movement_profile = MovementProfile::LegacyDefault;
+
+    let initial_position = game_state.player_position();
+    game_state.handle_key_press(InputKey::Right);
+    let result = game_state.update(
+        UVec2::new(1000, 1000),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(result.player_moved);
+    assert_eq!(game_state.player_position().x, initial_position.x + 1);
 }
 
 #[test]

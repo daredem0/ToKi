@@ -372,8 +372,12 @@ impl App {
                 sprite_texture_paths.insert(stem.to_string(), texture_path);
             }
         }
-        let resources =
-            ResourceManager::from_preloaded(terrain_atlas, sprite_atlases, sprite_texture_paths, tilemap);
+        let resources = ResourceManager::from_preloaded(
+            terrain_atlas,
+            sprite_atlases,
+            sprite_texture_paths,
+            tilemap,
+        );
         let asset_load_plan = RuntimeAssetLoadPlan::from_resolved_paths(
             scene_name.map(str::to_string),
             map_name.map(str::to_string),
@@ -512,17 +516,21 @@ impl App {
                 let texture_size = sprite_atlas
                     .image_size()
                     .unwrap_or(glam::UVec2::new(64, 16));
-                if let Some(frame) = self.game_system.get_entity_sprite_frame(
-                    entity_id,
-                    sprite_atlas,
-                    texture_size,
-                ) {
+                if let Some(frame) =
+                    self.game_system
+                        .get_entity_sprite_frame(entity_id, sprite_atlas, texture_size)
+                {
                     let flip_x = self.game_system.get_entity_sprite_flip_x(entity_id);
                     if let Some(texture_path) =
                         self.resources.get_sprite_texture_path(&atlas_name).cloned()
                     {
-                        self.rendering
-                            .add_sprite_with_texture(texture_path, frame, position, size, flip_x);
+                        self.rendering.add_sprite_with_texture(
+                            texture_path,
+                            frame,
+                            position,
+                            size,
+                            flip_x,
+                        );
                     } else {
                         self.rendering.add_sprite(frame, position, size, flip_x);
                     }

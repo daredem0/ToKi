@@ -341,6 +341,7 @@ mod tests {
                 active: true,
                 can_move: false,
                 ai_behavior: toki_core::entity::AiBehavior::Wander,
+                movement_profile: toki_core::entity::MovementProfile::None,
                 has_inventory: false,
             },
             collision: CollisionDef {

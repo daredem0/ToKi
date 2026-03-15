@@ -92,12 +92,7 @@ impl GpuState {
             .sprite_pipelines_by_texture
             .entry(texture_path.clone())
             .or_insert_with(|| {
-                SpritePipeline::new(
-                    &self.device,
-                    &self.queue,
-                    self.config.format,
-                    texture_path,
-                )
+                SpritePipeline::new(&self.device, &self.queue, self.config.format, texture_path)
             });
         pipeline.update_projection(&self.queue, self.current_mvp);
         pipeline.add_sprite(instance);
@@ -121,12 +116,7 @@ impl GpuState {
             .sprite_pipelines_by_texture
             .entry(texture_path.clone())
             .or_insert_with(|| {
-                SpritePipeline::new(
-                    &self.device,
-                    &self.queue,
-                    self.config.format,
-                    texture_path,
-                )
+                SpritePipeline::new(&self.device, &self.queue, self.config.format, texture_path)
             });
         pipeline.update_projection(&self.queue, self.current_mvp);
         pipeline.add_sprite(instance);

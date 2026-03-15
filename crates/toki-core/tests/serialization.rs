@@ -28,6 +28,11 @@ fn test_definition(name: &str, entity_type: &str) -> EntityDefinition {
             } else {
                 AiBehavior::None
             },
+            movement_profile: if entity_type == "player" {
+                MovementProfile::PlayerWasd
+            } else {
+                MovementProfile::None
+            },
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -77,6 +82,7 @@ fn create_test_entity() -> Entity {
         active: true,
         can_move: true,
         ai_behavior: AiBehavior::None,
+        movement_profile: MovementProfile::PlayerWasd,
         has_inventory: true,
     };
 

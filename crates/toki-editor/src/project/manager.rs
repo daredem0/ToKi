@@ -91,7 +91,9 @@ impl ProjectManager {
             }
             ProjectTemplateKind::TopDownStarter => {
                 let starter_scene: Scene = serde_json::from_slice(top_down_main_scene_bytes())
-                    .map_err(|e| anyhow::anyhow!("Failed to parse built-in top-down scene: {}", e))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to parse built-in top-down scene: {}", e)
+                    })?;
                 project_assets.save_scene(&starter_scene)?;
             }
         }
@@ -294,7 +296,9 @@ mod tests {
         assert!(project_path.join("entities/villager.json").exists());
         assert!(project_path.join("assets/sprites/terrain.png").exists());
         assert!(project_path.join("assets/sprites/creatures.png").exists());
-        assert!(project_path.join("assets/tilemaps/starter_overworld.json").exists());
+        assert!(project_path
+            .join("assets/tilemaps/starter_overworld.json")
+            .exists());
 
         let loaded_scenes = manager.load_scenes().expect("starter scenes should load");
         assert_eq!(loaded_scenes.len(), 1);
