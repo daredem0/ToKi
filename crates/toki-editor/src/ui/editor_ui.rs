@@ -89,6 +89,74 @@ pub struct MapEditorDraft {
     pub tilemap: TileMap,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct MapEditorEditCommand {
+    pub map_name: String,
+    pub is_draft: bool,
+    pub before: TileMap,
+    pub after: TileMap,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct MapEditorHistory {
+    undo_stack: Vec<MapEditorEditCommand>,
+    redo_stack: Vec<MapEditorEditCommand>,
+}
+
+impl MapEditorHistory {
+    fn push(&mut self, command: MapEditorEditCommand) {
+        self.undo_stack.push(command);
+        self.redo_stack.clear();
+    }
+
+    fn undo(&mut self, ui_state: &mut EditorUI) -> bool {
+        let Some(command) = self.undo_stack.pop() else {
+            return false;
+        };
+        if ui_state.apply_map_editor_tilemap_snapshot(
+            &command.map_name,
+            command.is_draft,
+            &command.before,
+        ) {
+            self.redo_stack.push(command);
+            true
+        } else {
+            self.undo_stack.push(command);
+            false
+        }
+    }
+
+    fn redo(&mut self, ui_state: &mut EditorUI) -> bool {
+        let Some(command) = self.redo_stack.pop() else {
+            return false;
+        };
+        if ui_state.apply_map_editor_tilemap_snapshot(
+            &command.map_name,
+            command.is_draft,
+            &command.after,
+        ) {
+            self.undo_stack.push(command);
+            true
+        } else {
+            self.redo_stack.push(command);
+            false
+        }
+    }
+
+    fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
+    }
+
+    fn clear(&mut self) {
+        self.undo_stack.clear();
+        self.redo_stack.clear();
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewMapRequest {
     pub name: String,
@@ -149,6 +217,9 @@ pub struct EditorUI {
     pub map_editor_new_map_height: u32,
     pub map_editor_new_map_requested: Option<NewMapRequest>,
     pub map_editor_save_requested: bool,
+    pub map_editor_history: MapEditorHistory,
+    pub map_editor_pending_tilemap_sync: Option<TileMap>,
+    pub map_editor_edit_before: Option<TileMap>,
 
     // Asset validation
     pub validate_assets_requested: bool,
@@ -232,6 +303,9 @@ impl EditorUI {
             map_editor_new_map_height: 32,
             map_editor_new_map_requested: None,
             map_editor_save_requested: false,
+            map_editor_history: MapEditorHistory::default(),
+            map_editor_pending_tilemap_sync: None,
+            map_editor_edit_before: None,
 
             // Asset validation
             validate_assets_requested: false,
@@ -402,6 +476,9 @@ impl EditorUI {
         self.map_editor_map_load_requested = None;
         self.map_editor_draft = Some(draft);
         self.map_editor_dirty = true;
+        self.map_editor_history.clear();
+        self.map_editor_pending_tilemap_sync = None;
+        self.map_editor_edit_before = None;
     }
 
     pub fn map_editor_selected_label(&self) -> String {
@@ -455,11 +532,83 @@ impl EditorUI {
         self.map_editor_active_map = Some(saved_name.clone());
         self.map_editor_map_load_requested = Some(saved_name);
         self.map_editor_save_requested = false;
+        self.map_editor_history.clear();
+        self.map_editor_pending_tilemap_sync = None;
+        self.map_editor_edit_before = None;
     }
 
     pub fn finalize_saved_existing_map(&mut self) {
         self.map_editor_dirty = false;
         self.map_editor_save_requested = false;
+    }
+
+    pub fn clear_map_editor_history(&mut self) {
+        self.map_editor_history.clear();
+        self.map_editor_pending_tilemap_sync = None;
+        self.map_editor_edit_before = None;
+    }
+
+    pub fn begin_map_editor_edit(&mut self, before: &TileMap) {
+        if self.map_editor_edit_before.is_none() {
+            self.map_editor_edit_before = Some(before.clone());
+        }
+    }
+
+    pub fn finish_map_editor_edit(&mut self, after: &TileMap) -> bool {
+        let Some(before) = self.map_editor_edit_before.take() else {
+            return false;
+        };
+        if before == *after {
+            return false;
+        }
+        let map_name = self
+            .map_editor_active_map
+            .clone()
+            .unwrap_or_else(|| "map".to_string());
+        let is_draft = self.map_editor_draft.is_some();
+        self.map_editor_history.push(MapEditorEditCommand {
+            map_name,
+            is_draft,
+            before,
+            after: after.clone(),
+        });
+        self.map_editor_dirty = true;
+        true
+    }
+
+    pub fn cancel_map_editor_edit(&mut self) {
+        self.map_editor_edit_before = None;
+    }
+
+    fn apply_map_editor_tilemap_snapshot(
+        &mut self,
+        map_name: &str,
+        is_draft: bool,
+        tilemap: &TileMap,
+    ) -> bool {
+        if self.map_editor_active_map.as_deref() != Some(map_name) {
+            return false;
+        }
+
+        if is_draft {
+            let Some(draft) = self.map_editor_draft.as_mut() else {
+                return false;
+            };
+            if draft.name != map_name {
+                return false;
+            }
+            draft.tilemap = tilemap.clone();
+        } else if self.map_editor_draft.is_some() {
+            return false;
+        }
+
+        self.map_editor_pending_tilemap_sync = Some(tilemap.clone());
+        self.map_editor_dirty = true;
+        true
+    }
+
+    pub fn take_pending_map_editor_tilemap_sync(&mut self) -> Option<TileMap> {
+        self.map_editor_pending_tilemap_sync.take()
     }
 
     pub fn execute_command(&mut self, command: EditorCommand) -> bool {
@@ -470,6 +619,13 @@ impl EditorUI {
     }
 
     pub fn undo(&mut self) -> bool {
+        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map_editor_history.can_undo()
+        {
+            let mut history = std::mem::take(&mut self.map_editor_history);
+            let undone = history.undo(self);
+            self.map_editor_history = history;
+            return undone;
+        }
         let mut history = std::mem::take(&mut self.command_history);
         let undone = history.undo(self);
         self.command_history = history;
@@ -477,6 +633,13 @@ impl EditorUI {
     }
 
     pub fn redo(&mut self) -> bool {
+        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map_editor_history.can_redo()
+        {
+            let mut history = std::mem::take(&mut self.map_editor_history);
+            let redone = history.redo(self);
+            self.map_editor_history = history;
+            return redone;
+        }
         let mut history = std::mem::take(&mut self.command_history);
         let redone = history.redo(self);
         self.command_history = history;
@@ -484,11 +647,19 @@ impl EditorUI {
     }
 
     pub fn can_undo(&self) -> bool {
-        self.command_history.can_undo()
+        if self.center_panel_tab == CenterPanelTab::MapEditor {
+            self.map_editor_history.can_undo()
+        } else {
+            self.command_history.can_undo()
+        }
     }
 
     pub fn can_redo(&self) -> bool {
-        self.command_history.can_redo()
+        if self.center_panel_tab == CenterPanelTab::MapEditor {
+            self.map_editor_history.can_redo()
+        } else {
+            self.command_history.can_redo()
+        }
     }
 
     // Entity placement mode management
@@ -1490,5 +1661,75 @@ mod tests {
         assert_eq!(ui.map_editor_tool, super::MapEditorTool::Drag);
         assert_eq!(ui.map_editor_brush_size_tiles, 1);
         assert!(ui.map_editor_selected_tile_info.is_none());
+    }
+
+    #[test]
+    fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
+        let mut ui = EditorUI::new();
+        ui.center_panel_tab = super::CenterPanelTab::MapEditor;
+        ui.set_map_editor_draft(MapEditorDraft {
+            name: "draft_map".to_string(),
+            tilemap: toki_core::assets::tilemap::TileMap {
+                size: glam::UVec2::new(2, 2),
+                tile_size: glam::UVec2::new(8, 8),
+                atlas: std::path::PathBuf::from("terrain.json"),
+                tiles: vec!["grass".to_string(); 4],
+            },
+        });
+
+        let before = ui
+            .map_editor_draft
+            .as_ref()
+            .expect("draft should exist")
+            .tilemap
+            .clone();
+        let mut after = before.clone();
+        after.tiles[0] = "water".to_string();
+
+        ui.begin_map_editor_edit(&before);
+        assert!(ui.finish_map_editor_edit(&after));
+        assert!(ui.can_undo());
+
+        assert!(ui.undo());
+        let undone = ui
+            .take_pending_map_editor_tilemap_sync()
+            .expect("undo should queue a tilemap sync");
+        assert_eq!(undone.tiles[0], "grass");
+
+        assert!(ui.redo());
+        let redone = ui
+            .take_pending_map_editor_tilemap_sync()
+            .expect("redo should queue a tilemap sync");
+        assert_eq!(redone.tiles[0], "water");
+    }
+
+    #[test]
+    fn map_editor_can_undo_prefers_map_history_when_map_editor_tab_is_active() {
+        let mut ui = EditorUI::new();
+        assert!(ui.execute_command(EditorCommand::add_entity(
+            "Main Scene",
+            sample_entity(1, IVec2::new(0, 0))
+        )));
+        ui.center_panel_tab = super::CenterPanelTab::MapEditor;
+        assert!(!ui.can_undo());
+
+        ui.set_map_editor_draft(MapEditorDraft {
+            name: "draft_map".to_string(),
+            tilemap: toki_core::assets::tilemap::TileMap {
+                size: glam::UVec2::new(1, 1),
+                tile_size: glam::UVec2::new(8, 8),
+                atlas: std::path::PathBuf::from("terrain.json"),
+                tiles: vec!["grass".to_string()],
+            },
+        });
+        let before = ui.map_editor_draft.as_ref().unwrap().tilemap.clone();
+        let mut after = before.clone();
+        after.tiles[0] = "water".to_string();
+        ui.begin_map_editor_edit(&before);
+        assert!(ui.finish_map_editor_edit(&after));
+
+        assert!(ui.can_undo());
+        assert!(ui.undo());
+        assert!(ui.take_pending_map_editor_tilemap_sync().is_some());
     }
 }

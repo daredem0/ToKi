@@ -863,6 +863,7 @@ impl EditorApp {
         self.handle_active_scene_map_loading();
         self.handle_map_requests();
         self.handle_new_map_editor_requests();
+        self.handle_pending_map_editor_tilemap_sync();
         self.handle_save_map_editor_request();
         self.handle_map_editor_map_requests();
 
@@ -1807,6 +1808,7 @@ impl EditorApp {
                 tracing::info!("Loaded map '{}' into map editor viewport", map_name);
                 self.ui.map_editor_active_map = Some(map_name);
                 self.ui.clear_map_editor_dirty();
+                self.ui.clear_map_editor_history();
                 viewport.mark_dirty();
             }
             Err(e) => {
@@ -1816,6 +1818,24 @@ impl EditorApp {
                     e
                 );
             }
+        }
+    }
+
+    fn handle_pending_map_editor_tilemap_sync(&mut self) {
+        let Some(tilemap) = self.ui.take_pending_map_editor_tilemap_sync() else {
+            return;
+        };
+
+        let Some(viewport) = &mut self.map_editor_viewport else {
+            return;
+        };
+
+        match viewport.scene_manager_mut().set_tilemap(tilemap) {
+            Ok(()) => viewport.mark_dirty(),
+            Err(error) => tracing::error!(
+                "Failed to apply pending map editor undo/redo snapshot to viewport: {}",
+                error
+            ),
         }
     }
 

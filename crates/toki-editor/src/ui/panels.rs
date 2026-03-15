@@ -494,12 +494,14 @@ impl PanelSystem {
 
         match ui_state.map_editor_tool {
             super::editor_ui::MapEditorTool::Drag => {
+                ui_state.cancel_map_editor_edit();
                 Self::handle_map_editor_primary_drag(viewport, &response, config.as_deref());
             }
             super::editor_ui::MapEditorTool::Brush => {
                 Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
             }
             super::editor_ui::MapEditorTool::Fill => {
+                ui_state.cancel_map_editor_edit();
                 Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
             }
         }
@@ -527,13 +529,22 @@ impl PanelSystem {
                 }
             }
             super::editor_ui::MapEditorTool::Brush => {
-                if let Some(selected_tile) = ui_state.map_editor_selected_tile.as_deref() {
+                let primary_down = ui.input(|input| input.pointer.primary_down());
+                if !primary_down {
+                    if let Some(tilemap) = viewport.scene_manager().tilemap() {
+                        ui_state.finish_map_editor_edit(tilemap);
+                    } else {
+                        ui_state.cancel_map_editor_edit();
+                    }
+                }
+                if let Some(selected_tile) = ui_state.map_editor_selected_tile.clone() {
                     if Self::handle_map_editor_brush_paint(
                         ui,
+                        ui_state,
                         viewport,
                         &response,
                         rect,
-                        selected_tile,
+                        &selected_tile,
                         ui_state.map_editor_brush_size_tiles,
                     ) {
                         ui_state.mark_map_editor_dirty();
@@ -541,8 +552,14 @@ impl PanelSystem {
                 }
             }
             super::editor_ui::MapEditorTool::Fill => {
-                if let Some(selected_tile) = ui_state.map_editor_selected_tile.as_deref() {
-                    if Self::handle_map_editor_fill_paint(ui, viewport, &response, selected_tile) {
+                if let Some(selected_tile) = ui_state.map_editor_selected_tile.clone() {
+                    if Self::handle_map_editor_fill_paint(
+                        ui,
+                        ui_state,
+                        viewport,
+                        &response,
+                        &selected_tile,
+                    ) {
                         ui_state.mark_map_editor_dirty();
                     }
                 }
@@ -583,6 +600,7 @@ impl PanelSystem {
 
     fn handle_map_editor_brush_paint(
         ui: &egui::Ui,
+        ui_state: &mut super::EditorUI,
         viewport: &mut SceneViewport,
         response: &egui::Response,
         rect: egui::Rect,
@@ -603,6 +621,9 @@ impl PanelSystem {
         let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
             return false;
         };
+        if ui.input(|input| input.pointer.primary_pressed()) {
+            ui_state.begin_map_editor_edit(tilemap);
+        }
         let Some(tile_pos) = MapPaintInteraction::tile_position_at_world(tilemap, world_pos) else {
             return false;
         };
@@ -617,6 +638,7 @@ impl PanelSystem {
 
     fn handle_map_editor_fill_paint(
         ui: &egui::Ui,
+        ui_state: &mut super::EditorUI,
         viewport: &mut SceneViewport,
         response: &egui::Response,
         selected_tile: &str,
@@ -629,12 +651,15 @@ impl PanelSystem {
         let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
             return false;
         };
+        ui_state.begin_map_editor_edit(tilemap);
 
         if MapPaintInteraction::fill_all(tilemap, selected_tile) {
+            ui_state.finish_map_editor_edit(tilemap);
             viewport.mark_dirty();
             return true;
         }
 
+        ui_state.cancel_map_editor_edit();
         false
     }
 
