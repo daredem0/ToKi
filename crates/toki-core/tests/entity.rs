@@ -143,7 +143,7 @@ impl DefinitionSpawnExt for EntityManager {
             .create_entity(position, id)
             .expect("player definition spawn should succeed");
         entity.control_role = ControlRole::PlayerCharacter;
-        entity.entity_type = EntityType::Player;
+        entity.entity_kind = EntityKind::Player;
         self.add_existing_entity(entity)
     }
 
@@ -183,7 +183,7 @@ fn test_entity_manager_creation() {
 
     assert_eq!(manager.get_player_id(), None);
     assert_eq!(manager.active_entities().len(), 0);
-    assert_eq!(manager.entities_of_type(&EntityType::Player).len(), 0);
+    assert_eq!(manager.entities_of_kind(&EntityKind::Player).len(), 0);
 }
 
 #[test]
@@ -198,7 +198,7 @@ fn test_spawn_player() {
 
     let player = manager.get_player().unwrap();
     assert_eq!(player.position, position);
-    assert_eq!(player.entity_type, EntityType::Player);
+    assert_eq!(player.entity_kind, EntityKind::Player);
     assert_eq!(player.effective_control_role(), ControlRole::PlayerCharacter);
     assert_eq!(player.attributes.health, Some(100));
     assert_eq!(player.attributes.speed, 2);
@@ -207,7 +207,7 @@ fn test_spawn_player() {
 
     // Check lookup tables
     assert_eq!(
-        manager.entities_of_type(&EntityType::Player),
+        manager.entities_of_kind(&EntityKind::Player),
         vec![player_id]
     );
     assert_eq!(manager.active_entities(), vec![player_id]);
@@ -220,7 +220,7 @@ fn test_add_existing_entity_tracks_explicit_player_character_role() {
         id: 11,
         position: IVec2::new(5, 6),
         size: UVec2::new(16, 16),
-        entity_type: EntityType::Npc,
+        entity_kind: EntityKind::Npc,
         category: "creature".to_string(),
         definition_name: Some("slime".to_string()),
         control_role: ControlRole::PlayerCharacter,
@@ -259,9 +259,9 @@ fn test_spawn_multiple_entities() {
     assert!(manager.get_entity(item_id).is_some());
 
     // Check type-based queries
-    assert_eq!(manager.entities_of_type(&EntityType::Player).len(), 1);
-    assert_eq!(manager.entities_of_type(&EntityType::Npc).len(), 1);
-    assert_eq!(manager.entities_of_type(&EntityType::Item).len(), 1);
+    assert_eq!(manager.entities_of_kind(&EntityKind::Player).len(), 1);
+    assert_eq!(manager.entities_of_kind(&EntityKind::Npc).len(), 1);
+    assert_eq!(manager.entities_of_kind(&EntityKind::Item).len(), 1);
 
     // Check active entities (all should be active by default)
     assert_eq!(manager.active_entities().len(), 3);
@@ -279,7 +279,7 @@ fn test_despawn_entity() {
 
     // Check NPC is gone
     assert!(manager.get_entity(npc_id).is_none());
-    assert_eq!(manager.entities_of_type(&EntityType::Npc).len(), 0);
+    assert_eq!(manager.entities_of_kind(&EntityKind::Npc).len(), 0);
 
     // Check player still exists
     assert!(manager.get_entity(player_id).is_some());
@@ -435,7 +435,7 @@ fn test_multiple_players_not_allowed() {
     assert!(manager.get_entity(second_player).is_some());
 
     // Both should be in the Player type list
-    let players = manager.entities_of_type(&EntityType::Player);
+    let players = manager.entities_of_kind(&EntityKind::Player);
     assert_eq!(players.len(), 2);
     assert!(players.contains(&first_player));
     assert!(players.contains(&second_player));
@@ -471,7 +471,7 @@ fn test_spawn_from_definition_sets_definition_name_without_assigning_player_role
 
     let entity = manager.get_entity(entity_id).expect("entity should exist");
     assert_eq!(entity.definition_name.as_deref(), Some("player"));
-    assert_eq!(entity.entity_type, EntityType::Npc);
+    assert_eq!(entity.entity_kind, EntityKind::Npc);
     assert_eq!(entity.position, IVec2::new(12, 34));
     assert_eq!(entity.effective_control_role(), ControlRole::None);
     assert_eq!(manager.get_player_id(), None);

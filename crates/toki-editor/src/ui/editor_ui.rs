@@ -623,7 +623,7 @@ impl EditorUI {
                                                         Some(entity.category.clone())
                                                     }
                                                 })
-                                                .unwrap_or_else(|| format!("{:?}", entity.entity_type));
+                                                .unwrap_or_else(|| format!("{:?}", entity.entity_kind));
                                             let entity_display = if matches!(
                                                 entity.effective_control_role(),
                                                 toki_core::entity::ControlRole::PlayerCharacter
@@ -976,7 +976,7 @@ impl EditorUI {
 #[cfg(test)]
 mod tests {
     use glam::{IVec2, UVec2};
-    use toki_core::entity::{EntityAttributes, EntityType};
+    use toki_core::entity::{EntityAttributes, EntityKind};
     use toki_core::rules::{
         Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger,
     };
@@ -990,7 +990,7 @@ mod tests {
             id,
             position,
             size: UVec2::new(16, 16),
-            entity_type: EntityType::Npc,
+            entity_kind: EntityKind::Npc,
             category: "creature".to_string(),
             definition_name: Some("npc".to_string()),
             control_role: toki_core::entity::ControlRole::None,

@@ -181,7 +181,7 @@ mod tests {
     use super::{can_entity_move_to_position, can_place_collision_box_at_position, CollisionBox};
     use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
     use crate::assets::tilemap::TileMap;
-    use crate::entity::{Entity, EntityAttributes, EntityType};
+    use crate::entity::{Entity, EntityAttributes, EntityKind};
     use glam::{IVec2, UVec2};
     use std::collections::HashMap;
     use std::path::PathBuf;
@@ -241,7 +241,7 @@ mod tests {
             id: 1,
             position: IVec2::ZERO,
             size: UVec2::new(16, 16),
-            entity_type: EntityType::Npc,
+            entity_kind: EntityKind::Npc,
             category: "creature".to_string(),
             definition_name: Some("test".to_string()),
             control_role: crate::entity::ControlRole::None,

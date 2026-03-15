@@ -7,7 +7,7 @@ use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::collision;
 use crate::entity::{
-    AiBehavior, Entity, EntityAttributes, EntityId, EntityManager, EntityType, MovementProfile,
+    AiBehavior, Entity, EntityAttributes, EntityId, EntityManager, EntityKind, MovementProfile,
 };
 use crate::events::{GameEvent, GameUpdateResult};
 use crate::rules::{
@@ -330,7 +330,7 @@ impl GameState {
             .expect("default player definition should always be valid");
         entity_manager.set_control_role(player_id, crate::entity::ControlRole::PlayerCharacter);
         if let Some(player) = entity_manager.get_entity_mut(player_id) {
-            player.entity_type = crate::entity::EntityType::Player;
+            player.entity_kind = crate::entity::EntityKind::Player;
         }
 
         Self {
@@ -373,7 +373,7 @@ impl GameState {
         self.entity_manager
             .set_control_role(player_id, crate::entity::ControlRole::PlayerCharacter);
         if let Some(player) = self.entity_manager.get_entity_mut(player_id) {
-            player.entity_type = crate::entity::EntityType::Player;
+            player.entity_kind = crate::entity::EntityKind::Player;
         }
         self.player_id = Some(player_id);
         player_id
@@ -1462,13 +1462,13 @@ impl GameState {
         match entity_type {
             RuleSpawnEntityType::PlayerLikeNpc => self.spawn_player_like_npc(position),
             RuleSpawnEntityType::Npc => self.entity_manager.spawn_entity(
-                EntityType::Npc,
+                EntityKind::Npc,
                 position,
                 glam::UVec2::new(16, 16),
                 EntityAttributes::default(),
             ),
             RuleSpawnEntityType::Item => self.entity_manager.spawn_entity(
-                EntityType::Item,
+                EntityKind::Item,
                 position,
                 glam::UVec2::new(16, 16),
                 EntityAttributes {
@@ -1479,7 +1479,7 @@ impl GameState {
                 },
             ),
             RuleSpawnEntityType::Decoration => self.entity_manager.spawn_entity(
-                EntityType::Decoration,
+                EntityKind::Decoration,
                 position,
                 glam::UVec2::new(16, 16),
                 EntityAttributes {
@@ -1490,7 +1490,7 @@ impl GameState {
                 },
             ),
             RuleSpawnEntityType::Trigger => self.entity_manager.spawn_entity(
-                EntityType::Trigger,
+                EntityKind::Trigger,
                 position,
                 glam::UVec2::new(16, 16),
                 EntityAttributes {

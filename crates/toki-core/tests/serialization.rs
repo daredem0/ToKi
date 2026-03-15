@@ -89,7 +89,7 @@ fn create_test_entity() -> Entity {
         id: 42,
         position: IVec2::new(10, 20),
         size: UVec2::new(16, 16),
-        entity_type: EntityType::Player,
+        entity_kind: EntityKind::Player,
         category: "human".to_string(),
         definition_name: Some("player".to_string()),
         control_role: ControlRole::PlayerCharacter,
@@ -133,7 +133,7 @@ fn test_entity_roundtrip_serialization() {
     assert_eq!(entity.id, deserialized.id);
     assert_eq!(entity.position, deserialized.position);
     assert_eq!(entity.size, deserialized.size);
-    assert_eq!(entity.entity_type, deserialized.entity_type);
+    assert_eq!(entity.entity_kind, deserialized.entity_kind);
     assert_eq!(entity.definition_name, deserialized.definition_name);
 
     // Verify attributes
@@ -150,7 +150,7 @@ fn test_entity_minimal_fields() {
         id: 1,
         position: IVec2::ZERO,
         size: UVec2::new(1, 1),
-        entity_type: EntityType::Item,
+        entity_kind: EntityKind::Item,
         category: "item".to_string(),
         definition_name: None,
         control_role: ControlRole::None,
@@ -163,7 +163,7 @@ fn test_entity_minimal_fields() {
 
     assert_eq!(entity.id, deserialized.id);
     assert_eq!(entity.position, deserialized.position);
-    assert_eq!(entity.entity_type, deserialized.entity_type);
+    assert_eq!(entity.entity_kind, deserialized.entity_kind);
     assert_eq!(deserialized.definition_name, None);
     assert!(deserialized.collision_box.is_none());
     assert!(deserialized.attributes.animation_controller.is_none());
@@ -184,11 +184,11 @@ fn test_entity_manager_roundtrip() {
     assert!(deserialized.get_entity(original_player_id).is_some());
 
     // Verify lookup tables were preserved
-    let player_entities = deserialized.entities_of_type(&EntityType::Player);
+    let player_entities = deserialized.entities_of_kind(&EntityKind::Player);
     assert_eq!(player_entities.len(), 1);
     assert_eq!(player_entities[0], original_player_id);
 
-    let npc_entities = deserialized.entities_of_type(&EntityType::Npc);
+    let npc_entities = deserialized.entities_of_kind(&EntityKind::Npc);
     assert_eq!(npc_entities.len(), 1);
 
     // Verify audio components were preserved
@@ -215,8 +215,8 @@ fn test_empty_entity_manager() {
 
     assert_eq!(deserialized.get_player_id(), None);
     assert_eq!(deserialized.active_entities().len(), 0);
-    assert_eq!(deserialized.entities_of_type(&EntityType::Player).len(), 0);
-    assert_eq!(deserialized.entities_of_type(&EntityType::Npc).len(), 0);
+    assert_eq!(deserialized.entities_of_kind(&EntityKind::Player).len(), 0);
+    assert_eq!(deserialized.entities_of_kind(&EntityKind::Npc).len(), 0);
 }
 
 #[test]
@@ -235,7 +235,7 @@ fn test_game_state_roundtrip() {
     assert_eq!(deserialized.player_id(), Some(player_id));
     let player = deserialized.player_entity().unwrap();
     assert_eq!(player.position, IVec2::new(64, 128));
-    assert_eq!(player.entity_type, EntityType::Player);
+    assert_eq!(player.entity_kind, EntityKind::Player);
 }
 
 #[test]
@@ -253,7 +253,7 @@ fn test_save_load_entity_to_file() {
     // Verify
     assert_eq!(entity.id, loaded_entity.id);
     assert_eq!(entity.position, loaded_entity.position);
-    assert_eq!(entity.entity_type, loaded_entity.entity_type);
+    assert_eq!(entity.entity_kind, loaded_entity.entity_kind);
 }
 
 #[test]
@@ -274,7 +274,7 @@ fn test_save_load_scene() {
     let loaded_player = loaded_manager.get_player().unwrap();
     assert_eq!(loaded_player.position, IVec2::new(100, 200));
 
-    let npc_entities = loaded_manager.entities_of_type(&EntityType::Npc);
+    let npc_entities = loaded_manager.entities_of_kind(&EntityKind::Npc);
     assert_eq!(npc_entities.len(), 1);
 }
 
@@ -305,7 +305,7 @@ fn test_json_structure() {
     // Verify JSON contains expected fields for debugging
     assert!(json.contains("\"id\": 42"));
     assert!(json.contains("\"position\""));
-    assert!(json.contains("\"entity_type\": \"Player\""));
+    assert!(json.contains("\"entity_kind\": \"Player\""));
     assert!(!json.contains("\"footstep_distance_accumulator\""));
     assert!(!json.contains("\"last_collision_state\""));
     assert!(!json.contains("\"footstep_trigger_distance\""));
@@ -336,7 +336,7 @@ fn test_entity_deserialization_ignores_legacy_audio_fields() {
 
     assert_eq!(parsed.id, 42);
     assert_eq!(parsed.position, IVec2::new(10, 20));
-    assert_eq!(parsed.entity_type, EntityType::Player);
+    assert_eq!(parsed.entity_kind, EntityKind::Player);
 }
 
 #[test]
@@ -367,18 +367,18 @@ fn test_file_error_handling() {
 }
 
 #[test]
-fn test_entity_type_serialization() {
+fn test_entity_kind_serialization() {
     let entity_types = vec![
-        EntityType::Player,
-        EntityType::Npc,
-        EntityType::Item,
-        EntityType::Decoration,
-        EntityType::Trigger,
+        EntityKind::Player,
+        EntityKind::Npc,
+        EntityKind::Item,
+        EntityKind::Decoration,
+        EntityKind::Trigger,
     ];
 
     for entity_type in entity_types {
         let json = serde_json::to_string(&entity_type).unwrap();
-        let deserialized: EntityType = serde_json::from_str(&json).unwrap();
+        let deserialized: EntityKind = serde_json::from_str(&json).unwrap();
         assert_eq!(entity_type, deserialized);
     }
 }

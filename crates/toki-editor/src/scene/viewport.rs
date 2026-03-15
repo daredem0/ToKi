@@ -554,7 +554,7 @@ impl SceneViewport {
         tracing::trace!(
             "Found entity {} (type: {:?}, visible: {})",
             entity_id,
-            entity.entity_type,
+            entity.entity_kind,
             entity.attributes.visible
         );
 

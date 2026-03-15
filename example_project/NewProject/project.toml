@@ -7,8 +7,8 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-"Scene 2" = "scenes/scene2.json"
 "Main Scene" = "scenes/mainscene.json"
+"Scene 2" = "scenes/scene2.json"
 main = "scenes/main.json"
 
 [assets]
@@ -32,29 +32,29 @@ pan = [
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
-"node:8" = [
-    235.4000701904297,
-    170.1680908203125,
-]
 "node:3" = [
     430.0,
-    50.0,
-]
-"node:9" = [
-    509.1368713378906,
-    180.75457763671875,
-]
-"node:2" = [
-    800.0,
     50.0,
 ]
 "node:1" = [
     60.0,
     50.0,
 ]
+"node:9" = [
+    509.1368713378906,
+    180.75457763671875,
+]
+"node:8" = [
+    235.4000701904297,
+    170.1680908203125,
+]
 "node:5" = [
     800.0,
     106.0,
+]
+"node:2" = [
+    800.0,
+    50.0,
 ]
 "node:4" = [
     60.0,

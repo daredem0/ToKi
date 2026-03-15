@@ -15,7 +15,7 @@
         16,
         16
       ],
-      "entity_type": "Player",
+      "entity_kind": "Player",
       "category": "",
       "definition_name": "player",
       "attributes": {
@@ -25,16 +25,6 @@
         "visible": true,
         "animation_controller": {
           "clips": {
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -45,6 +35,16 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },

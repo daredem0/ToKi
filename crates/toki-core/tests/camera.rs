@@ -1,13 +1,13 @@
 use glam::{IVec2, UVec2};
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
-use toki_core::entity::{Entity, EntityAttributes, EntityId, EntityType};
+use toki_core::entity::{Entity, EntityAttributes, EntityId, EntityKind};
 
 fn create_test_entity(id: EntityId, position: IVec2) -> Entity {
     Entity {
         id,
         position,
         size: UVec2::new(16, 16), // Standard sprite size
-        entity_type: EntityType::Player,
+        entity_kind: EntityKind::Player,
         category: "human".to_string(),
         definition_name: None,
         control_role: toki_core::entity::ControlRole::PlayerCharacter,

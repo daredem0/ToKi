@@ -108,7 +108,7 @@ mod tests {
     use super::CameraManager;
     use toki_core::assets::tilemap::TileMap;
     use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
-    use toki_core::entity::{Entity, EntityAttributes, EntityType};
+    use toki_core::entity::{Entity, EntityAttributes, EntityKind};
 
     fn sample_camera_manager() -> CameraManager {
         let camera = Camera {
@@ -149,7 +149,9 @@ mod tests {
             id: 1,
             position: glam::IVec2::new(20, 30),
             size: glam::UVec2::new(16, 16),
-            entity_type: EntityType::Player,
+            entity_kind: EntityKind::Player,
+            category: "human".to_string(),
+            control_role: toki_core::entity::ControlRole::PlayerCharacter,
             attributes: EntityAttributes::default(),
             collision_box: None,
             definition_name: None,

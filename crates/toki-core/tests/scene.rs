@@ -1,7 +1,7 @@
 use glam::{IVec2, UVec2};
 use toki_core::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use toki_core::entity::{
-    AiBehavior, ControlRole, Entity, EntityAttributes, EntityType, MovementProfile,
+    AiBehavior, ControlRole, Entity, EntityAttributes, EntityKind, MovementProfile,
 };
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::scene::Scene;
@@ -22,7 +22,7 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
         id,
         position,
         size: UVec2::new(16, 16),
-        entity_type: EntityType::Player,
+        entity_kind: EntityKind::Player,
         category: "human".to_string(),
         definition_name: None,
         control_role: ControlRole::PlayerCharacter,

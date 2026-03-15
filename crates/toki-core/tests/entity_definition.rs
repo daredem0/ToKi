@@ -74,7 +74,7 @@ fn test_entity_definition_create_entity_basic() {
     assert_eq!(entity.position, position);
     assert_eq!(entity.size.x, 16);
     assert_eq!(entity.size.y, 16);
-    assert_eq!(entity.entity_type, EntityType::Npc);
+    assert_eq!(entity.entity_kind, EntityKind::Npc);
     assert_eq!(entity.category, "human");
     assert_eq!(entity.control_role, ControlRole::LegacyDefault);
     assert_eq!(entity.effective_control_role(), ControlRole::None);
@@ -180,7 +180,7 @@ fn test_entity_definition_create_npc_entity() {
     assert_eq!(entity.position, position);
     assert_eq!(entity.size.x, 32);
     assert_eq!(entity.size.y, 32);
-    assert_eq!(entity.entity_type, EntityType::Npc);
+    assert_eq!(entity.entity_kind, EntityKind::Npc);
     assert_eq!(entity.category, "creature");
     assert_eq!(entity.effective_control_role(), ControlRole::None);
 
@@ -501,7 +501,7 @@ fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type()
     let entity = entity_def
         .create_entity(IVec2::ZERO, 1)
         .expect("unknown generic category should still instantiate");
-    assert_eq!(entity.entity_type, EntityType::Npc);
+    assert_eq!(entity.entity_kind, EntityKind::Npc);
     assert_eq!(entity.category, "mystery");
 }
 

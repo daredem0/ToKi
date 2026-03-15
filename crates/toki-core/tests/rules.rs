@@ -11,7 +11,7 @@ use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
     RuleTarget, RuleTrigger,
 };
-use toki_core::{entity::EntityType, GameState, InputKey, Scene};
+use toki_core::{entity::EntityKind, GameState, InputKey, Scene};
 
 fn create_test_tilemap() -> TileMap {
     TileMap {
@@ -607,7 +607,7 @@ fn spawn_action_creates_entity_at_requested_position() {
         &create_test_atlas(),
     );
 
-    let mut npc_ids = state.entity_manager().entities_of_type(&EntityType::Npc);
+    let mut npc_ids = state.entity_manager().entities_of_kind(&EntityKind::Npc);
     npc_ids.sort_unstable();
     assert_eq!(npc_ids.len(), 1);
     let spawned = state
@@ -649,7 +649,7 @@ fn spawn_actions_follow_rule_priority_order() {
         &create_test_atlas(),
     );
 
-    let mut npc_ids = state.entity_manager().entities_of_type(&EntityType::Npc);
+    let mut npc_ids = state.entity_manager().entities_of_kind(&EntityKind::Npc);
     npc_ids.sort_unstable();
     assert_eq!(npc_ids.len(), 2);
 
@@ -1283,7 +1283,7 @@ fn switch_scene_syncs_outgoing_scene_entities_before_loading_target() {
     let persisted_player = scene_a_after
         .entities
         .iter()
-        .find(|entity| matches!(entity.entity_type, EntityType::Player))
+        .find(|entity| matches!(entity.entity_kind, EntityKind::Player))
         .expect("scene A should still contain its player entity");
     assert_eq!(persisted_player.position, IVec2::new(1, 0));
 }

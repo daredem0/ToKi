@@ -5,7 +5,7 @@ use crate::ui::editor_ui::EntityMoveDragState;
 use crate::ui::undo_redo::{EditorCommand, EntityPosition};
 use crate::ui::EditorUI;
 use std::path::Path;
-use toki_core::entity::{Entity, EntityDefinition, EntityType};
+use toki_core::entity::{Entity, EntityDefinition, EntityKind};
 
 /// Handles entity selection and drag operations
 pub struct SelectionInteraction;
@@ -87,7 +87,7 @@ impl SelectionInteraction {
 
         let project_path = config.and_then(|cfg| cfg.current_project_path().map(|p| p.as_path()));
         let entity_def_name = Self::resolve_entity_definition_name(&entity, project_path)
-            .unwrap_or_else(|| Self::entity_type_name(&entity.entity_type).to_string());
+            .unwrap_or_else(|| Self::entity_kind_name(&entity.entity_kind).to_string());
 
         tracing::info!(
             "Starting move drag for entity {} using definition '{}'",
@@ -437,7 +437,7 @@ impl SelectionInteraction {
         }
 
         // Last-resort fallback for legacy scene entities that predate definition_name.
-        Some(Self::entity_type_name(&entity.entity_type).to_string())
+        Some(Self::entity_kind_name(&entity.entity_kind).to_string())
     }
 
     fn find_best_matching_definition_name(project_path: &Path, entity: &Entity) -> Option<String> {
@@ -484,7 +484,7 @@ impl SelectionInteraction {
     fn definition_match_score(entity: &Entity, definition: &EntityDefinition) -> Option<i32> {
         if !definition
             .category
-            .eq_ignore_ascii_case(Self::entity_type_name(&entity.entity_type))
+            .eq_ignore_ascii_case(Self::entity_kind_name(&entity.entity_kind))
         {
             return None;
         }
@@ -531,13 +531,13 @@ impl SelectionInteraction {
         Some(score)
     }
 
-    fn entity_type_name(entity_type: &EntityType) -> &'static str {
-        match entity_type {
-            EntityType::Player => "human",
-            EntityType::Npc => "creature",
-            EntityType::Item => "item",
-            EntityType::Decoration => "decoration",
-            EntityType::Trigger => "trigger",
+    fn entity_kind_name(entity_kind: &EntityKind) -> &'static str {
+        match entity_kind {
+            EntityKind::Player => "human",
+            EntityKind::Npc => "creature",
+            EntityKind::Item => "item",
+            EntityKind::Decoration => "decoration",
+            EntityKind::Trigger => "trigger",
         }
     }
 }
@@ -552,7 +552,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
     use toki_core::entity::{
         AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityAttributes,
-        EntityDefinition, EntityManager, EntityType, RenderingDef,
+        EntityDefinition, EntityManager, EntityKind, RenderingDef,
     };
 
     fn unique_temp_project_dir() -> PathBuf {
@@ -628,7 +628,7 @@ mod tests {
     fn resolve_entity_definition_name_prefers_entity_metadata() {
         let mut manager = EntityManager::new();
         let entity_id = manager.spawn_entity(
-            EntityType::Npc,
+            EntityKind::Npc,
             IVec2::new(10, 20),
             UVec2::new(16, 16),
             EntityAttributes::default(),
@@ -668,7 +668,7 @@ mod tests {
     fn resolve_entity_definition_name_falls_back_to_entity_type_name() {
         let mut manager = EntityManager::new();
         let entity_id = manager.spawn_entity(
-            EntityType::Player,
+            EntityKind::Player,
             IVec2::new(0, 0),
             UVec2::new(16, 16),
             EntityAttributes::default(),
@@ -687,7 +687,7 @@ mod tests {
         let mut ui_state = EditorUI::new();
         let mut manager = EntityManager::new();
         let entity_id = manager.spawn_entity(
-            EntityType::Npc,
+            EntityKind::Npc,
             IVec2::new(10, 20),
             UVec2::new(16, 16),
             EntityAttributes::default(),
@@ -754,13 +754,13 @@ mod tests {
         let mut ui_state = EditorUI::new();
         let mut manager = EntityManager::new();
         let first_id = manager.spawn_entity(
-            EntityType::Npc,
+            EntityKind::Npc,
             IVec2::new(0, 0),
             UVec2::new(16, 16),
             EntityAttributes::default(),
         );
         let second_id = manager.spawn_entity(
-            EntityType::Npc,
+            EntityKind::Npc,
             IVec2::new(32, 0),
             UVec2::new(16, 16),
             EntityAttributes::default(),
@@ -801,13 +801,13 @@ mod tests {
         let mut ui_state = EditorUI::new();
         let mut manager = EntityManager::new();
         let first_id = manager.spawn_entity(
-            EntityType::Npc,
+            EntityKind::Npc,
             IVec2::new(10, 20),
             UVec2::new(16, 16),
             EntityAttributes::default(),
         );
         let second_id = manager.spawn_entity(
-            EntityType::Npc,
+            EntityKind::Npc,
             IVec2::new(30, 40),
             UVec2::new(16, 16),
             EntityAttributes::default(),
@@ -916,13 +916,13 @@ mod tests {
         let mut ui_state = EditorUI::new();
         let mut manager = EntityManager::new();
         let first_id = manager.spawn_entity(
-            EntityType::Npc,
+            EntityKind::Npc,
             IVec2::new(0, 0),
             UVec2::new(16, 16),
             EntityAttributes::default(),
         );
         let second_id = manager.spawn_entity(
-            EntityType::Npc,
+            EntityKind::Npc,
             IVec2::new(48, 48),
             UVec2::new(16, 16),
             EntityAttributes::default(),

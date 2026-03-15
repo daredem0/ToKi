@@ -931,7 +931,7 @@ fn game_state_spawn_player_like_npc_uses_definition_metadata() {
         .expect("spawned npc should exist");
 
     assert_eq!(npc.definition_name.as_deref(), Some("player_like_npc"));
-    assert_eq!(npc.entity_type, toki_core::entity::EntityType::Npc);
+    assert_eq!(npc.entity_kind, toki_core::entity::EntityKind::Npc);
 }
 
 #[test]

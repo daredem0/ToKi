@@ -11,7 +11,8 @@ pub struct Entity {
     pub id: EntityId,
     pub position: glam::IVec2,
     pub size: glam::UVec2,
-    pub entity_type: EntityType,
+    #[serde(alias = "entity_type")]
+    pub entity_kind: EntityKind,
     #[serde(default)]
     pub category: String,
     /// Source entity definition name used to instantiate this entity.
@@ -51,7 +52,7 @@ impl Default for EntityAudioComponent {
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
-pub enum EntityType {
+pub enum EntityKind {
     Player,
     Npc,
     Item,
@@ -172,7 +173,7 @@ pub struct EntityManager {
 
     // Quick lookups
     player_id: Option<EntityId>,
-    entities_by_type: HashMap<EntityType, HashSet<EntityId>>,
+    entities_by_kind: HashMap<EntityKind, HashSet<EntityId>>,
 
     // This is prepared for spatial queries (collission)
     active_entities: HashSet<EntityId>,
@@ -187,13 +188,13 @@ impl EntityManager {
         matches!(entity.effective_control_role(), ControlRole::PlayerCharacter)
     }
 
-    fn legacy_category_for_type(entity_type: &EntityType) -> &'static str {
-        match entity_type {
-            EntityType::Player => "human",
-            EntityType::Npc => "creature",
-            EntityType::Item => "item",
-            EntityType::Decoration => "decoration",
-            EntityType::Trigger => "trigger",
+    fn legacy_category_for_kind(entity_kind: &EntityKind) -> &'static str {
+        match entity_kind {
+            EntityKind::Player => "human",
+            EntityKind::Npc => "creature",
+            EntityKind::Item => "item",
+            EntityKind::Decoration => "decoration",
+            EntityKind::Trigger => "trigger",
         }
     }
 
@@ -202,7 +203,7 @@ impl EntityManager {
             entities: HashMap::new(),
             next_id: 1, // we start at 1 to use 0 for invalid entities
             player_id: None,
-            entities_by_type: HashMap::new(),
+            entities_by_kind: HashMap::new(),
             active_entities: HashSet::new(),
             audio_components: HashMap::new(),
         }
@@ -219,7 +220,7 @@ impl EntityManager {
 
     pub fn spawn_entity(
         &mut self,
-        entity_type: EntityType,
+        entity_kind: EntityKind,
         position: IVec2,
         size: UVec2,
         attributes: EntityAttributes,
@@ -237,8 +238,8 @@ impl EntityManager {
             id,
             position,
             size,
-            entity_type: entity_type.clone(),
-            category: Self::legacy_category_for_type(&entity_type).to_string(),
+            entity_kind: entity_kind.clone(),
+            category: Self::legacy_category_for_kind(&entity_kind).to_string(),
             definition_name: None,
             control_role: ControlRole::LegacyDefault,
             attributes,
@@ -255,8 +256,8 @@ impl EntityManager {
             self.player_id = Some(id);
         }
 
-        self.entities_by_type
-            .entry(entity_type)
+        self.entities_by_kind
+            .entry(entity_kind)
             .or_default()
             .insert(id);
 
@@ -277,15 +278,15 @@ impl EntityManager {
         self.next_id += 1;
 
         let entity = definition.create_entity(position, id)?;
-        let entity_type = entity.entity_type.clone();
+        let entity_kind = entity.entity_kind.clone();
         let audio_component = definition.create_audio_component();
 
         if Self::tracks_player_role(&entity) {
             self.player_id = Some(id);
         }
 
-        self.entities_by_type
-            .entry(entity_type)
+        self.entities_by_kind
+            .entry(entity_kind)
             .or_default()
             .insert(id);
 
@@ -301,7 +302,7 @@ impl EntityManager {
     /// Add an existing entity to the manager (used for scene-to-gamestate conversion)
     pub fn add_existing_entity(&mut self, entity: Entity) -> EntityId {
         let id = entity.id;
-        let entity_type = entity.entity_type.clone();
+        let entity_kind = entity.entity_kind.clone();
 
         // Update next_id if needed to avoid conflicts
         if id >= self.next_id {
@@ -314,8 +315,8 @@ impl EntityManager {
         }
 
         // Update lookups
-        self.entities_by_type
-            .entry(entity_type)
+        self.entities_by_kind
+            .entry(entity_kind)
             .or_default()
             .insert(id);
 
@@ -339,8 +340,8 @@ impl EntityManager {
             self.player_id = None;
         }
 
-        if let Some(type_set) = self.entities_by_type.get_mut(&entity.entity_type) {
-            type_set.remove(&id);
+        if let Some(kind_set) = self.entities_by_kind.get_mut(&entity.entity_kind) {
+            kind_set.remove(&id);
         }
 
         // We don't care whether it was present; just ensure it's gone.
@@ -405,9 +406,9 @@ impl EntityManager {
     }
 
     // Queries
-    pub fn entities_of_type(&self, entity_type: &EntityType) -> Vec<EntityId> {
-        self.entities_by_type
-            .get(entity_type)
+    pub fn entities_of_kind(&self, entity_kind: &EntityKind) -> Vec<EntityId> {
+        self.entities_by_kind
+            .get(entity_kind)
             .map(|set| set.iter().copied().collect())
             .unwrap_or_default()
     }
@@ -560,14 +561,14 @@ pub struct AnimationClipDef {
 
 // Conversion implementations
 impl EntityDefinition {
-    fn runtime_entity_type_for_category(category: &str) -> EntityType {
+    fn runtime_entity_kind_for_category(category: &str) -> EntityKind {
         match category.trim().to_ascii_lowercase().as_str() {
-            "item" | "items" => EntityType::Item,
-            "trigger" | "triggers" => EntityType::Trigger,
+            "item" | "items" => EntityKind::Item,
+            "trigger" | "triggers" => EntityKind::Trigger,
             "decoration" | "decorations" | "building" | "buildings" | "plant" | "plants" => {
-                EntityType::Decoration
+                EntityKind::Decoration
             }
-            _ => EntityType::Npc,
+            _ => EntityKind::Npc,
         }
     }
 
@@ -589,7 +590,7 @@ impl EntityDefinition {
 
     /// Create an Entity instance from this definition at the given position
     pub fn create_entity(&self, position: IVec2, entity_id: EntityId) -> Result<Entity, String> {
-        let entity_type = Self::runtime_entity_type_for_category(&self.category);
+        let entity_kind = Self::runtime_entity_kind_for_category(&self.category);
 
         // Build animation controller
         let mut animation_controller = AnimationController::new();
@@ -648,7 +649,7 @@ impl EntityDefinition {
             id: entity_id,
             position,
             size: UVec2::new(self.rendering.size[0], self.rendering.size[1]),
-            entity_type,
+            entity_kind,
             category: self.category.clone(),
             definition_name: Some(self.name.clone()),
             control_role: ControlRole::LegacyDefault,

@@ -1674,7 +1674,7 @@ mod tests {
     use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
     use toki_core::assets::tilemap::TileMap;
     use toki_core::collision::CollisionBox;
-    use toki_core::entity::{Entity, EntityAttributes, EntityType};
+    use toki_core::entity::{Entity, EntityAttributes, EntityKind};
     use winit::keyboard::ModifiersState;
 
     #[test]
@@ -1848,7 +1848,7 @@ mod tests {
             id,
             position,
             size: UVec2::new(16, 16),
-            entity_type: EntityType::Npc,
+            entity_kind: EntityKind::Npc,
             category: "creature".to_string(),
             definition_name: Some("test".to_string()),
             control_role: toki_core::entity::ControlRole::None,

@@ -3020,7 +3020,7 @@ impl InspectorSystem {
                 ui.horizontal(|ui| {
                     ui.label("Type:");
                     if entity.category.is_empty() {
-                        ui.label(format!("{:?}", entity.entity_type));
+                        ui.label(format!("{:?}", entity.entity_kind));
                     } else {
                         ui.label(entity.category.as_str());
                     }
@@ -3766,7 +3766,7 @@ mod tests {
     use std::fs;
     use toki_core::animation::AnimationState;
     use toki_core::collision::CollisionBox;
-    use toki_core::entity::{ControlRole, EntityAttributes, EntityManager, EntityType};
+    use toki_core::entity::{ControlRole, EntityAttributes, EntityManager, EntityKind};
     use toki_core::rules::{
         Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
         RuleTarget, RuleTrigger,
@@ -3776,7 +3776,7 @@ mod tests {
     fn sample_entity_with_id(id: u32) -> toki_core::entity::Entity {
         let mut manager = EntityManager::new();
         let spawned_id = manager.spawn_entity(
-            EntityType::Npc,
+            EntityKind::Npc,
             IVec2::new(10, 20),
             UVec2::new(16, 16),
             EntityAttributes {

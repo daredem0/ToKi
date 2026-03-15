@@ -442,7 +442,7 @@ mod tests {
     use crate::ui::rule_graph::RuleGraph;
     use crate::ui::EditorUI;
     use glam::{IVec2, UVec2};
-    use toki_core::entity::{Entity, EntityAttributes, EntityType};
+    use toki_core::entity::{Entity, EntityAttributes, EntityKind};
     use toki_core::rules::{
         Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger,
     };
@@ -452,7 +452,7 @@ mod tests {
             id,
             position,
             size: UVec2::new(16, 16),
-            entity_type: EntityType::Npc,
+            entity_kind: EntityKind::Npc,
             category: "creature".to_string(),
             definition_name: Some("npc".to_string()),
             control_role: toki_core::entity::ControlRole::None,
