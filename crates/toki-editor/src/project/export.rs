@@ -22,6 +22,7 @@ pub struct RuntimeBundleConfig {
     pub pack: RuntimeBundlePackConfig,
     pub startup: RuntimeBundleStartupConfig,
     pub splash: RuntimeBundleSplashConfig,
+    pub audio: RuntimeBundleAudioConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -38,6 +39,13 @@ pub struct RuntimeBundleStartupConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeBundleSplashConfig {
     pub duration_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeBundleAudioConfig {
+    pub music_percent: u8,
+    pub movement_percent: u8,
+    pub collision_percent: u8,
 }
 
 pub fn export_hybrid_bundle(
@@ -107,6 +115,11 @@ pub fn export_hybrid_bundle(
             },
             splash: RuntimeBundleSplashConfig {
                 duration_ms: splash_duration_ms,
+            },
+            audio: RuntimeBundleAudioConfig {
+                music_percent: project.metadata.runtime.audio.music_percent,
+                movement_percent: project.metadata.runtime.audio.movement_percent,
+                collision_percent: project.metadata.runtime.audio.collision_percent,
             },
         },
     )?;
@@ -334,6 +347,10 @@ mod tests {
         fs::write(&runtime_bin, "runtime-binary").expect("runtime");
 
         let project = Project::new("MyGame".to_string(), project_root.clone());
+        let mut project = project;
+        project.metadata.runtime.audio.music_percent = 65;
+        project.metadata.runtime.audio.movement_percent = 40;
+        project.metadata.runtime.audio.collision_percent = 25;
         let export_root = parent.join("exports");
         fs::create_dir_all(&export_root).expect("exports dir");
 
@@ -430,6 +447,9 @@ mod tests {
         assert!(runtime_config.pack.enabled);
         assert_eq!(runtime_config.startup.scene.as_deref(), Some("Main Scene"));
         assert_eq!(runtime_config.splash.duration_ms, 3000);
+        assert_eq!(runtime_config.audio.music_percent, 65);
+        assert_eq!(runtime_config.audio.movement_percent, 40);
+        assert_eq!(runtime_config.audio.collision_percent, 25);
     }
 
     #[test]

@@ -1,4 +1,5 @@
 use kira::{
+    Decibels,
     sound::static_sound::{StaticSoundData, StaticSoundHandle},
     sound::streaming::{StreamingSoundData, StreamingSoundHandle, StreamingSoundSettings},
     sound::FromFileError,
@@ -47,6 +48,7 @@ pub struct AudioManager {
 
     // Audio channels with policies
     channels: HashMap<String, AudioChannel>,
+    channel_volume_percents: HashMap<String, u8>,
 }
 
 impl AudioManager {
@@ -75,6 +77,7 @@ impl AudioManager {
             sfx_paths: HashMap::new(),
             music_paths: HashMap::new(),
             channels: HashMap::new(),
+            channel_volume_percents: HashMap::new(),
         };
 
         system.scan_and_preload_sfx(preload_names)?;
@@ -155,6 +158,11 @@ impl AudioManager {
                 cooldown_duration: None,
             },
         );
+    }
+
+    pub fn set_channel_volume_percent(&mut self, channel: &str, percent: u8) {
+        self.channel_volume_percents
+            .insert(channel.to_string(), percent.min(100));
     }
 
     /// Set a cooldown duration for a channel to prevent rapid-fire sounds
@@ -263,6 +271,7 @@ impl AudioManager {
             self.set_channel_policy(channel, PlaybackPolicy::Overlap);
         }
 
+        let channel_gain = self.channel_volume_for(channel);
         let channel_data = self.channels.get_mut(channel).unwrap();
         let active_count =
             channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
@@ -334,7 +343,7 @@ impl AudioManager {
 
         // Try preloaded SFX first (fast path)
         if let Some(sound_data) = self.preloaded_sounds.get(name) {
-            let handle = self.manager.play(sound_data.clone())?;
+            let handle = self.manager.play(sound_data.volume(channel_gain))?;
             channel_data.active_handles.push(handle);
             channel_data.last_played = Some(Instant::now());
             let new_total =
@@ -352,7 +361,7 @@ impl AudioManager {
             let sound_data = StaticSoundData::from_file(path)?;
             self.preloaded_sounds
                 .insert(name.to_string(), sound_data.clone());
-            let handle = self.manager.play(sound_data)?;
+            let handle = self.manager.play(sound_data.volume(channel_gain))?;
             channel_data.active_handles.push(handle);
             channel_data.last_played = Some(Instant::now());
             let new_total =
@@ -388,6 +397,7 @@ impl AudioManager {
             self.set_channel_policy(channel, PlaybackPolicy::Exclusive);
         }
 
+        let channel_gain = self.channel_volume_for(channel);
         let channel_data = self.channels.get_mut(channel).unwrap();
         let active_count =
             channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
@@ -440,8 +450,11 @@ impl AudioManager {
                 channel
             );
             let start = std::time::Instant::now();
-            let sound_data = StreamingSoundData::from_file(path)?
-                .with_settings(StreamingSoundSettings::new().loop_region(..).volume(-10.0));
+            let sound_data = StreamingSoundData::from_file(path)?.with_settings(
+                StreamingSoundSettings::new()
+                    .loop_region(..)
+                    .volume(amplitude_to_decibels(volume) + channel_gain),
+            );
 
             let handle = self.manager.play(sound_data)?;
             channel_data.active_streaming_handles.push(handle);
@@ -487,6 +500,15 @@ impl AudioManager {
             "Available Music: {:?}",
             self.music_paths.keys().collect::<Vec<_>>()
         );
+    }
+
+    fn channel_volume_for(&self, channel: &str) -> Decibels {
+        let percent = self
+            .channel_volume_percents
+            .get(channel)
+            .copied()
+            .unwrap_or(100);
+        percent_to_decibels(percent)
     }
 }
 
@@ -536,9 +558,25 @@ fn classify_sfx_inventory(
     }
 }
 
+fn percent_to_decibels(percent: u8) -> Decibels {
+    if percent == 0 {
+        return Decibels::SILENCE;
+    }
+    amplitude_to_decibels(percent as f32 / 100.0)
+}
+
+fn amplitude_to_decibels(amplitude: f32) -> Decibels {
+    if amplitude <= 0.0 {
+        return Decibels::SILENCE;
+    }
+    Decibels((20.0 * amplitude.log10()).max(Decibels::SILENCE.0))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{classify_sfx_inventory, discover_ogg_assets};
+    use super::{
+        amplitude_to_decibels, classify_sfx_inventory, discover_ogg_assets, percent_to_decibels,
+    };
     use std::fs;
 
     #[test]
@@ -598,6 +636,18 @@ mod tests {
             vec!["sfx_jump".to_string(), "sfx_select".to_string()]
         );
     }
+
+    #[test]
+    fn percent_to_decibels_maps_full_half_and_muted_values() {
+        assert_eq!(percent_to_decibels(100), kira::Decibels::IDENTITY);
+        assert_eq!(percent_to_decibels(0), kira::Decibels::SILENCE);
+        assert!((percent_to_decibels(50).0 - (-6.0206)).abs() < 0.01);
+    }
+
+    #[test]
+    fn amplitude_to_decibels_matches_existing_music_baseline() {
+        assert!((amplitude_to_decibels(0.3).0 - (-10.4576)).abs() < 0.02);
+    }
 }
 
 impl std::fmt::Debug for AudioManager {
@@ -607,6 +657,7 @@ impl std::fmt::Debug for AudioManager {
             .field("sfx_paths_count", &self.sfx_paths.len())
             .field("music_paths_count", &self.music_paths.len())
             .field("channels_count", &self.channels.len())
+            .field("channel_volume_percents", &self.channel_volume_percents)
             .finish()
     }
 }

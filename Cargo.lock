@@ -4526,6 +4526,7 @@ dependencies = [
  "tempfile",
  "toki-core",
  "toki-render",
+ "toml",
  "tracing",
  "tracing-subscriber",
  "winit",

@@ -50,6 +50,9 @@ struct ProjectSettingsDraft {
     version: String,
     description: String,
     splash_duration_ms: u64,
+    music_mix_percent: u8,
+    movement_mix_percent: u8,
+    collision_mix_percent: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -236,6 +239,9 @@ impl ProjectSettingsDraft {
             version: project.metadata.project.version.clone(),
             description: project.metadata.project.description.clone(),
             splash_duration_ms: project.metadata.runtime.splash.duration_ms,
+            music_mix_percent: project.metadata.runtime.audio.music_percent,
+            movement_mix_percent: project.metadata.runtime.audio.movement_percent,
+            collision_mix_percent: project.metadata.runtime.audio.collision_percent,
         }
     }
 }
@@ -527,19 +533,36 @@ impl InspectorSystem {
 
         ui.separator();
         ui.collapsing("Audio", |ui| {
-            ui.label("Global mixer settings will live here.");
-            ui.label("Current runtime channels:");
+            ui.label("Channel loudness is global for the whole project.");
             ui.horizontal(|ui| {
-                ui.label("•");
-                ui.label("Music");
+                ui.label("Music:");
+                changed |= ui
+                    .add(
+                        egui::Slider::new(&mut draft.music_mix_percent, 0..=100)
+                            .suffix("%")
+                            .show_value(true),
+                    )
+                    .changed();
             });
             ui.horizontal(|ui| {
-                ui.label("•");
-                ui.label("Movement");
+                ui.label("Movement:");
+                changed |= ui
+                    .add(
+                        egui::Slider::new(&mut draft.movement_mix_percent, 0..=100)
+                            .suffix("%")
+                            .show_value(true),
+                    )
+                    .changed();
             });
             ui.horizontal(|ui| {
-                ui.label("•");
-                ui.label("Collision");
+                ui.label("Collision:");
+                changed |= ui
+                    .add(
+                        egui::Slider::new(&mut draft.collision_mix_percent, 0..=100)
+                            .suffix("%")
+                            .show_value(true),
+                    )
+                    .changed();
             });
         });
 
@@ -601,6 +624,18 @@ impl InspectorSystem {
         }
         if project.metadata.runtime.splash.duration_ms != draft.splash_duration_ms {
             project.metadata.runtime.splash.duration_ms = draft.splash_duration_ms;
+            changed = true;
+        }
+        if project.metadata.runtime.audio.music_percent != draft.music_mix_percent {
+            project.metadata.runtime.audio.music_percent = draft.music_mix_percent;
+            changed = true;
+        }
+        if project.metadata.runtime.audio.movement_percent != draft.movement_mix_percent {
+            project.metadata.runtime.audio.movement_percent = draft.movement_mix_percent;
+            changed = true;
+        }
+        if project.metadata.runtime.audio.collision_percent != draft.collision_mix_percent {
+            project.metadata.runtime.audio.collision_percent = draft.collision_mix_percent;
             changed = true;
         }
 
@@ -4335,6 +4370,9 @@ mod tests {
             version: "2.0.0".to_string(),
             description: "Updated description".to_string(),
             splash_duration_ms: 4500,
+            music_mix_percent: 70,
+            movement_mix_percent: 55,
+            collision_mix_percent: 35,
         };
 
         let changed = InspectorSystem::apply_project_settings_draft(&mut project, &draft);
@@ -4345,6 +4383,9 @@ mod tests {
         assert_eq!(project.metadata.project.version, "2.0.0");
         assert_eq!(project.metadata.project.description, "Updated description");
         assert_eq!(project.metadata.runtime.splash.duration_ms, 4500);
+        assert_eq!(project.metadata.runtime.audio.music_percent, 70);
+        assert_eq!(project.metadata.runtime.audio.movement_percent, 55);
+        assert_eq!(project.metadata.runtime.audio.collision_percent, 35);
         assert!(project.is_dirty);
         assert!(project.metadata.project.modified >= original_modified);
     }

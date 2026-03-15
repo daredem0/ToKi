@@ -47,6 +47,23 @@ impl Default for RuntimeSplashOptions {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuntimeAudioMixOptions {
+    pub music_percent: u8,
+    pub movement_percent: u8,
+    pub collision_percent: u8,
+}
+
+impl Default for RuntimeAudioMixOptions {
+    fn default() -> Self {
+        Self {
+            music_percent: 100,
+            movement_percent: 100,
+            collision_percent: 100,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RuntimeLaunchOptions {
     pub project_path: Option<PathBuf>,
@@ -54,6 +71,7 @@ pub struct RuntimeLaunchOptions {
     pub scene_name: Option<String>,
     pub map_name: Option<String>,
     pub splash: RuntimeSplashOptions,
+    pub audio_mix: RuntimeAudioMixOptions,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -176,11 +194,20 @@ impl App {
             .map(std::path::Path::to_path_buf)
             .or_else(|| std::env::current_dir().ok())
             .expect("Failed to resolve audio root path");
-        let audio_system = AudioManager::new_with_assets_root_and_preload_names(
+        let mut audio_system = AudioManager::new_with_assets_root_and_preload_names(
             audio_root,
             &asset_load_plan.preloaded_sfx_names,
         )
         .expect("Failed to initialize audio system");
+        audio_system.set_channel_volume_percent("music", launch_options.audio_mix.music_percent);
+        audio_system.set_channel_volume_percent(
+            "movement",
+            launch_options.audio_mix.movement_percent,
+        );
+        audio_system.set_channel_volume_percent(
+            "collision",
+            launch_options.audio_mix.collision_percent,
+        );
 
         Self {
             // Core systems
@@ -1033,7 +1060,8 @@ fn first_existing_path(candidates: &[PathBuf]) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::{
-        first_existing_path, App, RuntimeLaunchOptions, RuntimeSplashOptions, SplashPolicy,
+        first_existing_path, App, RuntimeAudioMixOptions, RuntimeLaunchOptions,
+        RuntimeSplashOptions, SplashPolicy,
     };
     use std::fs;
     use std::io::{Seek, Write};
@@ -1250,6 +1278,7 @@ mod tests {
             scene_name: None,
             map_name: None,
             splash: RuntimeSplashOptions::default(),
+            audio_mix: RuntimeAudioMixOptions::default(),
         };
 
         let resolved = App::resolve_post_splash_sprite_texture_path(&options, None);
@@ -1281,6 +1310,7 @@ mod tests {
             scene_name: None,
             map_name: None,
             splash: RuntimeSplashOptions::default(),
+            audio_mix: RuntimeAudioMixOptions::default(),
         };
 
         let resolved = App::resolve_post_splash_sprite_texture_path(&options, Some(&mount_dir));
@@ -1342,6 +1372,7 @@ mod tests {
             scene_name: Some("Main Scene".to_string()),
             map_name: None,
             splash: RuntimeSplashOptions::default(),
+            audio_mix: RuntimeAudioMixOptions::default(),
         };
 
         let (resources, game_state, pack_mount, asset_load_plan, _) =
@@ -1381,6 +1412,7 @@ mod tests {
             scene_name: Some("Main Scene".to_string()),
             map_name: None,
             splash: RuntimeSplashOptions::default(),
+            audio_mix: RuntimeAudioMixOptions::default(),
         };
 
         let error = App::build_startup_state_from_pack(&launch_options, &pack_path)

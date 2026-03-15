@@ -73,6 +73,30 @@ pub struct RuntimeSettings {
     /// Splash screen settings for runtime startup
     #[serde(default)]
     pub splash: RuntimeSplashSettings,
+    /// Global channel mixer settings
+    #[serde(default)]
+    pub audio: RuntimeAudioMixSettings,
+}
+
+/// Runtime audio mixer settings
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeAudioMixSettings {
+    #[serde(default = "default_runtime_audio_mix_percent")]
+    pub music_percent: u8,
+    #[serde(default = "default_runtime_audio_mix_percent")]
+    pub movement_percent: u8,
+    #[serde(default = "default_runtime_audio_mix_percent")]
+    pub collision_percent: u8,
+}
+
+impl Default for RuntimeAudioMixSettings {
+    fn default() -> Self {
+        Self {
+            music_percent: default_runtime_audio_mix_percent(),
+            movement_percent: default_runtime_audio_mix_percent(),
+            collision_percent: default_runtime_audio_mix_percent(),
+        }
+    }
 }
 
 /// Runtime splash settings (community-safe subset)
@@ -93,6 +117,10 @@ impl Default for RuntimeSplashSettings {
 
 fn default_runtime_splash_duration_ms() -> u64 {
     3000
+}
+
+fn default_runtime_audio_mix_percent() -> u8 {
+    100
 }
 
 /// Editor-specific settings
@@ -275,11 +303,49 @@ recent_files = []
         let metadata: ProjectMetadata =
             toml::from_str(toml).expect("metadata without runtime section should deserialize");
         assert_eq!(metadata.runtime.splash.duration_ms, 3000);
+        assert_eq!(metadata.runtime.audio.music_percent, 100);
+        assert_eq!(metadata.runtime.audio.movement_percent, 100);
+        assert_eq!(metadata.runtime.audio.collision_percent, 100);
     }
 
     #[test]
     fn runtime_settings_default_to_community_splash_duration() {
         let runtime = RuntimeSettings::default();
         assert_eq!(runtime.splash.duration_ms, 3000);
+        assert_eq!(runtime.audio.music_percent, 100);
+        assert_eq!(runtime.audio.movement_percent, 100);
+        assert_eq!(runtime.audio.collision_percent, 100);
+    }
+
+    #[test]
+    fn project_metadata_deserialization_reads_runtime_audio_mix_settings() {
+        let toml = r#"
+[project]
+name = "Demo"
+version = "1.0.0"
+created = "2026-01-01T00:00:00Z"
+modified = "2026-01-01T00:00:00Z"
+toki_editor_version = "0.0.14"
+description = ""
+
+[scenes]
+main = "scenes/main.json"
+
+[assets]
+sprites = "assets/sprites/"
+tilemaps = "assets/tilemaps/"
+audio = "assets/audio/"
+
+[runtime.audio]
+music_percent = 70
+movement_percent = 55
+collision_percent = 40
+"#;
+
+        let metadata: ProjectMetadata =
+            toml::from_str(toml).expect("metadata with runtime audio should deserialize");
+        assert_eq!(metadata.runtime.audio.music_percent, 70);
+        assert_eq!(metadata.runtime.audio.movement_percent, 55);
+        assert_eq!(metadata.runtime.audio.collision_percent, 40);
     }
 }
