@@ -185,7 +185,10 @@ pub struct EntityManager {
 
 impl EntityManager {
     fn tracks_player_role(entity: &Entity) -> bool {
-        matches!(entity.effective_control_role(), ControlRole::PlayerCharacter)
+        matches!(
+            entity.effective_control_role(),
+            ControlRole::PlayerCharacter
+        )
     }
 
     fn legacy_category_for_kind(entity_kind: &EntityKind) -> &'static str {
@@ -366,7 +369,10 @@ impl EntityManager {
         };
 
         entity.control_role = control_role;
-        if matches!(entity.effective_control_role(), ControlRole::PlayerCharacter) {
+        if matches!(
+            entity.effective_control_role(),
+            ControlRole::PlayerCharacter
+        ) {
             self.player_id = Some(id);
         } else if self.player_id == Some(id) {
             self.player_id = None;

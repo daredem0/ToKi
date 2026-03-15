@@ -256,6 +256,7 @@ impl InspectorSystem {
                 // Wrap all inspector content in a scrollable area
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, true])
+                    .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
                     .show(ui, |ui| {
                         let current_selection = ui_state.selection.clone();
                         match current_selection.as_ref() {
@@ -3766,7 +3767,7 @@ mod tests {
     use std::fs;
     use toki_core::animation::AnimationState;
     use toki_core::collision::CollisionBox;
-    use toki_core::entity::{ControlRole, EntityAttributes, EntityManager, EntityKind};
+    use toki_core::entity::{ControlRole, EntityAttributes, EntityKind, EntityManager};
     use toki_core::rules::{
         Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
         RuleTarget, RuleTrigger,

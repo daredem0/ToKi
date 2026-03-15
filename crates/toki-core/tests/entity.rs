@@ -199,7 +199,10 @@ fn test_spawn_player() {
     let player = manager.get_player().unwrap();
     assert_eq!(player.position, position);
     assert_eq!(player.entity_kind, EntityKind::Player);
-    assert_eq!(player.effective_control_role(), ControlRole::PlayerCharacter);
+    assert_eq!(
+        player.effective_control_role(),
+        ControlRole::PlayerCharacter
+    );
     assert_eq!(player.attributes.health, Some(100));
     assert_eq!(player.attributes.speed, 2);
     assert!(player.attributes.active);

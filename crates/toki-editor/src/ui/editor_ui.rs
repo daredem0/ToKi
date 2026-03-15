@@ -557,6 +557,7 @@ impl EditorUI {
 
                 egui::ScrollArea::vertical()
                     .id_salt("hierarchy_scroll")
+                    .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
                     .show(ui, |ui| {
                     // Collect actions to perform after UI iteration
                     let mut map_removals: Vec<(usize, usize)> = Vec::new();
@@ -776,199 +777,236 @@ impl EditorUI {
                     if let Some(new_active_scene) = active_scene_change {
                         self.active_scene = Some(new_active_scene);
                     }
-                });
 
-                ui.separator();
+                    ui.separator();
 
-                // Add new scene button
-                if ui.button("+ Add Scene").clicked() {
-                    let new_scene_name = format!("Scene {}", self.scenes.len() + 1);
-                    self.add_scene(new_scene_name.clone());
-                    tracing::info!("Created new scene: {}", new_scene_name);
-                }
+                    if ui.button("+ Add Scene").clicked() {
+                        let new_scene_name = format!("Scene {}", self.scenes.len() + 1);
+                        self.add_scene(new_scene_name.clone());
+                        tracing::info!("Created new scene: {}", new_scene_name);
+                    }
 
-                // Add Maps section if enabled
-                if self.show_maps {
+                    if self.show_maps {
+                        ui.add_space(10.0);
+                        ui.heading("🗺️ Maps");
+                        ui.separator();
+
+                        if let Some(config) = config {
+                            if let Some(project_path) = config.current_project_path() {
+                                let tilemaps_path = project_path.join("assets").join("tilemaps");
+
+                                if tilemaps_path.exists() {
+                                    if let Ok(entries) = std::fs::read_dir(&tilemaps_path) {
+                                        let mut map_selections: Vec<String> = Vec::new();
+                                        let mut scene_map_additions: Vec<(String, String)> = Vec::new();
+
+                                        for entry in entries.flatten() {
+                                            if let Some(name) = entry.file_name().to_str() {
+                                                if name.ends_with(".json") {
+                                                    let map_name =
+                                                        name.trim_end_matches(".json").to_string();
+
+                                                    let is_selected = matches!(
+                                                        &self.selection,
+                                                        Some(Selection::StandaloneMap(name)) if name == &map_name
+                                                    );
+
+                                                    let response =
+                                                        ui.selectable_label(is_selected, &map_name);
+
+                                                    if response.clicked() {
+                                                        tracing::info!("Map selected: {}", map_name);
+                                                        map_selections.push(map_name.clone());
+                                                    }
+
+                                                    response.context_menu(|ui| {
+                                                        ui.label("Add to Scene:");
+                                                        ui.separator();
+
+                                                        let scene_names: Vec<(String, bool)> = self
+                                                            .scenes
+                                                            .iter()
+                                                            .map(|s| {
+                                                                (
+                                                                    s.name.clone(),
+                                                                    s.maps.contains(&map_name),
+                                                                )
+                                                            })
+                                                            .collect();
+
+                                                        for (scene_name, already_added) in
+                                                            scene_names
+                                                        {
+                                                            if !already_added {
+                                                                if ui.button(&scene_name).clicked() {
+                                                                    scene_map_additions.push((
+                                                                        scene_name.clone(),
+                                                                        map_name.clone(),
+                                                                    ));
+                                                                    ui.close();
+                                                                }
+                                                            } else {
+                                                                ui.add_enabled(
+                                                                    false,
+                                                                    egui::Button::new(format!(
+                                                                        "{} (already added)",
+                                                                        scene_name
+                                                                    )),
+                                                                );
+                                                            }
+                                                        }
+
+                                                        if self.scenes.is_empty() {
+                                                            ui.label("No scenes available");
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                        }
+
+                                        for map_name in map_selections {
+                                            self.set_selection(Selection::StandaloneMap(map_name));
+                                        }
+
+                                        for (scene_name, map_name) in scene_map_additions {
+                                            if let Some(target_scene) =
+                                                self.scenes.iter_mut().find(|s| s.name == scene_name)
+                                            {
+                                                target_scene.maps.push(map_name.clone());
+                                                tracing::info!(
+                                                    "Added map '{}' to scene '{}'",
+                                                    map_name,
+                                                    scene_name
+                                                );
+                                                self.scene_content_changed = true;
+                                            }
+                                        }
+                                    } else {
+                                        tracing::warn!("Could not read tilemaps directory");
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     ui.add_space(10.0);
-                    ui.heading("🗺️ Maps");
+                    ui.heading("🧙 Entities");
                     ui.separator();
 
                     if let Some(config) = config {
                         if let Some(project_path) = config.current_project_path() {
-                            let tilemaps_path = project_path.join("assets").join("tilemaps");
+                            let (selected_entity, entity_additions, placement_request) =
+                                super::hierarchy::HierarchySystem::render_entity_palette(
+                                    ui,
+                                    project_path,
+                                    &self.selection,
+                                    &self.scenes,
+                                );
 
-                            if tilemaps_path.exists() {
-                                // Discover tilemap files
-                                if let Ok(entries) = std::fs::read_dir(&tilemaps_path) {
-                                    let mut found_maps = false;
+                            if let Some(selected_entity) = selected_entity {
+                                self.set_selection(Selection::EntityDefinition(selected_entity));
+                            }
 
-                                    // Collect actions to perform after UI iteration
-                                    let mut map_selections: Vec<String> = Vec::new();
-                                    let mut scene_map_additions: Vec<(String, String)> = Vec::new(); // (scene_name, map_name)
+                            if let Some(entity_definition) = placement_request {
+                                self.enter_placement_mode(entity_definition);
+                            }
 
-                                    egui::ScrollArea::vertical()
-                                        .id_salt("maps_scroll")
-                                        .max_height(150.0) // Limit height so hierarchy doesn't get too tall
-                                        .show(ui, |ui| {
-                                            for entry in entries.flatten() {
-                                                if let Some(name) = entry.file_name().to_str() {
-                                                    if name.ends_with(".json") {
-                                                        let map_name = name.trim_end_matches(".json").to_string();
-                                                        found_maps = true;
+                            for (scene_name, entity_name) in entity_additions {
+                                if let Some(project_path) = config.current_project_path() {
+                                    let entity_file = project_path
+                                        .join("entities")
+                                        .join(format!("{}.json", entity_name));
 
-                                                        let is_selected = matches!(
-                                                            &self.selection,
-                                                            Some(Selection::StandaloneMap(name)) if name == &map_name
-                                                        );
+                                    if entity_file.exists() {
+                                        match std::fs::read_to_string(&entity_file) {
+                                            Ok(content) => {
+                                                match serde_json::from_str::<toki_core::entity::EntityDefinition>(&content) {
+                                                    Ok(entity_def) => {
+                                                        let Some(scene_index) = self
+                                                            .scenes
+                                                            .iter()
+                                                            .position(|scene| scene.name == scene_name)
+                                                        else {
+                                                            continue;
+                                                        };
 
-                                                        let response = ui.selectable_label(is_selected, &map_name);
+                                                        let new_id = self.scenes[scene_index]
+                                                            .entities
+                                                            .iter()
+                                                            .map(|entity| entity.id)
+                                                            .max()
+                                                            .unwrap_or(0)
+                                                            + 1;
 
-                                                        if response.clicked() {
-                                                            tracing::info!("Map selected: {}", map_name);
-                                                            map_selections.push(map_name.clone());
-                                                        }
+                                                        let default_position =
+                                                            glam::IVec2::new(100, 100);
 
-                                                        // Right-click context menu for "Add to Scene"
-                                                        response.context_menu(|ui| {
-                                                            ui.label("Add to Scene:");
-                                                            ui.separator();
-
-                                                            // Show available scenes - create a copy to avoid borrowing issues
-                                                            let scene_names: Vec<(String, bool)> = self.scenes.iter()
-                                                                .map(|s| (s.name.clone(), s.maps.contains(&map_name)))
-                                                                .collect();
-
-                                                            for (scene_name, already_added) in scene_names {
-                                                                if !already_added {
-                                                                    if ui.button(&scene_name).clicked() {
-                                                                        scene_map_additions.push((scene_name.clone(), map_name.clone()));
-                                                                        ui.close();
-                                                                    }
-                                                                } else {
-                                                                    ui.add_enabled(false, egui::Button::new(format!("{} (already added)", scene_name)));
+                                                        match entity_def.create_entity(
+                                                            default_position,
+                                                            new_id,
+                                                        ) {
+                                                            Ok(entity) => {
+                                                                if self.execute_command(
+                                                                    EditorCommand::add_entity(
+                                                                        scene_name.clone(),
+                                                                        entity,
+                                                                    ),
+                                                                ) {
+                                                                    tracing::info!(
+                                                                        "Successfully added entity '{}' (ID: {}) to scene '{}' at position ({}, {})",
+                                                                        entity_name,
+                                                                        new_id,
+                                                                        scene_name,
+                                                                        default_position.x,
+                                                                        default_position.y
+                                                                    );
                                                                 }
                                                             }
-
-                                                            if self.scenes.is_empty() {
-                                                                ui.label("No scenes available");
+                                                            Err(e) => {
+                                                                tracing::error!(
+                                                                    "Failed to create entity '{}': {}",
+                                                                    entity_name,
+                                                                    e
+                                                                );
                                                             }
-                                                        });
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        tracing::error!(
+                                                            "Failed to parse entity definition '{}': {}",
+                                                            entity_name,
+                                                            e
+                                                        );
                                                     }
                                                 }
                                             }
-                                        });
-
-                                    // Apply collected actions
-                                    for map_name in map_selections {
-                                        self.set_selection(Selection::StandaloneMap(map_name));
-                                    }
-
-                                    for (scene_name, map_name) in scene_map_additions {
-                                        if let Some(target_scene) = self.scenes.iter_mut().find(|s| s.name == scene_name) {
-                                            target_scene.maps.push(map_name.clone());
-                                            tracing::info!("Added map '{}' to scene '{}'", map_name, scene_name);
-                                            // Signal that scene content changed by setting a flag
-                                            self.scene_content_changed = true;
-                                        }
-                                    }
-
-                                    let _ = found_maps;
-                                } else {
-                                    tracing::warn!("Could not read tilemaps directory");
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Add Entity Palette section
-                ui.add_space(10.0);
-                ui.heading("🧙 Entities");
-                ui.separator();
-
-                if let Some(config) = config {
-                    if let Some(project_path) = config.current_project_path() {
-                        let (selected_entity, entity_additions, placement_request) = super::hierarchy::HierarchySystem::render_entity_palette(ui, project_path, &self.selection, &self.scenes);
-
-                        // Handle entity selection
-                        if let Some(selected_entity) = selected_entity {
-                            self.set_selection(Selection::EntityDefinition(selected_entity));
-                        }
-
-                        // Handle placement mode request
-                        if let Some(entity_definition) = placement_request {
-                            self.enter_placement_mode(entity_definition);
-                        }
-
-                        // Process entity additions to scenes
-                        for (scene_name, entity_name) in entity_additions {
-                            // Try to load and create entity from definition
-                            if let Some(project_path) = config.current_project_path() {
-                                let entity_file =
-                                    project_path.join("entities").join(format!("{}.json", entity_name));
-
-                                if entity_file.exists() {
-                                    match std::fs::read_to_string(&entity_file) {
-                                        Ok(content) => {
-                                            match serde_json::from_str::<toki_core::entity::EntityDefinition>(&content) {
-                                                Ok(entity_def) => {
-                                                    let Some(scene_index) = self
-                                                        .scenes
-                                                        .iter()
-                                                        .position(|scene| scene.name == scene_name)
-                                                    else {
-                                                        continue;
-                                                    };
-
-                                                    // Generate a new entity ID (simple increment from existing entities)
-                                                    let new_id = self.scenes[scene_index]
-                                                        .entities
-                                                        .iter()
-                                                        .map(|entity| entity.id)
-                                                        .max()
-                                                        .unwrap_or(0)
-                                                        + 1;
-
-                                                    // Default position at (100, 100) - user can move it later
-                                                    let default_position = glam::IVec2::new(100, 100);
-
-                                                    match entity_def.create_entity(default_position, new_id) {
-                                                        Ok(entity) => {
-                                                            if self.execute_command(EditorCommand::add_entity(
-                                                                scene_name.clone(),
-                                                                entity,
-                                                            )) {
-                                                                tracing::info!("Successfully added entity '{}' (ID: {}) to scene '{}' at position ({}, {})",
-                                                                    entity_name, new_id, scene_name, default_position.x, default_position.y);
-                                                            }
-                                                        }
-                                                        Err(e) => {
-                                                            tracing::error!("Failed to create entity '{}': {}", entity_name, e);
-                                                        }
-                                                    }
-                                                }
-                                                Err(e) => {
-                                                    tracing::error!("Failed to parse entity definition '{}': {}", entity_name, e);
-                                                }
+                                            Err(e) => {
+                                                tracing::error!(
+                                                    "Failed to read entity file '{}': {}",
+                                                    entity_name,
+                                                    e
+                                                );
                                             }
                                         }
-                                        Err(e) => {
-                                            tracing::error!("Failed to read entity file '{}': {}", entity_name, e);
-                                        }
+                                    } else {
+                                        tracing::error!(
+                                            "Entity definition file not found: {:?}",
+                                            entity_file
+                                        );
                                     }
                                 } else {
-                                    tracing::error!("Entity definition file not found: {:?}", entity_file);
+                                    tracing::error!(
+                                        "No project path available for entity creation"
+                                    );
                                 }
-                            } else {
-                                tracing::error!("No project path available for entity creation");
                             }
+                        } else {
+                            ui.label("No project loaded for Entity palette");
                         }
                     } else {
-                        ui.label("No project loaded for Entity palette");
+                        ui.label("No project configuration available for Entity palette");
                     }
-                } else {
-                    ui.label("No project configuration available for Entity palette");
-                }
+                });
             });
     }
 }

@@ -552,7 +552,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
     use toki_core::entity::{
         AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityAttributes,
-        EntityDefinition, EntityManager, EntityKind, RenderingDef,
+        EntityDefinition, EntityKind, EntityManager, RenderingDef,
     };
 
     fn unique_temp_project_dir() -> PathBuf {

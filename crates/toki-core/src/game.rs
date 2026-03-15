@@ -7,7 +7,7 @@ use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::collision;
 use crate::entity::{
-    AiBehavior, Entity, EntityAttributes, EntityId, EntityManager, EntityKind, MovementProfile,
+    AiBehavior, Entity, EntityAttributes, EntityId, EntityKind, EntityManager, MovementProfile,
 };
 use crate::events::{GameEvent, GameUpdateResult};
 use crate::rules::{
@@ -166,8 +166,14 @@ impl GameState {
         world_bounds: glam::UVec2,
     ) -> glam::IVec2 {
         match key {
-            InputKey::Up => glam::IVec2::new(current_position.x, (current_position.y - self.movement_step).max(0)),
-            InputKey::Left => glam::IVec2::new((current_position.x - self.movement_step).max(0), current_position.y),
+            InputKey::Up => glam::IVec2::new(
+                current_position.x,
+                (current_position.y - self.movement_step).max(0),
+            ),
+            InputKey::Left => glam::IVec2::new(
+                (current_position.x - self.movement_step).max(0),
+                current_position.y,
+            ),
             InputKey::Down => glam::IVec2::new(
                 current_position.x,
                 (current_position.y + self.movement_step)
@@ -209,7 +215,9 @@ impl GameState {
         }
 
         if self.can_entity_move_to_position(entity_id, new_position, tilemap, atlas) {
-            if let Some((entity, entity_audio)) = self.entity_manager.get_entity_with_audio_mut(entity_id) {
+            if let Some((entity, entity_audio)) =
+                self.entity_manager.get_entity_with_audio_mut(entity_id)
+            {
                 entity.position = new_position;
                 entity_audio.last_collision_state = false;
             }
@@ -619,8 +627,7 @@ impl GameState {
                     if Some(entity_id) == self.player_id {
                         return None;
                     }
-                    if matches!(entity.attributes.ai_behavior, AiBehavior::Wander)
-                    {
+                    if matches!(entity.attributes.ai_behavior, AiBehavior::Wander) {
                         return Some(entity_id);
                     }
                 }
@@ -722,7 +729,14 @@ impl GameState {
 
         for key in held_keys {
             for &entity_id in &controlled_entity_ids {
-                self.apply_input_to_entity(entity_id, key, world_bounds, tilemap, atlas, &mut result);
+                self.apply_input_to_entity(
+                    entity_id,
+                    key,
+                    world_bounds,
+                    tilemap,
+                    atlas,
+                    &mut result,
+                );
             }
         }
 
