@@ -761,6 +761,49 @@ fn game_state_multiple_player_wasd_entities_move_together() {
 }
 
 #[test]
+fn game_state_profile_scoped_input_moves_only_matching_profile_entities() {
+    let mut game_state = GameState::new_empty();
+
+    let mut controlled = test_definition("controlled", "creature");
+    controlled.attributes.movement_profile = MovementProfile::PlayerWasd;
+    let controlled_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&controlled, IVec2::new(10, 10))
+        .expect("controlled entity should spawn");
+
+    let mut passive = test_definition("passive", "creature");
+    passive.attributes.movement_profile = MovementProfile::None;
+    let passive_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&passive, IVec2::new(40, 10))
+        .expect("passive entity should spawn");
+
+    game_state.handle_profile_key_press(MovementProfile::PlayerWasd, InputKey::Right);
+    game_state.update(
+        UVec2::new(512, 512),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert_eq!(
+        game_state
+            .entity_manager()
+            .get_entity(controlled_id)
+            .expect("controlled entity should exist")
+            .position,
+        IVec2::new(11, 10)
+    );
+    assert_eq!(
+        game_state
+            .entity_manager()
+            .get_entity(passive_id)
+            .expect("passive entity should exist")
+            .position,
+        IVec2::new(40, 10)
+    );
+}
+
+#[test]
 fn game_state_load_scene_uses_control_role_for_player_identity() {
     let mut game_state = GameState::new_empty();
     let mut hero_definition = test_definition("hero_slime", "creature");

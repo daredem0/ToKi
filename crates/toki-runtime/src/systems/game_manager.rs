@@ -1,3 +1,4 @@
+use toki_core::entity::MovementProfile;
 use toki_core::game::AudioEvent;
 use toki_core::{
     assets::atlas::AtlasMeta, assets::tilemap::TileMap, entity::Entity, sprite::SpriteFrame,
@@ -12,6 +13,15 @@ use winit::keyboard::KeyCode;
 #[derive(Debug)]
 pub struct GameManager {
     pub game_state: GameState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum KeyboardBinding {
+    Direct(InputKey),
+    Profile {
+        profile: MovementProfile,
+        input_key: InputKey,
+    },
 }
 
 impl GameManager {
@@ -33,23 +43,46 @@ impl GameManager {
 
     /// Handle winit keyboard input events, translating to core InputKey events
     pub fn handle_keyboard_input(&mut self, key: KeyCode, pressed: bool) {
-        if let Some(input_key) = self.translate_keycode(key) {
-            if pressed {
-                self.game_state.handle_key_press(input_key);
-            } else {
-                self.game_state.handle_key_release(input_key);
+        if let Some(binding) = self.translate_keycode(key) {
+            match binding {
+                KeyboardBinding::Direct(input_key) => {
+                    if pressed {
+                        self.game_state.handle_key_press(input_key);
+                    } else {
+                        self.game_state.handle_key_release(input_key);
+                    }
+                }
+                KeyboardBinding::Profile { profile, input_key } => {
+                    if pressed {
+                        self.game_state.handle_profile_key_press(profile, input_key);
+                    } else {
+                        self.game_state.handle_profile_key_release(profile, input_key);
+                    }
+                }
             }
         }
     }
 
     /// Translate winit KeyCode to core InputKey
-    fn translate_keycode(&self, key: KeyCode) -> Option<InputKey> {
+    fn translate_keycode(&self, key: KeyCode) -> Option<KeyboardBinding> {
         match key {
-            KeyCode::KeyW | KeyCode::ArrowUp => Some(InputKey::Up),
-            KeyCode::KeyA | KeyCode::ArrowLeft => Some(InputKey::Left),
-            KeyCode::KeyS | KeyCode::ArrowDown => Some(InputKey::Down),
-            KeyCode::KeyD | KeyCode::ArrowRight => Some(InputKey::Right),
-            KeyCode::F4 => Some(InputKey::DebugToggle),
+            KeyCode::KeyW => Some(KeyboardBinding::Profile {
+                profile: MovementProfile::PlayerWasd,
+                input_key: InputKey::Up,
+            }),
+            KeyCode::KeyA => Some(KeyboardBinding::Profile {
+                profile: MovementProfile::PlayerWasd,
+                input_key: InputKey::Left,
+            }),
+            KeyCode::KeyS => Some(KeyboardBinding::Profile {
+                profile: MovementProfile::PlayerWasd,
+                input_key: InputKey::Down,
+            }),
+            KeyCode::KeyD => Some(KeyboardBinding::Profile {
+                profile: MovementProfile::PlayerWasd,
+                input_key: InputKey::Right,
+            }),
+            KeyCode::F4 => Some(KeyboardBinding::Direct(InputKey::DebugToggle)),
             _ => None,
         }
     }
@@ -209,6 +242,15 @@ mod tests {
         }
     }
 
+    fn walkable_tilemap() -> TileMap {
+        TileMap {
+            size: glam::UVec2::new(2, 1),
+            tile_size: glam::UVec2::new(16, 16),
+            atlas: PathBuf::from("terrain.json"),
+            tiles: vec!["trigger".to_string(), "trigger".to_string()],
+        }
+    }
+
     #[test]
     fn debug_toggle_key_is_forwarded_to_core_input() {
         let mut game_state = GameState::new_empty();
@@ -295,6 +337,54 @@ mod tests {
         assert_eq!(
             manager.get_trigger_tile_positions(&tilemap, &atlas),
             vec![(1, 0)]
+        );
+    }
+
+    #[test]
+    fn player_wasd_profile_ignores_arrow_keys_for_movement() {
+        let mut game_state = GameState::new_empty();
+        let player_id = game_state.spawn_player_at(glam::IVec2::new(0, 0));
+        let mut manager = GameManager::new(game_state);
+        let atlas = sample_atlas();
+        let tilemap = walkable_tilemap();
+
+        manager.handle_keyboard_input(KeyCode::ArrowRight, true);
+        let result = manager.update(glam::UVec2::new(128, 128), &tilemap, &atlas);
+        manager.handle_keyboard_input(KeyCode::ArrowRight, false);
+
+        assert!(!result.player_moved);
+        assert_eq!(
+            manager
+                .game_state
+                .entity_manager()
+                .get_entity(player_id)
+                .expect("player should exist")
+                .position,
+            glam::IVec2::new(0, 0)
+        );
+    }
+
+    #[test]
+    fn player_wasd_profile_moves_from_wasd_keys() {
+        let mut game_state = GameState::new_empty();
+        let player_id = game_state.spawn_player_at(glam::IVec2::new(0, 0));
+        let mut manager = GameManager::new(game_state);
+        let atlas = sample_atlas();
+        let tilemap = walkable_tilemap();
+
+        manager.handle_keyboard_input(KeyCode::KeyD, true);
+        let result = manager.update(glam::UVec2::new(128, 128), &tilemap, &atlas);
+        manager.handle_keyboard_input(KeyCode::KeyD, false);
+
+        assert!(result.player_moved);
+        assert_eq!(
+            manager
+                .game_state
+                .entity_manager()
+                .get_entity(player_id)
+                .expect("player should exist")
+                .position,
+            glam::IVec2::new(1, 0)
         );
     }
 }

@@ -70,6 +70,10 @@ pub struct GameState {
     #[serde(default)]
     keys_held: HashSet<InputKey>,
 
+    /// Runtime-held movement input scoped by movement profile.
+    #[serde(skip, default)]
+    profile_keys_held: HashMap<MovementProfile, HashSet<InputKey>>,
+
     /// Game configuration constants
     movement_step: i32,
     sprite_size: u32,
@@ -160,6 +164,26 @@ impl GameState {
             .collect::<Vec<_>>();
         entity_ids.sort_unstable();
         entity_ids
+    }
+
+    fn held_keys_for_profile(&self, movement_profile: MovementProfile) -> Vec<InputKey> {
+        let mut held_keys = self.keys_held.iter().copied().collect::<HashSet<_>>();
+        if let Some(profile_keys) = self.profile_keys_held.get(&movement_profile) {
+            held_keys.extend(profile_keys.iter().copied());
+        }
+        let mut held_keys = held_keys.into_iter().collect::<Vec<_>>();
+        held_keys.sort_by_key(|key| Self::input_key_order(*key));
+        held_keys
+    }
+
+    fn all_held_keys(&self) -> Vec<InputKey> {
+        let mut held_keys = self.keys_held.clone();
+        for profile_keys in self.profile_keys_held.values() {
+            held_keys.extend(profile_keys.iter().copied());
+        }
+        let mut held_keys = held_keys.into_iter().collect::<Vec<_>>();
+        held_keys.sort_by_key(|key| Self::input_key_order(*key));
+        held_keys
     }
 
     fn candidate_input_position(
@@ -466,6 +490,7 @@ impl GameState {
             entity_manager,
             player_id: Some(player_id),
             keys_held: HashSet::new(),
+            profile_keys_held: HashMap::new(),
             movement_step: 1, // Move exactly 1 pixel per frame
             sprite_size: 16,  // Sprite is 16×16 pixels
             debug_collision_rendering: false,
@@ -482,6 +507,7 @@ impl GameState {
             entity_manager: EntityManager::new(),
             player_id: None,
             keys_held: HashSet::new(),
+            profile_keys_held: HashMap::new(),
             movement_step: 1,
             sprite_size: 16,
             debug_collision_rendering: false,
@@ -862,11 +888,12 @@ impl GameState {
             .collect::<HashMap<_, _>>();
         let mut result = GameUpdateResult::new();
 
-        let mut held_keys = self.keys_held.iter().copied().collect::<Vec<_>>();
-        held_keys.sort_by_key(|key| Self::input_key_order(*key));
-
-        for key in held_keys {
-            for &entity_id in &controlled_entity_ids {
+        for &entity_id in &controlled_entity_ids {
+            let Some(entity) = self.entity_manager.get_entity(entity_id) else {
+                continue;
+            };
+            let held_keys = self.held_keys_for_profile(Self::effective_movement_profile(entity));
+            for key in held_keys {
                 self.apply_input_to_entity(
                     entity_id,
                     key,
@@ -938,6 +965,25 @@ impl GameState {
         self.keys_held.remove(&key);
     }
 
+    /// Handle profile-scoped movement key press events.
+    pub fn handle_profile_key_press(&mut self, profile: MovementProfile, key: InputKey) {
+        if matches!(key, InputKey::DebugToggle) {
+            self.handle_key_press(key);
+            return;
+        }
+        self.profile_keys_held.entry(profile).or_default().insert(key);
+    }
+
+    /// Handle profile-scoped movement key release events.
+    pub fn handle_profile_key_release(&mut self, profile: MovementProfile, key: InputKey) {
+        if let Some(keys) = self.profile_keys_held.get_mut(&profile) {
+            keys.remove(&key);
+            if keys.is_empty() {
+                self.profile_keys_held.remove(&profile);
+            }
+        }
+    }
+
     pub fn rules(&self) -> &RuleSet {
         &self.rules
     }
@@ -1000,6 +1046,7 @@ impl GameState {
         // Clear current entities
         self.entity_manager = EntityManager::new();
         self.player_id = None;
+        self.profile_keys_held.clear();
         self.set_rules(scene.rules.clone());
 
         // Load entities from scene
@@ -1340,8 +1387,7 @@ impl GameState {
     }
 
     fn collect_rule_commands_for_key_triggers(&mut self, command_buffer: &mut Vec<RuleCommand>) {
-        let mut held_keys = self.keys_held.iter().copied().collect::<Vec<_>>();
-        held_keys.sort_by_key(|key| Self::input_key_order(*key));
+        let held_keys = self.all_held_keys();
 
         for input_key in held_keys {
             let trigger = RuleTrigger::OnKey {
@@ -1446,7 +1492,9 @@ impl GameState {
                 .resolve_rule_target(*target)
                 .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
                 .is_some(),
-            RuleCondition::KeyHeld { key } => self.keys_held.contains(&Self::to_input_key(*key)),
+            RuleCondition::KeyHeld { key } => self
+                .all_held_keys()
+                .contains(&Self::to_input_key(*key)),
             RuleCondition::EntityActive { target, is_active } => self
                 .resolve_rule_target(*target)
                 .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
