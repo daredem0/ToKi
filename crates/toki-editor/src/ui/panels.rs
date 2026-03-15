@@ -1,13 +1,14 @@
 use super::editor_ui::{CenterPanelTab, SceneRulesGraphCommandData, Selection};
 use super::interactions::{
-    CameraInteraction, MapPaintInteraction, PlacementInteraction, SelectionInteraction,
+    CameraInteraction, MapObjectInteraction, MapPaintInteraction, PlacementInteraction,
+    SelectionInteraction,
 };
 use super::rule_graph::{RuleGraph, RuleGraphError, RuleGraphNodeKind};
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use toki_core::animation::AnimationState;
-use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
+use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
 use toki_core::rules::{
     RuleAction, RuleCondition, RuleKey, RuleSoundChannel, RuleSpawnEntityType, RuleTarget,
     RuleTrigger,
@@ -416,6 +417,7 @@ impl PanelSystem {
                 super::editor_ui::MapEditorTool::Brush => "Brush",
                 super::editor_ui::MapEditorTool::Fill => "Fill",
                 super::editor_ui::MapEditorTool::PickTile => "Pick Tile",
+                super::editor_ui::MapEditorTool::PlaceObject => "Place Object",
             });
         });
         ui.separator();
@@ -509,6 +511,10 @@ impl PanelSystem {
                 ui_state.cancel_map_editor_edit();
                 Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
             }
+            super::editor_ui::MapEditorTool::PlaceObject => {
+                ui_state.cancel_map_editor_edit();
+                Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
+            }
         }
 
         viewport.render(ui, rect, project_path.as_deref(), renderer);
@@ -517,6 +523,7 @@ impl PanelSystem {
         }
         if let Some(project_path) = project_path.as_deref() {
             Self::paint_map_editor_brush_preview(ui, ui_state, viewport, rect, project_path);
+            Self::paint_map_editor_object_preview(ui, ui_state, viewport, rect, project_path);
         }
 
         match ui_state.map_editor_tool {
@@ -574,6 +581,17 @@ impl PanelSystem {
                     Self::handle_map_editor_tile_pick(ui, viewport, &response, rect)
                 {
                     ui_state.pick_map_editor_tile(tile_name);
+                }
+            }
+            super::editor_ui::MapEditorTool::PlaceObject => {
+                if Self::handle_map_editor_object_place(
+                    ui,
+                    ui_state,
+                    viewport,
+                    &response,
+                    rect,
+                ) {
+                    ui_state.mark_map_editor_dirty();
                 }
             }
         }
@@ -762,6 +780,213 @@ impl PanelSystem {
                 painter.rect_stroke(tile_screen_rect, 0.0, stroke, egui::StrokeKind::Inside);
             }
         }
+    }
+
+    fn handle_map_editor_object_place(
+        ui: &egui::Ui,
+        ui_state: &mut super::EditorUI,
+        viewport: &mut SceneViewport,
+        response: &egui::Response,
+        rect: egui::Rect,
+    ) -> bool {
+        let clicked = response.hovered() && ui.input(|input| input.pointer.primary_clicked());
+        if !clicked {
+            return false;
+        }
+
+        let Some(object_sheet_name) = ui_state.map_editor_selected_object_sheet.clone() else {
+            return false;
+        };
+        let Some(object_name) = ui_state.map_editor_selected_object_name.clone() else {
+            return false;
+        };
+        let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {
+            return false;
+        };
+        let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
+        let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
+            return false;
+        };
+        let Some(world_anchor) = MapObjectInteraction::object_anchor_at_world(tilemap, world_pos)
+        else {
+            return false;
+        };
+        let object_sheet_file = if object_sheet_name.ends_with(".json") {
+            object_sheet_name
+        } else {
+            format!("{}.json", object_sheet_name)
+        };
+
+        ui_state.begin_map_editor_edit(tilemap);
+        if MapObjectInteraction::place_object(tilemap, world_anchor, &object_sheet_file, &object_name)
+        {
+            ui_state.finish_map_editor_edit(tilemap);
+            viewport.mark_dirty();
+            return true;
+        }
+
+        ui_state.cancel_map_editor_edit();
+        false
+    }
+
+    fn paint_map_editor_object_preview(
+        ui: &egui::Ui,
+        ui_state: &mut super::EditorUI,
+        viewport: &SceneViewport,
+        rect: egui::Rect,
+        project_path: &std::path::Path,
+    ) {
+        if ui_state.map_editor_tool != super::editor_ui::MapEditorTool::PlaceObject {
+            return;
+        }
+        let Some(object_sheet_name) = ui_state.map_editor_selected_object_sheet.clone() else {
+            return;
+        };
+        let Some(object_name) = ui_state.map_editor_selected_object_name.clone() else {
+            return;
+        };
+        let Some(pointer_pos) = ui.input(|input| input.pointer.hover_pos()) else {
+            return;
+        };
+        if !rect.contains(pointer_pos) {
+            return;
+        }
+        let Some(tilemap) = viewport.scene_manager().tilemap() else {
+            return;
+        };
+        let Some((object_sheet, texture_path)) =
+            Self::load_map_editor_object_preview_assets(project_path, &object_sheet_name).ok()
+        else {
+            return;
+        };
+        let Some(object_info) = object_sheet.objects.get(&object_name) else {
+            return;
+        };
+        let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
+        let Some(world_anchor) = MapObjectInteraction::object_anchor_at_world(tilemap, world_pos)
+        else {
+            return;
+        };
+        let Some(texture) =
+            Self::ensure_map_editor_preview_texture(ui_state, ui.ctx(), &texture_path)
+        else {
+            return;
+        };
+        let Some(texture_size) = object_sheet.image_size() else {
+            return;
+        };
+        let Some(rect_px) = object_sheet.get_object_rect(&object_name) else {
+            return;
+        };
+        let uv_rect = egui::Rect::from_min_max(
+            egui::pos2(
+                rect_px[0] as f32 / texture_size.x as f32,
+                rect_px[1] as f32 / texture_size.y as f32,
+            ),
+            egui::pos2(
+                (rect_px[0] + rect_px[2]) as f32 / texture_size.x as f32,
+                (rect_px[1] + rect_px[3]) as f32 / texture_size.y as f32,
+            ),
+        );
+        let (viewport_width, viewport_height) = viewport.viewport_size();
+        let display_rect = Self::compute_viewport_display_rect(
+            rect,
+            (viewport_width, viewport_height),
+            viewport.sizing_mode() == crate::scene::viewport::ViewportSizingMode::Responsive,
+        );
+        let (camera_position, camera_scale) = viewport.camera_state();
+        let Some(object_screen_rect) = Self::world_rect_to_screen_rect(
+            display_rect,
+            camera_position,
+            camera_scale,
+            world_anchor,
+            glam::UVec2::new(
+                object_info.size_tiles.x * object_sheet.tile_size.x,
+                object_info.size_tiles.y * object_sheet.tile_size.y,
+            ),
+        ) else {
+            return;
+        };
+        let painter = ui.painter().with_clip_rect(display_rect);
+        painter.image(
+            texture.id(),
+            object_screen_rect,
+            uv_rect,
+            egui::Color32::from_white_alpha(180),
+        );
+        painter.rect_stroke(
+            object_screen_rect,
+            0.0,
+            egui::Stroke::new(1.0, egui::Color32::from_white_alpha(180)),
+            egui::StrokeKind::Outside,
+        );
+    }
+
+    fn load_map_editor_object_preview_assets(
+        project_path: &std::path::Path,
+        object_sheet_name: &str,
+    ) -> anyhow::Result<(ObjectSheetMeta, std::path::PathBuf)> {
+        let sheet_file = if object_sheet_name.ends_with(".json") {
+            object_sheet_name.to_string()
+        } else {
+            format!("{}.json", object_sheet_name)
+        };
+        let object_sheet_path = project_path.join("assets").join("sprites").join(sheet_file);
+        let object_sheet = ObjectSheetMeta::load_from_file(&object_sheet_path)
+            .map_err(|error| anyhow::anyhow!("failed to load object sheet: {}", error))?;
+        let texture_path = object_sheet_path
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("object sheet path has no parent"))?
+            .join(&object_sheet.image);
+        Ok((object_sheet, texture_path))
+    }
+
+    fn ensure_map_editor_preview_texture(
+        ui_state: &mut super::EditorUI,
+        ctx: &egui::Context,
+        texture_path: &std::path::Path,
+    ) -> Option<egui::TextureHandle> {
+        if ui_state.map_editor_brush_preview_image_path.as_deref() == Some(texture_path)
+            && ui_state.map_editor_brush_preview_texture.is_some()
+        {
+            return ui_state.map_editor_brush_preview_texture.clone();
+        }
+
+        let decoded = toki_core::graphics::image::load_image_rgba8(texture_path).ok()?;
+        let color_image = egui::ColorImage::from_rgba_unmultiplied(
+            [decoded.width as usize, decoded.height as usize],
+            &decoded.data,
+        );
+        let key = format!("map_editor_preview:{}", texture_path.display());
+        let texture = ctx.load_texture(key, color_image, egui::TextureOptions::NEAREST);
+        ui_state.map_editor_brush_preview_image_path = Some(texture_path.to_path_buf());
+        ui_state.map_editor_brush_preview_texture = Some(texture.clone());
+        Some(texture)
+    }
+
+    fn world_rect_to_screen_rect(
+        display_rect: egui::Rect,
+        camera_position: glam::IVec2,
+        camera_scale: f32,
+        world_top_left: glam::UVec2,
+        world_size: glam::UVec2,
+    ) -> Option<egui::Rect> {
+        if camera_scale <= 0.0 {
+            return None;
+        }
+
+        let screen_min_x =
+            display_rect.min.x + (world_top_left.x as f32 - camera_position.x as f32) / camera_scale;
+        let screen_min_y =
+            display_rect.min.y + (world_top_left.y as f32 - camera_position.y as f32) / camera_scale;
+        let screen_size = egui::vec2(
+            world_size.x as f32 / camera_scale,
+            world_size.y as f32 / camera_scale,
+        );
+        Some(egui::Rect::from_min_size(
+            egui::pos2(screen_min_x, screen_min_y),
+            screen_size,
+        ))
     }
 
     fn handle_map_editor_tile_inspect(

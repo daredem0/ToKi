@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
+use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
 use toki_render::RenderError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -9,10 +9,13 @@ pub struct ResolvedProjectResourcePaths {
     pub tilemap_texture_path: Option<std::path::PathBuf>,
     pub sprite_texture_path: Option<std::path::PathBuf>,
     pub sprite_atlas_paths: Vec<std::path::PathBuf>,
+    pub object_sheet_paths: Vec<std::path::PathBuf>,
 }
 
 type SpriteAtlasRegistry = HashMap<String, AtlasMeta>;
 type SpriteTextureRegistry = HashMap<String, Option<std::path::PathBuf>>;
+type ObjectSheetRegistry = HashMap<String, ObjectSheetMeta>;
+type ObjectTextureRegistry = HashMap<String, Option<std::path::PathBuf>>;
 
 /// Resource management system that handles loading and providing access to game assets.
 ///
@@ -23,6 +26,8 @@ pub struct ResourceManager {
     terrain_atlas: AtlasMeta,
     sprite_atlases: SpriteAtlasRegistry,
     sprite_texture_paths: SpriteTextureRegistry,
+    object_sheets: ObjectSheetRegistry,
+    object_texture_paths: ObjectTextureRegistry,
     tilemap: TileMap,
 }
 
@@ -32,6 +37,8 @@ impl ResourceManager {
         let terrain_atlas = AtlasMeta::load_from_file("assets/terrain.json")?;
         let mut sprite_atlases = HashMap::new();
         let mut sprite_texture_paths = HashMap::new();
+        let object_sheets = HashMap::new();
+        let object_texture_paths = HashMap::new();
         let creatures_path = std::path::PathBuf::from("assets/creatures.json");
         let creature_atlas = AtlasMeta::load_from_file(&creatures_path)?;
         register_sprite_atlas(
@@ -52,6 +59,8 @@ impl ResourceManager {
             terrain_atlas,
             sprite_atlases,
             sprite_texture_paths,
+            object_sheets,
+            object_texture_paths,
             tilemap,
         })
     }
@@ -69,11 +78,15 @@ impl ResourceManager {
         let terrain_atlas = AtlasMeta::load_from_file(resolved_paths.terrain_atlas_path)?;
         let (sprite_atlases, sprite_texture_paths) =
             load_sprite_atlas_registry(&resolved_paths.sprite_atlas_paths)?;
+        let (object_sheets, object_texture_paths) =
+            load_object_sheet_registry(&resolved_paths.object_sheet_paths)?;
 
         Ok(Self {
             terrain_atlas,
             sprite_atlases,
             sprite_texture_paths,
+            object_sheets,
+            object_texture_paths,
             tilemap,
         })
     }
@@ -82,12 +95,16 @@ impl ResourceManager {
         terrain_atlas: AtlasMeta,
         sprite_atlases: SpriteAtlasRegistry,
         sprite_texture_paths: SpriteTextureRegistry,
+        object_sheets: ObjectSheetRegistry,
+        object_texture_paths: ObjectTextureRegistry,
         tilemap: TileMap,
     ) -> Self {
         Self {
             terrain_atlas,
             sprite_atlases,
             sprite_texture_paths,
+            object_sheets,
+            object_texture_paths,
             tilemap,
         }
     }
@@ -113,6 +130,25 @@ impl ResourceManager {
                 atlas_name
                     .strip_suffix(".json")
                     .and_then(|trimmed| self.sprite_texture_paths.get(trimmed))
+            })
+            .and_then(|path| path.as_ref())
+    }
+
+    pub fn get_object_sheet(&self, sheet_name: &str) -> Option<&ObjectSheetMeta> {
+        self.object_sheets.get(sheet_name).or_else(|| {
+            sheet_name
+                .strip_suffix(".json")
+                .and_then(|trimmed| self.object_sheets.get(trimmed))
+        })
+    }
+
+    pub fn get_object_texture_path(&self, sheet_name: &str) -> Option<&std::path::PathBuf> {
+        self.object_texture_paths
+            .get(sheet_name)
+            .or_else(|| {
+                sheet_name
+                    .strip_suffix(".json")
+                    .and_then(|trimmed| self.object_texture_paths.get(trimmed))
             })
             .and_then(|path| path.as_ref())
     }
@@ -221,6 +257,68 @@ fn find_json_files(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
     json_files
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SpriteMetadataFileKind {
+    Atlas,
+    ObjectSheet,
+    Unknown,
+}
+
+fn classify_sprite_metadata_file(
+    path: &std::path::Path,
+) -> Result<SpriteMetadataFileKind, RenderError> {
+    let json_data = std::fs::read_to_string(path).map_err(|error| {
+        RenderError::Other(format!(
+            "Failed to read sprite metadata file '{}': {}",
+            path.display(),
+            error
+        ))
+    })?;
+
+    if let Ok(object_sheet) = serde_json::from_str::<ObjectSheetMeta>(&json_data) {
+        if matches!(
+            object_sheet.sheet_type,
+            toki_core::assets::object_sheet::ObjectSheetType::Objects
+        ) {
+            return Ok(SpriteMetadataFileKind::ObjectSheet);
+        }
+    }
+
+    if serde_json::from_str::<AtlasMeta>(&json_data).is_ok() {
+        return Ok(SpriteMetadataFileKind::Atlas);
+    }
+
+    Ok(SpriteMetadataFileKind::Unknown)
+}
+
+fn find_sprite_atlas_json_files(dir: &std::path::Path) -> Result<Vec<std::path::PathBuf>, RenderError> {
+    let mut atlas_files = Vec::new();
+
+    for path in find_json_files(dir) {
+        match classify_sprite_metadata_file(&path)? {
+            SpriteMetadataFileKind::Atlas => atlas_files.push(path),
+            SpriteMetadataFileKind::ObjectSheet | SpriteMetadataFileKind::Unknown => {}
+        }
+    }
+
+    Ok(atlas_files)
+}
+
+fn find_object_sheet_json_files(
+    dir: &std::path::Path,
+) -> Result<Vec<std::path::PathBuf>, RenderError> {
+    let mut object_sheet_files = Vec::new();
+
+    for path in find_json_files(dir) {
+        match classify_sprite_metadata_file(&path)? {
+            SpriteMetadataFileKind::ObjectSheet => object_sheet_files.push(path),
+            SpriteMetadataFileKind::Atlas | SpriteMetadataFileKind::Unknown => {}
+        }
+    }
+
+    Ok(object_sheet_files)
+}
+
 fn register_sprite_atlas(
     atlas_map: &mut SpriteAtlasRegistry,
     texture_map: &mut SpriteTextureRegistry,
@@ -259,11 +357,64 @@ fn load_sprite_atlas_registry(
     Ok((atlas_map, texture_map))
 }
 
+fn register_object_sheet(
+    sheet_map: &mut ObjectSheetRegistry,
+    texture_map: &mut ObjectTextureRegistry,
+    object_sheet_path: &std::path::Path,
+    object_sheet: ObjectSheetMeta,
+    texture_path: Option<std::path::PathBuf>,
+) {
+    if let Some(file_name) = object_sheet_path.file_name().and_then(|name| name.to_str()) {
+        sheet_map.insert(file_name.to_string(), object_sheet.clone());
+        texture_map.insert(file_name.to_string(), texture_path.clone());
+    }
+    if let Some(stem) = object_sheet_path.file_stem().and_then(|name| name.to_str()) {
+        sheet_map.insert(stem.to_string(), object_sheet);
+        texture_map.insert(stem.to_string(), texture_path);
+    }
+}
+
+pub fn resolve_object_sheet_texture_path(
+    object_sheet_path: &std::path::Path,
+) -> Result<Option<std::path::PathBuf>, RenderError> {
+    let object_sheet = ObjectSheetMeta::load_from_file(object_sheet_path)?;
+    let object_sheet_dir = object_sheet_path.parent().ok_or_else(|| {
+        RenderError::Other(format!(
+            "Object sheet path '{}' has no parent directory",
+            object_sheet_path.display()
+        ))
+    })?;
+    Ok(first_existing_path(&[object_sheet_dir.join(&object_sheet.image)]))
+}
+
+fn load_object_sheet_registry(
+    object_sheet_paths: &[std::path::PathBuf],
+) -> Result<(ObjectSheetRegistry, ObjectTextureRegistry), RenderError> {
+    let mut sheet_map = HashMap::new();
+    let mut texture_map = HashMap::new();
+
+    for object_sheet_path in object_sheet_paths {
+        let object_sheet = ObjectSheetMeta::load_from_file(object_sheet_path)?;
+        let texture_path = resolve_object_sheet_texture_path(object_sheet_path)?;
+        register_object_sheet(
+            &mut sheet_map,
+            &mut texture_map,
+            object_sheet_path,
+            object_sheet,
+            texture_path,
+        );
+    }
+
+    Ok((sheet_map, texture_map))
+}
+
 pub fn resolve_project_resource_paths(
     project_path: &std::path::Path,
     map_name: Option<&str>,
 ) -> Result<ResolvedProjectResourcePaths, RenderError> {
-    let sprite_atlas_paths = find_json_files(&project_path.join("assets").join("sprites"));
+    let sprite_atlas_paths = find_sprite_atlas_json_files(&project_path.join("assets").join("sprites"))?;
+    let object_sheet_paths =
+        find_object_sheet_json_files(&project_path.join("assets").join("sprites"))?;
     if sprite_atlas_paths.is_empty() {
         return Err(RenderError::Other(format!(
             "Could not find any sprite atlas in project '{}'",
@@ -331,6 +482,7 @@ pub fn resolve_project_resource_paths(
         tilemap_texture_path,
         sprite_texture_path,
         sprite_atlas_paths,
+        object_sheet_paths,
     })
 }
 
@@ -350,7 +502,8 @@ pub fn resolve_atlas_texture_path(
 #[cfg(test)]
 mod tests {
     use super::{
-        find_first_json_file, first_existing_path, resolve_project_resource_paths,
+        classify_sprite_metadata_file, find_first_json_file, first_existing_path,
+        resolve_project_resource_paths, SpriteMetadataFileKind,
         resolve_tilemap_atlas_path, ResourceManager,
     };
     use std::fs;
@@ -440,6 +593,7 @@ mod tests {
             tile_size: glam::UVec2::new(16, 16),
             atlas: PathBuf::from("terrain.json"),
             tiles: vec!["floor".to_string()],
+            objects: vec![],
         };
 
         let resolved = resolve_tilemap_atlas_path(&project_dir, &tilemap_path, &tilemap)
@@ -464,6 +618,7 @@ mod tests {
             tile_size: glam::UVec2::new(16, 16),
             atlas: PathBuf::from("terrain.json"),
             tiles: vec!["floor".to_string()],
+            objects: vec![],
         };
 
         let resolved = resolve_tilemap_atlas_path(&project_dir, &tilemap_path, &tilemap)
@@ -584,6 +739,121 @@ mod tests {
         assert_eq!(
             resolved.sprite_texture_path,
             Some(sprites_dir.join("creatures.png"))
+        );
+    }
+
+    #[test]
+    fn classify_sprite_metadata_file_distinguishes_object_sheets_from_atlases() {
+        let project_dir = make_unique_temp_dir();
+        let sprites_dir = project_dir.join("assets").join("sprites");
+        fs::create_dir_all(&sprites_dir).expect("sprites dir");
+
+        let atlas_path = sprites_dir.join("creatures.json");
+        write_minimal_atlas(&atlas_path, "creatures.png");
+        let object_sheet_path = sprites_dir.join("fauna.json");
+        fs::write(
+            &object_sheet_path,
+            r#"{
+  "sheet_type": "objects",
+  "image": "fauna.png",
+  "tile_size": [16, 16],
+  "objects": {
+    "fauna_a": {
+      "position": [0, 0],
+      "size_tiles": [1, 1]
+    }
+  }
+}"#,
+        )
+        .expect("object sheet should be written");
+
+        assert_eq!(
+            classify_sprite_metadata_file(&atlas_path).expect("atlas should classify"),
+            SpriteMetadataFileKind::Atlas
+        );
+        assert_eq!(
+            classify_sprite_metadata_file(&object_sheet_path)
+                .expect("object sheet should classify"),
+            SpriteMetadataFileKind::ObjectSheet
+        );
+    }
+
+    #[test]
+    fn resolve_project_resource_paths_ignores_object_sheets_in_sprite_registry() {
+        let project_dir = make_unique_temp_dir();
+        let sprites_dir = project_dir.join("assets").join("sprites");
+        let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+        fs::create_dir_all(&sprites_dir).expect("sprites dir");
+        fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+
+        write_minimal_atlas(&sprites_dir.join("creatures.json"), "creatures.png");
+        fs::write(
+            sprites_dir.join("fauna.json"),
+            r#"{
+  "sheet_type": "objects",
+  "image": "fauna.png",
+  "tile_size": [16, 16],
+  "objects": {
+    "fauna_a": {
+      "position": [0, 0],
+      "size_tiles": [1, 1]
+    }
+  }
+}"#,
+        )
+        .expect("object sheet should be written");
+        write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
+        write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+        fs::write(sprites_dir.join("creatures.png"), "png").expect("creatures image");
+        fs::write(tilemaps_dir.join("terrain.png"), "png").expect("terrain image");
+
+        let resolved = resolve_project_resource_paths(&project_dir, Some("demo_map"))
+            .expect("project resource paths should resolve");
+
+        assert_eq!(resolved.sprite_atlas_paths.len(), 1);
+        assert_eq!(
+            resolved.sprite_atlas_paths[0].file_name().and_then(|name| name.to_str()),
+            Some("creatures.json")
+        );
+    }
+
+    #[test]
+    fn load_for_project_registers_object_sheet_by_filename_and_stem() {
+        let project_dir = make_unique_temp_dir();
+        let sprites_dir = project_dir.join("assets").join("sprites");
+        let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+        fs::create_dir_all(&sprites_dir).expect("sprites dir");
+        fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+
+        write_minimal_atlas(&sprites_dir.join("players.json"), "player.png");
+        fs::write(
+            sprites_dir.join("fauna.json"),
+            r#"{
+  "sheet_type": "objects",
+  "image": "fauna.png",
+  "tile_size": [16, 16],
+  "objects": {
+    "fauna_a": {
+      "position": [0, 0],
+      "size_tiles": [1, 1]
+    }
+  }
+}"#,
+        )
+        .expect("object sheet should be written");
+        write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
+        write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+        fs::write(sprites_dir.join("player.png"), "png").expect("player image");
+        fs::write(sprites_dir.join("fauna.png"), "png").expect("fauna image");
+
+        let manager = ResourceManager::load_for_project(&project_dir, Some("demo_map"))
+            .expect("project resources should load");
+
+        assert!(manager.get_object_sheet("fauna.json").is_some());
+        assert!(manager.get_object_sheet("fauna").is_some());
+        assert_eq!(
+            manager.get_object_texture_path("fauna.json"),
+            Some(&sprites_dir.join("fauna.png"))
         );
     }
 }

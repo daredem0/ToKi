@@ -170,6 +170,7 @@ impl EditorApp {
                     .ok_or_else(|| anyhow::anyhow!("Atlas path has no file name"))?,
             ),
             tiles: vec![fill_tile; width.max(1) as usize * height.max(1) as usize],
+            objects: vec![],
         };
 
         Ok(MapEditorDraft {
@@ -2176,6 +2177,7 @@ mod tests {
                 tile_size: UVec2::new(8, 8),
                 atlas: PathBuf::from("terrain.json"),
                 tiles: vec!["grass".to_string(); 4],
+                objects: vec![],
             },
         };
         let live_tilemap = TileMap {
@@ -2188,6 +2190,7 @@ mod tests {
                 "grass".to_string(),
                 "grass".to_string(),
             ],
+            objects: vec![],
         };
 
         let saved = EditorApp::tilemap_to_save_for_map_editor_draft(&draft, Some(&live_tilemap));
@@ -2205,6 +2208,7 @@ mod tests {
                 tile_size: UVec2::new(8, 8),
                 atlas: PathBuf::from("terrain.json"),
                 tiles: vec!["grass".to_string(); 4],
+                objects: vec![],
             },
         };
 
@@ -2257,6 +2261,7 @@ mod tests {
                 "floor".to_string(),
                 "floor".to_string(),
             ],
+            objects: vec![],
         };
 
         (tilemap, atlas)

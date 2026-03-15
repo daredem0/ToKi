@@ -684,6 +684,7 @@ mod tests {
             tile_size: glam::UVec2::new(16, 16),
             atlas: PathBuf::from("atlas.json"),
             tiles: vec!["floor".to_string(); 64],
+            objects: vec![],
         }
     }
 
@@ -693,6 +694,7 @@ mod tests {
             tile_size: glam::UVec2::new(16, 16),
             atlas: PathBuf::from("atlas.json"),
             tiles: vec!["floor".to_string()],
+            objects: vec![],
         }
     }
 
@@ -711,6 +713,7 @@ mod tests {
             tile_size: glam::UVec2::new(8, 8),
             atlas: PathBuf::from("terrain.json"),
             tiles: vec!["grass".to_string(); 12],
+            objects: vec![],
         };
 
         let saved_path = manager
@@ -751,6 +754,7 @@ mod tests {
             tile_size: glam::UVec2::new(8, 8),
             atlas: PathBuf::from("terrain.json"),
             tiles: vec!["grass".to_string(); 9],
+            objects: vec![],
         };
 
         assert!(MapPaintInteraction::paint_brush(
@@ -814,6 +818,7 @@ mod tests {
                 "grass".to_string(),
                 "grass".to_string(),
             ],
+            objects: vec![],
         };
 
         assert!(MapPaintInteraction::paint_tile(

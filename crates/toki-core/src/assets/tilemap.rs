@@ -9,12 +9,21 @@ use std::path::PathBuf;
 
 pub const CHUNK_SIZE: u32 = 16; //16x16 tiles per chunk
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct MapObjectInstance {
+    pub sheet: PathBuf,
+    pub object_name: String,
+    pub position: UVec2,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct TileMap {
     pub size: UVec2,        // map dimensions in tiles (width x height)
     pub tile_size: UVec2,   // tile dimensions in pixels (width x height)
     pub atlas: PathBuf,     // path to atlas file
     pub tiles: Vec<String>, // row-major list of tile names
+    #[serde(default)]
+    pub objects: Vec<MapObjectInstance>,
 }
 
 impl TileMap {

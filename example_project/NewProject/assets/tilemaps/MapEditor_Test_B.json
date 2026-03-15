@@ -585,5 +585,39 @@
     "stone",
     "stone",
     "stone"
+  ],
+  "objects": [
+    {
+      "sheet": "fauna.json",
+      "object_name": "rock",
+      "position": [
+        72,
+        0
+      ]
+    },
+    {
+      "sheet": "fauna.json",
+      "object_name": "flower",
+      "position": [
+        72,
+        24
+      ]
+    },
+    {
+      "sheet": "fauna.json",
+      "object_name": "flower",
+      "position": [
+        72,
+        40
+      ]
+    },
+    {
+      "sheet": "fauna.json",
+      "object_name": "flower",
+      "position": [
+        72,
+        56
+      ]
+    }
   ]
 }

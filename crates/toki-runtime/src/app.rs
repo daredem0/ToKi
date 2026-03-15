@@ -433,6 +433,8 @@ impl App {
             decoded_project_cache.load_atlas_from_path(&resolved.terrain_atlas_path)?;
         let mut sprite_atlases = std::collections::HashMap::new();
         let mut sprite_texture_paths = std::collections::HashMap::new();
+        let mut object_sheets = std::collections::HashMap::new();
+        let mut object_texture_paths = std::collections::HashMap::new();
         for atlas_path in &resolved.sprite_atlas_paths {
             let atlas = decoded_project_cache.load_atlas_from_path(atlas_path)?;
             let texture_path = crate::systems::resources::resolve_atlas_texture_path(atlas_path)?;
@@ -445,10 +447,27 @@ impl App {
                 sprite_texture_paths.insert(stem.to_string(), texture_path);
             }
         }
+        for object_sheet_path in &resolved.object_sheet_paths {
+            let object_sheet = toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(
+                object_sheet_path,
+            )?;
+            let texture_path =
+                crate::systems::resources::resolve_object_sheet_texture_path(object_sheet_path)?;
+            if let Some(file_name) = object_sheet_path.file_name().and_then(|name| name.to_str()) {
+                object_sheets.insert(file_name.to_string(), object_sheet.clone());
+                object_texture_paths.insert(file_name.to_string(), texture_path.clone());
+            }
+            if let Some(stem) = object_sheet_path.file_stem().and_then(|name| name.to_str()) {
+                object_sheets.insert(stem.to_string(), object_sheet);
+                object_texture_paths.insert(stem.to_string(), texture_path);
+            }
+        }
         let resources = ResourceManager::from_preloaded(
             terrain_atlas,
             sprite_atlases,
             sprite_texture_paths,
+            object_sheets,
+            object_texture_paths,
             tilemap,
         );
         let asset_load_plan = RuntimeAssetLoadPlan::from_resolved_paths(
@@ -613,6 +632,53 @@ impl App {
                     } else {
                         self.rendering.add_sprite(frame, position, size, flip_x);
                     }
+                }
+            }
+
+            for object in &self.resources.get_tilemap().objects {
+                let sheet_name = object
+                    .sheet
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .or_else(|| object.sheet.to_str());
+                let Some(sheet_name) = sheet_name else {
+                    continue;
+                };
+                let Some(object_sheet) = self.resources.get_object_sheet(sheet_name) else {
+                    tracing::warn!("Map object requested missing object sheet '{}'", sheet_name);
+                    continue;
+                };
+                let texture_size = object_sheet
+                    .image_size()
+                    .unwrap_or(glam::UVec2::new(16, 16));
+                let Some(uv_rect) =
+                    object_sheet.get_object_uvs(&object.object_name, texture_size)
+                else {
+                    tracing::warn!(
+                        "Map object '{}' missing from object sheet '{}'",
+                        object.object_name,
+                        sheet_name
+                    );
+                    continue;
+                };
+                let Some(rect) = object_sheet.get_object_rect(&object.object_name) else {
+                    continue;
+                };
+                let frame = toki_core::sprite::SpriteFrame {
+                    u0: uv_rect[0],
+                    v0: uv_rect[1],
+                    u1: uv_rect[2],
+                    v1: uv_rect[3],
+                };
+                let size = glam::UVec2::new(rect[2], rect[3]);
+                let position = object.position.as_ivec2();
+                if let Some(texture_path) =
+                    self.resources.get_object_texture_path(sheet_name).cloned()
+                {
+                    self.rendering
+                        .add_sprite_with_texture(texture_path, frame, position, size, false);
+                } else {
+                    self.rendering.add_sprite(frame, position, size, false);
                 }
             }
 

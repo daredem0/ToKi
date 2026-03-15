@@ -231,6 +231,7 @@ mod tests {
                 "floor".to_string(),
                 "floor".to_string(),
             ],
+            objects: vec![],
         };
 
         (tilemap, atlas)

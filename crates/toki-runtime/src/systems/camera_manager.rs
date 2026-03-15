@@ -128,6 +128,7 @@ mod tests {
             tile_size: glam::UVec2::new(16, 16),
             atlas: std::path::PathBuf::from("atlas.json"),
             tiles: vec!["floor".to_string(); 16],
+            objects: vec![],
         }
     }
 

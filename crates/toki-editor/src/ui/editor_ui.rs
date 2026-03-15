@@ -48,6 +48,7 @@ pub(crate) enum MapEditorTool {
     Brush,
     Fill,
     PickTile,
+    PlaceObject,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -207,6 +208,8 @@ pub struct EditorUI {
     pub map_editor_draft: Option<MapEditorDraft>,
     pub map_editor_dirty: bool,
     pub map_editor_selected_tile: Option<String>,
+    pub map_editor_selected_object_sheet: Option<String>,
+    pub map_editor_selected_object_name: Option<String>,
     pub map_editor_tool: MapEditorTool,
     pub map_editor_brush_size_tiles: u32,
     pub map_editor_brush_preview_image_path: Option<PathBuf>,
@@ -293,6 +296,8 @@ impl EditorUI {
             map_editor_draft: None,
             map_editor_dirty: false,
             map_editor_selected_tile: None,
+            map_editor_selected_object_sheet: None,
+            map_editor_selected_object_name: None,
             map_editor_tool: MapEditorTool::Drag,
             map_editor_brush_size_tiles: 1,
             map_editor_brush_preview_image_path: None,
@@ -517,6 +522,44 @@ impl EditorUI {
         let mut sorted_names = tile_names.to_vec();
         sorted_names.sort();
         self.map_editor_selected_tile = Some(sorted_names[0].clone());
+    }
+
+    pub fn sync_map_editor_object_sheet_selection(&mut self, sheet_names: &[String]) {
+        if sheet_names.is_empty() {
+            self.map_editor_selected_object_sheet = None;
+            return;
+        }
+
+        if self
+            .map_editor_selected_object_sheet
+            .as_ref()
+            .is_some_and(|selected| sheet_names.iter().any(|name| name == selected))
+        {
+            return;
+        }
+
+        let mut sorted_names = sheet_names.to_vec();
+        sorted_names.sort();
+        self.map_editor_selected_object_sheet = Some(sorted_names[0].clone());
+    }
+
+    pub fn sync_map_editor_object_selection(&mut self, object_names: &[String]) {
+        if object_names.is_empty() {
+            self.map_editor_selected_object_name = None;
+            return;
+        }
+
+        if self
+            .map_editor_selected_object_name
+            .as_ref()
+            .is_some_and(|selected| object_names.iter().any(|name| name == selected))
+        {
+            return;
+        }
+
+        let mut sorted_names = object_names.to_vec();
+        sorted_names.sort();
+        self.map_editor_selected_object_name = Some(sorted_names[0].clone());
     }
 
     pub fn pick_map_editor_tile(&mut self, tile_name: String) {
@@ -1602,6 +1645,7 @@ mod tests {
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
                 tiles: vec!["grass".to_string(); 4],
+                objects: vec![],
             },
         });
 
@@ -1622,6 +1666,7 @@ mod tests {
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
                 tiles: vec!["grass".to_string(); 4],
+                objects: vec![],
             },
         });
 
@@ -1670,6 +1715,32 @@ mod tests {
     }
 
     #[test]
+    fn sync_map_editor_object_sheet_selection_picks_first_sorted_sheet() {
+        let mut ui = EditorUI::new();
+
+        ui.sync_map_editor_object_sheet_selection(&[
+            "trees".to_string(),
+            "fauna".to_string(),
+            "props".to_string(),
+        ]);
+
+        assert_eq!(ui.map_editor_selected_object_sheet.as_deref(), Some("fauna"));
+    }
+
+    #[test]
+    fn sync_map_editor_object_selection_picks_first_sorted_object() {
+        let mut ui = EditorUI::new();
+
+        ui.sync_map_editor_object_selection(&[
+            "tree_large".to_string(),
+            "bush".to_string(),
+            "flower".to_string(),
+        ]);
+
+        assert_eq!(ui.map_editor_selected_object_name.as_deref(), Some("bush"));
+    }
+
+    #[test]
     fn pick_map_editor_tile_sets_selected_tile_and_switches_back_to_brush() {
         let mut ui = EditorUI::new();
         ui.map_editor_tool = super::MapEditorTool::PickTile;
@@ -1691,6 +1762,7 @@ mod tests {
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
                 tiles: vec!["grass".to_string(); 4],
+                objects: vec![],
             },
         });
 
@@ -1737,6 +1809,7 @@ mod tests {
                 tile_size: glam::UVec2::new(8, 8),
                 atlas: std::path::PathBuf::from("terrain.json"),
                 tiles: vec!["grass".to_string()],
+                objects: vec![],
             },
         });
         let before = ui.map_editor_draft.as_ref().unwrap().tilemap.clone();

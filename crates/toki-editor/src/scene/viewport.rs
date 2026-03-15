@@ -1,8 +1,8 @@
-use crate::project::assets::SpriteAtlasAsset;
+use crate::project::assets::{ObjectSheetAsset, SpriteAtlasAsset};
 use crate::project::ProjectAssets;
 use crate::scene::SceneManager;
 use anyhow::Result;
-use toki_core::assets::atlas::AtlasMeta;
+use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::MapObjectInstance};
 use toki_core::Camera;
 use toki_render::{OffscreenTarget, SceneData, SceneRenderer};
 
@@ -147,6 +147,8 @@ pub struct SceneViewport {
     suppressed_entity_ids: std::collections::HashSet<toki_core::entity::EntityId>,
     // Sprite atlas caching to prevent redundant loads
     loaded_sprite_atlases: std::collections::HashMap<String, toki_core::assets::atlas::AtlasMeta>,
+    loaded_object_sheets:
+        std::collections::HashMap<String, toki_core::assets::object_sheet::ObjectSheetMeta>,
 }
 
 impl SceneViewport {
@@ -189,6 +191,7 @@ impl SceneViewport {
             is_dragging_camera: false,
             suppressed_entity_ids: std::collections::HashSet::new(),
             loaded_sprite_atlases: std::collections::HashMap::new(),
+            loaded_object_sheets: std::collections::HashMap::new(),
         })
     }
 
@@ -547,6 +550,7 @@ impl SceneViewport {
         let mut scene_data = SceneData::default();
 
         self.prepare_tilemap_data(&mut scene_data, project_path);
+        self.prepare_tilemap_object_data(&mut scene_data, project_path, project_assets);
         self.prepare_sprite_data(&mut scene_data, project_path, project_assets);
         self.prepare_preview_sprite_data(
             &mut scene_data,
@@ -571,6 +575,29 @@ impl SceneViewport {
         );
 
         scene_data
+    }
+
+    fn prepare_tilemap_object_data(
+        &mut self,
+        scene_data: &mut SceneData,
+        _project_path: Option<&std::path::Path>,
+        project_assets: &ProjectAssets,
+    ) {
+        let Some(tilemap) = self.scene_manager.tilemap().cloned() else {
+            return;
+        };
+        if tilemap.objects.is_empty() {
+            return;
+        }
+
+        for object in &tilemap.objects {
+            let Some(sprite_instance) =
+                self.build_map_object_sprite_instance(project_assets, object)
+            else {
+                continue;
+            };
+            scene_data.sprites.push(sprite_instance);
+        }
     }
 
     /// Prepare tilemap data and load associated atlas
@@ -1202,6 +1229,63 @@ impl SceneViewport {
         tracing::trace!("Cached sprite atlas: {}", atlas_path.display());
 
         Ok(atlas)
+    }
+
+    fn build_map_object_sprite_instance(
+        &mut self,
+        project_assets: &ProjectAssets,
+        object: &MapObjectInstance,
+    ) -> Option<toki_render::SpriteInstance> {
+        let sheet_name = object
+            .sheet
+            .file_stem()
+            .and_then(|name| name.to_str())
+            .or_else(|| object.sheet.to_str())?;
+        let object_sheet_asset = project_assets.object_sheets.get(sheet_name)?;
+        let object_sheet = self.load_object_sheet_from_asset(object_sheet_asset).ok()?;
+        let texture_size = object_sheet.image_size()?;
+        let rect = object_sheet.get_object_rect(&object.object_name)?;
+        let uv_rect = object_sheet.get_object_uvs(&object.object_name, texture_size)?;
+
+        Some(toki_render::SpriteInstance {
+            frame: toki_core::sprite::SpriteFrame {
+                u0: uv_rect[0],
+                v0: uv_rect[1],
+                u1: uv_rect[2],
+                v1: uv_rect[3],
+            },
+            position: object.position.as_ivec2(),
+            size: glam::UVec2::new(rect[2], rect[3]),
+            texture_path: object_sheet_asset
+                .path
+                .parent()
+                .map(|parent| parent.join(&object_sheet.image)),
+            flip_x: false,
+        })
+    }
+
+    fn load_object_sheet_from_asset(
+        &mut self,
+        object_sheet_asset: &ObjectSheetAsset,
+    ) -> Result<ObjectSheetMeta> {
+        let object_sheet_path = &object_sheet_asset.path;
+        let object_sheet_key = object_sheet_path.to_string_lossy().to_string();
+
+        if let Some(cached_object_sheet) = self.loaded_object_sheets.get(&object_sheet_key) {
+            return Ok(cached_object_sheet.clone());
+        }
+
+        let object_sheet = ObjectSheetMeta::load_from_file(object_sheet_path).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to load object sheet from '{}': {}",
+                object_sheet_path.display(),
+                e
+            )
+        })?;
+
+        self.loaded_object_sheets
+            .insert(object_sheet_key, object_sheet.clone());
+        Ok(object_sheet)
     }
 
     /// Render placeholder when not initialized

@@ -240,6 +240,7 @@ mod tests {
             tile_size: glam::UVec2::new(16, 16),
             atlas: PathBuf::from("terrain.json"),
             tiles: vec!["solid".to_string(), "trigger".to_string()],
+            objects: vec![],
         }
     }
 
@@ -249,6 +250,7 @@ mod tests {
             tile_size: glam::UVec2::new(16, 16),
             atlas: PathBuf::from("terrain.json"),
             tiles: vec!["trigger".to_string(), "trigger".to_string()],
+            objects: vec![],
         }
     }
 

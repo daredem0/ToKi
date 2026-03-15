@@ -19,6 +19,7 @@ fn create_test_tilemap() -> TileMap {
         tile_size: UVec2::new(16, 16),
         atlas: PathBuf::from("test_atlas.json"),
         tiles: vec!["floor".to_string(); 100],
+        objects: vec![],
     }
 }
 

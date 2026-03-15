@@ -28,6 +28,31 @@
       "type": "array",
       "items": {"type": "string"},
       "description": "Flat array of tile names arranged row by row from top-left to bottom-right"
+    },
+    "objects": {
+      "type": "array",
+      "description": "Optional placed object instances stored directly on the map asset",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sheet", "object_name", "position"],
+        "properties": {
+          "sheet": {
+            "type": "string",
+            "minLength": 1
+          },
+          "object_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "position": {
+            "type": "array",
+            "items": {"type": "integer", "minimum": 0},
+            "minItems": 2,
+            "maxItems": 2
+          }
+        }
+      }
     }
   }
 }
