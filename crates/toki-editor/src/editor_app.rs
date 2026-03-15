@@ -42,6 +42,7 @@ struct EditorApp {
 
     // Scene viewport integration
     scene_viewport: Option<SceneViewport>,
+    map_editor_viewport: Option<SceneViewport>,
 
     // Project management
     project_manager: ProjectManager,
@@ -91,6 +92,7 @@ impl EditorApp {
             ui,
             egui_winit: None,
             scene_viewport: None,
+            map_editor_viewport: None,
             project_manager: ProjectManager::new(),
             config,
             log_capture,
@@ -422,6 +424,30 @@ impl ApplicationHandler for EditorApp {
             }
         }
 
+        let map_editor_state = GameState::new_empty();
+        match SceneViewport::with_game_state(map_editor_state) {
+            Ok(mut viewport) => {
+                if let Some(renderer) = &self.renderer {
+                    match pollster::block_on(
+                        viewport.initialize(renderer.device().clone(), renderer.queue().clone()),
+                    ) {
+                        Ok(()) => {
+                            self.map_editor_viewport = Some(viewport);
+                            tracing::info!("Map editor viewport initialized");
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to initialize map editor viewport with WGPU: {e}");
+                        }
+                    }
+                } else {
+                    tracing::error!("Cannot initialize map editor viewport: renderer not available");
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to create map editor viewport: {e}");
+            }
+        }
+
         tracing::info!("Editor initialized successfully");
         if !self.startup_project_auto_open_done {
             self.startup_project_auto_open_done = true;
@@ -462,28 +488,22 @@ impl ApplicationHandler for EditorApp {
 
             WindowEvent::KeyboardInput { event, .. } => {
                 if event.state.is_pressed() {
-                    // Route viewport zoom keys only while Scene Viewport is the active center tab.
-                    if self.ui.center_panel_tab == CenterPanelTab::SceneViewport {
-                        if let Some(viewport) = &mut self.scene_viewport {
-                            tracing::debug!(
-                                "Passing logical key {:?} to viewport",
-                                event.logical_key
-                            );
-                            if viewport.handle_keyboard_input(
-                                &event.logical_key,
-                                Modifiers::from(self.modifiers),
-                                true,
-                            ) {
-                                // Viewport handled the input, request redraw
-                                tracing::debug!(
-                                    "Viewport consumed key {:?}, requesting redraw",
-                                    event.logical_key
-                                );
-                                if let Some(window) = &self.window {
-                                    window.request_redraw();
-                                }
-                                return; // Input consumed by viewport
+                    let active_viewport = match self.ui.center_panel_tab {
+                        CenterPanelTab::SceneViewport => self.scene_viewport.as_mut(),
+                        CenterPanelTab::MapEditor => self.map_editor_viewport.as_mut(),
+                        CenterPanelTab::SceneGraph | CenterPanelTab::SceneRules => None,
+                    };
+                    if let Some(viewport) = active_viewport {
+                        tracing::debug!("Passing logical key {:?} to viewport", event.logical_key);
+                        if viewport.handle_keyboard_input(
+                            &event.logical_key,
+                            Modifiers::from(self.modifiers),
+                            true,
+                        ) {
+                            if let Some(window) = &self.window {
+                                window.request_redraw();
                             }
+                            return;
                         }
                     }
 
@@ -622,79 +642,107 @@ impl EditorApp {
             }
         }
 
-        // Pre-render scene to texture before egui UI
-        if let Some(scene_viewport) = &mut self.scene_viewport {
-            if let Some(project_path) = &project_path {
-                if let Some(project_assets) = self.project_manager.get_project_assets() {
-                    // Prepare preview data for entity placement
-                    let preview_data = if self.ui.is_in_placement_mode() {
-                        if self.ui.entity_move_drag.is_none() {
-                            if let (Some(entity_def), Some(position), Some(cached_frame)) = (
-                                &self.ui.placement_entity_definition,
-                                &self.ui.placement_preview_position,
-                                &self.ui.placement_preview_cached_frame,
-                            ) {
-                                let is_valid = self.ui.placement_preview_valid.unwrap_or(true);
-                                Some((entity_def.as_str(), *position, *cached_frame, is_valid))
+        // Pre-render active center viewport to texture before egui UI.
+        if let Some(project_path) = &project_path {
+            if let Some(project_assets) = self.project_manager.get_project_assets() {
+                match self.ui.center_panel_tab {
+                    CenterPanelTab::SceneViewport => {
+                        if let Some(scene_viewport) = &mut self.scene_viewport {
+                            let preview_data = if self.ui.is_in_placement_mode() {
+                                if self.ui.entity_move_drag.is_none() {
+                                    if let (Some(entity_def), Some(position), Some(cached_frame)) = (
+                                        &self.ui.placement_entity_definition,
+                                        &self.ui.placement_preview_position,
+                                        &self.ui.placement_preview_cached_frame,
+                                    ) {
+                                        let is_valid =
+                                            self.ui.placement_preview_valid.unwrap_or(true);
+                                        Some((
+                                            entity_def.as_str(),
+                                            *position,
+                                            *cached_frame,
+                                            is_valid,
+                                        ))
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
                             } else {
                                 None
+                            };
+
+                            let drag_preview_data =
+                                self.ui.entity_move_drag.as_ref().and_then(|drag| {
+                                    self.ui.placement_preview_position.map(|preview_position| {
+                                        let tilemap = scene_viewport.scene_manager().tilemap();
+                                        let terrain_atlas = tilemap.map(|_| {
+                                            scene_viewport
+                                                .scene_manager()
+                                                .resources()
+                                                .get_terrain_atlas()
+                                        });
+                                        Self::build_drag_preview_sprites(
+                                            drag,
+                                            preview_position,
+                                            tilemap,
+                                            terrain_atlas,
+                                        )
+                                    })
+                                });
+
+                            if let Err(e) = scene_viewport.render_to_texture(
+                                project_path.as_path(),
+                                project_assets,
+                                renderer.egui_renderer_mut(),
+                                preview_data,
+                                drag_preview_data.as_deref(),
+                            ) {
+                                tracing::error!("Failed to render scene to texture: {}", e);
                             }
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
-
-                    let drag_preview_data = self.ui.entity_move_drag.as_ref().and_then(|drag| {
-                        self.ui.placement_preview_position.map(|preview_position| {
-                            let tilemap = scene_viewport.scene_manager().tilemap();
-                            let terrain_atlas = tilemap.map(|_| {
-                                scene_viewport
-                                    .scene_manager()
-                                    .resources()
-                                    .get_terrain_atlas()
-                            });
-                            Self::build_drag_preview_sprites(
-                                drag,
-                                preview_position,
-                                tilemap,
-                                terrain_atlas,
-                            )
-                        })
-                    });
-
-                    match scene_viewport.render_to_texture(
-                        project_path.as_path(),
-                        project_assets,
-                        renderer.egui_renderer_mut(),
-                        preview_data,
-                        drag_preview_data.as_deref(),
-                    ) {
-                        Ok(()) => {
-                            // Reduce log spam - render_to_texture already handles its own logging
-                            // tracing::debug!("Scene rendered to offscreen texture successfully");
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to render scene to texture: {}", e);
                         }
                     }
-                } else if self.project_manager.current_project.is_some() {
-                    tracing::warn!(
-                        "No project assets available for scene rendering {:?}",
-                        self.project_manager.current_project
-                    );
+                    CenterPanelTab::MapEditor => {
+                        if let Some(map_editor_viewport) = &mut self.map_editor_viewport {
+                            if let Err(e) = map_editor_viewport.render_to_texture(
+                                project_path.as_path(),
+                                project_assets,
+                                renderer.egui_renderer_mut(),
+                                None,
+                                None,
+                            ) {
+                                tracing::error!(
+                                    "Failed to render map editor viewport to texture: {}",
+                                    e
+                                );
+                            }
+                        }
+                    }
+                    CenterPanelTab::SceneGraph | CenterPanelTab::SceneRules => {}
                 }
+            } else if self.project_manager.current_project.is_some() {
+                tracing::warn!(
+                    "No project assets available for viewport rendering {:?}",
+                    self.project_manager.current_project
+                );
             }
         }
 
         // Run egui UI
+        let available_map_names = self.project_manager.get_project_assets().map(|assets| {
+            let mut names = assets.tilemaps.keys().cloned().collect::<Vec<_>>();
+            names.sort();
+            names
+        });
         let full_output = egui_ctx.run(raw_input, |ctx| {
             // Render UI - viewport will use the pre-rendered texture
             self.ui.render(
                 ctx,
                 self.scene_viewport.as_mut(),
+                self.map_editor_viewport.as_mut(),
                 self.project_manager.current_project.as_mut(),
+                available_map_names.clone(),
                 Some(&mut self.config),
                 self.log_capture.as_ref(),
                 None, // Can't pass renderer due to borrow issues
@@ -738,9 +786,17 @@ impl EditorApp {
         self.handle_play_scene_request();
         self.handle_active_scene_map_loading();
         self.handle_map_requests();
+        self.handle_map_editor_map_requests();
 
         if self
             .scene_viewport
+            .as_ref()
+            .is_some_and(crate::scene::SceneViewport::needs_render)
+        {
+            window.request_redraw();
+        }
+        if self
+            .map_editor_viewport
             .as_ref()
             .is_some_and(crate::scene::SceneViewport::needs_render)
         {
@@ -1516,6 +1572,45 @@ impl EditorApp {
                     map_name,
                     scene_name
                 );
+            }
+        }
+    }
+
+    fn handle_map_editor_map_requests(&mut self) {
+        let Some(map_name) = self.ui.map_editor_map_load_requested.take() else {
+            return;
+        };
+
+        let Some(project_path) = self.config.current_project_path().cloned() else {
+            tracing::warn!(
+                "No project loaded for map editor loading request: '{}'",
+                map_name
+            );
+            return;
+        };
+
+        let Some(viewport) = &mut self.map_editor_viewport else {
+            tracing::warn!(
+                "No map editor viewport available for loading map '{}'",
+                map_name
+            );
+            return;
+        };
+
+        let map_file = project_path
+            .join("assets")
+            .join("tilemaps")
+            .join(format!("{}.json", map_name));
+
+        viewport.scene_manager_mut().clear_tilemap();
+        match viewport.scene_manager_mut().load_tilemap(&map_file) {
+            Ok(()) => {
+                tracing::info!("Loaded map '{}' into map editor viewport", map_name);
+                self.ui.map_editor_active_map = Some(map_name);
+                viewport.mark_dirty();
+            }
+            Err(e) => {
+                tracing::error!("Failed to load map '{}' into map editor viewport: {}", map_name, e);
             }
         }
     }

@@ -31,6 +31,7 @@ pub(crate) enum CenterPanelTab {
     SceneViewport,
     SceneGraph,
     SceneRules,
+    MapEditor,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,6 +102,8 @@ pub struct EditorUI {
 
     // Map loading request
     pub map_load_requested: Option<(String, String)>, // (scene_name, map_name)
+    pub map_editor_active_map: Option<String>,
+    pub map_editor_map_load_requested: Option<String>,
 
     // Asset validation
     pub validate_assets_requested: bool,
@@ -168,6 +171,8 @@ impl EditorUI {
 
             // Map loading request
             map_load_requested: None,
+            map_editor_active_map: None,
+            map_editor_map_load_requested: None,
 
             // Asset validation
             validate_assets_requested: false,
@@ -281,6 +286,30 @@ impl EditorUI {
         self.clear_selection();
     }
 
+    pub fn sync_map_editor_selection(&mut self, available_map_names: &[String]) {
+        if available_map_names.is_empty() {
+            self.map_editor_active_map = None;
+            self.map_editor_map_load_requested = None;
+            return;
+        }
+
+        if self
+            .map_editor_active_map
+            .as_ref()
+            .is_some_and(|selected| available_map_names.iter().any(|name| name == selected))
+        {
+            return;
+        }
+
+        let mut sorted_names = available_map_names.to_vec();
+        sorted_names.sort();
+        let next_map = sorted_names[0].clone();
+        if self.map_editor_active_map.as_ref() != Some(&next_map) {
+            self.map_editor_active_map = Some(next_map.clone());
+            self.map_editor_map_load_requested = Some(next_map);
+        }
+    }
+
     pub fn execute_command(&mut self, command: EditorCommand) -> bool {
         let mut history = std::mem::take(&mut self.command_history);
         let changed = history.execute(command, self);
@@ -380,7 +409,9 @@ impl EditorUI {
         &mut self,
         ctx: &egui::Context,
         scene_viewport: Option<&mut SceneViewport>,
+        map_editor_viewport: Option<&mut SceneViewport>,
         project: Option<&mut crate::project::Project>,
+        available_map_names: Option<Vec<String>>,
         config: Option<&mut crate::config::EditorConfig>,
         log_capture: Option<&crate::logging::LogCapture>,
         renderer: Option<&mut egui_wgpu::Renderer>,
@@ -419,7 +450,15 @@ impl EditorUI {
         }
 
         // Render viewport last (mutable access)
-        PanelSystem::render_viewport(self, ctx, scene_viewport, config, renderer);
+        PanelSystem::render_viewport(
+            self,
+            ctx,
+            scene_viewport,
+            map_editor_viewport,
+            available_map_names,
+            config,
+            renderer,
+        );
     }
 
     /// Apply config settings to UI state
@@ -1191,5 +1230,28 @@ mod tests {
         ui.load_scenes_from_project(vec![toki_core::Scene::new("main".to_string())]);
 
         assert_eq!(ui.active_scene.as_deref(), Some("main"));
+    }
+
+    #[test]
+    fn sync_map_editor_selection_picks_sorted_first_map_and_requests_load() {
+        let mut ui = EditorUI::new();
+        let maps = vec!["zeta".to_string(), "alpha".to_string(), "middle".to_string()];
+
+        ui.sync_map_editor_selection(&maps);
+
+        assert_eq!(ui.map_editor_active_map.as_deref(), Some("alpha"));
+        assert_eq!(ui.map_editor_map_load_requested.as_deref(), Some("alpha"));
+    }
+
+    #[test]
+    fn sync_map_editor_selection_preserves_existing_valid_choice() {
+        let mut ui = EditorUI::new();
+        ui.map_editor_active_map = Some("middle".to_string());
+        let maps = vec!["zeta".to_string(), "alpha".to_string(), "middle".to_string()];
+
+        ui.sync_map_editor_selection(&maps);
+
+        assert_eq!(ui.map_editor_active_map.as_deref(), Some("middle"));
+        assert!(ui.map_editor_map_load_requested.is_none());
     }
 }

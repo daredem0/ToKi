@@ -121,6 +121,8 @@ impl PanelSystem {
         ui_state: &mut super::EditorUI,
         ctx: &egui::Context,
         scene_viewport: Option<&mut SceneViewport>,
+        map_editor_viewport: Option<&mut SceneViewport>,
+        available_map_names: Option<Vec<String>>,
         mut config: Option<&mut EditorConfig>,
         renderer: Option<&mut egui_wgpu::Renderer>,
     ) {
@@ -141,6 +143,11 @@ impl PanelSystem {
                     CenterPanelTab::SceneRules,
                     "Scene Rules",
                 );
+                ui.selectable_value(
+                    &mut ui_state.center_panel_tab,
+                    CenterPanelTab::MapEditor,
+                    "Map Editor",
+                );
             });
             ui.separator();
 
@@ -151,6 +158,18 @@ impl PanelSystem {
 
             if ui_state.center_panel_tab == CenterPanelTab::SceneRules {
                 Self::render_scene_graph(ui, ui_state, true);
+                return;
+            }
+
+            if ui_state.center_panel_tab == CenterPanelTab::MapEditor {
+                Self::render_map_editor(
+                    ui,
+                    ui_state,
+                    map_editor_viewport,
+                    available_map_names,
+                    config,
+                    renderer,
+                );
                 return;
             }
 
@@ -309,6 +328,84 @@ impl PanelSystem {
                     .on_hover_text("Scene viewport not initialized");
             }
         });
+    }
+
+    fn render_map_editor(
+        ui: &mut egui::Ui,
+        ui_state: &mut super::EditorUI,
+        map_editor_viewport: Option<&mut SceneViewport>,
+        available_map_names: Option<Vec<String>>,
+        mut config: Option<&mut EditorConfig>,
+        renderer: Option<&mut egui_wgpu::Renderer>,
+    ) {
+        if let Some(names) = &available_map_names {
+            ui_state.sync_map_editor_selection(names);
+        } else {
+            ui_state.sync_map_editor_selection(&[]);
+        }
+
+        ui.horizontal(|ui| {
+            ui.heading("Map Editor");
+            ui.separator();
+            ui.label("Map:");
+
+            let selected_label = ui_state
+                .map_editor_active_map
+                .as_deref()
+                .unwrap_or("No map selected");
+            egui::ComboBox::from_id_salt("map_editor_map_selector")
+                .selected_text(selected_label)
+                .show_ui(ui, |ui| {
+                    if let Some(map_names) = &available_map_names {
+                        for map_name in map_names {
+                            let is_selected =
+                                ui_state.map_editor_active_map.as_deref() == Some(map_name.as_str());
+                            if ui.selectable_label(is_selected, map_name).clicked()
+                                && !is_selected
+                            {
+                                ui_state.map_editor_active_map = Some(map_name.clone());
+                                ui_state.map_editor_map_load_requested = Some(map_name.clone());
+                            }
+                        }
+                    }
+                });
+
+            if let Some(active_map) = ui_state.map_editor_active_map.as_deref() {
+                ui.label(format!("Editing asset: {}", active_map));
+            }
+        });
+        ui.separator();
+
+        let Some(viewport) = map_editor_viewport else {
+            ui.label("Map editor viewport not initialized.");
+            return;
+        };
+
+        if let Some(cfg) = config.as_deref_mut() {
+            if Self::render_grid_toolbar(ui, cfg) {
+                viewport.mark_dirty();
+            }
+            ui.separator();
+        }
+
+        if let Err(error) = viewport.update() {
+            tracing::error!("Map editor viewport update error: {error}");
+        }
+
+        let available_size = ui.available_size();
+        let (rect, response) =
+            ui.allocate_exact_size(available_size, egui::Sense::drag().union(egui::Sense::hover()));
+
+        CameraInteraction::handle_drag(viewport, &response, config.as_deref());
+
+        let project_path = config
+            .as_deref()
+            .and_then(|cfg| cfg.current_project_path())
+            .map(|path| path.as_path());
+        viewport.render(ui, rect, project_path, renderer);
+        if let Some(cfg) = config.as_deref() {
+            Self::paint_viewport_grid_overlay(ui, rect, viewport, cfg);
+        }
     }
 
     fn sanitize_grid_size_axis(value: i32) -> u32 {
