@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ToKi Object Sheet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sheet_type", "image", "tile_size", "objects"],
+  "properties": {
+    "sheet_type": {
+      "type": "string",
+      "const": "objects"
+    },
+    "image": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tile_size": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "objects": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["position", "size_tiles"],
+        "properties": {
+          "position": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "size_tiles": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        }
+      }
+    }
+  }
+}

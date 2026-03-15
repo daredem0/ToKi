@@ -291,6 +291,7 @@ impl ProjectManager {
 mod tests {
     use super::ProjectManager;
     use crate::project::ProjectTemplateKind;
+    use crate::ui::interactions::MapPaintInteraction;
     use crate::ui::rule_graph::RuleGraph;
     use jsonschema::JSONSchema;
     use serde_json::Value;
@@ -299,6 +300,7 @@ mod tests {
     use std::path::PathBuf;
     use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
     use toki_core::assets::tilemap::TileMap;
+    use toki_core::collision::{can_place_collision_box_at_position, CollisionBox};
     use toki_core::game::{AudioChannel, AudioEvent};
     use toki_core::rules::{
         Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger,
@@ -732,6 +734,148 @@ mod tests {
             .get_project_assets()
             .expect("project assets should be available");
         assert!(project_assets.tilemaps.contains_key("draft_map"));
+    }
+
+    #[test]
+    fn save_tilemap_asset_persists_painted_brush_and_fill_changes() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let parent = temp_dir.path().to_path_buf();
+
+        let mut manager = ProjectManager::new();
+        manager
+            .create_new_project("test_project".to_string(), parent.clone())
+            .expect("project should be created");
+
+        let mut tilemap = TileMap {
+            size: glam::UVec2::new(3, 3),
+            tile_size: glam::UVec2::new(8, 8),
+            atlas: PathBuf::from("terrain.json"),
+            tiles: vec!["grass".to_string(); 9],
+        };
+
+        assert!(MapPaintInteraction::paint_brush(
+            &mut tilemap,
+            glam::UVec2::new(1, 1),
+            "water",
+            1,
+        ));
+        assert!(MapPaintInteraction::fill_all(&mut tilemap, "stone"));
+        assert!(MapPaintInteraction::paint_brush(
+            &mut tilemap,
+            glam::UVec2::new(0, 0),
+            "water",
+            2,
+        ));
+
+        let saved_path = manager
+            .save_tilemap_asset("painted_map", &tilemap)
+            .expect("painted tilemap should save");
+
+        let reloaded = TileMap::load_from_file(&saved_path).expect("saved tilemap should reload");
+        assert_eq!(reloaded, tilemap);
+        assert_eq!(reloaded.tiles[0], "water");
+        assert_eq!(reloaded.tiles[1], "water");
+        assert_eq!(reloaded.tiles[3], "water");
+        assert_eq!(reloaded.tiles[4], "water");
+        assert_eq!(reloaded.tiles[8], "stone");
+    }
+
+    #[test]
+    fn painted_map_reloaded_from_disk_keeps_atlas_collision_and_trigger_metadata() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let parent = temp_dir.path().to_path_buf();
+
+        let mut manager = ProjectManager::new();
+        manager
+            .create_new_project("test_project".to_string(), parent.clone())
+            .expect("project should be created");
+
+        let project_path = parent.join("test_project");
+        fs::write(
+            project_path.join("assets").join("sprites").join("terrain.json"),
+            r#"{
+                "image": "terrain.png",
+                "tile_size": [16, 16],
+                "tiles": {
+                    "grass": { "position": [0, 0] },
+                    "wall": { "position": [1, 0], "properties": { "solid": true, "trigger": false } },
+                    "switch": { "position": [2, 0], "properties": { "solid": false, "trigger": true } }
+                }
+            }"#,
+        )
+        .expect("terrain atlas should be written");
+
+        let mut tilemap = TileMap {
+            size: glam::UVec2::new(3, 1),
+            tile_size: glam::UVec2::new(16, 16),
+            atlas: PathBuf::from("terrain.json"),
+            tiles: vec![
+                "grass".to_string(),
+                "grass".to_string(),
+                "grass".to_string(),
+            ],
+        };
+
+        assert!(MapPaintInteraction::paint_tile(
+            &mut tilemap,
+            glam::UVec2::new(1, 0),
+            "wall",
+        ));
+        assert!(MapPaintInteraction::paint_tile(
+            &mut tilemap,
+            glam::UVec2::new(2, 0),
+            "switch",
+        ));
+
+        let saved_path = manager
+            .save_tilemap_asset("collision_map", &tilemap)
+            .expect("tilemap should save");
+
+        let reloaded_map = TileMap::load_from_file(&saved_path).expect("saved tilemap should load");
+        let reloaded_atlas = AtlasMeta::load_from_file(
+            project_path
+                .join("assets")
+                .join("sprites")
+                .join("terrain.json"),
+        )
+        .expect("terrain atlas should load");
+
+        assert_eq!(reloaded_map.tiles[1], "wall");
+        assert_eq!(reloaded_map.tiles[2], "switch");
+        assert_eq!(
+            reloaded_atlas.get_tile_properties("wall"),
+            Some(&TileProperties {
+                solid: true,
+                trigger: false,
+            })
+        );
+        assert_eq!(
+            reloaded_atlas.get_tile_properties("switch"),
+            Some(&TileProperties {
+                solid: false,
+                trigger: true,
+            })
+        );
+
+        let collision_box = CollisionBox::solid_box(glam::UVec2::new(16, 16));
+        assert!(!can_place_collision_box_at_position(
+            Some(&collision_box),
+            glam::IVec2::new(16, 0),
+            &reloaded_map,
+            &reloaded_atlas,
+        ));
+        assert!(can_place_collision_box_at_position(
+            Some(&collision_box),
+            glam::IVec2::new(32, 0),
+            &reloaded_map,
+            &reloaded_atlas,
+        ));
+        assert!(
+            reloaded_atlas
+                .get_tile_properties("switch")
+                .expect("switch tile metadata should exist")
+                .trigger
+        );
     }
 
     fn test_atlas() -> AtlasMeta {

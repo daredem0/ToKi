@@ -1,0 +1,30 @@
+{
+    "sheet_type": "objects",
+    "image": "fauna.png",
+    "tile_size": [
+        16,
+        16
+    ],
+    "objects": {
+        "rock": {
+            "position": [
+                0,
+                0
+            ],
+            "size_tiles": [
+                1,
+                1
+            ]
+        },
+        "flower": {
+            "position": [
+                1,
+                0
+            ],
+            "size_tiles": [
+                1,
+                1
+            ]
+        }
+    }
+}

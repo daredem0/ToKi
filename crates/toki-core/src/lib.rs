@@ -20,6 +20,7 @@ pub mod text;
 pub mod animation;
 pub mod assets {
     pub mod atlas;
+    pub mod object_sheet;
     pub mod tilemap;
 }
 

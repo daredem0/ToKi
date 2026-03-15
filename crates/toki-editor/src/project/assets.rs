@@ -3,6 +3,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use toki_core::{assets::atlas::AtlasMeta, assets::object_sheet::ObjectSheetMeta};
 use toki_core::{entity::EntityDefinition, Scene};
 
 /// Asset discovery and management for project
@@ -17,6 +18,8 @@ pub struct ProjectAssets {
     pub tilemaps: HashMap<String, TilemapAsset>,
     /// Discovered sprite atlases
     pub sprite_atlases: HashMap<String, SpriteAtlasAsset>,
+    /// Discovered object sheets
+    pub object_sheets: HashMap<String, ObjectSheetAsset>,
     /// Discovered music files
     pub music: HashMap<String, AudioAsset>,
     /// Discovered sound effects
@@ -54,6 +57,16 @@ pub struct SpriteAtlasAsset {
     /// Atlas name (from filename)
     pub name: String,
     /// Full path to atlas JSON file
+    pub path: PathBuf,
+}
+
+/// Object sheet asset information
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct ObjectSheetAsset {
+    /// Object sheet name (from filename)
+    pub name: String,
+    /// Full path to object sheet JSON file
     pub path: PathBuf,
 }
 
@@ -98,6 +111,7 @@ impl ProjectAssets {
             scenes: HashMap::new(),
             tilemaps: HashMap::new(),
             sprite_atlases: HashMap::new(),
+            object_sheets: HashMap::new(),
             music: HashMap::new(),
             sfx: HashMap::new(),
             entities: HashMap::new(),
@@ -113,10 +127,11 @@ impl ProjectAssets {
         self.scan_entities()?;
 
         tracing::info!(
-            "Scanned project assets: {} scenes, {} tilemaps, {} atlases, {} music, {} sfx, {} entities",
+            "Scanned project assets: {} scenes, {} tilemaps, {} atlases, {} object sheets, {} music, {} sfx, {} entities",
             self.scenes.len(),
             self.tilemaps.len(),
             self.sprite_atlases.len(),
+            self.object_sheets.len(),
             self.music.len(),
             self.sfx.len(),
             self.entities.len()
@@ -202,13 +217,34 @@ impl ProjectAssets {
 
             if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                    let atlas_asset = SpriteAtlasAsset {
-                        name: stem.to_string(),
-                        path: path.clone(),
-                    };
+                    match classify_sprite_metadata_file(&path)? {
+                        SpriteMetadataFileKind::Atlas => {
+                            let atlas_asset = SpriteAtlasAsset {
+                                name: stem.to_string(),
+                                path: path.clone(),
+                            };
 
-                    self.sprite_atlases.insert(stem.to_string(), atlas_asset);
-                    tracing::info!("🎨 Found sprite atlas file: '{}' at {:?}", stem, path);
+                            self.sprite_atlases.insert(stem.to_string(), atlas_asset);
+                            tracing::info!("🎨 Found sprite atlas file: '{}' at {:?}", stem, path);
+                        }
+                        SpriteMetadataFileKind::ObjectSheet => {
+                            let object_sheet_asset = ObjectSheetAsset {
+                                name: stem.to_string(),
+                                path: path.clone(),
+                            };
+
+                            self.object_sheets
+                                .insert(stem.to_string(), object_sheet_asset);
+                            tracing::info!("🌿 Found object sheet file: '{}' at {:?}", stem, path);
+                        }
+                        SpriteMetadataFileKind::Unknown => {
+                            tracing::warn!(
+                                "Skipping unrecognized sprite metadata file '{}' at {:?}",
+                                stem,
+                                path
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -396,6 +432,12 @@ impl ProjectAssets {
         self.sprite_atlases.keys().cloned().collect()
     }
 
+    /// Get all object sheet names
+    #[allow(dead_code)]
+    pub fn get_object_sheet_names(&self) -> Vec<String> {
+        self.object_sheets.keys().cloned().collect()
+    }
+
     /// Get all music names
     #[allow(dead_code)]
     pub fn get_music_names(&self) -> Vec<String> {
@@ -463,5 +505,109 @@ impl ProjectAssets {
         }
 
         Ok(categories)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SpriteMetadataFileKind {
+    Atlas,
+    ObjectSheet,
+    Unknown,
+}
+
+fn classify_sprite_metadata_file(path: &Path) -> Result<SpriteMetadataFileKind> {
+    let json_data = fs::read_to_string(path)?;
+
+    if let Ok(object_sheet) = serde_json::from_str::<ObjectSheetMeta>(&json_data) {
+        if matches!(
+            object_sheet.sheet_type,
+            toki_core::assets::object_sheet::ObjectSheetType::Objects
+        ) {
+            return Ok(SpriteMetadataFileKind::ObjectSheet);
+        }
+    }
+
+    if serde_json::from_str::<AtlasMeta>(&json_data).is_ok() {
+        return Ok(SpriteMetadataFileKind::Atlas);
+    }
+
+    Ok(SpriteMetadataFileKind::Unknown)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ProjectAssets;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn scan_assets_discovers_atlases_and_object_sheets_separately() {
+        let temp_dir = tempdir().expect("tempdir should be created");
+        let sprites_dir = temp_dir.path().join("assets/sprites");
+        fs::create_dir_all(&sprites_dir).expect("sprites dir should be created");
+
+        fs::write(
+            sprites_dir.join("terrain.json"),
+            r#"{
+                "image": "terrain.png",
+                "tile_size": [8, 8],
+                "tiles": {
+                    "grass": {
+                        "position": [0, 0],
+                        "properties": {
+                            "solid": false,
+                            "trigger": false
+                        }
+                    }
+                }
+            }"#,
+        )
+        .expect("atlas json should be written");
+
+        fs::write(
+            sprites_dir.join("fauna.json"),
+            r#"{
+                "sheet_type": "objects",
+                "image": "fauna.png",
+                "tile_size": [16, 16],
+                "objects": {
+                    "fauna_a": {
+                        "position": [0, 0],
+                        "size_tiles": [1, 1]
+                    }
+                }
+            }"#,
+        )
+        .expect("object sheet json should be written");
+
+        let mut assets = ProjectAssets::new(temp_dir.path().to_path_buf());
+        assets.scan_assets().expect("asset scan should succeed");
+
+        assert!(assets.sprite_atlases.contains_key("terrain"));
+        assert!(!assets.sprite_atlases.contains_key("fauna"));
+        assert!(assets.object_sheets.contains_key("fauna"));
+        assert_eq!(assets.get_sprite_atlas_names(), vec!["terrain".to_string()]);
+        assert_eq!(assets.get_object_sheet_names(), vec!["fauna".to_string()]);
+    }
+
+    #[test]
+    fn scan_assets_skips_unknown_sprite_metadata_files() {
+        let temp_dir = tempdir().expect("tempdir should be created");
+        let sprites_dir = temp_dir.path().join("assets/sprites");
+        fs::create_dir_all(&sprites_dir).expect("sprites dir should be created");
+
+        fs::write(
+            sprites_dir.join("mystery.json"),
+            r#"{
+                "hello": "world"
+            }"#,
+        )
+        .expect("mystery json should be written");
+
+        let mut assets = ProjectAssets::new(temp_dir.path().to_path_buf());
+        assets.scan_assets().expect("asset scan should succeed");
+
+        assert!(assets.sprite_atlases.is_empty());
+        assert!(assets.object_sheets.is_empty());
     }
 }
