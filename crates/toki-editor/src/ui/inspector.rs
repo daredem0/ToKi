@@ -502,6 +502,11 @@ impl InspectorSystem {
             ui.selectable_value(&mut ui_state.map_editor_tool, MapEditorTool::Drag, "Drag");
             ui.selectable_value(&mut ui_state.map_editor_tool, MapEditorTool::Brush, "Brush");
             ui.selectable_value(&mut ui_state.map_editor_tool, MapEditorTool::Fill, "Fill");
+            ui.selectable_value(
+                &mut ui_state.map_editor_tool,
+                MapEditorTool::PickTile,
+                "Pick Tile",
+            );
         });
         ui.separator();
 
@@ -535,7 +540,7 @@ impl InspectorSystem {
                 ui.label(match ui_state.map_editor_tool {
                     MapEditorTool::Brush => "Primary click/drag paints tiles.",
                     MapEditorTool::Fill => "Primary click fills the whole map.",
-                    MapEditorTool::Drag => unreachable!(),
+                    MapEditorTool::Drag | MapEditorTool::PickTile => unreachable!(),
                 });
                 if let Some((tile_names, atlas, texture_path)) =
                     Self::load_map_editor_brush_source(ui_state, config)
@@ -593,8 +598,16 @@ impl InspectorSystem {
                 ui.label(match ui_state.map_editor_tool {
                     MapEditorTool::Brush => "Secondary drag pans the camera.",
                     MapEditorTool::Fill => "Secondary drag pans the camera.",
-                    MapEditorTool::Drag => unreachable!(),
+                    MapEditorTool::Drag | MapEditorTool::PickTile => unreachable!(),
                 });
+            }
+            MapEditorTool::PickTile => {
+                ui.label("Click a tile in the map to pick it.");
+                ui.label("After picking, the tool switches back to Brush automatically.");
+                if let Some(tile_name) = ui_state.map_editor_selected_tile.as_deref() {
+                    ui.separator();
+                    ui.label(format!("Current Brush Tile: {}", tile_name));
+                }
             }
         }
 

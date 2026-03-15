@@ -47,6 +47,7 @@ pub(crate) enum MapEditorTool {
     Drag,
     Brush,
     Fill,
+    PickTile,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -516,6 +517,11 @@ impl EditorUI {
         let mut sorted_names = tile_names.to_vec();
         sorted_names.sort();
         self.map_editor_selected_tile = Some(sorted_names[0].clone());
+    }
+
+    pub fn pick_map_editor_tile(&mut self, tile_name: String) {
+        self.map_editor_selected_tile = Some(tile_name);
+        self.map_editor_tool = MapEditorTool::Brush;
     }
 
     pub fn mark_map_editor_dirty(&mut self) {
@@ -1661,6 +1667,17 @@ mod tests {
         assert_eq!(ui.map_editor_tool, super::MapEditorTool::Drag);
         assert_eq!(ui.map_editor_brush_size_tiles, 1);
         assert!(ui.map_editor_selected_tile_info.is_none());
+    }
+
+    #[test]
+    fn pick_map_editor_tile_sets_selected_tile_and_switches_back_to_brush() {
+        let mut ui = EditorUI::new();
+        ui.map_editor_tool = super::MapEditorTool::PickTile;
+
+        ui.pick_map_editor_tile("water".to_string());
+
+        assert_eq!(ui.map_editor_selected_tile.as_deref(), Some("water"));
+        assert_eq!(ui.map_editor_tool, super::MapEditorTool::Brush);
     }
 
     #[test]

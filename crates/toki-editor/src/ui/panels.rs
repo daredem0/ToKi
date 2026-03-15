@@ -415,6 +415,7 @@ impl PanelSystem {
                 super::editor_ui::MapEditorTool::Drag => "Drag",
                 super::editor_ui::MapEditorTool::Brush => "Brush",
                 super::editor_ui::MapEditorTool::Fill => "Fill",
+                super::editor_ui::MapEditorTool::PickTile => "Pick Tile",
             });
         });
         ui.separator();
@@ -504,6 +505,10 @@ impl PanelSystem {
                 ui_state.cancel_map_editor_edit();
                 Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
             }
+            super::editor_ui::MapEditorTool::PickTile => {
+                ui_state.cancel_map_editor_edit();
+                Self::handle_map_editor_secondary_drag(ui, viewport, &response, config.as_deref());
+            }
         }
 
         viewport.render(ui, rect, project_path.as_deref(), renderer);
@@ -562,6 +567,13 @@ impl PanelSystem {
                     ) {
                         ui_state.mark_map_editor_dirty();
                     }
+                }
+            }
+            super::editor_ui::MapEditorTool::PickTile => {
+                if let Some(tile_name) =
+                    Self::handle_map_editor_tile_pick(ui, viewport, &response, rect)
+                {
+                    ui_state.pick_map_editor_tile(tile_name);
                 }
             }
         }
@@ -795,6 +807,27 @@ impl PanelSystem {
             solid: properties.solid,
             trigger: properties.trigger,
         }))
+    }
+
+    fn handle_map_editor_tile_pick(
+        ui: &egui::Ui,
+        viewport: &SceneViewport,
+        response: &egui::Response,
+        rect: egui::Rect,
+    ) -> Option<String> {
+        let clicked = response.hovered() && ui.input(|input| input.pointer.primary_clicked());
+        if !clicked {
+            return None;
+        }
+
+        let pointer_pos = ui.input(|input| input.pointer.interact_pos())?;
+        let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
+        let tilemap = viewport.scene_manager().tilemap()?;
+        let tile_pos = MapPaintInteraction::tile_position_at_world(tilemap, world_pos)?;
+        tilemap
+            .get_tile_name(tile_pos.x, tile_pos.y)
+            .ok()
+            .map(ToString::to_string)
     }
 
     fn load_map_editor_tile_names(
