@@ -478,11 +478,17 @@ impl PanelSystem {
             ui.separator();
         }
 
+        let available_size = ui.available_size();
+        let requested_viewport_size = (
+            available_size.x.max(1.0).round() as u32,
+            available_size.y.max(1.0).round() as u32,
+        );
+        viewport.request_viewport_size(requested_viewport_size);
+
         if let Err(error) = viewport.update() {
             tracing::error!("Map editor viewport update error: {error}");
         }
 
-        let available_size = ui.available_size();
         let (rect, response) =
             ui.allocate_exact_size(available_size, egui::Sense::click_and_drag());
 
@@ -735,7 +741,12 @@ impl PanelSystem {
     fn compute_viewport_display_rect(
         outer_rect: egui::Rect,
         viewport_size: (u32, u32),
+        responsive: bool,
     ) -> egui::Rect {
+        if responsive {
+            return outer_rect;
+        }
+
         let viewport_aspect = viewport_size.0 as f32 / viewport_size.1 as f32;
         let available_size = outer_rect.size();
         let available_aspect = available_size.x / available_size.y;
@@ -773,8 +784,11 @@ impl PanelSystem {
         }
 
         let (viewport_width, viewport_height) = viewport.viewport_size();
-        let display_rect =
-            Self::compute_viewport_display_rect(outer_rect, (viewport_width, viewport_height));
+        let display_rect = Self::compute_viewport_display_rect(
+            outer_rect,
+            (viewport_width, viewport_height),
+            viewport.sizing_mode() == crate::scene::viewport::ViewportSizingMode::Responsive,
+        );
         let (camera_position, camera_scale) = viewport.camera_state();
         let grid_size = Self::effective_grid_size(viewport, config);
 
@@ -3016,11 +3030,19 @@ mod tests {
     #[test]
     fn compute_viewport_display_rect_keeps_aspect_and_centers() {
         let outer = egui::Rect::from_min_size(egui::Pos2::new(0.0, 0.0), egui::vec2(320.0, 144.0));
-        let display = PanelSystem::compute_viewport_display_rect(outer, (160, 144));
+        let display = PanelSystem::compute_viewport_display_rect(outer, (160, 144), false);
         assert_eq!(display.width(), 160.0);
         assert_eq!(display.height(), 144.0);
         assert_eq!(display.left(), 80.0);
         assert_eq!(display.right(), 240.0);
+    }
+
+    #[test]
+    fn compute_viewport_display_rect_uses_full_rect_for_responsive_viewports() {
+        let outer =
+            egui::Rect::from_min_size(egui::Pos2::new(10.0, 20.0), egui::vec2(640.0, 360.0));
+        let display = PanelSystem::compute_viewport_display_rect(outer, (640, 360), true);
+        assert_eq!(display, outer);
     }
 
     #[test]

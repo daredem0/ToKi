@@ -241,6 +241,10 @@ impl RenderTarget for OffscreenTarget {
         self.texture = new_target.texture;
         self.view = new_target.view;
         self.size = new_target.size;
+        #[cfg(feature = "editor")]
+        {
+            self.egui_texture_id = None;
+        }
         Ok(())
     }
 }

@@ -488,7 +488,7 @@ impl ApplicationHandler for EditorApp {
         }
 
         let map_editor_state = GameState::new_empty();
-        match SceneViewport::with_game_state(map_editor_state) {
+        match SceneViewport::with_game_state_responsive(map_editor_state) {
             Ok(mut viewport) => {
                 if let Some(renderer) = &self.renderer {
                     match pollster::block_on(

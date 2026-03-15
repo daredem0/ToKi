@@ -68,11 +68,40 @@ fn point_in_entity_bounds(
         && point_world.y < entity_max.y
 }
 
+fn request_viewport_size_state(
+    sizing_mode: ViewportSizingMode,
+    is_initialized: bool,
+    current_size: (u32, u32),
+    requested_size: Option<(u32, u32)>,
+    new_size: (u32, u32),
+) -> ((u32, u32), Option<(u32, u32)>, bool) {
+    if sizing_mode != ViewportSizingMode::Responsive {
+        return (current_size, requested_size, false);
+    }
+
+    let sanitized = (new_size.0.max(1), new_size.1.max(1));
+    if sanitized == current_size && requested_size.is_none() {
+        return (current_size, requested_size, false);
+    }
+
+    if !is_initialized {
+        (sanitized, None, true)
+    } else {
+        (current_size, Some(sanitized), true)
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct DragPreviewSprite {
     pub entity_id: toki_core::entity::EntityId,
     pub world_position: glam::IVec2,
     pub is_valid: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ViewportSizingMode {
+    Fixed,
+    Responsive,
 }
 
 /// Handles the scene viewport - integration between scene data and rendering
@@ -83,7 +112,9 @@ pub struct SceneViewport {
     device: Option<wgpu::Device>,
     queue: Option<wgpu::Queue>,
     is_initialized: bool,
+    sizing_mode: ViewportSizingMode,
     viewport_size: (u32, u32),
+    requested_viewport_size: Option<(u32, u32)>,
     atlas_cache: Option<AtlasMeta>,
     needs_render: bool, // Track if scene needs re-rendering
     camera: Camera,     // Camera for zoom and pan
@@ -99,6 +130,17 @@ pub struct SceneViewport {
 impl SceneViewport {
     /// Create viewport with existing game state
     pub fn with_game_state(game_state: toki_core::GameState) -> Result<Self> {
+        Self::with_game_state_and_sizing_mode(game_state, ViewportSizingMode::Fixed)
+    }
+
+    pub fn with_game_state_responsive(game_state: toki_core::GameState) -> Result<Self> {
+        Self::with_game_state_and_sizing_mode(game_state, ViewportSizingMode::Responsive)
+    }
+
+    fn with_game_state_and_sizing_mode(
+        game_state: toki_core::GameState,
+        sizing_mode: ViewportSizingMode,
+    ) -> Result<Self> {
         let scene_manager = SceneManager::with_game_state(game_state)?;
 
         // Initialize camera with default toki-runtime settings
@@ -114,7 +156,9 @@ impl SceneViewport {
             device: None,
             queue: None,
             is_initialized: false,
+            sizing_mode,
             viewport_size: (160, 144), // Native runtime resolution
+            requested_viewport_size: None,
             atlas_cache: None,
             needs_render: true, // Initial render required
             camera,
@@ -155,6 +199,49 @@ impl SceneViewport {
         Ok(())
     }
 
+    fn set_viewport_size_immediate(&mut self, new_size: (u32, u32)) {
+        self.viewport_size = new_size;
+        self.camera.viewport_size = glam::UVec2::new(new_size.0, new_size.1);
+    }
+
+    fn apply_requested_viewport_size(&mut self) -> Result<()> {
+        let Some(new_size) = self.requested_viewport_size.take() else {
+            return Ok(());
+        };
+
+        if new_size == self.viewport_size {
+            return Ok(());
+        }
+
+        self.set_viewport_size_immediate(new_size);
+        if let Some(target) = &mut self.offscreen_target {
+            toki_render::RenderTarget::resize(target, new_size)
+                .map_err(|e| anyhow::anyhow!("Failed to resize offscreen target: {}", e))?;
+        }
+        self.needs_render = true;
+        Ok(())
+    }
+
+    pub fn request_viewport_size(&mut self, new_size: (u32, u32)) -> bool {
+        let (current_size, requested_size, changed) = request_viewport_size_state(
+            self.sizing_mode,
+            self.is_initialized,
+            self.viewport_size,
+            self.requested_viewport_size,
+            new_size,
+        );
+        if !changed {
+            return false;
+        }
+
+        self.requested_viewport_size = requested_size;
+        if !self.is_initialized {
+            self.set_viewport_size_immediate(current_size);
+        }
+        self.needs_render = true;
+        true
+    }
+
     /// Update the viewport (called every frame if needed)
     pub fn update(&mut self) -> Result<()> {
         if !self.is_initialized {
@@ -178,6 +265,8 @@ impl SceneViewport {
         if !self.is_initialized {
             return Ok(()); // Skip if not initialized
         }
+
+        self.apply_requested_viewport_size()?;
 
         // Only render if scene needs updating
         if !self.needs_render {
@@ -252,21 +341,23 @@ impl SceneViewport {
             {
                 if let Some(texture_id) = _target.egui_texture_id {
                     // Calculate aspect ratio preserving viewport size
-                    let viewport_aspect = self.viewport_size.0 as f32 / self.viewport_size.1 as f32;
-                    let available_size = rect.size();
-                    let available_aspect = available_size.x / available_size.y;
-
-                    let display_size = if available_aspect > viewport_aspect {
-                        // Available space is wider than viewport - letterbox horizontally
-                        egui::Vec2::new(available_size.y * viewport_aspect, available_size.y)
+                    let display_rect = if self.sizing_mode == ViewportSizingMode::Responsive {
+                        rect
                     } else {
-                        // Available space is taller than viewport - letterbox vertically
-                        egui::Vec2::new(available_size.x, available_size.x / viewport_aspect)
-                    };
+                        let viewport_aspect =
+                            self.viewport_size.0 as f32 / self.viewport_size.1 as f32;
+                        let available_size = rect.size();
+                        let available_aspect = available_size.x / available_size.y;
 
-                    // Center the viewport within the available rect
-                    let offset = (available_size - display_size) * 0.5;
-                    let display_rect = egui::Rect::from_min_size(rect.min + offset, display_size);
+                        let display_size = if available_aspect > viewport_aspect {
+                            egui::Vec2::new(available_size.y * viewport_aspect, available_size.y)
+                        } else {
+                            egui::Vec2::new(available_size.x, available_size.x / viewport_aspect)
+                        };
+
+                        let offset = (available_size - display_size) * 0.5;
+                        egui::Rect::from_min_size(rect.min + offset, display_size)
+                    };
 
                     // Handle mouse interaction for camera panning and future entity selection
                     let response = ui.allocate_response(rect.size(), egui::Sense::click_and_drag());
@@ -354,6 +445,10 @@ impl SceneViewport {
 
     pub fn viewport_size(&self) -> (u32, u32) {
         self.viewport_size
+    }
+
+    pub fn sizing_mode(&self) -> ViewportSizingMode {
+        self.sizing_mode
     }
 
     /// Find entity at world position for hit detection
@@ -1439,7 +1534,10 @@ impl SceneViewport {
 
 #[cfg(test)]
 mod tests {
-    use super::{point_in_entity_bounds, screen_to_world_from_camera, world_to_i32_floor};
+    use super::{
+        point_in_entity_bounds, request_viewport_size_state, screen_to_world_from_camera,
+        world_to_i32_floor, ViewportSizingMode,
+    };
 
     #[test]
     fn screen_to_world_uses_camera_and_has_no_hardcoded_tile_offset() {
@@ -1497,5 +1595,50 @@ mod tests {
         assert!(point_in_entity_bounds(glam::IVec2::new(25, 35), pos, size));
         assert!(!point_in_entity_bounds(glam::IVec2::new(26, 35), pos, size));
         assert!(!point_in_entity_bounds(glam::IVec2::new(25, 36), pos, size));
+    }
+
+    #[test]
+    fn responsive_viewport_accepts_requested_size_before_initialization() {
+        let (current_size, requested_size, changed) = request_viewport_size_state(
+            ViewportSizingMode::Responsive,
+            false,
+            (160, 144),
+            None,
+            (640, 480),
+        );
+
+        assert!(changed);
+        assert_eq!(current_size, (640, 480));
+        assert_eq!(requested_size, None);
+    }
+
+    #[test]
+    fn fixed_viewport_ignores_requested_size_changes() {
+        let (current_size, requested_size, changed) = request_viewport_size_state(
+            ViewportSizingMode::Fixed,
+            true,
+            (160, 144),
+            None,
+            (640, 480),
+        );
+
+        assert!(!changed);
+        assert_eq!(current_size, (160, 144));
+        assert_eq!(requested_size, None);
+    }
+
+    #[test]
+    fn responsive_initialized_viewport_defers_resize_until_render_phase() {
+        let (current_size, requested_size, changed) = request_viewport_size_state(
+            ViewportSizingMode::Responsive,
+            true,
+            (160, 144),
+            None,
+            (640, 480),
+        );
+
+        assert!(changed);
+        assert_eq!(current_size, (160, 144));
+        assert_eq!(requested_size, Some((640, 480)));
     }
 }
