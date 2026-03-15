@@ -202,10 +202,8 @@ impl App {
         let available_width = (view_width - SPLASH_TEXT_HORIZONTAL_PADDING_PX).max(1.0);
         let char_count = content.chars().count().max(1) as f32;
         let max_size_for_width = available_width / (char_count * 0.55);
-        let size_px = max_size_for_width.clamp(
-            SPLASH_VERSION_MIN_SIZE_PX,
-            SPLASH_VERSION_DEFAULT_SIZE_PX,
-        );
+        let size_px =
+            max_size_for_width.clamp(SPLASH_VERSION_MIN_SIZE_PX, SPLASH_VERSION_DEFAULT_SIZE_PX);
         TextStyle {
             font_family: "Sans".to_string(),
             size_px,

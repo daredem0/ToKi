@@ -347,21 +347,34 @@ impl PanelSystem {
         ui.horizontal(|ui| {
             ui.heading("Map Editor");
             ui.separator();
+            if ui.button("New Map").clicked() {
+                ui_state.begin_new_map_dialog();
+            }
+            if ui
+                .add_enabled(
+                    ui_state.has_unsaved_map_editor_draft(),
+                    egui::Button::new("Save Map"),
+                )
+                .clicked()
+            {
+                ui_state.map_editor_save_requested = true;
+            }
+            ui.separator();
             ui.label("Map:");
 
-            let selected_label = ui_state
-                .map_editor_active_map
-                .as_deref()
-                .unwrap_or("No map selected");
+            let selected_label = ui_state.map_editor_selected_label();
             egui::ComboBox::from_id_salt("map_editor_map_selector")
                 .selected_text(selected_label)
                 .show_ui(ui, |ui| {
                     if let Some(map_names) = &available_map_names {
+                        if ui_state.has_unsaved_map_editor_draft() {
+                            ui.label("Save the current draft before switching maps.");
+                            return;
+                        }
                         for map_name in map_names {
-                            let is_selected =
-                                ui_state.map_editor_active_map.as_deref() == Some(map_name.as_str());
-                            if ui.selectable_label(is_selected, map_name).clicked()
-                                && !is_selected
+                            let is_selected = ui_state.map_editor_active_map.as_deref()
+                                == Some(map_name.as_str());
+                            if ui.selectable_label(is_selected, map_name).clicked() && !is_selected
                             {
                                 ui_state.map_editor_active_map = Some(map_name.clone());
                                 ui_state.map_editor_map_load_requested = Some(map_name.clone());
@@ -370,11 +383,60 @@ impl PanelSystem {
                     }
                 });
 
-            if let Some(active_map) = ui_state.map_editor_active_map.as_deref() {
+            if ui_state.has_unsaved_map_editor_draft() {
+                ui.label("Unsaved draft");
+            } else if let Some(active_map) = ui_state.map_editor_active_map.as_deref() {
                 ui.label(format!("Editing asset: {}", active_map));
             }
         });
         ui.separator();
+
+        if ui_state.map_editor_show_new_map_dialog {
+            let mut open = ui_state.map_editor_show_new_map_dialog;
+            let mut create_clicked = false;
+            let mut cancel_clicked = false;
+            egui::Window::new("New Map")
+                .collapsible(false)
+                .resizable(false)
+                .open(&mut open)
+                .show(ui.ctx(), |ui| {
+                    ui.label("Name");
+                    ui.text_edit_singleline(&mut ui_state.map_editor_new_map_name);
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        ui.label("Width");
+                        ui.add(
+                            egui::DragValue::new(&mut ui_state.map_editor_new_map_width)
+                                .range(1..=512)
+                                .speed(1),
+                        );
+                        ui.label("Height");
+                        ui.add(
+                            egui::DragValue::new(&mut ui_state.map_editor_new_map_height)
+                                .range(1..=512)
+                                .speed(1),
+                        );
+                    });
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        if ui.button("Create").clicked() {
+                            create_clicked = true;
+                        }
+                        if ui.button("Cancel").clicked() {
+                            cancel_clicked = true;
+                        }
+                    });
+                });
+
+            if create_clicked {
+                ui_state.submit_new_map_request();
+                open = false;
+            }
+            if cancel_clicked {
+                open = false;
+            }
+            ui_state.map_editor_show_new_map_dialog = open;
+        }
 
         let Some(viewport) = map_editor_viewport else {
             ui.label("Map editor viewport not initialized.");
@@ -393,8 +455,10 @@ impl PanelSystem {
         }
 
         let available_size = ui.available_size();
-        let (rect, response) =
-            ui.allocate_exact_size(available_size, egui::Sense::drag().union(egui::Sense::hover()));
+        let (rect, response) = ui.allocate_exact_size(
+            available_size,
+            egui::Sense::drag().union(egui::Sense::hover()),
+        );
 
         CameraInteraction::handle_drag(viewport, &response, config.as_deref());
 

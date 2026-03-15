@@ -450,12 +450,7 @@ mod tests {
         );
         buffer.set_size(&mut font_system, Some(200.0), Some(100.0));
         let attrs = super::attrs_for_style(&style);
-        buffer.set_text(
-            &mut font_system,
-            "Powered by ToKi",
-            &attrs,
-            Shaping::Basic,
-        );
+        buffer.set_text(&mut font_system, "Powered by ToKi", &attrs, Shaping::Basic);
         buffer.shape_until_scroll(&mut font_system, false);
 
         let measured = measure_buffer_size(&buffer);

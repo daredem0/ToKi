@@ -1,9 +1,8 @@
 use kira::{
-    Decibels,
     sound::static_sound::{StaticSoundData, StaticSoundHandle},
     sound::streaming::{StreamingSoundData, StreamingSoundHandle, StreamingSoundSettings},
     sound::FromFileError,
-    AudioManager as KiraAudioManager, AudioManagerSettings, Tween,
+    AudioManager as KiraAudioManager, AudioManagerSettings, Decibels, Tween,
 };
 use std::collections::HashMap;
 use std::fs;
@@ -780,8 +779,7 @@ impl EventHandler<AudioEvent> for AudioManager {
                     return;
                 };
 
-                if let Err(e) = self.play_sound_in_channel_with_gain(channel_name, sound_id, gain)
-                {
+                if let Err(e) = self.play_sound_in_channel_with_gain(channel_name, sound_id, gain) {
                     tracing::warn!(
                         "Failed to play sound '{}' in '{}' channel: {}",
                         sound_id,

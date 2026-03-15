@@ -72,6 +72,16 @@ impl SceneManager {
         self.tilemap.as_ref()
     }
 
+    /// Set the current tilemap directly without loading from disk.
+    pub fn set_tilemap(&mut self, tilemap: TileMap) -> Result<()> {
+        tilemap
+            .validate()
+            .map_err(|e| anyhow::anyhow!("Invalid tilemap: {}", e))?;
+        self.tilemap = Some(tilemap);
+        tracing::info!("Set in-memory tilemap on scene manager");
+        Ok(())
+    }
+
     /// Clear the current tilemap
     pub fn clear_tilemap(&mut self) {
         self.tilemap = None;

@@ -56,7 +56,8 @@ impl GameManager {
                     if pressed {
                         self.game_state.handle_profile_key_press(profile, input_key);
                     } else {
-                        self.game_state.handle_profile_key_release(profile, input_key);
+                        self.game_state
+                            .handle_profile_key_release(profile, input_key);
                     }
                 }
             }

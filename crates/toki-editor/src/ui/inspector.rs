@@ -313,18 +313,14 @@ impl InspectorSystem {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, true])
                     .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
-                    .show(ui, |ui| {
-                        match ui_state.right_panel_tab {
-                            super::editor_ui::RightPanelTab::Inspector => {
-                                Self::render_selection_inspector_contents(
-                                    ui_state, ui, game_state, config,
-                                );
-                            }
-                            super::editor_ui::RightPanelTab::Project => {
-                                Self::render_project_settings_panel(
-                                    ui_state, ui, project, config,
-                                );
-                            }
+                    .show(ui, |ui| match ui_state.right_panel_tab {
+                        super::editor_ui::RightPanelTab::Inspector => {
+                            Self::render_selection_inspector_contents(
+                                ui_state, ui, game_state, config,
+                            );
+                        }
+                        super::editor_ui::RightPanelTab::Project => {
+                            Self::render_project_settings_panel(ui_state, ui, project, config);
                         }
                     });
             });
@@ -405,8 +401,9 @@ impl InspectorSystem {
                 ui.monospace(node_key);
                 ui.separator();
 
-                let changed =
-                    Self::render_selected_rule_graph_node_editor(ui, ui_state, scene_name, node_key, config);
+                let changed = Self::render_selected_rule_graph_node_editor(
+                    ui, ui_state, scene_name, node_key, config,
+                );
 
                 if changed {
                     ui_state.scene_content_changed = true;
@@ -428,14 +425,18 @@ impl InspectorSystem {
             Some(Selection::Entity(entity_id)) => {
                 let mut entity_changed = false;
                 if ui_state.has_multi_entity_selection() {
-                    ui.heading(format!("👥 {} Entities", ui_state.selected_entity_ids.len()));
+                    ui.heading(format!(
+                        "👥 {} Entities",
+                        ui_state.selected_entity_ids.len()
+                    ));
                     ui.separator();
                     entity_changed = Self::render_multi_scene_entity_editor(ui, ui_state);
                 } else {
                     ui.separator();
                     ui.heading(format!("👤 Entity {}", entity_id));
                     ui.separator();
-                    if let Some(scene_entity) = Self::find_selected_scene_entity(ui_state, *entity_id)
+                    if let Some(scene_entity) =
+                        Self::find_selected_scene_entity(ui_state, *entity_id)
                     {
                         let mut draft = EntityPropertyDraft::from_entity(&scene_entity);
                         if Self::render_scene_entity_editor(ui, &mut draft, config) {
@@ -1089,8 +1090,12 @@ impl InspectorSystem {
     ) -> Result<(), String> {
         let content = serde_json::to_string_pretty(definition)
             .map_err(|err| format!("failed to serialize entity definition: {err}"))?;
-        std::fs::write(path, content)
-            .map_err(|err| format!("failed to write entity definition '{}': {err}", path.display()))
+        std::fs::write(path, content).map_err(|err| {
+            format!(
+                "failed to write entity definition '{}': {err}",
+                path.display()
+            )
+        })
     }
 
     fn render_scene_rules_editor(
@@ -2945,10 +2950,8 @@ impl InspectorSystem {
                         .changed();
                 });
         });
-        let uses_distance_trigger = matches!(
-            draft.movement_sound_trigger,
-            MovementSoundTrigger::Distance
-        );
+        let uses_distance_trigger =
+            matches!(draft.movement_sound_trigger, MovementSoundTrigger::Distance);
         ui.horizontal(|ui| {
             ui.label("Footstep Distance:");
             ui.add_enabled_ui(uses_distance_trigger, |ui| {
@@ -2966,7 +2969,9 @@ impl InspectorSystem {
             let mut sfx_names = config
                 .and_then(|cfg| cfg.current_project_path())
                 .map(|project_path| {
-                    Self::discover_audio_asset_names(project_path.join("assets/audio/sfx").as_path())
+                    Self::discover_audio_asset_names(
+                        project_path.join("assets/audio/sfx").as_path(),
+                    )
                 })
                 .unwrap_or_default();
             if !draft.movement_sound.trim().is_empty()
@@ -3765,8 +3770,9 @@ impl InspectorSystem {
                     // Try to read the entity definition file
                     match std::fs::read_to_string(&entity_file) {
                         Ok(content) => {
-                            if let Ok(mut definition) =
-                                serde_json::from_str::<toki_core::entity::EntityDefinition>(&content)
+                            if let Ok(mut definition) = serde_json::from_str::<
+                                toki_core::entity::EntityDefinition,
+                            >(&content)
                             {
                                 ui.separator();
                                 ui.label("Audio Settings:");
@@ -3819,7 +3825,8 @@ impl InspectorSystem {
                                             changed |= ui
                                                 .add(
                                                     egui::DragValue::new(
-                                                        &mut definition.audio
+                                                        &mut definition
+                                                            .audio
                                                             .footstep_trigger_distance,
                                                     )
                                                     .speed(0.5)
@@ -3878,11 +3885,12 @@ impl InspectorSystem {
 
                                 ui.horizontal(|ui| {
                                     ui.label("Movement Sound:");
-                                    let selected_text = if definition.audio.movement_sound.trim().is_empty() {
-                                        "None".to_string()
-                                    } else {
-                                        definition.audio.movement_sound.clone()
-                                    };
+                                    let selected_text =
+                                        if definition.audio.movement_sound.trim().is_empty() {
+                                            "None".to_string()
+                                        } else {
+                                            definition.audio.movement_sound.clone()
+                                        };
                                     let mut changed = false;
                                     egui::ComboBox::from_id_salt(format!(
                                         "entity_def_movement_sound_{}",
@@ -4386,7 +4394,10 @@ mod tests {
             MovementSoundTrigger::AnimationLoop
         );
         assert_eq!(entity.audio.footstep_trigger_distance, 0.0);
-        assert_eq!(entity.audio.movement_sound.as_deref(), Some("sfx_custom_step"));
+        assert_eq!(
+            entity.audio.movement_sound.as_deref(),
+            Some("sfx_custom_step")
+        );
         assert!(entity.attributes.has_inventory);
         assert_eq!(entity.attributes.speed, 0);
         assert_eq!(entity.attributes.render_layer, 8);

@@ -53,6 +53,16 @@ impl MenuSystem {
                     }
                     if ui
                         .add_enabled(
+                            ui_state.has_unsaved_map_editor_draft(),
+                            egui::Button::new("Save Map"),
+                        )
+                        .clicked()
+                    {
+                        tracing::info!("Save Map clicked");
+                        ui_state.map_editor_save_requested = true;
+                    }
+                    if ui
+                        .add_enabled(
                             !ui_state.background_task_running,
                             egui::Button::new("Export Game..."),
                         )

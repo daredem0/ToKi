@@ -393,7 +393,8 @@ impl EntityManager {
             .insert(id);
 
         self.active_entities.insert(id);
-        self.audio_components.insert(id, entity.audio.to_component());
+        self.audio_components
+            .insert(id, entity.audio.to_component());
 
         // Store the entity
         self.entities.insert(id, entity);

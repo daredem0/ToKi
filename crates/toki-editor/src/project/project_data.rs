@@ -360,6 +360,9 @@ collision_percent = 40
     #[test]
     fn new_project_uses_derived_editor_version() {
         let project = Project::new("Demo".to_string(), PathBuf::from("/tmp/Demo"));
-        assert_eq!(project.metadata.project.toki_editor_version, env!("TOKI_VERSION"));
+        assert_eq!(
+            project.metadata.project.toki_editor_version,
+            env!("TOKI_VERSION")
+        );
     }
 }

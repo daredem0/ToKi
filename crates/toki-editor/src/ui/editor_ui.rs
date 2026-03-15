@@ -7,6 +7,7 @@ use crate::project::SceneGraphLayout;
 use crate::scene::SceneViewport;
 use std::collections::HashMap;
 use toki_core::{
+    assets::tilemap::TileMap,
     entity::{Entity, EntityId},
     rules::RuleSet,
     Scene,
@@ -65,6 +66,19 @@ pub struct SceneRulesGraphCommandData {
     pub pan: [f32; 2],
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct MapEditorDraft {
+    pub name: String,
+    pub tilemap: TileMap,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewMapRequest {
+    pub name: String,
+    pub width: u32,
+    pub height: u32,
+}
+
 /// Manages the editor's UI state and rendering
 pub struct EditorUI {
     // Scene management
@@ -104,6 +118,13 @@ pub struct EditorUI {
     pub map_load_requested: Option<(String, String)>, // (scene_name, map_name)
     pub map_editor_active_map: Option<String>,
     pub map_editor_map_load_requested: Option<String>,
+    pub map_editor_draft: Option<MapEditorDraft>,
+    pub map_editor_show_new_map_dialog: bool,
+    pub map_editor_new_map_name: String,
+    pub map_editor_new_map_width: u32,
+    pub map_editor_new_map_height: u32,
+    pub map_editor_new_map_requested: Option<NewMapRequest>,
+    pub map_editor_save_requested: bool,
 
     // Asset validation
     pub validate_assets_requested: bool,
@@ -173,6 +194,13 @@ impl EditorUI {
             map_load_requested: None,
             map_editor_active_map: None,
             map_editor_map_load_requested: None,
+            map_editor_draft: None,
+            map_editor_show_new_map_dialog: false,
+            map_editor_new_map_name: "new_map".to_string(),
+            map_editor_new_map_width: 32,
+            map_editor_new_map_height: 32,
+            map_editor_new_map_requested: None,
+            map_editor_save_requested: false,
 
             // Asset validation
             validate_assets_requested: false,
@@ -287,6 +315,11 @@ impl EditorUI {
     }
 
     pub fn sync_map_editor_selection(&mut self, available_map_names: &[String]) {
+        if self.map_editor_draft.is_some() {
+            self.map_editor_map_load_requested = None;
+            return;
+        }
+
         if available_map_names.is_empty() {
             self.map_editor_active_map = None;
             self.map_editor_map_load_requested = None;
@@ -308,6 +341,56 @@ impl EditorUI {
             self.map_editor_active_map = Some(next_map.clone());
             self.map_editor_map_load_requested = Some(next_map);
         }
+    }
+
+    pub fn begin_new_map_dialog(&mut self) {
+        self.map_editor_show_new_map_dialog = true;
+        if self.map_editor_new_map_name.trim().is_empty() {
+            self.map_editor_new_map_name = "new_map".to_string();
+        }
+        self.map_editor_new_map_width = self.map_editor_new_map_width.max(1);
+        self.map_editor_new_map_height = self.map_editor_new_map_height.max(1);
+    }
+
+    pub fn submit_new_map_request(&mut self) {
+        let name = self.map_editor_new_map_name.trim().to_string();
+        if name.is_empty() {
+            return;
+        }
+
+        self.map_editor_new_map_requested = Some(NewMapRequest {
+            name,
+            width: self.map_editor_new_map_width.max(1),
+            height: self.map_editor_new_map_height.max(1),
+        });
+        self.map_editor_show_new_map_dialog = false;
+    }
+
+    pub fn set_map_editor_draft(&mut self, draft: MapEditorDraft) {
+        self.map_editor_active_map = Some(draft.name.clone());
+        self.map_editor_map_load_requested = None;
+        self.map_editor_draft = Some(draft);
+    }
+
+    pub fn map_editor_selected_label(&self) -> String {
+        if let Some(draft) = &self.map_editor_draft {
+            return format!("{}*", draft.name);
+        }
+
+        self.map_editor_active_map
+            .clone()
+            .unwrap_or_else(|| "No map selected".to_string())
+    }
+
+    pub fn has_unsaved_map_editor_draft(&self) -> bool {
+        self.map_editor_draft.is_some()
+    }
+
+    pub fn finalize_saved_map_editor_draft(&mut self, saved_name: String) {
+        self.map_editor_draft = None;
+        self.map_editor_active_map = Some(saved_name.clone());
+        self.map_editor_map_load_requested = Some(saved_name);
+        self.map_editor_save_requested = false;
     }
 
     pub fn execute_command(&mut self, command: EditorCommand) -> bool {
@@ -1074,7 +1157,7 @@ mod tests {
         Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger,
     };
 
-    use super::EditorUI;
+    use super::{EditorUI, MapEditorDraft};
     use crate::ui::rule_graph::RuleGraph;
     use crate::ui::undo_redo::EditorCommand;
 
@@ -1235,7 +1318,11 @@ mod tests {
     #[test]
     fn sync_map_editor_selection_picks_sorted_first_map_and_requests_load() {
         let mut ui = EditorUI::new();
-        let maps = vec!["zeta".to_string(), "alpha".to_string(), "middle".to_string()];
+        let maps = vec![
+            "zeta".to_string(),
+            "alpha".to_string(),
+            "middle".to_string(),
+        ];
 
         ui.sync_map_editor_selection(&maps);
 
@@ -1247,11 +1334,58 @@ mod tests {
     fn sync_map_editor_selection_preserves_existing_valid_choice() {
         let mut ui = EditorUI::new();
         ui.map_editor_active_map = Some("middle".to_string());
-        let maps = vec!["zeta".to_string(), "alpha".to_string(), "middle".to_string()];
+        let maps = vec![
+            "zeta".to_string(),
+            "alpha".to_string(),
+            "middle".to_string(),
+        ];
 
         ui.sync_map_editor_selection(&maps);
 
         assert_eq!(ui.map_editor_active_map.as_deref(), Some("middle"));
         assert!(ui.map_editor_map_load_requested.is_none());
+    }
+
+    #[test]
+    fn sync_map_editor_selection_preserves_unsaved_draft() {
+        let mut ui = EditorUI::new();
+        ui.set_map_editor_draft(MapEditorDraft {
+            name: "draft_map".to_string(),
+            tilemap: toki_core::assets::tilemap::TileMap {
+                size: glam::UVec2::new(2, 2),
+                tile_size: glam::UVec2::new(8, 8),
+                atlas: std::path::PathBuf::from("terrain.json"),
+                tiles: vec!["grass".to_string(); 4],
+            },
+        });
+
+        ui.sync_map_editor_selection(&["alpha".to_string(), "zeta".to_string()]);
+
+        assert_eq!(ui.map_editor_active_map.as_deref(), Some("draft_map"));
+        assert!(ui.map_editor_map_load_requested.is_none());
+        assert!(ui.has_unsaved_map_editor_draft());
+    }
+
+    #[test]
+    fn finalize_saved_map_editor_draft_requests_reload_from_disk() {
+        let mut ui = EditorUI::new();
+        ui.set_map_editor_draft(MapEditorDraft {
+            name: "draft_map".to_string(),
+            tilemap: toki_core::assets::tilemap::TileMap {
+                size: glam::UVec2::new(2, 2),
+                tile_size: glam::UVec2::new(8, 8),
+                atlas: std::path::PathBuf::from("terrain.json"),
+                tiles: vec!["grass".to_string(); 4],
+            },
+        });
+
+        ui.finalize_saved_map_editor_draft("draft_map".to_string());
+
+        assert!(!ui.has_unsaved_map_editor_draft());
+        assert_eq!(ui.map_editor_active_map.as_deref(), Some("draft_map"));
+        assert_eq!(
+            ui.map_editor_map_load_requested.as_deref(),
+            Some("draft_map")
+        );
     }
 }

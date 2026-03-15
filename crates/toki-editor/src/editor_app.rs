@@ -1,8 +1,10 @@
 use anyhow::Result;
 use egui_winit::winit;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
+use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
 use toki_core::GameState;
 use winit::application::ApplicationHandler;
 use winit::event::Modifiers;
@@ -17,11 +19,12 @@ use crate::background_tasks::{
 };
 use crate::config::EditorConfig;
 use crate::logging::LogCapture;
+use crate::project::ProjectAssets;
 use crate::project::{ProjectManager, ProjectTemplateKind};
 use crate::rendering::WindowRenderer;
 use crate::scene::viewport::DragPreviewSprite;
 use crate::scene::SceneViewport;
-use crate::ui::editor_ui::CenterPanelTab;
+use crate::ui::editor_ui::{CenterPanelTab, MapEditorDraft};
 use crate::ui::EditorUI;
 
 pub fn run_editor(log_capture: Option<LogCapture>) -> Result<()> {
@@ -113,6 +116,66 @@ impl EditorApp {
             Some(Self::workspace_root().join("assets").join("TokiLogo.png")),
         ];
         candidates.into_iter().flatten().find(|path| path.exists())
+    }
+
+    fn build_map_editor_draft(
+        project_assets: &ProjectAssets,
+        name: &str,
+        width: u32,
+        height: u32,
+    ) -> Result<MapEditorDraft> {
+        if name.trim().is_empty() {
+            return Err(anyhow::anyhow!("Map name cannot be empty"));
+        }
+        if name.contains('/') || name.contains('\\') {
+            return Err(anyhow::anyhow!("Map name cannot contain path separators"));
+        }
+
+        let mut atlas_names = project_assets
+            .sprite_atlases
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        atlas_names.sort();
+
+        let chosen_atlas_name = if project_assets.sprite_atlases.contains_key("terrain") {
+            "terrain".to_string()
+        } else {
+            atlas_names
+                .into_iter()
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("No sprite atlases available for new map"))?
+        };
+
+        let atlas_asset = project_assets
+            .sprite_atlases
+            .get(&chosen_atlas_name)
+            .ok_or_else(|| anyhow::anyhow!("Missing atlas asset '{}'", chosen_atlas_name))?;
+        let atlas_meta = AtlasMeta::load_from_file(&atlas_asset.path)
+            .map_err(|e| anyhow::anyhow!("Failed to load atlas '{}': {}", chosen_atlas_name, e))?;
+
+        let mut tile_names = atlas_meta.tiles.keys().cloned().collect::<Vec<_>>();
+        tile_names.sort();
+        let fill_tile = tile_names.into_iter().next().ok_or_else(|| {
+            anyhow::anyhow!("Atlas '{}' does not define any tiles", chosen_atlas_name)
+        })?;
+
+        let tilemap = TileMap {
+            size: glam::UVec2::new(width.max(1), height.max(1)),
+            tile_size: atlas_meta.tile_size,
+            atlas: PathBuf::from(
+                atlas_asset
+                    .path
+                    .file_name()
+                    .ok_or_else(|| anyhow::anyhow!("Atlas path has no file name"))?,
+            ),
+            tiles: vec![fill_tile; width.max(1) as usize * height.max(1) as usize],
+        };
+
+        Ok(MapEditorDraft {
+            name: name.trim().to_string(),
+            tilemap,
+        })
     }
 
     fn ensure_busy_logo_texture(&mut self, ctx: &egui::Context) {
@@ -436,11 +499,15 @@ impl ApplicationHandler for EditorApp {
                             tracing::info!("Map editor viewport initialized");
                         }
                         Err(e) => {
-                            tracing::error!("Failed to initialize map editor viewport with WGPU: {e}");
+                            tracing::error!(
+                                "Failed to initialize map editor viewport with WGPU: {e}"
+                            );
                         }
                     }
                 } else {
-                    tracing::error!("Cannot initialize map editor viewport: renderer not available");
+                    tracing::error!(
+                        "Cannot initialize map editor viewport: renderer not available"
+                    );
                 }
             }
             Err(e) => {
@@ -786,6 +853,8 @@ impl EditorApp {
         self.handle_play_scene_request();
         self.handle_active_scene_map_loading();
         self.handle_map_requests();
+        self.handle_new_map_editor_requests();
+        self.handle_save_map_editor_request();
         self.handle_map_editor_map_requests();
 
         if self
@@ -1576,7 +1645,94 @@ impl EditorApp {
         }
     }
 
+    fn handle_new_map_editor_requests(&mut self) {
+        let Some(request) = self.ui.map_editor_new_map_requested.take() else {
+            return;
+        };
+
+        let Some(project_assets) = self.project_manager.get_project_assets() else {
+            tracing::warn!(
+                "No project assets available for new map request '{}'",
+                request.name
+            );
+            return;
+        };
+
+        match Self::build_map_editor_draft(
+            project_assets,
+            &request.name,
+            request.width,
+            request.height,
+        ) {
+            Ok(draft) => {
+                let Some(viewport) = &mut self.map_editor_viewport else {
+                    tracing::warn!(
+                        "No map editor viewport available for new map '{}'",
+                        request.name
+                    );
+                    return;
+                };
+
+                if let Err(error) = viewport
+                    .scene_manager_mut()
+                    .set_tilemap(draft.tilemap.clone())
+                {
+                    tracing::error!(
+                        "Failed to load new map draft '{}' into map editor viewport: {}",
+                        draft.name,
+                        error
+                    );
+                    return;
+                }
+
+                self.ui.set_map_editor_draft(draft);
+                viewport.mark_dirty();
+            }
+            Err(error) => {
+                tracing::error!(
+                    "Failed to create new map draft '{}': {}",
+                    request.name,
+                    error
+                );
+            }
+        }
+    }
+
+    fn handle_save_map_editor_request(&mut self) {
+        if !self.ui.map_editor_save_requested {
+            return;
+        }
+
+        let Some(draft) = self.ui.map_editor_draft.clone() else {
+            self.ui.map_editor_save_requested = false;
+            return;
+        };
+
+        match self
+            .project_manager
+            .save_tilemap_asset(&draft.name, &draft.tilemap)
+        {
+            Ok(_) => {
+                tracing::info!("Saved map editor draft '{}'", draft.name);
+                self.ui.finalize_saved_map_editor_draft(draft.name);
+            }
+            Err(error) => {
+                tracing::error!(
+                    "Failed to save map editor draft '{}': {}",
+                    draft.name,
+                    error
+                );
+                self.ui.map_editor_save_requested = false;
+            }
+        }
+    }
+
     fn handle_map_editor_map_requests(&mut self) {
+        if self.ui.has_unsaved_map_editor_draft() {
+            self.ui.map_editor_map_load_requested = None;
+            return;
+        }
+
         let Some(map_name) = self.ui.map_editor_map_load_requested.take() else {
             return;
         };
@@ -1610,7 +1766,11 @@ impl EditorApp {
                 viewport.mark_dirty();
             }
             Err(e) => {
-                tracing::error!("Failed to load map '{}' into map editor viewport: {}", map_name, e);
+                tracing::error!(
+                    "Failed to load map '{}' into map editor viewport: {}",
+                    map_name,
+                    e
+                );
             }
         }
     }
@@ -1763,9 +1923,11 @@ impl EditorApp {
 #[cfg(test)]
 mod tests {
     use super::EditorApp;
+    use crate::project::ProjectAssets;
     use crate::ui::editor_ui::EntityMoveDragState;
     use glam::{IVec2, UVec2, Vec2};
     use std::collections::HashMap;
+    use std::fs;
     use std::path::PathBuf;
     use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
     use toki_core::assets::tilemap::TileMap;
@@ -1888,6 +2050,57 @@ mod tests {
             args,
             vec!["--project", "/tmp/project", "--scene", "Main Scene",]
         );
+    }
+
+    #[test]
+    fn build_map_editor_draft_prefers_terrain_atlas_and_fills_tiles() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should exist");
+        let project_path = temp_dir.path().to_path_buf();
+        fs::create_dir_all(project_path.join("assets").join("sprites"))
+            .expect("sprites dir should exist");
+
+        fs::write(
+            project_path
+                .join("assets")
+                .join("sprites")
+                .join("terrain.json"),
+            r#"{
+                "image": "terrain.png",
+                "tile_size": [8, 8],
+                "tiles": {
+                    "grass": { "position": [0, 0] },
+                    "water": { "position": [1, 0] }
+                }
+            }"#,
+        )
+        .expect("terrain atlas should be written");
+        fs::write(
+            project_path
+                .join("assets")
+                .join("sprites")
+                .join("other.json"),
+            r#"{
+                "image": "other.png",
+                "tile_size": [16, 16],
+                "tiles": {
+                    "stone": { "position": [0, 0] }
+                }
+            }"#,
+        )
+        .expect("other atlas should be written");
+
+        let mut project_assets = ProjectAssets::new(project_path);
+        project_assets.scan_assets().expect("assets should scan");
+
+        let draft = EditorApp::build_map_editor_draft(&project_assets, "new_map", 5, 4)
+            .expect("draft should build");
+
+        assert_eq!(draft.name, "new_map");
+        assert_eq!(draft.tilemap.size, UVec2::new(5, 4));
+        assert_eq!(draft.tilemap.tile_size, UVec2::new(8, 8));
+        assert_eq!(draft.tilemap.atlas, PathBuf::from("terrain.json"));
+        assert_eq!(draft.tilemap.tiles.len(), 20);
+        assert!(draft.tilemap.tiles.iter().all(|tile| tile == "grass"));
     }
 
     fn collision_assets_with_center_solid_tile() -> (TileMap, AtlasMeta) {

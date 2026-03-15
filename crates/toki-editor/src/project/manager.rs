@@ -3,6 +3,7 @@ use crate::project::{Project, ProjectAssets, ProjectTemplateKind};
 use anyhow::Result;
 use std::fs;
 use std::path::PathBuf;
+use toki_core::assets::tilemap::TileMap;
 use toki_core::{GameState, Scene};
 
 /// Manages project operations (create, load, save)
@@ -222,6 +223,38 @@ impl ProjectManager {
         } else {
             Ok(Vec::new())
         }
+    }
+
+    pub fn save_tilemap_asset(&mut self, map_name: &str, tilemap: &TileMap) -> Result<PathBuf> {
+        if map_name.trim().is_empty() {
+            return Err(anyhow::anyhow!("Map name cannot be empty"));
+        }
+        if map_name.contains('/') || map_name.contains('\\') {
+            return Err(anyhow::anyhow!("Map name cannot contain path separators"));
+        }
+
+        tilemap
+            .validate()
+            .map_err(|e| anyhow::anyhow!("Invalid tilemap: {}", e))?;
+
+        let project_path = self
+            .current_project
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No project currently loaded"))?
+            .path
+            .clone();
+        let tilemaps_dir = project_path.join("assets").join("tilemaps");
+        fs::create_dir_all(&tilemaps_dir)?;
+
+        let map_path = tilemaps_dir.join(format!("{}.json", map_name));
+        fs::write(&map_path, serde_json::to_string_pretty(tilemap)?)?;
+
+        if let Some(project_assets) = &mut self.project_assets {
+            project_assets.scan_assets()?;
+        }
+
+        tracing::info!("Saved tilemap asset '{}' to {:?}", map_name, map_path);
+        Ok(map_path)
     }
 
     /// Create the project folder structure
@@ -659,6 +692,46 @@ mod tests {
             atlas: PathBuf::from("atlas.json"),
             tiles: vec!["floor".to_string()],
         }
+    }
+
+    #[test]
+    fn save_tilemap_asset_writes_map_and_rescans_assets() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let parent = temp_dir.path().to_path_buf();
+
+        let mut manager = ProjectManager::new();
+        manager
+            .create_new_project("test_project".to_string(), parent.clone())
+            .expect("project should be created");
+
+        let tilemap = TileMap {
+            size: glam::UVec2::new(4, 3),
+            tile_size: glam::UVec2::new(8, 8),
+            atlas: PathBuf::from("terrain.json"),
+            tiles: vec!["grass".to_string(); 12],
+        };
+
+        let saved_path = manager
+            .save_tilemap_asset("draft_map", &tilemap)
+            .expect("tilemap should save");
+
+        assert_eq!(
+            saved_path,
+            parent
+                .join("test_project")
+                .join("assets")
+                .join("tilemaps")
+                .join("draft_map.json")
+        );
+        assert!(saved_path.exists());
+
+        let loaded = TileMap::load_from_file(&saved_path).expect("saved tilemap should load");
+        assert_eq!(loaded, tilemap);
+
+        let project_assets = manager
+            .get_project_assets()
+            .expect("project assets should be available");
+        assert!(project_assets.tilemaps.contains_key("draft_map"));
     }
 
     fn test_atlas() -> AtlasMeta {

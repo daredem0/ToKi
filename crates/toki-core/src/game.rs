@@ -336,7 +336,8 @@ impl GameState {
                 return;
             }
 
-            while entity_audio.footstep_distance_accumulator >= entity_audio.footstep_trigger_distance
+            while entity_audio.footstep_distance_accumulator
+                >= entity_audio.footstep_trigger_distance
             {
                 if let Some(movement_sound) = entity_audio
                     .movement_sound
@@ -971,7 +972,10 @@ impl GameState {
             self.handle_key_press(key);
             return;
         }
-        self.profile_keys_held.entry(profile).or_default().insert(key);
+        self.profile_keys_held
+            .entry(profile)
+            .or_default()
+            .insert(key);
     }
 
     /// Handle profile-scoped movement key release events.
@@ -1492,9 +1496,9 @@ impl GameState {
                 .resolve_rule_target(*target)
                 .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
                 .is_some(),
-            RuleCondition::KeyHeld { key } => self
-                .all_held_keys()
-                .contains(&Self::to_input_key(*key)),
+            RuleCondition::KeyHeld { key } => {
+                self.all_held_keys().contains(&Self::to_input_key(*key))
+            }
             RuleCondition::EntityActive { target, is_active } => self
                 .resolve_rule_target(*target)
                 .and_then(|entity_id| self.entity_manager.get_entity(entity_id))

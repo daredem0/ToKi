@@ -2,14 +2,14 @@ use crate::assets::atlas::AtlasMeta;
 use crate::graphics::vertex::QuadVertex;
 use crate::CoreError;
 use glam::UVec2;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
 pub const CHUNK_SIZE: u32 = 16; //16x16 tiles per chunk
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct TileMap {
     pub size: UVec2,        // map dimensions in tiles (width x height)
     pub tile_size: UVec2,   // tile dimensions in pixels (width x height)
