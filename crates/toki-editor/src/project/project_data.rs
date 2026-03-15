@@ -82,6 +82,8 @@ pub struct RuntimeSettings {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeAudioMixSettings {
     #[serde(default = "default_runtime_audio_mix_percent")]
+    pub master_percent: u8,
+    #[serde(default = "default_runtime_audio_mix_percent")]
     pub music_percent: u8,
     #[serde(default = "default_runtime_audio_mix_percent")]
     pub movement_percent: u8,
@@ -92,6 +94,7 @@ pub struct RuntimeAudioMixSettings {
 impl Default for RuntimeAudioMixSettings {
     fn default() -> Self {
         Self {
+            master_percent: default_runtime_audio_mix_percent(),
             music_percent: default_runtime_audio_mix_percent(),
             movement_percent: default_runtime_audio_mix_percent(),
             collision_percent: default_runtime_audio_mix_percent(),
@@ -303,6 +306,7 @@ recent_files = []
         let metadata: ProjectMetadata =
             toml::from_str(toml).expect("metadata without runtime section should deserialize");
         assert_eq!(metadata.runtime.splash.duration_ms, 3000);
+        assert_eq!(metadata.runtime.audio.master_percent, 100);
         assert_eq!(metadata.runtime.audio.music_percent, 100);
         assert_eq!(metadata.runtime.audio.movement_percent, 100);
         assert_eq!(metadata.runtime.audio.collision_percent, 100);
@@ -312,6 +316,7 @@ recent_files = []
     fn runtime_settings_default_to_community_splash_duration() {
         let runtime = RuntimeSettings::default();
         assert_eq!(runtime.splash.duration_ms, 3000);
+        assert_eq!(runtime.audio.master_percent, 100);
         assert_eq!(runtime.audio.music_percent, 100);
         assert_eq!(runtime.audio.movement_percent, 100);
         assert_eq!(runtime.audio.collision_percent, 100);
@@ -337,6 +342,7 @@ tilemaps = "assets/tilemaps/"
 audio = "assets/audio/"
 
 [runtime.audio]
+master_percent = 85
 music_percent = 70
 movement_percent = 55
 collision_percent = 40
@@ -344,6 +350,7 @@ collision_percent = 40
 
         let metadata: ProjectMetadata =
             toml::from_str(toml).expect("metadata with runtime audio should deserialize");
+        assert_eq!(metadata.runtime.audio.master_percent, 85);
         assert_eq!(metadata.runtime.audio.music_percent, 70);
         assert_eq!(metadata.runtime.audio.movement_percent, 55);
         assert_eq!(metadata.runtime.audio.collision_percent, 40);

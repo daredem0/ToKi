@@ -36,6 +36,7 @@ struct RuntimeConfigSplash {
 
 #[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
 struct RuntimeConfigAudio {
+    master_percent: Option<u8>,
     music_percent: Option<u8>,
     movement_percent: Option<u8>,
     collision_percent: Option<u8>,
@@ -195,6 +196,9 @@ fn apply_runtime_config(
         }
     }
     if let Some(audio) = config.audio {
+        if let Some(master_percent) = audio.master_percent {
+            launch_options.audio_mix.master_percent = master_percent.min(100);
+        }
         if let Some(music_percent) = audio.music_percent {
             launch_options.audio_mix.music_percent = music_percent.min(100);
         }
@@ -285,6 +289,8 @@ struct ProjectRuntimeSettings {
 #[derive(Debug, serde::Deserialize, Default)]
 struct ProjectRuntimeAudioSettings {
     #[serde(default = "default_project_audio_percent")]
+    master_percent: u8,
+    #[serde(default = "default_project_audio_percent")]
     music_percent: u8,
     #[serde(default = "default_project_audio_percent")]
     movement_percent: u8,
@@ -319,6 +325,7 @@ fn apply_project_audio_mix_from_project_file_if_present(
     };
 
     launch_options.audio_mix.music_percent = metadata.runtime.audio.music_percent.min(100);
+    launch_options.audio_mix.master_percent = metadata.runtime.audio.master_percent.min(100);
     launch_options.audio_mix.movement_percent = metadata.runtime.audio.movement_percent.min(100);
     launch_options.audio_mix.collision_percent = metadata.runtime.audio.collision_percent.min(100);
     launch_options
@@ -469,6 +476,7 @@ mod tests {
                     duration_ms: Some(3200),
                 }),
                 audio: Some(RuntimeConfigAudio {
+                    master_percent: Some(85),
                     music_percent: Some(65),
                     movement_percent: Some(45),
                     collision_percent: Some(25),
@@ -481,6 +489,7 @@ mod tests {
         assert_eq!(options.pack_path, Some(temp.path().join("game.toki.pak")));
         assert_eq!(options.scene_name.as_deref(), Some("Main Scene"));
         assert_eq!(options.splash.duration_ms, 3200);
+        assert_eq!(options.audio_mix.master_percent, 85);
         assert_eq!(options.audio_mix.music_percent, 65);
         assert_eq!(options.audio_mix.movement_percent, 45);
         assert_eq!(options.audio_mix.collision_percent, 25);
@@ -512,6 +521,7 @@ mod tests {
                     duration_ms: Some(3200),
                 }),
                 audio: Some(RuntimeConfigAudio {
+                    master_percent: Some(95),
                     music_percent: Some(80),
                     movement_percent: Some(60),
                     collision_percent: Some(40),
@@ -525,6 +535,7 @@ mod tests {
         assert_eq!(options.scene_name.as_deref(), Some("CLI Scene"));
         assert_eq!(options.splash.duration_ms, 3200);
         assert!(!options.splash.show_branding);
+        assert_eq!(options.audio_mix.master_percent, 95);
         assert_eq!(options.audio_mix.music_percent, 80);
         assert_eq!(options.audio_mix.movement_percent, 60);
         assert_eq!(options.audio_mix.collision_percent, 40);
@@ -578,7 +589,7 @@ mod tests {
   "pack": { "path": "game.toki.pak", "enabled": true },
   "startup": { "scene": "Main Scene" },
   "splash": { "duration_ms": 3000 },
-  "audio": { "music_percent": 70, "movement_percent": 55, "collision_percent": 40 }
+  "audio": { "master_percent": 88, "music_percent": 70, "movement_percent": 55, "collision_percent": 40 }
 }"#,
         )
         .expect("second config");
@@ -596,6 +607,7 @@ mod tests {
         assert_eq!(
             loaded.0.audio,
             Some(RuntimeConfigAudio {
+                master_percent: Some(88),
                 music_percent: Some(70),
                 movement_percent: Some(55),
                 collision_percent: Some(40),
@@ -657,6 +669,7 @@ tilemaps = "assets/tilemaps/"
 audio = "assets/audio/"
 
 [runtime.audio]
+master_percent = 91
 music_percent = 72
 movement_percent = 58
 collision_percent = 31
@@ -670,6 +683,7 @@ collision_percent = 31
         };
         let updated = apply_project_audio_mix_from_project_file_if_present(options);
 
+        assert_eq!(updated.audio_mix.master_percent, 91);
         assert_eq!(updated.audio_mix.music_percent, 72);
         assert_eq!(updated.audio_mix.movement_percent, 58);
         assert_eq!(updated.audio_mix.collision_percent, 31);
@@ -687,6 +701,7 @@ collision_percent = 31
         let options = RuntimeLaunchOptions {
             project_path: Some(dir.path().to_path_buf()),
             audio_mix: RuntimeAudioMixOptions {
+                master_percent: 95,
                 music_percent: 90,
                 movement_percent: 80,
                 collision_percent: 70,
@@ -695,6 +710,7 @@ collision_percent = 31
         };
         let updated = apply_project_audio_mix_from_project_file_if_present(options);
 
+        assert_eq!(updated.audio_mix.master_percent, 95);
         assert_eq!(updated.audio_mix.music_percent, 90);
         assert_eq!(updated.audio_mix.movement_percent, 80);
         assert_eq!(updated.audio_mix.collision_percent, 70);

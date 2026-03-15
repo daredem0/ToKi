@@ -49,6 +49,7 @@ impl Default for RuntimeSplashOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeAudioMixOptions {
+    pub master_percent: u8,
     pub music_percent: u8,
     pub movement_percent: u8,
     pub collision_percent: u8,
@@ -57,6 +58,7 @@ pub struct RuntimeAudioMixOptions {
 impl Default for RuntimeAudioMixOptions {
     fn default() -> Self {
         Self {
+            master_percent: 100,
             music_percent: 100,
             movement_percent: 100,
             collision_percent: 100,
@@ -199,6 +201,7 @@ impl App {
             &asset_load_plan.preloaded_sfx_names,
         )
         .expect("Failed to initialize audio system");
+        audio_system.set_master_volume_percent(launch_options.audio_mix.master_percent);
         audio_system.set_channel_volume_percent("music", launch_options.audio_mix.music_percent);
         audio_system.set_channel_volume_percent(
             "movement",

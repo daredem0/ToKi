@@ -2,14 +2,14 @@
 name = "NewProject"
 version = "1.0.0"
 created = "2025-08-28T20:32:34.920817717Z"
-modified = "2026-03-15T11:31:14.249129375Z"
+modified = "2026-03-15T11:37:24.369211675Z"
 toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
+main = "scenes/main.json"
 "Main Scene" = "scenes/mainscene.json"
 "Scene 2" = "scenes/scene2.json"
-main = "scenes/main.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -20,6 +20,7 @@ audio = "assets/audio/"
 duration_ms = 1200
 
 [runtime.audio]
+master_percent = 100
 music_percent = 80
 movement_percent = 80
 collision_percent = 10
@@ -37,13 +38,9 @@ pan = [
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
-"node:2" = [
-    800.0,
+"node:3" = [
+    430.0,
     50.0,
-]
-"node:4" = [
-    60.0,
-    106.0,
 ]
 "node:5" = [
     800.0,
@@ -53,8 +50,12 @@ pan = [
     60.0,
     50.0,
 ]
-"node:3" = [
-    430.0,
+"node:4" = [
+    60.0,
+    106.0,
+]
+"node:2" = [
+    800.0,
     50.0,
 ]
 "node:6" = [

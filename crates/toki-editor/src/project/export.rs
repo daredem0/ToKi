@@ -43,6 +43,7 @@ pub struct RuntimeBundleSplashConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeBundleAudioConfig {
+    pub master_percent: u8,
     pub music_percent: u8,
     pub movement_percent: u8,
     pub collision_percent: u8,
@@ -117,6 +118,7 @@ pub fn export_hybrid_bundle(
                 duration_ms: splash_duration_ms,
             },
             audio: RuntimeBundleAudioConfig {
+                master_percent: project.metadata.runtime.audio.master_percent,
                 music_percent: project.metadata.runtime.audio.music_percent,
                 movement_percent: project.metadata.runtime.audio.movement_percent,
                 collision_percent: project.metadata.runtime.audio.collision_percent,
@@ -348,6 +350,7 @@ mod tests {
 
         let project = Project::new("MyGame".to_string(), project_root.clone());
         let mut project = project;
+        project.metadata.runtime.audio.master_percent = 80;
         project.metadata.runtime.audio.music_percent = 65;
         project.metadata.runtime.audio.movement_percent = 40;
         project.metadata.runtime.audio.collision_percent = 25;
@@ -447,6 +450,7 @@ mod tests {
         assert!(runtime_config.pack.enabled);
         assert_eq!(runtime_config.startup.scene.as_deref(), Some("Main Scene"));
         assert_eq!(runtime_config.splash.duration_ms, 3000);
+        assert_eq!(runtime_config.audio.master_percent, 80);
         assert_eq!(runtime_config.audio.music_percent, 65);
         assert_eq!(runtime_config.audio.movement_percent, 40);
         assert_eq!(runtime_config.audio.collision_percent, 25);

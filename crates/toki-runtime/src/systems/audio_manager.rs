@@ -48,6 +48,7 @@ pub struct AudioManager {
 
     // Audio channels with policies
     channels: HashMap<String, AudioChannel>,
+    master_volume_percent: u8,
     channel_volume_percents: HashMap<String, u8>,
 }
 
@@ -77,6 +78,7 @@ impl AudioManager {
             sfx_paths: HashMap::new(),
             music_paths: HashMap::new(),
             channels: HashMap::new(),
+            master_volume_percent: 100,
             channel_volume_percents: HashMap::new(),
         };
 
@@ -163,6 +165,10 @@ impl AudioManager {
     pub fn set_channel_volume_percent(&mut self, channel: &str, percent: u8) {
         self.channel_volume_percents
             .insert(channel.to_string(), percent.min(100));
+    }
+
+    pub fn set_master_volume_percent(&mut self, percent: u8) {
+        self.master_volume_percent = percent.min(100);
     }
 
     /// Set a cooldown duration for a channel to prevent rapid-fire sounds
@@ -503,12 +509,13 @@ impl AudioManager {
     }
 
     fn channel_volume_for(&self, channel: &str) -> Decibels {
+        let master = percent_to_decibels(self.master_volume_percent);
         let percent = self
             .channel_volume_percents
             .get(channel)
             .copied()
             .unwrap_or(100);
-        percent_to_decibels(percent)
+        master + percent_to_decibels(percent)
     }
 }
 
@@ -648,6 +655,11 @@ mod tests {
     fn amplitude_to_decibels_matches_existing_music_baseline() {
         assert!((amplitude_to_decibels(0.3).0 - (-10.4576)).abs() < 0.02);
     }
+
+    #[test]
+    fn amplitude_to_decibels_combines_master_and_channel_gain_multiplicatively() {
+        assert!((amplitude_to_decibels(0.8 * 0.5).0 - (-7.9588)).abs() < 0.02);
+    }
 }
 
 impl std::fmt::Debug for AudioManager {
@@ -657,6 +669,7 @@ impl std::fmt::Debug for AudioManager {
             .field("sfx_paths_count", &self.sfx_paths.len())
             .field("music_paths_count", &self.music_paths.len())
             .field("channels_count", &self.channels.len())
+            .field("master_volume_percent", &self.master_volume_percent)
             .field("channel_volume_percents", &self.channel_volume_percents)
             .finish()
     }
