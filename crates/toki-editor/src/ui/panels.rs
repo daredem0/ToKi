@@ -794,16 +794,16 @@ impl PanelSystem {
 
         let world_min_x = camera_position.x;
         let world_min_y = camera_position.y;
-        let world_span_x = viewport_width as i32 * camera_scale as i32;
-        let world_span_y = viewport_height as i32 * camera_scale as i32;
-        let world_max_x = world_min_x + world_span_x;
-        let world_max_y = world_min_y + world_span_y;
+        let world_span_x = viewport_width as f32 * camera_scale;
+        let world_span_y = viewport_height as f32 * camera_scale;
+        let world_max_x = world_min_x + world_span_x.ceil() as i32;
+        let world_max_y = world_min_y + world_span_y.ceil() as i32;
 
         let stroke = egui::Stroke::new(1.0, egui::Color32::from_white_alpha(34));
         let painter = ui.painter();
 
         for world_x in Self::grid_world_lines(world_min_x, world_max_x, grid_size.x as i32) {
-            let t = (world_x - world_min_x) as f32 / world_span_x as f32;
+            let t = (world_x - world_min_x) as f32 / world_span_x.max(1.0);
             let screen_x = egui::lerp(display_rect.left()..=display_rect.right(), t);
             painter.line_segment(
                 [
@@ -815,7 +815,7 @@ impl PanelSystem {
         }
 
         for world_y in Self::grid_world_lines(world_min_y, world_max_y, grid_size.y as i32) {
-            let t = (world_y - world_min_y) as f32 / world_span_y as f32;
+            let t = (world_y - world_min_y) as f32 / world_span_y.max(1.0);
             let screen_y = egui::lerp(display_rect.top()..=display_rect.bottom(), t);
             painter.line_segment(
                 [

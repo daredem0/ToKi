@@ -11,7 +11,7 @@ fn screen_to_world_from_camera(
     display_rect: egui::Rect,
     viewport_size: (u32, u32),
     camera_position: glam::IVec2,
-    camera_scale: u32,
+    camera_scale: f32,
 ) -> glam::Vec2 {
     // Convert screen position relative to display rect to 0-1 normalized coordinates
     let normalized_x = (screen_pos.x - display_rect.min.x) / display_rect.width();
@@ -47,8 +47,8 @@ fn screen_to_world_from_camera(
     };
 
     // Convert to world coordinates using camera state
-    let world_x = camera_position.x as f32 + viewport_x * camera_scale as f32;
-    let world_y = camera_position.y as f32 + viewport_y * camera_scale as f32;
+    let world_x = camera_position.x as f32 + viewport_x * camera_scale;
+    let world_y = camera_position.y as f32 + viewport_y * camera_scale;
     glam::Vec2::new(world_x, world_y)
 }
 
@@ -91,6 +91,29 @@ fn request_viewport_size_state(
     }
 }
 
+const MIN_EDITOR_ZOOM_SCALE: f32 = 0.25;
+const MAX_EDITOR_ZOOM_SCALE: f32 = 8.0;
+
+fn next_zoom_in_scale(current_scale: f32) -> f32 {
+    if current_scale > 1.0 {
+        (current_scale - 1.0).max(1.0)
+    } else if current_scale > MIN_EDITOR_ZOOM_SCALE {
+        (current_scale * 0.5).max(MIN_EDITOR_ZOOM_SCALE)
+    } else {
+        current_scale
+    }
+}
+
+fn next_zoom_out_scale(current_scale: f32) -> f32 {
+    if current_scale < 1.0 {
+        (current_scale * 2.0).min(1.0)
+    } else if current_scale < MAX_EDITOR_ZOOM_SCALE {
+        (current_scale + 1.0).min(MAX_EDITOR_ZOOM_SCALE)
+    } else {
+        current_scale
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct DragPreviewSprite {
     pub entity_id: toki_core::entity::EntityId,
@@ -118,6 +141,7 @@ pub struct SceneViewport {
     atlas_cache: Option<AtlasMeta>,
     needs_render: bool, // Track if scene needs re-rendering
     camera: Camera,     // Camera for zoom and pan
+    editor_zoom_scale: f32,
     // Mouse interaction state
     last_mouse_pos: Option<glam::Vec2>, // For camera panning
     is_dragging_camera: bool,
@@ -162,6 +186,7 @@ impl SceneViewport {
             atlas_cache: None,
             needs_render: true, // Initial render required
             camera,
+            editor_zoom_scale: 1.0,
             last_mouse_pos: None,
             is_dragging_camera: false,
             suppressed_entity_ids: std::collections::HashSet::new(),
@@ -202,6 +227,19 @@ impl SceneViewport {
     fn set_viewport_size_immediate(&mut self, new_size: (u32, u32)) {
         self.viewport_size = new_size;
         self.camera.viewport_size = glam::UVec2::new(new_size.0, new_size.1);
+    }
+
+    fn effective_camera_scale(&self) -> f32 {
+        self.camera.scale as f32 * self.editor_zoom_scale
+    }
+
+    fn calculate_editor_projection(&self) -> glam::Mat4 {
+        let left = self.camera.position.x as f32;
+        let top = self.camera.position.y as f32;
+        let effective_scale = self.effective_camera_scale();
+        let right = left + self.viewport_size.0 as f32 * effective_scale;
+        let bottom = top + self.viewport_size.1 as f32 * effective_scale;
+        glam::Mat4::orthographic_rh_gl(left, right, bottom, top, -1.0, 1.0)
     }
 
     fn apply_requested_viewport_size(&mut self) -> Result<()> {
@@ -284,6 +322,8 @@ impl SceneViewport {
         );
 
         // Render to offscreen target
+        let projection = self.calculate_editor_projection();
+
         if let (Some(scene_renderer), Some(target)) =
             (&mut self.scene_renderer, &mut self.offscreen_target)
         {
@@ -292,9 +332,6 @@ impl SceneViewport {
                            scene_data.atlas.is_some(),
                            scene_data.sprites.len(),
                            scene_data.debug_shapes.len());
-
-            // Calculate projection matrix using camera
-            let projection = self.camera.calculate_projection();
 
             // Render scene to texture with camera projection
             scene_renderer.render_scene_with_projection(target, &scene_data, projection)?;
@@ -439,8 +476,8 @@ impl SceneViewport {
         None
     }
 
-    pub fn camera_state(&self) -> (glam::IVec2, u32) {
-        (self.camera.position, self.camera.scale)
+    pub fn camera_state(&self) -> (glam::IVec2, f32) {
+        (self.camera.position, self.effective_camera_scale())
     }
 
     pub fn viewport_size(&self) -> (u32, u32) {
@@ -775,8 +812,9 @@ impl SceneViewport {
 
         scene_data.sprites.push(sprite_instance);
         // Calculate viewport coordinates for debugging
-        let viewport_x = (position.x - self.camera.position.x) as f32 / self.camera.scale as f32;
-        let viewport_y = (position.y - self.camera.position.y) as f32 / self.camera.scale as f32;
+        let effective_scale = self.effective_camera_scale();
+        let viewport_x = (position.x - self.camera.position.x) as f32 / effective_scale;
+        let viewport_y = (position.y - self.camera.position.y) as f32 / effective_scale;
 
         tracing::trace!("Added sprite instance for entity {} - entity world top-left: ({}, {}), viewport coords: ({:.1}, {:.1}), render position: ({}, {}), size: {}x{}",
                        entity_id, position.x, position.y, viewport_x, viewport_y, render_position_i32.x, render_position_i32.y, size.x, size.y);
@@ -1272,25 +1310,25 @@ impl SceneViewport {
 
     /// Zoom in (increase scale)
     pub fn zoom_in(&mut self) {
-        if self.camera.scale > 1 {
-            // Min zoom level
-            self.camera.scale -= 1;
+        let next_scale = next_zoom_in_scale(self.editor_zoom_scale);
+        if (next_scale - self.editor_zoom_scale).abs() > f32::EPSILON {
+            self.editor_zoom_scale = next_scale;
             self.mark_dirty();
-            tracing::info!("Zoomed in to scale {}", self.camera.scale);
+            tracing::info!("Zoomed in to editor scale {}", self.editor_zoom_scale);
         } else {
-            tracing::trace!("Already at minimum zoom level: {}", self.camera.scale);
+            tracing::trace!("Already at minimum zoom level: {}", self.editor_zoom_scale);
         }
     }
 
     /// Zoom out (decrease scale)
     pub fn zoom_out(&mut self) {
-        if self.camera.scale < 8 {
-            // Max zoom level
-            self.camera.scale += 1;
+        let next_scale = next_zoom_out_scale(self.editor_zoom_scale);
+        if (next_scale - self.editor_zoom_scale).abs() > f32::EPSILON {
+            self.editor_zoom_scale = next_scale;
             self.mark_dirty();
-            tracing::info!("Zoomed out to scale {}", self.camera.scale);
+            tracing::info!("Zoomed out to editor scale {}", self.editor_zoom_scale);
         } else {
-            tracing::trace!("Already at maximum zoom level: {}", self.camera.scale);
+            tracing::trace!("Already at maximum zoom level: {}", self.editor_zoom_scale);
         }
     }
 
@@ -1470,7 +1508,7 @@ impl SceneViewport {
             display_rect,
             self.viewport_size,
             self.camera.position,
-            self.camera.scale,
+            self.effective_camera_scale(),
         )
     }
 
@@ -1498,8 +1536,9 @@ impl SceneViewport {
             let screen_delta = mouse_pos - last_pos;
 
             // Convert screen delta to world delta (account for camera scale, aspect ratio, and pan speed)
-            let world_delta_x = -screen_delta.x * self.camera.scale as f32 * pan_speed;
-            let world_delta_y = -screen_delta.y * self.camera.scale as f32 * pan_speed;
+            let effective_scale = self.effective_camera_scale();
+            let world_delta_x = -screen_delta.x * effective_scale * pan_speed;
+            let world_delta_y = -screen_delta.y * effective_scale * pan_speed;
 
             // Apply camera movement (negative for natural drag feel)
             self.camera
@@ -1535,8 +1574,9 @@ impl SceneViewport {
 #[cfg(test)]
 mod tests {
     use super::{
-        point_in_entity_bounds, request_viewport_size_state, screen_to_world_from_camera,
-        world_to_i32_floor, ViewportSizingMode,
+        next_zoom_in_scale, next_zoom_out_scale, point_in_entity_bounds,
+        request_viewport_size_state, screen_to_world_from_camera, world_to_i32_floor,
+        ViewportSizingMode,
     };
 
     #[test]
@@ -1548,7 +1588,7 @@ mod tests {
             display,
             (160, 144),
             glam::IVec2::new(10, 20),
-            1,
+            1.0,
         );
         assert_eq!(world, glam::Vec2::new(10.0, 20.0));
     }
@@ -1564,7 +1604,7 @@ mod tests {
             display,
             (160, 144),
             glam::IVec2::ZERO,
-            1,
+            1.0,
         );
         assert_eq!(left_letterbox.x, 0.0);
 
@@ -1573,9 +1613,25 @@ mod tests {
             display,
             (160, 144),
             glam::IVec2::ZERO,
-            1,
+            1.0,
         );
         assert_eq!(right_letterbox.x, 160.0);
+    }
+
+    #[test]
+    fn zoom_in_progresses_below_native_scale() {
+        assert_eq!(next_zoom_in_scale(2.0), 1.0);
+        assert_eq!(next_zoom_in_scale(1.0), 0.5);
+        assert_eq!(next_zoom_in_scale(0.5), 0.25);
+        assert_eq!(next_zoom_in_scale(0.25), 0.25);
+    }
+
+    #[test]
+    fn zoom_out_returns_fractional_zoom_to_native_then_outward() {
+        assert_eq!(next_zoom_out_scale(0.25), 0.5);
+        assert_eq!(next_zoom_out_scale(0.5), 1.0);
+        assert_eq!(next_zoom_out_scale(1.0), 2.0);
+        assert_eq!(next_zoom_out_scale(8.0), 8.0);
     }
 
     #[test]
