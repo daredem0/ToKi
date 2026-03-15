@@ -25,11 +25,17 @@ use crate::systems::{
 use toki_core::serialization::{load_game, save_game};
 
 const COMMUNITY_SPLASH_MIN_DURATION_MS: u64 = 3000;
-const COMMUNITY_SPLASH_MAX_DURATION_MS: u64 = 4000;
+const COMMUNITY_SPLASH_MAX_DURATION_MS: u64 = 10000;
 const COMMUNITY_SPLASH_DEFAULT_DURATION_MS: u64 = 3000;
 const COMMUNITY_SPLASH_BRANDING_TEXT: &str = "Powered by ToKi";
+const COMMUNITY_SPLASH_VERSION_TEXT: &str = env!("TOKI_VERSION");
 const SPLASH_LOGO_WIDTH: u32 = 128;
 const SPLASH_LOGO_HEIGHT: u32 = 108;
+const SPLASH_TEXT_LINE_HEIGHT_MULTIPLIER: f32 = 1.25;
+const SPLASH_BRANDING_VERSION_GAP_PX: f32 = 4.0;
+const SPLASH_VERSION_DEFAULT_SIZE_PX: f32 = 11.0;
+const SPLASH_VERSION_MIN_SIZE_PX: f32 = 7.0;
+const SPLASH_TEXT_HORIZONTAL_PADDING_PX: f32 = 8.0;
 const COMMUNITY_SPLASH_LOGO_PNG: &[u8] = include_bytes!("../../../assets/TokiLogo.png");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -165,6 +171,49 @@ impl App {
         glam::IVec2::new(x, y)
     }
 
+    fn splash_branding_positions(
+        view_size: glam::Vec2,
+        splash_logo_loaded: bool,
+        logo_origin: glam::IVec2,
+        logo_size: glam::UVec2,
+        branding_style: &TextStyle,
+        version_style: &TextStyle,
+    ) -> (glam::Vec2, glam::Vec2) {
+        let branding_height = branding_style.size_px * SPLASH_TEXT_LINE_HEIGHT_MULTIPLIER;
+        let version_height = version_style.size_px * SPLASH_TEXT_LINE_HEIGHT_MULTIPLIER;
+        let total_block_height = branding_height + SPLASH_BRANDING_VERSION_GAP_PX + version_height;
+        let max_branding_top = (view_size.y - total_block_height - 4.0).max(0.0);
+        let branding_position = if splash_logo_loaded {
+            glam::Vec2::new(
+                view_size.x * 0.5,
+                (logo_origin.y as f32 + logo_size.y as f32 + 8.0).min(max_branding_top),
+            )
+        } else {
+            glam::Vec2::new(view_size.x * 0.5, (view_size.y * 0.5).min(max_branding_top))
+        };
+        let version_position = glam::Vec2::new(
+            branding_position.x,
+            branding_position.y + branding_height + SPLASH_BRANDING_VERSION_GAP_PX,
+        );
+        (branding_position, version_position)
+    }
+
+    fn fitted_splash_version_style(view_width: f32, content: &str) -> TextStyle {
+        let available_width = (view_width - SPLASH_TEXT_HORIZONTAL_PADDING_PX).max(1.0);
+        let char_count = content.chars().count().max(1) as f32;
+        let max_size_for_width = available_width / (char_count * 0.55);
+        let size_px = max_size_for_width.clamp(
+            SPLASH_VERSION_MIN_SIZE_PX,
+            SPLASH_VERSION_DEFAULT_SIZE_PX,
+        );
+        TextStyle {
+            font_family: "Sans".to_string(),
+            size_px,
+            weight: TextWeight::Normal,
+            ..TextStyle::default()
+        }
+    }
+
     fn new(launch_options: RuntimeLaunchOptions) -> Self {
         let splash_policy = SplashPolicy::Community;
         let splash_config = splash_policy.resolve(&launch_options.splash);
@@ -203,14 +252,10 @@ impl App {
         .expect("Failed to initialize audio system");
         audio_system.set_master_volume_percent(launch_options.audio_mix.master_percent);
         audio_system.set_channel_volume_percent("music", launch_options.audio_mix.music_percent);
-        audio_system.set_channel_volume_percent(
-            "movement",
-            launch_options.audio_mix.movement_percent,
-        );
-        audio_system.set_channel_volume_percent(
-            "collision",
-            launch_options.audio_mix.collision_percent,
-        );
+        audio_system
+            .set_channel_volume_percent("movement", launch_options.audio_mix.movement_percent);
+        audio_system
+            .set_channel_volume_percent("collision", launch_options.audio_mix.collision_percent);
 
         Self {
             // Core systems
@@ -823,20 +868,32 @@ impl App {
                 weight: TextWeight::Bold,
                 ..TextStyle::default()
             };
-            let branding_position = if self.splash_logo_loaded {
-                glam::Vec2::new(
-                    view_size.x * 0.5,
-                    (logo_origin.y as f32 + logo_size.y as f32 + 8.0).min(view_size.y - 4.0),
-                )
-            } else {
-                glam::Vec2::new(view_size.x * 0.5, view_size.y * 0.5)
-            };
+            let version_style =
+                Self::fitted_splash_version_style(view_size.x, COMMUNITY_SPLASH_VERSION_TEXT);
+            let (branding_position, version_position) = Self::splash_branding_positions(
+                view_size,
+                self.splash_logo_loaded,
+                logo_origin,
+                logo_size,
+                &branding_style,
+                &version_style,
+            );
             self.rendering.add_text_item(
                 TextItem::new_screen(
                     COMMUNITY_SPLASH_BRANDING_TEXT,
                     branding_position,
                     branding_style,
                 )
+                .with_anchor(TextAnchor::TopCenter)
+                .with_layer(10),
+            );
+            self.rendering.add_text_item(
+                TextItem::new_screen(
+                    COMMUNITY_SPLASH_VERSION_TEXT,
+                    version_position,
+                    version_style,
+                )
+                .with_max_width((view_size.x - SPLASH_TEXT_HORIZONTAL_PADDING_PX).max(1.0))
                 .with_anchor(TextAnchor::TopCenter)
                 .with_layer(10),
             );
@@ -1070,7 +1127,10 @@ fn first_existing_path(candidates: &[PathBuf]) -> Option<PathBuf> {
 mod tests {
     use super::{
         first_existing_path, App, RuntimeAudioMixOptions, RuntimeLaunchOptions,
-        RuntimeSplashOptions, SplashPolicy,
+        RuntimeSplashOptions, SplashPolicy, COMMUNITY_SPLASH_VERSION_TEXT,
+        SPLASH_BRANDING_VERSION_GAP_PX, SPLASH_TEXT_HORIZONTAL_PADDING_PX,
+        SPLASH_TEXT_LINE_HEIGHT_MULTIPLIER, SPLASH_VERSION_DEFAULT_SIZE_PX,
+        SPLASH_VERSION_MIN_SIZE_PX,
     };
     use std::fs;
     use std::io::{Seek, Write};
@@ -1080,6 +1140,7 @@ mod tests {
     use toki_core::rules::{
         Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger,
     };
+    use toki_core::text::{TextStyle, TextWeight};
     use toki_core::Scene;
 
     fn make_unique_temp_dir() -> std::path::PathBuf {
@@ -1455,7 +1516,7 @@ mod tests {
         );
 
         let above_max = SplashPolicy::Community.resolve(&RuntimeSplashOptions {
-            duration_ms: 9_999,
+            duration_ms: super::COMMUNITY_SPLASH_MAX_DURATION_MS + 1,
             show_branding: true,
         });
         assert_eq!(
@@ -1498,5 +1559,87 @@ mod tests {
         });
         let origin = App::centered_logo_origin_for_view(view, glam::UVec2::new(128, 108));
         assert_eq!(origin, glam::IVec2::new(16, 106));
+    }
+
+    #[test]
+    fn splash_version_text_is_positioned_below_branding_text() {
+        let branding_style = TextStyle {
+            font_family: "Sans".to_string(),
+            size_px: 16.0,
+            weight: TextWeight::Bold,
+            ..TextStyle::default()
+        };
+        let version_style = TextStyle {
+            font_family: "Sans".to_string(),
+            size_px: 11.0,
+            weight: TextWeight::Normal,
+            ..TextStyle::default()
+        };
+        let view_size = glam::Vec2::new(320.0, 240.0);
+        let logo_size = glam::UVec2::new(128, 108);
+        let logo_origin = App::centered_logo_origin_for_view(view_size, logo_size);
+
+        let (branding_position, version_position) = App::splash_branding_positions(
+            view_size,
+            true,
+            logo_origin,
+            logo_size,
+            &branding_style,
+            &version_style,
+        );
+
+        let branding_bottom =
+            branding_position.y + branding_style.size_px * SPLASH_TEXT_LINE_HEIGHT_MULTIPLIER;
+        assert!(
+            version_position.y >= branding_bottom + SPLASH_BRANDING_VERSION_GAP_PX,
+            "version text should be below branding text: branding_bottom={}, version_y={}",
+            branding_bottom,
+            version_position.y
+        );
+    }
+
+    #[test]
+    fn splash_branding_block_fits_in_default_runtime_view() {
+        let branding_style = TextStyle {
+            font_family: "Sans".to_string(),
+            size_px: 16.0,
+            weight: TextWeight::Bold,
+            ..TextStyle::default()
+        };
+        let version_style = TextStyle {
+            font_family: "Sans".to_string(),
+            size_px: 11.0,
+            weight: TextWeight::Normal,
+            ..TextStyle::default()
+        };
+        let view_size = glam::Vec2::new(160.0, 144.0);
+        let logo_size = glam::UVec2::new(128, 108);
+        let logo_origin = App::centered_logo_origin_for_view(view_size, logo_size);
+
+        let (branding_position, version_position) = App::splash_branding_positions(
+            view_size,
+            true,
+            logo_origin,
+            logo_size,
+            &branding_style,
+            &version_style,
+        );
+
+        let branding_bottom =
+            branding_position.y + branding_style.size_px * SPLASH_TEXT_LINE_HEIGHT_MULTIPLIER;
+        let version_bottom =
+            version_position.y + version_style.size_px * SPLASH_TEXT_LINE_HEIGHT_MULTIPLIER;
+        assert!(version_position.y >= branding_bottom + SPLASH_BRANDING_VERSION_GAP_PX);
+        assert!(version_bottom <= view_size.y - 4.0);
+    }
+
+    #[test]
+    fn splash_version_style_shrinks_long_version_to_fit_default_view_width() {
+        let style = App::fitted_splash_version_style(160.0, COMMUNITY_SPLASH_VERSION_TEXT);
+        let estimated_width =
+            COMMUNITY_SPLASH_VERSION_TEXT.chars().count() as f32 * style.size_px * 0.55;
+        assert!(style.size_px <= SPLASH_VERSION_DEFAULT_SIZE_PX);
+        assert!(style.size_px >= SPLASH_VERSION_MIN_SIZE_PX);
+        assert!(estimated_width <= 160.0 - SPLASH_TEXT_HORIZONTAL_PADDING_PX);
     }
 }

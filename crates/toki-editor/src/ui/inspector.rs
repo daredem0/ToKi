@@ -608,7 +608,11 @@ impl InspectorSystem {
                 ui.monospace(project.metadata.project.modified.to_rfc3339());
             });
             ui.horizontal(|ui| {
-                ui.label("Editor Version:");
+                ui.label("Current Editor Version:");
+                ui.monospace(env!("TOKI_VERSION"));
+            });
+            ui.horizontal(|ui| {
+                ui.label("Project Created With:");
                 ui.monospace(&project.metadata.project.toki_editor_version);
             });
         });

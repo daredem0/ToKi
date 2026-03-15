@@ -110,14 +110,15 @@ impl GlyphonTextRenderer {
             };
 
             let estimated_size = estimate_text_size(item);
-            let anchored_pos = apply_anchor(base_pos, estimated_size, item.anchor);
-
+            let estimated_anchored_pos = apply_anchor(base_pos, estimated_size, item.anchor);
             let max_width = item
                 .max_width
-                .unwrap_or_else(|| (surface_width as f32 - anchored_pos.x).max(1.0));
+                .unwrap_or_else(|| (surface_width as f32 - estimated_anchored_pos.x).max(1.0));
             let key = make_buffer_key(item, max_width, surface_height as f32);
             let buffer_index = self.upsert_buffer(item, max_width, surface_height as f32, &key);
             used_keys.insert(key);
+            let actual_size = measure_buffer_size(&self.cached_buffers[buffer_index].buffer);
+            let anchored_pos = apply_anchor(base_pos, actual_size, item.anchor);
             entries.push(PreparedTextEntry {
                 buffer_index,
                 left: anchored_pos.x,
@@ -126,7 +127,7 @@ impl GlyphonTextRenderer {
             });
 
             if let Some(box_style) = &item.box_style {
-                backgrounds.push(background_rect_for(anchored_pos, estimated_size, box_style));
+                backgrounds.push(background_rect_for(anchored_pos, actual_size, box_style));
             }
         }
 
@@ -286,6 +287,19 @@ pub fn estimate_text_size(item: &TextItem) -> glam::Vec2 {
     glam::Vec2::new(width, height)
 }
 
+fn measure_buffer_size(buffer: &Buffer) -> glam::Vec2 {
+    let mut width = 0.0f32;
+    let mut height = 0.0f32;
+    for run in buffer.layout_runs() {
+        width = width.max(run.line_w);
+        height = height.max(run.line_top + run.line_height);
+    }
+    if height <= 0.0 {
+        height = buffer.metrics().line_height.max(1.0);
+    }
+    glam::Vec2::new(width.max(1.0), height.max(1.0))
+}
+
 pub fn apply_anchor(position: glam::Vec2, size: glam::Vec2, anchor: TextAnchor) -> glam::Vec2 {
     let x = match anchor {
         TextAnchor::TopLeft | TextAnchor::CenterLeft | TextAnchor::BottomLeft => position.x,
@@ -350,7 +364,10 @@ fn color_from_rgba(rgba: [f32; 4]) -> Color {
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_anchor, estimate_text_size, make_buffer_key, to_screen_position};
+    use super::{
+        apply_anchor, estimate_text_size, make_buffer_key, measure_buffer_size, to_screen_position,
+    };
+    use glyphon::{Buffer, FontSystem, Metrics, Shaping};
     use toki_core::text::{TextAnchor, TextItem, TextSpace, TextStyle};
 
     #[test]
@@ -418,5 +435,31 @@ mod tests {
         let key_a = make_buffer_key(&item_a, 180.0, 320.0);
         let key_b = make_buffer_key(&item_b, 180.0, 320.0);
         assert_eq!(key_a, key_b);
+    }
+
+    #[test]
+    fn measure_buffer_size_uses_actual_shaped_line_width() {
+        let mut font_system = FontSystem::new();
+        let style = TextStyle {
+            size_px: 16.0,
+            ..TextStyle::default()
+        };
+        let mut buffer = Buffer::new(
+            &mut font_system,
+            Metrics::new(style.size_px, style.size_px * 1.25),
+        );
+        buffer.set_size(&mut font_system, Some(200.0), Some(100.0));
+        let attrs = super::attrs_for_style(&style);
+        buffer.set_text(
+            &mut font_system,
+            "Powered by ToKi",
+            &attrs,
+            Shaping::Basic,
+        );
+        buffer.shape_until_scroll(&mut font_system, false);
+
+        let measured = measure_buffer_size(&buffer);
+        assert!(measured.x > 1.0);
+        assert!(measured.y >= style.size_px * 1.25);
     }
 }

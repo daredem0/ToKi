@@ -208,7 +208,7 @@ impl Project {
                 version: "1.0.0".to_string(),
                 created: now,
                 modified: now,
-                toki_editor_version: env!("CARGO_PKG_VERSION").to_string(),
+                toki_editor_version: env!("TOKI_VERSION").to_string(),
                 description: String::new(),
             },
             scenes: {
@@ -278,7 +278,8 @@ impl Project {
 
 #[cfg(test)]
 mod tests {
-    use super::{ProjectMetadata, RuntimeSettings};
+    use super::{Project, ProjectMetadata, RuntimeSettings};
+    use std::path::PathBuf;
 
     #[test]
     fn project_metadata_deserialization_defaults_runtime_settings() {
@@ -354,5 +355,11 @@ collision_percent = 40
         assert_eq!(metadata.runtime.audio.music_percent, 70);
         assert_eq!(metadata.runtime.audio.movement_percent, 55);
         assert_eq!(metadata.runtime.audio.collision_percent, 40);
+    }
+
+    #[test]
+    fn new_project_uses_derived_editor_version() {
+        let project = Project::new("Demo".to_string(), PathBuf::from("/tmp/Demo"));
+        assert_eq!(project.metadata.project.toki_editor_version, env!("TOKI_VERSION"));
     }
 }

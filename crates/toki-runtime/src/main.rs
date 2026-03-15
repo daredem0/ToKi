@@ -58,6 +58,8 @@ fn main() -> Result<()> {
         .with_line_number(true)
         .init();
 
+    tracing::info!("Starting ToKi runtime {}", env!("TOKI_VERSION"));
+
     let mut launch_options = parse_launch_options(std::env::args().skip(1).collect());
     if launch_options.project_path.is_none() {
         launch_options = apply_runtime_config_if_present(launch_options);
