@@ -589,6 +589,17 @@ impl InspectorSystem {
                                 &tile_name,
                             );
                         });
+                        if let Some((solid, trigger)) =
+                            Self::selected_map_editor_tile_metadata(&atlas, &tile_name)
+                        {
+                            ui.horizontal(|ui| {
+                                ui.label("Solid:");
+                                ui.label(if solid { "Yes" } else { "No" });
+                                ui.separator();
+                                ui.label("Trigger:");
+                                ui.label(if trigger { "Yes" } else { "No" });
+                            });
+                        }
                     } else {
                         ui.label("Selected Tile: none");
                     }
@@ -707,6 +718,14 @@ impl InspectorSystem {
             egui::Color32::WHITE,
         );
         response.on_hover_text(tile_name);
+    }
+
+    fn selected_map_editor_tile_metadata(
+        atlas: &toki_core::assets::atlas::AtlasMeta,
+        tile_name: &str,
+    ) -> Option<(bool, bool)> {
+        let properties = atlas.get_tile_properties(tile_name)?;
+        Some((properties.solid, properties.trigger))
     }
 
     fn ensure_map_editor_brush_preview_texture(
@@ -5261,6 +5280,35 @@ mod tests {
 
         let names = InspectorSystem::discover_audio_asset_names(temp_dir.path());
         assert_eq!(names, vec!["ambience", "battle_theme", "impact"]);
+    }
+
+    #[test]
+    fn selected_map_editor_tile_metadata_reads_solid_and_trigger_flags() {
+        let mut tiles = std::collections::HashMap::new();
+        tiles.insert(
+            "grass".to_string(),
+            toki_core::assets::atlas::TileInfo {
+                position: UVec2::new(0, 0),
+                properties: toki_core::assets::atlas::TileProperties {
+                    solid: true,
+                    trigger: false,
+                },
+            },
+        );
+        let atlas = toki_core::assets::atlas::AtlasMeta {
+            image: std::path::PathBuf::from("terrain.png"),
+            tile_size: UVec2::new(8, 8),
+            tiles,
+        };
+
+        assert_eq!(
+            InspectorSystem::selected_map_editor_tile_metadata(&atlas, "grass"),
+            Some((true, false))
+        );
+        assert_eq!(
+            InspectorSystem::selected_map_editor_tile_metadata(&atlas, "missing"),
+            None
+        );
     }
 
     #[test]
