@@ -63,7 +63,7 @@
     ],
     "default_state": "idle"
   },
-  "category": "character",
+  "category": "human",
   "tags": [
     "player",
     "starter",

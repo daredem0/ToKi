@@ -5,6 +5,26 @@ use toki_core::Scene;
 pub struct HierarchySystem;
 
 impl HierarchySystem {
+    fn category_label(raw: &str) -> String {
+        if raw.trim().is_empty() {
+            return "Uncategorized".to_string();
+        }
+
+        raw.split(['_', '-', ' '])
+            .filter(|segment| !segment.is_empty())
+            .map(|segment| {
+                let mut chars = segment.chars();
+                match chars.next() {
+                    Some(first) => {
+                        first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase()
+                    }
+                    None => String::new(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
     /// Renders the entity palette showing available entity definitions for placement
     pub fn render_entity_palette(
         ui: &mut egui::Ui,
@@ -74,7 +94,7 @@ impl HierarchySystem {
 
                             for (category, mut entity_names) in sorted_categories {
                                 // Show category header
-                                ui.label(format!("📂 {}", category));
+                                ui.label(format!("📂 {}", Self::category_label(&category)));
                                 ui.indent(format!("category_{}", category), |ui| {
                                     // Sort entity names
                                     entity_names.sort();
@@ -155,5 +175,23 @@ impl HierarchySystem {
         config: Option<&crate::config::EditorConfig>,
     ) {
         editor_ui.render_hierarchy_and_maps_combined_panel(ctx, game_state, config);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::HierarchySystem;
+
+    #[test]
+    fn category_label_humanizes_legacy_and_snake_case_values() {
+        assert_eq!(HierarchySystem::category_label("npc"), "Npc");
+        assert_eq!(HierarchySystem::category_label("player_character"), "Player Character");
+        assert_eq!(HierarchySystem::category_label("creature"), "Creature");
+    }
+
+    #[test]
+    fn category_label_falls_back_for_empty_input() {
+        assert_eq!(HierarchySystem::category_label(""), "Uncategorized");
+        assert_eq!(HierarchySystem::category_label("   "), "Uncategorized");
     }
 }

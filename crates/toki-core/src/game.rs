@@ -436,7 +436,7 @@ impl GameState {
                 ],
                 default_state: "idle".to_string(),
             },
-            category: "character".to_string(),
+            category: "human".to_string(),
             tags: vec!["player".to_string()],
         }
     }
@@ -496,7 +496,7 @@ impl GameState {
                 ],
                 default_state: "idle".to_string(),
             },
-            category: "npc".to_string(),
+            category: "human".to_string(),
             tags: vec!["npc".to_string()],
         }
     }

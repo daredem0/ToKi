@@ -62,7 +62,7 @@
     ],
     "default_state": "idle"
   },
-  "category": "npc",
+  "category": "human",
   "tags": [
     "npc",
     "starter",

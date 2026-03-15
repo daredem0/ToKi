@@ -110,7 +110,7 @@
     ],
     "default_state": "idle_down"
   },
-  "category": "character",
+  "category": "human",
   "tags": [
     "player",
     "hero",

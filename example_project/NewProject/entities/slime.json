@@ -62,7 +62,7 @@
     ],
     "default_state": "walk"
   },
-  "category": "npc",
+  "category": "creature",
   "tags": [
     "creature",
     "monster",
