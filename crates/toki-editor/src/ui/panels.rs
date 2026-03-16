@@ -15,6 +15,8 @@ use toki_core::rules::{
 };
 
 mod map_editor;
+mod map_editor_interactions;
+mod map_editor_preview;
 mod scene_graph;
 mod scene_graph_canvas;
 mod scene_viewport;
