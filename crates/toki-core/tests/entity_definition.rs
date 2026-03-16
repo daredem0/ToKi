@@ -15,6 +15,7 @@ fn test_entity_definition_create_entity_basic() {
         },
         attributes: AttributesDef {
             health: Some(100),
+            stats: std::collections::HashMap::new(),
             speed: 2,
             solid: true,
             active: true,
@@ -140,6 +141,7 @@ fn test_entity_definition_create_npc_entity() {
         },
         attributes: AttributesDef {
             health: Some(50),
+            stats: std::collections::HashMap::new(),
             speed: 1,
             solid: true,
             active: true,
@@ -280,6 +282,7 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
         },
         attributes: AttributesDef {
             health: Some(25),
+            stats: std::collections::HashMap::new(),
             speed: 2,
             solid: true,
             active: true,
@@ -400,6 +403,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
         },
         attributes: AttributesDef {
             health: Some(100),
+            stats: std::collections::HashMap::new(),
             speed: 2,
             solid: true,
             active: true,
@@ -482,6 +486,7 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
         },
         attributes: AttributesDef {
             health: Some(100),
+            stats: std::collections::HashMap::new(),
             speed: 2,
             solid: true,
             active: true,
@@ -570,6 +575,7 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
         },
         attributes: AttributesDef {
             health: Some(25),
+            stats: std::collections::HashMap::new(),
             speed: 1,
             solid: true,
             active: true,
@@ -615,6 +621,68 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
 }
 
 #[test]
+fn test_entity_definition_seeds_authored_attack_power_stat() {
+    let entity_def = EntityDefinition {
+        name: "fighter".to_string(),
+        display_name: "Fighter".to_string(),
+        description: "Attack-powered fighter".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+        },
+        attributes: AttributesDef {
+            health: Some(30),
+            stats: std::collections::HashMap::from([(ATTACK_POWER_STAT_ID.to_string(), 17)]),
+            speed: 2,
+            solid: true,
+            active: true,
+            can_move: true,
+            ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::PlayerWasd,
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: "step".to_string(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "fighters".to_string(),
+            clips: vec![AnimationClipDef {
+                state: "idle".to_string(),
+                frame_tiles: vec!["fighter/idle_0".to_string()],
+                frame_duration_ms: 150.0,
+                loop_mode: "loop".to_string(),
+            }],
+            default_state: "idle".to_string(),
+        },
+        category: "human".to_string(),
+        tags: vec![],
+    };
+
+    let entity = entity_def
+        .create_entity(IVec2::new(0, 0), 1)
+        .expect("definition should create entity");
+
+    assert_eq!(entity.attributes.health, Some(30));
+    assert_eq!(entity.attributes.current_stat(HEALTH_STAT_ID), Some(30));
+    assert_eq!(
+        entity.attributes.current_stat(ATTACK_POWER_STAT_ID),
+        Some(17)
+    );
+    assert_eq!(entity.attributes.base_stat(ATTACK_POWER_STAT_ID), Some(17));
+}
+
+#[test]
 fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type() {
     let entity_def = EntityDefinition {
         name: "invalid".to_string(),
@@ -627,6 +695,7 @@ fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type()
         },
         attributes: AttributesDef {
             health: None,
+            stats: std::collections::HashMap::new(),
             speed: 1,
             solid: false,
             active: true,
@@ -677,6 +746,7 @@ fn test_entity_definition_invalid_animation_state() {
         },
         attributes: AttributesDef {
             health: None,
+            stats: std::collections::HashMap::new(),
             speed: 1,
             solid: false,
             active: true,
@@ -730,6 +800,7 @@ fn test_entity_definition_invalid_loop_mode() {
         },
         attributes: AttributesDef {
             health: None,
+            stats: std::collections::HashMap::new(),
             speed: 1,
             solid: false,
             active: true,
@@ -783,6 +854,7 @@ fn test_entity_definition_serialization() {
         },
         attributes: AttributesDef {
             health: None,
+            stats: std::collections::HashMap::new(),
             speed: 0,
             solid: false,
             active: false,
@@ -848,6 +920,7 @@ fn test_entity_definition_create_audio_component() {
         },
         attributes: AttributesDef {
             health: Some(100),
+            stats: std::collections::HashMap::new(),
             speed: 2,
             solid: true,
             active: true,

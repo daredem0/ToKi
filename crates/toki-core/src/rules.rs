@@ -10,6 +10,8 @@ pub enum RuleTrigger {
     OnPlayerMove,
     OnKey { key: RuleKey },
     OnCollision,
+    OnDamaged,
+    OnDeath,
     OnTrigger,
 }
 

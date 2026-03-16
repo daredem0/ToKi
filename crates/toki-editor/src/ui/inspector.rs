@@ -7,7 +7,10 @@ use chrono::Utc;
 use std::collections::{HashMap, HashSet};
 use toki_core::animation::AnimationState;
 use toki_core::assets::object_sheet::ObjectSheetMeta;
-use toki_core::entity::{AiBehavior, ControlRole, MovementProfile, MovementSoundTrigger};
+use toki_core::entity::{
+    AiBehavior, ControlRole, MovementProfile, MovementSoundTrigger, ATTACK_POWER_STAT_ID,
+    HEALTH_STAT_ID,
+};
 use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
     RuleTarget, RuleTrigger,
@@ -38,6 +41,8 @@ struct EntityPropertyDraft {
     render_layer: i32,
     health_enabled: bool,
     health_value: i64,
+    attack_power_enabled: bool,
+    attack_power_value: i64,
     collision_enabled: bool,
     collision_offset_x: i32,
     collision_offset_y: i32,
@@ -152,6 +157,8 @@ enum RuleTriggerKind {
     PlayerMove,
     Key,
     Collision,
+    Damaged,
+    Death,
     Trigger,
 }
 
@@ -215,6 +222,11 @@ impl EntityPropertyDraft {
             Some(value) => (true, value as i64),
             None => (false, 0),
         };
+        let (attack_power_enabled, attack_power_value) =
+            match entity.attributes.current_stat(ATTACK_POWER_STAT_ID) {
+                Some(value) => (true, value as i64),
+                None => (false, 0),
+            };
 
         Self {
             control_role: entity.control_role,
@@ -237,6 +249,8 @@ impl EntityPropertyDraft {
             render_layer: entity.attributes.render_layer,
             health_enabled,
             health_value,
+            attack_power_enabled,
+            attack_power_value,
             collision_enabled,
             collision_offset_x,
             collision_offset_y,
@@ -1010,6 +1024,51 @@ impl InspectorSystem {
         Some((properties.solid, properties.trigger))
     }
 
+    fn set_optional_runtime_stat(
+        attributes: &mut toki_core::entity::EntityAttributes,
+        stat_id: &str,
+        value: Option<i32>,
+    ) -> bool {
+        let previous_base = attributes.stats.base.get(stat_id).copied();
+        let previous_current = attributes.stats.current.get(stat_id).copied();
+        let mut changed = false;
+
+        match value {
+            Some(value) => {
+                if previous_base != Some(value) {
+                    attributes.stats.base.insert(stat_id.to_string(), value);
+                    changed = true;
+                }
+                if previous_current != Some(value) {
+                    attributes.stats.current.insert(stat_id.to_string(), value);
+                    changed = true;
+                }
+            }
+            None => {
+                changed |= attributes.stats.base.remove(stat_id).is_some();
+                changed |= attributes.stats.current.remove(stat_id).is_some();
+            }
+        }
+
+        changed
+    }
+
+    fn set_optional_definition_stat(
+        attributes: &mut toki_core::entity::AttributesDef,
+        stat_id: &str,
+        value: Option<i32>,
+    ) -> bool {
+        let previous = attributes.stats.get(stat_id).copied();
+        match value {
+            Some(value) if previous != Some(value) => {
+                attributes.stats.insert(stat_id.to_string(), value);
+                true
+            }
+            Some(_) => false,
+            None => attributes.stats.remove(stat_id).is_some(),
+        }
+    }
+
     fn ensure_map_editor_brush_preview_texture(
         ui_state: &mut EditorUI,
         ctx: &egui::Context,
@@ -1564,6 +1623,8 @@ impl InspectorSystem {
             RuleTrigger::OnPlayerMove => RuleTriggerKind::PlayerMove,
             RuleTrigger::OnKey { .. } => RuleTriggerKind::Key,
             RuleTrigger::OnCollision => RuleTriggerKind::Collision,
+            RuleTrigger::OnDamaged => RuleTriggerKind::Damaged,
+            RuleTrigger::OnDeath => RuleTriggerKind::Death,
             RuleTrigger::OnTrigger => RuleTriggerKind::Trigger,
         }
     }
@@ -1575,6 +1636,8 @@ impl InspectorSystem {
             RuleTriggerKind::PlayerMove => "OnPlayerMove",
             RuleTriggerKind::Key => "OnKey",
             RuleTriggerKind::Collision => "OnCollision",
+            RuleTriggerKind::Damaged => "OnDamaged",
+            RuleTriggerKind::Death => "OnDeath",
             RuleTriggerKind::Trigger => "OnTrigger",
         }
     }
@@ -1586,6 +1649,8 @@ impl InspectorSystem {
             RuleTriggerKind::PlayerMove => RuleTrigger::OnPlayerMove,
             RuleTriggerKind::Key => RuleTrigger::OnKey { key: RuleKey::Up },
             RuleTriggerKind::Collision => RuleTrigger::OnCollision,
+            RuleTriggerKind::Damaged => RuleTrigger::OnDamaged,
+            RuleTriggerKind::Death => RuleTrigger::OnDeath,
             RuleTriggerKind::Trigger => RuleTrigger::OnTrigger,
         };
     }
@@ -2134,6 +2199,8 @@ impl InspectorSystem {
             RuleTrigger::OnPlayerMove => "OnPlayerMove".to_string(),
             RuleTrigger::OnKey { key } => format!("OnKey({})", Self::rule_key_label(key)),
             RuleTrigger::OnCollision => "OnCollision".to_string(),
+            RuleTrigger::OnDamaged => "OnDamaged".to_string(),
+            RuleTrigger::OnDeath => "OnDeath".to_string(),
             RuleTrigger::OnTrigger => "OnTrigger".to_string(),
         }
     }
@@ -2235,6 +2302,8 @@ impl InspectorSystem {
                     RuleTriggerKind::PlayerMove,
                     RuleTriggerKind::Key,
                     RuleTriggerKind::Collision,
+                    RuleTriggerKind::Damaged,
+                    RuleTriggerKind::Death,
                     RuleTriggerKind::Trigger,
                 ] {
                     changed |= ui
@@ -2255,6 +2324,8 @@ impl InspectorSystem {
                 RuleTriggerKind::PlayerMove => RuleTrigger::OnPlayerMove,
                 RuleTriggerKind::Key => RuleTrigger::OnKey { key: RuleKey::Up },
                 RuleTriggerKind::Collision => RuleTrigger::OnCollision,
+                RuleTriggerKind::Damaged => RuleTrigger::OnDamaged,
+                RuleTriggerKind::Death => RuleTrigger::OnDeath,
                 RuleTriggerKind::Trigger => RuleTrigger::OnTrigger,
             };
             changed = true;
@@ -2707,6 +2778,20 @@ impl InspectorSystem {
                                 &mut trigger_kind,
                                 RuleTriggerKind::Collision,
                                 Self::trigger_kind_label(RuleTriggerKind::Collision),
+                            )
+                            .changed();
+                        outcome.changed |= ui
+                            .selectable_value(
+                                &mut trigger_kind,
+                                RuleTriggerKind::Damaged,
+                                Self::trigger_kind_label(RuleTriggerKind::Damaged),
+                            )
+                            .changed();
+                        outcome.changed |= ui
+                            .selectable_value(
+                                &mut trigger_kind,
+                                RuleTriggerKind::Death,
+                                Self::trigger_kind_label(RuleTriggerKind::Death),
                             )
                             .changed();
                         outcome.changed |= ui
@@ -3576,11 +3661,11 @@ impl InspectorSystem {
         });
 
         ui.separator();
-        ui.label("Health");
-        changed |= ui.checkbox(&mut draft.health_enabled, "Enabled").changed();
-        if draft.health_enabled {
-            ui.horizontal(|ui| {
-                ui.label("Value:");
+        ui.label("Stats");
+        ui.horizontal(|ui| {
+            ui.label("Health:");
+            changed |= ui.checkbox(&mut draft.health_enabled, "Enabled").changed();
+            if draft.health_enabled {
                 changed |= ui
                     .add(
                         egui::DragValue::new(&mut draft.health_value)
@@ -3588,8 +3673,23 @@ impl InspectorSystem {
                             .range(0..=i64::MAX),
                     )
                     .changed();
-            });
-        }
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.label("Attack Power:");
+            changed |= ui
+                .checkbox(&mut draft.attack_power_enabled, "Enabled")
+                .changed();
+            if draft.attack_power_enabled {
+                changed |= ui
+                    .add(
+                        egui::DragValue::new(&mut draft.attack_power_value)
+                            .speed(1.0)
+                            .range(0..=i64::MAX),
+                    )
+                    .changed();
+            }
+        });
 
         ui.separator();
         ui.label("Collision");
@@ -3953,6 +4053,12 @@ impl InspectorSystem {
                         ui.label(format!("{}", health));
                     });
                 }
+                if let Some(attack_power) = entity.attributes.current_stat(ATTACK_POWER_STAT_ID) {
+                    ui.horizontal(|ui| {
+                        ui.label("Attack Power:");
+                        ui.label(format!("{}", attack_power));
+                    });
+                }
 
                 if entity.attributes.has_inventory {
                     ui.horizontal(|ui| {
@@ -4164,6 +4270,22 @@ impl InspectorSystem {
             None
         };
         changed |= set_if_changed(&mut entity.attributes.health, new_health);
+        changed |= Self::set_optional_runtime_stat(
+            &mut entity.attributes,
+            HEALTH_STAT_ID,
+            new_health.map(|value| value as i32),
+        );
+
+        let new_attack_power = if draft.attack_power_enabled {
+            Some(draft.attack_power_value.clamp(0, i32::MAX as i64) as i32)
+        } else {
+            None
+        };
+        changed |= Self::set_optional_runtime_stat(
+            &mut entity.attributes,
+            ATTACK_POWER_STAT_ID,
+            new_attack_power,
+        );
 
         if draft.collision_enabled {
             if entity.collision_box.is_none() {
@@ -4336,6 +4458,90 @@ impl InspectorSystem {
                                 toki_core::entity::EntityDefinition,
                             >(&content)
                             {
+                                ui.separator();
+                                ui.label("Stats:");
+
+                                ui.horizontal(|ui| {
+                                    ui.label("Health:");
+                                    let mut changed = false;
+                                    let mut health_enabled = definition.attributes.health.is_some();
+                                    let mut health_value =
+                                        definition.attributes.health.unwrap_or(0) as i64;
+                                    changed |=
+                                        ui.checkbox(&mut health_enabled, "Enabled").changed();
+                                    if health_enabled {
+                                        changed |= ui
+                                            .add(
+                                                egui::DragValue::new(&mut health_value)
+                                                    .speed(1.0)
+                                                    .range(0..=i64::MAX),
+                                            )
+                                            .changed();
+                                    }
+                                    if changed {
+                                        let new_health = if health_enabled {
+                                            Some(health_value.clamp(0, u32::MAX as i64) as u32)
+                                        } else {
+                                            None
+                                        };
+                                        definition.attributes.health = new_health;
+                                        Self::set_optional_definition_stat(
+                                            &mut definition.attributes,
+                                            HEALTH_STAT_ID,
+                                            new_health.map(|value| value as i32),
+                                        );
+                                        if let Err(err) =
+                                            Self::save_entity_definition(&definition, &entity_file)
+                                        {
+                                            tracing::error!("{}", err);
+                                            ui.colored_label(egui::Color32::RED, err);
+                                        }
+                                    }
+                                });
+
+                                ui.horizontal(|ui| {
+                                    ui.label("Attack Power:");
+                                    let mut changed = false;
+                                    let mut attack_power =
+                                        definition.attributes.stats.get(ATTACK_POWER_STAT_ID).copied();
+                                    let mut attack_power_enabled = attack_power.is_some();
+                                    let mut attack_power_value = attack_power.unwrap_or(0) as i64;
+                                    changed |= ui
+                                        .checkbox(&mut attack_power_enabled, "Enabled")
+                                        .changed();
+                                    if attack_power_enabled {
+                                        changed |= ui
+                                            .add(
+                                                egui::DragValue::new(&mut attack_power_value)
+                                                    .speed(1.0)
+                                                    .range(0..=i64::MAX),
+                                            )
+                                            .changed();
+                                    }
+                                    if changed {
+                                        attack_power = if attack_power_enabled {
+                                            Some(
+                                                attack_power_value
+                                                    .clamp(0, i32::MAX as i64)
+                                                    as i32,
+                                            )
+                                        } else {
+                                            None
+                                        };
+                                        Self::set_optional_definition_stat(
+                                            &mut definition.attributes,
+                                            ATTACK_POWER_STAT_ID,
+                                            attack_power,
+                                        );
+                                        if let Err(err) =
+                                            Self::save_entity_definition(&definition, &entity_file)
+                                        {
+                                            tracing::error!("{}", err);
+                                            ui.colored_label(egui::Color32::RED, err);
+                                        }
+                                    }
+                                });
+
                                 ui.separator();
                                 ui.label("Audio Settings:");
 
@@ -4590,6 +4796,21 @@ impl InspectorSystem {
                                                 ui.horizontal(|ui| {
                                                     ui.label("Health:");
                                                     ui.label(format!("{}", health));
+                                                });
+                                            }
+
+                                            if let Some(attack_power) = attributes
+                                                .get("stats")
+                                                .and_then(|v| v.as_object())
+                                                .and_then(|stats| {
+                                                    stats
+                                                        .get(ATTACK_POWER_STAT_ID)
+                                                        .and_then(|v| v.as_i64())
+                                                })
+                                            {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Attack Power:");
+                                                    ui.label(format!("{}", attack_power));
                                                 });
                                             }
 
@@ -4849,6 +5070,7 @@ mod tests {
     use toki_core::collision::CollisionBox;
     use toki_core::entity::{
         ControlRole, EntityAttributes, EntityKind, EntityManager, MovementSoundTrigger,
+        ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
     };
     use toki_core::rules::{
         Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
@@ -4930,6 +5152,8 @@ mod tests {
         draft.render_layer = 8;
         draft.health_enabled = true;
         draft.health_value = -4;
+        draft.attack_power_enabled = true;
+        draft.attack_power_value = 12;
         draft.collision_enabled = true;
         draft.collision_offset_x = 3;
         draft.collision_offset_y = -2;
@@ -4965,6 +5189,11 @@ mod tests {
         assert_eq!(entity.attributes.speed, 0);
         assert_eq!(entity.attributes.render_layer, 8);
         assert_eq!(entity.attributes.health, Some(0));
+        assert_eq!(entity.attributes.current_stat(HEALTH_STAT_ID), Some(0));
+        assert_eq!(
+            entity.attributes.current_stat(ATTACK_POWER_STAT_ID),
+            Some(12)
+        );
 
         let collision = entity
             .collision_box
@@ -4978,14 +5207,22 @@ mod tests {
     #[test]
     fn apply_entity_property_draft_disables_health_and_collision() {
         let mut entity = sample_entity_with_id(1);
+        InspectorSystem::set_optional_runtime_stat(
+            &mut entity.attributes,
+            ATTACK_POWER_STAT_ID,
+            Some(9),
+        );
         let mut draft = EntityPropertyDraft::from_entity(&entity);
         draft.health_enabled = false;
+        draft.attack_power_enabled = false;
         draft.collision_enabled = false;
 
         let changed = InspectorSystem::apply_entity_property_draft(&mut entity, &draft);
 
         assert!(changed);
         assert_eq!(entity.attributes.health, None);
+        assert_eq!(entity.attributes.current_stat(HEALTH_STAT_ID), None);
+        assert_eq!(entity.attributes.current_stat(ATTACK_POWER_STAT_ID), None);
         assert!(entity.collision_box.is_none());
     }
 
@@ -5252,6 +5489,12 @@ mod tests {
 
         InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Collision);
         assert_eq!(rule.trigger, RuleTrigger::OnCollision);
+
+        InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Damaged);
+        assert_eq!(rule.trigger, RuleTrigger::OnDamaged);
+
+        InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Death);
+        assert_eq!(rule.trigger, RuleTrigger::OnDeath);
 
         InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Trigger);
         assert_eq!(rule.trigger, RuleTrigger::OnTrigger);
@@ -5638,6 +5881,7 @@ mod tests {
             },
             attributes: toki_core::entity::AttributesDef {
                 health: Some(100),
+                stats: std::collections::HashMap::from([(ATTACK_POWER_STAT_ID.to_string(), 14)]),
                 speed: 2,
                 solid: true,
                 active: true,
@@ -5683,5 +5927,9 @@ mod tests {
             MovementSoundTrigger::AnimationLoop
         );
         assert_eq!(reloaded.audio.movement_sound, "sfx_step");
+        assert_eq!(
+            reloaded.attributes.stats.get(ATTACK_POWER_STAT_ID).copied(),
+            Some(14)
+        );
     }
 }

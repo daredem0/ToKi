@@ -235,6 +235,130 @@ fn on_collision_rule_only_fires_once_for_sustained_blocked_input() {
 }
 
 #[test]
+fn on_damaged_rule_runs_when_primary_action_applies_health_damage() {
+    let mut state = GameState::new_empty();
+    let player_id = state.spawn_player_at(IVec2::new(50, 60));
+    let player = state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 120.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    state.spawn_player_like_npc(IVec2::new(66, 60));
+
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "damaged-rule",
+            RuleTrigger::OnDamaged,
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "rule_damaged".to_string(),
+            }],
+        )],
+    });
+
+    state.handle_profile_action_press(
+        toki_core::entity::MovementProfile::PlayerWasd,
+        toki_core::game::InputAction::Primary,
+    );
+    let update = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(update.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "rule_damaged"
+    )));
+}
+
+#[test]
+fn on_death_rule_runs_when_primary_action_is_lethal() {
+    let mut state = GameState::new_empty();
+    let player_id = state.spawn_player_at(IVec2::new(50, 60));
+    let player = state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 120.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    let target_id = state.spawn_player_like_npc(IVec2::new(66, 60));
+    let target = state
+        .entity_manager_mut()
+        .get_entity_mut(target_id)
+        .expect("target should exist");
+    target.attributes.health = Some(10);
+    target.attributes.stats = toki_core::entity::EntityStats::from_legacy_health(Some(10));
+
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "death-rule",
+            RuleTrigger::OnDeath,
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Collision,
+                sound_id: "rule_death".to_string(),
+            }],
+        )],
+    });
+
+    state.handle_profile_action_press(
+        toki_core::entity::MovementProfile::PlayerWasd,
+        toki_core::game::InputAction::Primary,
+    );
+    let update = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(update.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "rule_death"
+    )));
+}
+
+#[test]
 fn on_trigger_rule_runs_when_entity_overlaps_trigger_tile() {
     let mut state = GameState::new_empty();
     state.spawn_player_at(IVec2::new(0, 0));

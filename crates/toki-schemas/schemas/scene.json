@@ -87,7 +87,7 @@
           "oneOf": [
             {
               "type": "string",
-              "enum": ["OnStart", "OnUpdate", "OnPlayerMove", "OnCollision", "OnTrigger"]
+              "enum": ["OnStart", "OnUpdate", "OnPlayerMove", "OnCollision", "OnDamaged", "OnDeath", "OnTrigger"]
             },
             {
               "type": "object",

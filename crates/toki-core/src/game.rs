@@ -128,6 +128,8 @@ struct RuleRuntimeState {
     fired_once_rules: HashSet<String>,
     velocities: HashMap<EntityId, glam::IVec2>,
     frame_collision_detected: bool,
+    frame_damage_detected: bool,
+    frame_death_detected: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -666,7 +668,12 @@ impl GameState {
                 new_value
             );
 
+            if change.stat_id == HEALTH_STAT_ID && change.delta < 0 {
+                self.rule_runtime.frame_damage_detected = true;
+            }
+
             if change.stat_id == HEALTH_STAT_ID && new_value <= 0 {
+                self.rule_runtime.frame_death_detected = true;
                 tracing::info!(
                     "Entity {} reached zero {} and will be despawned",
                     change.target_entity_id,
@@ -863,6 +870,7 @@ impl GameState {
             },
             attributes: crate::entity::AttributesDef {
                 health: Some(100),
+                stats: std::collections::HashMap::new(),
                 speed: 2,
                 solid: true,
                 active: true,
@@ -924,6 +932,7 @@ impl GameState {
             },
             attributes: crate::entity::AttributesDef {
                 health: Some(50),
+                stats: std::collections::HashMap::new(),
                 speed: 1,
                 solid: true,
                 active: true,
@@ -983,6 +992,8 @@ impl GameState {
         let mut result = GameUpdateResult::new();
         let mut rule_commands = Vec::new();
         self.rule_runtime.frame_collision_detected = false;
+        self.rule_runtime.frame_damage_detected = false;
+        self.rule_runtime.frame_death_detected = false;
 
         if !self.rule_runtime.started {
             self.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut rule_commands);
@@ -1057,6 +1068,18 @@ impl GameState {
         if self.rule_runtime.frame_collision_detected {
             self.collect_rule_commands_for_trigger(
                 RuleTrigger::OnCollision,
+                &mut reactive_rule_commands,
+            );
+        }
+        if self.rule_runtime.frame_damage_detected {
+            self.collect_rule_commands_for_trigger(
+                RuleTrigger::OnDamaged,
+                &mut reactive_rule_commands,
+            );
+        }
+        if self.rule_runtime.frame_death_detected {
+            self.collect_rule_commands_for_trigger(
+                RuleTrigger::OnDeath,
                 &mut reactive_rule_commands,
             );
         }

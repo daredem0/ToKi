@@ -581,6 +581,7 @@ mod tests {
             },
             attributes: AttributesDef {
                 health: Some(50),
+                stats: std::collections::HashMap::new(),
                 speed: 1,
                 solid: true,
                 active: true,

@@ -83,6 +83,8 @@ enum GraphTriggerKind {
     PlayerMove,
     Key,
     Collision,
+    Damaged,
+    Death,
     Trigger,
 }
 
@@ -1911,6 +1913,8 @@ impl PanelSystem {
                                                             GraphTriggerKind::PlayerMove,
                                                             GraphTriggerKind::Key,
                                                             GraphTriggerKind::Collision,
+                                                            GraphTriggerKind::Damaged,
+                                                            GraphTriggerKind::Death,
                                                             GraphTriggerKind::Trigger,
                                                         ] {
                                                             ui.selectable_value(
@@ -2967,6 +2971,8 @@ impl PanelSystem {
                             GraphTriggerKind::PlayerMove,
                             GraphTriggerKind::Key,
                             GraphTriggerKind::Collision,
+                            GraphTriggerKind::Damaged,
+                            GraphTriggerKind::Death,
                             GraphTriggerKind::Trigger,
                         ] {
                             ui.selectable_value(
@@ -3213,6 +3219,8 @@ impl PanelSystem {
             RuleTrigger::OnPlayerMove => "OnPlayerMove".to_string(),
             RuleTrigger::OnKey { key } => format!("OnKey({})", Self::key_label(key)),
             RuleTrigger::OnCollision => "OnCollision".to_string(),
+            RuleTrigger::OnDamaged => "OnDamaged".to_string(),
+            RuleTrigger::OnDeath => "OnDeath".to_string(),
             RuleTrigger::OnTrigger => "OnTrigger".to_string(),
         }
     }
@@ -3299,6 +3307,8 @@ impl PanelSystem {
             RuleTrigger::OnPlayerMove => GraphTriggerKind::PlayerMove,
             RuleTrigger::OnKey { .. } => GraphTriggerKind::Key,
             RuleTrigger::OnCollision => GraphTriggerKind::Collision,
+            RuleTrigger::OnDamaged => GraphTriggerKind::Damaged,
+            RuleTrigger::OnDeath => GraphTriggerKind::Death,
             RuleTrigger::OnTrigger => GraphTriggerKind::Trigger,
         }
     }
@@ -3310,6 +3320,8 @@ impl PanelSystem {
             GraphTriggerKind::PlayerMove => "OnPlayerMove",
             GraphTriggerKind::Key => "OnKey",
             GraphTriggerKind::Collision => "OnCollision",
+            GraphTriggerKind::Damaged => "OnDamaged",
+            GraphTriggerKind::Death => "OnDeath",
             GraphTriggerKind::Trigger => "OnTrigger",
         }
     }
@@ -3321,6 +3333,8 @@ impl PanelSystem {
             GraphTriggerKind::PlayerMove => RuleTrigger::OnPlayerMove,
             GraphTriggerKind::Key => RuleTrigger::OnKey { key: RuleKey::Up },
             GraphTriggerKind::Collision => RuleTrigger::OnCollision,
+            GraphTriggerKind::Damaged => RuleTrigger::OnDamaged,
+            GraphTriggerKind::Death => RuleTrigger::OnDeath,
             GraphTriggerKind::Trigger => RuleTrigger::OnTrigger,
         }
     }
@@ -3666,6 +3680,14 @@ mod tests {
         assert_eq!(
             PanelSystem::trigger_summary(RuleTrigger::OnStart),
             "OnStart"
+        );
+        assert_eq!(
+            PanelSystem::trigger_summary(RuleTrigger::OnDamaged),
+            "OnDamaged"
+        );
+        assert_eq!(
+            PanelSystem::trigger_summary(RuleTrigger::OnDeath),
+            "OnDeath"
         );
         assert_eq!(
             PanelSystem::trigger_summary(RuleTrigger::OnKey { key: RuleKey::Left }),

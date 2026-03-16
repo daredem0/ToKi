@@ -588,6 +588,8 @@ mod tests {
                 "OnPlayerMove",
                 "OnKey",
                 "OnCollision",
+                "OnDamaged",
+                "OnDeath",
                 "OnTrigger",
             ]),
             "Fixture should cover every supported trigger variant"
@@ -662,6 +664,8 @@ mod tests {
             RuleTrigger::OnPlayerMove => "OnPlayerMove",
             RuleTrigger::OnKey { .. } => "OnKey",
             RuleTrigger::OnCollision => "OnCollision",
+            RuleTrigger::OnDamaged => "OnDamaged",
+            RuleTrigger::OnDeath => "OnDeath",
             RuleTrigger::OnTrigger => "OnTrigger",
         }
     }

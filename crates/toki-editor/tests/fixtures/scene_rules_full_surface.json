@@ -91,6 +91,38 @@
         ]
       },
       {
+        "id": "rule_damaged_audio",
+        "enabled": true,
+        "priority": 55,
+        "once": false,
+        "trigger": "OnDamaged",
+        "conditions": ["Always"],
+        "actions": [
+          {
+            "PlaySound": {
+              "channel": "Movement",
+              "sound_id": "sfx_damaged"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rule_death_audio",
+        "enabled": true,
+        "priority": 52,
+        "once": false,
+        "trigger": "OnDeath",
+        "conditions": ["Always"],
+        "actions": [
+          {
+            "PlaySound": {
+              "channel": "Collision",
+              "sound_id": "sfx_death"
+            }
+          }
+        ]
+      },
+      {
         "id": "rule_trigger_switch",
         "enabled": true,
         "priority": 50,

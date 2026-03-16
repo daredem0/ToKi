@@ -671,6 +671,8 @@ pub struct RenderingDef {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributesDef {
     pub health: Option<u32>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub stats: HashMap<String, i32>,
     pub speed: u32,
     pub solid: bool,
     pub active: bool,
@@ -782,9 +784,31 @@ impl EntityDefinition {
         animation_controller.play(default_state);
 
         // Build attributes
+        let mut authored_stats = EntityStats::default();
+        for (stat_id, value) in &self.attributes.stats {
+            let authored_value = (*value).max(0);
+            authored_stats.base.insert(stat_id.clone(), authored_value);
+            authored_stats
+                .current
+                .insert(stat_id.clone(), authored_value);
+        }
+        if let Some(health) = self.attributes.health {
+            let health = health as i32;
+            authored_stats
+                .base
+                .insert(HEALTH_STAT_ID.to_string(), health);
+            authored_stats
+                .current
+                .insert(HEALTH_STAT_ID.to_string(), health);
+        }
+
         let mut attributes = EntityAttributes {
-            health: self.attributes.health,
-            stats: EntityStats::from_legacy_health(self.attributes.health),
+            health: self.attributes.health.or_else(|| {
+                authored_stats
+                    .base(HEALTH_STAT_ID)
+                    .and_then(|value| u32::try_from(value).ok())
+            }),
+            stats: authored_stats,
             speed: self.attributes.speed,
             solid: self.attributes.solid,
             visible: self.rendering.visible,

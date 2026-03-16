@@ -8,7 +8,7 @@ use toki_core::assets::{
 };
 use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, ControlRole,
-    EntityDefinition, MovementProfile, MovementSoundTrigger, RenderingDef,
+    EntityDefinition, MovementProfile, MovementSoundTrigger, RenderingDef, ATTACK_POWER_STAT_ID,
 };
 use toki_core::rules::{Rule, RuleAction, RuleSet, RuleTarget, RuleTrigger};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
@@ -101,6 +101,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
         },
         attributes: AttributesDef {
             health: Some(100),
+            stats: std::collections::HashMap::new(),
             speed: 2,
             solid: true,
             active: true,
@@ -859,6 +860,61 @@ fn game_state_primary_action_applies_damage_to_adjacent_target_health_stat() {
         .expect("target should still exist after non-lethal hit");
     assert_eq!(target.attributes.health, Some(15));
     assert_eq!(target.attributes.current_stat("health"), Some(15));
+}
+
+#[test]
+fn game_state_primary_action_uses_attack_power_stat_for_damage() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    player
+        .attributes
+        .stats
+        .ensure_stat(ATTACK_POWER_STAT_ID, 17);
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 120.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    let mut target_definition = test_definition("target_attack_power", "creature");
+    target_definition.attributes.health = Some(25);
+    let target_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&target_definition, IVec2::new(66, 60))
+        .expect("target should spawn");
+
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    game_state.update(world_bounds, &tilemap, &atlas);
+
+    let target = game_state
+        .entity_manager()
+        .get_entity(target_id)
+        .expect("target should still exist after non-lethal hit");
+    assert_eq!(target.attributes.health, Some(8));
+    assert_eq!(target.attributes.current_stat("health"), Some(8));
 }
 
 #[test]

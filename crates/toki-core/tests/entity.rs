@@ -14,6 +14,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
         },
         attributes: AttributesDef {
             health: Some(100),
+            stats: std::collections::HashMap::new(),
             speed: 2,
             solid: true,
             active: true,

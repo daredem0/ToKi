@@ -70,9 +70,21 @@
       "required": ["health", "speed", "solid", "active", "can_move", "has_inventory"],
       "properties": {
         "health": {
-          "type": "integer",
+          "type": ["integer", "null"],
           "minimum": 0,
           "description": "Health points"
+        },
+        "stats": {
+          "type": "object",
+          "description": "Optional authored base stats keyed by stat id",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
         },
         "speed": {
           "type": "number",
