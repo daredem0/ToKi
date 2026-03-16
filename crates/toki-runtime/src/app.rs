@@ -7,22 +7,19 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::WindowId;
 
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
-use toki_core::graphics::image::load_image_rgba8_from_bytes;
-use toki_core::math::projection::ProjectionParameter;
+use toki_core::serialization::{load_game, save_game};
 use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
-use toki_core::{EventHandler, GameState, Scene, TimingSystem};
+use toki_core::{EventHandler, TimingSystem};
 use toki_render::RenderError;
 
-use crate::systems::resources::resolve_project_resource_paths;
 use crate::systems::AudioManager;
 use crate::systems::{
     CameraManager, DecodedProjectCache, GameManager, PerformanceMonitor, PlatformSystem,
     RenderingSystem, ResourceManager, RuntimeAssetLoadPlan,
 };
-use toki_core::serialization::{load_game, save_game};
 
 const COMMUNITY_SPLASH_MIN_DURATION_MS: u64 = 3000;
 const COMMUNITY_SPLASH_MAX_DURATION_MS: u64 = 10000;
@@ -37,6 +34,14 @@ const SPLASH_VERSION_DEFAULT_SIZE_PX: f32 = 11.0;
 const SPLASH_VERSION_MIN_SIZE_PX: f32 = 7.0;
 const SPLASH_TEXT_HORIZONTAL_PADDING_PX: f32 = 8.0;
 const COMMUNITY_SPLASH_LOGO_PNG: &[u8] = include_bytes!("../../../assets/TokiLogo.png");
+
+#[path = "app_bootstrap.rs"]
+mod app_bootstrap;
+#[path = "app_splash.rs"]
+mod app_splash;
+
+use app_bootstrap::first_existing_path;
+use app_splash::{ResolvedSplashConfig, SplashPolicy};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeSplashOptions {
@@ -88,39 +93,6 @@ pub struct RuntimeLaunchOptions {
     pub display: RuntimeDisplayOptions,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SplashPolicy {
-    Community,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct ResolvedSplashConfig {
-    duration: Duration,
-    show_branding: bool,
-}
-
-impl SplashPolicy {
-    fn resolve(self, requested: &RuntimeSplashOptions) -> ResolvedSplashConfig {
-        match self {
-            Self::Community => {
-                if !requested.show_branding {
-                    tracing::warn!(
-                        "Splash branding cannot be disabled in Community bundle; forcing branding ON"
-                    );
-                }
-                let clamped_duration = requested.duration_ms.clamp(
-                    COMMUNITY_SPLASH_MIN_DURATION_MS,
-                    COMMUNITY_SPLASH_MAX_DURATION_MS,
-                );
-                ResolvedSplashConfig {
-                    duration: Duration::from_millis(clamped_duration),
-                    show_branding: true,
-                }
-            }
-        }
-    }
-}
-
 #[derive(Debug)]
 struct App {
     // Core systems
@@ -154,68 +126,6 @@ impl App {
             .as_ref()
             .map(tempfile::TempDir::path)
             .or(self.launch_options.project_path.as_deref())
-    }
-
-    fn projection_view_size(parameters: ProjectionParameter) -> glam::Vec2 {
-        let aspect = parameters.width as f32 / parameters.height as f32;
-        let desired_aspect = parameters.desired_width as f32 / parameters.desired_height as f32;
-
-        if aspect > desired_aspect {
-            let height = parameters.desired_height as f32;
-            let width = height * aspect;
-            glam::Vec2::new(width, height)
-        } else {
-            let width = parameters.desired_width as f32;
-            let height = width / aspect;
-            glam::Vec2::new(width, height)
-        }
-    }
-
-    fn centered_logo_origin_for_view(view_size: glam::Vec2, logo_size: glam::UVec2) -> glam::IVec2 {
-        let x = ((view_size.x - logo_size.x as f32) * 0.5).floor() as i32;
-        let y = ((view_size.y - logo_size.y as f32) * 0.5).floor() as i32;
-        glam::IVec2::new(x, y)
-    }
-
-    fn splash_branding_positions(
-        view_size: glam::Vec2,
-        splash_logo_loaded: bool,
-        logo_origin: glam::IVec2,
-        logo_size: glam::UVec2,
-        branding_style: &TextStyle,
-        version_style: &TextStyle,
-    ) -> (glam::Vec2, glam::Vec2) {
-        let branding_height = branding_style.size_px * SPLASH_TEXT_LINE_HEIGHT_MULTIPLIER;
-        let version_height = version_style.size_px * SPLASH_TEXT_LINE_HEIGHT_MULTIPLIER;
-        let total_block_height = branding_height + SPLASH_BRANDING_VERSION_GAP_PX + version_height;
-        let max_branding_top = (view_size.y - total_block_height - 4.0).max(0.0);
-        let branding_position = if splash_logo_loaded {
-            glam::Vec2::new(
-                view_size.x * 0.5,
-                (logo_origin.y as f32 + logo_size.y as f32 + 8.0).min(max_branding_top),
-            )
-        } else {
-            glam::Vec2::new(view_size.x * 0.5, (view_size.y * 0.5).min(max_branding_top))
-        };
-        let version_position = glam::Vec2::new(
-            branding_position.x,
-            branding_position.y + branding_height + SPLASH_BRANDING_VERSION_GAP_PX,
-        );
-        (branding_position, version_position)
-    }
-
-    fn fitted_splash_version_style(view_width: f32, content: &str) -> TextStyle {
-        let available_width = (view_width - SPLASH_TEXT_HORIZONTAL_PADDING_PX).max(1.0);
-        let char_count = content.chars().count().max(1) as f32;
-        let max_size_for_width = available_width / (char_count * 0.55);
-        let size_px =
-            max_size_for_width.clamp(SPLASH_VERSION_MIN_SIZE_PX, SPLASH_VERSION_DEFAULT_SIZE_PX);
-        TextStyle {
-            font_family: "Sans".to_string(),
-            size_px,
-            weight: TextWeight::Normal,
-            ..TextStyle::default()
-        }
     }
 
     fn new(launch_options: RuntimeLaunchOptions) -> Self {
@@ -284,255 +194,6 @@ impl App {
             decoded_project_cache,
             pack_mount,
         }
-    }
-
-    fn build_startup_state(
-        launch_options: &RuntimeLaunchOptions,
-    ) -> (
-        ResourceManager,
-        GameState,
-        Option<tempfile::TempDir>,
-        RuntimeAssetLoadPlan,
-        DecodedProjectCache,
-    ) {
-        if let Some(pack_path) = &launch_options.pack_path {
-            return Self::build_startup_state_from_pack(launch_options, pack_path).unwrap_or_else(
-                |error| {
-                    panic!(
-                        "Failed to initialize runtime from pack '{}': {}",
-                        pack_path.display(),
-                        error
-                    )
-                },
-            );
-        }
-
-        let mut decoded_project_cache = DecodedProjectCache::default();
-        if let Some(project_path) = &launch_options.project_path {
-            let scene = launch_options.scene_name.as_deref().and_then(|scene_name| {
-                Self::load_project_scene_with_cache(
-                    project_path,
-                    scene_name,
-                    &mut decoded_project_cache,
-                )
-                .ok()
-            });
-
-            let map_name = launch_options.map_name.clone().or_else(|| {
-                scene
-                    .as_ref()
-                    .and_then(|loaded_scene| loaded_scene.maps.first().cloned())
-            });
-
-            match Self::load_project_resources_with_cache(
-                project_path,
-                launch_options.scene_name.as_deref(),
-                map_name.as_deref(),
-                &mut decoded_project_cache,
-            ) {
-                Ok((resources, asset_load_plan)) => {
-                    let game_state = if let Some(scene) = scene {
-                        Self::game_state_from_scene(scene)
-                    } else {
-                        Self::fallback_game_state()
-                    };
-                    return (
-                        resources,
-                        game_state,
-                        None,
-                        asset_load_plan,
-                        decoded_project_cache,
-                    );
-                }
-                Err(error) => {
-                    tracing::error!(
-                        "Failed to load project resources for '{}': {}",
-                        project_path.display(),
-                        error
-                    );
-                }
-            }
-        }
-
-        match ResourceManager::load_all() {
-            Ok(resources) => (
-                resources,
-                Self::fallback_game_state(),
-                None,
-                RuntimeAssetLoadPlan {
-                    scene_name: launch_options.scene_name.clone(),
-                    map_name: launch_options.map_name.clone(),
-                    tilemap_texture_path: None,
-                    sprite_texture_path: None,
-                    preloaded_sfx_names: crate::systems::asset_loading::common_preloaded_sfx_names(
-                    ),
-                    stream_music: true,
-                },
-                decoded_project_cache,
-            ),
-            Err(error) => {
-                panic!("Failed to initialize runtime resources: {error}");
-            }
-        }
-    }
-
-    fn build_startup_state_from_pack(
-        launch_options: &RuntimeLaunchOptions,
-        pack_path: &std::path::Path,
-    ) -> anyhow::Result<(
-        ResourceManager,
-        GameState,
-        Option<tempfile::TempDir>,
-        RuntimeAssetLoadPlan,
-        DecodedProjectCache,
-    )> {
-        let mount = crate::pack::extract_pak_to_tempdir(pack_path)?;
-        let mount_path = mount.path().to_path_buf();
-        let mut decoded_project_cache = DecodedProjectCache::default();
-        let scene = launch_options
-            .scene_name
-            .as_deref()
-            .map(|scene_name| {
-                Self::load_project_scene_with_cache(
-                    &mount_path,
-                    scene_name,
-                    &mut decoded_project_cache,
-                )
-            })
-            .transpose()
-            .map_err(anyhow::Error::msg)?;
-        let map_name = launch_options.map_name.clone().or_else(|| {
-            scene
-                .as_ref()
-                .and_then(|loaded_scene| loaded_scene.maps.first().cloned())
-        });
-        let (resources, asset_load_plan) = Self::load_project_resources_with_cache(
-            &mount_path,
-            launch_options.scene_name.as_deref(),
-            map_name.as_deref(),
-            &mut decoded_project_cache,
-        )?;
-        let game_state = if let Some(scene) = scene {
-            Self::game_state_from_scene(scene)
-        } else {
-            Self::fallback_game_state()
-        };
-        Ok((
-            resources,
-            game_state,
-            Some(mount),
-            asset_load_plan,
-            decoded_project_cache,
-        ))
-    }
-
-    fn load_project_resources_with_cache(
-        project_path: &std::path::Path,
-        scene_name: Option<&str>,
-        map_name: Option<&str>,
-        decoded_project_cache: &mut DecodedProjectCache,
-    ) -> Result<(ResourceManager, RuntimeAssetLoadPlan), RenderError> {
-        let resolved = resolve_project_resource_paths(project_path, map_name)?;
-        let tilemap = decoded_project_cache.load_tilemap_from_path(&resolved.tilemap_path)?;
-        tilemap.validate()?;
-        let terrain_atlas =
-            decoded_project_cache.load_atlas_from_path(&resolved.terrain_atlas_path)?;
-        let mut sprite_atlases = std::collections::HashMap::new();
-        let mut sprite_texture_paths = std::collections::HashMap::new();
-        let mut object_sheets = std::collections::HashMap::new();
-        let mut object_texture_paths = std::collections::HashMap::new();
-        for atlas_path in &resolved.sprite_atlas_paths {
-            let atlas = decoded_project_cache.load_atlas_from_path(atlas_path)?;
-            let texture_path = crate::systems::resources::resolve_atlas_texture_path(atlas_path)?;
-            if let Some(file_name) = atlas_path.file_name().and_then(|name| name.to_str()) {
-                sprite_atlases.insert(file_name.to_string(), atlas.clone());
-                sprite_texture_paths.insert(file_name.to_string(), texture_path.clone());
-            }
-            if let Some(stem) = atlas_path.file_stem().and_then(|name| name.to_str()) {
-                sprite_atlases.insert(stem.to_string(), atlas);
-                sprite_texture_paths.insert(stem.to_string(), texture_path);
-            }
-        }
-        for object_sheet_path in &resolved.object_sheet_paths {
-            let object_sheet = toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(
-                object_sheet_path,
-            )?;
-            let texture_path =
-                crate::systems::resources::resolve_object_sheet_texture_path(object_sheet_path)?;
-            if let Some(file_name) = object_sheet_path.file_name().and_then(|name| name.to_str()) {
-                object_sheets.insert(file_name.to_string(), object_sheet.clone());
-                object_texture_paths.insert(file_name.to_string(), texture_path.clone());
-            }
-            if let Some(stem) = object_sheet_path.file_stem().and_then(|name| name.to_str()) {
-                object_sheets.insert(stem.to_string(), object_sheet);
-                object_texture_paths.insert(stem.to_string(), texture_path);
-            }
-        }
-        let resources = ResourceManager::from_preloaded(
-            terrain_atlas,
-            sprite_atlases,
-            sprite_texture_paths,
-            object_sheets,
-            object_texture_paths,
-            tilemap,
-        );
-        let asset_load_plan = RuntimeAssetLoadPlan::from_resolved_paths(
-            scene_name.map(str::to_string),
-            map_name.map(str::to_string),
-            &resolved,
-        );
-        Ok((resources, asset_load_plan))
-    }
-
-    fn load_project_scene_with_cache(
-        project_path: &std::path::Path,
-        scene_name: &str,
-        decoded_project_cache: &mut DecodedProjectCache,
-    ) -> Result<Scene, String> {
-        let scene_path = project_path
-            .join("scenes")
-            .join(format!("{scene_name}.json"));
-        decoded_project_cache.load_scene_from_path(&scene_path)
-    }
-
-    fn game_state_from_scene(scene: Scene) -> GameState {
-        let scene_name = scene.name.clone();
-        let mut game_state = GameState::new_empty();
-        game_state.add_scene(scene);
-        if let Err(error) = game_state.load_scene(&scene_name) {
-            tracing::error!(
-                "Failed to load startup scene '{}' into game state: {}",
-                scene_name,
-                error
-            );
-            return Self::fallback_game_state();
-        }
-        game_state
-    }
-
-    fn fallback_game_state() -> GameState {
-        let mut game_state = GameState::new_empty();
-        let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
-        let _npc_id = game_state.spawn_player_like_npc(glam::IVec2::new(120, 72));
-        game_state
-    }
-
-    fn project_texture_paths(project_path: &std::path::Path) -> (Option<PathBuf>, Option<PathBuf>) {
-        let tilemap_texture = first_existing_path(&[
-            project_path
-                .join("assets")
-                .join("sprites")
-                .join("terrain.png"),
-            project_path.join("assets").join("terrain.png"),
-        ]);
-        let sprite_texture = first_existing_path(&[
-            project_path
-                .join("assets")
-                .join("sprites")
-                .join("creatures.png"),
-            project_path.join("assets").join("creatures.png"),
-        ]);
-        (tilemap_texture, sprite_texture)
     }
 
     fn tick(&mut self) {
@@ -954,87 +615,6 @@ impl App {
         }
     }
 
-    fn render_startup_splash(&mut self) {
-        let logo_size = glam::UVec2::new(SPLASH_LOGO_WIDTH, SPLASH_LOGO_HEIGHT);
-        let view_size = Self::projection_view_size(self.rendering.projection_params());
-        let logo_origin = Self::centered_logo_origin_for_view(view_size, logo_size);
-        self.rendering.update_projection(glam::Mat4::IDENTITY);
-        self.rendering.set_tilemap_render_enabled(false);
-        self.rendering.clear_sprites();
-        self.rendering.clear_text_items();
-        self.rendering.clear_debug_shapes();
-        self.rendering.finalize_debug_shapes();
-        if self.splash_logo_loaded {
-            self.rendering.add_sprite(
-                toki_core::sprite::SpriteFrame {
-                    u0: 0.0,
-                    v0: 0.0,
-                    u1: 1.0,
-                    v1: 1.0,
-                },
-                logo_origin,
-                logo_size,
-                false,
-            );
-        }
-        if self.splash_config.show_branding {
-            let branding_style = TextStyle {
-                font_family: "Sans".to_string(),
-                size_px: 16.0,
-                weight: TextWeight::Bold,
-                ..TextStyle::default()
-            };
-            let version_style =
-                Self::fitted_splash_version_style(view_size.x, COMMUNITY_SPLASH_VERSION_TEXT);
-            let (branding_position, version_position) = Self::splash_branding_positions(
-                view_size,
-                self.splash_logo_loaded,
-                logo_origin,
-                logo_size,
-                &branding_style,
-                &version_style,
-            );
-            self.rendering.add_text_item(
-                TextItem::new_screen(
-                    COMMUNITY_SPLASH_BRANDING_TEXT,
-                    branding_position,
-                    branding_style,
-                )
-                .with_anchor(TextAnchor::TopCenter)
-                .with_layer(10),
-            );
-            self.rendering.add_text_item(
-                TextItem::new_screen(
-                    COMMUNITY_SPLASH_VERSION_TEXT,
-                    version_position,
-                    version_style,
-                )
-                .with_max_width((view_size.x - SPLASH_TEXT_HORIZONTAL_PADDING_PX).max(1.0))
-                .with_anchor(TextAnchor::TopCenter)
-                .with_layer(10),
-            );
-        }
-        self.rendering.draw();
-        self.platform.request_redraw();
-    }
-
-    fn restore_runtime_sprite_texture_after_splash(&mut self) {
-        if let Some(path) = &self.post_splash_sprite_texture_path {
-            if let Err(error) = self.rendering.load_sprite_texture(path.clone()) {
-                tracing::warn!(
-                    "Failed to restore sprite texture '{}' after splash: {}",
-                    path.display(),
-                    error
-                );
-            }
-            return;
-        }
-
-        tracing::warn!(
-            "No post-splash sprite texture path available; keeping current sprite texture"
-        );
-    }
-
     fn refresh_tilemap_vertices_for_current_camera(&mut self) {
         if !self.rendering.has_gpu() {
             return;
@@ -1049,30 +629,6 @@ impl App {
             self.camera_system.cached_visible_chunks(),
         );
         self.rendering.update_tilemap_vertices(&verts);
-    }
-
-    fn resolve_post_splash_sprite_texture_path(
-        launch_options: &RuntimeLaunchOptions,
-        content_root: Option<&std::path::Path>,
-    ) -> Option<PathBuf> {
-        if let Some(root) = content_root {
-            let (_, sprite_texture) = Self::project_texture_paths(root);
-            if sprite_texture.is_some() {
-                return sprite_texture;
-            }
-        }
-
-        if let Some(project_path) = &launch_options.project_path {
-            let (_, sprite_texture) = Self::project_texture_paths(project_path);
-            if sprite_texture.is_some() {
-                return sprite_texture;
-            }
-        }
-
-        first_existing_path(&[
-            PathBuf::from("assets/creatures.png"),
-            PathBuf::from("assets/sprites/creatures.png"),
-        ])
     }
 }
 
@@ -1125,23 +681,7 @@ impl ApplicationHandler for App {
                     content_root.as_deref(),
                 )
             });
-        self.splash_config = self.splash_policy.resolve(&self.launch_options.splash);
-        if let Ok(decoded_logo) = load_image_rgba8_from_bytes(COMMUNITY_SPLASH_LOGO_PNG) {
-            if let Err(error) = self.rendering.load_sprite_texture_rgba8(&decoded_logo) {
-                tracing::warn!(
-                    "Failed to load embedded startup logo texture (splash will render branding-only): {}",
-                    error
-                );
-                self.splash_logo_loaded = false;
-            } else {
-                self.splash_logo_loaded = true;
-            }
-        } else {
-            tracing::warn!(
-                "Failed to decode embedded startup logo bytes; splash will render branding-only"
-            );
-            self.splash_logo_loaded = false;
-        }
+        self.initialize_splash_resources();
 
         // Update rendering size
         if let Some(size) = self.platform.inner_size() {
@@ -1233,10 +773,6 @@ pub fn run_minimal_window_with_options(
 
     // Return Ok if the application was closed successfully
     Ok(())
-}
-
-fn first_existing_path(candidates: &[PathBuf]) -> Option<PathBuf> {
-    candidates.iter().find(|path| path.exists()).cloned()
 }
 
 #[cfg(test)]
