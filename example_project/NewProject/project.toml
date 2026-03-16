@@ -41,16 +41,20 @@ pan = [
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
-"node:4" = [
-    60.0,
+"node:5" = [
+    800.0,
     106.0,
+]
+"node:1" = [
+    110.08570861816406,
+    34.51572799682617,
 ]
 "node:2" = [
     800.0,
     50.0,
 ]
-"node:5" = [
-    800.0,
+"node:4" = [
+    60.0,
     106.0,
 ]
 "node:6" = [
@@ -60,10 +64,6 @@ pan = [
 "node:3" = [
     430.0,
     50.0,
-]
-"node:1" = [
-    110.08570861816406,
-    34.51572799682617,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]

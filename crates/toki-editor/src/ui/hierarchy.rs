@@ -25,6 +25,15 @@ impl HierarchySystem {
             .join(" ")
     }
 
+    fn category_section_label(raw: &str) -> String {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "creature" => "Creatures".to_string(),
+            "human" => "Humans".to_string(),
+            "item" => "Items".to_string(),
+            _ => Self::category_label(raw),
+        }
+    }
+
     /// Renders the entity palette showing available entity definitions for placement
     pub fn render_entity_palette(
         ui: &mut egui::Ui,
@@ -89,62 +98,63 @@ impl HierarchySystem {
                     sorted_categories.sort_by(|a, b| a.0.cmp(&b.0));
 
                     for (category, mut entity_names) in sorted_categories {
-                        ui.label(format!("📂 {}", Self::category_label(&category)));
-                        ui.indent(format!("category_{}", category), |ui| {
-                            entity_names.sort();
+                        egui::CollapsingHeader::new(Self::category_section_label(&category))
+                            .id_salt(format!("entity_palette_category_{}", category))
+                            .default_open(false)
+                            .show(ui, |ui| {
+                                entity_names.sort();
 
-                            for entity_name in entity_names {
-                                let is_selected = matches!(
-                                    selection,
-                                    Some(Selection::EntityDefinition(name)) if name == &entity_name
-                                );
-
-                                let button =
-                                    ui.selectable_label(is_selected, format!("🧙 {}", entity_name));
-
-                                if button.clicked() {
-                                    tracing::info!(
-                                        "Entity '{}' clicked - entering placement mode",
-                                        entity_name
+                                for entity_name in entity_names {
+                                    let is_selected = matches!(
+                                        selection,
+                                        Some(Selection::EntityDefinition(name)) if name == &entity_name
                                     );
-                                    placement_mode_request = Some(entity_name.clone());
-                                    selected_entity = Some(entity_name.clone());
-                                }
 
-                                button.context_menu(|ui| {
-                                    ui.label(format!("Entity: {}", entity_name));
-                                    ui.separator();
-                                    ui.label("Add to Scene:");
-                                    ui.separator();
+                                    let button = ui.selectable_label(is_selected, &entity_name);
 
-                                    let scene_names: Vec<String> =
-                                        scenes.iter().map(|s| s.name.clone()).collect();
-
-                                    for scene_name in scene_names {
-                                        if ui.button(&scene_name).clicked() {
-                                            tracing::info!(
-                                                "Adding entity '{}' to scene '{}'",
-                                                entity_name,
-                                                scene_name
-                                            );
-                                            scene_entity_additions
-                                                .push((scene_name.clone(), entity_name.clone()));
-                                            ui.close();
-                                        }
-                                    }
-
-                                    ui.separator();
-                                    ui.label("Actions:");
-                                    if ui.button("📖 View Definition").clicked() {
+                                    if button.clicked() {
                                         tracing::info!(
-                                            "View definition for entity: {}",
+                                            "Entity '{}' clicked - entering placement mode",
                                             entity_name
                                         );
-                                        ui.close();
+                                        placement_mode_request = Some(entity_name.clone());
+                                        selected_entity = Some(entity_name.clone());
                                     }
-                                });
-                            }
-                        });
+
+                                    button.context_menu(|ui| {
+                                        ui.label(format!("Entity: {}", entity_name));
+                                        ui.separator();
+                                        ui.label("Add to Scene:");
+                                        ui.separator();
+
+                                        let scene_names: Vec<String> =
+                                            scenes.iter().map(|s| s.name.clone()).collect();
+
+                                        for scene_name in scene_names {
+                                            if ui.button(&scene_name).clicked() {
+                                                tracing::info!(
+                                                    "Adding entity '{}' to scene '{}'",
+                                                    entity_name,
+                                                    scene_name
+                                                );
+                                                scene_entity_additions
+                                                    .push((scene_name.clone(), entity_name.clone()));
+                                                ui.close();
+                                            }
+                                        }
+
+                                        ui.separator();
+                                        ui.label("Actions:");
+                                        if ui.button("View Definition").clicked() {
+                                            tracing::info!(
+                                                "View definition for entity: {}",
+                                                entity_name
+                                            );
+                                            ui.close();
+                                        }
+                                    });
+                                }
+                            });
                         ui.add_space(5.0);
                     }
 

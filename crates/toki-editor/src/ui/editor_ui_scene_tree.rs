@@ -301,13 +301,5 @@ impl EditorUI {
         if let Some(new_active_scene) = active_scene_change {
             self.active_scene = Some(new_active_scene);
         }
-
-        ui.separator();
-
-        if ui.button("+ Add Scene").clicked() {
-            let new_scene_name = format!("Scene {}", self.scenes.len() + 1);
-            self.add_scene(new_scene_name.clone());
-            tracing::info!("Created new scene: {}", new_scene_name);
-        }
     }
 }
