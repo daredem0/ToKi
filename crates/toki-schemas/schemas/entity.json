@@ -86,6 +86,45 @@
             "minimum": 0
           }
         },
+        "primary_projectile": {
+          "type": ["object", "null"],
+          "description": "Optional projectile spawned by the entity's primary action",
+          "required": ["sheet", "object_name", "size", "speed", "damage", "lifetime_ticks"],
+          "properties": {
+            "sheet": {
+              "type": "string",
+              "minLength": 1
+            },
+            "object_name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "size": {
+              "type": "array",
+              "items": {"type": "integer", "minimum": 1},
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "speed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "damage": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "lifetime_ticks": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "spawn_offset": {
+              "type": "array",
+              "items": {"type": "integer"},
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        },
         "speed": {
           "type": "number",
           "minimum": 0,

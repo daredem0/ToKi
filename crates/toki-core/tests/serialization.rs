@@ -33,6 +33,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             } else {
                 MovementProfile::None
             },
+            primary_projectile: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -86,6 +87,8 @@ fn create_test_entity() -> Entity {
         can_move: true,
         ai_behavior: AiBehavior::None,
         movement_profile: MovementProfile::PlayerWasd,
+        primary_projectile: None,
+        projectile: None,
         has_inventory: true,
     };
 

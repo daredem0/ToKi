@@ -8,7 +8,8 @@ use toki_core::assets::{
 };
 use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, ControlRole,
-    EntityDefinition, MovementProfile, MovementSoundTrigger, RenderingDef, ATTACK_POWER_STAT_ID,
+    EntityDefinition, EntityKind, MovementProfile, MovementSoundTrigger, PrimaryProjectileDef,
+    RenderingDef, ATTACK_POWER_STAT_ID,
 };
 use toki_core::rules::{Rule, RuleAction, RuleSet, RuleTarget, RuleTrigger};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
@@ -116,6 +117,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             } else {
                 MovementProfile::None
             },
+            primary_projectile: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -1190,6 +1192,200 @@ fn game_state_primary_action_damages_scene_loaded_legacy_health_target() {
         .expect("legacy health target should still exist after non-lethal hit");
     assert_eq!(target.attributes.health, Some(15));
     assert_eq!(target.attributes.current_stat("health"), Some(15));
+}
+
+#[test]
+fn game_state_primary_action_spawns_projectile_when_authored() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    player.attributes.primary_projectile = Some(PrimaryProjectileDef {
+        sheet: "fauna".to_string(),
+        object_name: "rock".to_string(),
+        size: [16, 16],
+        speed: 4,
+        damage: 8,
+        lifetime_ticks: 5,
+        spawn_offset: [0, 0],
+    });
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 120.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    game_state.update(
+        UVec2::new(128, 128),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    let projectile_ids = game_state
+        .entity_manager()
+        .active_entities()
+        .into_iter()
+        .filter(|&entity_id| {
+            game_state
+                .entity_manager()
+                .get_entity(entity_id)
+                .is_some_and(|entity| entity.entity_kind == EntityKind::Projectile)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(projectile_ids.len(), 1);
+
+    let renderables = game_state.get_projectile_renderables();
+    assert_eq!(renderables.len(), 1);
+    assert_eq!(renderables[0].sheet, "fauna");
+    assert_eq!(renderables[0].object_name, "rock");
+    assert_eq!(renderables[0].position, IVec2::new(70, 60));
+}
+
+#[test]
+fn game_state_projectile_moves_and_expires_after_lifetime() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    player.attributes.primary_projectile = Some(PrimaryProjectileDef {
+        sheet: "fauna".to_string(),
+        object_name: "rock".to_string(),
+        size: [16, 16],
+        speed: 4,
+        damage: 8,
+        lifetime_ticks: 3,
+        spawn_offset: [0, 0],
+    });
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 120.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    assert_eq!(
+        game_state.get_projectile_renderables()[0].position,
+        IVec2::new(70, 60)
+    );
+
+    game_state.update(world_bounds, &tilemap, &atlas);
+    assert_eq!(
+        game_state.get_projectile_renderables()[0].position,
+        IVec2::new(74, 60)
+    );
+
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    assert!(
+        game_state.get_projectile_renderables().is_empty(),
+        "projectile should despawn after its lifetime expires"
+    );
+}
+
+#[test]
+fn game_state_projectile_applies_damage_and_despawns_on_hit() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    player.attributes.primary_projectile = Some(PrimaryProjectileDef {
+        sheet: "fauna".to_string(),
+        object_name: "rock".to_string(),
+        size: [16, 16],
+        speed: 4,
+        damage: 8,
+        lifetime_ticks: 10,
+        spawn_offset: [0, 0],
+    });
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 120.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    let mut target_definition = test_definition("projectile_target", "creature");
+    target_definition.attributes.health = Some(25);
+    let target_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&target_definition, IVec2::new(90, 60))
+        .expect("target should spawn");
+
+    let world_bounds = UVec2::new(160, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.update(world_bounds, &tilemap, &atlas);
+
+    let target = game_state
+        .entity_manager()
+        .get_entity(target_id)
+        .expect("target should survive non-lethal projectile damage");
+    assert_eq!(target.attributes.health, Some(17));
+    assert_eq!(target.attributes.current_stat("health"), Some(17));
+    assert!(
+        game_state.get_projectile_renderables().is_empty(),
+        "projectile should despawn on hit"
+    );
 }
 
 #[test]

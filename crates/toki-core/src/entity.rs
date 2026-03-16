@@ -8,6 +8,30 @@ pub type EntityId = u32;
 pub const HEALTH_STAT_ID: &str = "health";
 pub const ATTACK_POWER_STAT_ID: &str = "attack_power";
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrimaryProjectileDef {
+    pub sheet: String,
+    pub object_name: String,
+    pub size: [u32; 2],
+    pub speed: u32,
+    pub damage: i32,
+    pub lifetime_ticks: u32,
+    #[serde(default)]
+    pub spawn_offset: [i32; 2],
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProjectileState {
+    pub sheet: String,
+    pub object_name: String,
+    pub size: [u32; 2],
+    pub velocity: [i32; 2],
+    pub remaining_ticks: u32,
+    pub damage: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_id: Option<EntityId>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entity {
     pub id: EntityId,
@@ -123,6 +147,7 @@ pub enum EntityKind {
     Item,
     Decoration,
     Trigger,
+    Projectile,
 }
 
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize, Default)]
@@ -197,6 +222,10 @@ pub struct EntityAttributes {
     pub ai_behavior: AiBehavior,
     #[serde(default)]
     pub movement_profile: MovementProfile,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_projectile: Option<PrimaryProjectileDef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projectile: Option<ProjectileState>,
 
     // Extended attributes for entity definitions
     #[serde(default)]
@@ -263,6 +292,8 @@ impl Default for EntityAttributes {
             can_move: true,
             ai_behavior: AiBehavior::default(),
             movement_profile: MovementProfile::default(),
+            primary_projectile: None,
+            projectile: None,
             has_inventory: false,
         }
     }
@@ -336,6 +367,7 @@ impl EntityManager {
             EntityKind::Item => "item",
             EntityKind::Decoration => "decoration",
             EntityKind::Trigger => "trigger",
+            EntityKind::Projectile => "projectile",
         }
     }
 
@@ -681,6 +713,8 @@ pub struct AttributesDef {
     pub ai_behavior: AiBehavior,
     #[serde(default)]
     pub movement_profile: MovementProfile,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_projectile: Option<PrimaryProjectileDef>,
     pub has_inventory: bool,
 }
 
@@ -725,6 +759,7 @@ impl EntityDefinition {
         match category.trim().to_ascii_lowercase().as_str() {
             "item" | "items" => EntityKind::Item,
             "trigger" | "triggers" => EntityKind::Trigger,
+            "projectile" | "projectiles" => EntityKind::Projectile,
             "decoration" | "decorations" | "building" | "buildings" | "plant" | "plants" => {
                 EntityKind::Decoration
             }
@@ -818,6 +853,8 @@ impl EntityDefinition {
             can_move: self.attributes.can_move,
             ai_behavior: self.attributes.ai_behavior,
             movement_profile: self.attributes.movement_profile,
+            primary_projectile: self.attributes.primary_projectile.clone(),
+            projectile: None,
             has_inventory: self.attributes.has_inventory,
         };
         attributes.ensure_legacy_health_stat();

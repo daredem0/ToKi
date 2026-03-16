@@ -4,7 +4,7 @@ use toki_core::{
     assets::atlas::AtlasMeta,
     assets::tilemap::TileMap,
     entity::Entity,
-    game::{EntityHealthBar, InputAction},
+    game::{EntityHealthBar, InputAction, ProjectileRenderData},
     sprite::SpriteFrame,
     GameState, GameUpdateResult, InputKey,
 };
@@ -139,6 +139,10 @@ impl GameManager {
 
     pub fn get_entity_health_bars(&self) -> Vec<EntityHealthBar> {
         self.game_state.get_entity_health_bars()
+    }
+
+    pub fn get_projectile_renderables(&self) -> Vec<ProjectileRenderData> {
+        self.game_state.get_projectile_renderables()
     }
 
     /// Spawn an NPC that looks like the player

@@ -101,6 +101,7 @@ impl GameState {
                 can_move: true,
                 ai_behavior: crate::entity::AiBehavior::None,
                 movement_profile: crate::entity::MovementProfile::PlayerWasd,
+                primary_projectile: None,
                 has_inventory: false,
             },
             collision: crate::entity::CollisionDef {
@@ -163,6 +164,7 @@ impl GameState {
                 can_move: false,
                 ai_behavior: crate::entity::AiBehavior::Wander,
                 movement_profile: crate::entity::MovementProfile::None,
+                primary_projectile: None,
                 has_inventory: false,
             },
             collision: crate::entity::CollisionDef {

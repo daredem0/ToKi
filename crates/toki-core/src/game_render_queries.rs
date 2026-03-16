@@ -1,4 +1,4 @@
-use super::{EntityHealthBar, GameState};
+use super::{EntityHealthBar, GameState, ProjectileRenderData};
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::entity::EntityId;
@@ -158,6 +158,27 @@ impl GameState {
                     size: entity.size,
                     current: current.clamp(0, max),
                     max,
+                })
+            })
+            .collect()
+    }
+
+    pub fn get_projectile_renderables(&self) -> Vec<ProjectileRenderData> {
+        self.entity_manager
+            .active_entities()
+            .iter()
+            .filter_map(|&entity_id| {
+                let entity = self.entity_manager.get_entity(entity_id)?;
+                if !entity.attributes.visible || !entity.attributes.active {
+                    return None;
+                }
+                let projectile = entity.attributes.projectile.as_ref()?;
+                Some(ProjectileRenderData {
+                    entity_id,
+                    position: entity.position,
+                    size: entity.size,
+                    sheet: projectile.sheet.clone(),
+                    object_name: projectile.object_name.clone(),
                 })
             })
             .collect()

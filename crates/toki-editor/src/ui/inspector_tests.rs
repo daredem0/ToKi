@@ -36,6 +36,8 @@ fn sample_entity_with_id(id: u32) -> toki_core::entity::Entity {
             can_move: true,
             ai_behavior: AiBehavior::Wander,
             movement_profile: MovementProfile::LegacyDefault,
+            primary_projectile: None,
+            projectile: None,
             has_inventory: false,
         },
     );
@@ -827,6 +829,7 @@ fn save_entity_definition_persists_audio_updates() {
             can_move: true,
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::PlayerWasd,
+            primary_projectile: None,
             has_inventory: false,
         },
         collision: toki_core::entity::CollisionDef {

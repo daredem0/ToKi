@@ -39,6 +39,8 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
             can_move: true,
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::PlayerWasd,
+            primary_projectile: None,
+            projectile: None,
             has_inventory: false,
         },
         collision_box: None,

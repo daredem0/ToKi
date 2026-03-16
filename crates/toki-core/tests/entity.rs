@@ -29,6 +29,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             } else {
                 MovementProfile::None
             },
+            primary_projectile: None,
             has_inventory: false,
         },
         collision: CollisionDef {

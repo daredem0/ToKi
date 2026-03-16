@@ -31,6 +31,7 @@ fn sample_entity_definition(name: &str) -> EntityDefinition {
             can_move: false,
             ai_behavior: toki_core::entity::AiBehavior::Wander,
             movement_profile: toki_core::entity::MovementProfile::None,
+            primary_projectile: None,
             has_inventory: false,
         },
         collision: CollisionDef {

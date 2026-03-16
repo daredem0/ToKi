@@ -493,6 +493,7 @@ impl SelectionInteraction {
             EntityKind::Item => "item",
             EntityKind::Decoration => "decoration",
             EntityKind::Trigger => "trigger",
+            EntityKind::Projectile => "projectile",
         }
     }
 }

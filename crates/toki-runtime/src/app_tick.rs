@@ -97,6 +97,53 @@ impl App {
                 }
             }
 
+            for projectile in self.game_system.get_projectile_renderables() {
+                let Some(object_sheet) = self.resources.get_object_sheet(&projectile.sheet) else {
+                    tracing::warn!(
+                        "Projectile {} requested missing object sheet '{}'",
+                        projectile.entity_id,
+                        projectile.sheet
+                    );
+                    continue;
+                };
+                let texture_size = object_sheet
+                    .image_size()
+                    .unwrap_or(glam::UVec2::new(16, 16));
+                let Some(uv_rect) =
+                    object_sheet.get_object_uvs(&projectile.object_name, texture_size)
+                else {
+                    tracing::warn!(
+                        "Projectile {} requested missing object '{}' in sheet '{}'",
+                        projectile.entity_id,
+                        projectile.object_name,
+                        projectile.sheet
+                    );
+                    continue;
+                };
+                let frame = toki_core::sprite::SpriteFrame {
+                    u0: uv_rect[0],
+                    v0: uv_rect[1],
+                    u1: uv_rect[2],
+                    v1: uv_rect[3],
+                };
+                if let Some(texture_path) = self
+                    .resources
+                    .get_object_texture_path(&projectile.sheet)
+                    .cloned()
+                {
+                    self.rendering.add_sprite_with_texture(
+                        texture_path,
+                        frame,
+                        projectile.position,
+                        projectile.size,
+                        false,
+                    );
+                } else {
+                    self.rendering
+                        .add_sprite(frame, projectile.position, projectile.size, false);
+                }
+            }
+
             for object in &self.resources.get_tilemap().objects {
                 if !object.visible {
                     continue;

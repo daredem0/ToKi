@@ -22,6 +22,7 @@ fn test_entity_definition_create_entity_basic() {
             can_move: true,
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::LegacyDefault,
+            primary_projectile: None,
             has_inventory: true,
         },
         collision: CollisionDef {
@@ -148,6 +149,7 @@ fn test_entity_definition_create_npc_entity() {
             can_move: false,
             ai_behavior: AiBehavior::Wander,
             movement_profile: MovementProfile::LegacyDefault,
+            primary_projectile: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -289,6 +291,7 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
             can_move: true,
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::PlayerWasd,
+            primary_projectile: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -410,6 +413,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
             can_move: true,
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::LegacyDefault,
+            primary_projectile: None,
             has_inventory: true,
         },
         collision: CollisionDef {
@@ -493,6 +497,7 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
             can_move: true,
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::PlayerWasd,
+            primary_projectile: None,
             has_inventory: true,
         },
         collision: CollisionDef {
@@ -582,6 +587,7 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
             can_move: true,
             ai_behavior: AiBehavior::Wander,
             movement_profile: MovementProfile::None,
+            primary_projectile: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -640,6 +646,7 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
             can_move: true,
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::PlayerWasd,
+            primary_projectile: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -683,6 +690,81 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
 }
 
 #[test]
+fn test_entity_definition_copies_authored_primary_projectile() {
+    let entity_def = EntityDefinition {
+        name: "ranger".to_string(),
+        display_name: "Ranger".to_string(),
+        description: "Projectile-capable ranger".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+        },
+        attributes: AttributesDef {
+            health: Some(30),
+            stats: std::collections::HashMap::from([(ATTACK_POWER_STAT_ID.to_string(), 8)]),
+            speed: 2,
+            solid: true,
+            active: true,
+            can_move: true,
+            ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::PlayerWasd,
+            primary_projectile: Some(PrimaryProjectileDef {
+                sheet: "fauna".to_string(),
+                object_name: "rock".to_string(),
+                size: [16, 16],
+                speed: 4,
+                damage: 8,
+                lifetime_ticks: 20,
+                spawn_offset: [1, 2],
+            }),
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: "step".to_string(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "ranger".to_string(),
+            clips: vec![AnimationClipDef {
+                state: "idle".to_string(),
+                frame_tiles: vec!["ranger/idle_0".to_string()],
+                frame_duration_ms: 150.0,
+                loop_mode: "loop".to_string(),
+            }],
+            default_state: "idle".to_string(),
+        },
+        category: "human".to_string(),
+        tags: vec![],
+    };
+
+    let entity = entity_def
+        .create_entity(IVec2::new(0, 0), 1)
+        .expect("definition should create entity");
+
+    let projectile = entity
+        .attributes
+        .primary_projectile
+        .expect("authored projectile should be copied to runtime entity");
+    assert_eq!(projectile.sheet, "fauna");
+    assert_eq!(projectile.object_name, "rock");
+    assert_eq!(projectile.size, [16, 16]);
+    assert_eq!(projectile.speed, 4);
+    assert_eq!(projectile.damage, 8);
+    assert_eq!(projectile.lifetime_ticks, 20);
+    assert_eq!(projectile.spawn_offset, [1, 2]);
+}
+
+#[test]
 fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type() {
     let entity_def = EntityDefinition {
         name: "invalid".to_string(),
@@ -702,6 +784,7 @@ fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type()
             can_move: false,
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::LegacyDefault,
+            primary_projectile: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -753,6 +836,7 @@ fn test_entity_definition_invalid_animation_state() {
             can_move: false,
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::LegacyDefault,
+            primary_projectile: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -807,6 +891,7 @@ fn test_entity_definition_invalid_loop_mode() {
             can_move: false,
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::LegacyDefault,
+            primary_projectile: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -861,6 +946,7 @@ fn test_entity_definition_serialization() {
             can_move: false,
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::LegacyDefault,
+            primary_projectile: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -927,6 +1013,7 @@ fn test_entity_definition_create_audio_component() {
             can_move: true,
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::LegacyDefault,
+            primary_projectile: None,
             has_inventory: false,
         },
         collision: CollisionDef {
