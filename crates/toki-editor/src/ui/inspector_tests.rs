@@ -1,4 +1,3 @@
-
 use super::{
     AiBehavior, EntityPropertyDraft, InspectorSystem, MovementProfile, MultiEntityBatchEdit,
     ProjectSettingsDraft, RuleActionKind, RuleConditionKind, RuleTriggerKind,
