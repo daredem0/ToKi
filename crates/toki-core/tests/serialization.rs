@@ -15,6 +15,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: Some(100),
@@ -34,6 +35,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
                 MovementProfile::None
             },
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -82,6 +84,7 @@ fn create_test_entity() -> Entity {
         solid: true,
         visible: true,
         animation_controller: Some(controller),
+        static_object_render: None,
         render_layer: 2,
         active: true,
         can_move: true,
@@ -89,6 +92,8 @@ fn create_test_entity() -> Entity {
         movement_profile: MovementProfile::PlayerWasd,
         primary_projectile: None,
         projectile: None,
+        pickup: None,
+        inventory: toki_core::entity::Inventory::default(),
         has_inventory: true,
     };
 

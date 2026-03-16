@@ -32,6 +32,7 @@ fn sample_entity_definition(name: &str, category: &str, size: [u32; 2]) -> Entit
             size,
             render_layer: 0,
             visible: true,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: Some(50),
@@ -43,6 +44,7 @@ fn sample_entity_definition(name: &str, category: &str, size: [u32; 2]) -> Entit
             ai_behavior: toki_core::entity::AiBehavior::Wander,
             movement_profile: toki_core::entity::MovementProfile::None,
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {

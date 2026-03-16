@@ -658,19 +658,14 @@ impl EditorApp {
                         if let Some(scene_viewport) = &mut self.scene_viewport {
                             let preview_data = if self.ui.is_in_placement_mode() {
                                 if self.ui.entity_move_drag.is_none() {
-                                    if let (Some(entity_def), Some(position), Some(cached_frame)) = (
+                                    if let (Some(_entity_def), Some(position), Some(cached_frame)) = (
                                         &self.ui.placement_entity_definition,
                                         &self.ui.placement_preview_position,
                                         &self.ui.placement_preview_cached_frame,
                                     ) {
                                         let is_valid =
                                             self.ui.placement_preview_valid.unwrap_or(true);
-                                        Some((
-                                            entity_def.as_str(),
-                                            *position,
-                                            *cached_frame,
-                                            is_valid,
-                                        ))
+                                        Some((*position, cached_frame.clone(), is_valid))
                                     } else {
                                         None
                                     }

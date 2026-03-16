@@ -11,6 +11,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: Some(100),
@@ -30,6 +31,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
                 MovementProfile::None
             },
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {

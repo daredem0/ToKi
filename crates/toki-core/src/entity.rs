@@ -9,6 +9,43 @@ pub const HEALTH_STAT_ID: &str = "health";
 pub const ATTACK_POWER_STAT_ID: &str = "attack_power";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PickupDef {
+    pub item_id: String,
+    pub count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StaticObjectRenderDef {
+    pub sheet: String,
+    pub object_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct Inventory {
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub items: HashMap<String, u32>,
+}
+
+impl Inventory {
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn item_count(&self, item_id: &str) -> u32 {
+        self.items.get(item_id).copied().unwrap_or(0)
+    }
+
+    pub fn add_item(&mut self, item_id: &str, count: u32) {
+        if item_id.is_empty() || count == 0 {
+            return;
+        }
+
+        let entry = self.items.entry(item_id.to_string()).or_insert(0);
+        *entry = entry.saturating_add(count);
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PrimaryProjectileDef {
     pub sheet: String,
     pub object_name: String,
@@ -226,6 +263,12 @@ pub struct EntityAttributes {
     pub primary_projectile: Option<PrimaryProjectileDef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub projectile: Option<ProjectileState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub static_object_render: Option<StaticObjectRenderDef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pickup: Option<PickupDef>,
+    #[serde(default, skip_serializing_if = "Inventory::is_empty")]
+    pub inventory: Inventory,
 
     // Extended attributes for entity definitions
     #[serde(default)]
@@ -294,6 +337,9 @@ impl Default for EntityAttributes {
             movement_profile: MovementProfile::default(),
             primary_projectile: None,
             projectile: None,
+            static_object_render: None,
+            pickup: None,
+            inventory: Inventory::default(),
             has_inventory: false,
         }
     }
@@ -698,6 +744,8 @@ pub struct RenderingDef {
     pub size: [u32; 2],
     pub render_layer: i32,
     pub visible: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub static_object: Option<StaticObjectRenderDef>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -715,6 +763,8 @@ pub struct AttributesDef {
     pub movement_profile: MovementProfile,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub primary_projectile: Option<PrimaryProjectileDef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pickup: Option<PickupDef>,
     pub has_inventory: bool,
 }
 
@@ -792,31 +842,35 @@ impl EntityDefinition {
     pub fn create_entity(&self, position: IVec2, entity_id: EntityId) -> Result<Entity, String> {
         let entity_kind = Self::runtime_entity_kind_for_category(&self.category);
 
-        // Build animation controller
-        let mut animation_controller = AnimationController::new();
-        for clip_def in &self.animations.clips {
-            let state = Self::parse_animation_state(&clip_def.state)?;
+        // Build animation controller when clips are authored.
+        let animation_controller = if self.animations.clips.is_empty() {
+            None
+        } else {
+            let mut animation_controller = AnimationController::new();
+            for clip_def in &self.animations.clips {
+                let state = Self::parse_animation_state(&clip_def.state)?;
 
-            let loop_mode = match clip_def.loop_mode.to_lowercase().as_str() {
-                "loop" => LoopMode::Loop,
-                "once" => LoopMode::Once,
-                "ping_pong" => LoopMode::PingPong,
-                _ => return Err(format!("Unknown loop mode: {}", clip_def.loop_mode)),
-            };
+                let loop_mode = match clip_def.loop_mode.to_lowercase().as_str() {
+                    "loop" => LoopMode::Loop,
+                    "once" => LoopMode::Once,
+                    "ping_pong" => LoopMode::PingPong,
+                    _ => return Err(format!("Unknown loop mode: {}", clip_def.loop_mode)),
+                };
 
-            let clip = AnimationClip {
-                state,
-                atlas_name: self.animations.atlas_name.clone(),
-                frame_tile_names: clip_def.frame_tiles.clone(),
-                frame_duration_ms: clip_def.frame_duration_ms,
-                loop_mode,
-            };
-            animation_controller.add_clip(clip);
-        }
+                let clip = AnimationClip {
+                    state,
+                    atlas_name: self.animations.atlas_name.clone(),
+                    frame_tile_names: clip_def.frame_tiles.clone(),
+                    frame_duration_ms: clip_def.frame_duration_ms,
+                    loop_mode,
+                };
+                animation_controller.add_clip(clip);
+            }
 
-        // Set default animation state
-        let default_state = Self::parse_animation_state(&self.animations.default_state)?;
-        animation_controller.play(default_state);
+            let default_state = Self::parse_animation_state(&self.animations.default_state)?;
+            animation_controller.play(default_state);
+            Some(animation_controller)
+        };
 
         // Build attributes
         let mut authored_stats = EntityStats::default();
@@ -847,7 +901,7 @@ impl EntityDefinition {
             speed: self.attributes.speed,
             solid: self.attributes.solid,
             visible: self.rendering.visible,
-            animation_controller: Some(animation_controller),
+            animation_controller,
             render_layer: self.rendering.render_layer,
             active: self.attributes.active,
             can_move: self.attributes.can_move,
@@ -855,6 +909,9 @@ impl EntityDefinition {
             movement_profile: self.attributes.movement_profile,
             primary_projectile: self.attributes.primary_projectile.clone(),
             projectile: None,
+            static_object_render: self.rendering.static_object.clone(),
+            pickup: self.attributes.pickup.clone(),
+            inventory: Inventory::default(),
             has_inventory: self.attributes.has_inventory,
         };
         attributes.ensure_legacy_health_stat();

@@ -246,3 +246,159 @@ fn entity_schema_rejects_invalid_primary_projectile_lifetime() {
 
     assert_invalid(&schema, &doc);
 }
+
+#[test]
+fn entity_schema_accepts_pickup_authoring() {
+    let schema = compile_entity_schema();
+    let doc = json!({
+        "name": "coin_pickup",
+        "display_name": "Coin Pickup",
+        "description": "Collectible coin",
+        "rendering": {
+            "size": [16, 16],
+            "render_layer": 0,
+            "visible": true
+        },
+        "attributes": {
+            "health": null,
+            "pickup": {
+                "item_id": "coin",
+                "count": 3
+            },
+            "speed": 0,
+            "solid": false,
+            "active": true,
+            "can_move": false,
+            "has_inventory": false
+        },
+        "collision": {
+            "enabled": true,
+            "offset": [0, 0],
+            "size": [16, 16],
+            "trigger": true
+        },
+        "audio": {
+            "footstep_trigger_distance": 16.0,
+            "movement_sound": "pickup"
+        },
+        "animations": {
+            "atlas_name": "items",
+            "clips": [
+                {
+                    "state": "idle",
+                    "frame_tiles": ["coin/idle_0"],
+                    "frame_duration_ms": 150.0,
+                    "loop_mode": "loop"
+                }
+            ],
+            "default_state": "idle"
+        },
+        "category": "item",
+        "tags": []
+    });
+
+    assert_valid(&schema, &doc);
+}
+
+#[test]
+fn entity_schema_rejects_invalid_pickup_count() {
+    let schema = compile_entity_schema();
+    let doc = json!({
+        "name": "coin_pickup",
+        "display_name": "Coin Pickup",
+        "description": "Collectible coin",
+        "rendering": {
+            "size": [16, 16],
+            "render_layer": 0,
+            "visible": true
+        },
+        "attributes": {
+            "health": null,
+            "pickup": {
+                "item_id": "coin",
+                "count": 0
+            },
+            "speed": 0,
+            "solid": false,
+            "active": true,
+            "can_move": false,
+            "has_inventory": false
+        },
+        "collision": {
+            "enabled": true,
+            "offset": [0, 0],
+            "size": [16, 16],
+            "trigger": true
+        },
+        "audio": {
+            "footstep_trigger_distance": 16.0,
+            "movement_sound": "pickup"
+        },
+        "animations": {
+            "atlas_name": "items",
+            "clips": [
+                {
+                    "state": "idle",
+                    "frame_tiles": ["coin/idle_0"],
+                    "frame_duration_ms": 150.0,
+                    "loop_mode": "loop"
+                }
+            ],
+            "default_state": "idle"
+        },
+        "category": "item",
+        "tags": []
+    });
+
+    assert_invalid(&schema, &doc);
+}
+
+#[test]
+fn entity_schema_accepts_static_object_render_without_animation_clips() {
+    let schema = compile_entity_schema();
+    let doc = json!({
+        "name": "coin_pickup",
+        "display_name": "Coin Pickup",
+        "description": "Collectible coin",
+        "rendering": {
+            "size": [16, 16],
+            "render_layer": 0,
+            "visible": true,
+            "static_object": {
+                "sheet": "items",
+                "object_name": "coin"
+            }
+        },
+        "attributes": {
+            "health": null,
+            "pickup": {
+                "item_id": "coin",
+                "count": 1
+            },
+            "speed": 0,
+            "solid": false,
+            "active": true,
+            "can_move": false,
+            "has_inventory": false
+        },
+        "collision": {
+            "enabled": true,
+            "offset": [0, 0],
+            "size": [16, 16],
+            "trigger": true
+        },
+        "audio": {
+            "footstep_trigger_distance": 16.0,
+            "movement_sound": ""
+        },
+        "animations": {
+            "atlas_name": "",
+            "clips": [],
+            "default_state": ""
+        },
+        "category": "item",
+        "tags": []
+    });
+
+    assert_valid(&schema, &doc);
+}

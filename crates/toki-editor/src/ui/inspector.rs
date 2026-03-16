@@ -27,6 +27,9 @@ pub struct InspectorSystem;
 
 #[derive(Debug, Clone)]
 struct EntityPropertyDraft {
+    category: String,
+    static_object_sheet: Option<String>,
+    static_object_name: Option<String>,
     control_role: ControlRole,
     position_x: i32,
     position_y: i32,
@@ -235,6 +238,17 @@ impl EntityPropertyDraft {
             };
 
         Self {
+            category: entity.category.clone(),
+            static_object_sheet: entity
+                .attributes
+                .static_object_render
+                .as_ref()
+                .map(|render| render.sheet.clone()),
+            static_object_name: entity
+                .attributes
+                .static_object_render
+                .as_ref()
+                .map(|render| render.object_name.clone()),
             control_role: entity.control_role,
             position_x: entity.position.x,
             position_y: entity.position.y,

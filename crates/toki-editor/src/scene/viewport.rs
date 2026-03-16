@@ -1,6 +1,7 @@
 use crate::project::assets::{ObjectSheetAsset, SpriteAtlasAsset};
 use crate::project::ProjectAssets;
 use crate::scene::SceneManager;
+use crate::ui::editor_ui::PlacementPreviewVisual;
 use anyhow::Result;
 use toki_core::assets::{
     atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::MapObjectInstance,
@@ -210,7 +211,7 @@ impl SceneViewport {
         project_path: &std::path::Path,
         project_assets: &ProjectAssets,
         renderer: &mut egui_wgpu::Renderer,
-        preview_data: Option<(&str, glam::Vec2, toki_core::sprite::SpriteFrame, bool)>,
+        preview_data: Option<(glam::Vec2, PlacementPreviewVisual, bool)>,
         drag_preview_data: Option<&[DragPreviewSprite]>,
     ) -> Result<()> {
         if !self.is_initialized {

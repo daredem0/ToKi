@@ -1,11 +1,12 @@
 use super::*;
+use crate::ui::editor_ui::PlacementPreviewVisual;
 
 impl SceneViewport {
     pub(super) fn prepare_scene_data(
         &mut self,
         project_path: Option<&std::path::Path>,
         project_assets: &ProjectAssets,
-        preview_data: Option<(&str, glam::Vec2, toki_core::sprite::SpriteFrame, bool)>,
+        preview_data: Option<(glam::Vec2, PlacementPreviewVisual, bool)>,
         drag_preview_data: Option<&[DragPreviewSprite]>,
     ) -> SceneData {
         tracing::trace!("Preparing scene data for rendering...");
@@ -15,12 +16,8 @@ impl SceneViewport {
         self.prepare_tilemap_data(&mut scene_data, project_path);
         self.prepare_tilemap_object_data(&mut scene_data, project_path, project_assets);
         self.prepare_sprite_data(&mut scene_data, project_path, project_assets);
-        self.prepare_preview_sprite_data(
-            &mut scene_data,
-            project_path,
-            project_assets,
-            preview_data,
-        );
+        self.prepare_static_entity_sprite_data(&mut scene_data, project_assets);
+        self.prepare_preview_sprite_data(&mut scene_data, preview_data);
         self.prepare_drag_preview_sprite_data(
             &mut scene_data,
             project_path,
@@ -140,6 +137,32 @@ impl SceneViewport {
                 project_path,
                 project_assets,
             );
+        }
+    }
+
+    pub(super) fn prepare_static_entity_sprite_data(
+        &mut self,
+        scene_data: &mut SceneData,
+        project_assets: &ProjectAssets,
+    ) {
+        for entity in self
+            .scene_manager
+            .game_state()
+            .get_static_entity_renderables()
+        {
+            if self.suppressed_entity_ids.contains(&entity.entity_id) {
+                continue;
+            }
+            let Some(sprite_instance) = self.build_static_object_sprite_instance(
+                project_assets,
+                &entity.sheet,
+                &entity.object_name,
+                entity.position,
+                entity.size,
+            ) else {
+                continue;
+            };
+            scene_data.sprites.push(sprite_instance);
         }
     }
 
@@ -315,53 +338,18 @@ impl SceneViewport {
     pub(super) fn prepare_preview_sprite_data(
         &mut self,
         scene_data: &mut SceneData,
-        project_path: Option<&std::path::Path>,
-        _project_assets: &ProjectAssets,
-        preview_data: Option<(&str, glam::Vec2, toki_core::sprite::SpriteFrame, bool)>,
+        preview_data: Option<(glam::Vec2, PlacementPreviewVisual, bool)>,
     ) {
-        let Some((entity_def_name, preview_position, cached_frame, is_valid)) = preview_data else {
+        let Some((preview_position, cached_visual, is_valid)) = preview_data else {
             return;
         };
-
-        tracing::trace!("Preparing preview sprite for entity '{}' at position ({:.1}, {:.1}) using cached frame",
-            entity_def_name, preview_position.x, preview_position.y);
-
-        let Some(project_path) = project_path else {
-            tracing::warn!("No project path provided for preview sprite");
-            return;
-        };
-
-        let entity_file = project_path
-            .join("entities")
-            .join(format!("{}.json", entity_def_name));
-        if !entity_file.exists() {
-            tracing::warn!(
-                "Entity definition file not found for preview: {:?}",
-                entity_file
-            );
-            return;
-        }
-
-        let entity_def = match std::fs::read_to_string(&entity_file).and_then(|content| {
-            serde_json::from_str::<toki_core::entity::EntityDefinition>(&content)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
-        }) {
-            Ok(def) => def,
-            Err(error) => {
-                tracing::warn!("Failed to load entity definition for preview: {}", error);
-                return;
-            }
-        };
-
-        let entity_size =
-            glam::UVec2::new(entity_def.rendering.size[0], entity_def.rendering.size[1]);
         let render_position_i32 = world_to_i32_floor(preview_position);
 
         let preview_sprite = toki_render::SpriteInstance {
-            frame: cached_frame,
+            frame: cached_visual.frame,
             position: render_position_i32,
-            size: entity_size,
-            texture_path: None,
+            size: cached_visual.size,
+            texture_path: cached_visual.texture_path,
             flip_x: false,
         };
 
@@ -376,14 +364,10 @@ impl SceneViewport {
         let outline_shape = toki_render::DebugShape {
             shape_type: toki_render::DebugShapeType::Rectangle,
             position: glam::Vec2::new(render_position_i32.x as f32, render_position_i32.y as f32),
-            size: glam::Vec2::new(entity_size.x as f32, entity_size.y as f32),
+            size: glam::Vec2::new(cached_visual.size.x as f32, cached_visual.size.y as f32),
             color: outline_color,
         };
         scene_data.debug_shapes.push(outline_shape);
-
-        tracing::trace!("Added preview sprite for '{}' at render position ({}, {}) with size {}x{} and {} outline",
-            entity_def_name, render_position_i32.x, render_position_i32.y, entity_size.x, entity_size.y,
-            if is_valid { "green" } else { "red" });
     }
 
     pub(super) fn prepare_drag_preview_sprite_data(
@@ -408,23 +392,36 @@ impl SceneViewport {
             };
 
             let entity_size = entity.size;
-            let Some(animation_controller) = &entity.attributes.animation_controller else {
-                continue;
-            };
+            if let Some(animation_controller) = &entity.attributes.animation_controller {
+                let Ok(atlas_name) = animation_controller.current_atlas_name() else {
+                    continue;
+                };
+                let atlas_name = atlas_name.to_string();
 
-            let Ok(atlas_name) = animation_controller.current_atlas_name() else {
+                self.load_and_create_sprite_instance(
+                    scene_data,
+                    preview.entity_id,
+                    preview.world_position,
+                    entity_size,
+                    &atlas_name,
+                    (project_assets, project_path),
+                );
+            } else if let Some(static_object_render) =
+                entity.attributes.static_object_render.clone()
+            {
+                let Some(sprite_instance) = self.build_static_object_sprite_instance(
+                    project_assets,
+                    &static_object_render.sheet,
+                    &static_object_render.object_name,
+                    preview.world_position,
+                    entity_size,
+                ) else {
+                    continue;
+                };
+                scene_data.sprites.push(sprite_instance);
+            } else {
                 continue;
-            };
-            let atlas_name = atlas_name.to_string();
-
-            self.load_and_create_sprite_instance(
-                scene_data,
-                preview.entity_id,
-                preview.world_position,
-                entity_size,
-                &atlas_name,
-                (project_assets, project_path),
-            );
+            }
 
             let outline_color = if preview.is_valid {
                 [0.0, 1.0, 0.0, 1.0]

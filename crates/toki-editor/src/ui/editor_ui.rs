@@ -72,6 +72,13 @@ pub struct MarqueeSelectionState {
     pub current_screen: egui::Pos2,
 }
 
+#[derive(Debug, Clone)]
+pub struct PlacementPreviewVisual {
+    pub frame: toki_core::sprite::SpriteFrame,
+    pub texture_path: Option<PathBuf>,
+    pub size: glam::UVec2,
+}
+
 /// Manages the editor's UI state and rendering
 pub struct EditorUI {
     // Scene management
@@ -141,7 +148,7 @@ pub struct EditorUI {
     pub placement_mode: bool,
     pub placement_entity_definition: Option<String>,
     pub placement_preview_position: Option<glam::Vec2>, // World coordinates for preview
-    pub placement_preview_cached_frame: Option<toki_core::sprite::SpriteFrame>, // Cached sprite frame for preview
+    pub placement_preview_cached_frame: Option<PlacementPreviewVisual>, // Cached preview visual for placement
     pub placement_preview_valid: Option<bool>, // Whether the current preview position is valid for placement
     pub entity_move_drag: Option<EntityMoveDragState>, // Active drag-move operation for existing scene entities
     pub marquee_selection: Option<MarqueeSelectionState>, // Active marquee-selection rectangle in viewport

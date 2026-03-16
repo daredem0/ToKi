@@ -326,3 +326,20 @@ fn build_drag_preview_sprites_computes_validity_per_entity() {
     assert!(first_preview.is_valid);
     assert!(!second_preview.is_valid);
 }
+
+#[test]
+fn load_preview_sprite_frame_static_supports_object_sheet_backed_entities() {
+    let project_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../example_project/NewProject");
+    let mut project_assets = ProjectAssets::new(project_path.clone());
+    project_assets
+        .scan_assets()
+        .expect("example project assets should scan");
+
+    let preview =
+        EditorApp::load_preview_sprite_frame_static("coin_pickup", &project_path, &project_assets)
+            .expect("static object-backed pickup should produce a preview visual");
+
+    assert_eq!(preview.size, UVec2::new(16, 16));
+    assert!(preview.texture_path.is_some());
+}

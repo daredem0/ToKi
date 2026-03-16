@@ -21,6 +21,7 @@ fn sample_entity_definition(name: &str) -> EntityDefinition {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: Some(10),
@@ -32,6 +33,7 @@ fn sample_entity_definition(name: &str) -> EntityDefinition {
             ai_behavior: toki_core::entity::AiBehavior::Wander,
             movement_profile: toki_core::entity::MovementProfile::None,
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {

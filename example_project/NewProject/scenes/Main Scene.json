@@ -33,6 +33,16 @@
         "visible": true,
         "animation_controller": {
           "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -43,16 +53,6 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -190,6 +190,16 @@
         "visible": true,
         "animation_controller": {
           "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -200,16 +210,6 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -521,26 +521,6 @@
         "visible": true,
         "animation_controller": {
           "clips": {
-            "AttackRight": {
-              "state": "AttackRight",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/attack_right_a",
-                "player/attack_right_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Once"
-            },
-            "AttackUp": {
-              "state": "AttackUp",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/attack_up_a",
-                "player/attack_up_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Once"
-            },
             "WalkUp": {
               "state": "WalkUp",
               "atlas_name": "players.json",
@@ -560,16 +540,6 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "WalkRight": {
-              "state": "WalkRight",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_right_a",
-                "player/walk_right_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Loop"
-            },
             "AttackLeft": {
               "state": "AttackLeft",
               "atlas_name": "players.json",
@@ -579,16 +549,6 @@
               ],
               "frame_duration_ms": 180.0,
               "loop_mode": "Once"
-            },
-            "WalkLeft": {
-              "state": "WalkLeft",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_right_a",
-                "player/walk_right_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Loop"
             },
             "AttackDown": {
               "state": "AttackDown",
@@ -600,6 +560,16 @@
               "frame_duration_ms": 180.0,
               "loop_mode": "Once"
             },
+            "WalkDown": {
+              "state": "WalkDown",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_down_a",
+                "player/walk_down_b"
+              ],
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Loop"
+            },
             "IdleDown": {
               "state": "IdleDown",
               "atlas_name": "players.json",
@@ -609,12 +579,32 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "WalkDown": {
-              "state": "WalkDown",
+            "AttackRight": {
+              "state": "AttackRight",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_down_a",
-                "player/walk_down_b"
+                "player/attack_right_a",
+                "player/attack_right_b"
+              ],
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Once"
+            },
+            "WalkRight": {
+              "state": "WalkRight",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_right_a",
+                "player/walk_right_b"
+              ],
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Loop"
+            },
+            "WalkLeft": {
+              "state": "WalkLeft",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_right_a",
+                "player/walk_right_b"
               ],
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
@@ -627,6 +617,16 @@
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
+            },
+            "AttackUp": {
+              "state": "AttackUp",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/attack_up_a",
+                "player/attack_up_b"
+              ],
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Once"
             },
             "IdleRight": {
               "state": "IdleRight",
@@ -675,6 +675,165 @@
           16
         ],
         "trigger": false
+      }
+    },
+    {
+      "id": 11,
+      "position": [
+        120,
+        120
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Item",
+      "category": "item",
+      "definition_name": "coin_pickup",
+      "audio": {
+        "footstep_trigger_distance": 16.0,
+        "hearing_radius": 64,
+        "movement_sound_trigger": "distance",
+        "movement_sound": null,
+        "collision_sound": null
+      },
+      "attributes": {
+        "health": null,
+        "speed": 0,
+        "solid": false,
+        "visible": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "active": true,
+        "can_move": false,
+        "ai_behavior": "none",
+        "movement_profile": "none",
+        "static_object_render": {
+          "sheet": "items",
+          "object_name": "coin"
+        },
+        "pickup": {
+          "item_id": "coin",
+          "count": 1
+        },
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": true
+      }
+    },
+    {
+      "id": 12,
+      "position": [
+        136,
+        104
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Item",
+      "category": "item",
+      "definition_name": "gem_pickup",
+      "audio": {
+        "footstep_trigger_distance": 16.0,
+        "hearing_radius": 64,
+        "movement_sound_trigger": "distance",
+        "movement_sound": null,
+        "collision_sound": null
+      },
+      "attributes": {
+        "health": null,
+        "speed": 0,
+        "solid": false,
+        "visible": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "active": true,
+        "can_move": false,
+        "ai_behavior": "none",
+        "movement_profile": "none",
+        "static_object_render": {
+          "sheet": "items",
+          "object_name": "gem"
+        },
+        "pickup": {
+          "item_id": "gem",
+          "count": 1
+        },
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": true
+      }
+    },
+    {
+      "id": 13,
+      "position": [
+        112,
+        80
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Item",
+      "category": "item",
+      "definition_name": "potion_pickup",
+      "audio": {
+        "footstep_trigger_distance": 16.0,
+        "hearing_radius": 64,
+        "movement_sound_trigger": "distance",
+        "movement_sound": null,
+        "collision_sound": null
+      },
+      "attributes": {
+        "health": null,
+        "speed": 0,
+        "solid": false,
+        "visible": true,
+        "animation_controller": null,
+        "render_layer": 0,
+        "active": true,
+        "can_move": false,
+        "ai_behavior": "none",
+        "movement_profile": "none",
+        "static_object_render": {
+          "sheet": "items",
+          "object_name": "potion"
+        },
+        "pickup": {
+          "item_id": "potion",
+          "count": 1
+        },
+        "has_inventory": false
+      },
+      "collision_box": {
+        "offset": [
+          0,
+          0
+        ],
+        "size": [
+          16,
+          16
+        ],
+        "trigger": true
       }
     }
   ],

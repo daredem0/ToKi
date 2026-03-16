@@ -69,29 +69,29 @@ impl UndoRedoHistory {
 
 #[derive(Debug, Clone)]
 pub enum EditorCommand {
-    AddEntity(AddEntityCommand),
-    RemoveEntity(RemoveEntityCommand),
-    MoveEntities(MoveEntitiesCommand),
-    UpdateEntities(UpdateEntitiesCommand),
-    UpdateSceneRulesGraph(UpdateSceneRulesGraphCommand),
+    AddEntity(Box<AddEntityCommand>),
+    RemoveEntity(Box<RemoveEntityCommand>),
+    MoveEntities(Box<MoveEntitiesCommand>),
+    UpdateEntities(Box<UpdateEntitiesCommand>),
+    UpdateSceneRulesGraph(Box<UpdateSceneRulesGraphCommand>),
 }
 
 impl EditorCommand {
     pub fn add_entity(scene_name: impl Into<String>, entity: Entity) -> Self {
-        Self::AddEntity(AddEntityCommand {
+        Self::AddEntity(Box::new(AddEntityCommand {
             scene_name: scene_name.into(),
             entity,
-        })
+        }))
     }
 
     pub fn remove_entities(
         scene_name: impl Into<String>,
         removed_entities: Vec<IndexedEntity>,
     ) -> Self {
-        Self::RemoveEntity(RemoveEntityCommand {
+        Self::RemoveEntity(Box::new(RemoveEntityCommand {
             scene_name: scene_name.into(),
             removed_entities,
-        })
+        }))
     }
 
     pub fn move_entities(
@@ -99,11 +99,11 @@ impl EditorCommand {
         before_positions: Vec<EntityPosition>,
         after_positions: Vec<EntityPosition>,
     ) -> Self {
-        Self::MoveEntities(MoveEntitiesCommand {
+        Self::MoveEntities(Box::new(MoveEntitiesCommand {
             scene_name: scene_name.into(),
             before_positions,
             after_positions,
-        })
+        }))
     }
 
     pub fn update_entities(
@@ -111,11 +111,11 @@ impl EditorCommand {
         before_entities: Vec<Entity>,
         after_entities: Vec<Entity>,
     ) -> Self {
-        Self::UpdateEntities(UpdateEntitiesCommand {
+        Self::UpdateEntities(Box::new(UpdateEntitiesCommand {
             scene_name: scene_name.into(),
             before_entities,
             after_entities,
-        })
+        }))
     }
 
     pub fn update_scene_rules_graph(
@@ -127,7 +127,7 @@ impl EditorCommand {
         before_layout: Option<SceneGraphLayout>,
         after_layout: Option<SceneGraphLayout>,
     ) -> Self {
-        Self::UpdateSceneRulesGraph(UpdateSceneRulesGraphCommand {
+        Self::UpdateSceneRulesGraph(Box::new(UpdateSceneRulesGraphCommand {
             scene_name: scene_name.into(),
             before_rule_set,
             after_rule_set,
@@ -135,7 +135,7 @@ impl EditorCommand {
             after_graph,
             before_layout,
             after_layout,
-        })
+        }))
     }
 
     pub fn apply(&self, ui_state: &mut EditorUI) -> bool {

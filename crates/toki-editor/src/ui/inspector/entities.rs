@@ -7,6 +7,7 @@ impl InspectorSystem {
         config: Option<&EditorConfig>,
     ) -> bool {
         let mut changed = false;
+        let is_static_item = draft.category == "item" && draft.static_object_sheet.is_some();
 
         ui.label("Scene Entity Properties");
         ui.separator();
@@ -46,164 +47,179 @@ impl InspectorSystem {
                 .changed();
         });
 
-        ui.horizontal(|ui| {
-            ui.label("Speed:");
-            changed |= ui
-                .add(
-                    egui::DragValue::new(&mut draft.speed)
-                        .speed(1.0)
-                        .range(0..=i64::MAX),
-                )
-                .changed();
-        });
+        if let (Some(sheet), Some(object_name)) =
+            (&draft.static_object_sheet, &draft.static_object_name)
+        {
+            ui.horizontal(|ui| {
+                ui.label("Static Render:");
+                ui.label(format!("{sheet}/{object_name}"));
+            });
+        }
+
+        if !is_static_item {
+            ui.horizontal(|ui| {
+                ui.label("Speed:");
+                changed |= ui
+                    .add(
+                        egui::DragValue::new(&mut draft.speed)
+                            .speed(1.0)
+                            .range(0..=i64::MAX),
+                    )
+                    .changed();
+            });
+        }
 
         changed |= ui.checkbox(&mut draft.visible, "Visible").changed();
         changed |= ui.checkbox(&mut draft.active, "Active").changed();
         changed |= ui.checkbox(&mut draft.solid, "Solid").changed();
-        changed |= ui.checkbox(&mut draft.can_move, "Can Move").changed();
-        ui.horizontal(|ui| {
-            ui.label("Control Role:");
-            egui::ComboBox::from_id_salt("entity_control_role")
-                .selected_text(control_role_label(draft.control_role))
-                .show_ui(ui, |ui| {
-                    changed |= ui
-                        .selectable_value(&mut draft.control_role, ControlRole::None, "None")
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut draft.control_role,
-                            ControlRole::PlayerCharacter,
-                            "Player Character",
-                        )
-                        .changed();
-                });
-        });
-        ui.horizontal(|ui| {
-            ui.label("Movement:");
-            egui::ComboBox::from_id_salt("entity_movement_profile")
-                .selected_text(movement_profile_label(
-                    draft.control_role,
-                    draft.movement_profile,
-                ))
-                .show_ui(ui, |ui| {
-                    changed |= ui
-                        .selectable_value(
-                            &mut draft.movement_profile,
-                            MovementProfile::None,
-                            "None",
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut draft.movement_profile,
-                            MovementProfile::PlayerWasd,
-                            "Player WASD",
-                        )
-                        .changed();
-                });
-        });
-        ui.horizontal(|ui| {
-            ui.label("AI:");
-            egui::ComboBox::from_id_salt("entity_ai_behavior")
-                .selected_text(ai_behavior_label(draft.ai_behavior))
-                .show_ui(ui, |ui| {
-                    changed |= ui
-                        .selectable_value(&mut draft.ai_behavior, AiBehavior::None, "None")
-                        .changed();
-                    changed |= ui
-                        .selectable_value(&mut draft.ai_behavior, AiBehavior::Wander, "Wander")
-                        .changed();
-                });
-        });
+        if !is_static_item {
+            changed |= ui.checkbox(&mut draft.can_move, "Can Move").changed();
+            ui.horizontal(|ui| {
+                ui.label("Control Role:");
+                egui::ComboBox::from_id_salt("entity_control_role")
+                    .selected_text(control_role_label(draft.control_role))
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(&mut draft.control_role, ControlRole::None, "None")
+                            .changed();
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.control_role,
+                                ControlRole::PlayerCharacter,
+                                "Player Character",
+                            )
+                            .changed();
+                    });
+            });
+            ui.horizontal(|ui| {
+                ui.label("Movement:");
+                egui::ComboBox::from_id_salt("entity_movement_profile")
+                    .selected_text(movement_profile_label(
+                        draft.control_role,
+                        draft.movement_profile,
+                    ))
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.movement_profile,
+                                MovementProfile::None,
+                                "None",
+                            )
+                            .changed();
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.movement_profile,
+                                MovementProfile::PlayerWasd,
+                                "Player WASD",
+                            )
+                            .changed();
+                    });
+            });
+            ui.horizontal(|ui| {
+                ui.label("AI:");
+                egui::ComboBox::from_id_salt("entity_ai_behavior")
+                    .selected_text(ai_behavior_label(draft.ai_behavior))
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(&mut draft.ai_behavior, AiBehavior::None, "None")
+                            .changed();
+                        changed |= ui
+                            .selectable_value(&mut draft.ai_behavior, AiBehavior::Wander, "Wander")
+                            .changed();
+                    });
+            });
+        }
         changed |= ui
             .checkbox(&mut draft.has_inventory, "Has Inventory")
             .changed();
 
-        ui.separator();
-        ui.label("Audio");
-        ui.horizontal(|ui| {
-            ui.label("Movement Trigger:");
-            egui::ComboBox::from_id_salt("entity_movement_sound_trigger")
-                .selected_text(movement_sound_trigger_label(draft.movement_sound_trigger))
-                .show_ui(ui, |ui| {
+        if !is_static_item {
+            ui.separator();
+            ui.label("Audio");
+            ui.horizontal(|ui| {
+                ui.label("Movement Trigger:");
+                egui::ComboBox::from_id_salt("entity_movement_sound_trigger")
+                    .selected_text(movement_sound_trigger_label(draft.movement_sound_trigger))
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.movement_sound_trigger,
+                                MovementSoundTrigger::Distance,
+                                "Distance",
+                            )
+                            .changed();
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.movement_sound_trigger,
+                                MovementSoundTrigger::AnimationLoop,
+                                "Animation Loop",
+                            )
+                            .changed();
+                    });
+            });
+            let uses_distance_trigger =
+                matches!(draft.movement_sound_trigger, MovementSoundTrigger::Distance);
+            ui.horizontal(|ui| {
+                ui.label("Footstep Distance:");
+                ui.add_enabled_ui(uses_distance_trigger, |ui| {
                     changed |= ui
-                        .selectable_value(
-                            &mut draft.movement_sound_trigger,
-                            MovementSoundTrigger::Distance,
-                            "Distance",
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut draft.movement_sound_trigger,
-                            MovementSoundTrigger::AnimationLoop,
-                            "Animation Loop",
+                        .add(
+                            egui::DragValue::new(&mut draft.footstep_trigger_distance)
+                                .speed(0.5)
+                                .range(0.0..=f32::MAX),
                         )
                         .changed();
                 });
-        });
-        let uses_distance_trigger =
-            matches!(draft.movement_sound_trigger, MovementSoundTrigger::Distance);
-        ui.horizontal(|ui| {
-            ui.label("Footstep Distance:");
-            ui.add_enabled_ui(uses_distance_trigger, |ui| {
+            });
+            ui.horizontal(|ui| {
+                ui.label("Movement Sound:");
+                let mut sfx_names = config
+                    .and_then(|cfg| cfg.current_project_path())
+                    .map(|project_path| {
+                        Self::discover_audio_asset_names(
+                            project_path.join("assets/audio/sfx").as_path(),
+                        )
+                    })
+                    .unwrap_or_default();
+                if !draft.movement_sound.trim().is_empty()
+                    && !sfx_names.iter().any(|name| name == &draft.movement_sound)
+                {
+                    sfx_names.push(draft.movement_sound.clone());
+                    sfx_names.sort();
+                    sfx_names.dedup();
+                }
+                egui::ComboBox::from_id_salt("entity_movement_sound")
+                    .selected_text(if draft.movement_sound.trim().is_empty() {
+                        "None".to_string()
+                    } else {
+                        draft.movement_sound.clone()
+                    })
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(&mut draft.movement_sound, String::new(), "None")
+                            .changed();
+                        for sound_name in &sfx_names {
+                            changed |= ui
+                                .selectable_value(
+                                    &mut draft.movement_sound,
+                                    sound_name.clone(),
+                                    sound_name,
+                                )
+                                .changed();
+                        }
+                    });
+            });
+            ui.horizontal(|ui| {
+                ui.label("Hearing Radius:");
                 changed |= ui
                     .add(
-                        egui::DragValue::new(&mut draft.footstep_trigger_distance)
-                            .speed(0.5)
-                            .range(0.0..=f32::MAX),
+                        egui::DragValue::new(&mut draft.hearing_radius)
+                            .speed(1.0)
+                            .range(0..=u32::MAX),
                     )
                     .changed();
             });
-        });
-        ui.horizontal(|ui| {
-            ui.label("Movement Sound:");
-            let mut sfx_names = config
-                .and_then(|cfg| cfg.current_project_path())
-                .map(|project_path| {
-                    Self::discover_audio_asset_names(
-                        project_path.join("assets/audio/sfx").as_path(),
-                    )
-                })
-                .unwrap_or_default();
-            if !draft.movement_sound.trim().is_empty()
-                && !sfx_names.iter().any(|name| name == &draft.movement_sound)
-            {
-                sfx_names.push(draft.movement_sound.clone());
-                sfx_names.sort();
-                sfx_names.dedup();
-            }
-            egui::ComboBox::from_id_salt("entity_movement_sound")
-                .selected_text(if draft.movement_sound.trim().is_empty() {
-                    "None".to_string()
-                } else {
-                    draft.movement_sound.clone()
-                })
-                .show_ui(ui, |ui| {
-                    changed |= ui
-                        .selectable_value(&mut draft.movement_sound, String::new(), "None")
-                        .changed();
-                    for sound_name in &sfx_names {
-                        changed |= ui
-                            .selectable_value(
-                                &mut draft.movement_sound,
-                                sound_name.clone(),
-                                sound_name,
-                            )
-                            .changed();
-                    }
-                });
-        });
-        ui.horizontal(|ui| {
-            ui.label("Hearing Radius:");
-            changed |= ui
-                .add(
-                    egui::DragValue::new(&mut draft.hearing_radius)
-                        .speed(1.0)
-                        .range(0..=u32::MAX),
-                )
-                .changed();
-        });
+        }
 
         ui.separator();
         ui.label("Stats");
@@ -614,17 +630,30 @@ impl InspectorSystem {
                         ui.label("Yes");
                     });
                 }
-                ui.horizontal(|ui| {
-                    ui.label("AI:");
-                    ui.label(ai_behavior_label(entity.attributes.ai_behavior));
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Movement:");
-                    ui.label(movement_profile_label(
-                        entity.control_role,
-                        entity.attributes.movement_profile,
-                    ));
-                });
+                let is_static_item =
+                    entity.category == "item" && entity.attributes.static_object_render.is_some();
+                if let Some(static_render) = &entity.attributes.static_object_render {
+                    ui.horizontal(|ui| {
+                        ui.label("Static Render:");
+                        ui.label(format!(
+                            "{}/{}",
+                            static_render.sheet, static_render.object_name
+                        ));
+                    });
+                }
+                if !is_static_item {
+                    ui.horizontal(|ui| {
+                        ui.label("AI:");
+                        ui.label(ai_behavior_label(entity.attributes.ai_behavior));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Movement:");
+                        ui.label(movement_profile_label(
+                            entity.control_role,
+                            entity.attributes.movement_profile,
+                        ));
+                    });
+                }
 
                 if let Some(collision_box) = &entity.collision_box {
                     ui.separator();

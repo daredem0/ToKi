@@ -1,11 +1,12 @@
 use super::*;
+use crate::ui::editor_ui::PlacementPreviewVisual;
 
 impl EditorApp {
     pub(super) fn load_preview_sprite_frame_static(
         entity_def_name: &str,
         project_path: &std::path::Path,
         project_assets: &crate::project::ProjectAssets,
-    ) -> Option<toki_core::sprite::SpriteFrame> {
+    ) -> Option<PlacementPreviewVisual> {
         tracing::info!(
             "Loading preview sprite frame for entity '{}' (one-time cache)",
             entity_def_name
@@ -33,6 +34,49 @@ impl EditorApp {
             }
         };
 
+        if let Some(static_object) = &entity_def.rendering.static_object {
+            let sheet_name = static_object
+                .sheet
+                .strip_suffix(".json")
+                .unwrap_or(&static_object.sheet);
+            let object_sheet_asset = project_assets.object_sheets.get(sheet_name)?;
+            let object_sheet =
+                match toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(
+                    &object_sheet_asset.path,
+                ) {
+                    Ok(sheet) => sheet,
+                    Err(error) => {
+                        tracing::warn!("Failed to load object sheet for preview: {}", error);
+                        return None;
+                    }
+                };
+            let texture_size = object_sheet
+                .image_size()
+                .unwrap_or(glam::UVec2::new(16, 16));
+            let Some(uvs) = object_sheet.get_object_uvs(&static_object.object_name, texture_size)
+            else {
+                tracing::warn!(
+                    "Failed to get UV coordinates for object '{}' in preview",
+                    static_object.object_name
+                );
+                return None;
+            };
+
+            return Some(PlacementPreviewVisual {
+                frame: toki_core::sprite::SpriteFrame {
+                    u0: uvs[0],
+                    v0: uvs[1],
+                    u1: uvs[2],
+                    v1: uvs[3],
+                },
+                texture_path: object_sheet_asset
+                    .path
+                    .parent()
+                    .map(|parent| parent.join(&object_sheet.image)),
+                size: glam::UVec2::new(entity_def.rendering.size[0], entity_def.rendering.size[1]),
+            });
+        }
+
         let atlas_name = &entity_def.animations.atlas_name;
         let atlas_name_clean = atlas_name.strip_suffix(".json").unwrap_or(atlas_name);
         let atlas_asset = project_assets.sprite_atlases.get(atlas_name_clean)?;
@@ -53,11 +97,21 @@ impl EditorApp {
         if let Some(clip_def) = entity_def.animations.clips.first() {
             if let Some(first_tile_name) = clip_def.frame_tiles.first() {
                 if let Some(uvs) = sprite_atlas.get_tile_uvs(first_tile_name, sprite_texture_size) {
-                    return Some(toki_core::sprite::SpriteFrame {
-                        u0: uvs[0],
-                        v0: uvs[1],
-                        u1: uvs[2],
-                        v1: uvs[3],
+                    return Some(PlacementPreviewVisual {
+                        frame: toki_core::sprite::SpriteFrame {
+                            u0: uvs[0],
+                            v0: uvs[1],
+                            u1: uvs[2],
+                            v1: uvs[3],
+                        },
+                        texture_path: atlas_asset
+                            .path
+                            .parent()
+                            .map(|parent| parent.join(&sprite_atlas.image)),
+                        size: glam::UVec2::new(
+                            entity_def.rendering.size[0],
+                            entity_def.rendering.size[1],
+                        ),
                     });
                 }
 

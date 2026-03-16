@@ -91,6 +91,7 @@ impl GameState {
                 size: [16, 16],
                 render_layer: 0,
                 visible: true,
+                static_object: None,
             },
             attributes: crate::entity::AttributesDef {
                 health: Some(100),
@@ -102,7 +103,8 @@ impl GameState {
                 ai_behavior: crate::entity::AiBehavior::None,
                 movement_profile: crate::entity::MovementProfile::PlayerWasd,
                 primary_projectile: None,
-                has_inventory: false,
+                pickup: None,
+                has_inventory: true,
             },
             collision: crate::entity::CollisionDef {
                 enabled: true,
@@ -154,6 +156,7 @@ impl GameState {
                 size: [16, 16],
                 render_layer: 0,
                 visible: true,
+                static_object: None,
             },
             attributes: crate::entity::AttributesDef {
                 health: Some(50),
@@ -165,6 +168,7 @@ impl GameState {
                 ai_behavior: crate::entity::AiBehavior::Wander,
                 movement_profile: crate::entity::MovementProfile::None,
                 primary_projectile: None,
+                pickup: None,
                 has_inventory: false,
             },
             collision: crate::entity::CollisionDef {

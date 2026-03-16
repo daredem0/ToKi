@@ -226,156 +226,190 @@ impl InspectorSystem {
                                     }
                                 });
 
-                                ui.separator();
-                                ui.label("Audio Settings:");
+                                let is_static_item = definition.category == "item"
+                                    && definition.rendering.static_object.is_some();
 
-                                ui.horizontal(|ui| {
-                                    ui.label("Movement Trigger:");
-                                    let mut changed = false;
-                                    egui::ComboBox::from_id_salt(format!(
-                                        "entity_def_movement_trigger_{}",
-                                        entity_name
-                                    ))
-                                    .selected_text(movement_sound_trigger_label(
-                                        definition.audio.movement_sound_trigger,
-                                    ))
-                                    .show_ui(ui, |ui| {
-                                        changed |= ui
-                                            .selectable_value(
-                                                &mut definition.audio.movement_sound_trigger,
-                                                MovementSoundTrigger::Distance,
-                                                "Distance",
-                                            )
-                                            .changed();
-                                        changed |= ui
-                                            .selectable_value(
-                                                &mut definition.audio.movement_sound_trigger,
-                                                MovementSoundTrigger::AnimationLoop,
-                                                "Animation Loop",
-                                            )
-                                            .changed();
-                                    });
-                                    if changed {
-                                        if let Err(err) =
-                                            Self::save_entity_definition(&definition, &entity_file)
-                                        {
-                                            tracing::error!("{}", err);
-                                            ui.colored_label(egui::Color32::RED, err);
-                                        }
+                                if is_static_item {
+                                    if let Some(static_object) = &definition.rendering.static_object
+                                    {
+                                        ui.separator();
+                                        ui.label("Static Render");
+                                        ui.horizontal(|ui| {
+                                            ui.label("Sheet:");
+                                            ui.label(&static_object.sheet);
+                                        });
+                                        ui.horizontal(|ui| {
+                                            ui.label("Object:");
+                                            ui.label(&static_object.object_name);
+                                        });
                                     }
-                                });
+                                } else {
+                                    ui.separator();
+                                    ui.label("Audio Settings:");
 
-                                ui.horizontal(|ui| {
-                                    ui.label("Footstep Distance:");
-                                    let mut changed = false;
-                                    ui.add_enabled_ui(
-                                        matches!(
+                                    ui.horizontal(|ui| {
+                                        ui.label("Movement Trigger:");
+                                        let mut changed = false;
+                                        egui::ComboBox::from_id_salt(format!(
+                                            "entity_def_movement_trigger_{}",
+                                            entity_name
+                                        ))
+                                        .selected_text(movement_sound_trigger_label(
                                             definition.audio.movement_sound_trigger,
-                                            MovementSoundTrigger::Distance
-                                        ),
-                                        |ui| {
-                                            changed |= ui
-                                                .add(
-                                                    egui::DragValue::new(
+                                        ))
+                                        .show_ui(
+                                            ui,
+                                            |ui| {
+                                                changed |= ui
+                                                    .selectable_value(
                                                         &mut definition
                                                             .audio
-                                                            .footstep_trigger_distance,
+                                                            .movement_sound_trigger,
+                                                        MovementSoundTrigger::Distance,
+                                                        "Distance",
                                                     )
-                                                    .speed(0.5)
-                                                    .range(0.0..=f32::MAX),
-                                                )
-                                                .changed();
-                                        },
-                                    );
-                                    if changed {
-                                        definition.audio.footstep_trigger_distance =
-                                            definition.audio.footstep_trigger_distance.max(0.0);
-                                        if let Err(err) =
-                                            Self::save_entity_definition(&definition, &entity_file)
-                                        {
-                                            tracing::error!("{}", err);
-                                            ui.colored_label(egui::Color32::RED, err);
-                                        }
-                                    }
-                                });
-
-                                ui.horizontal(|ui| {
-                                    ui.label("Hearing Radius:");
-                                    let mut changed = false;
-                                    changed |= ui
-                                        .add(
-                                            egui::DragValue::new(
-                                                &mut definition.audio.hearing_radius,
-                                            )
-                                            .speed(1.0)
-                                            .range(0..=u32::MAX),
-                                        )
-                                        .changed();
-                                    if changed {
-                                        if let Err(err) =
-                                            Self::save_entity_definition(&definition, &entity_file)
-                                        {
-                                            tracing::error!("{}", err);
-                                            ui.colored_label(egui::Color32::RED, err);
-                                        }
-                                    }
-                                });
-
-                                let mut movement_sound_options = Self::discover_audio_asset_names(
-                                    project_path.join("assets/audio/sfx").as_path(),
-                                );
-                                if !definition.audio.movement_sound.trim().is_empty()
-                                    && !movement_sound_options
-                                        .iter()
-                                        .any(|name| name == &definition.audio.movement_sound)
-                                {
-                                    movement_sound_options
-                                        .push(definition.audio.movement_sound.clone());
-                                    movement_sound_options.sort();
-                                    movement_sound_options.dedup();
-                                }
-
-                                ui.horizontal(|ui| {
-                                    ui.label("Movement Sound:");
-                                    let selected_text =
-                                        if definition.audio.movement_sound.trim().is_empty() {
-                                            "None".to_string()
-                                        } else {
-                                            definition.audio.movement_sound.clone()
-                                        };
-                                    let mut changed = false;
-                                    egui::ComboBox::from_id_salt(format!(
-                                        "entity_def_movement_sound_{}",
-                                        entity_name
-                                    ))
-                                    .selected_text(selected_text)
-                                    .show_ui(ui, |ui| {
-                                        changed |= ui
-                                            .selectable_value(
-                                                &mut definition.audio.movement_sound,
-                                                String::new(),
-                                                "None",
-                                            )
-                                            .changed();
-                                        for sound_name in &movement_sound_options {
-                                            changed |= ui
-                                                .selectable_value(
-                                                    &mut definition.audio.movement_sound,
-                                                    sound_name.clone(),
-                                                    sound_name,
-                                                )
-                                                .changed();
+                                                    .changed();
+                                                changed |= ui
+                                                    .selectable_value(
+                                                        &mut definition
+                                                            .audio
+                                                            .movement_sound_trigger,
+                                                        MovementSoundTrigger::AnimationLoop,
+                                                        "Animation Loop",
+                                                    )
+                                                    .changed();
+                                            },
+                                        );
+                                        if changed {
+                                            if let Err(err) = Self::save_entity_definition(
+                                                &definition,
+                                                &entity_file,
+                                            ) {
+                                                tracing::error!("{}", err);
+                                                ui.colored_label(egui::Color32::RED, err);
+                                            }
                                         }
                                     });
-                                    if changed {
-                                        if let Err(err) =
-                                            Self::save_entity_definition(&definition, &entity_file)
-                                        {
-                                            tracing::error!("{}", err);
-                                            ui.colored_label(egui::Color32::RED, err);
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Footstep Distance:");
+                                        let mut changed = false;
+                                        ui.add_enabled_ui(
+                                            matches!(
+                                                definition.audio.movement_sound_trigger,
+                                                MovementSoundTrigger::Distance
+                                            ),
+                                            |ui| {
+                                                changed |= ui
+                                                    .add(
+                                                        egui::DragValue::new(
+                                                            &mut definition
+                                                                .audio
+                                                                .footstep_trigger_distance,
+                                                        )
+                                                        .speed(0.5)
+                                                        .range(0.0..=f32::MAX),
+                                                    )
+                                                    .changed();
+                                            },
+                                        );
+                                        if changed {
+                                            definition.audio.footstep_trigger_distance =
+                                                definition.audio.footstep_trigger_distance.max(0.0);
+                                            if let Err(err) = Self::save_entity_definition(
+                                                &definition,
+                                                &entity_file,
+                                            ) {
+                                                tracing::error!("{}", err);
+                                                ui.colored_label(egui::Color32::RED, err);
+                                            }
                                         }
+                                    });
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Hearing Radius:");
+                                        let mut changed = false;
+                                        changed |= ui
+                                            .add(
+                                                egui::DragValue::new(
+                                                    &mut definition.audio.hearing_radius,
+                                                )
+                                                .speed(1.0)
+                                                .range(0..=u32::MAX),
+                                            )
+                                            .changed();
+                                        if changed {
+                                            if let Err(err) = Self::save_entity_definition(
+                                                &definition,
+                                                &entity_file,
+                                            ) {
+                                                tracing::error!("{}", err);
+                                                ui.colored_label(egui::Color32::RED, err);
+                                            }
+                                        }
+                                    });
+
+                                    let mut movement_sound_options =
+                                        Self::discover_audio_asset_names(
+                                            project_path.join("assets/audio/sfx").as_path(),
+                                        );
+                                    if !definition.audio.movement_sound.trim().is_empty()
+                                        && !movement_sound_options
+                                            .iter()
+                                            .any(|name| name == &definition.audio.movement_sound)
+                                    {
+                                        movement_sound_options
+                                            .push(definition.audio.movement_sound.clone());
+                                        movement_sound_options.sort();
+                                        movement_sound_options.dedup();
                                     }
-                                });
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Movement Sound:");
+                                        let selected_text =
+                                            if definition.audio.movement_sound.trim().is_empty() {
+                                                "None".to_string()
+                                            } else {
+                                                definition.audio.movement_sound.clone()
+                                            };
+                                        let mut changed = false;
+                                        egui::ComboBox::from_id_salt(format!(
+                                            "entity_def_movement_sound_{}",
+                                            entity_name
+                                        ))
+                                        .selected_text(selected_text)
+                                        .show_ui(
+                                            ui,
+                                            |ui| {
+                                                changed |= ui
+                                                    .selectable_value(
+                                                        &mut definition.audio.movement_sound,
+                                                        String::new(),
+                                                        "None",
+                                                    )
+                                                    .changed();
+                                                for sound_name in &movement_sound_options {
+                                                    changed |= ui
+                                                        .selectable_value(
+                                                            &mut definition.audio.movement_sound,
+                                                            sound_name.clone(),
+                                                            sound_name,
+                                                        )
+                                                        .changed();
+                                                }
+                                            },
+                                        );
+                                        if changed {
+                                            if let Err(err) = Self::save_entity_definition(
+                                                &definition,
+                                                &entity_file,
+                                            ) {
+                                                tracing::error!("{}", err);
+                                                ui.colored_label(egui::Color32::RED, err);
+                                            }
+                                        }
+                                    });
+                                }
                             }
 
                             // Try to parse as JSON to show detailed info
@@ -388,6 +422,17 @@ impl InspectorSystem {
                                     });
 
                                     if let Some(obj) = json.as_object() {
+                                        let is_static_item = obj
+                                            .get("category")
+                                            .and_then(|v| v.as_str())
+                                            .is_some_and(|category| category == "item")
+                                            && obj
+                                                .get("rendering")
+                                                .and_then(|v| v.as_object())
+                                                .and_then(|rendering| {
+                                                    rendering.get("static_object")
+                                                })
+                                                .is_some();
                                         // Show basic entity information
                                         if let Some(display_name) =
                                             obj.get("display_name").and_then(|v| v.as_str())
@@ -602,110 +647,117 @@ impl InspectorSystem {
                                         }
 
                                         // Show audio information
-                                        if let Some(audio) =
-                                            obj.get("audio").and_then(|v| v.as_object())
-                                        {
-                                            ui.separator();
-                                            ui.label("Audio:");
-
-                                            if let Some(distance) = audio
-                                                .get("footstep_trigger_distance")
-                                                .and_then(|v| v.as_f64())
+                                        if !is_static_item {
+                                            if let Some(audio) =
+                                                obj.get("audio").and_then(|v| v.as_object())
                                             {
-                                                ui.horizontal(|ui| {
-                                                    ui.label("Footstep Distance:");
-                                                    ui.label(format!("{:.1}", distance));
-                                                });
-                                            }
+                                                ui.separator();
+                                                ui.label("Audio:");
 
-                                            if let Some(movement_sound) =
-                                                audio.get("movement_sound").and_then(|v| v.as_str())
-                                            {
-                                                ui.horizontal(|ui| {
-                                                    ui.label("Movement Sound:");
-                                                    ui.label(movement_sound);
-                                                });
-                                            }
+                                                if let Some(distance) = audio
+                                                    .get("footstep_trigger_distance")
+                                                    .and_then(|v| v.as_f64())
+                                                {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label("Footstep Distance:");
+                                                        ui.label(format!("{:.1}", distance));
+                                                    });
+                                                }
 
-                                            if let Some(collision_sound) = audio
-                                                .get("collision_sound")
-                                                .and_then(|v| v.as_str())
-                                            {
-                                                ui.horizontal(|ui| {
-                                                    ui.label("Collision Sound:");
-                                                    ui.label(collision_sound);
-                                                });
+                                                if let Some(movement_sound) = audio
+                                                    .get("movement_sound")
+                                                    .and_then(|v| v.as_str())
+                                                {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label("Movement Sound:");
+                                                        ui.label(movement_sound);
+                                                    });
+                                                }
+
+                                                if let Some(collision_sound) = audio
+                                                    .get("collision_sound")
+                                                    .and_then(|v| v.as_str())
+                                                {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label("Collision Sound:");
+                                                        ui.label(collision_sound);
+                                                    });
+                                                }
                                             }
                                         }
 
                                         // Show animation information
-                                        if let Some(animations) =
-                                            obj.get("animations").and_then(|v| v.as_object())
-                                        {
-                                            ui.separator();
-                                            ui.label("Animations:");
-
-                                            if let Some(atlas_name) = animations
-                                                .get("atlas_name")
-                                                .and_then(|v| v.as_str())
+                                        if !is_static_item {
+                                            if let Some(animations) =
+                                                obj.get("animations").and_then(|v| v.as_object())
                                             {
-                                                ui.horizontal(|ui| {
-                                                    ui.label("Atlas:");
-                                                    ui.label(atlas_name);
-                                                });
-                                            }
+                                                ui.separator();
+                                                ui.label("Animations:");
 
-                                            if let Some(default_state) = animations
-                                                .get("default_state")
-                                                .and_then(|v| v.as_str())
-                                            {
-                                                ui.horizontal(|ui| {
-                                                    ui.label("Default State:");
-                                                    ui.label(default_state);
-                                                });
-                                            }
+                                                if let Some(atlas_name) = animations
+                                                    .get("atlas_name")
+                                                    .and_then(|v| v.as_str())
+                                                {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label("Atlas:");
+                                                        ui.label(atlas_name);
+                                                    });
+                                                }
 
-                                            if let Some(clips) =
-                                                animations.get("clips").and_then(|v| v.as_array())
-                                            {
-                                                ui.horizontal(|ui| {
-                                                    ui.label("Available Clips:");
-                                                    ui.label(format!("{}", clips.len()));
-                                                });
+                                                if let Some(default_state) = animations
+                                                    .get("default_state")
+                                                    .and_then(|v| v.as_str())
+                                                {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label("Default State:");
+                                                        ui.label(default_state);
+                                                    });
+                                                }
 
-                                                ui.indent("animation_clips", |ui| {
-                                                    for clip in clips.iter() {
-                                                        if let Some(clip_obj) = clip.as_object() {
-                                                            let state = clip_obj
-                                                                .get("state")
-                                                                .and_then(|v| v.as_str())
-                                                                .unwrap_or("unknown");
-                                                            let loop_mode = clip_obj
-                                                                .get("loop_mode")
-                                                                .and_then(|v| v.as_str())
-                                                                .unwrap_or("unknown");
-                                                            let frame_duration = clip_obj
-                                                                .get("frame_duration_ms")
-                                                                .and_then(|v| v.as_f64())
-                                                                .unwrap_or(0.0);
-                                                            let frame_count = clip_obj
-                                                                .get("frame_tiles")
-                                                                .and_then(|v| v.as_array())
-                                                                .map(|arr| arr.len())
-                                                                .unwrap_or(0);
+                                                if let Some(clips) = animations
+                                                    .get("clips")
+                                                    .and_then(|v| v.as_array())
+                                                {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label("Available Clips:");
+                                                        ui.label(format!("{}", clips.len()));
+                                                    });
 
-                                                            ui.horizontal(|ui| {
-                                                                ui.label(format!(
-                                                                    "• {}: {} frames, {:.0}ms, {}",
-                                                                    state,
-                                                                    frame_count,
-                                                                    frame_duration,
-                                                                    loop_mode
-                                                                ));
-                                                            });
+                                                    ui.indent("animation_clips", |ui| {
+                                                        for clip in clips.iter() {
+                                                            if let Some(clip_obj) = clip.as_object()
+                                                            {
+                                                                let state = clip_obj
+                                                                    .get("state")
+                                                                    .and_then(|v| v.as_str())
+                                                                    .unwrap_or("unknown");
+                                                                let loop_mode = clip_obj
+                                                                    .get("loop_mode")
+                                                                    .and_then(|v| v.as_str())
+                                                                    .unwrap_or("unknown");
+                                                                let frame_duration = clip_obj
+                                                                    .get("frame_duration_ms")
+                                                                    .and_then(|v| v.as_f64())
+                                                                    .unwrap_or(0.0);
+                                                                let frame_count = clip_obj
+                                                                    .get("frame_tiles")
+                                                                    .and_then(|v| v.as_array())
+                                                                    .map(|arr| arr.len())
+                                                                    .unwrap_or(0);
+
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label(format!(
+                                                                        "• {}: {} frames, {:.0}ms, {}",
+                                                                        state,
+                                                                        frame_count,
+                                                                        frame_duration,
+                                                                        loop_mode
+                                                                    ));
+                                                                });
+                                                            }
                                                         }
-                                                    }
-                                                });
+                                                    });
+                                                }
                                             }
                                         }
 

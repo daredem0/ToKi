@@ -113,6 +113,72 @@ fn wrapper_methods_expose_core_entity_state() {
 }
 
 #[test]
+fn static_entity_renderable_wrappers_expose_object_sheet_backed_entities() {
+    let mut game_state = GameState::new_empty();
+    let pickup_definition = toki_core::entity::EntityDefinition {
+        name: "coin_pickup_render".to_string(),
+        display_name: "Coin Pickup Render".to_string(),
+        description: "Static object-sheet-backed pickup".to_string(),
+        rendering: toki_core::entity::RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+            static_object: Some(toki_core::entity::StaticObjectRenderDef {
+                sheet: "items".to_string(),
+                object_name: "coin".to_string(),
+            }),
+        },
+        attributes: toki_core::entity::AttributesDef {
+            health: None,
+            stats: HashMap::new(),
+            speed: 0,
+            solid: false,
+            active: true,
+            can_move: false,
+            ai_behavior: toki_core::entity::AiBehavior::None,
+            movement_profile: toki_core::entity::MovementProfile::None,
+            primary_projectile: None,
+            pickup: Some(toki_core::entity::PickupDef {
+                item_id: "coin".to_string(),
+                count: 1,
+            }),
+            has_inventory: false,
+        },
+        collision: toki_core::entity::CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: true,
+        },
+        audio: toki_core::entity::AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 64,
+            movement_sound_trigger: toki_core::entity::MovementSoundTrigger::Distance,
+            movement_sound: "".to_string(),
+            collision_sound: None,
+        },
+        animations: toki_core::entity::AnimationsDef {
+            atlas_name: "".to_string(),
+            clips: vec![],
+            default_state: "".to_string(),
+        },
+        category: "item".to_string(),
+        tags: vec!["pickup".to_string()],
+    };
+    let pickup_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&pickup_definition, glam::IVec2::new(24, 12))
+        .expect("pickup should spawn");
+    let manager = GameManager::new(game_state);
+
+    let renderable = manager.get_static_entity_renderables();
+    assert_eq!(renderable.len(), 1);
+    assert_eq!(renderable[0].entity_id, pickup_id);
+    assert_eq!(renderable[0].sheet, "items");
+    assert_eq!(renderable[0].object_name, "coin");
+}
+
+#[test]
 fn sprite_frame_wrappers_resolve_from_atlas() {
     let mut game_state = GameState::new_empty();
     let player_id = game_state.spawn_player_at(glam::IVec2::new(0, 0));

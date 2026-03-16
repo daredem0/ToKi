@@ -16,6 +16,8 @@ mod game_animation;
 mod game_combat;
 #[path = "game_input.rs"]
 mod game_input;
+#[path = "game_inventory.rs"]
+mod game_inventory;
 #[path = "game_movement.rs"]
 mod game_movement;
 #[path = "game_render_queries.rs"]
@@ -53,6 +55,15 @@ pub struct EntityHealthBar {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectileRenderData {
+    pub entity_id: EntityId,
+    pub position: glam::IVec2,
+    pub size: glam::UVec2,
+    pub sheet: String,
+    pub object_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StaticEntityRenderData {
     pub entity_id: EntityId,
     pub position: glam::IVec2,
     pub size: glam::UVec2,
@@ -218,6 +229,7 @@ impl GameState {
 
         self.process_profile_actions();
         self.update_projectiles(tilemap, atlas);
+        self.collect_overlapping_pickups();
         self.resolve_pending_stat_changes();
 
         // Update NPC AI

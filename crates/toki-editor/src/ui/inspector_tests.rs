@@ -31,6 +31,7 @@ fn sample_entity_with_id(id: u32) -> toki_core::entity::Entity {
             solid: true,
             visible: true,
             animation_controller: None,
+            static_object_render: None,
             render_layer: 1,
             active: true,
             can_move: true,
@@ -38,6 +39,8 @@ fn sample_entity_with_id(id: u32) -> toki_core::entity::Entity {
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
             projectile: None,
+            pickup: None,
+            inventory: toki_core::entity::Inventory::default(),
             has_inventory: false,
         },
     );
@@ -819,6 +822,7 @@ fn save_entity_definition_persists_audio_updates() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            static_object: None,
         },
         attributes: toki_core::entity::AttributesDef {
             health: Some(100),
@@ -830,6 +834,7 @@ fn save_entity_definition_persists_audio_updates() {
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: toki_core::entity::CollisionDef {

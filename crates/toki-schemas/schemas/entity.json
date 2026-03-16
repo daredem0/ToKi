@@ -62,6 +62,21 @@
         "visible": {
           "type": "boolean",
           "description": "Whether entity is visible by default"
+        },
+        "static_object": {
+          "type": ["object", "null"],
+          "description": "Optional object-sheet-backed static render source for entities without animation clips",
+          "required": ["sheet", "object_name"],
+          "properties": {
+            "sheet": {
+              "type": "string",
+              "minLength": 1
+            },
+            "object_name": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     },
@@ -122,6 +137,21 @@
               "items": {"type": "integer"},
               "minItems": 2,
               "maxItems": 2
+            }
+          }
+        },
+        "pickup": {
+          "type": ["object", "null"],
+          "description": "Optional item stack granted when another entity collects this entity by overlap",
+          "required": ["item_id", "count"],
+          "properties": {
+            "item_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
             }
           }
         },
@@ -213,7 +243,6 @@
           "items": {
             "$ref": "#/definitions/animationClip"
           },
-          "minItems": 1,
           "description": "Array of animation clips"
         },
         "default_state": {

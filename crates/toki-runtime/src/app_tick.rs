@@ -97,6 +97,52 @@ impl App {
                 }
             }
 
+            for entity in self.game_system.get_static_entity_renderables() {
+                let Some(object_sheet) = self.resources.get_object_sheet(&entity.sheet) else {
+                    tracing::warn!(
+                        "Entity {} requested missing object sheet '{}'",
+                        entity.entity_id,
+                        entity.sheet
+                    );
+                    continue;
+                };
+                let texture_size = object_sheet
+                    .image_size()
+                    .unwrap_or(glam::UVec2::new(16, 16));
+                let Some(uv_rect) = object_sheet.get_object_uvs(&entity.object_name, texture_size)
+                else {
+                    tracing::warn!(
+                        "Entity {} requested missing object '{}' in sheet '{}'",
+                        entity.entity_id,
+                        entity.object_name,
+                        entity.sheet
+                    );
+                    continue;
+                };
+                let frame = toki_core::sprite::SpriteFrame {
+                    u0: uv_rect[0],
+                    v0: uv_rect[1],
+                    u1: uv_rect[2],
+                    v1: uv_rect[3],
+                };
+                if let Some(texture_path) = self
+                    .resources
+                    .get_object_texture_path(&entity.sheet)
+                    .cloned()
+                {
+                    self.rendering.add_sprite_with_texture(
+                        texture_path,
+                        frame,
+                        entity.position,
+                        entity.size,
+                        false,
+                    );
+                } else {
+                    self.rendering
+                        .add_sprite(frame, entity.position, entity.size, false);
+                }
+            }
+
             for projectile in self.game_system.get_projectile_renderables() {
                 let Some(object_sheet) = self.resources.get_object_sheet(&projectile.sheet) else {
                     tracing::warn!(

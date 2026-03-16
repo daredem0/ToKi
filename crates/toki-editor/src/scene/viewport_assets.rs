@@ -143,6 +143,37 @@ impl SceneViewport {
         })
     }
 
+    pub(super) fn build_static_object_sprite_instance(
+        &mut self,
+        project_assets: &ProjectAssets,
+        sheet_name: &str,
+        object_name: &str,
+        position: glam::IVec2,
+        size: glam::UVec2,
+    ) -> Option<toki_render::SpriteInstance> {
+        let sheet_name = sheet_name.strip_suffix(".json").unwrap_or(sheet_name);
+        let object_sheet_asset = project_assets.object_sheets.get(sheet_name)?;
+        let object_sheet = self.load_object_sheet_from_asset(object_sheet_asset).ok()?;
+        let texture_size = object_sheet.image_size()?;
+        let uv_rect = object_sheet.get_object_uvs(object_name, texture_size)?;
+
+        Some(toki_render::SpriteInstance {
+            frame: toki_core::sprite::SpriteFrame {
+                u0: uv_rect[0],
+                v0: uv_rect[1],
+                u1: uv_rect[2],
+                v1: uv_rect[3],
+            },
+            position,
+            size,
+            texture_path: object_sheet_asset
+                .path
+                .parent()
+                .map(|parent| parent.join(&object_sheet.image)),
+            flip_x: false,
+        })
+    }
+
     pub(super) fn load_object_sheet_from_asset(
         &mut self,
         object_sheet_asset: &ObjectSheetAsset,

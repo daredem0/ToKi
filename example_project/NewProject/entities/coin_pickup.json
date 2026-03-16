@@ -1,0 +1,48 @@
+{
+  "name": "coin_pickup",
+  "display_name": "Coin Pickup",
+  "description": "A collectible coin that adds one coin to inventory on overlap.",
+  "rendering": {
+    "size": [16, 16],
+    "render_layer": 0,
+    "visible": true,
+    "static_object": {
+      "sheet": "items",
+      "object_name": "coin"
+    }
+  },
+  "attributes": {
+    "health": null,
+    "speed": 0,
+    "solid": false,
+    "active": true,
+    "can_move": false,
+    "ai_behavior": "none",
+    "movement_profile": "none",
+    "pickup": {
+      "item_id": "coin",
+      "count": 1
+    },
+    "has_inventory": false
+  },
+  "collision": {
+    "enabled": true,
+    "offset": [0, 0],
+    "size": [16, 16],
+    "trigger": true
+  },
+  "audio": {
+    "footstep_trigger_distance": 16.0,
+    "hearing_radius": 64,
+    "movement_sound_trigger": "distance",
+    "movement_sound": "",
+    "collision_sound": null
+  },
+  "animations": {
+    "atlas_name": "",
+    "clips": [],
+    "default_state": ""
+  },
+  "category": "item",
+  "tags": ["pickup", "coin", "collectible"]
+}

@@ -12,6 +12,7 @@ fn test_entity_definition_create_entity_basic() {
             size: [16, 16],
             render_layer: 1,
             visible: true,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: Some(100),
@@ -23,6 +24,7 @@ fn test_entity_definition_create_entity_basic() {
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
+            pickup: None,
             has_inventory: true,
         },
         collision: CollisionDef {
@@ -139,6 +141,7 @@ fn test_entity_definition_create_npc_entity() {
             size: [32, 32],
             render_layer: 0,
             visible: true,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: Some(50),
@@ -150,6 +153,7 @@ fn test_entity_definition_create_npc_entity() {
             ai_behavior: AiBehavior::Wander,
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -281,6 +285,10 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            static_object: Some(StaticObjectRenderDef {
+                sheet: "items".to_string(),
+                object_name: "coin".to_string(),
+            }),
         },
         attributes: AttributesDef {
             health: Some(25),
@@ -292,6 +300,7 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -403,6 +412,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
             size: [16, 16],
             render_layer: 1,
             visible: true,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: Some(100),
@@ -414,6 +424,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
+            pickup: None,
             has_inventory: true,
         },
         collision: CollisionDef {
@@ -487,6 +498,7 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
             size: [16, 16],
             render_layer: 1,
             visible: true,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: Some(100),
@@ -498,6 +510,7 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: None,
+            pickup: None,
             has_inventory: true,
         },
         collision: CollisionDef {
@@ -577,6 +590,10 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            static_object: Some(StaticObjectRenderDef {
+                sheet: "items".to_string(),
+                object_name: "coin".to_string(),
+            }),
         },
         attributes: AttributesDef {
             health: Some(25),
@@ -588,6 +605,7 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
             ai_behavior: AiBehavior::Wander,
             movement_profile: MovementProfile::None,
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -636,6 +654,10 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            static_object: Some(StaticObjectRenderDef {
+                sheet: "items".to_string(),
+                object_name: "coin".to_string(),
+            }),
         },
         attributes: AttributesDef {
             health: Some(30),
@@ -647,6 +669,7 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -699,6 +722,7 @@ fn test_entity_definition_copies_authored_primary_projectile() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: Some(30),
@@ -718,6 +742,7 @@ fn test_entity_definition_copies_authored_primary_projectile() {
                 lifetime_ticks: 20,
                 spawn_offset: [1, 2],
             }),
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -765,6 +790,79 @@ fn test_entity_definition_copies_authored_primary_projectile() {
 }
 
 #[test]
+fn test_entity_definition_copies_authored_pickup() {
+    let entity_def = EntityDefinition {
+        name: "coin_pickup".to_string(),
+        display_name: "Coin Pickup".to_string(),
+        description: "Collectible coin".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+            static_object: Some(StaticObjectRenderDef {
+                sheet: "items".to_string(),
+                object_name: "coin".to_string(),
+            }),
+        },
+        attributes: AttributesDef {
+            health: None,
+            stats: std::collections::HashMap::new(),
+            speed: 0,
+            solid: false,
+            active: true,
+            can_move: false,
+            ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::None,
+            primary_projectile: None,
+            pickup: Some(PickupDef {
+                item_id: "coin".to_string(),
+                count: 3,
+            }),
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: true,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: "step".to_string(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "".to_string(),
+            clips: vec![],
+            default_state: "".to_string(),
+        },
+        category: "item".to_string(),
+        tags: vec![],
+    };
+
+    let entity = entity_def
+        .create_entity(IVec2::new(0, 0), 1)
+        .expect("definition should create entity");
+
+    let pickup = entity
+        .attributes
+        .pickup
+        .expect("authored pickup should be copied to runtime entity");
+    assert_eq!(pickup.item_id, "coin");
+    assert_eq!(pickup.count, 3);
+    assert_eq!(entity.attributes.inventory.item_count("coin"), 0);
+    let static_render = entity
+        .attributes
+        .static_object_render
+        .expect("static object render should be copied");
+    assert_eq!(static_render.sheet, "items");
+    assert_eq!(static_render.object_name, "coin");
+    assert!(entity.attributes.animation_controller.is_none());
+}
+
+#[test]
 fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type() {
     let entity_def = EntityDefinition {
         name: "invalid".to_string(),
@@ -774,6 +872,7 @@ fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type()
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: None,
@@ -785,6 +884,7 @@ fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type()
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -826,6 +926,7 @@ fn test_entity_definition_invalid_animation_state() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: None,
@@ -837,6 +938,7 @@ fn test_entity_definition_invalid_animation_state() {
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -881,6 +983,7 @@ fn test_entity_definition_invalid_loop_mode() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: None,
@@ -892,6 +995,7 @@ fn test_entity_definition_invalid_loop_mode() {
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -936,6 +1040,7 @@ fn test_entity_definition_serialization() {
             size: [8, 8],
             render_layer: -1,
             visible: false,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: None,
@@ -947,6 +1052,7 @@ fn test_entity_definition_serialization() {
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -1003,6 +1109,7 @@ fn test_entity_definition_create_audio_component() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: Some(100),
@@ -1014,6 +1121,7 @@ fn test_entity_definition_create_audio_component() {
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {

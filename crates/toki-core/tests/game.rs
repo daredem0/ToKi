@@ -8,8 +8,8 @@ use toki_core::assets::{
 };
 use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, ControlRole,
-    EntityDefinition, EntityKind, MovementProfile, MovementSoundTrigger, PrimaryProjectileDef,
-    RenderingDef, ATTACK_POWER_STAT_ID,
+    EntityDefinition, EntityKind, MovementProfile, MovementSoundTrigger, PickupDef,
+    PrimaryProjectileDef, RenderingDef, ATTACK_POWER_STAT_ID,
 };
 use toki_core::rules::{Rule, RuleAction, RuleSet, RuleTarget, RuleTrigger};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
@@ -99,6 +99,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            static_object: None,
         },
         attributes: AttributesDef {
             health: Some(100),
@@ -118,6 +119,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
                 MovementProfile::None
             },
             primary_projectile: None,
+            pickup: None,
             has_inventory: false,
         },
         collision: CollisionDef {
@@ -1386,6 +1388,160 @@ fn game_state_projectile_applies_damage_and_despawns_on_hit() {
         game_state.get_projectile_renderables().is_empty(),
         "projectile should despawn on hit"
     );
+}
+
+#[test]
+fn game_state_collects_overlapping_pickup_into_inventory_and_despawns_item() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player_id = game_state.player_id().expect("player should exist");
+
+    let mut pickup_definition = test_definition("coin_pickup", "item");
+    pickup_definition.attributes.health = None;
+    pickup_definition.attributes.solid = false;
+    pickup_definition.attributes.can_move = false;
+    pickup_definition.attributes.pickup = Some(PickupDef {
+        item_id: "coin".to_string(),
+        count: 2,
+    });
+    let pickup_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&pickup_definition, IVec2::new(50, 60))
+        .expect("pickup should spawn");
+
+    game_state.update(
+        UVec2::new(128, 128),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    let player = game_state
+        .entity_manager()
+        .get_entity(player_id)
+        .expect("player should still exist");
+    assert_eq!(player.attributes.inventory.item_count("coin"), 2);
+    assert!(
+        game_state.entity_manager().get_entity(pickup_id).is_none(),
+        "pickup should despawn after collection"
+    );
+}
+
+#[test]
+fn game_state_pickup_collection_stacks_and_does_not_double_collect() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player_id = game_state.player_id().expect("player should exist");
+
+    let mut pickup_definition = test_definition("coin_pickup_stack", "item");
+    pickup_definition.attributes.health = None;
+    pickup_definition.attributes.solid = false;
+    pickup_definition.attributes.can_move = false;
+    pickup_definition.attributes.pickup = Some(PickupDef {
+        item_id: "coin".to_string(),
+        count: 1,
+    });
+
+    let first_pickup_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&pickup_definition, IVec2::new(50, 60))
+        .expect("first pickup should spawn");
+    let second_pickup_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&pickup_definition, IVec2::new(50, 60))
+        .expect("second pickup should spawn");
+
+    game_state.update(
+        UVec2::new(128, 128),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    game_state.update(
+        UVec2::new(128, 128),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    let player = game_state
+        .entity_manager()
+        .get_entity(player_id)
+        .expect("player should still exist");
+    assert_eq!(player.attributes.inventory.item_count("coin"), 2);
+    assert!(game_state
+        .entity_manager()
+        .get_entity(first_pickup_id)
+        .is_none());
+    assert!(game_state
+        .entity_manager()
+        .get_entity(second_pickup_id)
+        .is_none());
+}
+
+#[test]
+fn game_state_static_entity_renderables_include_object_sheet_backed_entities() {
+    let mut game_state = GameState::new_empty();
+    let static_pickup = EntityDefinition {
+        name: "coin_pickup_render".to_string(),
+        display_name: "Coin Pickup Render".to_string(),
+        description: "Static object-sheet-backed pickup".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+            static_object: Some(toki_core::entity::StaticObjectRenderDef {
+                sheet: "items".to_string(),
+                object_name: "coin".to_string(),
+            }),
+        },
+        attributes: AttributesDef {
+            health: None,
+            stats: std::collections::HashMap::new(),
+            speed: 0,
+            solid: false,
+            active: true,
+            can_move: false,
+            ai_behavior: toki_core::entity::AiBehavior::None,
+            movement_profile: MovementProfile::None,
+            primary_projectile: None,
+            pickup: Some(PickupDef {
+                item_id: "coin".to_string(),
+                count: 1,
+            }),
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: true,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 64,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: "".to_string(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "".to_string(),
+            clips: vec![],
+            default_state: "".to_string(),
+        },
+        category: "item".to_string(),
+        tags: vec!["pickup".to_string()],
+    };
+
+    let entity_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&static_pickup, IVec2::new(32, 48))
+        .expect("static pickup should spawn");
+
+    let static_renderables = game_state.get_static_entity_renderables();
+    assert_eq!(static_renderables.len(), 1);
+    assert_eq!(static_renderables[0].entity_id, entity_id);
+    assert_eq!(static_renderables[0].sheet, "items");
+    assert_eq!(static_renderables[0].object_name, "coin");
+    assert_eq!(static_renderables[0].position, IVec2::new(32, 48));
+    assert!(game_state.get_renderable_entities().is_empty());
 }
 
 #[test]

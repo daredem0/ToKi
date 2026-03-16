@@ -1,0 +1,40 @@
+{
+  "sheet_type": "objects",
+  "image": "items.png",
+  "tile_size": [
+    16,
+    16
+  ],
+  "objects": {
+    "coin": {
+      "position": [
+        0,
+        0
+      ],
+      "size_tiles": [
+        1,
+        1
+      ]
+    },
+    "gem": {
+      "position": [
+        1,
+        0
+      ],
+      "size_tiles": [
+        1,
+        1
+      ]
+    },
+    "potion": {
+      "position": [
+        2,
+        0
+      ],
+      "size_tiles": [
+        1,
+        1
+      ]
+    }
+  }
+}
