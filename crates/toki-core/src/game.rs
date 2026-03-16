@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::animation::{AnimationController, AnimationState};
+use crate::animation::AnimationState;
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::collision;
@@ -17,6 +17,8 @@ use crate::rules::{
 };
 use crate::scene_manager::SceneManager;
 
+#[path = "game_animation.rs"]
+mod game_animation;
 #[path = "game_input.rs"]
 mod game_input;
 #[path = "game_movement.rs"]
@@ -140,13 +142,7 @@ struct RuleRuntimeState {
     frame_death_detected: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FacingDirection {
-    Down,
-    Up,
-    Left,
-    Right,
-}
+use game_animation::FacingDirection;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum RuleCommand {
@@ -188,88 +184,6 @@ struct StatChangeRequest {
 impl GameState {
     fn effective_movement_profile(entity: &Entity) -> MovementProfile {
         entity.effective_movement_profile()
-    }
-
-    fn facing_from_delta(delta: glam::IVec2) -> Option<FacingDirection> {
-        if delta == glam::IVec2::ZERO {
-            return None;
-        }
-        if delta.x.abs() > delta.y.abs() {
-            if delta.x < 0 {
-                Some(FacingDirection::Left)
-            } else {
-                Some(FacingDirection::Right)
-            }
-        } else if delta.y < 0 {
-            Some(FacingDirection::Up)
-        } else {
-            Some(FacingDirection::Down)
-        }
-    }
-
-    fn facing_from_animation_state(state: AnimationState) -> FacingDirection {
-        match state {
-            AnimationState::IdleUp | AnimationState::WalkUp | AnimationState::AttackUp => {
-                FacingDirection::Up
-            }
-            AnimationState::IdleLeft | AnimationState::WalkLeft | AnimationState::AttackLeft => {
-                FacingDirection::Left
-            }
-            AnimationState::IdleRight | AnimationState::WalkRight | AnimationState::AttackRight => {
-                FacingDirection::Right
-            }
-            AnimationState::Idle
-            | AnimationState::Walk
-            | AnimationState::Attack
-            | AnimationState::IdleDown
-            | AnimationState::WalkDown
-            | AnimationState::AttackDown => FacingDirection::Down,
-        }
-    }
-
-    fn directional_animation_state(moving: bool, facing: FacingDirection) -> AnimationState {
-        match (moving, facing) {
-            (false, FacingDirection::Down) => AnimationState::IdleDown,
-            (false, FacingDirection::Up) => AnimationState::IdleUp,
-            (false, FacingDirection::Left) => AnimationState::IdleLeft,
-            (false, FacingDirection::Right) => AnimationState::IdleRight,
-            (true, FacingDirection::Down) => AnimationState::WalkDown,
-            (true, FacingDirection::Up) => AnimationState::WalkUp,
-            (true, FacingDirection::Left) => AnimationState::WalkLeft,
-            (true, FacingDirection::Right) => AnimationState::WalkRight,
-        }
-    }
-
-    fn animation_state_flip_x(state: AnimationState) -> bool {
-        matches!(
-            state,
-            AnimationState::IdleLeft | AnimationState::WalkLeft | AnimationState::AttackLeft
-        )
-    }
-
-    fn directional_attack_state(facing: FacingDirection) -> AnimationState {
-        match facing {
-            FacingDirection::Down => AnimationState::AttackDown,
-            FacingDirection::Up => AnimationState::AttackUp,
-            FacingDirection::Left => AnimationState::AttackLeft,
-            FacingDirection::Right => AnimationState::AttackRight,
-        }
-    }
-
-    fn is_action_animation_state(state: AnimationState) -> bool {
-        matches!(
-            state,
-            AnimationState::Attack
-                | AnimationState::AttackDown
-                | AnimationState::AttackUp
-                | AnimationState::AttackLeft
-                | AnimationState::AttackRight
-        )
-    }
-
-    fn action_animation_locks_locomotion(animation_controller: &AnimationController) -> bool {
-        Self::is_action_animation_state(animation_controller.current_clip_state)
-            && !animation_controller.is_finished
     }
 
     fn primary_action_damage_for_entity(entity: &Entity) -> i32 {
@@ -480,29 +394,6 @@ impl GameState {
                 }
                 self.trigger_entity_primary_action(entity_id);
             }
-        }
-    }
-
-    fn resolve_animation_state(
-        animation_controller: &AnimationController,
-        moving: bool,
-        delta: glam::IVec2,
-    ) -> AnimationState {
-        let fallback = if moving {
-            AnimationState::Walk
-        } else {
-            AnimationState::Idle
-        };
-
-        let facing = Self::facing_from_delta(delta).unwrap_or_else(|| {
-            Self::facing_from_animation_state(animation_controller.current_clip_state)
-        });
-        let directional = Self::directional_animation_state(moving, facing);
-
-        if animation_controller.has_clip(directional) {
-            directional
-        } else {
-            fallback
         }
     }
 
