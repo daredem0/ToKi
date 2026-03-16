@@ -2,6 +2,86 @@ use super::EditorUI;
 use crate::ui::undo_redo::{EditorCommand, IndexedEntity};
 
 impl EditorUI {
+    fn is_scene_item_entity(entity: &toki_core::entity::Entity) -> bool {
+        entity.category == "item" || entity.attributes.pickup.is_some()
+    }
+
+    fn render_scene_entity_group(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        label: &str,
+        entities: &[&toki_core::entity::Entity],
+        current_selection: &Option<super::Selection>,
+        selection_changes: &mut Vec<super::Selection>,
+        entity_removals: &mut Vec<(String, u32)>,
+    ) {
+        if entities.is_empty() {
+            return;
+        }
+
+        egui::CollapsingHeader::new(label)
+            .id_salt(format!(
+                "{}_{}",
+                label.replace(' ', "_").to_lowercase(),
+                scene_name
+            ))
+            .default_open(false)
+            .show(ui, |ui| {
+                for entity in entities {
+                    let is_selected = matches!(
+                        current_selection,
+                        Some(super::Selection::Entity(id)) if id == &entity.id
+                    );
+
+                    ui.horizontal(|ui| {
+                        let kind_label = entity
+                            .definition_name
+                            .clone()
+                            .or_else(|| {
+                                if entity.category.is_empty() {
+                                    None
+                                } else {
+                                    Some(entity.category.clone())
+                                }
+                            })
+                            .unwrap_or_else(|| format!("{:?}", entity.entity_kind));
+                        let entity_display = if matches!(
+                            entity.effective_control_role(),
+                            toki_core::entity::ControlRole::PlayerCharacter
+                        ) {
+                            format!("👤 {} (Player Character, ID: {})", kind_label, entity.id)
+                        } else if Self::is_scene_item_entity(entity) {
+                            format!("🪙 {} (ID: {})", kind_label, entity.id)
+                        } else {
+                            format!("🧩 {} (ID: {})", kind_label, entity.id)
+                        };
+
+                        let response = ui.selectable_label(is_selected, entity_display);
+
+                        if response.clicked() {
+                            selection_changes.push(super::Selection::Entity(entity.id));
+                            tracing::info!("Selected scene entity ID: {}", entity.id);
+                        }
+
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.label(format!("({}, {})", entity.position.x, entity.position.y));
+                        });
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.add_space(20.0);
+                        if ui
+                            .small_button("🗑️")
+                            .on_hover_text("Remove from scene")
+                            .clicked()
+                        {
+                            entity_removals.push((scene_name.to_string(), entity.id));
+                        }
+                    });
+                }
+            });
+    }
+
     pub(super) fn render_scene_hierarchy_section(
         &mut self,
         ui: &mut egui::Ui,
@@ -73,68 +153,29 @@ impl EditorUI {
                     }
 
                     if !scene.entities.is_empty() {
-                        ui.label("Scene Entities:");
-                        ui.indent(format!("entities_{}", scene.name), |ui| {
-                            for entity in &scene.entities {
-                                let is_selected = matches!(
-                                    &self.selection,
-                                    Some(super::Selection::Entity(id)) if id == &entity.id
-                                );
+                        let (scene_items, scene_entities): (Vec<_>, Vec<_>) = scene
+                            .entities
+                            .iter()
+                            .partition(|entity| Self::is_scene_item_entity(entity));
 
-                                ui.horizontal(|ui| {
-                                    let kind_label = entity
-                                        .definition_name
-                                        .clone()
-                                        .or_else(|| {
-                                            if entity.category.is_empty() {
-                                                None
-                                            } else {
-                                                Some(entity.category.clone())
-                                            }
-                                        })
-                                        .unwrap_or_else(|| format!("{:?}", entity.entity_kind));
-                                    let entity_display = if matches!(
-                                        entity.effective_control_role(),
-                                        toki_core::entity::ControlRole::PlayerCharacter
-                                    ) {
-                                        format!(
-                                            "👤 {} (Player Character, ID: {})",
-                                            kind_label, entity.id
-                                        )
-                                    } else {
-                                        format!("🧩 {} (ID: {})", kind_label, entity.id)
-                                    };
-
-                                    let response = ui.selectable_label(is_selected, entity_display);
-
-                                    if response.clicked() {
-                                        selection_changes.push(super::Selection::Entity(entity.id));
-                                        tracing::info!("Selected scene entity ID: {}", entity.id);
-                                    }
-
-                                    ui.with_layout(
-                                        egui::Layout::right_to_left(egui::Align::Center),
-                                        |ui| {
-                                            ui.label(format!(
-                                                "({}, {})",
-                                                entity.position.x, entity.position.y
-                                            ));
-                                        },
-                                    );
-                                });
-
-                                ui.horizontal(|ui| {
-                                    ui.add_space(20.0);
-                                    if ui
-                                        .small_button("🗑️")
-                                        .on_hover_text("Remove from scene")
-                                        .clicked()
-                                    {
-                                        entity_removals.push((scene.name.clone(), entity.id));
-                                    }
-                                });
-                            }
-                        });
+                        Self::render_scene_entity_group(
+                            ui,
+                            &scene.name,
+                            "Scene Entities:",
+                            &scene_entities,
+                            &self.selection,
+                            &mut selection_changes,
+                            &mut entity_removals,
+                        );
+                        Self::render_scene_entity_group(
+                            ui,
+                            &scene.name,
+                            "Scene Items:",
+                            &scene_items,
+                            &self.selection,
+                            &mut selection_changes,
+                            &mut entity_removals,
+                        );
                     }
 
                     ui.label("Runtime Entities:");
