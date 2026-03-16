@@ -9,7 +9,7 @@ impl EditorUI {
         config: Option<&crate::config::EditorConfig>,
     ) {
         ui.add_space(10.0);
-        ui.heading("🗺️ Maps");
+        ui.heading("Maps");
         ui.separator();
 
         let Some(config) = config else {
@@ -103,7 +103,7 @@ impl EditorUI {
         config: Option<&crate::config::EditorConfig>,
     ) {
         ui.add_space(10.0);
-        ui.heading("🧙 Entities");
+        ui.heading("Entities");
         ui.separator();
 
         let Some(config) = config else {

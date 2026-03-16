@@ -49,11 +49,11 @@ impl EditorUI {
                             entity.effective_control_role(),
                             toki_core::entity::ControlRole::PlayerCharacter
                         ) {
-                            format!("👤 {} (Player Character, ID: {})", kind_label, entity.id)
+                            format!("Player: {} (ID: {})", kind_label, entity.id)
                         } else if Self::is_scene_item_entity(entity) {
-                            format!("🪙 {} (ID: {})", kind_label, entity.id)
+                            format!("Item: {} (ID: {})", kind_label, entity.id)
                         } else {
-                            format!("🧩 {} (ID: {})", kind_label, entity.id)
+                            format!("Entity: {} (ID: {})", kind_label, entity.id)
                         };
 
                         let response = ui.selectable_label(is_selected, entity_display);
@@ -64,19 +64,15 @@ impl EditorUI {
                         }
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui
+                                .small_button("🗑")
+                                .on_hover_text("Remove from scene")
+                                .clicked()
+                            {
+                                entity_removals.push((scene_name.to_string(), entity.id));
+                            }
                             ui.label(format!("({}, {})", entity.position.x, entity.position.y));
                         });
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.add_space(20.0);
-                        if ui
-                            .small_button("🗑️")
-                            .on_hover_text("Remove from scene")
-                            .clicked()
-                        {
-                            entity_removals.push((scene_name.to_string(), entity.id));
-                        }
                     });
                 }
             });
@@ -95,10 +91,10 @@ impl EditorUI {
         for (scene_index, scene) in self.scenes.iter().enumerate() {
             let is_active_scene = self.active_scene.as_ref() == Some(&scene.name);
             let scene_header = if is_active_scene {
-                egui::RichText::new(format!("🎬 {}", scene.name))
+                egui::RichText::new(format!("Scene: {}", scene.name))
                     .color(egui::Color32::from_rgb(132, 211, 132))
             } else {
-                egui::RichText::new(format!("🎬 {}", scene.name))
+                egui::RichText::new(format!("Scene: {}", scene.name))
             };
             let scene_header_response = egui::CollapsingHeader::new(scene_header)
                 .id_salt(format!("scene_{}", scene.name))
@@ -120,8 +116,8 @@ impl EditorUI {
                                 );
 
                                 ui.horizontal(|ui| {
-                                    let response = ui
-                                        .selectable_label(is_selected, format!("🗺️ {}", map_name));
+                                    let response =
+                                        ui.selectable_label(is_selected, format!("🗺 {}", map_name));
 
                                     if response.clicked() {
                                         selection_changes.push(super::Selection::Map(
@@ -139,7 +135,7 @@ impl EditorUI {
                                         egui::Layout::right_to_left(egui::Align::Center),
                                         |ui| {
                                             if ui
-                                                .small_button("🗑️")
+                                                .small_button("🗑")
                                                 .on_hover_text("Remove map from scene")
                                                 .clicked()
                                             {
@@ -202,7 +198,7 @@ impl EditorUI {
                                                 ui.horizontal(|ui| {
                                                     let response = ui.selectable_label(
                                                         is_selected,
-                                                        format!("⚙️ Runtime Entity {}", entity_id),
+                                                        format!("Runtime: Entity {}", entity_id),
                                                     );
 
                                                     if response.clicked() {

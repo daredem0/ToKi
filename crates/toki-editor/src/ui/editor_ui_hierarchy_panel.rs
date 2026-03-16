@@ -10,7 +10,7 @@ impl EditorUI {
             .resizable(true)
             .default_width(250.0)
             .show(ctx, |ui| {
-                ui.heading("📋 Scene Hierarchy");
+                ui.heading("Scene Hierarchy");
                 ui.separator();
 
                 egui::ScrollArea::vertical()

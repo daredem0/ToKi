@@ -405,7 +405,7 @@ impl InspectorSystem {
                     ui.separator();
                     ui.label("Scene Actions:");
 
-                    if ui.button("🗺️ Add Map").clicked() {
+                    if ui.button("🗺 Add Map").clicked() {
                         tracing::info!("Add Map to scene: {}", scene_name);
                     }
 
