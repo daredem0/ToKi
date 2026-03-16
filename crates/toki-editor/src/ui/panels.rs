@@ -19,6 +19,7 @@ mod map_editor_interactions;
 mod map_editor_preview;
 mod scene_graph;
 mod scene_graph_canvas;
+mod scene_graph_editors;
 mod scene_viewport;
 
 /// Handles panel rendering for the editor (viewport and log panels)
