@@ -123,6 +123,7 @@ impl MenuSystem {
                     ui.checkbox(&mut ui_state.show_hierarchy, "Hierarchy");
                     ui.checkbox(&mut ui_state.show_inspector, "Inspector");
                     ui.checkbox(&mut ui_state.show_maps, "Maps");
+                    ui.checkbox(&mut ui_state.show_runtime_entities, "Show runtime entities");
                     ui.checkbox(&mut ui_state.show_console, "Console");
                 });
 

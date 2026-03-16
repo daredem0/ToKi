@@ -178,53 +178,61 @@ impl EditorUI {
                         );
                     }
 
-                    ui.label("Runtime Entities:");
-                    ui.indent("scene_runtime_entities", |ui| {
-                        if let Some(game_state) = game_state {
-                            let entity_ids = game_state.entity_manager().active_entities();
+                    if self.show_runtime_entities {
+                        egui::CollapsingHeader::new("Runtime Entities:")
+                            .id_salt(format!("runtime_entities_{}", scene.name))
+                            .default_open(false)
+                            .show(ui, |ui| {
+                                if let Some(game_state) = game_state {
+                                    let entity_ids = game_state.entity_manager().active_entities();
 
-                            if entity_ids.is_empty() {
-                                ui.label("No runtime entities");
-                            } else {
-                                for entity_id in &entity_ids {
-                                    if let Some(entity) =
-                                        game_state.entity_manager().get_entity(*entity_id)
-                                    {
-                                        let is_selected = matches!(
-                                            &self.selection,
-                                            Some(super::Selection::Entity(id))
-                                                if id == entity_id
-                                        );
+                                    if entity_ids.is_empty() {
+                                        ui.label("No runtime entities");
+                                    } else {
+                                        for entity_id in &entity_ids {
+                                            if let Some(entity) =
+                                                game_state.entity_manager().get_entity(*entity_id)
+                                            {
+                                                let is_selected = matches!(
+                                                    &self.selection,
+                                                    Some(super::Selection::Entity(id))
+                                                        if id == entity_id
+                                                );
 
-                                        ui.horizontal(|ui| {
-                                            let response = ui.selectable_label(
-                                                is_selected,
-                                                format!("⚙️ Runtime Entity {}", entity_id),
-                                            );
+                                                ui.horizontal(|ui| {
+                                                    let response = ui.selectable_label(
+                                                        is_selected,
+                                                        format!("⚙️ Runtime Entity {}", entity_id),
+                                                    );
 
-                                            if response.clicked() {
-                                                selection_changes
-                                                    .push(super::Selection::Entity(*entity_id));
-                                                self.selected_entity_id = Some(*entity_id);
+                                                    if response.clicked() {
+                                                        selection_changes.push(
+                                                            super::Selection::Entity(*entity_id),
+                                                        );
+                                                        self.selected_entity_id = Some(*entity_id);
+                                                    }
+
+                                                    ui.with_layout(
+                                                        egui::Layout::right_to_left(
+                                                            egui::Align::Center,
+                                                        ),
+                                                        |ui| {
+                                                            ui.label(format!(
+                                                                "({}, {})",
+                                                                entity.position.x,
+                                                                entity.position.y
+                                                            ));
+                                                        },
+                                                    );
+                                                });
                                             }
-
-                                            ui.with_layout(
-                                                egui::Layout::right_to_left(egui::Align::Center),
-                                                |ui| {
-                                                    ui.label(format!(
-                                                        "({}, {})",
-                                                        entity.position.x, entity.position.y
-                                                    ));
-                                                },
-                                            );
-                                        });
+                                        }
                                     }
+                                } else {
+                                    ui.label("No game state available");
                                 }
-                            }
-                        } else {
-                            ui.label("No game state available");
-                        }
-                    });
+                            });
+                    }
                 });
 
             if scene_header_response.header_response.clicked() {
