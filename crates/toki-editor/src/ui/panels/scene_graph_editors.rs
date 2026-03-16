@@ -422,4 +422,147 @@ impl PanelSystem {
             });
         changed
     }
+
+    pub(super) fn render_graph_selected_node_editor(
+        ui: &mut egui::Ui,
+        graph: &RuleGraph,
+        node_badges: &HashMap<u64, String>,
+        node_id: u64,
+        scene_name: &str,
+    ) -> Option<GraphCommand> {
+        let Some(node_kind) = graph
+            .nodes
+            .iter()
+            .find(|node| node.id == node_id)
+            .map(|node| node.kind.clone())
+        else {
+            ui.label("Selected node no longer exists.");
+            return None;
+        };
+
+        let display_label = Self::rule_graph_node_label(graph, node_badges, node_id)
+            .unwrap_or_else(|| format!("node {node_id}"));
+        ui.horizontal(|ui| {
+            ui.monospace(display_label);
+        });
+
+        let mut command = None;
+        ui.horizontal(|ui| {
+            if ui.button("Disconnect All").clicked() {
+                command = Some(GraphCommand::DisconnectNode(node_id));
+            }
+            if ui.button("Delete Node").clicked() {
+                command = Some(GraphCommand::RemoveNode(node_id));
+            }
+        });
+
+        ui.separator();
+
+        match node_kind {
+            RuleGraphNodeKind::Trigger(trigger) => {
+                let mut trigger_value = trigger;
+                let mut kind = Self::graph_trigger_kind(trigger);
+                let kind_salt = format!("graph_canvas_trigger_kind::{scene_name}::{node_id}");
+                egui::ComboBox::from_id_salt(kind_salt)
+                    .selected_text(Self::graph_trigger_kind_label(kind))
+                    .show_ui(ui, |ui| {
+                        for candidate in [
+                            GraphTriggerKind::Start,
+                            GraphTriggerKind::Update,
+                            GraphTriggerKind::PlayerMove,
+                            GraphTriggerKind::Key,
+                            GraphTriggerKind::Collision,
+                            GraphTriggerKind::Damaged,
+                            GraphTriggerKind::Death,
+                            GraphTriggerKind::Trigger,
+                        ] {
+                            ui.selectable_value(
+                                &mut kind,
+                                candidate,
+                                Self::graph_trigger_kind_label(candidate),
+                            );
+                        }
+                    });
+                if kind != Self::graph_trigger_kind(trigger) {
+                    trigger_value = Self::graph_default_trigger(kind);
+                }
+                if let RuleTrigger::OnKey { key } = &mut trigger_value {
+                    let key_salt = format!("graph_canvas_trigger_key::{scene_name}::{node_id}");
+                    let _ = Self::edit_rule_key(ui, key, &key_salt);
+                }
+                if command.is_none() && trigger_value != trigger {
+                    command = Some(GraphCommand::SetTrigger(node_id, trigger_value));
+                }
+            }
+            RuleGraphNodeKind::Condition(condition) => {
+                let mut edited_condition = condition;
+                let mut kind = Self::graph_condition_kind(condition);
+                let kind_salt = format!("graph_canvas_condition_kind::{scene_name}::{node_id}");
+                egui::ComboBox::from_id_salt(kind_salt)
+                    .selected_text(Self::graph_condition_kind_label(kind))
+                    .show_ui(ui, |ui| {
+                        for candidate in [
+                            GraphConditionKind::Always,
+                            GraphConditionKind::TargetExists,
+                            GraphConditionKind::KeyHeld,
+                            GraphConditionKind::EntityActive,
+                        ] {
+                            ui.selectable_value(
+                                &mut kind,
+                                candidate,
+                                Self::graph_condition_kind_label(candidate),
+                            );
+                        }
+                    });
+                if kind != Self::graph_condition_kind(condition) {
+                    edited_condition = Self::graph_default_condition(kind);
+                }
+                let _ = Self::edit_graph_condition_payload(
+                    ui,
+                    &mut edited_condition,
+                    &format!("graph_canvas_condition_payload::{scene_name}::{node_id}"),
+                );
+                if command.is_none() && edited_condition != condition {
+                    command = Some(GraphCommand::SetCondition(node_id, edited_condition));
+                }
+            }
+            RuleGraphNodeKind::Action(action) => {
+                let mut edited_action = action.clone();
+                let mut kind = Self::graph_action_kind(&action);
+                let kind_salt = format!("graph_canvas_action_kind::{scene_name}::{node_id}");
+                egui::ComboBox::from_id_salt(kind_salt)
+                    .selected_text(Self::graph_action_kind_label(kind))
+                    .show_ui(ui, |ui| {
+                        for candidate in [
+                            GraphActionKind::PlaySound,
+                            GraphActionKind::PlayMusic,
+                            GraphActionKind::PlayAnimation,
+                            GraphActionKind::SetVelocity,
+                            GraphActionKind::Spawn,
+                            GraphActionKind::DestroySelf,
+                            GraphActionKind::SwitchScene,
+                        ] {
+                            ui.selectable_value(
+                                &mut kind,
+                                candidate,
+                                Self::graph_action_kind_label(candidate),
+                            );
+                        }
+                    });
+                if kind != Self::graph_action_kind(&action) {
+                    edited_action = Self::graph_default_action(kind);
+                }
+                let _ = Self::edit_graph_action_payload(
+                    ui,
+                    &mut edited_action,
+                    &format!("graph_canvas_action_payload::{scene_name}::{node_id}"),
+                );
+                if command.is_none() && edited_action != action {
+                    command = Some(GraphCommand::SetAction(node_id, edited_action));
+                }
+            }
+        }
+
+        command
+    }
 }
