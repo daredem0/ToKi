@@ -6,12 +6,16 @@ use super::undo_redo::UndoRedoHistory;
 use crate::project::SceneGraphLayout;
 use crate::scene::SceneViewport;
 
+#[path = "editor_ui_asset_palette.rs"]
+mod editor_ui_asset_palette;
 #[path = "editor_ui_graph.rs"]
 mod editor_ui_graph;
 #[path = "editor_ui_hierarchy_panel.rs"]
 mod editor_ui_hierarchy_panel;
 #[path = "editor_ui_map_editor.rs"]
 mod editor_ui_map_editor;
+#[path = "editor_ui_scene_tree.rs"]
+mod editor_ui_scene_tree;
 
 pub(crate) use editor_ui_graph::SceneRulesGraphCommandData;
 pub(crate) use editor_ui_map_editor::{
