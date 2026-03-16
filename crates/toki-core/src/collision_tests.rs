@@ -1,4 +1,3 @@
-
 use super::{can_entity_move_to_position, can_place_collision_box_at_position, CollisionBox};
 use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use crate::assets::tilemap::{MapObjectInstance, TileMap};

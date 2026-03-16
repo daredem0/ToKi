@@ -1,4 +1,3 @@
-
 use super::{Project, ProjectMetadata, RuntimeSettings};
 use std::path::PathBuf;
 

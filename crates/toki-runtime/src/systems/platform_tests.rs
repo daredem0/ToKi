@@ -1,4 +1,3 @@
-
 use super::PlatformSystem;
 
 #[test]

@@ -1,4 +1,3 @@
-
 use super::CameraManager;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};

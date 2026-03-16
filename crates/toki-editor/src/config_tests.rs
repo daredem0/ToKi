@@ -1,4 +1,3 @@
-
 use super::{EditorConfig, GridSettings};
 
 #[test]

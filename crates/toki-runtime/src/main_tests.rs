@@ -1,4 +1,3 @@
-
 use super::{
     apply_project_runtime_settings_from_project_file_if_present, apply_runtime_config,
     auto_detect_project_launch_options, detect_first_scene_name,

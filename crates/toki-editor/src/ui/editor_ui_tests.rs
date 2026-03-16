@@ -1,4 +1,3 @@
-
 use glam::{IVec2, UVec2};
 use toki_core::entity::{EntityAttributes, EntityKind};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};

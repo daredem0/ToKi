@@ -1,4 +1,3 @@
-
 use super::{
     next_zoom_in_scale, next_zoom_out_scale, point_in_entity_bounds, request_viewport_size_state,
     screen_to_world_from_camera, world_to_i32_floor, ViewportSizingMode,

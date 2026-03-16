@@ -1,4 +1,3 @@
-
 use super::MapPaintInteraction;
 use glam::{UVec2, Vec2};
 use std::path::PathBuf;

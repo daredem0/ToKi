@@ -1,4 +1,3 @@
-
 use super::{TextAnchor, TextItem, TextSlant, TextSpace, TextStyle, TextWeight};
 
 #[test]

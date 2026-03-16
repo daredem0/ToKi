@@ -1,4 +1,3 @@
-
 use super::build_quad_vertices;
 use glam::Vec2;
 use toki_core::sprite::SpriteFrame;

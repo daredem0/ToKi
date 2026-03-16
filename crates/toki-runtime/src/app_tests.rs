@@ -1,4 +1,3 @@
-
 use super::{
     first_existing_path, App, RuntimeAudioMixOptions, RuntimeDisplayOptions, RuntimeLaunchOptions,
     RuntimeSplashOptions, SplashPolicy, COMMUNITY_SPLASH_VERSION_TEXT,

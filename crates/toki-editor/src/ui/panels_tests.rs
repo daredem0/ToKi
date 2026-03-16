@@ -1,4 +1,3 @@
-
 use super::{GraphValidationFixCommand, PanelSystem};
 use crate::ui::rule_graph::RuleGraph;
 use std::collections::HashMap;

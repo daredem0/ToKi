@@ -1,4 +1,3 @@
-
 use super::{
     classify_sprite_metadata_file, find_first_json_file, first_existing_path,
     resolve_project_resource_paths, resolve_tilemap_atlas_path, ResourceManager,

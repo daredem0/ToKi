@@ -1,4 +1,3 @@
-
 use toki_core::animation::AnimationState;
 use toki_core::rules::{
     RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleTarget, RuleTrigger,

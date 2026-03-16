@@ -1,4 +1,3 @@
-
 use super::{
     find_atlas_file, find_font_files, find_image_for_atlas, RenderingSystem, RuntimeRenderBackend,
 };

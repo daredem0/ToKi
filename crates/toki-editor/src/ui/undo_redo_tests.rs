@@ -1,4 +1,3 @@
-
 use super::{EditorCommand, EntityPosition, IndexedEntity, UndoRedoHistory};
 use crate::project::SceneGraphLayout;
 use crate::ui::rule_graph::RuleGraph;

@@ -1,4 +1,3 @@
-
 use super::{
     BackgroundTaskKind, BackgroundTaskManager, BackgroundTaskUpdate, TaskResult, WorkerMessage,
 };

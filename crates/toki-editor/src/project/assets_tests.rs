@@ -1,4 +1,3 @@
-
 use super::ProjectAssets;
 use std::fs;
 use tempfile::tempdir;

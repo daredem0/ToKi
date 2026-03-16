@@ -1,4 +1,3 @@
-
 use super::MapObjectInteraction;
 use glam::UVec2;
 use std::path::PathBuf;

@@ -1,4 +1,3 @@
-
 use super::ProjectManager;
 use crate::project::ProjectTemplateKind;
 use crate::ui::interactions::MapPaintInteraction;

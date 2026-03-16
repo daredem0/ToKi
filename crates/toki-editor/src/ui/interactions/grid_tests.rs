@@ -1,4 +1,3 @@
-
 use super::GridInteraction;
 use crate::config::{EditorConfig, GridSettings};
 use glam::{UVec2, Vec2};

@@ -1,4 +1,3 @@
-
 use super::PerformanceMonitor;
 use std::time::{Duration, Instant};
 

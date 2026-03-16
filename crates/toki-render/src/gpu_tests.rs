@@ -1,4 +1,3 @@
-
 use super::default_texture_path;
 
 #[test]

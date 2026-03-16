@@ -1,4 +1,3 @@
-
 use super::EditorApp;
 use crate::project::ProjectAssets;
 use crate::ui::editor_ui::{EntityMoveDragState, MapEditorDraft};

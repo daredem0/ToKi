@@ -1,4 +1,3 @@
-
 use super::{ObjectSheetMeta, ObjectSheetType};
 use glam::UVec2;
 use std::fs;
