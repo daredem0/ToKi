@@ -21,6 +21,7 @@ mod scene_graph;
 mod scene_graph_canvas;
 mod scene_graph_editors;
 mod scene_graph_layout;
+mod scene_graph_validation;
 mod scene_viewport;
 
 /// Handles panel rendering for the editor (viewport and log panels)
