@@ -918,6 +918,113 @@ fn game_state_primary_action_uses_attack_power_stat_for_damage() {
 }
 
 #[test]
+fn game_state_held_primary_action_does_not_apply_repeated_damage_every_frame() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 120.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    let mut target_definition = test_definition("held_primary_target", "creature");
+    target_definition.attributes.health = Some(25);
+    let target_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&target_definition, IVec2::new(66, 60))
+        .expect("target should spawn");
+
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.update(world_bounds, &tilemap, &atlas);
+
+    let target = game_state
+        .entity_manager()
+        .get_entity(target_id)
+        .expect("target should still exist after non-lethal hit");
+    assert_eq!(target.attributes.health, Some(15));
+    assert_eq!(target.attributes.current_stat("health"), Some(15));
+}
+
+#[test]
+fn game_state_primary_action_can_damage_again_after_release_and_repress() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 120.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    let mut target_definition = test_definition("repress_primary_target", "creature");
+    target_definition.attributes.health = Some(25);
+    let target_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&target_definition, IVec2::new(66, 60))
+        .expect("target should spawn");
+
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.handle_profile_action_release(MovementProfile::PlayerWasd, InputAction::Primary);
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    game_state.update(world_bounds, &tilemap, &atlas);
+
+    let target = game_state
+        .entity_manager()
+        .get_entity(target_id)
+        .expect("target should still exist after two non-lethal hits");
+    assert_eq!(target.attributes.health, Some(5));
+    assert_eq!(target.attributes.current_stat("health"), Some(5));
+}
+
+#[test]
 fn game_state_primary_action_does_not_damage_out_of_range_target() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
