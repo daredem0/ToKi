@@ -1,45 +1,60 @@
 use super::*;
 
 impl EditorApp {
-    pub(super) fn open_project_at_path(&mut self, project_path: std::path::PathBuf) {
-        match self.project_manager.open_project(project_path.clone()) {
-            Ok(game_state) => match SceneViewport::with_game_state(game_state) {
-                Ok(viewport) => {
-                    self.scene_viewport = self.initialize_viewport(viewport);
-                    self.last_loaded_active_scene = None;
-                    self.loaded_scene_maps.clear();
+    pub(super) fn activate_loaded_project(
+        &mut self,
+        game_state: GameState,
+        project_path: std::path::PathBuf,
+        context: &str,
+    ) {
+        match SceneViewport::with_game_state(game_state) {
+            Ok(viewport) => {
+                self.scene_viewport = self.initialize_viewport(viewport);
+                self.last_loaded_active_scene = None;
+                self.loaded_scene_maps.clear();
 
-                    self.config.set_project_path(project_path);
-                    if let Err(error) = self.config.save() {
-                        tracing::warn!("Failed to save config after opening project: {}", error);
-                    }
-
-                    if let Some(project) = self.project_manager.current_project.as_ref() {
-                        self.ui.set_title(&project.name.to_string());
-                    }
-
-                    match self.project_manager.load_scenes() {
-                        Ok(loaded_scenes) => {
-                            self.ui.load_scenes_from_project(loaded_scenes);
-                            tracing::info!("Loaded scenes into UI hierarchy");
-                        }
-                        Err(error) => {
-                            tracing::error!("Failed to load scenes into UI: {}", error);
-                        }
-                    }
-
-                    self.migrate_legacy_graph_layouts_into_project();
-                    self.sync_ui_graph_layouts_from_project();
-
-                    tracing::info!("Opened project successfully");
-                }
-                Err(error) => {
-                    tracing::error!(
-                        "Failed to initialize scene viewport for opened project: {}",
+                self.config.set_project_path(project_path);
+                if let Err(error) = self.config.save() {
+                    tracing::warn!(
+                        "Failed to save config after activating {}: {}",
+                        context,
                         error
                     );
                 }
-            },
+
+                if let Some(project) = self.project_manager.current_project.as_ref() {
+                    self.ui.set_title(&project.name.to_string());
+                }
+
+                match self.project_manager.load_scenes() {
+                    Ok(loaded_scenes) => {
+                        self.ui.load_scenes_from_project(loaded_scenes);
+                        tracing::info!("Loaded scenes into UI hierarchy");
+                    }
+                    Err(error) => {
+                        tracing::error!("Failed to load scenes into UI: {}", error);
+                    }
+                }
+
+                self.migrate_legacy_graph_layouts_into_project();
+                self.sync_ui_graph_layouts_from_project();
+            }
+            Err(error) => {
+                tracing::error!(
+                    "Failed to initialize scene viewport for {}: {}",
+                    context,
+                    error
+                );
+            }
+        }
+    }
+
+    pub(super) fn open_project_at_path(&mut self, project_path: std::path::PathBuf) {
+        match self.project_manager.open_project(project_path.clone()) {
+            Ok(game_state) => {
+                self.activate_loaded_project(game_state, project_path, "opened project");
+                tracing::info!("Opened project successfully");
+            }
             Err(error) => {
                 tracing::error!("Failed to open project: {}", error);
             }
