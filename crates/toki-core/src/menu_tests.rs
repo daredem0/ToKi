@@ -111,10 +111,12 @@ fn navigation_skips_non_selectable_items() {
                 },
                 MenuItemDefinition::Button {
                     text: "Resume".to_string(),
+                    border_style: MenuBorderStyle::Square,
                     action: MenuAction::CloseMenu,
                 },
                 MenuItemDefinition::Button {
                     text: "Next".to_string(),
+                    border_style: MenuBorderStyle::Square,
                     action: MenuAction::OpenScreen {
                         screen_id: "custom".to_string(),
                     },
@@ -144,6 +146,7 @@ fn menu_controller_returns_exit_runtime_command_for_exit_game_action() {
             title: "Paused".to_string(),
             items: vec![MenuItemDefinition::Button {
                 text: "Exit".to_string(),
+                border_style: MenuBorderStyle::Square,
                 action: MenuAction::ExitGame,
             }],
         }],
@@ -168,6 +171,8 @@ fn menu_settings_default_includes_appearance_defaults() {
 
     assert_eq!(settings.appearance.font_family, "Sans");
     assert_eq!(settings.appearance.font_size_px, 14);
+    assert_eq!(settings.appearance.title_spacing_px, 8);
+    assert_eq!(settings.appearance.button_spacing_px, 8);
     assert_eq!(settings.appearance.color_hex, "#7CFF7C");
 }
 
@@ -179,6 +184,7 @@ fn menu_hex_color_and_border_helpers_follow_shared_menu_visual_rules() {
         menu_border_color(MenuBorderStyle::Square, accent, 0.95),
         Some([124.0 / 255.0, 1.0, 124.0 / 255.0, 0.95])
     );
+    assert_eq!(menu_border_color(MenuBorderStyle::None, accent, 0.95), None);
     assert_eq!(
         tinted_menu_background(accent, 0.16, 0.9),
         [accent[0] * 0.16, accent[1] * 0.16, accent[2] * 0.16, 0.9]
@@ -199,6 +205,11 @@ fn shared_menu_visual_metrics_match_runtime_overlay_defaults() {
 
 #[test]
 fn build_menu_layout_uses_fixed_panel_width_and_shared_entry_geometry() {
+    let appearance = MenuAppearance {
+        title_spacing_px: 18,
+        button_spacing_px: 12,
+        ..MenuAppearance::default()
+    };
     let layout = build_menu_layout(
         &MenuView {
             screen_id: "pause".to_string(),
@@ -208,21 +219,32 @@ fn build_menu_layout_uses_fixed_panel_width_and_shared_entry_geometry() {
                     text: "Resume".to_string(),
                     selected: true,
                     selectable: true,
+                    border_style: MenuBorderStyle::Square,
                 },
                 MenuViewEntry {
                     text: "Inventory".to_string(),
                     selected: false,
                     selectable: true,
+                    border_style: MenuBorderStyle::None,
                 },
             ],
         },
-        &MenuAppearance::default(),
+        &appearance,
         glam::Vec2::new(320.0, 180.0),
     );
 
     assert_eq!(layout.panel.width, 280.0);
     assert_eq!(layout.entries.len(), 2);
     assert_eq!(layout.entries[0].rect.width, 248.0);
-    assert!(layout.entries[1].rect.y > layout.entries[0].rect.y);
+    assert_eq!(
+        layout.entries[0].rect.y - (layout.title.rect.y + layout.title.rect.height),
+        appearance.title_spacing_px as f32
+    );
+    assert_eq!(
+        layout.entries[1].rect.y - layout.entries[0].rect.y,
+        layout.entries[0].rect.height + appearance.button_spacing_px as f32
+    );
+    assert_eq!(layout.entries[0].border_style, MenuBorderStyle::Square);
+    assert_eq!(layout.entries[1].border_style, MenuBorderStyle::None);
     assert_eq!(layout.title.rect.width, layout.entries[0].rect.width);
 }

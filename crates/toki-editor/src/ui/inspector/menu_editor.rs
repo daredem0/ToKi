@@ -132,12 +132,46 @@ impl InspectorSystem {
             }
         });
 
+        let mut title_spacing = appearance.title_spacing_px;
+        ui.horizontal(|ui| {
+            ui.label("Title Spacing");
+            if ui
+                .add(
+                    egui::DragValue::new(&mut title_spacing)
+                        .range(0..=64)
+                        .speed(1.0),
+                )
+                .changed()
+            {
+                appearance.title_spacing_px = title_spacing;
+                appearance_changed = true;
+            }
+        });
+
+        let mut button_spacing = appearance.button_spacing_px;
+        ui.horizontal(|ui| {
+            ui.label("Button Spacing");
+            if ui
+                .add(
+                    egui::DragValue::new(&mut button_spacing)
+                        .range(0..=64)
+                        .speed(1.0),
+                )
+                .changed()
+            {
+                appearance.button_spacing_px = button_spacing;
+                appearance_changed = true;
+            }
+        });
+
         let mut border_style = appearance.border_style;
         egui::ComboBox::from_label("Border Style")
             .selected_text(match border_style {
+                MenuBorderStyle::None => "None",
                 MenuBorderStyle::Square => "Square",
             })
             .show_ui(ui, |ui| {
+                ui.selectable_value(&mut border_style, MenuBorderStyle::None, "None");
                 ui.selectable_value(&mut border_style, MenuBorderStyle::Square, "Square");
             });
         if border_style != appearance.border_style {
@@ -248,6 +282,7 @@ impl InspectorSystem {
                     project,
                     MenuItemDefinition::Button {
                         text: "New Button".to_string(),
+                        border_style: MenuBorderStyle::Square,
                         action: MenuAction::CloseMenu,
                     },
                 );
@@ -347,9 +382,35 @@ impl InspectorSystem {
                     changed = true;
                 }
             }
-            MenuItemDefinition::Button { text, action } => {
+            MenuItemDefinition::Button {
+                text,
+                border_style,
+                action,
+            } => {
                 ui.label("Label");
                 if ui.text_edit_singleline(text).changed() {
+                    changed = true;
+                }
+                let mut selected_border_style = *border_style;
+                egui::ComboBox::from_label("Button Border Style")
+                    .selected_text(match selected_border_style {
+                        MenuBorderStyle::None => "None",
+                        MenuBorderStyle::Square => "Square",
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(
+                            &mut selected_border_style,
+                            MenuBorderStyle::None,
+                            "None",
+                        );
+                        ui.selectable_value(
+                            &mut selected_border_style,
+                            MenuBorderStyle::Square,
+                            "Square",
+                        );
+                    });
+                if *border_style != selected_border_style {
+                    *border_style = selected_border_style;
                     changed = true;
                 }
                 changed |= Self::render_menu_action_editor(ui, &available_screen_ids, action);
@@ -503,6 +564,7 @@ impl InspectorSystem {
                 title: "New Menu".to_string(),
                 items: vec![MenuItemDefinition::Button {
                     text: "Resume".to_string(),
+                    border_style: MenuBorderStyle::Square,
                     action: MenuAction::CloseMenu,
                 }],
             });
@@ -641,6 +703,7 @@ impl InspectorSystem {
             },
             MenuEditorItemKind::Button => MenuItemDefinition::Button {
                 text: "Button".to_string(),
+                border_style: MenuBorderStyle::Square,
                 action: MenuAction::CloseMenu,
             },
             MenuEditorItemKind::InventoryList => MenuItemDefinition::DynamicList {
@@ -736,6 +799,7 @@ impl InspectorSystem {
                                 MenuItemDefinition::Button { text, .. } => text.clone(),
                                 _ => "Button".to_string(),
                             },
+                            border_style: MenuBorderStyle::Square,
                             action: MenuAction::Back,
                         };
                     }

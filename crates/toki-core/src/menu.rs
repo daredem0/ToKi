@@ -30,6 +30,10 @@ pub struct MenuAppearance {
     pub font_family: String,
     #[serde(default = "default_menu_font_size_px")]
     pub font_size_px: u16,
+    #[serde(default = "default_menu_title_spacing_px")]
+    pub title_spacing_px: u16,
+    #[serde(default = "default_menu_button_spacing_px")]
+    pub button_spacing_px: u16,
     #[serde(default = "default_menu_color_hex")]
     pub color_hex: String,
     #[serde(default)]
@@ -93,6 +97,7 @@ pub struct MenuEntryLayout {
     pub text: String,
     pub selected: bool,
     pub selectable: bool,
+    pub border_style: MenuBorderStyle,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -108,6 +113,8 @@ impl Default for MenuAppearance {
         Self {
             font_family: default_menu_font_family(),
             font_size_px: default_menu_font_size_px(),
+            title_spacing_px: default_menu_title_spacing_px(),
+            button_spacing_px: default_menu_button_spacing_px(),
             color_hex: default_menu_color_hex(),
             border_style: MenuBorderStyle::default(),
         }
@@ -117,6 +124,7 @@ impl Default for MenuAppearance {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum MenuBorderStyle {
+    None,
     #[default]
     Square,
 }
@@ -137,6 +145,8 @@ pub enum MenuItemDefinition {
     },
     Button {
         text: String,
+        #[serde(default)]
+        border_style: MenuBorderStyle,
         action: MenuAction,
     },
     DynamicList {
@@ -187,6 +197,7 @@ pub struct MenuViewEntry {
     pub text: String,
     pub selected: bool,
     pub selectable: bool,
+    pub border_style: MenuBorderStyle,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -265,11 +276,15 @@ impl MenuController {
                     text: text.clone(),
                     selected: false,
                     selectable: false,
+                    border_style: MenuBorderStyle::None,
                 }),
-                MenuItemDefinition::Button { text, .. } => entries.push(MenuViewEntry {
+                MenuItemDefinition::Button {
+                    text, border_style, ..
+                } => entries.push(MenuViewEntry {
                     text: text.clone(),
                     selected: index == selected_index,
                     selectable: true,
+                    border_style: *border_style,
                 }),
                 MenuItemDefinition::DynamicList {
                     heading,
@@ -281,6 +296,7 @@ impl MenuController {
                             text: heading.clone(),
                             selected: false,
                             selectable: false,
+                            border_style: MenuBorderStyle::None,
                         });
                     }
                     let dynamic_entries = match source {
@@ -290,6 +306,7 @@ impl MenuController {
                                 text: format!("{} x{}", entry.item_id, entry.count),
                                 selected: false,
                                 selectable: false,
+                                border_style: MenuBorderStyle::None,
                             })
                             .collect::<Vec<_>>(),
                     };
@@ -298,6 +315,7 @@ impl MenuController {
                             text: empty_text.clone(),
                             selected: false,
                             selectable: false,
+                            border_style: MenuBorderStyle::None,
                         });
                     } else {
                         entries.extend(dynamic_entries);
@@ -425,6 +443,14 @@ fn default_menu_font_size_px() -> u16 {
     14
 }
 
+fn default_menu_title_spacing_px() -> u16 {
+    8
+}
+
+fn default_menu_button_spacing_px() -> u16 {
+    8
+}
+
 fn default_menu_color_hex() -> String {
     "#7CFF7C".to_string()
 }
@@ -437,10 +463,12 @@ fn default_menu_screens() -> Vec<MenuScreenDefinition> {
             items: vec![
                 MenuItemDefinition::Button {
                     text: "Resume".to_string(),
+                    border_style: MenuBorderStyle::Square,
                     action: MenuAction::CloseMenu,
                 },
                 MenuItemDefinition::Button {
                     text: "Inventory".to_string(),
+                    border_style: MenuBorderStyle::Square,
                     action: MenuAction::OpenScreen {
                         screen_id: "inventory_menu".to_string(),
                     },
@@ -458,6 +486,7 @@ fn default_menu_screens() -> Vec<MenuScreenDefinition> {
                 },
                 MenuItemDefinition::Button {
                     text: "Back".to_string(),
+                    border_style: MenuBorderStyle::Square,
                     action: MenuAction::Back,
                 },
             ],
@@ -475,7 +504,7 @@ pub fn build_menu_layout(
     viewport: glam::Vec2,
 ) -> MenuLayout {
     let metrics = menu_visual_metrics();
-    let panel = menu_panel_rect(view, appearance.font_size_px as f32, viewport);
+    let panel = menu_panel_rect(view, appearance, viewport);
     let content_x = panel.x + metrics.panel_inner_margin_px;
     let content_width = (panel.width - metrics.panel_inner_margin_px * 2.0).max(1.0);
     let title_height = appearance.font_size_px as f32
@@ -487,7 +516,9 @@ pub fn build_menu_layout(
         width: content_width,
         height: title_height,
     };
+    let entries_start_y = title_rect.y + title_rect.height + appearance.title_spacing_px as f32;
     let entry_height = appearance.font_size_px as f32 + metrics.entry_padding_px.y * 2.0;
+    let button_spacing = appearance.button_spacing_px as f32;
     let entries = view
         .entries
         .iter()
@@ -495,13 +526,14 @@ pub fn build_menu_layout(
         .map(|(index, entry)| MenuEntryLayout {
             rect: MenuRect {
                 x: content_x,
-                y: metrics.entries_start_y_px + index as f32 * metrics.entry_spacing_y_px,
+                y: entries_start_y + index as f32 * (entry_height + button_spacing),
                 width: content_width,
                 height: entry_height,
             },
             text: entry.text.clone(),
             selected: entry.selected,
             selectable: entry.selectable,
+            border_style: entry.border_style,
         })
         .collect();
     let hint_font_size = (appearance.font_size_px as f32 - 2.0).max(10.0);
@@ -527,12 +559,19 @@ pub fn build_menu_layout(
     }
 }
 
-fn menu_panel_rect(view: &MenuView, font_size_px: f32, viewport: glam::Vec2) -> MenuRect {
+fn menu_panel_rect(view: &MenuView, appearance: &MenuAppearance, viewport: glam::Vec2) -> MenuRect {
     let metrics = menu_visual_metrics();
+    let font_size_px = appearance.font_size_px as f32;
+    let title_height =
+        font_size_px + metrics.title_size_delta_px + metrics.title_padding_px.y * 2.0;
+    let entries_start_y =
+        metrics.title_top_y_px + title_height + appearance.title_spacing_px as f32;
+    let entry_height = font_size_px + metrics.entry_padding_px.y * 2.0;
+    let button_spacing = appearance.button_spacing_px as f32;
     let last_entry_y = if view.entries.is_empty() {
-        metrics.entries_start_y_px
+        entries_start_y
     } else {
-        metrics.entries_start_y_px + (view.entries.len() - 1) as f32 * metrics.entry_spacing_y_px
+        entries_start_y + (view.entries.len() - 1) as f32 * (entry_height + button_spacing)
     };
     let hint_size_px = (font_size_px - 2.0).max(10.0);
     let bottom = (last_entry_y + font_size_px + metrics.entry_padding_px.y * 2.0 + 12.0).max(
@@ -583,6 +622,7 @@ pub fn menu_border_color(
     alpha: f32,
 ) -> Option<[f32; 4]> {
     match border_style {
+        MenuBorderStyle::None => None,
         MenuBorderStyle::Square if alpha > 0.0 => Some([accent[0], accent[1], accent[2], alpha]),
         MenuBorderStyle::Square => None,
     }

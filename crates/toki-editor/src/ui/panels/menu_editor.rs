@@ -111,11 +111,15 @@ pub(super) fn render_menu_editor(
                 text: text.clone(),
                 selected: false,
                 selectable: false,
+                border_style: MenuBorderStyle::None,
             }),
-            MenuItemDefinition::Button { text, .. } => entries.push(MenuViewEntry {
+            MenuItemDefinition::Button {
+                text, border_style, ..
+            } => entries.push(MenuViewEntry {
                 text: text.clone(),
                 selected: selected_entry_index == Some(item_index),
                 selectable: true,
+                border_style: *border_style,
             }),
             MenuItemDefinition::DynamicList {
                 heading,
@@ -127,12 +131,14 @@ pub(super) fn render_menu_editor(
                         text: heading.clone(),
                         selected: false,
                         selectable: false,
+                        border_style: MenuBorderStyle::None,
                     });
                 }
                 entries.push(MenuViewEntry {
                     text: empty_text.clone(),
                     selected: false,
                     selectable: false,
+                    border_style: MenuBorderStyle::None,
                 });
             }
         }
@@ -281,6 +287,7 @@ fn menu_preview_stroke(
     width: f32,
 ) -> egui::Stroke {
     match border_style {
+        MenuBorderStyle::None => egui::Stroke::NONE,
         MenuBorderStyle::Square => egui::Stroke::new(width, color),
     }
 }
