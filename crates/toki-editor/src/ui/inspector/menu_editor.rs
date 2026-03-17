@@ -72,17 +72,6 @@ impl InspectorSystem {
         ui: &mut egui::Ui,
         project: &mut Project,
     ) {
-        ui.label("Runtime Menu Settings");
-        if ui
-            .checkbox(
-                &mut project.metadata.runtime.menu.gate_gameplay_when_open,
-                "Gate gameplay while menu is open",
-            )
-            .changed()
-        {
-            Self::mark_menu_settings_changed(project);
-        }
-
         let available_screen_ids = project
             .metadata
             .runtime
@@ -91,269 +80,310 @@ impl InspectorSystem {
             .iter()
             .map(|screen| screen.id.clone())
             .collect::<Vec<_>>();
-        let mut pause_root = project.metadata.runtime.menu.pause_root_screen_id.clone();
-        egui::ComboBox::from_label("Pause Root Screen")
-            .selected_text(pause_root.clone())
-            .show_ui(ui, |ui| {
-                for screen_id in &available_screen_ids {
-                    ui.selectable_value(&mut pause_root, screen_id.clone(), screen_id);
-                }
-            });
-        if pause_root != project.metadata.runtime.menu.pause_root_screen_id {
-            project.metadata.runtime.menu.pause_root_screen_id = pause_root;
-            Self::mark_menu_settings_changed(project);
-        }
-
-        ui.separator();
-        ui.label("Appearance");
         let mut appearance = project.metadata.runtime.menu.appearance.clone();
         let mut appearance_changed = false;
-        ui.label("Font Family");
-        if ui
-            .text_edit_singleline(&mut appearance.font_family)
-            .changed()
-        {
-            appearance_changed = true;
-        }
+        egui::CollapsingHeader::new("Runtime Menu Settings")
+            .default_open(false)
+            .show(ui, |ui| {
+                if ui
+                    .checkbox(
+                        &mut project.metadata.runtime.menu.gate_gameplay_when_open,
+                        "Gate gameplay while menu is open",
+                    )
+                    .changed()
+                {
+                    Self::mark_menu_settings_changed(project);
+                }
 
-        let mut font_size = appearance.font_size_px;
-        ui.horizontal(|ui| {
-            ui.label("Font Size");
-            if ui
-                .add(
-                    egui::DragValue::new(&mut font_size)
-                        .range(8..=64)
-                        .speed(1.0),
-                )
-                .changed()
-            {
-                appearance.font_size_px = font_size;
-                appearance_changed = true;
-            }
-        });
-
-        let mut menu_width_percent = appearance.menu_width_percent;
-        ui.horizontal(|ui| {
-            ui.label("Menu Width %");
-            if ui
-                .add(
-                    egui::DragValue::new(&mut menu_width_percent)
-                        .range(20..=100)
-                        .speed(1.0),
-                )
-                .changed()
-            {
-                appearance.menu_width_percent = menu_width_percent;
-                appearance_changed = true;
-            }
-        });
-
-        let mut menu_height_percent = appearance.menu_height_percent;
-        ui.horizontal(|ui| {
-            ui.label("Menu Height %");
-            if ui
-                .add(
-                    egui::DragValue::new(&mut menu_height_percent)
-                        .range(20..=100)
-                        .speed(1.0),
-                )
-                .changed()
-            {
-                appearance.menu_height_percent = menu_height_percent;
-                appearance_changed = true;
-            }
-        });
-
-        let mut title_spacing = appearance.title_spacing_px;
-        ui.horizontal(|ui| {
-            ui.label("Title Spacing");
-            if ui
-                .add(
-                    egui::DragValue::new(&mut title_spacing)
-                        .range(0..=64)
-                        .speed(1.0),
-                )
-                .changed()
-            {
-                appearance.title_spacing_px = title_spacing;
-                appearance_changed = true;
-            }
-        });
-
-        let mut button_spacing = appearance.button_spacing_px;
-        ui.horizontal(|ui| {
-            ui.label("Button Spacing");
-            if ui
-                .add(
-                    egui::DragValue::new(&mut button_spacing)
-                        .range(0..=64)
-                        .speed(1.0),
-                )
-                .changed()
-            {
-                appearance.button_spacing_px = button_spacing;
-                appearance_changed = true;
-            }
-        });
-
-        let mut footer_spacing = appearance.footer_spacing_px;
-        ui.horizontal(|ui| {
-            ui.label("Footer Spacing");
-            if ui
-                .add(
-                    egui::DragValue::new(&mut footer_spacing)
-                        .range(0..=128)
-                        .speed(1.0),
-                )
-                .changed()
-            {
-                appearance.footer_spacing_px = footer_spacing;
-                appearance_changed = true;
-            }
-        });
-
-        let mut opacity_percent = appearance.opacity_percent;
-        ui.horizontal(|ui| {
-            ui.label("Menu Opacity %");
-            if ui
-                .add(
-                    egui::Slider::new(&mut opacity_percent, 0..=100)
-                        .clamping(egui::SliderClamping::Always),
-                )
-                .changed()
-            {
-                appearance.opacity_percent = opacity_percent;
-                appearance_changed = true;
-            }
-        });
-
-        let mut border_style = appearance.border_style;
-        egui::ComboBox::from_label("Border Style")
-            .selected_text(match border_style {
-                MenuBorderStyle::None => "None",
-                MenuBorderStyle::Square => "Square",
-            })
-            .show_ui(ui, |ui| {
-                ui.selectable_value(&mut border_style, MenuBorderStyle::None, "None");
-                ui.selectable_value(&mut border_style, MenuBorderStyle::Square, "Square");
+                let mut pause_root = project.metadata.runtime.menu.pause_root_screen_id.clone();
+                egui::ComboBox::from_label("Pause Root Screen")
+                    .selected_text(pause_root.clone())
+                    .show_ui(ui, |ui| {
+                        for screen_id in &available_screen_ids {
+                            ui.selectable_value(&mut pause_root, screen_id.clone(), screen_id);
+                        }
+                    });
+                if pause_root != project.metadata.runtime.menu.pause_root_screen_id {
+                    project.metadata.runtime.menu.pause_root_screen_id = pause_root;
+                    Self::mark_menu_settings_changed(project);
+                }
             });
-        if border_style != appearance.border_style {
-            appearance.border_style = border_style;
-            appearance_changed = true;
-        }
 
-        ui.label("Border Color Hex");
-        if ui
-            .text_edit_singleline(&mut appearance.border_color_hex)
-            .changed()
-        {
-            appearance_changed = true;
-        }
-        if !Self::is_valid_menu_hex_color(&appearance.border_color_hex) {
-            ui.colored_label(
-                egui::Color32::from_rgb(215, 120, 120),
-                "Use a 6-digit hex color like #7CFF7C",
-            );
-        }
-        ui.label("Text Color Hex");
-        if ui
-            .text_edit_singleline(&mut appearance.text_color_hex)
-            .changed()
-        {
-            appearance_changed = true;
-        }
-        if !Self::is_valid_menu_hex_color(&appearance.text_color_hex) {
-            ui.colored_label(
-                egui::Color32::from_rgb(215, 120, 120),
-                "Use a 6-digit hex color like #FFFFFF",
-            );
-        }
-        ui.separator();
-        ui.label("Menu Background");
-        if ui
-            .checkbox(
-                &mut appearance.menu_background_transparent,
-                "Transparent Menu Background",
-            )
-            .changed()
-        {
-            appearance_changed = true;
-        }
-        if ui
-            .text_edit_singleline(&mut appearance.menu_background_color_hex)
-            .changed()
-        {
-            appearance_changed = true;
-        }
-        if !Self::is_valid_menu_hex_color(&appearance.menu_background_color_hex) {
-            ui.colored_label(
-                egui::Color32::from_rgb(215, 120, 120),
-                "Use a 6-digit hex color like #142914",
-            );
-        }
-        ui.label("Title Background");
-        if ui
-            .checkbox(
-                &mut appearance.title_background_transparent,
-                "Transparent Title Background",
-            )
-            .changed()
-        {
-            appearance_changed = true;
-        }
-        if ui
-            .text_edit_singleline(&mut appearance.title_background_color_hex)
-            .changed()
-        {
-            appearance_changed = true;
-        }
-        if !Self::is_valid_menu_hex_color(&appearance.title_background_color_hex) {
-            ui.colored_label(
-                egui::Color32::from_rgb(215, 120, 120),
-                "Use a 6-digit hex color like #143614",
-            );
-        }
-        ui.label("Entry Background");
-        if ui
-            .checkbox(
-                &mut appearance.entry_background_transparent,
-                "Transparent Entry Background",
-            )
-            .changed()
-        {
-            appearance_changed = true;
-        }
-        if ui
-            .text_edit_singleline(&mut appearance.entry_background_color_hex)
-            .changed()
-        {
-            appearance_changed = true;
-        }
-        if !Self::is_valid_menu_hex_color(&appearance.entry_background_color_hex) {
-            ui.colored_label(
-                egui::Color32::from_rgb(215, 120, 120),
-                "Use a 6-digit hex color like #0F1F0F",
-            );
-        }
-        ui.label("Footer Text");
-        if ui
-            .add(
-                egui::TextEdit::multiline(&mut appearance.footer_text)
-                    .desired_rows(3)
-                    .lock_focus(true),
-            )
-            .changed()
-        {
-            appearance_changed = true;
-        }
+        egui::CollapsingHeader::new("Typography")
+            .default_open(false)
+            .show(ui, |ui| {
+                ui.label("Font Family");
+                if ui
+                    .text_edit_singleline(&mut appearance.font_family)
+                    .changed()
+                {
+                    appearance_changed = true;
+                }
+
+                let mut font_size = appearance.font_size_px;
+                ui.horizontal(|ui| {
+                    ui.label("Font Size");
+                    if ui
+                        .add(
+                            egui::DragValue::new(&mut font_size)
+                                .range(8..=64)
+                                .speed(1.0),
+                        )
+                        .changed()
+                    {
+                        appearance.font_size_px = font_size;
+                        appearance_changed = true;
+                    }
+                });
+            });
+
+        egui::CollapsingHeader::new("Layout")
+            .default_open(false)
+            .show(ui, |ui| {
+                let mut menu_width_percent = appearance.menu_width_percent;
+                ui.horizontal(|ui| {
+                    ui.label("Menu Width %");
+                    if ui
+                        .add(
+                            egui::DragValue::new(&mut menu_width_percent)
+                                .range(20..=100)
+                                .speed(1.0),
+                        )
+                        .changed()
+                    {
+                        appearance.menu_width_percent = menu_width_percent;
+                        appearance_changed = true;
+                    }
+                });
+
+                let mut menu_height_percent = appearance.menu_height_percent;
+                ui.horizontal(|ui| {
+                    ui.label("Menu Height %");
+                    if ui
+                        .add(
+                            egui::DragValue::new(&mut menu_height_percent)
+                                .range(20..=100)
+                                .speed(1.0),
+                        )
+                        .changed()
+                    {
+                        appearance.menu_height_percent = menu_height_percent;
+                        appearance_changed = true;
+                    }
+                });
+
+                let mut title_spacing = appearance.title_spacing_px;
+                ui.horizontal(|ui| {
+                    ui.label("Title Spacing");
+                    if ui
+                        .add(
+                            egui::DragValue::new(&mut title_spacing)
+                                .range(0..=64)
+                                .speed(1.0),
+                        )
+                        .changed()
+                    {
+                        appearance.title_spacing_px = title_spacing;
+                        appearance_changed = true;
+                    }
+                });
+
+                let mut button_spacing = appearance.button_spacing_px;
+                ui.horizontal(|ui| {
+                    ui.label("Button Spacing");
+                    if ui
+                        .add(
+                            egui::DragValue::new(&mut button_spacing)
+                                .range(0..=64)
+                                .speed(1.0),
+                        )
+                        .changed()
+                    {
+                        appearance.button_spacing_px = button_spacing;
+                        appearance_changed = true;
+                    }
+                });
+
+                let mut footer_spacing = appearance.footer_spacing_px;
+                ui.horizontal(|ui| {
+                    ui.label("Footer Spacing");
+                    if ui
+                        .add(
+                            egui::DragValue::new(&mut footer_spacing)
+                                .range(0..=128)
+                                .speed(1.0),
+                        )
+                        .changed()
+                    {
+                        appearance.footer_spacing_px = footer_spacing;
+                        appearance_changed = true;
+                    }
+                });
+            });
+
+        egui::CollapsingHeader::new("Style")
+            .default_open(false)
+            .show(ui, |ui| {
+                let mut opacity_percent = appearance.opacity_percent;
+                ui.horizontal(|ui| {
+                    ui.label("Menu Opacity %");
+                    if ui
+                        .add(
+                            egui::Slider::new(&mut opacity_percent, 0..=100)
+                                .clamping(egui::SliderClamping::Always),
+                        )
+                        .changed()
+                    {
+                        appearance.opacity_percent = opacity_percent;
+                        appearance_changed = true;
+                    }
+                });
+
+                let mut border_style = appearance.border_style;
+                egui::ComboBox::from_label("Border Style")
+                    .selected_text(match border_style {
+                        MenuBorderStyle::None => "None",
+                        MenuBorderStyle::Square => "Square",
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut border_style, MenuBorderStyle::None, "None");
+                        ui.selectable_value(&mut border_style, MenuBorderStyle::Square, "Square");
+                    });
+                if border_style != appearance.border_style {
+                    appearance.border_style = border_style;
+                    appearance_changed = true;
+                }
+
+                ui.label("Border Color Hex");
+                if ui
+                    .text_edit_singleline(&mut appearance.border_color_hex)
+                    .changed()
+                {
+                    appearance_changed = true;
+                }
+                if !Self::is_valid_menu_hex_color(&appearance.border_color_hex) {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(215, 120, 120),
+                        "Use a 6-digit hex color like #7CFF7C",
+                    );
+                }
+
+                ui.label("Text Color Hex");
+                if ui
+                    .text_edit_singleline(&mut appearance.text_color_hex)
+                    .changed()
+                {
+                    appearance_changed = true;
+                }
+                if !Self::is_valid_menu_hex_color(&appearance.text_color_hex) {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(215, 120, 120),
+                        "Use a 6-digit hex color like #FFFFFF",
+                    );
+                }
+            });
+
+        egui::CollapsingHeader::new("Backgrounds")
+            .default_open(false)
+            .show(ui, |ui| {
+                ui.label("Menu Background");
+                if ui
+                    .checkbox(
+                        &mut appearance.menu_background_transparent,
+                        "Transparent Menu Background",
+                    )
+                    .changed()
+                {
+                    appearance_changed = true;
+                }
+                if ui
+                    .text_edit_singleline(&mut appearance.menu_background_color_hex)
+                    .changed()
+                {
+                    appearance_changed = true;
+                }
+                if !Self::is_valid_menu_hex_color(&appearance.menu_background_color_hex) {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(215, 120, 120),
+                        "Use a 6-digit hex color like #142914",
+                    );
+                }
+
+                ui.label("Title Background");
+                if ui
+                    .checkbox(
+                        &mut appearance.title_background_transparent,
+                        "Transparent Title Background",
+                    )
+                    .changed()
+                {
+                    appearance_changed = true;
+                }
+                if ui
+                    .text_edit_singleline(&mut appearance.title_background_color_hex)
+                    .changed()
+                {
+                    appearance_changed = true;
+                }
+                if !Self::is_valid_menu_hex_color(&appearance.title_background_color_hex) {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(215, 120, 120),
+                        "Use a 6-digit hex color like #143614",
+                    );
+                }
+
+                ui.label("Entry Background");
+                if ui
+                    .checkbox(
+                        &mut appearance.entry_background_transparent,
+                        "Transparent Entry Background",
+                    )
+                    .changed()
+                {
+                    appearance_changed = true;
+                }
+                if ui
+                    .text_edit_singleline(&mut appearance.entry_background_color_hex)
+                    .changed()
+                {
+                    appearance_changed = true;
+                }
+                if !Self::is_valid_menu_hex_color(&appearance.entry_background_color_hex) {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(215, 120, 120),
+                        "Use a 6-digit hex color like #0F1F0F",
+                    );
+                }
+            });
+
+        egui::CollapsingHeader::new("Footer")
+            .default_open(false)
+            .show(ui, |ui| {
+                ui.label("Footer Text");
+                if ui
+                    .add(
+                        egui::TextEdit::multiline(&mut appearance.footer_text)
+                            .desired_rows(3)
+                            .lock_focus(true),
+                    )
+                    .changed()
+                {
+                    appearance_changed = true;
+                }
+            });
+
         if appearance_changed {
             project.metadata.runtime.menu.appearance = appearance;
             Self::mark_menu_settings_changed(project);
         }
 
-        if ui.button("+ Add Screen").clicked() {
-            Self::add_menu_screen(ui_state, project);
-        }
+        egui::CollapsingHeader::new("Screens")
+            .default_open(false)
+            .show(ui, |ui| {
+                if ui.button("+ Add Screen").clicked() {
+                    Self::add_menu_screen(ui_state, project);
+                }
+            });
     }
 
     fn render_menu_screen_editor(
@@ -362,9 +392,6 @@ impl InspectorSystem {
         project: &mut Project,
         screen_id: &str,
     ) {
-        ui.label("Screen");
-        ui.separator();
-
         let Some(screen_index) = Self::selected_menu_screen_index(project, screen_id) else {
             ui.label("Selected screen no longer exists.");
             return;
@@ -373,32 +400,34 @@ impl InspectorSystem {
         let mut screen_deleted = false;
         let mut changed = false;
         let mut renamed_to = None;
-        {
-            let screen = &mut project.metadata.runtime.menu.screens[screen_index];
-            let mut title = screen.title.clone();
-            ui.label("Title");
-            if ui.text_edit_singleline(&mut title).changed() && title != screen.title {
-                screen.title = title;
-                changed = true;
-            }
-
-            changed |= Self::render_menu_border_override_editor(
-                ui,
-                "Title Border Style",
-                &mut screen.title_border_style_override,
-            );
-
-            let mut id = screen.id.clone();
-            ui.label("Screen ID");
-            if ui.text_edit_singleline(&mut id).changed() {
-                let normalized = Self::normalize_menu_screen_id(&id);
-                if !normalized.is_empty() && normalized != screen.id {
-                    screen.id = normalized.clone();
-                    renamed_to = Some(normalized);
+        egui::CollapsingHeader::new("Screen Settings")
+            .default_open(false)
+            .show(ui, |ui| {
+                let screen = &mut project.metadata.runtime.menu.screens[screen_index];
+                let mut title = screen.title.clone();
+                ui.label("Title");
+                if ui.text_edit_singleline(&mut title).changed() && title != screen.title {
+                    screen.title = title;
                     changed = true;
                 }
-            }
-        }
+
+                changed |= Self::render_menu_border_override_editor(
+                    ui,
+                    "Title Border Style",
+                    &mut screen.title_border_style_override,
+                );
+
+                let mut id = screen.id.clone();
+                ui.label("Screen ID");
+                if ui.text_edit_singleline(&mut id).changed() {
+                    let normalized = Self::normalize_menu_screen_id(&id);
+                    if !normalized.is_empty() && normalized != screen.id {
+                        screen.id = normalized.clone();
+                        renamed_to = Some(normalized);
+                        changed = true;
+                    }
+                }
+            });
         if let Some(normalized) = renamed_to {
             if project.metadata.runtime.menu.pause_root_screen_id == *screen_id {
                 project.metadata.runtime.menu.pause_root_screen_id = normalized.clone();
@@ -414,61 +443,67 @@ impl InspectorSystem {
             Self::mark_menu_settings_changed(project);
         }
 
-        ui.horizontal(|ui| {
-            if ui.button("Duplicate Screen").clicked() {
-                Self::duplicate_menu_screen(ui_state, project, screen_index);
-            }
-            if ui.button("Delete Screen").clicked() {
-                screen_deleted = Self::delete_menu_screen(ui_state, project, screen_index);
-            }
-        });
+        egui::CollapsingHeader::new("Screen Actions")
+            .default_open(false)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    if ui.button("Duplicate Screen").clicked() {
+                        Self::duplicate_menu_screen(ui_state, project, screen_index);
+                    }
+                    if ui.button("Delete Screen").clicked() {
+                        screen_deleted = Self::delete_menu_screen(ui_state, project, screen_index);
+                    }
+                });
+            });
 
         if screen_deleted {
             return;
         }
 
-        ui.separator();
-        ui.label("Entries");
-        ui.horizontal(|ui| {
-            if ui.button("+ Text").clicked() {
-                Self::add_menu_item_to_selected_screen(
-                    ui_state,
-                    project,
-                    MenuItemDefinition::Label {
-                        text: "New Text".to_string(),
-                        border_style_override: None,
-                    },
-                );
-            }
-            if ui.button("+ Button").clicked() {
-                Self::add_menu_item_to_selected_screen(
-                    ui_state,
-                    project,
-                    MenuItemDefinition::Button {
-                        text: "New Button".to_string(),
-                        border_style_override: None,
-                        action: MenuAction::CloseMenu,
-                    },
-                );
-            }
-            if ui.button("+ Inventory List").clicked() {
-                Self::add_menu_item_to_selected_screen(
-                    ui_state,
-                    project,
-                    MenuItemDefinition::DynamicList {
-                        heading: Some("Inventory".to_string()),
-                        source: MenuListSource::PlayerInventory,
-                        empty_text: "Inventory is empty".to_string(),
-                        border_style_override: None,
-                    },
-                );
-            }
-        });
+        egui::CollapsingHeader::new("Entries")
+            .default_open(false)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    if ui.button("+ Text").clicked() {
+                        Self::add_menu_item_to_selected_screen(
+                            ui_state,
+                            project,
+                            MenuItemDefinition::Label {
+                                text: "New Text".to_string(),
+                                border_style_override: None,
+                            },
+                        );
+                    }
+                    if ui.button("+ Button").clicked() {
+                        Self::add_menu_item_to_selected_screen(
+                            ui_state,
+                            project,
+                            MenuItemDefinition::Button {
+                                text: "New Button".to_string(),
+                                border_style_override: None,
+                                action: MenuAction::CloseMenu,
+                            },
+                        );
+                    }
+                    if ui.button("+ Inventory List").clicked() {
+                        Self::add_menu_item_to_selected_screen(
+                            ui_state,
+                            project,
+                            MenuItemDefinition::DynamicList {
+                                heading: Some("Inventory".to_string()),
+                                source: MenuListSource::PlayerInventory,
+                                empty_text: "Inventory is empty".to_string(),
+                                border_style_override: None,
+                            },
+                        );
+                    }
+                });
 
-        let item_count = project.metadata.runtime.menu.screens[screen_index]
-            .items
-            .len();
-        ui.label(format!("{item_count} item(s) on this screen"));
+                let item_count = project.metadata.runtime.menu.screens[screen_index]
+                    .items
+                    .len();
+                ui.label(format!("{item_count} item(s) on this screen"));
+            });
     }
 
     fn render_menu_entry_editor(
@@ -478,11 +513,6 @@ impl InspectorSystem {
         screen_id: &str,
         item_index: usize,
     ) {
-        ui.label("Entry");
-        ui.separator();
-        ui.label(format!("Screen: {screen_id}"));
-        ui.label(format!("Position: {}", item_index + 1));
-
         let Some(screen_index) = Self::selected_menu_screen_index(project, screen_id) else {
             ui.label("Selected screen no longer exists.");
             return;
@@ -496,38 +526,52 @@ impl InspectorSystem {
             return;
         }
 
-        ui.horizontal(|ui| {
-            if ui.button("Move Up").clicked() {
-                Self::move_menu_item(ui_state, project, screen_index, item_index, -1);
-            }
-            if ui.button("Move Down").clicked() {
-                Self::move_menu_item(ui_state, project, screen_index, item_index, 1);
-            }
-        });
-        ui.horizontal(|ui| {
-            if ui.button("Duplicate Entry").clicked() {
-                Self::duplicate_menu_item(ui_state, project, screen_index, item_index);
-            }
-            if ui.button("Delete Entry").clicked() {
-                Self::delete_menu_item(ui_state, project, screen_index, item_index);
-            }
-        });
-        ui.separator();
+        egui::CollapsingHeader::new("Entry Summary")
+            .default_open(false)
+            .show(ui, |ui| {
+                ui.label(format!("Screen: {screen_id}"));
+                ui.label(format!("Position: {}", item_index + 1));
+            });
+
+        egui::CollapsingHeader::new("Entry Actions")
+            .default_open(false)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    if ui.button("Move Up").clicked() {
+                        Self::move_menu_item(ui_state, project, screen_index, item_index, -1);
+                    }
+                    if ui.button("Move Down").clicked() {
+                        Self::move_menu_item(ui_state, project, screen_index, item_index, 1);
+                    }
+                });
+                ui.horizontal(|ui| {
+                    if ui.button("Duplicate Entry").clicked() {
+                        Self::duplicate_menu_item(ui_state, project, screen_index, item_index);
+                    }
+                    if ui.button("Delete Entry").clicked() {
+                        Self::delete_menu_item(ui_state, project, screen_index, item_index);
+                    }
+                });
+            });
 
         let mut item_kind = {
             let item = &project.metadata.runtime.menu.screens[screen_index].items[item_index];
             MenuEditorItemKind::from_item(item)
         };
-        egui::ComboBox::from_label("Type")
-            .selected_text(item_kind.label())
-            .show_ui(ui, |ui| {
-                ui.selectable_value(&mut item_kind, MenuEditorItemKind::Label, "Text");
-                ui.selectable_value(&mut item_kind, MenuEditorItemKind::Button, "Button");
-                ui.selectable_value(
-                    &mut item_kind,
-                    MenuEditorItemKind::InventoryList,
-                    "Inventory List",
-                );
+        egui::CollapsingHeader::new("Entry Content")
+            .default_open(false)
+            .show(ui, |ui| {
+                egui::ComboBox::from_label("Type")
+                    .selected_text(item_kind.label())
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut item_kind, MenuEditorItemKind::Label, "Text");
+                        ui.selectable_value(&mut item_kind, MenuEditorItemKind::Button, "Button");
+                        ui.selectable_value(
+                            &mut item_kind,
+                            MenuEditorItemKind::InventoryList,
+                            "Inventory List",
+                        );
+                    });
             });
         Self::coerce_menu_item_kind(project, screen_index, item_index, item_kind);
 
@@ -540,85 +584,90 @@ impl InspectorSystem {
             .map(|screen| screen.id.clone())
             .collect::<Vec<_>>();
         let mut changed = false;
-        match &mut project.metadata.runtime.menu.screens[screen_index].items[item_index] {
-            MenuItemDefinition::Label {
-                text,
-                border_style_override,
-            } => {
-                ui.label("Text");
-                if ui.text_edit_singleline(text).changed() {
-                    changed = true;
-                }
-                changed |= Self::render_menu_border_override_editor(
-                    ui,
-                    "Entry Border Style",
-                    border_style_override,
-                );
-            }
-            MenuItemDefinition::Button {
-                text,
-                border_style_override,
-                action,
-            } => {
-                ui.label("Label");
-                if ui.text_edit_singleline(text).changed() {
-                    changed = true;
-                }
-                changed |= Self::render_menu_border_override_editor(
-                    ui,
-                    "Entry Border Style",
-                    border_style_override,
-                );
-                changed |= Self::render_menu_action_editor(ui, &available_screen_ids, action);
-            }
-            MenuItemDefinition::DynamicList {
-                heading,
-                source,
-                empty_text,
-                border_style_override,
-            } => {
-                let mut show_heading = heading.is_some();
-                if ui.checkbox(&mut show_heading, "Show Heading").changed() {
-                    *heading = if show_heading {
-                        Some("Inventory".to_string())
-                    } else {
-                        None
-                    };
-                    changed = true;
-                }
-                if let Some(heading_text) = heading.as_mut() {
-                    ui.label("Heading");
-                    if ui.text_edit_singleline(heading_text).changed() {
-                        changed = true;
+        egui::CollapsingHeader::new("Entry Properties")
+            .default_open(false)
+            .show(ui, |ui| {
+                match &mut project.metadata.runtime.menu.screens[screen_index].items[item_index] {
+                    MenuItemDefinition::Label {
+                        text,
+                        border_style_override,
+                    } => {
+                        ui.label("Text");
+                        if ui.text_edit_singleline(text).changed() {
+                            changed = true;
+                        }
+                        changed |= Self::render_menu_border_override_editor(
+                            ui,
+                            "Entry Border Style",
+                            border_style_override,
+                        );
+                    }
+                    MenuItemDefinition::Button {
+                        text,
+                        border_style_override,
+                        action,
+                    } => {
+                        ui.label("Label");
+                        if ui.text_edit_singleline(text).changed() {
+                            changed = true;
+                        }
+                        changed |= Self::render_menu_border_override_editor(
+                            ui,
+                            "Entry Border Style",
+                            border_style_override,
+                        );
+                        changed |=
+                            Self::render_menu_action_editor(ui, &available_screen_ids, action);
+                    }
+                    MenuItemDefinition::DynamicList {
+                        heading,
+                        source,
+                        empty_text,
+                        border_style_override,
+                    } => {
+                        let mut show_heading = heading.is_some();
+                        if ui.checkbox(&mut show_heading, "Show Heading").changed() {
+                            *heading = if show_heading {
+                                Some("Inventory".to_string())
+                            } else {
+                                None
+                            };
+                            changed = true;
+                        }
+                        if let Some(heading_text) = heading.as_mut() {
+                            ui.label("Heading");
+                            if ui.text_edit_singleline(heading_text).changed() {
+                                changed = true;
+                            }
+                        }
+
+                        let mut selected_source = source.clone();
+                        egui::ComboBox::from_label("List Source")
+                            .selected_text("Player Inventory")
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut selected_source,
+                                    MenuListSource::PlayerInventory,
+                                    "Player Inventory",
+                                );
+                            });
+                        if *source != selected_source {
+                            *source = selected_source;
+                            changed = true;
+                        }
+
+                        ui.label("Empty Text");
+                        if ui.text_edit_singleline(empty_text).changed() {
+                            changed = true;
+                        }
+                        changed |= Self::render_menu_border_override_editor(
+                            ui,
+                            "Entry Border Style",
+                            border_style_override,
+                        );
                     }
                 }
-
-                let mut selected_source = source.clone();
-                egui::ComboBox::from_label("List Source")
-                    .selected_text("Player Inventory")
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(
-                            &mut selected_source,
-                            MenuListSource::PlayerInventory,
-                            "Player Inventory",
-                        );
-                    });
-                if *source != selected_source {
-                    *source = selected_source;
-                    changed = true;
-                }
-
-                ui.label("Empty Text");
-                if ui.text_edit_singleline(empty_text).changed() {
-                    changed = true;
-                }
-                changed |= Self::render_menu_border_override_editor(
-                    ui,
-                    "Entry Border Style",
-                    border_style_override,
-                );
-            }
-        }
+            });
         if changed {
             Self::mark_menu_settings_changed(project);
         }
@@ -629,11 +678,14 @@ impl InspectorSystem {
         } = &project.metadata.runtime.menu.screens[screen_index].items[item_index]
         {
             if !Self::menu_screen_exists(&project.metadata.runtime.menu, screen_id) {
-                ui.separator();
-                ui.colored_label(
-                    egui::Color32::from_rgb(215, 120, 120),
-                    format!("Target screen '{screen_id}' does not exist."),
-                );
+                egui::CollapsingHeader::new("Entry Validation")
+                    .default_open(false)
+                    .show(ui, |ui| {
+                        ui.colored_label(
+                            egui::Color32::from_rgb(215, 120, 120),
+                            format!("Target screen '{screen_id}' does not exist."),
+                        );
+                    });
             }
         }
     }

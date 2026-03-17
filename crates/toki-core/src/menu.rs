@@ -678,8 +678,7 @@ fn menu_panel_rect(view: &MenuView, appearance: &MenuAppearance, viewport: glam:
     };
     let hint_size_px = (font_size_px - 2.0).max(10.0);
     let hint_height = hint_size_px + metrics.hint_padding_px.y * 2.0;
-    let content_bottom =
-        last_entry_bottom + appearance.footer_spacing_px as f32 + hint_height;
+    let content_bottom = last_entry_bottom + appearance.footer_spacing_px as f32 + hint_height;
     let requested_panel_width =
         viewport.x * (appearance.menu_width_percent.clamp(20, 100) as f32 / 100.0);
     let requested_panel_height =

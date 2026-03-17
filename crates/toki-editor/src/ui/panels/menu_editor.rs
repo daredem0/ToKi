@@ -93,12 +93,20 @@ pub(super) fn render_menu_editor(
         border_color: menu_hex_color_rgba(
             &project.metadata.runtime.menu.appearance.border_color_hex,
         )
-        .map(|color| apply_menu_opacity(color, project.metadata.runtime.menu.appearance.opacity_percent))
+        .map(|color| {
+            apply_menu_opacity(
+                color,
+                project.metadata.runtime.menu.appearance.opacity_percent,
+            )
+        })
         .map(menu_preview_color32)
         .unwrap_or(egui::Color32::from_rgb(124, 255, 124)),
         text_color: menu_hex_color_rgba(&project.metadata.runtime.menu.appearance.text_color_hex)
             .map(|color| {
-                apply_menu_opacity(color, project.metadata.runtime.menu.appearance.opacity_percent)
+                apply_menu_opacity(
+                    color,
+                    project.metadata.runtime.menu.appearance.opacity_percent,
+                )
             })
             .map(menu_preview_color32)
             .unwrap_or(egui::Color32::WHITE),
