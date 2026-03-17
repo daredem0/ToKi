@@ -12,6 +12,7 @@ use toki_core::entity::{
     ControlRole, EntityAttributes, EntityKind, EntityManager, MovementSoundTrigger,
     ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
 };
+use toki_core::menu::{MenuAction, MenuItemDefinition, MenuScreenDefinition};
 use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
     RuleTarget, RuleTrigger,
@@ -203,6 +204,86 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
     assert_eq!(project.metadata.runtime.audio.collision_percent, 35);
     assert!(project.is_dirty);
     assert!(project.metadata.project.modified >= original_modified);
+}
+
+#[test]
+fn add_menu_screen_selects_new_screen_and_marks_project_dirty() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+    let mut project = Project::new("Demo".to_string(), temp_dir.path().join("Demo"));
+    let mut ui = EditorUI::new();
+
+    InspectorSystem::add_menu_screen(&mut ui, &mut project);
+
+    let selected_screen_id = match ui.selection.as_ref() {
+        Some(super::Selection::MenuScreen(screen_id)) => screen_id.as_str(),
+        other => panic!("expected selected menu screen, got {other:?}"),
+    };
+    assert_eq!(selected_screen_id, "new_menu");
+    assert!(project
+        .metadata
+        .runtime
+        .menu
+        .screens
+        .iter()
+        .any(|screen| screen.id == "new_menu"));
+    assert!(project.is_dirty);
+}
+
+#[test]
+fn delete_menu_item_falls_back_to_screen_selection_when_last_item_removed() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+    let mut project = Project::new("Demo".to_string(), temp_dir.path().join("Demo"));
+    project.metadata.runtime.menu.screens = vec![MenuScreenDefinition {
+        id: "pause_menu".to_string(),
+        title: "Paused".to_string(),
+        items: vec![MenuItemDefinition::Label {
+            text: "Only item".to_string(),
+        }],
+    }];
+    let mut ui = EditorUI::new();
+    ui.select_menu_entry("pause_menu", 0);
+
+    InspectorSystem::delete_menu_item(&mut ui, &mut project, 0, 0);
+
+    assert_eq!(project.metadata.runtime.menu.screens[0].items.len(), 0);
+    assert_eq!(
+        ui.selection,
+        Some(super::Selection::MenuScreen("pause_menu".to_string()))
+    );
+}
+
+#[test]
+fn rewrite_menu_action_screen_targets_updates_open_screen_actions() {
+    let mut settings = toki_core::menu::MenuSettings {
+        pause_root_screen_id: "pause_menu".to_string(),
+        gate_gameplay_when_open: true,
+        screens: vec![MenuScreenDefinition {
+            id: "pause_menu".to_string(),
+            title: "Paused".to_string(),
+            items: vec![MenuItemDefinition::Button {
+                text: "Inventory".to_string(),
+                action: MenuAction::OpenScreen {
+                    screen_id: "inventory_menu".to_string(),
+                },
+            }],
+        }],
+    };
+
+    InspectorSystem::rewrite_menu_action_screen_targets(
+        &mut settings,
+        "inventory_menu",
+        "items_menu",
+    );
+
+    assert_eq!(
+        settings.screens[0].items[0],
+        MenuItemDefinition::Button {
+            text: "Inventory".to_string(),
+            action: MenuAction::OpenScreen {
+                screen_id: "items_menu".to_string(),
+            },
+        }
+    );
 }
 
 #[test]

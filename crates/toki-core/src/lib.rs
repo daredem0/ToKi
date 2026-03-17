@@ -14,9 +14,9 @@ pub mod errors;
 pub use errors::CoreError;
 pub mod pack;
 
+pub mod menu;
 pub mod sprite;
 pub mod text;
-pub mod menu;
 
 pub mod animation;
 pub mod assets {

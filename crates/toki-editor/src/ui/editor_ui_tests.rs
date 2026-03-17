@@ -1,8 +1,11 @@
 use glam::{IVec2, UVec2};
+use tempfile::tempdir;
 use toki_core::entity::{EntityAttributes, EntityKind};
+use toki_core::menu::{MenuAction, MenuItemDefinition, MenuScreenDefinition};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 
-use super::{EditorUI, MapEditorDraft};
+use super::{EditorUI, MapEditorDraft, Selection};
+use crate::project::Project;
 use crate::ui::rule_graph::RuleGraph;
 use crate::ui::undo_redo::EditorCommand;
 
@@ -247,6 +250,81 @@ fn sync_map_editor_selection_preserves_dirty_loaded_map() {
 
     assert_eq!(ui.map_editor_active_map.as_deref(), Some("middle"));
     assert!(ui.map_editor_map_load_requested.is_none());
+}
+
+fn sample_project_with_menu_screens(screen_ids: &[&str]) -> Project {
+    let temp_dir = tempdir().expect("temp dir should exist");
+    let mut project = Project::new("Menu Demo".to_string(), temp_dir.path().join("MenuDemo"));
+    project.metadata.runtime.menu.screens = screen_ids
+        .iter()
+        .map(|screen_id| MenuScreenDefinition {
+            id: (*screen_id).to_string(),
+            title: format!("{screen_id} title"),
+            items: vec![MenuItemDefinition::Button {
+                text: "Resume".to_string(),
+                action: MenuAction::CloseMenu,
+            }],
+        })
+        .collect();
+    project
+}
+
+#[test]
+fn sync_menu_editor_selection_picks_first_screen_when_none_selected() {
+    let mut ui = EditorUI::new();
+    let project = sample_project_with_menu_screens(&["pause_menu", "inventory_menu"]);
+
+    ui.sync_menu_editor_selection(Some(&project));
+
+    assert_eq!(
+        ui.selection,
+        Some(Selection::MenuScreen("pause_menu".to_string()))
+    );
+}
+
+#[test]
+fn sync_menu_editor_selection_preserves_valid_entry_selection() {
+    let mut ui = EditorUI::new();
+    let project = sample_project_with_menu_screens(&["pause_menu"]);
+    ui.select_menu_entry("pause_menu", 0);
+
+    ui.sync_menu_editor_selection(Some(&project));
+
+    assert_eq!(
+        ui.selection,
+        Some(Selection::MenuEntry {
+            screen_id: "pause_menu".to_string(),
+            item_index: 0,
+        })
+    );
+}
+
+#[test]
+fn sync_menu_editor_selection_downgrades_missing_entry_to_screen_selection() {
+    let mut ui = EditorUI::new();
+    let project = sample_project_with_menu_screens(&["pause_menu"]);
+    ui.select_menu_entry("pause_menu", 3);
+
+    ui.sync_menu_editor_selection(Some(&project));
+
+    assert_eq!(
+        ui.selection,
+        Some(Selection::MenuScreen("pause_menu".to_string()))
+    );
+}
+
+#[test]
+fn sync_menu_editor_selection_replaces_missing_screen_selection() {
+    let mut ui = EditorUI::new();
+    let project = sample_project_with_menu_screens(&["pause_menu", "inventory_menu"]);
+    ui.select_menu_screen("missing_menu");
+
+    ui.sync_menu_editor_selection(Some(&project));
+
+    assert_eq!(
+        ui.selection,
+        Some(Selection::MenuScreen("pause_menu".to_string()))
+    );
 }
 
 #[test]

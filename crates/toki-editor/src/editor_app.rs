@@ -499,7 +499,9 @@ impl ApplicationHandler for EditorApp {
                     let active_viewport = match self.ui.center_panel_tab {
                         CenterPanelTab::SceneViewport => self.scene_viewport.as_mut(),
                         CenterPanelTab::MapEditor => self.map_editor_viewport.as_mut(),
-                        CenterPanelTab::SceneGraph | CenterPanelTab::SceneRules => None,
+                        CenterPanelTab::SceneGraph
+                        | CenterPanelTab::SceneRules
+                        | CenterPanelTab::MenuEditor => None,
                     };
                     if let Some(viewport) = active_viewport {
                         tracing::debug!("Passing logical key {:?} to viewport", event.logical_key);
@@ -722,7 +724,9 @@ impl EditorApp {
                             }
                         }
                     }
-                    CenterPanelTab::SceneGraph | CenterPanelTab::SceneRules => {}
+                    CenterPanelTab::SceneGraph
+                    | CenterPanelTab::SceneRules
+                    | CenterPanelTab::MenuEditor => {}
                 }
             } else if self.project_manager.current_project.is_some() {
                 tracing::warn!(

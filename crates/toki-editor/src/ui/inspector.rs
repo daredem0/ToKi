@@ -19,6 +19,7 @@ use toki_core::rules::{
 mod assets;
 mod entities;
 mod map_editor;
+mod menu_editor;
 mod project;
 mod rules;
 
@@ -363,7 +364,7 @@ impl InspectorSystem {
                     .show(ui, |ui| match ui_state.right_panel_tab {
                         super::editor_ui::RightPanelTab::Inspector => {
                             Self::render_selection_inspector_contents(
-                                ui_state, ui, ctx, game_state, config,
+                                ui_state, ui, ctx, game_state, project, config,
                             );
                         }
                         super::editor_ui::RightPanelTab::Project => {
@@ -378,10 +379,16 @@ impl InspectorSystem {
         ui: &mut egui::Ui,
         ctx: &egui::Context,
         game_state: Option<&toki_core::GameState>,
+        project: Option<&mut Project>,
         config: Option<&EditorConfig>,
     ) {
         if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::MapEditor {
             Self::render_map_editor_command_palette(ui_state, ui, ctx, config);
+            return;
+        }
+
+        if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::MenuEditor {
+            Self::render_menu_editor_inspector(ui_state, ui, project);
             return;
         }
 
@@ -527,6 +534,9 @@ impl InspectorSystem {
                 ui.separator();
 
                 Self::render_entity_definition_details(ui, entity_name, config);
+            }
+            Some(Selection::MenuScreen(_)) | Some(Selection::MenuEntry { .. }) => {
+                ui.label("Menu selection available only in Menu Editor.");
             }
             None => {
                 ui.label("No selection");

@@ -8,7 +8,9 @@ fn menu_controller_opens_pause_root_and_renders_default_selection() {
     let mut controller = MenuController::new(MenuSettings::default());
     controller.open_pause_root();
 
-    let view = controller.current_view(&[]).expect("pause menu should open");
+    let view = controller
+        .current_view(&[])
+        .expect("pause menu should open");
     assert_eq!(view.screen_id, "pause_menu");
     assert_eq!(view.title, "Paused");
     assert_eq!(view.entries[0].text, "Resume");
@@ -22,7 +24,9 @@ fn menu_controller_wraps_selection_across_selectable_entries() {
     controller.open_pause_root();
     controller.handle_input(MenuInput::Up);
 
-    let view = controller.current_view(&[]).expect("pause menu should remain open");
+    let view = controller
+        .current_view(&[])
+        .expect("pause menu should remain open");
     assert_eq!(view.entries[1].text, "Inventory");
     assert!(view.entries[1].selected);
 }

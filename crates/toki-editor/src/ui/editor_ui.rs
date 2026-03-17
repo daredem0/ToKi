@@ -14,6 +14,8 @@ mod editor_ui_graph;
 mod editor_ui_hierarchy_panel;
 #[path = "editor_ui_map_editor.rs"]
 mod editor_ui_map_editor;
+#[path = "editor_ui_menu_editor.rs"]
+mod editor_ui_menu_editor;
 #[path = "editor_ui_scene_tree.rs"]
 mod editor_ui_scene_tree;
 
@@ -30,13 +32,18 @@ use toki_core::{
     Scene,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Selection {
     Scene(String),
     Map(String, String), // (scene_name, map_name)
     Entity(EntityId),
     StandaloneMap(String), // Map selected from Maps panel (not in scene context)
     EntityDefinition(String), // Entity definition from palette
+    MenuScreen(String),
+    MenuEntry {
+        screen_id: String,
+        item_index: usize,
+    },
     RuleGraphNode {
         scene_name: String,
         node_key: String,
@@ -50,6 +57,7 @@ pub(crate) enum CenterPanelTab {
     SceneGraph,
     SceneRules,
     MapEditor,
+    MenuEditor,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -416,7 +424,7 @@ impl EditorUI {
         ctx: &egui::Context,
         scene_viewport: Option<&mut SceneViewport>,
         map_editor_viewport: Option<&mut SceneViewport>,
-        project: Option<&mut crate::project::Project>,
+        mut project: Option<&mut crate::project::Project>,
         available_map_names: Option<Vec<String>>,
         config: Option<&mut crate::config::EditorConfig>,
         log_capture: Option<&crate::logging::LogCapture>,
@@ -445,9 +453,13 @@ impl EditorUI {
                 self,
                 ctx,
                 game_state,
-                project,
+                project.as_deref_mut(),
                 config_readonly,
             );
+        }
+
+        if self.center_panel_tab == CenterPanelTab::MenuEditor {
+            self.sync_menu_editor_selection(project.as_deref());
         }
 
         // Render viewport last (mutable access)
@@ -456,6 +468,7 @@ impl EditorUI {
             ctx,
             scene_viewport,
             map_editor_viewport,
+            project,
             available_map_names,
             config,
             renderer,

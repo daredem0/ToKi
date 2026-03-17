@@ -6,9 +6,7 @@ use super::{
     RuntimeConfigStartup,
 };
 use std::path::PathBuf;
-use toki_core::menu::{
-    MenuAction, MenuItemDefinition, MenuScreenDefinition, MenuSettings,
-};
+use toki_core::menu::{MenuAction, MenuItemDefinition, MenuScreenDefinition, MenuSettings};
 use toki_runtime::{RuntimeAudioMixOptions, RuntimeDisplayOptions, RuntimeLaunchOptions};
 
 #[test]

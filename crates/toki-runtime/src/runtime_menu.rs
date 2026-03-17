@@ -82,10 +82,14 @@ impl App {
         };
 
         self.rendering.add_text_item(
-            TextItem::new_screen(view.title, glam::Vec2::new(center_x, MENU_TITLE_Y), title_style)
-                .with_anchor(TextAnchor::TopCenter)
-                .with_layer(10)
-                .with_box_style(title_box),
+            TextItem::new_screen(
+                view.title,
+                glam::Vec2::new(center_x, MENU_TITLE_Y),
+                title_style,
+            )
+            .with_anchor(TextAnchor::TopCenter)
+            .with_layer(10)
+            .with_box_style(title_box),
         );
 
         for (index, entry) in view.entries.iter().enumerate() {
@@ -111,7 +115,10 @@ impl App {
             self.rendering.add_text_item(
                 TextItem::new_screen(
                     format!("{prefix}{}", entry.text),
-                    glam::Vec2::new(center_x, MENU_ENTRIES_START_Y + index as f32 * MENU_ENTRY_SPACING_Y),
+                    glam::Vec2::new(
+                        center_x,
+                        MENU_ENTRIES_START_Y + index as f32 * MENU_ENTRY_SPACING_Y,
+                    ),
                     style,
                 )
                 .with_anchor(TextAnchor::TopCenter)

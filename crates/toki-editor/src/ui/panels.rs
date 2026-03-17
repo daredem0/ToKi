@@ -17,6 +17,7 @@ use toki_core::rules::{
 mod map_editor;
 mod map_editor_interactions;
 mod map_editor_preview;
+mod menu_editor;
 mod scene_graph;
 mod scene_graph_canvas;
 mod scene_graph_editors;
@@ -143,11 +144,13 @@ enum GraphCommand {
 
 impl PanelSystem {
     /// Renders the main scene viewport panel in the center of the screen
+    #[allow(clippy::too_many_arguments)]
     pub fn render_viewport(
         ui_state: &mut super::EditorUI,
         ctx: &egui::Context,
         scene_viewport: Option<&mut SceneViewport>,
         map_editor_viewport: Option<&mut SceneViewport>,
+        project: Option<&mut crate::project::Project>,
         available_map_names: Option<Vec<String>>,
         config: Option<&mut EditorConfig>,
         renderer: Option<&mut egui_wgpu::Renderer>,
@@ -174,6 +177,11 @@ impl PanelSystem {
                     CenterPanelTab::MapEditor,
                     "Map Editor",
                 );
+                ui.selectable_value(
+                    &mut ui_state.center_panel_tab,
+                    CenterPanelTab::MenuEditor,
+                    "Menu Editor",
+                );
             });
             ui.separator();
 
@@ -196,6 +204,11 @@ impl PanelSystem {
                     config,
                     renderer,
                 );
+                return;
+            }
+
+            if ui_state.center_panel_tab == CenterPanelTab::MenuEditor {
+                menu_editor::render_menu_editor(ui, ui_state, project);
                 return;
             }
 

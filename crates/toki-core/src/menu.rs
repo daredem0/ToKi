@@ -130,9 +130,13 @@ impl MenuController {
 
     pub fn open_pause_root(&mut self) {
         let root = self.settings.pause_root_screen_id.clone();
-        if self.screen_map.contains_key(&root) {
+        self.open_screen(&root);
+    }
+
+    pub fn open_screen(&mut self, screen_id: &str) {
+        if self.screen_map.contains_key(screen_id) {
             self.stack.clear();
-            self.stack.push(root);
+            self.stack.push(screen_id.to_string());
         }
     }
 
@@ -270,8 +274,8 @@ impl MenuController {
             .iter()
             .position(|&index| index == current_index)
             .unwrap_or(0);
-        let next_pos = ((current_pos as isize + direction).rem_euclid(selectable_indices.len() as isize))
-            as usize;
+        let next_pos = ((current_pos as isize + direction)
+            .rem_euclid(selectable_indices.len() as isize)) as usize;
         self.selected_index_by_screen
             .insert(screen_id.to_string(), selectable_indices[next_pos]);
     }
