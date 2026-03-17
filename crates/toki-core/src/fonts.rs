@@ -41,9 +41,7 @@ impl ProjectFontRegistry {
 
 pub fn builtin_font_family(name: &str) -> Option<BuiltinFontFamily> {
     match name.trim().to_ascii_lowercase().as_str() {
-        "sans" | "sans-serif" | "sansserif" | "proportional" => {
-            Some(BuiltinFontFamily::Sans)
-        }
+        "sans" | "sans-serif" | "sansserif" | "proportional" => Some(BuiltinFontFamily::Sans),
         "serif" => Some(BuiltinFontFamily::Serif),
         "mono" | "monospace" | "monospaced" => Some(BuiltinFontFamily::Mono),
         _ => None,
@@ -64,7 +62,9 @@ pub fn find_font_files(dir: &Path) -> Vec<PathBuf> {
         .filter(|path| {
             path.extension()
                 .and_then(|ext| ext.to_str())
-                .is_some_and(|ext| matches!(ext.to_ascii_lowercase().as_str(), "ttf" | "otf" | "ttc"))
+                .is_some_and(|ext| {
+                    matches!(ext.to_ascii_lowercase().as_str(), "ttf" | "otf" | "ttc")
+                })
         })
         .collect();
     fonts.sort();

@@ -478,8 +478,9 @@ pub fn build_menu_layout(
     let panel = menu_panel_rect(view, appearance.font_size_px as f32, viewport);
     let content_x = panel.x + metrics.panel_inner_margin_px;
     let content_width = (panel.width - metrics.panel_inner_margin_px * 2.0).max(1.0);
-    let title_height =
-        appearance.font_size_px as f32 + metrics.title_size_delta_px + metrics.title_padding_px.y * 2.0;
+    let title_height = appearance.font_size_px as f32
+        + metrics.title_size_delta_px
+        + metrics.title_padding_px.y * 2.0;
     let title_rect = MenuRect {
         x: content_x,
         y: metrics.title_top_y_px,
@@ -534,11 +535,13 @@ fn menu_panel_rect(view: &MenuView, font_size_px: f32, viewport: glam::Vec2) -> 
         metrics.entries_start_y_px + (view.entries.len() - 1) as f32 * metrics.entry_spacing_y_px
     };
     let hint_size_px = (font_size_px - 2.0).max(10.0);
-    let bottom = (last_entry_y
-        + font_size_px
-        + metrics.entry_padding_px.y * 2.0
-        + 12.0)
-        .max(viewport.y - metrics.hint_bottom_padding_px - hint_size_px - metrics.hint_padding_px.y * 2.0 - 8.0);
+    let bottom = (last_entry_y + font_size_px + metrics.entry_padding_px.y * 2.0 + 12.0).max(
+        viewport.y
+            - metrics.hint_bottom_padding_px
+            - hint_size_px
+            - metrics.hint_padding_px.y * 2.0
+            - 8.0,
+    );
     let x = (viewport.x - metrics.panel_width_px) * 0.5;
     let y = (metrics.title_top_y_px - metrics.panel_inner_margin_px).max(8.0);
     MenuRect {

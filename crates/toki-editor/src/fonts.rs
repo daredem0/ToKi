@@ -56,11 +56,7 @@ pub fn load_project_fonts_into_egui(
 }
 
 pub fn menu_font_family_choices(registry: &ProjectFontRegistry) -> Vec<String> {
-    let mut families = vec![
-        "Sans".to_string(),
-        "Serif".to_string(),
-        "Mono".to_string(),
-    ];
+    let mut families = vec!["Sans".to_string(), "Serif".to_string(), "Mono".to_string()];
     for family in registry.family_names() {
         if !families.iter().any(|existing| existing == &family) {
             families.push(family);
@@ -76,7 +72,10 @@ pub fn resolve_preview_font_family(
     match builtin_font_family(requested_family) {
         Some(BuiltinFontFamily::Sans | BuiltinFontFamily::Serif) => egui::FontFamily::Proportional,
         Some(BuiltinFontFamily::Mono) => egui::FontFamily::Monospace,
-        None if available_families.iter().any(|family| family == requested_family) => {
+        None if available_families
+            .iter()
+            .any(|family| family == requested_family) =>
+        {
             egui::FontFamily::Name(requested_family.to_string().into())
         }
         None => egui::FontFamily::Proportional,

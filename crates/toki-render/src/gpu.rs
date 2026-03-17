@@ -4,9 +4,9 @@ use std::sync::Arc;
 use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
 use winit::window::Window;
 
-use toki_core::math::projection::screen_space_projection;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
+use toki_core::math::projection::screen_space_projection;
 use toki_core::sprite::SpriteFrame;
 use toki_core::text::TextItem;
 
@@ -179,21 +179,16 @@ impl GpuState {
         self.ui_rect_pipeline.add_rect(x, y, width, height, color);
     }
 
-    pub fn add_filled_ui_rect(
-        &mut self,
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
-        color: [f32; 4],
-    ) {
+    pub fn add_filled_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
         self.ui_rect_pipeline
             .add_filled_rect(x, y, width, height, color);
     }
 
     pub fn finalize_ui_rects(&mut self) {
-        self.ui_rect_pipeline
-            .update_camera(&self.queue, screen_space_projection(self.config.width as f32, self.config.height as f32));
+        self.ui_rect_pipeline.update_camera(
+            &self.queue,
+            screen_space_projection(self.config.width as f32, self.config.height as f32),
+        );
         self.ui_rect_pipeline.update_vertices(&self.device);
     }
 
@@ -440,11 +435,10 @@ impl GpuState {
                 );
             }
         }
-        self.ui_debug_pipeline
-            .update_camera(
-                &self.queue,
-                screen_space_projection(self.config.width as f32, self.config.height as f32),
-            );
+        self.ui_debug_pipeline.update_camera(
+            &self.queue,
+            screen_space_projection(self.config.width as f32, self.config.height as f32),
+        );
         self.ui_debug_pipeline.update_vertices(&self.device);
     }
 }

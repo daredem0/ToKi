@@ -515,14 +515,7 @@ impl RenderingSystem {
         }
     }
 
-    pub fn add_filled_ui_rect(
-        &mut self,
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
-        color: [f32; 4],
-    ) {
+    pub fn add_filled_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
         if let Some(backend) = &mut self.backend {
             backend.add_filled_ui_rect(x, y, width, height, color);
         }

@@ -9,7 +9,10 @@ fn builtin_font_family_recognizes_engine_aliases() {
     );
     assert_eq!(builtin_font_family("Serif"), Some(BuiltinFontFamily::Serif));
     assert_eq!(builtin_font_family("Mono"), Some(BuiltinFontFamily::Mono));
-    assert_eq!(builtin_font_family("Monospace"), Some(BuiltinFontFamily::Mono));
+    assert_eq!(
+        builtin_font_family("Monospace"),
+        Some(BuiltinFontFamily::Mono)
+    );
     assert_eq!(builtin_font_family("Fancy"), None);
 }
 

@@ -1,6 +1,6 @@
 use toki_core::menu::{
-    build_menu_layout, menu_border_color, menu_hex_color_rgba, tinted_menu_background,
-    MenuCommand, MenuInput,
+    build_menu_layout, menu_border_color, menu_hex_color_rgba, tinted_menu_background, MenuCommand,
+    MenuInput,
 };
 use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
 
@@ -85,7 +85,11 @@ impl App {
             weight: TextWeight::Bold,
             ..entry_style.clone()
         };
-        self.render_menu_layout_rect(&layout.title.rect, tinted_menu_background(accent, 0.16, 0.9), menu_border_color(appearance.border_style, accent, 0.95));
+        self.render_menu_layout_rect(
+            &layout.title.rect,
+            tinted_menu_background(accent, 0.16, 0.9),
+            menu_border_color(appearance.border_style, accent, 0.95),
+        );
 
         self.rendering.add_text_item(
             TextItem::new_screen(
