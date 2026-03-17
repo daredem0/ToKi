@@ -2,8 +2,8 @@ use super::super::editor_ui::{EditorUI, Selection};
 use crate::fonts::resolve_preview_font_family;
 use crate::project::Project;
 use toki_core::menu::{
-    build_menu_layout, menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba,
-    MenuBorderStyle, MenuItemDefinition, MenuView, MenuViewEntry,
+    apply_menu_opacity, build_menu_layout, menu_border_color, menu_fill_color_rgba,
+    menu_hex_color_rgba, MenuBorderStyle, MenuItemDefinition, MenuView, MenuViewEntry,
 };
 
 #[derive(Debug, Clone)]
@@ -93,9 +93,13 @@ pub(super) fn render_menu_editor(
         border_color: menu_hex_color_rgba(
             &project.metadata.runtime.menu.appearance.border_color_hex,
         )
+        .map(|color| apply_menu_opacity(color, project.metadata.runtime.menu.appearance.opacity_percent))
         .map(menu_preview_color32)
         .unwrap_or(egui::Color32::from_rgb(124, 255, 124)),
         text_color: menu_hex_color_rgba(&project.metadata.runtime.menu.appearance.text_color_hex)
+            .map(|color| {
+                apply_menu_opacity(color, project.metadata.runtime.menu.appearance.opacity_percent)
+            })
             .map(menu_preview_color32)
             .unwrap_or(egui::Color32::WHITE),
         menu_background_color: menu_fill_color_rgba(
@@ -111,6 +115,7 @@ pub(super) fn render_menu_editor(
                 .menu
                 .appearance
                 .menu_background_transparent,
+            project.metadata.runtime.menu.appearance.opacity_percent,
         )
         .map(menu_preview_color32),
         title_background_color: menu_fill_color_rgba(
@@ -126,6 +131,7 @@ pub(super) fn render_menu_editor(
                 .menu
                 .appearance
                 .title_background_transparent,
+            project.metadata.runtime.menu.appearance.opacity_percent,
         )
         .map(menu_preview_color32),
         entry_background_color: menu_fill_color_rgba(
@@ -141,6 +147,7 @@ pub(super) fn render_menu_editor(
                 .menu
                 .appearance
                 .entry_background_transparent,
+            project.metadata.runtime.menu.appearance.opacity_percent,
         )
         .map(menu_preview_color32),
         font_family: resolve_preview_font_family(

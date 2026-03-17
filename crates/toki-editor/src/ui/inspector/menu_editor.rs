@@ -148,6 +148,22 @@ impl InspectorSystem {
             }
         });
 
+        let mut menu_height_percent = appearance.menu_height_percent;
+        ui.horizontal(|ui| {
+            ui.label("Menu Height %");
+            if ui
+                .add(
+                    egui::DragValue::new(&mut menu_height_percent)
+                        .range(20..=100)
+                        .speed(1.0),
+                )
+                .changed()
+            {
+                appearance.menu_height_percent = menu_height_percent;
+                appearance_changed = true;
+            }
+        });
+
         let mut title_spacing = appearance.title_spacing_px;
         ui.horizontal(|ui| {
             ui.label("Title Spacing");
@@ -192,6 +208,21 @@ impl InspectorSystem {
                 .changed()
             {
                 appearance.footer_spacing_px = footer_spacing;
+                appearance_changed = true;
+            }
+        });
+
+        let mut opacity_percent = appearance.opacity_percent;
+        ui.horizontal(|ui| {
+            ui.label("Menu Opacity %");
+            if ui
+                .add(
+                    egui::Slider::new(&mut opacity_percent, 0..=100)
+                        .clamping(egui::SliderClamping::Always),
+                )
+                .changed()
+            {
+                appearance.opacity_percent = opacity_percent;
                 appearance_changed = true;
             }
         });

@@ -2,14 +2,14 @@
 name = "TopDownBundle"
 version = "1.0.0"
 created = "2025-08-28T20:32:34.920817717Z"
-modified = "2026-03-15T22:42:22.664417471Z"
+modified = "2026-03-17T12:29:05.633498419Z"
 toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-main = "scenes/main.json"
 "Main Scene" = "scenes/mainscene.json"
 "Scene 2" = "scenes/scene2.json"
+main = "scenes/main.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -28,6 +28,76 @@ collision_percent = 10
 [runtime.display]
 show_entity_health_bars = true
 
+[runtime.menu]
+pause_root_screen_id = "pause_menu"
+gate_gameplay_when_open = true
+
+[runtime.menu.appearance]
+font_family = "Sans"
+font_size_px = 30
+menu_width_percent = 65
+menu_height_percent = 85
+title_spacing_px = 32
+button_spacing_px = 12
+footer_spacing_px = 128
+opacity_percent = 50
+border_color_hex = "#7CFF7C"
+text_color_hex = "#FFFFFF"
+menu_background_color_hex = "#142914"
+menu_background_transparent = false
+title_background_color_hex = "#143614"
+title_background_transparent = true
+entry_background_color_hex = "#0F1F0F"
+entry_background_transparent = false
+footer_text = """
+          Esc: Back   
+Enter/Space: Select"""
+border_style = "square"
+
+[[runtime.menu.screens]]
+id = "pause_menu"
+title = "Paused"
+title_border_style_override = "none"
+
+[[runtime.menu.screens.items]]
+kind = "button"
+text = "Resume"
+
+[runtime.menu.screens.items.action]
+kind = "close_menu"
+
+[[runtime.menu.screens.items]]
+kind = "button"
+text = "Inventory"
+
+[runtime.menu.screens.items.action]
+kind = "open_screen"
+screen_id = "inventory_menu"
+
+[[runtime.menu.screens.items]]
+kind = "button"
+text = "Exit Game"
+
+[runtime.menu.screens.items.action]
+kind = "exit_game"
+
+[[runtime.menu.screens]]
+id = "inventory_menu"
+title = "Inventory"
+
+[[runtime.menu.screens.items]]
+kind = "dynamic_list"
+heading = "Items"
+source = "player_inventory"
+empty_text = "Inventory is empty"
+
+[[runtime.menu.screens.items]]
+kind = "button"
+text = "Back"
+
+[runtime.menu.screens.items.action]
+kind = "back"
+
 [editor]
 recent_files = []
 
@@ -41,13 +111,9 @@ pan = [
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
-"node:5" = [
-    800.0,
+"node:6" = [
+    430.0,
     106.0,
-]
-"node:1" = [
-    110.08570861816406,
-    34.51572799682617,
 ]
 "node:2" = [
     800.0,
@@ -57,9 +123,13 @@ pan = [
     60.0,
     106.0,
 ]
-"node:6" = [
-    430.0,
+"node:5" = [
+    800.0,
     106.0,
+]
+"node:1" = [
+    110.08570861816406,
+    34.51572799682617,
 ]
 "node:3" = [
     430.0,

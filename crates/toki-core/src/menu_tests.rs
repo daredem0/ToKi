@@ -1,8 +1,8 @@
 use super::{
-    build_menu_layout, menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba,
-    menu_visual_metrics, InventoryEntry, MenuAction, MenuAppearance, MenuBorderStyle, MenuCommand,
-    MenuController, MenuInput, MenuItemDefinition, MenuListSource, MenuScreenDefinition,
-    MenuSettings, MenuView, MenuViewEntry,
+    apply_menu_opacity, build_menu_layout, menu_border_color, menu_fill_color_rgba,
+    menu_hex_color_rgba, menu_visual_metrics, InventoryEntry, MenuAction, MenuAppearance,
+    MenuBorderStyle, MenuCommand, MenuController, MenuInput, MenuItemDefinition, MenuListSource,
+    MenuScreenDefinition, MenuSettings, MenuView, MenuViewEntry,
 };
 
 #[test]
@@ -176,9 +176,11 @@ fn menu_settings_default_includes_appearance_defaults() {
     assert_eq!(settings.appearance.font_family, "Sans");
     assert_eq!(settings.appearance.font_size_px, 14);
     assert_eq!(settings.appearance.menu_width_percent, 88);
+    assert_eq!(settings.appearance.menu_height_percent, 70);
     assert_eq!(settings.appearance.title_spacing_px, 8);
     assert_eq!(settings.appearance.button_spacing_px, 8);
     assert_eq!(settings.appearance.footer_spacing_px, 16);
+    assert_eq!(settings.appearance.opacity_percent, 100);
     assert_eq!(settings.appearance.border_color_hex, "#7CFF7C");
     assert_eq!(settings.appearance.text_color_hex, "#FFFFFF");
     assert_eq!(settings.appearance.menu_background_color_hex, "#142914");
@@ -203,12 +205,16 @@ fn menu_hex_color_and_border_helpers_follow_shared_menu_visual_rules() {
     );
     assert_eq!(menu_border_color(MenuBorderStyle::None, accent, 0.95), None);
     assert_eq!(
-        menu_fill_color_rgba("#7CFF7C", false),
+        menu_fill_color_rgba("#7CFF7C", false, 100),
         Some([124.0 / 255.0, 1.0, 124.0 / 255.0, 1.0])
     );
     assert_eq!(
-        menu_fill_color_rgba("#7CFF7C", true),
+        menu_fill_color_rgba("#7CFF7C", true, 100),
         Some([124.0 / 255.0, 1.0, 124.0 / 255.0, 0.0])
+    );
+    assert_eq!(
+        apply_menu_opacity([1.0, 1.0, 1.0, 1.0], 40),
+        [1.0, 1.0, 1.0, 0.4]
     );
 }
 
@@ -228,9 +234,11 @@ fn shared_menu_visual_metrics_match_runtime_overlay_defaults() {
 fn build_menu_layout_uses_fixed_panel_width_and_shared_entry_geometry() {
     let appearance = MenuAppearance {
         menu_width_percent: 90,
+        menu_height_percent: 80,
         title_spacing_px: 18,
         button_spacing_px: 12,
         footer_spacing_px: 22,
+        opacity_percent: 75,
         footer_text: "Press confirm".to_string(),
         ..MenuAppearance::default()
     };
@@ -278,4 +286,5 @@ fn build_menu_layout_uses_fixed_panel_width_and_shared_entry_geometry() {
         layout.hint.rect.y - (layout.entries[1].rect.y + layout.entries[1].rect.height),
         appearance.footer_spacing_px as f32
     );
+    assert!(layout.panel.height >= 144.0);
 }

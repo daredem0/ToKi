@@ -1,6 +1,6 @@
 use toki_core::menu::{
-    build_menu_layout, menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba, MenuCommand,
-    MenuInput,
+    apply_menu_opacity, build_menu_layout, menu_border_color, menu_fill_color_rgba,
+    menu_hex_color_rgba, MenuCommand, MenuInput,
 };
 use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
 
@@ -47,10 +47,12 @@ impl App {
         let border_color =
             menu_hex_color_rgba(&self.menu_system.settings().appearance.border_color_hex)
                 .unwrap_or([0.49, 1.0, 0.49, 1.0]);
-        let text_color =
-            menu_hex_color_rgba(&self.menu_system.settings().appearance.text_color_hex)
-                .unwrap_or([1.0, 1.0, 1.0, 1.0]);
         let appearance = self.menu_system.settings().appearance.clone();
+        let opacity_alpha = (appearance.opacity_percent.clamp(0, 100) as f32) / 100.0;
+        let text_color = apply_menu_opacity(
+            menu_hex_color_rgba(&appearance.text_color_hex).unwrap_or([1.0, 1.0, 1.0, 1.0]),
+            appearance.opacity_percent,
+        );
         let layout = build_menu_layout(&view, &appearance, viewport);
         let panel_rect = layout.panel;
         self.render_menu_layout_rect(
@@ -58,8 +60,9 @@ impl App {
             menu_fill_color_rgba(
                 &appearance.menu_background_color_hex,
                 appearance.menu_background_transparent,
+                appearance.opacity_percent,
             ),
-            menu_border_color(appearance.border_style, border_color, 1.0),
+            menu_border_color(appearance.border_style, border_color, opacity_alpha),
         );
 
         let title_style = TextStyle {
@@ -86,8 +89,9 @@ impl App {
             menu_fill_color_rgba(
                 &appearance.title_background_color_hex,
                 appearance.title_background_transparent,
+                appearance.opacity_percent,
             ),
-            menu_border_color(layout.title.border_style, border_color, 1.0),
+            menu_border_color(layout.title.border_style, border_color, opacity_alpha),
         );
 
         self.rendering.add_text_item(
@@ -106,8 +110,9 @@ impl App {
                 menu_fill_color_rgba(
                     &appearance.entry_background_color_hex,
                     appearance.entry_background_transparent,
+                    appearance.opacity_percent,
                 ),
-                menu_border_color(entry.border_style, border_color, 1.0),
+                menu_border_color(entry.border_style, border_color, opacity_alpha),
             );
 
             let style = if entry.selected {
@@ -238,12 +243,16 @@ mod tests {
     #[test]
     fn menu_fill_color_rgba_supports_transparent_backgrounds() {
         assert_eq!(
-            menu_fill_color_rgba("#112233", true),
+            menu_fill_color_rgba("#112233", true, 100),
             Some([17.0 / 255.0, 34.0 / 255.0, 51.0 / 255.0, 0.0])
         );
         assert_eq!(
-            menu_fill_color_rgba("#112233", false),
+            menu_fill_color_rgba("#112233", false, 100),
             Some([17.0 / 255.0, 34.0 / 255.0, 51.0 / 255.0, 1.0])
+        );
+        assert_eq!(
+            menu_fill_color_rgba("#112233", false, 50),
+            Some([17.0 / 255.0, 34.0 / 255.0, 51.0 / 255.0, 0.5])
         );
     }
 }

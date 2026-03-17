@@ -32,12 +32,16 @@ pub struct MenuAppearance {
     pub font_size_px: u16,
     #[serde(default = "default_menu_width_percent")]
     pub menu_width_percent: u16,
+    #[serde(default = "default_menu_height_percent")]
+    pub menu_height_percent: u16,
     #[serde(default = "default_menu_title_spacing_px")]
     pub title_spacing_px: u16,
     #[serde(default = "default_menu_button_spacing_px")]
     pub button_spacing_px: u16,
     #[serde(default = "default_menu_footer_spacing_px")]
     pub footer_spacing_px: u16,
+    #[serde(default = "default_menu_opacity_percent")]
+    pub opacity_percent: u16,
     #[serde(default = "default_menu_border_color_hex", alias = "color_hex")]
     pub border_color_hex: String,
     #[serde(default = "default_menu_text_color_hex")]
@@ -135,9 +139,11 @@ impl Default for MenuAppearance {
             font_family: default_menu_font_family(),
             font_size_px: default_menu_font_size_px(),
             menu_width_percent: default_menu_width_percent(),
+            menu_height_percent: default_menu_height_percent(),
             title_spacing_px: default_menu_title_spacing_px(),
             button_spacing_px: default_menu_button_spacing_px(),
             footer_spacing_px: default_menu_footer_spacing_px(),
+            opacity_percent: default_menu_opacity_percent(),
             border_color_hex: default_menu_border_color_hex(),
             text_color_hex: default_menu_text_color_hex(),
             menu_background_color_hex: default_menu_background_color_hex(),
@@ -492,6 +498,10 @@ fn default_menu_width_percent() -> u16 {
     88
 }
 
+fn default_menu_height_percent() -> u16 {
+    70
+}
+
 fn default_menu_title_spacing_px() -> u16 {
     8
 }
@@ -502,6 +512,10 @@ fn default_menu_button_spacing_px() -> u16 {
 
 fn default_menu_footer_spacing_px() -> u16 {
     16
+}
+
+fn default_menu_opacity_percent() -> u16 {
+    100
 }
 
 fn default_menu_border_color_hex() -> String {
@@ -664,19 +678,22 @@ fn menu_panel_rect(view: &MenuView, appearance: &MenuAppearance, viewport: glam:
     };
     let hint_size_px = (font_size_px - 2.0).max(10.0);
     let hint_height = hint_size_px + metrics.hint_padding_px.y * 2.0;
-    let bottom =
+    let content_bottom =
         last_entry_bottom + appearance.footer_spacing_px as f32 + hint_height;
     let requested_panel_width =
         viewport.x * (appearance.menu_width_percent.clamp(20, 100) as f32 / 100.0);
+    let requested_panel_height =
+        viewport.y * (appearance.menu_height_percent.clamp(20, 100) as f32 / 100.0);
     let max_panel_width = (viewport.x - 16.0).max(40.0);
     let panel_width = requested_panel_width.clamp(40.0, max_panel_width);
     let x = (viewport.x - panel_width) * 0.5;
     let y = (metrics.title_top_y_px - metrics.panel_inner_margin_px).max(8.0);
+    let content_height = (content_bottom - y + metrics.panel_inner_margin_px).max(80.0);
     MenuRect {
         x,
         y,
         width: panel_width,
-        height: (bottom - y + metrics.panel_inner_margin_px).max(80.0),
+        height: content_height.max(requested_panel_height),
     }
 }
 
@@ -696,9 +713,19 @@ pub fn menu_hex_color_rgba(hex: &str) -> Option<[f32; 4]> {
     ])
 }
 
-pub fn menu_fill_color_rgba(hex: &str, transparent: bool) -> Option<[f32; 4]> {
+pub fn apply_menu_opacity(mut color: [f32; 4], opacity_percent: u16) -> [f32; 4] {
+    color[3] *= (opacity_percent.clamp(0, 100) as f32) / 100.0;
+    color
+}
+
+pub fn menu_fill_color_rgba(
+    hex: &str,
+    transparent: bool,
+    opacity_percent: u16,
+) -> Option<[f32; 4]> {
     let mut color = menu_hex_color_rgba(hex)?;
     color[3] = if transparent { 0.0 } else { 1.0 };
+    color = apply_menu_opacity(color, opacity_percent);
     Some(color)
 }
 
