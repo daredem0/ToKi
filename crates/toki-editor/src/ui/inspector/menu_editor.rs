@@ -132,6 +132,22 @@ impl InspectorSystem {
             }
         });
 
+        let mut menu_width_percent = appearance.menu_width_percent;
+        ui.horizontal(|ui| {
+            ui.label("Menu Width %");
+            if ui
+                .add(
+                    egui::DragValue::new(&mut menu_width_percent)
+                        .range(20..=100)
+                        .speed(1.0),
+                )
+                .changed()
+            {
+                appearance.menu_width_percent = menu_width_percent;
+                appearance_changed = true;
+            }
+        });
+
         let mut title_spacing = appearance.title_spacing_px;
         ui.horizontal(|ui| {
             ui.label("Title Spacing");
@@ -160,6 +176,22 @@ impl InspectorSystem {
                 .changed()
             {
                 appearance.button_spacing_px = button_spacing;
+                appearance_changed = true;
+            }
+        });
+
+        let mut footer_spacing = appearance.footer_spacing_px;
+        ui.horizontal(|ui| {
+            ui.label("Footer Spacing");
+            if ui
+                .add(
+                    egui::DragValue::new(&mut footer_spacing)
+                        .range(0..=128)
+                        .speed(1.0),
+                )
+                .changed()
+            {
+                appearance.footer_spacing_px = footer_spacing;
                 appearance_changed = true;
             }
         });
@@ -271,6 +303,17 @@ impl InspectorSystem {
                 egui::Color32::from_rgb(215, 120, 120),
                 "Use a 6-digit hex color like #0F1F0F",
             );
+        }
+        ui.label("Footer Text");
+        if ui
+            .add(
+                egui::TextEdit::multiline(&mut appearance.footer_text)
+                    .desired_rows(3)
+                    .lock_focus(true),
+            )
+            .changed()
+        {
+            appearance_changed = true;
         }
         if appearance_changed {
             project.metadata.runtime.menu.appearance = appearance;

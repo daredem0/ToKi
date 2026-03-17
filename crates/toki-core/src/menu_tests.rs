@@ -175,13 +175,19 @@ fn menu_settings_default_includes_appearance_defaults() {
 
     assert_eq!(settings.appearance.font_family, "Sans");
     assert_eq!(settings.appearance.font_size_px, 14);
+    assert_eq!(settings.appearance.menu_width_percent, 88);
     assert_eq!(settings.appearance.title_spacing_px, 8);
     assert_eq!(settings.appearance.button_spacing_px, 8);
+    assert_eq!(settings.appearance.footer_spacing_px, 16);
     assert_eq!(settings.appearance.border_color_hex, "#7CFF7C");
     assert_eq!(settings.appearance.text_color_hex, "#FFFFFF");
     assert_eq!(settings.appearance.menu_background_color_hex, "#142914");
     assert_eq!(settings.appearance.title_background_color_hex, "#143614");
     assert_eq!(settings.appearance.entry_background_color_hex, "#0F1F0F");
+    assert_eq!(
+        settings.appearance.footer_text,
+        "Esc: Back   Enter/Space: Select"
+    );
     assert!(!settings.appearance.menu_background_transparent);
     assert!(!settings.appearance.title_background_transparent);
     assert!(!settings.appearance.entry_background_transparent);
@@ -221,8 +227,11 @@ fn shared_menu_visual_metrics_match_runtime_overlay_defaults() {
 #[test]
 fn build_menu_layout_uses_fixed_panel_width_and_shared_entry_geometry() {
     let appearance = MenuAppearance {
+        menu_width_percent: 90,
         title_spacing_px: 18,
         button_spacing_px: 12,
+        footer_spacing_px: 22,
+        footer_text: "Press confirm".to_string(),
         ..MenuAppearance::default()
     };
     let layout = build_menu_layout(
@@ -249,9 +258,9 @@ fn build_menu_layout_uses_fixed_panel_width_and_shared_entry_geometry() {
         glam::Vec2::new(320.0, 180.0),
     );
 
-    assert_eq!(layout.panel.width, 280.0);
+    assert_eq!(layout.panel.width, 288.0);
     assert_eq!(layout.entries.len(), 2);
-    assert_eq!(layout.entries[0].rect.width, 248.0);
+    assert_eq!(layout.entries[0].rect.width, 256.0);
     assert_eq!(
         layout.entries[0].rect.y - (layout.title.rect.y + layout.title.rect.height),
         appearance.title_spacing_px as f32
@@ -264,4 +273,9 @@ fn build_menu_layout_uses_fixed_panel_width_and_shared_entry_geometry() {
     assert_eq!(layout.entries[1].border_style, MenuBorderStyle::None);
     assert_eq!(layout.title.rect.width, layout.entries[0].rect.width);
     assert_eq!(layout.title.border_style, MenuBorderStyle::None);
+    assert_eq!(layout.hint.text, "Press confirm");
+    assert_eq!(
+        layout.hint.rect.y - (layout.entries[1].rect.y + layout.entries[1].rect.height),
+        appearance.footer_spacing_px as f32
+    );
 }

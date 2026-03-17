@@ -30,10 +30,14 @@ pub struct MenuAppearance {
     pub font_family: String,
     #[serde(default = "default_menu_font_size_px")]
     pub font_size_px: u16,
+    #[serde(default = "default_menu_width_percent")]
+    pub menu_width_percent: u16,
     #[serde(default = "default_menu_title_spacing_px")]
     pub title_spacing_px: u16,
     #[serde(default = "default_menu_button_spacing_px")]
     pub button_spacing_px: u16,
+    #[serde(default = "default_menu_footer_spacing_px")]
+    pub footer_spacing_px: u16,
     #[serde(default = "default_menu_border_color_hex", alias = "color_hex")]
     pub border_color_hex: String,
     #[serde(default = "default_menu_text_color_hex")]
@@ -50,6 +54,8 @@ pub struct MenuAppearance {
     pub entry_background_color_hex: String,
     #[serde(default)]
     pub entry_background_transparent: bool,
+    #[serde(default = "default_menu_footer_text")]
+    pub footer_text: String,
     #[serde(default)]
     pub border_style: MenuBorderStyle,
 }
@@ -128,8 +134,10 @@ impl Default for MenuAppearance {
         Self {
             font_family: default_menu_font_family(),
             font_size_px: default_menu_font_size_px(),
+            menu_width_percent: default_menu_width_percent(),
             title_spacing_px: default_menu_title_spacing_px(),
             button_spacing_px: default_menu_button_spacing_px(),
+            footer_spacing_px: default_menu_footer_spacing_px(),
             border_color_hex: default_menu_border_color_hex(),
             text_color_hex: default_menu_text_color_hex(),
             menu_background_color_hex: default_menu_background_color_hex(),
@@ -138,6 +146,7 @@ impl Default for MenuAppearance {
             title_background_transparent: false,
             entry_background_color_hex: default_menu_entry_background_color_hex(),
             entry_background_transparent: false,
+            footer_text: default_menu_footer_text(),
             border_style: MenuBorderStyle::default(),
         }
     }
@@ -479,12 +488,20 @@ fn default_menu_font_size_px() -> u16 {
     14
 }
 
+fn default_menu_width_percent() -> u16 {
+    88
+}
+
 fn default_menu_title_spacing_px() -> u16 {
     8
 }
 
 fn default_menu_button_spacing_px() -> u16 {
     8
+}
+
+fn default_menu_footer_spacing_px() -> u16 {
+    16
 }
 
 fn default_menu_border_color_hex() -> String {
@@ -505,6 +522,10 @@ fn default_menu_title_background_color_hex() -> String {
 
 fn default_menu_entry_background_color_hex() -> String {
     "#0F1F0F".to_string()
+}
+
+fn default_menu_footer_text() -> String {
+    "Esc: Back   Enter/Space: Select".to_string()
 }
 
 fn default_menu_screens() -> Vec<MenuScreenDefinition> {
@@ -574,7 +595,7 @@ pub fn build_menu_layout(
     let entries_start_y = title_rect.y + title_rect.height + appearance.title_spacing_px as f32;
     let entry_height = appearance.font_size_px as f32 + metrics.entry_padding_px.y * 2.0;
     let button_spacing = appearance.button_spacing_px as f32;
-    let entries = view
+    let entries: Vec<MenuEntryLayout> = view
         .entries
         .iter()
         .enumerate()
@@ -595,9 +616,14 @@ pub fn build_menu_layout(
         .collect();
     let hint_font_size = (appearance.font_size_px as f32 - 2.0).max(10.0);
     let hint_height = hint_font_size + metrics.hint_padding_px.y * 2.0;
+    let footer_y = entries
+        .last()
+        .map(|entry| entry.rect.y + entry.rect.height)
+        .unwrap_or(title_rect.y + title_rect.height)
+        + appearance.footer_spacing_px as f32;
     let hint_rect = MenuRect {
         x: content_x,
-        y: viewport.y - metrics.hint_bottom_padding_px - hint_height,
+        y: footer_y,
         width: content_width,
         height: hint_height,
     };
@@ -614,7 +640,7 @@ pub fn build_menu_layout(
         entries,
         hint: MenuLayoutBlock {
             rect: hint_rect,
-            text: "Esc: Back   Enter/Space: Select".to_string(),
+            text: appearance.footer_text.clone(),
             border_style: MenuBorderStyle::None,
         },
     }
@@ -629,25 +655,27 @@ fn menu_panel_rect(view: &MenuView, appearance: &MenuAppearance, viewport: glam:
         metrics.title_top_y_px + title_height + appearance.title_spacing_px as f32;
     let entry_height = font_size_px + metrics.entry_padding_px.y * 2.0;
     let button_spacing = appearance.button_spacing_px as f32;
-    let last_entry_y = if view.entries.is_empty() {
-        entries_start_y
+    let last_entry_bottom = if view.entries.is_empty() {
+        metrics.title_top_y_px + title_height
     } else {
-        entries_start_y + (view.entries.len() - 1) as f32 * (entry_height + button_spacing)
+        entries_start_y
+            + (view.entries.len() - 1) as f32 * (entry_height + button_spacing)
+            + entry_height
     };
     let hint_size_px = (font_size_px - 2.0).max(10.0);
-    let bottom = (last_entry_y + font_size_px + metrics.entry_padding_px.y * 2.0 + 12.0).max(
-        viewport.y
-            - metrics.hint_bottom_padding_px
-            - hint_size_px
-            - metrics.hint_padding_px.y * 2.0
-            - 8.0,
-    );
-    let x = (viewport.x - metrics.panel_width_px) * 0.5;
+    let hint_height = hint_size_px + metrics.hint_padding_px.y * 2.0;
+    let bottom =
+        last_entry_bottom + appearance.footer_spacing_px as f32 + hint_height;
+    let requested_panel_width =
+        viewport.x * (appearance.menu_width_percent.clamp(20, 100) as f32 / 100.0);
+    let max_panel_width = (viewport.x - 16.0).max(40.0);
+    let panel_width = requested_panel_width.clamp(40.0, max_panel_width);
+    let x = (viewport.x - panel_width) * 0.5;
     let y = (metrics.title_top_y_px - metrics.panel_inner_margin_px).max(8.0);
     MenuRect {
         x,
         y,
-        width: metrics.panel_width_px,
+        width: panel_width,
         height: (bottom - y + metrics.panel_inner_margin_px).max(80.0),
     }
 }

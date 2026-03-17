@@ -230,7 +230,7 @@ mod tests {
             glam::Vec2::new(320.0, 180.0),
         );
 
-        assert_eq!(layout.panel.width, 280.0);
+        assert_eq!(layout.panel.width, 281.6);
         assert_eq!(layout.entries.len(), 2);
         assert!(layout.entries[0].rect.width > 200.0);
     }
