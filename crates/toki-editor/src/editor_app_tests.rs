@@ -129,6 +129,37 @@ fn build_runtime_launch_args_omits_absent_optional_values() {
 }
 
 #[test]
+fn suggested_new_project_parent_path_uses_current_project_parent_directory() {
+    let current_project_path = std::path::Path::new("/tmp/projects/MyGame");
+
+    let suggested = EditorApp::suggested_new_project_parent_path(current_project_path);
+
+    assert_eq!(suggested, PathBuf::from("/tmp/projects"));
+}
+
+#[test]
+fn split_new_project_destination_accepts_directory_like_destination() {
+    let destination = std::path::Path::new("/tmp/projects/NewProject");
+
+    let split = EditorApp::split_new_project_destination(destination)
+        .expect("directory-like project destination should split");
+
+    assert_eq!(split.0, PathBuf::from("/tmp/projects"));
+    assert_eq!(split.1, "NewProject");
+}
+
+#[test]
+fn split_new_project_destination_accepts_project_toml_destination() {
+    let destination = std::path::Path::new("/tmp/projects/NewProject/project.toml");
+
+    let split = EditorApp::split_new_project_destination(destination)
+        .expect("project.toml destination should split");
+
+    assert_eq!(split.0, PathBuf::from("/tmp/projects"));
+    assert_eq!(split.1, "NewProject");
+}
+
+#[test]
 fn build_map_editor_draft_prefers_terrain_atlas_and_fills_tiles() {
     let temp_dir = tempfile::tempdir().expect("temp dir should exist");
     let project_path = temp_dir.path().to_path_buf();

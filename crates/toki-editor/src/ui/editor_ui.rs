@@ -3,6 +3,7 @@ use super::menus::MenuSystem;
 use super::panels::PanelSystem;
 use super::rule_graph::RuleGraph;
 use super::undo_redo::UndoRedoHistory;
+use crate::project::ProjectTemplateKind;
 use crate::project::SceneGraphLayout;
 use crate::scene::SceneViewport;
 
@@ -87,6 +88,13 @@ pub struct PlacementPreviewVisual {
     pub size: glam::UVec2,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewProjectRequest {
+    pub template: ProjectTemplateKind,
+    pub parent_path: PathBuf,
+    pub name: String,
+}
+
 /// Manages the editor's UI state and rendering
 pub struct EditorUI {
     // Scene management
@@ -111,6 +119,11 @@ pub struct EditorUI {
     // Project management flags
     pub new_project_requested: bool,
     pub new_top_down_project_requested: bool,
+    pub show_new_project_dialog: bool,
+    pub new_project_template: ProjectTemplateKind,
+    pub new_project_parent_directory: Option<PathBuf>,
+    pub new_project_name: String,
+    pub new_project_submit_requested: Option<NewProjectRequest>,
     pub open_project_requested: bool,
     pub browse_for_project_requested: bool,
     pub save_project_requested: bool,
@@ -204,6 +217,11 @@ impl EditorUI {
             // Project management flags
             new_project_requested: false,
             new_top_down_project_requested: false,
+            show_new_project_dialog: false,
+            new_project_template: ProjectTemplateKind::Empty,
+            new_project_parent_directory: None,
+            new_project_name: "NewProject".to_string(),
+            new_project_submit_requested: None,
             open_project_requested: false,
             browse_for_project_requested: false,
             save_project_requested: false,
@@ -318,6 +336,37 @@ impl EditorUI {
         self.selection = None;
         self.selected_entity_id = None;
         self.selected_entity_ids.clear();
+    }
+
+    pub fn begin_new_project_dialog(
+        &mut self,
+        template: ProjectTemplateKind,
+        suggested_parent_directory: Option<PathBuf>,
+        suggested_name: String,
+    ) {
+        self.show_new_project_dialog = true;
+        self.new_project_template = template;
+        self.new_project_parent_directory = suggested_parent_directory;
+        if !suggested_name.trim().is_empty() {
+            self.new_project_name = suggested_name;
+        }
+    }
+
+    pub fn submit_new_project_request(&mut self) {
+        let Some(parent_path) = self.new_project_parent_directory.clone() else {
+            return;
+        };
+        let name = self.new_project_name.trim().to_string();
+        if name.is_empty() {
+            return;
+        }
+
+        self.new_project_submit_requested = Some(NewProjectRequest {
+            template: self.new_project_template,
+            parent_path,
+            name,
+        });
+        self.show_new_project_dialog = false;
     }
 
     pub fn set_single_entity_selection(&mut self, entity_id: EntityId) {

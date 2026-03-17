@@ -1,29 +1,12 @@
 use super::*;
 
 impl EditorApp {
-    pub(super) fn handle_new_project_requested(&mut self, template: ProjectTemplateKind) {
-        self.ui.new_project_requested = false;
-        self.ui.new_top_down_project_requested = false;
-
-        let folder_path = if let Some(config_path) = &self.config.project_path {
-            tracing::info!(
-                "Using project path from config as parent: {:?}",
-                config_path
-            );
-            Some(config_path.clone())
-        } else {
-            tracing::info!("No project path in config, asking user to select folder");
-            rfd::FileDialog::new()
-                .set_title("Select folder for new project")
-                .pick_folder()
-        };
-
-        let Some(parent_path) = folder_path else {
-            return;
-        };
-
-        let project_name = Self::next_available_project_name(&parent_path, "NewProject");
-
+    pub(super) fn handle_new_project_requested(
+        &mut self,
+        template: ProjectTemplateKind,
+        parent_path: std::path::PathBuf,
+        project_name: String,
+    ) {
         tracing::info!(
             "Creating project '{}' from template '{}' in {:?}",
             project_name,
@@ -58,6 +41,41 @@ impl EditorApp {
                 tracing::error!("Failed to create new project: {}", error);
             }
         }
+    }
+
+    pub(super) fn suggested_new_project_parent_path(
+        current_project_path: &std::path::Path,
+    ) -> std::path::PathBuf {
+        current_project_path
+            .parent()
+            .unwrap_or(current_project_path)
+            .to_path_buf()
+    }
+
+    #[cfg(test)]
+    pub(super) fn split_new_project_destination(
+        destination_path: &std::path::Path,
+    ) -> Option<(std::path::PathBuf, String)> {
+        if destination_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("project.toml"))
+        {
+            let project_dir = destination_path.parent()?;
+            let project_name = project_dir.file_name()?.to_str()?.trim().to_string();
+            if project_name.is_empty() {
+                return None;
+            }
+            let parent_path = project_dir.parent()?.to_path_buf();
+            return Some((parent_path, project_name));
+        }
+
+        let project_name = destination_path.file_name()?.to_str()?.trim().to_string();
+        if project_name.is_empty() {
+            return None;
+        }
+        let parent_path = destination_path.parent()?.to_path_buf();
+        Some((parent_path, project_name))
     }
 
     pub(super) fn next_available_project_name(

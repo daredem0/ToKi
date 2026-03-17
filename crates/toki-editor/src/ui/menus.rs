@@ -161,6 +161,80 @@ impl MenuSystem {
                 );
             }
         });
+
+        if ui_state.show_new_project_dialog {
+            Self::render_new_project_dialog(ui_state, ctx);
+        }
+    }
+
+    fn render_new_project_dialog(ui_state: &mut super::EditorUI, ctx: &egui::Context) {
+        let mut open = ui_state.show_new_project_dialog;
+        let mut create_clicked = false;
+        let mut cancel_clicked = false;
+        egui::Window::new("New Project")
+            .collapsible(false)
+            .resizable(false)
+            .open(&mut open)
+            .show(ctx, |ui| {
+                ui.label(format!(
+                    "Template: {}",
+                    ui_state.new_project_template.label()
+                ));
+                ui.separator();
+
+                ui.label("Project Name");
+                ui.text_edit_singleline(&mut ui_state.new_project_name);
+                ui.separator();
+
+                ui.label("Parent Folder");
+                let parent_label = ui_state
+                    .new_project_parent_directory
+                    .as_ref()
+                    .map(|path| path.display().to_string())
+                    .unwrap_or_else(|| "No folder selected".to_string());
+                ui.monospace(parent_label);
+                if ui.button("Browse...").clicked() {
+                    let mut dialog =
+                        rfd::FileDialog::new().set_title("Select folder for new project");
+                    if let Some(parent) = ui_state.new_project_parent_directory.as_deref() {
+                        dialog = dialog.set_directory(parent);
+                    }
+                    if let Some(folder) = dialog.pick_folder() {
+                        ui_state.new_project_parent_directory = Some(folder);
+                    }
+                }
+
+                let can_create = ui_state.new_project_parent_directory.is_some()
+                    && !ui_state.new_project_name.trim().is_empty();
+                if !can_create {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(215, 120, 120),
+                        "Select a folder and enter a project name.",
+                    );
+                }
+
+                ui.separator();
+                ui.horizontal(|ui| {
+                    if ui
+                        .add_enabled(can_create, egui::Button::new("Create"))
+                        .clicked()
+                    {
+                        create_clicked = true;
+                    }
+                    if ui.button("Cancel").clicked() {
+                        cancel_clicked = true;
+                    }
+                });
+            });
+
+        if create_clicked {
+            ui_state.submit_new_project_request();
+            open = false;
+        }
+        if cancel_clicked {
+            open = false;
+        }
+        ui_state.show_new_project_dialog = open;
     }
 
     fn render_busy_logo(

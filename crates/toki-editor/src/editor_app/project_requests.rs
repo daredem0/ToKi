@@ -139,11 +139,45 @@ impl EditorApp {
         }
 
         if self.ui.new_project_requested {
-            self.handle_new_project_requested(ProjectTemplateKind::Empty);
+            self.ui.new_project_requested = false;
+            let suggested_parent = self
+                .config
+                .current_project_path()
+                .map(|path| Self::suggested_new_project_parent_path(path.as_path()));
+            let suggested_name = Self::next_available_project_name(
+                suggested_parent
+                    .as_deref()
+                    .unwrap_or_else(|| std::path::Path::new(".")),
+                "NewProject",
+            );
+            self.ui.begin_new_project_dialog(
+                ProjectTemplateKind::Empty,
+                suggested_parent,
+                suggested_name,
+            );
         }
 
         if self.ui.new_top_down_project_requested {
-            self.handle_new_project_requested(ProjectTemplateKind::TopDownStarter);
+            self.ui.new_top_down_project_requested = false;
+            let suggested_parent = self
+                .config
+                .current_project_path()
+                .map(|path| Self::suggested_new_project_parent_path(path.as_path()));
+            let suggested_name = Self::next_available_project_name(
+                suggested_parent
+                    .as_deref()
+                    .unwrap_or_else(|| std::path::Path::new(".")),
+                "NewProject",
+            );
+            self.ui.begin_new_project_dialog(
+                ProjectTemplateKind::TopDownStarter,
+                suggested_parent,
+                suggested_name,
+            );
+        }
+
+        if let Some(request) = self.ui.new_project_submit_requested.take() {
+            self.handle_new_project_requested(request.template, request.parent_path, request.name);
         }
 
         if self.ui.open_project_requested {
