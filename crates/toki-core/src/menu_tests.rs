@@ -1,6 +1,6 @@
 use super::{
-    InventoryEntry, MenuAction, MenuController, MenuInput, MenuItemDefinition, MenuListSource,
-    MenuScreenDefinition, MenuSettings,
+    InventoryEntry, MenuAction, MenuCommand, MenuController, MenuInput, MenuItemDefinition,
+    MenuListSource, MenuScreenDefinition, MenuSettings,
 };
 
 #[test]
@@ -36,14 +36,14 @@ fn menu_controller_opens_submenu_and_back_returns_to_previous_screen() {
     let mut controller = MenuController::new(MenuSettings::default());
     controller.open_pause_root();
     controller.handle_input(MenuInput::Down);
-    controller.handle_input(MenuInput::Confirm);
+    assert_eq!(controller.handle_input(MenuInput::Confirm), None);
 
     let inventory_view = controller
         .current_view(&[])
         .expect("inventory menu should be open");
     assert_eq!(inventory_view.screen_id, "inventory_menu");
 
-    controller.handle_input(MenuInput::Back);
+    assert_eq!(controller.handle_input(MenuInput::Back), None);
     let pause_view = controller
         .current_view(&[])
         .expect("pause menu should be restored");
@@ -54,7 +54,7 @@ fn menu_controller_opens_submenu_and_back_returns_to_previous_screen() {
 fn menu_controller_back_on_root_closes_menu() {
     let mut controller = MenuController::new(MenuSettings::default());
     controller.open_pause_root();
-    controller.handle_input(MenuInput::Back);
+    assert_eq!(controller.handle_input(MenuInput::Back), None);
     assert!(!controller.is_open());
 }
 
@@ -63,7 +63,7 @@ fn dynamic_inventory_list_is_rendered_as_non_selectable_entries() {
     let mut controller = MenuController::new(MenuSettings::default());
     controller.open_pause_root();
     controller.handle_input(MenuInput::Down);
-    controller.handle_input(MenuInput::Confirm);
+    assert_eq!(controller.handle_input(MenuInput::Confirm), None);
 
     let view = controller
         .current_view(&[
@@ -94,6 +94,7 @@ fn navigation_skips_non_selectable_items() {
     let settings = MenuSettings {
         pause_root_screen_id: "custom".to_string(),
         gate_gameplay_when_open: true,
+        appearance: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "custom".to_string(),
             title: "Custom".to_string(),
@@ -128,4 +129,42 @@ fn navigation_skips_non_selectable_items() {
     controller.handle_input(MenuInput::Down);
     let moved = controller.current_view(&[]).expect("view");
     assert!(moved.entries[4].selected);
+}
+
+#[test]
+fn menu_controller_returns_exit_runtime_command_for_exit_game_action() {
+    let settings = MenuSettings {
+        pause_root_screen_id: "pause_menu".to_string(),
+        gate_gameplay_when_open: true,
+        appearance: Default::default(),
+        screens: vec![MenuScreenDefinition {
+            id: "pause_menu".to_string(),
+            title: "Paused".to_string(),
+            items: vec![MenuItemDefinition::Button {
+                text: "Exit".to_string(),
+                action: MenuAction::ExitGame,
+            }],
+        }],
+    };
+
+    let mut controller = MenuController::new(settings);
+    controller.open_pause_root();
+
+    assert_eq!(
+        controller.handle_input(MenuInput::Confirm),
+        Some(MenuCommand::ExitRuntime)
+    );
+    assert!(
+        controller.is_open(),
+        "menu stays open until runtime handles exit"
+    );
+}
+
+#[test]
+fn menu_settings_default_includes_appearance_defaults() {
+    let settings = MenuSettings::default();
+
+    assert_eq!(settings.appearance.font_family, "Sans");
+    assert_eq!(settings.appearance.font_size_px, 14);
+    assert_eq!(settings.appearance.color_hex, "#7CFF7C");
 }

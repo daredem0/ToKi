@@ -115,6 +115,7 @@ struct App {
     splash_started_at: Option<Instant>,
     splash_logo_loaded: bool,
     post_splash_sprite_texture_path: Option<PathBuf>,
+    exit_requested: bool,
     asset_load_plan: RuntimeAssetLoadPlan,
     #[allow(dead_code)]
     decoded_project_cache: DecodedProjectCache,
@@ -194,6 +195,7 @@ impl App {
             splash_started_at: None,
             splash_logo_loaded: false,
             post_splash_sprite_texture_path: None,
+            exit_requested: false,
             asset_load_plan,
             decoded_project_cache,
             pack_mount,

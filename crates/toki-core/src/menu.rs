@@ -7,6 +7,8 @@ pub struct MenuSettings {
     pub pause_root_screen_id: String,
     #[serde(default = "default_gate_gameplay_when_open")]
     pub gate_gameplay_when_open: bool,
+    #[serde(default)]
+    pub appearance: MenuAppearance,
     #[serde(default = "default_menu_screens")]
     pub screens: Vec<MenuScreenDefinition>,
 }
@@ -16,9 +18,40 @@ impl Default for MenuSettings {
         Self {
             pause_root_screen_id: default_pause_root_screen_id(),
             gate_gameplay_when_open: default_gate_gameplay_when_open(),
+            appearance: MenuAppearance::default(),
             screens: default_menu_screens(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MenuAppearance {
+    #[serde(default = "default_menu_font_family")]
+    pub font_family: String,
+    #[serde(default = "default_menu_font_size_px")]
+    pub font_size_px: u16,
+    #[serde(default = "default_menu_color_hex")]
+    pub color_hex: String,
+    #[serde(default)]
+    pub border_style: MenuBorderStyle,
+}
+
+impl Default for MenuAppearance {
+    fn default() -> Self {
+        Self {
+            font_family: default_menu_font_family(),
+            font_size_px: default_menu_font_size_px(),
+            color_hex: default_menu_color_hex(),
+            border_style: MenuBorderStyle::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum MenuBorderStyle {
+    #[default]
+    Square,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -53,6 +86,7 @@ pub enum MenuAction {
     CloseMenu,
     OpenScreen { screen_id: String },
     Back,
+    ExitGame,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -67,6 +101,11 @@ pub enum MenuInput {
     Down,
     Confirm,
     Back,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MenuCommand {
+    ExitRuntime,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -206,16 +245,23 @@ impl MenuController {
         })
     }
 
-    pub fn handle_input(&mut self, input: MenuInput) {
-        let Some(current_screen_id) = self.current_screen_id().map(str::to_string) else {
-            return;
-        };
+    pub fn handle_input(&mut self, input: MenuInput) -> Option<MenuCommand> {
+        let current_screen_id = self.current_screen_id().map(str::to_string)?;
 
         match input {
-            MenuInput::Up => self.move_selection(&current_screen_id, -1),
-            MenuInput::Down => self.move_selection(&current_screen_id, 1),
+            MenuInput::Up => {
+                self.move_selection(&current_screen_id, -1);
+                None
+            }
+            MenuInput::Down => {
+                self.move_selection(&current_screen_id, 1);
+                None
+            }
             MenuInput::Confirm => self.confirm_current_selection(&current_screen_id),
-            MenuInput::Back => self.go_back(),
+            MenuInput::Back => {
+                self.go_back();
+                None
+            }
         }
     }
 
@@ -227,27 +273,33 @@ impl MenuController {
         }
     }
 
-    fn confirm_current_selection(&mut self, current_screen_id: &str) {
-        let Some(screen) = self.screen_map.get(current_screen_id) else {
-            return;
-        };
+    fn confirm_current_selection(&mut self, current_screen_id: &str) -> Option<MenuCommand> {
+        let screen = self.screen_map.get(current_screen_id)?;
         let selected_index = *self
             .selected_index_by_screen
             .get(current_screen_id)
             .unwrap_or(&0);
         let Some(MenuItemDefinition::Button { action, .. }) = screen.items.get(selected_index)
         else {
-            return;
+            return None;
         };
 
         match action {
-            MenuAction::CloseMenu => self.close(),
+            MenuAction::CloseMenu => {
+                self.close();
+                None
+            }
             MenuAction::OpenScreen { screen_id } => {
                 if self.screen_map.contains_key(screen_id) {
                     self.stack.push(screen_id.clone());
                 }
+                None
             }
-            MenuAction::Back => self.go_back(),
+            MenuAction::Back => {
+                self.go_back();
+                None
+            }
+            MenuAction::ExitGame => Some(MenuCommand::ExitRuntime),
         }
     }
 
@@ -296,6 +348,18 @@ fn default_pause_root_screen_id() -> String {
 
 fn default_gate_gameplay_when_open() -> bool {
     true
+}
+
+fn default_menu_font_family() -> String {
+    "Sans".to_string()
+}
+
+fn default_menu_font_size_px() -> u16 {
+    14
+}
+
+fn default_menu_color_hex() -> String {
+    "#7CFF7C".to_string()
 }
 
 fn default_menu_screens() -> Vec<MenuScreenDefinition> {

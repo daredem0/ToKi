@@ -1,6 +1,14 @@
 use super::super::editor_ui::{EditorUI, Selection};
 use crate::project::Project;
-use toki_core::menu::MenuItemDefinition;
+use toki_core::menu::{MenuBorderStyle, MenuItemDefinition};
+
+#[derive(Debug, Clone)]
+struct MenuPreviewTheme {
+    accent: egui::Color32,
+    font_family: egui::FontFamily,
+    font_size: f32,
+    border_style: MenuBorderStyle,
+}
 
 pub(super) fn render_menu_editor(
     ui: &mut egui::Ui,
@@ -56,19 +64,48 @@ pub(super) fn render_menu_editor(
             columns[1].label("Selected screen no longer exists.");
             return;
         };
+        let theme = MenuPreviewTheme {
+            accent: menu_preview_color(&project.metadata.runtime.menu.appearance.color_hex)
+                .unwrap_or(egui::Color32::from_rgb(124, 255, 124)),
+            font_family: egui::FontFamily::Name(
+                project
+                    .metadata
+                    .runtime
+                    .menu
+                    .appearance
+                    .font_family
+                    .clone()
+                    .into(),
+            ),
+            font_size: project.metadata.runtime.menu.appearance.font_size_px as f32,
+            border_style: project.metadata.runtime.menu.appearance.border_style,
+        };
 
         columns[1].with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
             egui::Frame::group(ui.style())
                 .inner_margin(egui::Margin::same(16))
+                .fill(egui::Color32::from_rgba_unmultiplied(
+                    ((theme.accent.r() as f32) * 0.16) as u8,
+                    ((theme.accent.g() as f32) * 0.16) as u8,
+                    ((theme.accent.b() as f32) * 0.16) as u8,
+                    224,
+                ))
+                .stroke(menu_preview_stroke(theme.border_style, theme.accent, 1.5))
                 .show(ui, |ui| {
                     let screen_selected = matches!(
                         ui_state.selection.as_ref(),
                         Some(Selection::MenuScreen(screen_id)) if screen_id == &screen.id
                     );
                     let title_text = if screen_selected {
-                        egui::RichText::new(&screen.title).strong()
+                        egui::RichText::new(&screen.title)
+                            .strong()
+                            .family(theme.font_family.clone())
+                            .size(theme.font_size + 4.0)
+                            .color(theme.accent)
                     } else {
                         egui::RichText::new(&screen.title)
+                            .family(theme.font_family.clone())
+                            .size(theme.font_size + 4.0)
                     };
                     if ui.add(egui::Button::new(title_text).frame(false)).clicked() {
                         ui_state.select_menu_screen(screen.id.clone());
@@ -84,7 +121,7 @@ pub(super) fn render_menu_editor(
                             }) if screen_id == &screen.id && *selected_index == item_index
                         );
                         render_menu_item_preview(
-                            ui, ui_state, &screen.id, item_index, item, selected,
+                            ui, ui_state, &screen.id, item_index, item, selected, &theme,
                         );
                         ui.add_space(6.0);
                     }
@@ -100,20 +137,38 @@ fn render_menu_item_preview(
     item_index: usize,
     item: &MenuItemDefinition,
     selected: bool,
+    theme: &MenuPreviewTheme,
 ) {
     match item {
         MenuItemDefinition::Label { text } => {
             let text = if selected {
-                egui::RichText::new(text).strong()
+                egui::RichText::new(text)
+                    .strong()
+                    .family(theme.font_family.clone())
+                    .size(theme.font_size)
+                    .color(theme.accent)
             } else {
                 egui::RichText::new(text)
+                    .family(theme.font_family.clone())
+                    .size(theme.font_size)
             };
             if ui.add(egui::Button::new(text).frame(false)).clicked() {
                 ui_state.select_menu_entry(screen_id.to_string(), item_index);
             }
         }
         MenuItemDefinition::Button { text, .. } => {
-            let button = egui::Button::new(text).selected(selected);
+            let button = egui::Button::new(
+                egui::RichText::new(text)
+                    .family(theme.font_family.clone())
+                    .size(theme.font_size)
+                    .color(if selected {
+                        theme.accent
+                    } else {
+                        ui.visuals().text_color()
+                    }),
+            )
+            .selected(selected)
+            .stroke(menu_preview_stroke(theme.border_style, theme.accent, 1.2));
             if ui.add_sized([220.0, 28.0], button).clicked() {
                 ui_state.select_menu_entry(screen_id.to_string(), item_index);
             }
@@ -124,17 +179,30 @@ fn render_menu_item_preview(
             ..
         } => {
             let frame = egui::Frame::group(ui.style()).stroke(if selected {
-                egui::Stroke::new(1.5, egui::Color32::from_rgb(120, 200, 255))
+                menu_preview_stroke(theme.border_style, theme.accent, 1.5)
             } else {
-                egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color)
+                menu_preview_stroke(
+                    theme.border_style,
+                    ui.visuals().widgets.noninteractive.bg_stroke.color,
+                    1.0,
+                )
             });
             let response = frame
                 .show(ui, |ui| {
                     ui.set_width(220.0);
                     if let Some(heading) = heading {
-                        ui.label(egui::RichText::new(heading).strong());
+                        ui.label(
+                            egui::RichText::new(heading)
+                                .strong()
+                                .family(theme.font_family.clone())
+                                .size(theme.font_size),
+                        );
                     }
-                    ui.label(empty_text);
+                    ui.label(
+                        egui::RichText::new(empty_text)
+                            .family(theme.font_family.clone())
+                            .size(theme.font_size),
+                    );
                     ui.small("Runtime list items appear here.");
                 })
                 .response;
@@ -142,5 +210,26 @@ fn render_menu_item_preview(
                 ui_state.select_menu_entry(screen_id.to_string(), item_index);
             }
         }
+    }
+}
+
+fn menu_preview_color(hex: &str) -> Option<egui::Color32> {
+    let trimmed = hex.trim().trim_start_matches('#');
+    if trimmed.len() != 6 {
+        return None;
+    }
+    let red = u8::from_str_radix(&trimmed[0..2], 16).ok()?;
+    let green = u8::from_str_radix(&trimmed[2..4], 16).ok()?;
+    let blue = u8::from_str_radix(&trimmed[4..6], 16).ok()?;
+    Some(egui::Color32::from_rgb(red, green, blue))
+}
+
+fn menu_preview_stroke(
+    border_style: MenuBorderStyle,
+    color: egui::Color32,
+    width: f32,
+) -> egui::Stroke {
+    match border_style {
+        MenuBorderStyle::Square => egui::Stroke::new(width, color),
     }
 }

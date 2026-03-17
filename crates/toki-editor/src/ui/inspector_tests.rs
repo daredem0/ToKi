@@ -257,6 +257,7 @@ fn rewrite_menu_action_screen_targets_updates_open_screen_actions() {
     let mut settings = toki_core::menu::MenuSettings {
         pause_root_screen_id: "pause_menu".to_string(),
         gate_gameplay_when_open: true,
+        appearance: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "pause_menu".to_string(),
             title: "Paused".to_string(),

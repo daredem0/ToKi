@@ -2,7 +2,8 @@ use super::{EditorUI, InspectorSystem, Selection};
 use crate::project::Project;
 use chrono::Utc;
 use toki_core::menu::{
-    MenuAction, MenuItemDefinition, MenuListSource, MenuScreenDefinition, MenuSettings,
+    MenuAction, MenuBorderStyle, MenuItemDefinition, MenuListSource, MenuScreenDefinition,
+    MenuSettings,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,6 +101,62 @@ impl InspectorSystem {
             });
         if pause_root != project.metadata.runtime.menu.pause_root_screen_id {
             project.metadata.runtime.menu.pause_root_screen_id = pause_root;
+            Self::mark_menu_settings_changed(project);
+        }
+
+        ui.separator();
+        ui.label("Appearance");
+        let mut appearance = project.metadata.runtime.menu.appearance.clone();
+        let mut appearance_changed = false;
+        ui.label("Font Family");
+        if ui
+            .text_edit_singleline(&mut appearance.font_family)
+            .changed()
+        {
+            appearance_changed = true;
+        }
+
+        let mut font_size = appearance.font_size_px;
+        ui.horizontal(|ui| {
+            ui.label("Font Size");
+            if ui
+                .add(
+                    egui::DragValue::new(&mut font_size)
+                        .range(8..=64)
+                        .speed(1.0),
+                )
+                .changed()
+            {
+                appearance.font_size_px = font_size;
+                appearance_changed = true;
+            }
+        });
+
+        let mut border_style = appearance.border_style;
+        egui::ComboBox::from_label("Border Style")
+            .selected_text(match border_style {
+                MenuBorderStyle::Square => "Square",
+            })
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut border_style, MenuBorderStyle::Square, "Square");
+            });
+        if border_style != appearance.border_style {
+            appearance.border_style = border_style;
+            appearance_changed = true;
+        }
+
+        ui.label("Menu Color Hex");
+        if ui.text_edit_singleline(&mut appearance.color_hex).changed() {
+            appearance_changed = true;
+        }
+        if !Self::is_valid_menu_hex_color(&appearance.color_hex) {
+            ui.colored_label(
+                egui::Color32::from_rgb(215, 120, 120),
+                "Use a 6-digit hex color like #7CFF7C",
+            );
+        }
+        if appearance_changed {
+            project.metadata.runtime.menu.appearance = appearance;
             Self::mark_menu_settings_changed(project);
         }
 
@@ -368,17 +425,20 @@ impl InspectorSystem {
             MenuAction::CloseMenu => 0,
             MenuAction::OpenScreen { .. } => 1,
             MenuAction::Back => 2,
+            MenuAction::ExitGame => 3,
         };
         egui::ComboBox::from_label("Action")
             .selected_text(match action_kind {
                 0 => "Resume / Close Menu",
                 1 => "Open Screen",
-                _ => "Back",
+                2 => "Back",
+                _ => "Exit Game",
             })
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut action_kind, 0, "Resume / Close Menu");
                 ui.selectable_value(&mut action_kind, 1, "Open Screen");
                 ui.selectable_value(&mut action_kind, 2, "Back");
+                ui.selectable_value(&mut action_kind, 3, "Exit Game");
             });
 
         match action_kind {
@@ -407,8 +467,13 @@ impl InspectorSystem {
                 }
             }
             _ => {
-                if *action != MenuAction::Back {
-                    *action = MenuAction::Back;
+                let next_action = if action_kind == 2 {
+                    MenuAction::Back
+                } else {
+                    MenuAction::ExitGame
+                };
+                if *action != next_action {
+                    *action = next_action;
                     changed = true;
                 }
             }
@@ -682,5 +747,10 @@ impl InspectorSystem {
     fn mark_menu_settings_changed(project: &mut Project) {
         project.metadata.project.modified = Utc::now();
         project.is_dirty = true;
+    }
+
+    fn is_valid_menu_hex_color(hex: &str) -> bool {
+        let trimmed = hex.trim().trim_start_matches('#');
+        trimmed.len() == 6 && trimmed.chars().all(|ch| ch.is_ascii_hexdigit())
     }
 }

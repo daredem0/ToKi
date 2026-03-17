@@ -234,6 +234,10 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::KeyboardInput { event, .. } => {
                 self.handle_keyboard_input_event(event);
+                if self.exit_requested {
+                    tracing::info!("Menu requested runtime exit; stopping");
+                    event_loop.exit();
+                }
             }
             WindowEvent::CloseRequested => {
                 tracing::info!("Close was requested; stopping");

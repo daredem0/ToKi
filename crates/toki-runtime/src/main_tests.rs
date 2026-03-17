@@ -102,6 +102,7 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
     let configured_menu = MenuSettings {
         pause_root_screen_id: "custom_pause".to_string(),
         gate_gameplay_when_open: false,
+        appearance: Default::default(),
         screens: vec![MenuScreenDefinition {
             id: "custom_pause".to_string(),
             title: "Custom Pause".to_string(),
@@ -193,6 +194,7 @@ fn apply_runtime_config_keeps_existing_paths_and_scene_but_updates_splash_durati
             menu: Some(MenuSettings {
                 pause_root_screen_id: "override".to_string(),
                 gate_gameplay_when_open: false,
+                appearance: Default::default(),
                 screens: vec![],
             }),
         },
@@ -292,6 +294,7 @@ fn load_runtime_config_skips_invalid_candidate_and_uses_next() {
         Some(MenuSettings {
             pause_root_screen_id: "pause_menu".to_string(),
             gate_gameplay_when_open: true,
+            appearance: Default::default(),
             screens: vec![],
         })
     );
@@ -415,6 +418,7 @@ fn apply_project_runtime_settings_do_not_override_existing_launch_audio_mix() {
         menu: MenuSettings {
             pause_root_screen_id: "cli_pause".to_string(),
             gate_gameplay_when_open: false,
+            appearance: Default::default(),
             screens: vec![],
         },
         ..RuntimeLaunchOptions::default()
