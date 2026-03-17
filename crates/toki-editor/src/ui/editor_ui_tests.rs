@@ -1,7 +1,7 @@
 use glam::{IVec2, UVec2};
 use tempfile::tempdir;
 use toki_core::entity::{EntityAttributes, EntityKind};
-use toki_core::menu::{MenuAction, MenuBorderStyle, MenuItemDefinition, MenuScreenDefinition};
+use toki_core::menu::{MenuAction, MenuItemDefinition, MenuScreenDefinition};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 
 use super::{EditorUI, MapEditorDraft, Selection};
@@ -262,7 +262,7 @@ fn sample_project_with_menu_screens(screen_ids: &[&str]) -> Project {
             title: format!("{screen_id} title"),
             items: vec![MenuItemDefinition::Button {
                 text: "Resume".to_string(),
-                border_style: MenuBorderStyle::Square,
+                border_style_override: None,
                 action: MenuAction::CloseMenu,
             }],
         })

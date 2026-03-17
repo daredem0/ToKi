@@ -273,6 +273,7 @@ impl InspectorSystem {
                     project,
                     MenuItemDefinition::Label {
                         text: "New Text".to_string(),
+                        border_style_override: None,
                     },
                 );
             }
@@ -282,7 +283,7 @@ impl InspectorSystem {
                     project,
                     MenuItemDefinition::Button {
                         text: "New Button".to_string(),
-                        border_style: MenuBorderStyle::Square,
+                        border_style_override: None,
                         action: MenuAction::CloseMenu,
                     },
                 );
@@ -295,6 +296,7 @@ impl InspectorSystem {
                         heading: Some("Inventory".to_string()),
                         source: MenuListSource::PlayerInventory,
                         empty_text: "Inventory is empty".to_string(),
+                        border_style_override: None,
                     },
                 );
             }
@@ -376,49 +378,41 @@ impl InspectorSystem {
             .collect::<Vec<_>>();
         let mut changed = false;
         match &mut project.metadata.runtime.menu.screens[screen_index].items[item_index] {
-            MenuItemDefinition::Label { text } => {
+            MenuItemDefinition::Label {
+                text,
+                border_style_override,
+            } => {
                 ui.label("Text");
                 if ui.text_edit_singleline(text).changed() {
                     changed = true;
                 }
+                changed |= Self::render_menu_border_override_editor(
+                    ui,
+                    "Entry Border Style",
+                    border_style_override,
+                );
             }
             MenuItemDefinition::Button {
                 text,
-                border_style,
+                border_style_override,
                 action,
             } => {
                 ui.label("Label");
                 if ui.text_edit_singleline(text).changed() {
                     changed = true;
                 }
-                let mut selected_border_style = *border_style;
-                egui::ComboBox::from_label("Button Border Style")
-                    .selected_text(match selected_border_style {
-                        MenuBorderStyle::None => "None",
-                        MenuBorderStyle::Square => "Square",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(
-                            &mut selected_border_style,
-                            MenuBorderStyle::None,
-                            "None",
-                        );
-                        ui.selectable_value(
-                            &mut selected_border_style,
-                            MenuBorderStyle::Square,
-                            "Square",
-                        );
-                    });
-                if *border_style != selected_border_style {
-                    *border_style = selected_border_style;
-                    changed = true;
-                }
+                changed |= Self::render_menu_border_override_editor(
+                    ui,
+                    "Entry Border Style",
+                    border_style_override,
+                );
                 changed |= Self::render_menu_action_editor(ui, &available_screen_ids, action);
             }
             MenuItemDefinition::DynamicList {
                 heading,
                 source,
                 empty_text,
+                border_style_override,
             } => {
                 let mut show_heading = heading.is_some();
                 if ui.checkbox(&mut show_heading, "Show Heading").changed() {
@@ -455,6 +449,11 @@ impl InspectorSystem {
                 if ui.text_edit_singleline(empty_text).changed() {
                     changed = true;
                 }
+                changed |= Self::render_menu_border_override_editor(
+                    ui,
+                    "Entry Border Style",
+                    border_style_override,
+                );
             }
         }
         if changed {
@@ -564,7 +563,7 @@ impl InspectorSystem {
                 title: "New Menu".to_string(),
                 items: vec![MenuItemDefinition::Button {
                     text: "Resume".to_string(),
-                    border_style: MenuBorderStyle::Square,
+                    border_style_override: None,
                     action: MenuAction::CloseMenu,
                 }],
             });
@@ -700,16 +699,18 @@ impl InspectorSystem {
         let next_item = match kind {
             MenuEditorItemKind::Label => MenuItemDefinition::Label {
                 text: "Text".to_string(),
+                border_style_override: None,
             },
             MenuEditorItemKind::Button => MenuItemDefinition::Button {
                 text: "Button".to_string(),
-                border_style: MenuBorderStyle::Square,
+                border_style_override: None,
                 action: MenuAction::CloseMenu,
             },
             MenuEditorItemKind::InventoryList => MenuItemDefinition::DynamicList {
                 heading: Some("Inventory".to_string()),
                 source: MenuListSource::PlayerInventory,
                 empty_text: "Inventory is empty".to_string(),
+                border_style_override: None,
             },
         };
 
@@ -799,7 +800,7 @@ impl InspectorSystem {
                                 MenuItemDefinition::Button { text, .. } => text.clone(),
                                 _ => "Button".to_string(),
                             },
-                            border_style: MenuBorderStyle::Square,
+                            border_style_override: None,
                             action: MenuAction::Back,
                         };
                     }
@@ -816,5 +817,29 @@ impl InspectorSystem {
     fn is_valid_menu_hex_color(hex: &str) -> bool {
         let trimmed = hex.trim().trim_start_matches('#');
         trimmed.len() == 6 && trimmed.chars().all(|ch| ch.is_ascii_hexdigit())
+    }
+
+    fn render_menu_border_override_editor(
+        ui: &mut egui::Ui,
+        label: &str,
+        border_style_override: &mut Option<MenuBorderStyle>,
+    ) -> bool {
+        let mut selected = *border_style_override;
+        egui::ComboBox::from_label(label)
+            .selected_text(match selected {
+                None => "Inherit",
+                Some(MenuBorderStyle::None) => "None",
+                Some(MenuBorderStyle::Square) => "Square",
+            })
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut selected, None, "Inherit");
+                ui.selectable_value(&mut selected, Some(MenuBorderStyle::None), "None");
+                ui.selectable_value(&mut selected, Some(MenuBorderStyle::Square), "Square");
+            });
+        if *border_style_override != selected {
+            *border_style_override = selected;
+            return true;
+        }
+        false
     }
 }

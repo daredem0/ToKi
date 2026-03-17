@@ -12,7 +12,7 @@ use toki_core::entity::{
     ControlRole, EntityAttributes, EntityKind, EntityManager, MovementSoundTrigger,
     ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
 };
-use toki_core::menu::{MenuAction, MenuBorderStyle, MenuItemDefinition, MenuScreenDefinition};
+use toki_core::menu::{MenuAction, MenuItemDefinition, MenuScreenDefinition};
 use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
     RuleTarget, RuleTrigger,
@@ -238,6 +238,7 @@ fn delete_menu_item_falls_back_to_screen_selection_when_last_item_removed() {
         title: "Paused".to_string(),
         items: vec![MenuItemDefinition::Label {
             text: "Only item".to_string(),
+            border_style_override: None,
         }],
     }];
     let mut ui = EditorUI::new();
@@ -263,7 +264,7 @@ fn rewrite_menu_action_screen_targets_updates_open_screen_actions() {
             title: "Paused".to_string(),
             items: vec![MenuItemDefinition::Button {
                 text: "Inventory".to_string(),
-                border_style: MenuBorderStyle::Square,
+                border_style_override: None,
                 action: MenuAction::OpenScreen {
                     screen_id: "inventory_menu".to_string(),
                 },
@@ -281,7 +282,7 @@ fn rewrite_menu_action_screen_targets_updates_open_screen_actions() {
         settings.screens[0].items[0],
         MenuItemDefinition::Button {
             text: "Inventory".to_string(),
-            border_style: MenuBorderStyle::Square,
+            border_style_override: None,
             action: MenuAction::OpenScreen {
                 screen_id: "items_menu".to_string(),
             },

@@ -111,15 +111,11 @@ impl App {
                 } else {
                     [0.0, 0.0, 0.0, 0.45]
                 },
-                if entry.selectable {
-                    menu_border_color(
-                        entry.border_style,
-                        accent,
-                        if entry.selected { 0.95 } else { 0.55 },
-                    )
-                } else {
-                    None
-                },
+                menu_border_color(
+                    entry.border_style,
+                    accent,
+                    if entry.selected { 0.95 } else { 0.55 },
+                ),
             );
 
             let style = if entry.selected {
@@ -225,13 +221,13 @@ mod tests {
                         text: "Resume".to_string(),
                         selected: true,
                         selectable: true,
-                        border_style: toki_core::menu::MenuBorderStyle::Square,
+                        border_style_override: None,
                     },
                     MenuViewEntry {
                         text: "Inventory".to_string(),
                         selected: false,
                         selectable: true,
-                        border_style: toki_core::menu::MenuBorderStyle::Square,
+                        border_style_override: None,
                     },
                 ],
             },

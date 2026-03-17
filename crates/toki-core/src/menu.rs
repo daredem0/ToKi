@@ -142,11 +142,13 @@ pub struct MenuScreenDefinition {
 pub enum MenuItemDefinition {
     Label {
         text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        border_style_override: Option<MenuBorderStyle>,
     },
     Button {
         text: String,
-        #[serde(default)]
-        border_style: MenuBorderStyle,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        border_style_override: Option<MenuBorderStyle>,
         action: MenuAction,
     },
     DynamicList {
@@ -154,6 +156,8 @@ pub enum MenuItemDefinition {
         heading: Option<String>,
         source: MenuListSource,
         empty_text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        border_style_override: Option<MenuBorderStyle>,
     },
 }
 
@@ -197,7 +201,7 @@ pub struct MenuViewEntry {
     pub text: String,
     pub selected: bool,
     pub selectable: bool,
-    pub border_style: MenuBorderStyle,
+    pub border_style_override: Option<MenuBorderStyle>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -272,31 +276,37 @@ impl MenuController {
         let mut entries = Vec::new();
         for (index, item) in screen.items.iter().enumerate() {
             match item {
-                MenuItemDefinition::Label { text } => entries.push(MenuViewEntry {
+                MenuItemDefinition::Label {
+                    text,
+                    border_style_override,
+                } => entries.push(MenuViewEntry {
                     text: text.clone(),
                     selected: false,
                     selectable: false,
-                    border_style: MenuBorderStyle::None,
+                    border_style_override: *border_style_override,
                 }),
                 MenuItemDefinition::Button {
-                    text, border_style, ..
+                    text,
+                    border_style_override,
+                    ..
                 } => entries.push(MenuViewEntry {
                     text: text.clone(),
                     selected: index == selected_index,
                     selectable: true,
-                    border_style: *border_style,
+                    border_style_override: *border_style_override,
                 }),
                 MenuItemDefinition::DynamicList {
                     heading,
                     source,
                     empty_text,
+                    border_style_override,
                 } => {
                     if let Some(heading) = heading {
                         entries.push(MenuViewEntry {
                             text: heading.clone(),
                             selected: false,
                             selectable: false,
-                            border_style: MenuBorderStyle::None,
+                            border_style_override: *border_style_override,
                         });
                     }
                     let dynamic_entries = match source {
@@ -306,7 +316,7 @@ impl MenuController {
                                 text: format!("{} x{}", entry.item_id, entry.count),
                                 selected: false,
                                 selectable: false,
-                                border_style: MenuBorderStyle::None,
+                                border_style_override: *border_style_override,
                             })
                             .collect::<Vec<_>>(),
                     };
@@ -315,7 +325,7 @@ impl MenuController {
                             text: empty_text.clone(),
                             selected: false,
                             selectable: false,
-                            border_style: MenuBorderStyle::None,
+                            border_style_override: *border_style_override,
                         });
                     } else {
                         entries.extend(dynamic_entries);
@@ -463,12 +473,12 @@ fn default_menu_screens() -> Vec<MenuScreenDefinition> {
             items: vec![
                 MenuItemDefinition::Button {
                     text: "Resume".to_string(),
-                    border_style: MenuBorderStyle::Square,
+                    border_style_override: None,
                     action: MenuAction::CloseMenu,
                 },
                 MenuItemDefinition::Button {
                     text: "Inventory".to_string(),
-                    border_style: MenuBorderStyle::Square,
+                    border_style_override: None,
                     action: MenuAction::OpenScreen {
                         screen_id: "inventory_menu".to_string(),
                     },
@@ -483,10 +493,11 @@ fn default_menu_screens() -> Vec<MenuScreenDefinition> {
                     heading: Some("Items".to_string()),
                     source: MenuListSource::PlayerInventory,
                     empty_text: "Inventory is empty".to_string(),
+                    border_style_override: None,
                 },
                 MenuItemDefinition::Button {
                     text: "Back".to_string(),
-                    border_style: MenuBorderStyle::Square,
+                    border_style_override: None,
                     action: MenuAction::Back,
                 },
             ],
@@ -533,7 +544,9 @@ pub fn build_menu_layout(
             text: entry.text.clone(),
             selected: entry.selected,
             selectable: entry.selectable,
-            border_style: entry.border_style,
+            border_style: entry
+                .border_style_override
+                .unwrap_or(appearance.border_style),
         })
         .collect();
     let hint_font_size = (appearance.font_size_px as f32 - 2.0).max(10.0);

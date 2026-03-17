@@ -103,20 +103,22 @@ fn navigation_skips_non_selectable_items() {
             items: vec![
                 MenuItemDefinition::Label {
                     text: "Heading".to_string(),
+                    border_style_override: None,
                 },
                 MenuItemDefinition::DynamicList {
                     heading: Some("Items".to_string()),
                     source: MenuListSource::PlayerInventory,
                     empty_text: "Empty".to_string(),
+                    border_style_override: None,
                 },
                 MenuItemDefinition::Button {
                     text: "Resume".to_string(),
-                    border_style: MenuBorderStyle::Square,
+                    border_style_override: None,
                     action: MenuAction::CloseMenu,
                 },
                 MenuItemDefinition::Button {
                     text: "Next".to_string(),
-                    border_style: MenuBorderStyle::Square,
+                    border_style_override: None,
                     action: MenuAction::OpenScreen {
                         screen_id: "custom".to_string(),
                     },
@@ -146,7 +148,7 @@ fn menu_controller_returns_exit_runtime_command_for_exit_game_action() {
             title: "Paused".to_string(),
             items: vec![MenuItemDefinition::Button {
                 text: "Exit".to_string(),
-                border_style: MenuBorderStyle::Square,
+                border_style_override: None,
                 action: MenuAction::ExitGame,
             }],
         }],
@@ -219,13 +221,13 @@ fn build_menu_layout_uses_fixed_panel_width_and_shared_entry_geometry() {
                     text: "Resume".to_string(),
                     selected: true,
                     selectable: true,
-                    border_style: MenuBorderStyle::Square,
+                    border_style_override: None,
                 },
                 MenuViewEntry {
                     text: "Inventory".to_string(),
                     selected: false,
                     selectable: true,
-                    border_style: MenuBorderStyle::None,
+                    border_style_override: Some(MenuBorderStyle::None),
                 },
             ],
         },
@@ -244,7 +246,7 @@ fn build_menu_layout_uses_fixed_panel_width_and_shared_entry_geometry() {
         layout.entries[1].rect.y - layout.entries[0].rect.y,
         layout.entries[0].rect.height + appearance.button_spacing_px as f32
     );
-    assert_eq!(layout.entries[0].border_style, MenuBorderStyle::Square);
+    assert_eq!(layout.entries[0].border_style, appearance.border_style);
     assert_eq!(layout.entries[1].border_style, MenuBorderStyle::None);
     assert_eq!(layout.title.rect.width, layout.entries[0].rect.width);
 }

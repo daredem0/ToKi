@@ -107,23 +107,29 @@ pub(super) fn render_menu_editor(
     let mut entries = Vec::new();
     for (item_index, item) in screen.items.iter().enumerate() {
         match item {
-            MenuItemDefinition::Label { text } => entries.push(MenuViewEntry {
+            MenuItemDefinition::Label {
+                text,
+                border_style_override,
+            } => entries.push(MenuViewEntry {
                 text: text.clone(),
                 selected: false,
                 selectable: false,
-                border_style: MenuBorderStyle::None,
+                border_style_override: *border_style_override,
             }),
             MenuItemDefinition::Button {
-                text, border_style, ..
+                text,
+                border_style_override,
+                ..
             } => entries.push(MenuViewEntry {
                 text: text.clone(),
                 selected: selected_entry_index == Some(item_index),
                 selectable: true,
-                border_style: *border_style,
+                border_style_override: *border_style_override,
             }),
             MenuItemDefinition::DynamicList {
                 heading,
                 empty_text,
+                border_style_override,
                 ..
             } => {
                 if let Some(heading) = heading {
@@ -131,14 +137,14 @@ pub(super) fn render_menu_editor(
                         text: heading.clone(),
                         selected: false,
                         selectable: false,
-                        border_style: MenuBorderStyle::None,
+                        border_style_override: *border_style_override,
                     });
                 }
                 entries.push(MenuViewEntry {
                     text: empty_text.clone(),
                     selected: false,
                     selectable: false,
-                    border_style: MenuBorderStyle::None,
+                    border_style_override: *border_style_override,
                 });
             }
         }
@@ -237,21 +243,19 @@ pub(super) fn render_menu_editor(
             [0.0, 0.0, 0.0, 0.45]
         };
         painter.rect_filled(entry_rect, 0.0, menu_preview_color32(fill));
-        if entry.selectable {
-            let alpha = if entry.selected { 0.95 } else { 0.55 };
-            if let Some(border) =
-                menu_border_color(theme.border_style, color32_to_rgba(theme.accent), alpha)
-            {
-                painter.rect_stroke(
-                    entry_rect,
-                    0.0,
-                    egui::Stroke::new(
-                        if entry.selected { 1.5 } else { 1.2 },
-                        menu_preview_color32(border),
-                    ),
-                    egui::StrokeKind::Outside,
-                );
-            }
+        let alpha = if entry.selected { 0.95 } else { 0.55 };
+        if let Some(border) =
+            menu_border_color(entry.border_style, color32_to_rgba(theme.accent), alpha)
+        {
+            painter.rect_stroke(
+                entry_rect,
+                0.0,
+                egui::Stroke::new(
+                    if entry.selected { 1.5 } else { 1.2 },
+                    menu_preview_color32(border),
+                ),
+                egui::StrokeKind::Outside,
+            );
         }
         painter.text(
             entry_rect.center_top() + egui::vec2(0.0, 6.0),
