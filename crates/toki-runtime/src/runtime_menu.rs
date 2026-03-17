@@ -1,5 +1,5 @@
 use toki_core::menu::{
-    build_menu_layout, menu_border_color, menu_hex_color_rgba, tinted_menu_background, MenuCommand,
+    build_menu_layout, menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba, MenuCommand,
     MenuInput,
 };
 use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
@@ -44,51 +44,50 @@ impl App {
                 let size = self.camera_system.viewport_size();
                 glam::Vec2::new(size.x as f32, size.y as f32)
             });
-        let accent = menu_hex_color_rgba(&self.menu_system.settings().appearance.color_hex)
-            .unwrap_or([0.49, 1.0, 0.49, 1.0]);
+        let border_color =
+            menu_hex_color_rgba(&self.menu_system.settings().appearance.border_color_hex)
+                .unwrap_or([0.49, 1.0, 0.49, 1.0]);
+        let text_color =
+            menu_hex_color_rgba(&self.menu_system.settings().appearance.text_color_hex)
+                .unwrap_or([1.0, 1.0, 1.0, 1.0]);
         let appearance = self.menu_system.settings().appearance.clone();
         let layout = build_menu_layout(&view, &appearance, viewport);
         let panel_rect = layout.panel;
-        self.rendering.add_filled_ui_rect(
-            panel_rect.x,
-            panel_rect.y,
-            panel_rect.width,
-            panel_rect.height,
-            tinted_menu_background(accent, 0.16, 0.88),
+        self.render_menu_layout_rect(
+            &panel_rect,
+            menu_fill_color_rgba(
+                &appearance.menu_background_color_hex,
+                appearance.menu_background_transparent,
+            ),
+            menu_border_color(appearance.border_style, border_color, 1.0),
         );
-        if let Some(border_color) = menu_border_color(appearance.border_style, accent, 0.95) {
-            self.rendering.add_ui_rect(
-                panel_rect.x,
-                panel_rect.y,
-                panel_rect.width,
-                panel_rect.height,
-                border_color,
-            );
-        }
 
         let title_style = TextStyle {
             font_family: appearance.font_family.clone(),
             size_px: appearance.font_size_px as f32 + 4.0,
             weight: TextWeight::Bold,
-            color: [1.0, 1.0, 1.0, 1.0],
+            color: text_color,
             ..TextStyle::default()
         };
         let entry_style = TextStyle {
             font_family: appearance.font_family.clone(),
             size_px: appearance.font_size_px as f32,
             weight: TextWeight::Normal,
-            color: [1.0, 1.0, 1.0, 1.0],
+            color: text_color,
             ..TextStyle::default()
         };
         let selected_style = TextStyle {
-            color: accent,
+            color: text_color,
             weight: TextWeight::Bold,
             ..entry_style.clone()
         };
         self.render_menu_layout_rect(
             &layout.title.rect,
-            tinted_menu_background(accent, 0.16, 0.9),
-            menu_border_color(appearance.border_style, accent, 0.95),
+            menu_fill_color_rgba(
+                &appearance.title_background_color_hex,
+                appearance.title_background_transparent,
+            ),
+            menu_border_color(layout.title.border_style, border_color, 1.0),
         );
 
         self.rendering.add_text_item(
@@ -104,18 +103,11 @@ impl App {
         for entry in &layout.entries {
             self.render_menu_layout_rect(
                 &entry.rect,
-                if entry.selected {
-                    tinted_menu_background(accent, 0.22, 0.88)
-                } else if entry.selectable {
-                    tinted_menu_background(accent, 0.08, 0.72)
-                } else {
-                    [0.0, 0.0, 0.0, 0.45]
-                },
-                menu_border_color(
-                    entry.border_style,
-                    accent,
-                    if entry.selected { 0.95 } else { 0.55 },
+                menu_fill_color_rgba(
+                    &appearance.entry_background_color_hex,
+                    appearance.entry_background_transparent,
                 ),
+                menu_border_color(entry.border_style, border_color, 1.0),
             );
 
             let style = if entry.selected {
@@ -138,7 +130,7 @@ impl App {
             );
         }
 
-        self.render_menu_layout_rect(&layout.hint.rect, [0.0, 0.0, 0.0, 0.65], None);
+        self.render_menu_layout_rect(&layout.hint.rect, None, None);
         self.rendering.add_text_item(
             TextItem::new_screen(
                 layout.hint.text,
@@ -146,7 +138,7 @@ impl App {
                 TextStyle {
                     font_family: appearance.font_family.clone(),
                     size_px: (appearance.font_size_px as f32 - 2.0).max(10.0),
-                    color: [0.85, 0.85, 0.85, 1.0],
+                    color: text_color,
                     ..TextStyle::default()
                 },
             )
@@ -162,11 +154,13 @@ impl App {
     fn render_menu_layout_rect(
         &mut self,
         rect: &toki_core::menu::MenuRect,
-        fill: [f32; 4],
+        fill: Option<[f32; 4]>,
         border: Option<[f32; 4]>,
     ) {
-        self.rendering
-            .add_filled_ui_rect(rect.x, rect.y, rect.width, rect.height, fill);
+        if let Some(fill) = fill {
+            self.rendering
+                .add_filled_ui_rect(rect.x, rect.y, rect.width, rect.height, fill);
+        }
         if let Some(border) = border {
             self.rendering
                 .add_ui_rect(rect.x, rect.y, rect.width, rect.height, border);
@@ -216,6 +210,7 @@ mod tests {
             &MenuView {
                 screen_id: "pause".to_string(),
                 title: "Paused".to_string(),
+                title_border_style_override: None,
                 entries: vec![
                     MenuViewEntry {
                         text: "Resume".to_string(),
@@ -238,5 +233,17 @@ mod tests {
         assert_eq!(layout.panel.width, 280.0);
         assert_eq!(layout.entries.len(), 2);
         assert!(layout.entries[0].rect.width > 200.0);
+    }
+
+    #[test]
+    fn menu_fill_color_rgba_supports_transparent_backgrounds() {
+        assert_eq!(
+            menu_fill_color_rgba("#112233", true),
+            Some([17.0 / 255.0, 34.0 / 255.0, 51.0 / 255.0, 0.0])
+        );
+        assert_eq!(
+            menu_fill_color_rgba("#112233", false),
+            Some([17.0 / 255.0, 34.0 / 255.0, 51.0 / 255.0, 1.0])
+        );
     }
 }

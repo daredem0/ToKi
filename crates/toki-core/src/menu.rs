@@ -34,8 +34,22 @@ pub struct MenuAppearance {
     pub title_spacing_px: u16,
     #[serde(default = "default_menu_button_spacing_px")]
     pub button_spacing_px: u16,
-    #[serde(default = "default_menu_color_hex")]
-    pub color_hex: String,
+    #[serde(default = "default_menu_border_color_hex", alias = "color_hex")]
+    pub border_color_hex: String,
+    #[serde(default = "default_menu_text_color_hex")]
+    pub text_color_hex: String,
+    #[serde(default = "default_menu_background_color_hex")]
+    pub menu_background_color_hex: String,
+    #[serde(default)]
+    pub menu_background_transparent: bool,
+    #[serde(default = "default_menu_title_background_color_hex")]
+    pub title_background_color_hex: String,
+    #[serde(default)]
+    pub title_background_transparent: bool,
+    #[serde(default = "default_menu_entry_background_color_hex")]
+    pub entry_background_color_hex: String,
+    #[serde(default)]
+    pub entry_background_transparent: bool,
     #[serde(default)]
     pub border_style: MenuBorderStyle,
 }
@@ -89,6 +103,7 @@ impl MenuRect {
 pub struct MenuLayoutBlock {
     pub rect: MenuRect,
     pub text: String,
+    pub border_style: MenuBorderStyle,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -115,7 +130,14 @@ impl Default for MenuAppearance {
             font_size_px: default_menu_font_size_px(),
             title_spacing_px: default_menu_title_spacing_px(),
             button_spacing_px: default_menu_button_spacing_px(),
-            color_hex: default_menu_color_hex(),
+            border_color_hex: default_menu_border_color_hex(),
+            text_color_hex: default_menu_text_color_hex(),
+            menu_background_color_hex: default_menu_background_color_hex(),
+            menu_background_transparent: false,
+            title_background_color_hex: default_menu_title_background_color_hex(),
+            title_background_transparent: false,
+            entry_background_color_hex: default_menu_entry_background_color_hex(),
+            entry_background_transparent: false,
             border_style: MenuBorderStyle::default(),
         }
     }
@@ -133,6 +155,8 @@ pub enum MenuBorderStyle {
 pub struct MenuScreenDefinition {
     pub id: String,
     pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title_border_style_override: Option<MenuBorderStyle>,
     #[serde(default)]
     pub items: Vec<MenuItemDefinition>,
 }
@@ -193,6 +217,7 @@ pub enum MenuCommand {
 pub struct MenuView {
     pub screen_id: String,
     pub title: String,
+    pub title_border_style_override: Option<MenuBorderStyle>,
     pub entries: Vec<MenuViewEntry>,
 }
 
@@ -336,6 +361,7 @@ impl MenuController {
         Some(MenuView {
             screen_id,
             title: screen.title.clone(),
+            title_border_style_override: screen.title_border_style_override,
             entries,
         })
     }
@@ -461,8 +487,24 @@ fn default_menu_button_spacing_px() -> u16 {
     8
 }
 
-fn default_menu_color_hex() -> String {
+fn default_menu_border_color_hex() -> String {
     "#7CFF7C".to_string()
+}
+
+fn default_menu_text_color_hex() -> String {
+    "#FFFFFF".to_string()
+}
+
+fn default_menu_background_color_hex() -> String {
+    "#142914".to_string()
+}
+
+fn default_menu_title_background_color_hex() -> String {
+    "#143614".to_string()
+}
+
+fn default_menu_entry_background_color_hex() -> String {
+    "#0F1F0F".to_string()
 }
 
 fn default_menu_screens() -> Vec<MenuScreenDefinition> {
@@ -470,6 +512,7 @@ fn default_menu_screens() -> Vec<MenuScreenDefinition> {
         MenuScreenDefinition {
             id: "pause_menu".to_string(),
             title: "Paused".to_string(),
+            title_border_style_override: None,
             items: vec![
                 MenuItemDefinition::Button {
                     text: "Resume".to_string(),
@@ -488,6 +531,7 @@ fn default_menu_screens() -> Vec<MenuScreenDefinition> {
         MenuScreenDefinition {
             id: "inventory_menu".to_string(),
             title: "Inventory".to_string(),
+            title_border_style_override: None,
             items: vec![
                 MenuItemDefinition::DynamicList {
                     heading: Some("Items".to_string()),
@@ -563,11 +607,15 @@ pub fn build_menu_layout(
         title: MenuLayoutBlock {
             rect: title_rect,
             text: view.title.clone(),
+            border_style: view
+                .title_border_style_override
+                .unwrap_or(appearance.border_style),
         },
         entries,
         hint: MenuLayoutBlock {
             rect: hint_rect,
             text: "Esc: Back   Enter/Space: Select".to_string(),
+            border_style: MenuBorderStyle::None,
         },
     }
 }
@@ -620,13 +668,10 @@ pub fn menu_hex_color_rgba(hex: &str) -> Option<[f32; 4]> {
     ])
 }
 
-pub fn tinted_menu_background(accent: [f32; 4], shade: f32, alpha: f32) -> [f32; 4] {
-    [
-        accent[0] * shade,
-        accent[1] * shade,
-        accent[2] * shade,
-        alpha,
-    ]
+pub fn menu_fill_color_rgba(hex: &str, transparent: bool) -> Option<[f32; 4]> {
+    let mut color = menu_hex_color_rgba(hex)?;
+    color[3] = if transparent { 0.0 } else { 1.0 };
+    Some(color)
 }
 
 pub fn menu_border_color(

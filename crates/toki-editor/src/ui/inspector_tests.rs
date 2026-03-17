@@ -236,6 +236,7 @@ fn delete_menu_item_falls_back_to_screen_selection_when_last_item_removed() {
     project.metadata.runtime.menu.screens = vec![MenuScreenDefinition {
         id: "pause_menu".to_string(),
         title: "Paused".to_string(),
+        title_border_style_override: None,
         items: vec![MenuItemDefinition::Label {
             text: "Only item".to_string(),
             border_style_override: None,
@@ -262,6 +263,7 @@ fn rewrite_menu_action_screen_targets_updates_open_screen_actions() {
         screens: vec![MenuScreenDefinition {
             id: "pause_menu".to_string(),
             title: "Paused".to_string(),
+            title_border_style_override: None,
             items: vec![MenuItemDefinition::Button {
                 text: "Inventory".to_string(),
                 border_style_override: None,

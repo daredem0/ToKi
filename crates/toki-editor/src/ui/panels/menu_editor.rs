@@ -2,16 +2,19 @@ use super::super::editor_ui::{EditorUI, Selection};
 use crate::fonts::resolve_preview_font_family;
 use crate::project::Project;
 use toki_core::menu::{
-    build_menu_layout, menu_border_color, menu_hex_color_rgba, tinted_menu_background,
+    build_menu_layout, menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba,
     MenuBorderStyle, MenuItemDefinition, MenuView, MenuViewEntry,
 };
 
 #[derive(Debug, Clone)]
 struct MenuPreviewTheme {
-    accent: egui::Color32,
+    border_color: egui::Color32,
+    text_color: egui::Color32,
+    menu_background_color: Option<egui::Color32>,
+    title_background_color: Option<egui::Color32>,
+    entry_background_color: Option<egui::Color32>,
     font_family: egui::FontFamily,
     font_size: f32,
-    border_style: MenuBorderStyle,
 }
 
 pub(super) fn render_menu_editor(
@@ -87,15 +90,64 @@ pub(super) fn render_menu_editor(
         return;
     };
     let theme = MenuPreviewTheme {
-        accent: menu_hex_color_rgba(&project.metadata.runtime.menu.appearance.color_hex)
+        border_color: menu_hex_color_rgba(
+            &project.metadata.runtime.menu.appearance.border_color_hex,
+        )
+        .map(menu_preview_color32)
+        .unwrap_or(egui::Color32::from_rgb(124, 255, 124)),
+        text_color: menu_hex_color_rgba(&project.metadata.runtime.menu.appearance.text_color_hex)
             .map(menu_preview_color32)
-            .unwrap_or(egui::Color32::from_rgb(124, 255, 124)),
+            .unwrap_or(egui::Color32::WHITE),
+        menu_background_color: menu_fill_color_rgba(
+            &project
+                .metadata
+                .runtime
+                .menu
+                .appearance
+                .menu_background_color_hex,
+            project
+                .metadata
+                .runtime
+                .menu
+                .appearance
+                .menu_background_transparent,
+        )
+        .map(menu_preview_color32),
+        title_background_color: menu_fill_color_rgba(
+            &project
+                .metadata
+                .runtime
+                .menu
+                .appearance
+                .title_background_color_hex,
+            project
+                .metadata
+                .runtime
+                .menu
+                .appearance
+                .title_background_transparent,
+        )
+        .map(menu_preview_color32),
+        entry_background_color: menu_fill_color_rgba(
+            &project
+                .metadata
+                .runtime
+                .menu
+                .appearance
+                .entry_background_color_hex,
+            project
+                .metadata
+                .runtime
+                .menu
+                .appearance
+                .entry_background_transparent,
+        )
+        .map(menu_preview_color32),
         font_family: resolve_preview_font_family(
             &project.metadata.runtime.menu.appearance.font_family,
             &ui_state.menu_preview_font_families,
         ),
         font_size: project.metadata.runtime.menu.appearance.font_size_px as f32,
-        border_style: project.metadata.runtime.menu.appearance.border_style,
     };
     let selected_entry_index = match ui_state.selection.as_ref() {
         Some(Selection::MenuEntry {
@@ -155,6 +207,7 @@ pub(super) fn render_menu_editor(
         &MenuView {
             screen_id: screen.id.clone(),
             title: screen.title.clone(),
+            title_border_style_override: screen.title_border_style_override,
             entries,
         },
         &project.metadata.runtime.menu.appearance,
@@ -168,38 +221,29 @@ pub(super) fn render_menu_editor(
         rect.center().y - layout.panel.height * 0.5 - layout.panel.y,
     );
     let panel_rect = translated_rect(&layout.panel, origin);
-    painter.rect_filled(
-        panel_rect,
-        0.0,
-        menu_preview_color32(tinted_menu_background(
-            color32_to_rgba(theme.accent),
-            0.16,
-            0.88,
-        )),
-    );
+    if let Some(fill) = theme.menu_background_color {
+        painter.rect_filled(panel_rect, 0.0, fill);
+    }
     painter.rect_stroke(
         panel_rect,
         0.0,
-        menu_preview_stroke(theme.border_style, theme.accent, 1.5),
+        menu_preview_stroke(
+            project.metadata.runtime.menu.appearance.border_style,
+            theme.border_color,
+            1.5,
+        ),
         egui::StrokeKind::Outside,
     );
 
-    let screen_selected = matches!(
-        ui_state.selection.as_ref(),
-        Some(Selection::MenuScreen(screen_id)) if screen_id == &screen.id
-    );
     let title_rect = translated_rect(&layout.title.rect, origin);
-    painter.rect_filled(
-        title_rect,
-        0.0,
-        menu_preview_color32(tinted_menu_background(
-            color32_to_rgba(theme.accent),
-            0.16,
-            0.9,
-        )),
-    );
-    if let Some(border) = menu_border_color(theme.border_style, color32_to_rgba(theme.accent), 0.95)
-    {
+    if let Some(fill) = theme.title_background_color {
+        painter.rect_filled(title_rect, 0.0, fill);
+    }
+    if let Some(border) = menu_border_color(
+        layout.title.border_style,
+        color32_to_rgba(theme.border_color),
+        1.0,
+    ) {
         painter.rect_stroke(
             title_rect,
             0.0,
@@ -222,11 +266,7 @@ pub(super) fn render_menu_editor(
         egui::Align2::CENTER_TOP,
         &layout.title.text,
         egui::FontId::new(theme.font_size + 4.0, theme.font_family.clone()),
-        if screen_selected {
-            theme.accent
-        } else {
-            ui.visuals().text_color()
-        },
+        theme.text_color,
     );
 
     for (item_index, entry) in layout.entries.iter().enumerate() {
@@ -235,17 +275,11 @@ pub(super) fn render_menu_editor(
         if ui.interact(entry_rect, id, egui::Sense::click()).clicked() {
             ui_state.select_menu_entry(screen.id.clone(), item_index);
         }
-        let fill = if entry.selected {
-            tinted_menu_background(color32_to_rgba(theme.accent), 0.22, 0.88)
-        } else if entry.selectable {
-            tinted_menu_background(color32_to_rgba(theme.accent), 0.08, 0.72)
-        } else {
-            [0.0, 0.0, 0.0, 0.45]
-        };
-        painter.rect_filled(entry_rect, 0.0, menu_preview_color32(fill));
-        let alpha = if entry.selected { 0.95 } else { 0.55 };
+        if let Some(fill) = theme.entry_background_color {
+            painter.rect_filled(entry_rect, 0.0, fill);
+        }
         if let Some(border) =
-            menu_border_color(entry.border_style, color32_to_rgba(theme.accent), alpha)
+            menu_border_color(entry.border_style, color32_to_rgba(theme.border_color), 1.0)
         {
             painter.rect_stroke(
                 entry_rect,
@@ -266,22 +300,17 @@ pub(super) fn render_menu_editor(
                 format!("  {}", entry.text)
             },
             egui::FontId::new(theme.font_size, theme.font_family.clone()),
-            if entry.selected {
-                theme.accent
-            } else {
-                ui.visuals().text_color()
-            },
+            theme.text_color,
         );
     }
 
     let hint_rect = translated_rect(&layout.hint.rect, origin);
-    painter.rect_filled(hint_rect, 0.0, menu_preview_color32([0.0, 0.0, 0.0, 0.65]));
     painter.text(
         hint_rect.center_top() + egui::vec2(0.0, 4.0),
         egui::Align2::CENTER_TOP,
         &layout.hint.text,
         egui::FontId::new((theme.font_size - 2.0).max(10.0), theme.font_family.clone()),
-        egui::Color32::from_rgb(217, 217, 217),
+        theme.text_color,
     );
 }
 

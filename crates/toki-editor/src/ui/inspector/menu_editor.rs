@@ -179,14 +179,97 @@ impl InspectorSystem {
             appearance_changed = true;
         }
 
-        ui.label("Menu Color Hex");
-        if ui.text_edit_singleline(&mut appearance.color_hex).changed() {
+        ui.label("Border Color Hex");
+        if ui
+            .text_edit_singleline(&mut appearance.border_color_hex)
+            .changed()
+        {
             appearance_changed = true;
         }
-        if !Self::is_valid_menu_hex_color(&appearance.color_hex) {
+        if !Self::is_valid_menu_hex_color(&appearance.border_color_hex) {
             ui.colored_label(
                 egui::Color32::from_rgb(215, 120, 120),
                 "Use a 6-digit hex color like #7CFF7C",
+            );
+        }
+        ui.label("Text Color Hex");
+        if ui
+            .text_edit_singleline(&mut appearance.text_color_hex)
+            .changed()
+        {
+            appearance_changed = true;
+        }
+        if !Self::is_valid_menu_hex_color(&appearance.text_color_hex) {
+            ui.colored_label(
+                egui::Color32::from_rgb(215, 120, 120),
+                "Use a 6-digit hex color like #FFFFFF",
+            );
+        }
+        ui.separator();
+        ui.label("Menu Background");
+        if ui
+            .checkbox(
+                &mut appearance.menu_background_transparent,
+                "Transparent Menu Background",
+            )
+            .changed()
+        {
+            appearance_changed = true;
+        }
+        if ui
+            .text_edit_singleline(&mut appearance.menu_background_color_hex)
+            .changed()
+        {
+            appearance_changed = true;
+        }
+        if !Self::is_valid_menu_hex_color(&appearance.menu_background_color_hex) {
+            ui.colored_label(
+                egui::Color32::from_rgb(215, 120, 120),
+                "Use a 6-digit hex color like #142914",
+            );
+        }
+        ui.label("Title Background");
+        if ui
+            .checkbox(
+                &mut appearance.title_background_transparent,
+                "Transparent Title Background",
+            )
+            .changed()
+        {
+            appearance_changed = true;
+        }
+        if ui
+            .text_edit_singleline(&mut appearance.title_background_color_hex)
+            .changed()
+        {
+            appearance_changed = true;
+        }
+        if !Self::is_valid_menu_hex_color(&appearance.title_background_color_hex) {
+            ui.colored_label(
+                egui::Color32::from_rgb(215, 120, 120),
+                "Use a 6-digit hex color like #143614",
+            );
+        }
+        ui.label("Entry Background");
+        if ui
+            .checkbox(
+                &mut appearance.entry_background_transparent,
+                "Transparent Entry Background",
+            )
+            .changed()
+        {
+            appearance_changed = true;
+        }
+        if ui
+            .text_edit_singleline(&mut appearance.entry_background_color_hex)
+            .changed()
+        {
+            appearance_changed = true;
+        }
+        if !Self::is_valid_menu_hex_color(&appearance.entry_background_color_hex) {
+            ui.colored_label(
+                egui::Color32::from_rgb(215, 120, 120),
+                "Use a 6-digit hex color like #0F1F0F",
             );
         }
         if appearance_changed {
@@ -224,6 +307,12 @@ impl InspectorSystem {
                 screen.title = title;
                 changed = true;
             }
+
+            changed |= Self::render_menu_border_override_editor(
+                ui,
+                "Title Border Style",
+                &mut screen.title_border_style_override,
+            );
 
             let mut id = screen.id.clone();
             ui.label("Screen ID");
@@ -561,6 +650,7 @@ impl InspectorSystem {
             .push(MenuScreenDefinition {
                 id: next_id.clone(),
                 title: "New Menu".to_string(),
+                title_border_style_override: None,
                 items: vec![MenuItemDefinition::Button {
                     text: "Resume".to_string(),
                     border_style_override: None,

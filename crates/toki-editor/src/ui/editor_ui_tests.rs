@@ -260,6 +260,7 @@ fn sample_project_with_menu_screens(screen_ids: &[&str]) -> Project {
         .map(|screen_id| MenuScreenDefinition {
             id: (*screen_id).to_string(),
             title: format!("{screen_id} title"),
+            title_border_style_override: None,
             items: vec![MenuItemDefinition::Button {
                 text: "Resume".to_string(),
                 border_style_override: None,

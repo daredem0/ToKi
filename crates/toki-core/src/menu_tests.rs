@@ -1,8 +1,8 @@
 use super::{
-    build_menu_layout, menu_border_color, menu_hex_color_rgba, menu_visual_metrics,
-    tinted_menu_background, InventoryEntry, MenuAction, MenuAppearance, MenuBorderStyle,
-    MenuCommand, MenuController, MenuInput, MenuItemDefinition, MenuListSource,
-    MenuScreenDefinition, MenuSettings, MenuView, MenuViewEntry,
+    build_menu_layout, menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba,
+    menu_visual_metrics, InventoryEntry, MenuAction, MenuAppearance, MenuBorderStyle, MenuCommand,
+    MenuController, MenuInput, MenuItemDefinition, MenuListSource, MenuScreenDefinition,
+    MenuSettings, MenuView, MenuViewEntry,
 };
 
 #[test]
@@ -100,6 +100,7 @@ fn navigation_skips_non_selectable_items() {
         screens: vec![MenuScreenDefinition {
             id: "custom".to_string(),
             title: "Custom".to_string(),
+            title_border_style_override: None,
             items: vec![
                 MenuItemDefinition::Label {
                     text: "Heading".to_string(),
@@ -146,6 +147,7 @@ fn menu_controller_returns_exit_runtime_command_for_exit_game_action() {
         screens: vec![MenuScreenDefinition {
             id: "pause_menu".to_string(),
             title: "Paused".to_string(),
+            title_border_style_override: None,
             items: vec![MenuItemDefinition::Button {
                 text: "Exit".to_string(),
                 border_style_override: None,
@@ -175,7 +177,14 @@ fn menu_settings_default_includes_appearance_defaults() {
     assert_eq!(settings.appearance.font_size_px, 14);
     assert_eq!(settings.appearance.title_spacing_px, 8);
     assert_eq!(settings.appearance.button_spacing_px, 8);
-    assert_eq!(settings.appearance.color_hex, "#7CFF7C");
+    assert_eq!(settings.appearance.border_color_hex, "#7CFF7C");
+    assert_eq!(settings.appearance.text_color_hex, "#FFFFFF");
+    assert_eq!(settings.appearance.menu_background_color_hex, "#142914");
+    assert_eq!(settings.appearance.title_background_color_hex, "#143614");
+    assert_eq!(settings.appearance.entry_background_color_hex, "#0F1F0F");
+    assert!(!settings.appearance.menu_background_transparent);
+    assert!(!settings.appearance.title_background_transparent);
+    assert!(!settings.appearance.entry_background_transparent);
 }
 
 #[test]
@@ -188,8 +197,12 @@ fn menu_hex_color_and_border_helpers_follow_shared_menu_visual_rules() {
     );
     assert_eq!(menu_border_color(MenuBorderStyle::None, accent, 0.95), None);
     assert_eq!(
-        tinted_menu_background(accent, 0.16, 0.9),
-        [accent[0] * 0.16, accent[1] * 0.16, accent[2] * 0.16, 0.9]
+        menu_fill_color_rgba("#7CFF7C", false),
+        Some([124.0 / 255.0, 1.0, 124.0 / 255.0, 1.0])
+    );
+    assert_eq!(
+        menu_fill_color_rgba("#7CFF7C", true),
+        Some([124.0 / 255.0, 1.0, 124.0 / 255.0, 0.0])
     );
 }
 
@@ -216,6 +229,7 @@ fn build_menu_layout_uses_fixed_panel_width_and_shared_entry_geometry() {
         &MenuView {
             screen_id: "pause".to_string(),
             title: "Paused".to_string(),
+            title_border_style_override: Some(MenuBorderStyle::None),
             entries: vec![
                 MenuViewEntry {
                     text: "Resume".to_string(),
@@ -249,4 +263,5 @@ fn build_menu_layout_uses_fixed_panel_width_and_shared_entry_geometry() {
     assert_eq!(layout.entries[0].border_style, appearance.border_style);
     assert_eq!(layout.entries[1].border_style, MenuBorderStyle::None);
     assert_eq!(layout.title.rect.width, layout.entries[0].rect.width);
+    assert_eq!(layout.title.border_style, MenuBorderStyle::None);
 }

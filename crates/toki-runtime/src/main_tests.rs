@@ -106,6 +106,7 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
         screens: vec![MenuScreenDefinition {
             id: "custom_pause".to_string(),
             title: "Custom Pause".to_string(),
+            title_border_style_override: None,
             items: vec![MenuItemDefinition::Button {
                 text: "Resume".to_string(),
                 border_style_override: None,
