@@ -41,6 +41,7 @@ pub enum Selection {
     StandaloneMap(String), // Map selected from Maps panel (not in scene context)
     EntityDefinition(String), // Entity definition from palette
     MenuScreen(String),
+    MenuDialog(String),
     MenuEntry {
         screen_id: String,
         item_index: usize,

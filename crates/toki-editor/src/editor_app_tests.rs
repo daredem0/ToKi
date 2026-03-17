@@ -8,7 +8,11 @@ use std::path::PathBuf;
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::TileMap;
 use toki_core::collision::CollisionBox;
-use toki_core::entity::{Entity, EntityAttributes, EntityKind};
+use toki_core::entity::{
+    AiBehavior, AnimationsDef, AttributesDef, AudioDef, CollisionDef, Entity, EntityAttributes,
+    EntityDefinition, EntityKind, MovementProfile, MovementSoundTrigger, PickupDef, RenderingDef,
+    StaticObjectRenderDef,
+};
 use winit::keyboard::ModifiersState;
 
 #[test]
@@ -360,12 +364,85 @@ fn build_drag_preview_sprites_computes_validity_per_entity() {
 
 #[test]
 fn load_preview_sprite_frame_static_supports_object_sheet_backed_entities() {
-    let project_path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../example_project/NewProject");
+    let temp_dir = tempfile::tempdir().expect("temp dir should exist");
+    let project_path = temp_dir.path().to_path_buf();
+    fs::create_dir_all(project_path.join("entities")).expect("entities dir should exist");
+    fs::create_dir_all(project_path.join("assets/sprites")).expect("sprites dir should exist");
+    fs::write(
+        project_path.join("assets/sprites/items.json"),
+        r#"{
+            "sheet_type": "objects",
+            "image": "items.png",
+            "tile_size": [16, 16],
+            "objects": {
+                "coin": {
+                    "position": [0, 0],
+                    "size_tiles": [1, 1]
+                }
+            }
+        }"#,
+    )
+    .expect("object sheet should be written");
+    let entity_def = EntityDefinition {
+        name: "coin_pickup".to_string(),
+        display_name: "Coin Pickup".to_string(),
+        description: "Collectible coin".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+            static_object: Some(StaticObjectRenderDef {
+                sheet: "items".to_string(),
+                object_name: "coin".to_string(),
+            }),
+        },
+        attributes: AttributesDef {
+            health: None,
+            stats: HashMap::new(),
+            speed: 0,
+            solid: false,
+            active: true,
+            can_move: false,
+            ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::None,
+            primary_projectile: None,
+            pickup: Some(PickupDef {
+                item_id: "coin".to_string(),
+                count: 1,
+            }),
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: true,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: "step".to_string(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "".to_string(),
+            clips: vec![],
+            default_state: "".to_string(),
+        },
+        category: "item".to_string(),
+        tags: vec!["pickup".to_string()],
+    };
+    fs::write(
+        project_path.join("entities/coin_pickup.json"),
+        serde_json::to_string_pretty(&entity_def).expect("entity json should serialize"),
+    )
+    .expect("entity definition should be written");
+
     let mut project_assets = ProjectAssets::new(project_path.clone());
     project_assets
         .scan_assets()
-        .expect("example project assets should scan");
+        .expect("project assets should scan");
 
     let preview =
         EditorApp::load_preview_sprite_frame_static("coin_pickup", &project_path, &project_assets)

@@ -2,7 +2,8 @@ use super::super::editor_ui::{EditorUI, Selection};
 use crate::fonts::resolve_preview_font_family;
 use crate::project::Project;
 use toki_core::menu::{
-    build_menu_layout, compose_menu_ui, MenuItemDefinition, MenuView, MenuViewEntry,
+    build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui, MenuItemDefinition,
+    MenuView, MenuViewEntry,
 };
 use toki_core::ui::{UiBlock, UiComposition};
 
@@ -21,159 +22,251 @@ pub(super) fn render_menu_editor(
     ui_state.sync_menu_editor_selection(Some(project));
 
     ui.horizontal(|ui| {
-        ui.label("Screen");
+        ui.label("Surface");
 
-        let selected_screen_id = ui_state
-            .selected_menu_screen_id()
-            .map(str::to_string)
-            .or_else(|| {
-                project
-                    .metadata
-                    .runtime
-                    .menu
-                    .screens
-                    .first()
-                    .map(|screen| screen.id.clone())
-            });
-        let selected_screen_label = project
-            .metadata
-            .runtime
-            .menu
-            .screens
-            .iter()
-            .find(|screen| Some(screen.id.as_str()) == selected_screen_id.as_deref())
-            .map(|screen| screen.title.clone())
-            .unwrap_or_else(|| "Select screen".to_string());
+        let selected_surface_label = match ui_state.selection.as_ref() {
+            Some(Selection::MenuScreen(screen_id))
+            | Some(Selection::MenuEntry { screen_id, .. }) => project
+                .metadata
+                .runtime
+                .menu
+                .screens
+                .iter()
+                .find(|screen| &screen.id == screen_id)
+                .map(|screen| format!("Screen: {}", screen.title))
+                .unwrap_or_else(|| "Select surface".to_string()),
+            Some(Selection::MenuDialog(dialog_id)) => project
+                .metadata
+                .runtime
+                .menu
+                .dialogs
+                .iter()
+                .find(|dialog| &dialog.id == dialog_id)
+                .map(|dialog| format!("Dialog: {}", dialog.title))
+                .unwrap_or_else(|| "Select surface".to_string()),
+            _ => project
+                .metadata
+                .runtime
+                .menu
+                .screens
+                .first()
+                .map(|screen| format!("Screen: {}", screen.title))
+                .or_else(|| {
+                    project
+                        .metadata
+                        .runtime
+                        .menu
+                        .dialogs
+                        .first()
+                        .map(|dialog| format!("Dialog: {}", dialog.title))
+                })
+                .unwrap_or_else(|| "Select surface".to_string()),
+        };
 
         egui::ComboBox::from_id_salt("menu_editor_screen_selector")
-            .selected_text(selected_screen_label)
+            .selected_text(selected_surface_label)
             .width(220.0)
             .show_ui(ui, |ui| {
                 for screen in &project.metadata.runtime.menu.screens {
-                    let selected = Some(screen.id.as_str()) == selected_screen_id.as_deref();
+                    let selected = matches!(
+                        ui_state.selection.as_ref(),
+                        Some(Selection::MenuScreen(id)) | Some(Selection::MenuEntry { screen_id: id, .. })
+                            if id == &screen.id
+                    );
                     if ui.selectable_label(selected, &screen.title).clicked() {
                         ui_state.select_menu_screen(screen.id.clone());
                     }
                 }
+                if !project.metadata.runtime.menu.dialogs.is_empty()
+                    && !project.metadata.runtime.menu.screens.is_empty()
+                {
+                    ui.separator();
+                }
+                for dialog in &project.metadata.runtime.menu.dialogs {
+                    let selected = matches!(
+                        ui_state.selection.as_ref(),
+                        Some(Selection::MenuDialog(id)) if id == &dialog.id
+                    );
+                    if ui
+                        .selectable_label(selected, format!("Dialog: {}", dialog.title))
+                        .clicked()
+                    {
+                        ui_state.select_menu_dialog(dialog.id.clone());
+                    }
+                }
             });
 
-        if let Some(screen_id) = selected_screen_id.as_deref() {
+        if let Some(screen_id) = ui_state.selected_menu_screen_id() {
             ui.small(format!("id: {screen_id}"));
+        } else if let Some(dialog_id) = ui_state.selected_menu_dialog_id() {
+            ui.small(format!("id: {dialog_id}"));
         }
     });
     ui.separator();
 
-    let Some(selected_screen_id) = ui_state.selected_menu_screen_id().map(str::to_string) else {
-        ui.label("Select a screen to preview it.");
-        return;
-    };
-    let Some(screen) = project
-        .metadata
-        .runtime
-        .menu
-        .screens
-        .iter()
-        .find(|screen| screen.id == selected_screen_id)
-    else {
-        ui.label("Selected screen no longer exists.");
-        return;
-    };
-    let selected_entry_index = match ui_state.selection.as_ref() {
-        Some(Selection::MenuEntry {
-            screen_id,
-            item_index,
-        }) if screen_id == &screen.id => Some(*item_index),
-        _ => None,
-    };
-    let mut entries = Vec::new();
-    for (item_index, item) in screen.items.iter().enumerate() {
-        match item {
-            MenuItemDefinition::Label {
-                text,
-                border_style_override,
-            } => entries.push(MenuViewEntry {
-                text: text.clone(),
-                selected: false,
-                selectable: false,
-                border_style_override: *border_style_override,
-            }),
-            MenuItemDefinition::Button {
-                text,
-                border_style_override,
-                ..
-            } => entries.push(MenuViewEntry {
-                text: text.clone(),
-                selected: selected_entry_index == Some(item_index),
-                selectable: true,
-                border_style_override: *border_style_override,
-            }),
-            MenuItemDefinition::DynamicList {
-                heading,
-                empty_text,
-                border_style_override,
-                ..
-            } => {
-                if let Some(heading) = heading {
-                    entries.push(MenuViewEntry {
-                        text: heading.clone(),
-                        selected: false,
-                        selectable: false,
-                        border_style_override: *border_style_override,
-                    });
-                }
-                entries.push(MenuViewEntry {
-                    text: empty_text.clone(),
-                    selected: false,
-                    selectable: false,
-                    border_style_override: *border_style_override,
-                });
-            }
-        }
-    }
-
     let available = ui.available_size();
-    let layout = build_menu_layout(
-        &MenuView {
-            screen_id: screen.id.clone(),
-            title: screen.title.clone(),
-            title_border_style_override: screen.title_border_style_override,
-            entries,
-        },
-        &project.metadata.runtime.menu.appearance,
-        glam::Vec2::new(available.x.max(320.0), available.y.max(240.0)),
-    );
-    let composition = compose_menu_ui(&layout, &project.metadata.runtime.menu.appearance);
+    let viewport = glam::Vec2::new(available.x.max(320.0), available.y.max(240.0));
 
     let (rect, _response) = ui.allocate_exact_size(available, egui::Sense::hover());
     let painter = ui.painter_at(rect);
-    let origin = egui::vec2(
-        rect.center().x - layout.panel.width * 0.5 - layout.panel.x,
-        rect.center().y - layout.panel.height * 0.5 - layout.panel.y,
-    );
-    paint_ui_composition(
-        &painter,
-        &composition,
-        origin,
-        &ui_state.menu_preview_font_families,
-    );
+    match ui_state.selection.as_ref() {
+        Some(Selection::MenuDialog(dialog_id)) => {
+            let Some(dialog) = project
+                .metadata
+                .runtime
+                .menu
+                .dialogs
+                .iter()
+                .find(|dialog| dialog.id == *dialog_id)
+            else {
+                ui.label("Selected dialog no longer exists.");
+                return;
+            };
+            let layout = build_dialog_layout(
+                &toki_core::menu::MenuDialogView {
+                    dialog_id: dialog.id.clone(),
+                    title: dialog.title.clone(),
+                    body: dialog.body.clone(),
+                    confirm_text: dialog.confirm_text.clone(),
+                    cancel_text: dialog.cancel_text.clone(),
+                    confirm_selected: true,
+                },
+                &project.metadata.runtime.menu.appearance,
+                viewport,
+            );
+            let composition = compose_dialog_ui(&layout, &project.metadata.runtime.menu.appearance);
+            let origin = egui::vec2(
+                rect.center().x - layout.panel.width * 0.5 - layout.panel.x,
+                rect.center().y - layout.panel.height * 0.5 - layout.panel.y,
+            );
+            paint_ui_composition(
+                &painter,
+                &composition,
+                origin,
+                &ui_state.menu_preview_font_families,
+            );
+            let panel_rect = translated_rect(&layout.panel, origin);
+            if ui
+                .interact(
+                    panel_rect,
+                    ui.id().with(("menu_dialog", &dialog.id)),
+                    egui::Sense::click(),
+                )
+                .clicked()
+            {
+                ui_state.select_menu_dialog(dialog.id.clone());
+            }
+        }
+        _ => {
+            let Some(selected_screen_id) = ui_state.selected_menu_screen_id().map(str::to_string)
+            else {
+                ui.label("Select a screen or dialog to preview it.");
+                return;
+            };
+            let Some(screen) = project
+                .metadata
+                .runtime
+                .menu
+                .screens
+                .iter()
+                .find(|screen| screen.id == selected_screen_id)
+            else {
+                ui.label("Selected screen no longer exists.");
+                return;
+            };
+            let selected_entry_index = match ui_state.selection.as_ref() {
+                Some(Selection::MenuEntry {
+                    screen_id,
+                    item_index,
+                }) if screen_id == &screen.id => Some(*item_index),
+                _ => None,
+            };
+            let mut entries = Vec::new();
+            for (item_index, item) in screen.items.iter().enumerate() {
+                match item {
+                    MenuItemDefinition::Label {
+                        text,
+                        border_style_override,
+                    } => entries.push(MenuViewEntry {
+                        text: text.clone(),
+                        selected: false,
+                        selectable: false,
+                        border_style_override: *border_style_override,
+                    }),
+                    MenuItemDefinition::Button {
+                        text,
+                        border_style_override,
+                        ..
+                    } => entries.push(MenuViewEntry {
+                        text: text.clone(),
+                        selected: selected_entry_index == Some(item_index),
+                        selectable: true,
+                        border_style_override: *border_style_override,
+                    }),
+                    MenuItemDefinition::DynamicList {
+                        heading,
+                        empty_text,
+                        border_style_override,
+                        ..
+                    } => {
+                        if let Some(heading) = heading {
+                            entries.push(MenuViewEntry {
+                                text: heading.clone(),
+                                selected: false,
+                                selectable: false,
+                                border_style_override: *border_style_override,
+                            });
+                        }
+                        entries.push(MenuViewEntry {
+                            text: empty_text.clone(),
+                            selected: false,
+                            selectable: false,
+                            border_style_override: *border_style_override,
+                        });
+                    }
+                }
+            }
+            let layout = build_menu_layout(
+                &MenuView {
+                    screen_id: screen.id.clone(),
+                    title: screen.title.clone(),
+                    title_border_style_override: screen.title_border_style_override,
+                    entries,
+                },
+                &project.metadata.runtime.menu.appearance,
+                viewport,
+            );
+            let composition = compose_menu_ui(&layout, &project.metadata.runtime.menu.appearance);
+            let origin = egui::vec2(
+                rect.center().x - layout.panel.width * 0.5 - layout.panel.x,
+                rect.center().y - layout.panel.height * 0.5 - layout.panel.y,
+            );
+            paint_ui_composition(
+                &painter,
+                &composition,
+                origin,
+                &ui_state.menu_preview_font_families,
+            );
 
-    let title_rect = translated_rect(&layout.title.rect, origin);
-    if ui
-        .interact(
-            title_rect,
-            ui.id().with(("menu_title", &screen.id)),
-            egui::Sense::click(),
-        )
-        .clicked()
-    {
-        ui_state.select_menu_screen(screen.id.clone());
-    }
+            let title_rect = translated_rect(&layout.title.rect, origin);
+            if ui
+                .interact(
+                    title_rect,
+                    ui.id().with(("menu_title", &screen.id)),
+                    egui::Sense::click(),
+                )
+                .clicked()
+            {
+                ui_state.select_menu_screen(screen.id.clone());
+            }
 
-    for (item_index, entry) in layout.entries.iter().enumerate() {
-        let entry_rect = translated_rect(&entry.rect, origin);
-        let id = ui.id().with(("menu_entry", &screen.id, item_index));
-        if ui.interact(entry_rect, id, egui::Sense::click()).clicked() {
-            ui_state.select_menu_entry(screen.id.clone(), item_index);
+            for (item_index, entry) in layout.entries.iter().enumerate() {
+                let entry_rect = translated_rect(&entry.rect, origin);
+                let id = ui.id().with(("menu_entry", &screen.id, item_index));
+                if ui.interact(entry_rect, id, egui::Sense::click()).clicked() {
+                    ui_state.select_menu_entry(screen.id.clone(), item_index);
+                }
+            }
         }
     }
 }

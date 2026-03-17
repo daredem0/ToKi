@@ -2,8 +2,8 @@ use super::{EditorUI, InspectorSystem, Selection};
 use crate::project::Project;
 use chrono::Utc;
 use toki_core::menu::{
-    MenuAction, MenuBorderStyle, MenuItemDefinition, MenuListSource, MenuScreenDefinition,
-    MenuSettings,
+    MenuAction, MenuBorderStyle, MenuDialogDefinition, MenuItemDefinition, MenuListSource,
+    MenuScreenDefinition, MenuSettings,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,6 +54,9 @@ impl InspectorSystem {
         match ui_state.selection.clone() {
             Some(Selection::MenuScreen(screen_id)) => {
                 Self::render_menu_screen_editor(ui_state, ui, project, &screen_id);
+            }
+            Some(Selection::MenuDialog(dialog_id)) => {
+                Self::render_menu_dialog_editor(ui_state, ui, project, &dialog_id);
             }
             Some(Selection::MenuEntry {
                 screen_id,
@@ -394,6 +397,13 @@ impl InspectorSystem {
                     Self::add_menu_screen(ui_state, project);
                 }
             });
+        egui::CollapsingHeader::new("Dialogs")
+            .default_open(false)
+            .show(ui, |ui| {
+                if ui.button("+ Add Dialog").clicked() {
+                    Self::add_menu_dialog(ui_state, project);
+                }
+            });
     }
 
     fn render_menu_screen_editor(
@@ -516,6 +526,128 @@ impl InspectorSystem {
             });
     }
 
+    fn render_menu_dialog_editor(
+        ui_state: &mut EditorUI,
+        ui: &mut egui::Ui,
+        project: &mut Project,
+        dialog_id: &str,
+    ) {
+        let Some(dialog_index) = Self::selected_menu_dialog_index(project, dialog_id) else {
+            ui.label("Selected dialog no longer exists.");
+            return;
+        };
+
+        let available_screen_ids = project
+            .metadata
+            .runtime
+            .menu
+            .screens
+            .iter()
+            .map(|screen| screen.id.clone())
+            .collect::<Vec<_>>();
+        let available_dialog_ids = project
+            .metadata
+            .runtime
+            .menu
+            .dialogs
+            .iter()
+            .map(|dialog| dialog.id.clone())
+            .collect::<Vec<_>>();
+        let mut changed = false;
+        let mut renamed_to = None;
+        let mut duplicate_dialog = false;
+        let mut delete_dialog = false;
+
+        egui::CollapsingHeader::new("Dialog")
+            .default_open(false)
+            .show(ui, |ui| {
+                let dialog = &mut project.metadata.runtime.menu.dialogs[dialog_index];
+                ui.label("Title");
+                if ui.text_edit_singleline(&mut dialog.title).changed() {
+                    changed = true;
+                }
+
+                ui.label("Dialog ID");
+                let mut id = dialog.id.clone();
+                if ui.text_edit_singleline(&mut id).changed() {
+                    let normalized = Self::normalize_menu_screen_id(&id);
+                    if !normalized.is_empty() && normalized != dialog.id {
+                        dialog.id = normalized.clone();
+                        renamed_to = Some(normalized);
+                        changed = true;
+                    }
+                }
+
+                ui.label("Body");
+                if ui
+                    .add(
+                        egui::TextEdit::multiline(&mut dialog.body)
+                            .desired_rows(3)
+                            .lock_focus(true),
+                    )
+                    .changed()
+                {
+                    changed = true;
+                }
+
+                ui.separator();
+                ui.label("Confirm Button");
+                if ui.text_edit_singleline(&mut dialog.confirm_text).changed() {
+                    changed = true;
+                }
+                ui.push_id("dialog_confirm_action", |ui| {
+                    changed |= Self::render_menu_action_editor(
+                        ui,
+                        &available_screen_ids,
+                        &available_dialog_ids,
+                        &mut dialog.confirm_action,
+                    );
+                });
+
+                ui.separator();
+                ui.label("Cancel Button");
+                if ui.text_edit_singleline(&mut dialog.cancel_text).changed() {
+                    changed = true;
+                }
+                ui.push_id("dialog_cancel_action", |ui| {
+                    changed |= Self::render_menu_action_editor(
+                        ui,
+                        &available_screen_ids,
+                        &available_dialog_ids,
+                        &mut dialog.cancel_action,
+                    );
+                });
+
+                ui.separator();
+                ui.horizontal(|ui| {
+                    if ui.button("Duplicate Dialog").clicked() {
+                        duplicate_dialog = true;
+                    }
+                    if ui.button("Delete Dialog").clicked() {
+                        delete_dialog = true;
+                    }
+                });
+            });
+
+        if let Some(normalized) = renamed_to {
+            Self::rewrite_menu_action_dialog_targets(
+                &mut project.metadata.runtime.menu,
+                dialog_id,
+                &normalized,
+            );
+            ui_state.select_menu_dialog(normalized);
+        }
+        if changed {
+            Self::mark_menu_settings_changed(project);
+        }
+        if duplicate_dialog {
+            Self::duplicate_menu_dialog(ui_state, project, dialog_index);
+        }
+        if delete_dialog {
+            Self::delete_menu_dialog(ui_state, project, dialog_index);
+        }
+    }
+
     fn render_menu_entry_editor(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
@@ -548,9 +680,17 @@ impl InspectorSystem {
             .iter()
             .map(|screen| screen.id.clone())
             .collect::<Vec<_>>();
+        let available_dialog_ids = project
+            .metadata
+            .runtime
+            .menu
+            .dialogs
+            .iter()
+            .map(|dialog| dialog.id.clone())
+            .collect::<Vec<_>>();
         let mut changed = false;
         let mut has_missing_target_validation = false;
-        let mut missing_target_screen_id = String::new();
+        let mut missing_target_id = String::new();
 
         egui::CollapsingHeader::new("Entry")
             .default_open(false)
@@ -620,13 +760,26 @@ impl InspectorSystem {
                             "Entry Border Style",
                             border_style_override,
                         );
-                        changed |=
-                            Self::render_menu_action_editor(ui, &available_screen_ids, action);
-                        if let MenuAction::OpenScreen { screen_id } = action {
-                            if !available_screen_ids.iter().any(|id| id == screen_id) {
+                        changed |= Self::render_menu_action_editor(
+                            ui,
+                            &available_screen_ids,
+                            &available_dialog_ids,
+                            action,
+                        );
+                        match action {
+                            MenuAction::OpenScreen { screen_id }
+                                if !available_screen_ids.iter().any(|id| id == screen_id) =>
+                            {
                                 has_missing_target_validation = true;
-                                missing_target_screen_id = screen_id.clone();
+                                missing_target_id = screen_id.clone();
                             }
+                            MenuAction::OpenDialog { dialog_id }
+                                if !available_dialog_ids.iter().any(|id| id == dialog_id) =>
+                            {
+                                has_missing_target_validation = true;
+                                missing_target_id = dialog_id.clone();
+                            }
+                            _ => {}
                         }
                     }
                     MenuItemDefinition::DynamicList {
@@ -685,7 +838,7 @@ impl InspectorSystem {
         if has_missing_target_validation {
             ui.colored_label(
                 egui::Color32::from_rgb(215, 120, 120),
-                format!("Target screen '{missing_target_screen_id}' does not exist."),
+                format!("Target surface '{missing_target_id}' does not exist."),
             );
         }
     }
@@ -693,27 +846,34 @@ impl InspectorSystem {
     fn render_menu_action_editor(
         ui: &mut egui::Ui,
         available_screen_ids: &[String],
+        available_dialog_ids: &[String],
         action: &mut MenuAction,
     ) -> bool {
         let mut changed = false;
         let mut action_kind = match action {
             MenuAction::CloseMenu => 0,
-            MenuAction::OpenScreen { .. } => 1,
-            MenuAction::Back => 2,
-            MenuAction::ExitGame => 3,
+            MenuAction::CloseDialog => 1,
+            MenuAction::OpenScreen { .. } => 2,
+            MenuAction::OpenDialog { .. } => 3,
+            MenuAction::Back => 4,
+            MenuAction::ExitGame => 5,
         };
         egui::ComboBox::from_label("Action")
             .selected_text(match action_kind {
                 0 => "Resume / Close Menu",
-                1 => "Open Screen",
-                2 => "Back",
+                1 => "Close Dialog",
+                2 => "Open Screen",
+                3 => "Open Dialog",
+                4 => "Back",
                 _ => "Exit Game",
             })
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut action_kind, 0, "Resume / Close Menu");
-                ui.selectable_value(&mut action_kind, 1, "Open Screen");
-                ui.selectable_value(&mut action_kind, 2, "Back");
-                ui.selectable_value(&mut action_kind, 3, "Exit Game");
+                ui.selectable_value(&mut action_kind, 1, "Close Dialog");
+                ui.selectable_value(&mut action_kind, 2, "Open Screen");
+                ui.selectable_value(&mut action_kind, 3, "Open Dialog");
+                ui.selectable_value(&mut action_kind, 4, "Back");
+                ui.selectable_value(&mut action_kind, 5, "Exit Game");
             });
 
         match action_kind {
@@ -724,6 +884,12 @@ impl InspectorSystem {
                 }
             }
             1 => {
+                if *action != MenuAction::CloseDialog {
+                    *action = MenuAction::CloseDialog;
+                    changed = true;
+                }
+            }
+            2 => {
                 let mut target = match action {
                     MenuAction::OpenScreen { screen_id } => screen_id.clone(),
                     _ => available_screen_ids.first().cloned().unwrap_or_default(),
@@ -741,8 +907,26 @@ impl InspectorSystem {
                     changed = true;
                 }
             }
+            3 => {
+                let mut target = match action {
+                    MenuAction::OpenDialog { dialog_id } => dialog_id.clone(),
+                    _ => available_dialog_ids.first().cloned().unwrap_or_default(),
+                };
+                egui::ComboBox::from_label("Target Dialog")
+                    .selected_text(target.clone())
+                    .show_ui(ui, |ui| {
+                        for dialog_id in available_dialog_ids {
+                            ui.selectable_value(&mut target, dialog_id.clone(), dialog_id);
+                        }
+                    });
+                let next_action = MenuAction::OpenDialog { dialog_id: target };
+                if *action != next_action {
+                    *action = next_action;
+                    changed = true;
+                }
+            }
             _ => {
-                let next_action = if action_kind == 2 {
+                let next_action = if action_kind == 4 {
                     MenuAction::Back
                 } else {
                     MenuAction::ExitGame
@@ -764,6 +948,16 @@ impl InspectorSystem {
             .screens
             .iter()
             .position(|screen| screen.id == screen_id)
+    }
+
+    fn selected_menu_dialog_index(project: &Project, dialog_id: &str) -> Option<usize> {
+        project
+            .metadata
+            .runtime
+            .menu
+            .dialogs
+            .iter()
+            .position(|dialog| dialog.id == dialog_id)
     }
 
     pub(crate) fn add_menu_screen(ui_state: &mut EditorUI, project: &mut Project) {
@@ -790,6 +984,26 @@ impl InspectorSystem {
         ui_state.select_menu_screen(next_id);
     }
 
+    pub(crate) fn add_menu_dialog(ui_state: &mut EditorUI, project: &mut Project) {
+        let next_id = Self::next_menu_dialog_id(&project.metadata.runtime.menu);
+        project
+            .metadata
+            .runtime
+            .menu
+            .dialogs
+            .push(MenuDialogDefinition {
+                id: next_id.clone(),
+                title: "New Dialog".to_string(),
+                body: "Are you sure?".to_string(),
+                confirm_text: "Confirm".to_string(),
+                cancel_text: "Cancel".to_string(),
+                confirm_action: MenuAction::CloseDialog,
+                cancel_action: MenuAction::CloseDialog,
+            });
+        Self::mark_menu_settings_changed(project);
+        ui_state.select_menu_dialog(next_id);
+    }
+
     fn duplicate_menu_screen(ui_state: &mut EditorUI, project: &mut Project, screen_index: usize) {
         let original = project.metadata.runtime.menu.screens[screen_index].clone();
         let mut duplicate = original.clone();
@@ -805,6 +1019,23 @@ impl InspectorSystem {
             .insert(insert_index, duplicate.clone());
         Self::mark_menu_settings_changed(project);
         ui_state.select_menu_screen(duplicate.id);
+    }
+
+    fn duplicate_menu_dialog(ui_state: &mut EditorUI, project: &mut Project, dialog_index: usize) {
+        let original = project.metadata.runtime.menu.dialogs[dialog_index].clone();
+        let mut duplicate = original.clone();
+        duplicate.id =
+            Self::next_menu_dialog_id_for_base(&project.metadata.runtime.menu, &original.id);
+        duplicate.title = format!("{} Copy", original.title);
+        let insert_index = dialog_index + 1;
+        project
+            .metadata
+            .runtime
+            .menu
+            .dialogs
+            .insert(insert_index, duplicate.clone());
+        Self::mark_menu_settings_changed(project);
+        ui_state.select_menu_dialog(duplicate.id);
     }
 
     fn delete_menu_screen(
@@ -827,6 +1058,13 @@ impl InspectorSystem {
         Self::mark_menu_settings_changed(project);
         ui_state.sync_menu_editor_selection(Some(project));
         true
+    }
+
+    fn delete_menu_dialog(ui_state: &mut EditorUI, project: &mut Project, dialog_index: usize) {
+        let removed = project.metadata.runtime.menu.dialogs.remove(dialog_index);
+        Self::remove_menu_dialog_action_targets(&mut project.metadata.runtime.menu, &removed.id);
+        Self::mark_menu_settings_changed(project);
+        ui_state.sync_menu_editor_selection(Some(project));
     }
 
     fn add_menu_item_to_selected_screen(
@@ -964,6 +1202,10 @@ impl InspectorSystem {
         Self::next_menu_screen_id_for_base(settings, "new_menu")
     }
 
+    fn next_menu_dialog_id(settings: &MenuSettings) -> String {
+        Self::next_menu_dialog_id_for_base(settings, "new_dialog")
+    }
+
     fn next_menu_screen_id_for_base(settings: &MenuSettings, base: &str) -> String {
         if !Self::menu_screen_exists(settings, base) {
             return base.to_string();
@@ -978,8 +1220,26 @@ impl InspectorSystem {
         }
     }
 
+    fn next_menu_dialog_id_for_base(settings: &MenuSettings, base: &str) -> String {
+        if !Self::menu_dialog_exists(settings, base) {
+            return base.to_string();
+        }
+        let mut index = 2usize;
+        loop {
+            let candidate = format!("{base}_{index}");
+            if !Self::menu_dialog_exists(settings, &candidate) {
+                return candidate;
+            }
+            index += 1;
+        }
+    }
+
     fn menu_screen_exists(settings: &MenuSettings, screen_id: &str) -> bool {
         settings.screens.iter().any(|screen| screen.id == screen_id)
+    }
+
+    fn menu_dialog_exists(settings: &MenuSettings, dialog_id: &str) -> bool {
+        settings.dialogs.iter().any(|dialog| dialog.id == dialog_id)
     }
 
     pub(crate) fn rewrite_menu_action_screen_targets(
@@ -1000,17 +1260,55 @@ impl InspectorSystem {
                 }
             }
         }
+        for dialog in &mut settings.dialogs {
+            if let MenuAction::OpenScreen { screen_id } = &mut dialog.confirm_action {
+                if screen_id == previous_id {
+                    *screen_id = next_id.to_string();
+                }
+            }
+            if let MenuAction::OpenScreen { screen_id } = &mut dialog.cancel_action {
+                if screen_id == previous_id {
+                    *screen_id = next_id.to_string();
+                }
+            }
+        }
+    }
+
+    pub(crate) fn rewrite_menu_action_dialog_targets(
+        settings: &mut MenuSettings,
+        previous_id: &str,
+        next_id: &str,
+    ) {
+        for screen in &mut settings.screens {
+            for item in &mut screen.items {
+                if let MenuItemDefinition::Button {
+                    action: MenuAction::OpenDialog { dialog_id },
+                    ..
+                } = item
+                {
+                    if dialog_id == previous_id {
+                        *dialog_id = next_id.to_string();
+                    }
+                }
+            }
+        }
+        for dialog in &mut settings.dialogs {
+            for action in [&mut dialog.confirm_action, &mut dialog.cancel_action] {
+                if let MenuAction::OpenDialog { dialog_id } = action {
+                    if dialog_id == previous_id {
+                        *dialog_id = next_id.to_string();
+                    }
+                }
+            }
+        }
     }
 
     fn remove_menu_action_targets(settings: &mut MenuSettings, removed_id: &str) {
         for screen in &mut settings.screens {
             for item in &mut screen.items {
-                if let MenuItemDefinition::Button {
-                    action: MenuAction::OpenScreen { screen_id },
-                    ..
-                } = item
-                {
-                    if screen_id == removed_id {
+                if let MenuItemDefinition::Button { action, .. } = item {
+                    if matches!(action, MenuAction::OpenScreen { screen_id } if screen_id == removed_id)
+                    {
                         *item = MenuItemDefinition::Button {
                             text: match item {
                                 MenuItemDefinition::Button { text, .. } => text.clone(),
@@ -1020,6 +1318,35 @@ impl InspectorSystem {
                             action: MenuAction::Back,
                         };
                     }
+                }
+            }
+        }
+        for dialog in &mut settings.dialogs {
+            for action in [&mut dialog.confirm_action, &mut dialog.cancel_action] {
+                if matches!(action, MenuAction::OpenScreen { screen_id } if screen_id == removed_id)
+                {
+                    *action = MenuAction::Back;
+                }
+            }
+        }
+    }
+
+    fn remove_menu_dialog_action_targets(settings: &mut MenuSettings, removed_id: &str) {
+        for screen in &mut settings.screens {
+            for item in &mut screen.items {
+                if let MenuItemDefinition::Button { action, .. } = item {
+                    if matches!(action, MenuAction::OpenDialog { dialog_id } if dialog_id == removed_id)
+                    {
+                        *action = MenuAction::Back;
+                    }
+                }
+            }
+        }
+        for dialog in &mut settings.dialogs {
+            for action in [&mut dialog.confirm_action, &mut dialog.cancel_action] {
+                if matches!(action, MenuAction::OpenDialog { dialog_id } if dialog_id == removed_id)
+                {
+                    *action = MenuAction::CloseDialog;
                 }
             }
         }

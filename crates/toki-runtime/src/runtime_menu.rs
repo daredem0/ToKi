@@ -1,4 +1,7 @@
-use toki_core::menu::{build_menu_layout, compose_menu_ui, MenuCommand, MenuInput};
+use toki_core::menu::{
+    build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui, MenuCommand,
+    MenuInput,
+};
 
 use super::App;
 
@@ -44,6 +47,12 @@ impl App {
         let layout = build_menu_layout(&view, &appearance, viewport);
         let composition = compose_menu_ui(&layout, &appearance);
         self.rendering.render_ui_composition(&composition);
+
+        if let Some(dialog_view) = self.menu_system.current_dialog_view() {
+            let dialog_layout = build_dialog_layout(&dialog_view, &appearance, viewport);
+            let dialog_composition = compose_dialog_ui(&dialog_layout, &appearance);
+            self.rendering.render_ui_composition(&dialog_composition);
+        }
     }
 
     fn apply_menu_command(&mut self, command: MenuCommand) {

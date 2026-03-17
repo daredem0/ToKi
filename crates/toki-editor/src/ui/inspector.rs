@@ -535,7 +535,9 @@ impl InspectorSystem {
 
                 Self::render_entity_definition_details(ui, entity_name, config);
             }
-            Some(Selection::MenuScreen(_)) | Some(Selection::MenuEntry { .. }) => {
+            Some(Selection::MenuScreen(_))
+            | Some(Selection::MenuDialog(_))
+            | Some(Selection::MenuEntry { .. }) => {
                 ui.label("Menu selection available only in Menu Editor.");
             }
             None => {

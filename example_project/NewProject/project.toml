@@ -2,7 +2,7 @@
 name = "TopDownBundle"
 version = "1.0.0"
 created = "2025-08-28T20:32:34.920817717Z"
-modified = "2026-03-17T12:41:54.111593274Z"
+modified = "2026-03-17T22:20:14.048714866Z"
 toki_editor_version = "0.1.0"
 description = ""
 
@@ -79,7 +79,8 @@ kind = "button"
 text = "Exit Game"
 
 [runtime.menu.screens.items.action]
-kind = "exit_game"
+kind = "open_dialog"
+dialog_id = "end_game"
 
 [[runtime.menu.screens]]
 id = "inventory_menu"
@@ -98,6 +99,19 @@ text = "Back"
 [runtime.menu.screens.items.action]
 kind = "back"
 
+[[runtime.menu.dialogs]]
+id = "end_game"
+title = "End Game"
+body = "Are you sure?"
+confirm_text = "Confirm"
+cancel_text = "Cancel"
+
+[runtime.menu.dialogs.confirm_action]
+kind = "exit_game"
+
+[runtime.menu.dialogs.cancel_action]
+kind = "close_dialog"
+
 [editor]
 recent_files = []
 
@@ -111,18 +125,6 @@ pan = [
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
-"node:2" = [
-    800.0,
-    50.0,
-]
-"node:4" = [
-    60.0,
-    106.0,
-]
-"node:1" = [
-    110.08570861816406,
-    34.51572799682617,
-]
 "node:3" = [
     430.0,
     50.0,
@@ -133,6 +135,18 @@ pan = [
 ]
 "node:5" = [
     800.0,
+    106.0,
+]
+"node:2" = [
+    800.0,
+    50.0,
+]
+"node:1" = [
+    110.08570861816406,
+    34.51572799682617,
+]
+"node:4" = [
+    60.0,
     106.0,
 ]
 

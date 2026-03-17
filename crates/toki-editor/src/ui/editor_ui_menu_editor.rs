@@ -9,7 +9,8 @@ impl EditorUI {
         };
 
         let screens = &project.metadata.runtime.menu.screens;
-        if screens.is_empty() {
+        let dialogs = &project.metadata.runtime.menu.dialogs;
+        if screens.is_empty() && dialogs.is_empty() {
             self.clear_menu_editor_selection();
             return;
         }
@@ -32,11 +33,19 @@ impl EditorUI {
                     return;
                 }
             }
+            Some(Selection::MenuDialog(dialog_id)) => {
+                if dialogs.iter().any(|dialog| dialog.id == dialog_id) {
+                    return;
+                }
+            }
             _ => {}
         }
 
-        let first_screen_id = screens[0].id.clone();
-        self.selection = Some(Selection::MenuScreen(first_screen_id));
+        if let Some(first_screen_id) = screens.first().map(|screen| screen.id.clone()) {
+            self.selection = Some(Selection::MenuScreen(first_screen_id));
+        } else if let Some(first_dialog_id) = dialogs.first().map(|dialog| dialog.id.clone()) {
+            self.selection = Some(Selection::MenuDialog(first_dialog_id));
+        }
         self.selected_entity_id = None;
         self.selected_entity_ids.clear();
     }
@@ -44,7 +53,9 @@ impl EditorUI {
     pub fn clear_menu_editor_selection(&mut self) {
         if matches!(
             self.selection,
-            Some(Selection::MenuScreen(_)) | Some(Selection::MenuEntry { .. })
+            Some(Selection::MenuScreen(_))
+                | Some(Selection::MenuDialog(_))
+                | Some(Selection::MenuEntry { .. })
         ) {
             self.selection = None;
         }
@@ -54,6 +65,12 @@ impl EditorUI {
         self.selected_entity_id = None;
         self.selected_entity_ids.clear();
         self.selection = Some(Selection::MenuScreen(screen_id.into()));
+    }
+
+    pub fn select_menu_dialog(&mut self, dialog_id: impl Into<String>) {
+        self.selected_entity_id = None;
+        self.selected_entity_ids.clear();
+        self.selection = Some(Selection::MenuDialog(dialog_id.into()));
     }
 
     pub fn select_menu_entry(&mut self, screen_id: impl Into<String>, item_index: usize) {
@@ -69,6 +86,13 @@ impl EditorUI {
         match self.selection.as_ref() {
             Some(Selection::MenuScreen(screen_id)) => Some(screen_id.as_str()),
             Some(Selection::MenuEntry { screen_id, .. }) => Some(screen_id.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn selected_menu_dialog_id(&self) -> Option<&str> {
+        match self.selection.as_ref() {
+            Some(Selection::MenuDialog(dialog_id)) => Some(dialog_id.as_str()),
             _ => None,
         }
     }

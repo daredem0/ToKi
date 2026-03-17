@@ -271,6 +271,25 @@ fn sample_project_with_menu_screens(screen_ids: &[&str]) -> Project {
     project
 }
 
+fn sample_project_with_menu_dialogs(dialog_ids: &[&str]) -> Project {
+    let temp_dir = tempdir().expect("temp dir should exist");
+    let mut project = Project::new("Menu Demo".to_string(), temp_dir.path().join("MenuDemo"));
+    project.metadata.runtime.menu.screens.clear();
+    project.metadata.runtime.menu.dialogs = dialog_ids
+        .iter()
+        .map(|dialog_id| toki_core::menu::MenuDialogDefinition {
+            id: (*dialog_id).to_string(),
+            title: format!("{dialog_id} title"),
+            body: "Are you sure?".to_string(),
+            confirm_text: "Confirm".to_string(),
+            cancel_text: "Cancel".to_string(),
+            confirm_action: MenuAction::CloseDialog,
+            cancel_action: MenuAction::CloseDialog,
+        })
+        .collect();
+    project
+}
+
 #[test]
 fn sync_menu_editor_selection_picks_first_screen_when_none_selected() {
     let mut ui = EditorUI::new();
@@ -281,6 +300,19 @@ fn sync_menu_editor_selection_picks_first_screen_when_none_selected() {
     assert_eq!(
         ui.selection,
         Some(Selection::MenuScreen("pause_menu".to_string()))
+    );
+}
+
+#[test]
+fn sync_menu_editor_selection_picks_first_dialog_when_only_dialogs_exist() {
+    let mut ui = EditorUI::new();
+    let project = sample_project_with_menu_dialogs(&["exit_confirm", "discard_confirm"]);
+
+    ui.sync_menu_editor_selection(Some(&project));
+
+    assert_eq!(
+        ui.selection,
+        Some(Selection::MenuDialog("exit_confirm".to_string()))
     );
 }
 

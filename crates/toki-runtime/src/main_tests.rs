@@ -113,6 +113,7 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
                 action: MenuAction::CloseMenu,
             }],
         }],
+        dialogs: vec![],
     };
     apply_runtime_config(
         &mut options,
@@ -198,6 +199,7 @@ fn apply_runtime_config_keeps_existing_paths_and_scene_but_updates_splash_durati
                 gate_gameplay_when_open: false,
                 appearance: Default::default(),
                 screens: vec![],
+                dialogs: vec![],
             }),
         },
         temp.path(),
@@ -298,6 +300,7 @@ fn load_runtime_config_skips_invalid_candidate_and_uses_next() {
             gate_gameplay_when_open: true,
             appearance: Default::default(),
             screens: vec![],
+            dialogs: vec![],
         })
     );
 }
@@ -422,6 +425,7 @@ fn apply_project_runtime_settings_do_not_override_existing_launch_audio_mix() {
             gate_gameplay_when_open: false,
             appearance: Default::default(),
             screens: vec![],
+            dialogs: vec![],
         },
         ..RuntimeLaunchOptions::default()
     };

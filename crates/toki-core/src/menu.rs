@@ -14,6 +14,8 @@ pub struct MenuSettings {
     pub appearance: MenuAppearance,
     #[serde(default = "default_menu_screens")]
     pub screens: Vec<MenuScreenDefinition>,
+    #[serde(default)]
+    pub dialogs: Vec<MenuDialogDefinition>,
 }
 
 impl Default for MenuSettings {
@@ -23,6 +25,7 @@ impl Default for MenuSettings {
             gate_gameplay_when_open: default_gate_gameplay_when_open(),
             appearance: MenuAppearance::default(),
             screens: default_menu_screens(),
+            dialogs: Vec::new(),
         }
     }
 }
@@ -124,6 +127,15 @@ pub struct MenuLayout {
     pub hint: MenuLayoutBlock,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct MenuDialogLayout {
+    pub panel: MenuRect,
+    pub title: MenuLayoutBlock,
+    pub body: MenuLayoutBlock,
+    pub confirm_button: MenuEntryLayout,
+    pub cancel_button: MenuEntryLayout,
+}
+
 impl Default for MenuAppearance {
     fn default() -> Self {
         Self {
@@ -168,6 +180,17 @@ pub struct MenuScreenDefinition {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MenuDialogDefinition {
+    pub id: String,
+    pub title: String,
+    pub body: String,
+    pub confirm_text: String,
+    pub cancel_text: String,
+    pub confirm_action: MenuAction,
+    pub cancel_action: MenuAction,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum MenuItemDefinition {
     Label {
@@ -195,7 +218,9 @@ pub enum MenuItemDefinition {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum MenuAction {
     CloseMenu,
+    CloseDialog,
     OpenScreen { screen_id: String },
+    OpenDialog { dialog_id: String },
     Back,
     ExitGame,
 }
@@ -236,6 +261,16 @@ pub struct MenuViewEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MenuDialogView {
+    pub dialog_id: String,
+    pub title: String,
+    pub body: String,
+    pub confirm_text: String,
+    pub cancel_text: String,
+    pub confirm_selected: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InventoryEntry {
     pub item_id: String,
     pub count: u32,
@@ -245,8 +280,16 @@ pub struct InventoryEntry {
 pub struct MenuController {
     settings: MenuSettings,
     screen_map: HashMap<String, MenuScreenDefinition>,
+    dialog_map: HashMap<String, MenuDialogDefinition>,
     stack: Vec<String>,
     selected_index_by_screen: HashMap<String, usize>,
+    active_dialog: Option<ActiveDialogState>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ActiveDialogState {
+    dialog_id: String,
+    confirm_selected: bool,
 }
 
 impl MenuController {
@@ -257,11 +300,19 @@ impl MenuController {
             .cloned()
             .map(|screen| (screen.id.clone(), screen))
             .collect::<HashMap<_, _>>();
+        let dialog_map = settings
+            .dialogs
+            .iter()
+            .cloned()
+            .map(|dialog| (dialog.id.clone(), dialog))
+            .collect::<HashMap<_, _>>();
         let mut controller = Self {
             settings,
             screen_map,
+            dialog_map,
             stack: Vec::new(),
             selected_index_by_screen: HashMap::new(),
+            active_dialog: None,
         };
         for screen_id in controller.screen_map.keys().cloned().collect::<Vec<_>>() {
             let selected = controller.first_selectable_index(&screen_id).unwrap_or(0);
@@ -280,6 +331,10 @@ impl MenuController {
         !self.stack.is_empty()
     }
 
+    pub fn is_dialog_open(&self) -> bool {
+        self.active_dialog.is_some()
+    }
+
     pub fn open_pause_root(&mut self) {
         let root = self.settings.pause_root_screen_id.clone();
         self.open_screen(&root);
@@ -289,11 +344,13 @@ impl MenuController {
         if self.screen_map.contains_key(screen_id) {
             self.stack.clear();
             self.stack.push(screen_id.to_string());
+            self.active_dialog = None;
         }
     }
 
     pub fn close(&mut self) {
         self.stack.clear();
+        self.active_dialog = None;
     }
 
     pub fn current_screen_id(&self) -> Option<&str> {
@@ -372,7 +429,23 @@ impl MenuController {
         })
     }
 
+    pub fn current_dialog_view(&self) -> Option<MenuDialogView> {
+        let active_dialog = self.active_dialog.as_ref()?;
+        let dialog = self.dialog_map.get(&active_dialog.dialog_id)?;
+        Some(MenuDialogView {
+            dialog_id: dialog.id.clone(),
+            title: dialog.title.clone(),
+            body: dialog.body.clone(),
+            confirm_text: dialog.confirm_text.clone(),
+            cancel_text: dialog.cancel_text.clone(),
+            confirm_selected: active_dialog.confirm_selected,
+        })
+    }
+
     pub fn handle_input(&mut self, input: MenuInput) -> Option<MenuCommand> {
+        if self.active_dialog.is_some() {
+            return self.handle_dialog_input(input);
+        }
         let current_screen_id = self.current_screen_id().map(str::to_string)?;
 
         match input {
@@ -392,6 +465,32 @@ impl MenuController {
         }
     }
 
+    fn handle_dialog_input(&mut self, input: MenuInput) -> Option<MenuCommand> {
+        match input {
+            MenuInput::Up | MenuInput::Down => {
+                if let Some(active_dialog) = &mut self.active_dialog {
+                    active_dialog.confirm_selected = !active_dialog.confirm_selected;
+                }
+                None
+            }
+            MenuInput::Confirm => {
+                let active_dialog = self.active_dialog.clone()?;
+                let dialog = self.dialog_map.get(&active_dialog.dialog_id)?.clone();
+                let action = if active_dialog.confirm_selected {
+                    dialog.confirm_action
+                } else {
+                    dialog.cancel_action
+                };
+                self.apply_action(&action, true)
+            }
+            MenuInput::Back => {
+                let active_dialog = self.active_dialog.clone()?;
+                let dialog = self.dialog_map.get(&active_dialog.dialog_id)?.clone();
+                self.apply_action(&dialog.cancel_action, true)
+            }
+        }
+    }
+
     fn go_back(&mut self) {
         if self.stack.len() > 1 {
             self.stack.pop();
@@ -401,29 +500,54 @@ impl MenuController {
     }
 
     fn confirm_current_selection(&mut self, current_screen_id: &str) -> Option<MenuCommand> {
-        let screen = self.screen_map.get(current_screen_id)?;
         let selected_index = *self
             .selected_index_by_screen
             .get(current_screen_id)
             .unwrap_or(&0);
-        let Some(MenuItemDefinition::Button { action, .. }) = screen.items.get(selected_index)
-        else {
-            return None;
+        let action = {
+            let screen = self.screen_map.get(current_screen_id)?;
+            let Some(MenuItemDefinition::Button { action, .. }) = screen.items.get(selected_index)
+            else {
+                return None;
+            };
+            action.clone()
         };
 
+        self.apply_action(&action, false)
+    }
+
+    fn apply_action(&mut self, action: &MenuAction, from_dialog: bool) -> Option<MenuCommand> {
         match action {
             MenuAction::CloseMenu => {
                 self.close();
                 None
             }
+            MenuAction::CloseDialog => {
+                self.active_dialog = None;
+                None
+            }
             MenuAction::OpenScreen { screen_id } => {
+                self.active_dialog = None;
                 if self.screen_map.contains_key(screen_id) {
                     self.stack.push(screen_id.clone());
                 }
                 None
             }
+            MenuAction::OpenDialog { dialog_id } => {
+                if self.dialog_map.contains_key(dialog_id) {
+                    self.active_dialog = Some(ActiveDialogState {
+                        dialog_id: dialog_id.clone(),
+                        confirm_selected: true,
+                    });
+                }
+                None
+            }
             MenuAction::Back => {
-                self.go_back();
+                if from_dialog {
+                    self.active_dialog = None;
+                } else {
+                    self.go_back();
+                }
                 None
             }
             MenuAction::ExitGame => Some(MenuCommand::ExitRuntime),
@@ -754,6 +878,176 @@ pub fn compose_menu_ui(layout: &MenuLayout, appearance: &MenuAppearance) -> UiCo
         }),
     });
 
+    composition
+}
+
+pub fn build_dialog_layout(
+    view: &MenuDialogView,
+    appearance: &MenuAppearance,
+    viewport: glam::Vec2,
+) -> MenuDialogLayout {
+    let metrics = menu_visual_metrics();
+    let panel_width = (viewport.x * (appearance.menu_width_percent.clamp(20, 100) as f32 / 100.0))
+        .clamp(160.0, (viewport.x - 16.0).max(160.0));
+    let content_x = (viewport.x - panel_width) * 0.5 + metrics.panel_inner_margin_px;
+    let content_width = (panel_width - metrics.panel_inner_margin_px * 2.0).max(1.0);
+    let title_height = appearance.font_size_px as f32
+        + metrics.title_size_delta_px
+        + metrics.title_padding_px.y * 2.0;
+    let title_rect = MenuRect {
+        x: content_x,
+        y: viewport.y * 0.18,
+        width: content_width,
+        height: title_height,
+    };
+    let body_height =
+        ((appearance.font_size_px as f32 * 3.2).max(40.0)) + metrics.entry_padding_px.y * 2.0;
+    let body_rect = MenuRect {
+        x: content_x,
+        y: title_rect.y + title_rect.height + appearance.title_spacing_px as f32,
+        width: content_width,
+        height: body_height,
+    };
+    let button_height = appearance.font_size_px as f32 + metrics.entry_padding_px.y * 2.0;
+    let button_width =
+        ((content_width - appearance.button_spacing_px as f32).max(2.0) * 0.5).floor();
+    let confirm_rect = MenuRect {
+        x: content_x,
+        y: body_rect.y + body_rect.height + appearance.footer_spacing_px as f32,
+        width: button_width,
+        height: button_height,
+    };
+    let cancel_rect = MenuRect {
+        x: content_x + button_width + appearance.button_spacing_px as f32,
+        y: confirm_rect.y,
+        width: button_width,
+        height: button_height,
+    };
+    let panel = MenuRect {
+        x: (viewport.x - panel_width) * 0.5,
+        y: (title_rect.y - metrics.panel_inner_margin_px).max(8.0),
+        width: panel_width,
+        height: (cancel_rect.y + cancel_rect.height - title_rect.y)
+            + metrics.panel_inner_margin_px * 2.0
+            + appearance.title_spacing_px as f32,
+    };
+
+    MenuDialogLayout {
+        panel,
+        title: MenuLayoutBlock {
+            rect: title_rect,
+            text: view.title.clone(),
+            border_style: appearance.border_style,
+        },
+        body: MenuLayoutBlock {
+            rect: body_rect,
+            text: view.body.clone(),
+            border_style: appearance.border_style,
+        },
+        confirm_button: MenuEntryLayout {
+            rect: confirm_rect,
+            text: view.confirm_text.clone(),
+            selected: view.confirm_selected,
+            selectable: true,
+            border_style: appearance.border_style,
+        },
+        cancel_button: MenuEntryLayout {
+            rect: cancel_rect,
+            text: view.cancel_text.clone(),
+            selected: !view.confirm_selected,
+            selectable: true,
+            border_style: appearance.border_style,
+        },
+    }
+}
+
+pub fn compose_dialog_ui(layout: &MenuDialogLayout, appearance: &MenuAppearance) -> UiComposition {
+    let border_color =
+        menu_hex_color_rgba(&appearance.border_color_hex).unwrap_or([0.49, 1.0, 0.49, 1.0]);
+    let opacity_alpha = (appearance.opacity_percent.clamp(0, 100) as f32) / 100.0;
+    let text_color = apply_menu_opacity(
+        menu_hex_color_rgba(&appearance.text_color_hex).unwrap_or([1.0, 1.0, 1.0, 1.0]),
+        appearance.opacity_percent,
+    );
+    let title_style = TextStyle {
+        font_family: appearance.font_family.clone(),
+        size_px: appearance.font_size_px as f32 + 4.0,
+        weight: TextWeight::Bold,
+        color: text_color,
+        ..TextStyle::default()
+    };
+    let body_style = TextStyle {
+        font_family: appearance.font_family.clone(),
+        size_px: appearance.font_size_px as f32,
+        weight: TextWeight::Normal,
+        color: text_color,
+        ..TextStyle::default()
+    };
+    let button_style = body_style.clone();
+    let selected_button_style = TextStyle {
+        weight: TextWeight::Bold,
+        ..body_style.clone()
+    };
+
+    let mut composition = UiComposition::default();
+    composition.push(UiBlock {
+        rect: layout.panel,
+        fill_color: menu_fill_color_rgba(
+            &appearance.menu_background_color_hex,
+            appearance.menu_background_transparent,
+            appearance.opacity_percent,
+        ),
+        border_color: menu_border_color(appearance.border_style, border_color, opacity_alpha),
+        text: None,
+    });
+    for block in [&layout.title, &layout.body] {
+        composition.push(UiBlock {
+            rect: block.rect,
+            fill_color: menu_fill_color_rgba(
+                &appearance.title_background_color_hex,
+                appearance.title_background_transparent,
+                appearance.opacity_percent,
+            ),
+            border_color: menu_border_color(block.border_style, border_color, opacity_alpha),
+            text: Some(UiTextBlock {
+                content: block.text.clone(),
+                position: glam::Vec2::new(block.rect.center_x(), block.rect.y + 10.0),
+                anchor: TextAnchor::TopCenter,
+                style: if block.rect == layout.title.rect {
+                    title_style.clone()
+                } else {
+                    body_style.clone()
+                },
+                layer: 11,
+            }),
+        });
+    }
+    for button in [&layout.confirm_button, &layout.cancel_button] {
+        composition.push(UiBlock {
+            rect: button.rect,
+            fill_color: menu_fill_color_rgba(
+                &appearance.entry_background_color_hex,
+                appearance.entry_background_transparent,
+                appearance.opacity_percent,
+            ),
+            border_color: menu_border_color(button.border_style, border_color, opacity_alpha),
+            text: Some(UiTextBlock {
+                content: if button.selected {
+                    format!("> {}", button.text)
+                } else {
+                    format!("  {}", button.text)
+                },
+                position: glam::Vec2::new(button.rect.center_x(), button.rect.y + 6.0),
+                anchor: TextAnchor::TopCenter,
+                style: if button.selected {
+                    selected_button_style.clone()
+                } else {
+                    button_style.clone()
+                },
+                layer: 11,
+            }),
+        });
+    }
     composition
 }
 

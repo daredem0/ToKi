@@ -272,6 +272,7 @@ fn rewrite_menu_action_screen_targets_updates_open_screen_actions() {
                 },
             }],
         }],
+        dialogs: vec![],
     };
 
     InspectorSystem::rewrite_menu_action_screen_targets(
@@ -287,6 +288,53 @@ fn rewrite_menu_action_screen_targets_updates_open_screen_actions() {
             border_style_override: None,
             action: MenuAction::OpenScreen {
                 screen_id: "items_menu".to_string(),
+            },
+        }
+    );
+}
+
+#[test]
+fn rewrite_menu_action_dialog_targets_updates_open_dialog_actions() {
+    let mut settings = toki_core::menu::MenuSettings {
+        pause_root_screen_id: "pause_menu".to_string(),
+        gate_gameplay_when_open: true,
+        appearance: Default::default(),
+        screens: vec![MenuScreenDefinition {
+            id: "pause_menu".to_string(),
+            title: "Paused".to_string(),
+            title_border_style_override: None,
+            items: vec![MenuItemDefinition::Button {
+                text: "Exit".to_string(),
+                border_style_override: None,
+                action: MenuAction::OpenDialog {
+                    dialog_id: "exit_confirm".to_string(),
+                },
+            }],
+        }],
+        dialogs: vec![toki_core::menu::MenuDialogDefinition {
+            id: "exit_confirm".to_string(),
+            title: "Exit Game?".to_string(),
+            body: "Unsaved progress may be lost.".to_string(),
+            confirm_text: "Exit".to_string(),
+            cancel_text: "Cancel".to_string(),
+            confirm_action: MenuAction::CloseDialog,
+            cancel_action: MenuAction::CloseDialog,
+        }],
+    };
+
+    InspectorSystem::rewrite_menu_action_dialog_targets(
+        &mut settings,
+        "exit_confirm",
+        "quit_confirm",
+    );
+
+    assert_eq!(
+        settings.screens[0].items[0],
+        MenuItemDefinition::Button {
+            text: "Exit".to_string(),
+            border_style_override: None,
+            action: MenuAction::OpenDialog {
+                dialog_id: "quit_confirm".to_string(),
             },
         }
     );
