@@ -4,6 +4,25 @@ use crate::entity::Entity;
 use super::GameState;
 
 impl GameState {
+    pub fn player_inventory_entries(&self) -> Vec<crate::menu::InventoryEntry> {
+        let Some(player) = self.player_entity() else {
+            return Vec::new();
+        };
+
+        let mut entries = player
+            .attributes
+            .inventory
+            .items
+            .iter()
+            .map(|(item_id, count)| crate::menu::InventoryEntry {
+                item_id: item_id.clone(),
+                count: *count,
+            })
+            .collect::<Vec<_>>();
+        entries.sort_by(|a, b| a.item_id.cmp(&b.item_id));
+        entries
+    }
+
     fn entity_bounds_for_pickup_interaction(entity: &Entity) -> (glam::IVec2, glam::UVec2) {
         if let Some(collision_box) = &entity.collision_box {
             collision_box.world_bounds(entity.position)

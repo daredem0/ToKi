@@ -9,6 +9,7 @@ use std::io::{Seek, Write};
 use std::path::PathBuf;
 use std::time::Duration;
 use toki_core::math::projection::ProjectionParameter;
+use toki_core::menu::MenuSettings;
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::text::{TextStyle, TextWeight};
 use toki_core::Scene;
@@ -223,6 +224,7 @@ fn resolve_post_splash_sprite_texture_path_prefers_project_creatures_texture() {
         splash: RuntimeSplashOptions::default(),
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
+        menu: MenuSettings::default(),
     };
 
     let resolved = App::resolve_post_splash_sprite_texture_path(&options, None);
@@ -256,6 +258,7 @@ fn resolve_post_splash_sprite_texture_path_prefers_content_root_over_project_pat
         splash: RuntimeSplashOptions::default(),
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
+        menu: MenuSettings::default(),
     };
 
     let resolved = App::resolve_post_splash_sprite_texture_path(&options, Some(&mount_dir));
@@ -319,6 +322,7 @@ fn build_startup_state_loads_resources_and_scene_from_pack_mount() {
         splash: RuntimeSplashOptions::default(),
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
+        menu: MenuSettings::default(),
     };
 
     let (resources, game_state, pack_mount, asset_load_plan, _) =
@@ -360,6 +364,7 @@ fn build_startup_state_from_pack_returns_error_when_required_assets_are_missing(
         splash: RuntimeSplashOptions::default(),
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
+        menu: MenuSettings::default(),
     };
 
     let error = App::build_startup_state_from_pack(&launch_options, &pack_path)

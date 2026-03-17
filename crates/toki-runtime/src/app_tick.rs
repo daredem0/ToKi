@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use toki_core::camera::RuntimeState;
 use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
-use toki_core::EventHandler;
+use toki_core::{EventHandler, GameUpdateResult};
 
 use super::App;
 
@@ -15,11 +15,15 @@ impl App {
             self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
             self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
         );
-        let game_result = self.game_system.update(
-            world_bounds,
-            self.resources.get_tilemap(),
-            self.resources.get_terrain_atlas(),
-        );
+        let game_result = if self.should_gate_gameplay_for_menu() {
+            GameUpdateResult::new()
+        } else {
+            self.game_system.update(
+                world_bounds,
+                self.resources.get_tilemap(),
+                self.resources.get_terrain_atlas(),
+            )
+        };
 
         let listener_position = self
             .game_system
@@ -318,6 +322,8 @@ impl App {
                         .with_layer(1);
                 self.rendering.add_text_item(hud_text);
             }
+
+            self.render_runtime_menu_overlay();
         }
 
         self.platform.request_redraw();

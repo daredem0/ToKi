@@ -6,6 +6,9 @@ use super::{
     RuntimeConfigStartup,
 };
 use std::path::PathBuf;
+use toki_core::menu::{
+    MenuAction, MenuItemDefinition, MenuScreenDefinition, MenuSettings,
+};
 use toki_runtime::{RuntimeAudioMixOptions, RuntimeDisplayOptions, RuntimeLaunchOptions};
 
 #[test]
@@ -98,6 +101,18 @@ fn option_value_rejects_next_flag() {
 fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
     let temp = tempfile::tempdir().expect("temp dir");
     let mut options = RuntimeLaunchOptions::default();
+    let configured_menu = MenuSettings {
+        pause_root_screen_id: "custom_pause".to_string(),
+        gate_gameplay_when_open: false,
+        screens: vec![MenuScreenDefinition {
+            id: "custom_pause".to_string(),
+            title: "Custom Pause".to_string(),
+            items: vec![MenuItemDefinition::Button {
+                text: "Resume".to_string(),
+                action: MenuAction::CloseMenu,
+            }],
+        }],
+    };
     apply_runtime_config(
         &mut options,
         RuntimeConfig {
@@ -122,6 +137,7 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
             display: Some(RuntimeConfigDisplay {
                 show_entity_health_bars: Some(true),
             }),
+            menu: Some(configured_menu.clone()),
         },
         temp.path(),
     );
@@ -135,6 +151,7 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
     assert_eq!(options.audio_mix.movement_percent, 45);
     assert_eq!(options.audio_mix.collision_percent, 25);
     assert!(options.display.show_entity_health_bars);
+    assert_eq!(options.menu, configured_menu);
 }
 
 #[test]
@@ -175,6 +192,11 @@ fn apply_runtime_config_keeps_existing_paths_and_scene_but_updates_splash_durati
             display: Some(RuntimeConfigDisplay {
                 show_entity_health_bars: Some(true),
             }),
+            menu: Some(MenuSettings {
+                pause_root_screen_id: "override".to_string(),
+                gate_gameplay_when_open: false,
+                screens: vec![],
+            }),
         },
         temp.path(),
     );
@@ -189,6 +211,7 @@ fn apply_runtime_config_keeps_existing_paths_and_scene_but_updates_splash_durati
     assert_eq!(options.audio_mix.movement_percent, 60);
     assert_eq!(options.audio_mix.collision_percent, 40);
     assert!(options.display.show_entity_health_bars);
+    assert_eq!(options.menu.pause_root_screen_id, "override");
 }
 
 #[test]
@@ -210,6 +233,7 @@ fn apply_runtime_config_ignores_disabled_pack_entry() {
             splash: None,
             audio: None,
             display: None,
+            menu: None,
         },
         temp.path(),
     );
@@ -240,7 +264,8 @@ fn load_runtime_config_skips_invalid_candidate_and_uses_next() {
   "pack": { "path": "game.toki.pak", "enabled": true },
   "startup": { "scene": "Main Scene" },
   "splash": { "duration_ms": 3000 },
-  "audio": { "master_percent": 88, "music_percent": 70, "movement_percent": 55, "collision_percent": 40 }
+  "audio": { "master_percent": 88, "music_percent": 70, "movement_percent": 55, "collision_percent": 40 },
+  "menu": { "pause_root_screen_id": "pause_menu", "gate_gameplay_when_open": true, "screens": [] }
 }"#,
         )
         .expect("second config");
@@ -262,6 +287,14 @@ fn load_runtime_config_skips_invalid_candidate_and_uses_next() {
             music_percent: Some(70),
             movement_percent: Some(55),
             collision_percent: Some(40),
+        })
+    );
+    assert_eq!(
+        loaded.0.menu,
+        Some(MenuSettings {
+            pause_root_screen_id: "pause_menu".to_string(),
+            gate_gameplay_when_open: true,
+            screens: vec![],
         })
     );
 }
@@ -326,6 +359,21 @@ collision_percent = 31
 
 [runtime.display]
 show_entity_health_bars = true
+
+[runtime.menu]
+pause_root_screen_id = "custom_pause"
+gate_gameplay_when_open = false
+
+[[runtime.menu.screens]]
+id = "custom_pause"
+title = "Custom Pause"
+
+[[runtime.menu.screens.items]]
+kind = "button"
+text = "Resume"
+
+[runtime.menu.screens.items.action]
+kind = "close_menu"
 "#,
     )
     .expect("project");
@@ -341,6 +389,9 @@ show_entity_health_bars = true
     assert_eq!(updated.audio_mix.movement_percent, 58);
     assert_eq!(updated.audio_mix.collision_percent, 31);
     assert!(updated.display.show_entity_health_bars);
+    assert_eq!(updated.menu.pause_root_screen_id, "custom_pause");
+    assert!(!updated.menu.gate_gameplay_when_open);
+    assert_eq!(updated.menu.screens.len(), 1);
 }
 
 #[test]
@@ -363,6 +414,11 @@ fn apply_project_runtime_settings_do_not_override_existing_launch_audio_mix() {
         display: RuntimeDisplayOptions {
             show_entity_health_bars: false,
         },
+        menu: MenuSettings {
+            pause_root_screen_id: "cli_pause".to_string(),
+            gate_gameplay_when_open: false,
+            screens: vec![],
+        },
         ..RuntimeLaunchOptions::default()
     };
     let updated = apply_project_runtime_settings_from_project_file_if_present(options);
@@ -372,4 +428,5 @@ fn apply_project_runtime_settings_do_not_override_existing_launch_audio_mix() {
     assert_eq!(updated.audio_mix.movement_percent, 80);
     assert_eq!(updated.audio_mix.collision_percent, 70);
     assert!(updated.display.show_entity_health_bars);
+    assert_eq!(updated.menu.pause_root_screen_id, "cli_pause");
 }

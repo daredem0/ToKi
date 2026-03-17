@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use toki_core::menu::MenuSettings;
 use toki_core::pack::{
     hash_bytes, infer_pack_asset_type, recommended_pack_compression, PackCompression, PakEntry,
     PakManifest, PAK_MAGIC, PAK_VERSION,
@@ -24,6 +25,7 @@ pub struct RuntimeBundleConfig {
     pub splash: RuntimeBundleSplashConfig,
     pub audio: RuntimeBundleAudioConfig,
     pub display: RuntimeBundleDisplayConfig,
+    pub menu: MenuSettings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -132,6 +134,7 @@ pub fn export_hybrid_bundle(
             display: RuntimeBundleDisplayConfig {
                 show_entity_health_bars: project.metadata.runtime.display.show_entity_health_bars,
             },
+            menu: project.metadata.runtime.menu.clone(),
         },
     )?;
 

@@ -155,6 +155,9 @@ fn export_hybrid_bundle_writes_runtime_and_pak_manifest() {
     assert_eq!(runtime_config.audio.movement_percent, 40);
     assert_eq!(runtime_config.audio.collision_percent, 25);
     assert!(runtime_config.display.show_entity_health_bars);
+    assert_eq!(runtime_config.menu.pause_root_screen_id, "pause_menu");
+    assert!(runtime_config.menu.gate_gameplay_when_open);
+    assert_eq!(runtime_config.menu.screens.len(), 2);
 }
 
 #[test]

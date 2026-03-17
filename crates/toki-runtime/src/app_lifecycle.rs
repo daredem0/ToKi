@@ -1,5 +1,6 @@
 use std::time::Instant;
 
+use toki_core::menu::MenuInput;
 use toki_core::serialization::{load_game, save_game};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -35,12 +36,32 @@ impl App {
                         }
                         Err(e) => tracing::error!("Failed to load game: {}", e),
                     },
+                    KeyCode::Escape => {
+                        if self.is_menu_open() {
+                            self.handle_menu_input(MenuInput::Back);
+                        } else {
+                            self.open_pause_menu();
+                        }
+                    }
+                    KeyCode::ArrowUp | KeyCode::KeyW if self.is_menu_open() => {
+                        self.handle_menu_input(MenuInput::Up);
+                    }
+                    KeyCode::ArrowDown | KeyCode::KeyS if self.is_menu_open() => {
+                        self.handle_menu_input(MenuInput::Down);
+                    }
+                    KeyCode::Enter | KeyCode::Space if self.is_menu_open() => {
+                        self.handle_menu_input(MenuInput::Confirm);
+                    }
                     _ => {
-                        self.game_system.handle_keyboard_input(keycode, true);
+                        if !self.is_menu_open() {
+                            self.game_system.handle_keyboard_input(keycode, true);
+                        }
                     }
                 },
                 ElementState::Released => {
-                    self.game_system.handle_keyboard_input(keycode, false);
+                    if !self.is_menu_open() {
+                        self.game_system.handle_keyboard_input(keycode, false);
+                    }
                 }
             }
         }

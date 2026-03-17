@@ -4,6 +4,13 @@ use crate::rules::RuleKey;
 use std::collections::HashSet;
 
 impl GameState {
+    pub fn clear_runtime_inputs(&mut self) {
+        self.keys_held.clear();
+        self.profile_keys_held.clear();
+        self.profile_actions_held.clear();
+        self.pending_profile_actions.clear();
+    }
+
     pub(super) fn controlled_input_entity_ids(&self) -> Vec<EntityId> {
         let mut entity_ids = self
             .entity_manager

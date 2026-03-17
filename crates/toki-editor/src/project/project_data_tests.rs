@@ -43,6 +43,9 @@ fn runtime_settings_default_to_community_splash_duration() {
     assert_eq!(runtime.audio.movement_percent, 100);
     assert_eq!(runtime.audio.collision_percent, 100);
     assert!(!runtime.display.show_entity_health_bars);
+    assert_eq!(runtime.menu.pause_root_screen_id, "pause_menu");
+    assert!(runtime.menu.gate_gameplay_when_open);
+    assert_eq!(runtime.menu.screens.len(), 2);
 }
 
 #[test]
@@ -72,6 +75,21 @@ collision_percent = 40
 
 [runtime.display]
 show_entity_health_bars = true
+
+[runtime.menu]
+pause_root_screen_id = "pause_menu"
+gate_gameplay_when_open = true
+
+[[runtime.menu.screens]]
+id = "pause_menu"
+title = "Paused"
+
+[[runtime.menu.screens.items]]
+kind = "button"
+text = "Resume"
+
+[runtime.menu.screens.items.action]
+kind = "close_menu"
 "#;
 
     let metadata: ProjectMetadata =
@@ -81,6 +99,8 @@ show_entity_health_bars = true
     assert_eq!(metadata.runtime.audio.movement_percent, 55);
     assert_eq!(metadata.runtime.audio.collision_percent, 40);
     assert!(metadata.runtime.display.show_entity_health_bars);
+    assert_eq!(metadata.runtime.menu.pause_root_screen_id, "pause_menu");
+    assert_eq!(metadata.runtime.menu.screens.len(), 1);
 }
 
 #[test]

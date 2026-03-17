@@ -1,5 +1,6 @@
 use anyhow::Result;
 use std::path::PathBuf;
+use toki_core::menu::MenuSettings;
 use tracing_subscriber::EnvFilter;
 
 use toki_runtime::{
@@ -17,6 +18,7 @@ struct RuntimeConfig {
     splash: Option<RuntimeConfigSplash>,
     audio: Option<RuntimeConfigAudio>,
     display: Option<RuntimeConfigDisplay>,
+    menu: Option<MenuSettings>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
@@ -222,6 +224,9 @@ fn apply_runtime_config(
             launch_options.display.show_entity_health_bars = show_entity_health_bars;
         }
     }
+    if let Some(menu) = config.menu {
+        launch_options.menu = menu;
+    }
 }
 
 fn load_runtime_config() -> Option<(RuntimeConfig, PathBuf)> {
@@ -299,6 +304,8 @@ struct ProjectRuntimeSettings {
     audio: ProjectRuntimeAudioSettings,
     #[serde(default)]
     display: ProjectRuntimeDisplaySettings,
+    #[serde(default)]
+    menu: MenuSettings,
 }
 
 #[derive(Debug, serde::Deserialize, Default)]
@@ -328,7 +335,8 @@ fn apply_project_runtime_settings_from_project_file_if_present(
 ) -> RuntimeLaunchOptions {
     let should_apply_audio = launch_options.audio_mix == RuntimeAudioMixOptions::default();
     let should_apply_display = launch_options.display == RuntimeDisplayOptions::default();
-    if !should_apply_audio && !should_apply_display {
+    let should_apply_menu = launch_options.menu == MenuSettings::default();
+    if !should_apply_audio && !should_apply_display && !should_apply_menu {
         return launch_options;
     }
 
@@ -358,6 +366,9 @@ fn apply_project_runtime_settings_from_project_file_if_present(
     if should_apply_display {
         launch_options.display.show_entity_health_bars =
             metadata.runtime.display.show_entity_health_bars;
+    }
+    if should_apply_menu {
+        launch_options.menu = metadata.runtime.menu;
     }
     launch_options
 }

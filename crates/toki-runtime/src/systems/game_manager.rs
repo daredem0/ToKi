@@ -1,5 +1,6 @@
 use toki_core::entity::MovementProfile;
 use toki_core::game::AudioEvent;
+use toki_core::menu::InventoryEntry;
 use toki_core::{
     assets::atlas::AtlasMeta,
     assets::tilemap::TileMap,
@@ -78,6 +79,10 @@ impl GameManager {
                 }
             }
         }
+    }
+
+    pub fn clear_runtime_inputs(&mut self) {
+        self.game_state.clear_runtime_inputs();
     }
 
     /// Translate winit KeyCode to core InputKey
@@ -176,6 +181,10 @@ impl GameManager {
     /// Get the player entity ID
     pub fn player_id(&self) -> Option<toki_core::entity::EntityId> {
         self.game_state.player_id()
+    }
+
+    pub fn player_inventory_entries(&self) -> Vec<InventoryEntry> {
+        self.game_state.player_inventory_entries()
     }
 
     /// Get entities for camera system integration

@@ -16,6 +16,7 @@ pub mod pack;
 
 pub mod sprite;
 pub mod text;
+pub mod menu;
 
 pub mod animation;
 pub mod assets {

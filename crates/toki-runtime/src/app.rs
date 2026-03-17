@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use toki_core::camera::{Camera, CameraController, CameraMode};
+use toki_core::menu::{MenuController, MenuSettings};
 use toki_core::TimingSystem;
 use toki_render::RenderError;
 
@@ -36,6 +37,8 @@ mod app_lifecycle;
 mod app_splash;
 #[path = "app_tick.rs"]
 mod app_tick;
+#[path = "runtime_menu.rs"]
+mod runtime_menu;
 
 use app_bootstrap::first_existing_path;
 use app_splash::{ResolvedSplashConfig, SplashPolicy};
@@ -88,6 +91,7 @@ pub struct RuntimeLaunchOptions {
     pub splash: RuntimeSplashOptions,
     pub audio_mix: RuntimeAudioMixOptions,
     pub display: RuntimeDisplayOptions,
+    pub menu: MenuSettings,
 }
 
 #[derive(Debug)]
@@ -104,6 +108,7 @@ struct App {
     rendering: RenderingSystem,
     timing: TimingSystem,
     launch_options: RuntimeLaunchOptions,
+    menu_system: MenuController,
     splash_policy: SplashPolicy,
     splash_config: ResolvedSplashConfig,
     splash_active: bool,
@@ -167,6 +172,7 @@ impl App {
             .set_channel_volume_percent("movement", launch_options.audio_mix.movement_percent);
         audio_system
             .set_channel_volume_percent("collision", launch_options.audio_mix.collision_percent);
+        let menu_system = MenuController::new(launch_options.menu.clone());
 
         Self {
             // Core systems
@@ -181,6 +187,7 @@ impl App {
             rendering: RenderingSystem::new(),
             timing: TimingSystem::new(),
             launch_options,
+            menu_system,
             splash_policy,
             splash_config,
             splash_active: true,

@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use toki_core::menu::MenuSettings;
 
 /// Main project data structure
 #[allow(dead_code)]
@@ -79,6 +80,9 @@ pub struct RuntimeSettings {
     /// Project-wide display toggles for runtime presentation
     #[serde(default)]
     pub display: RuntimeDisplaySettings,
+    /// Runtime menu definitions and defaults
+    #[serde(default)]
+    pub menu: MenuSettings,
 }
 
 /// Runtime audio mixer settings
