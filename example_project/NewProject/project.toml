@@ -2,7 +2,7 @@
 name = "TopDownBundle"
 version = "1.0.0"
 created = "2025-08-28T20:32:34.920817717Z"
-modified = "2026-03-17T22:20:14.048714866Z"
+modified = "2026-03-17T22:35:42.925752917Z"
 toki_editor_version = "0.1.0"
 description = ""
 
@@ -64,23 +64,23 @@ kind = "button"
 text = "Resume"
 
 [runtime.menu.screens.items.action]
-kind = "close_menu"
+kind = "close_ui"
 
 [[runtime.menu.screens.items]]
 kind = "button"
 text = "Inventory"
 
 [runtime.menu.screens.items.action]
-kind = "open_screen"
-screen_id = "inventory_menu"
+kind = "open_surface"
+surface_id = "inventory_menu"
 
 [[runtime.menu.screens.items]]
 kind = "button"
 text = "Exit Game"
 
 [runtime.menu.screens.items.action]
-kind = "open_dialog"
-dialog_id = "end_game"
+kind = "open_surface"
+surface_id = "end_game"
 
 [[runtime.menu.screens]]
 id = "inventory_menu"
@@ -107,10 +107,23 @@ confirm_text = "Confirm"
 cancel_text = "Cancel"
 
 [runtime.menu.dialogs.confirm_action]
-kind = "exit_game"
+kind = "exit_runtime"
 
 [runtime.menu.dialogs.cancel_action]
-kind = "close_dialog"
+kind = "close_surface"
+
+[[runtime.menu.dialogs]]
+id = "end_gamen"
+title = "End Game"
+body = "Are you sure?"
+confirm_text = "Confirm"
+cancel_text = "Cancel"
+
+[runtime.menu.dialogs.confirm_action]
+kind = "exit_runtime"
+
+[runtime.menu.dialogs.cancel_action]
+kind = "close_surface"
 
 [editor]
 recent_files = []
@@ -125,28 +138,28 @@ pan = [
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
+"node:2" = [
+    800.0,
+    50.0,
+]
 "node:3" = [
     430.0,
     50.0,
-]
-"node:6" = [
-    430.0,
-    106.0,
 ]
 "node:5" = [
     800.0,
     106.0,
 ]
-"node:2" = [
-    800.0,
-    50.0,
+"node:4" = [
+    60.0,
+    106.0,
 ]
 "node:1" = [
     110.08570861816406,
     34.51572799682617,
 ]
-"node:4" = [
-    60.0,
+"node:6" = [
+    430.0,
     106.0,
 ]
 

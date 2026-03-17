@@ -12,7 +12,7 @@ use toki_core::entity::{
     ControlRole, EntityAttributes, EntityKind, EntityManager, MovementSoundTrigger,
     ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
 };
-use toki_core::menu::{MenuAction, MenuItemDefinition, MenuScreenDefinition};
+use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
 use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
     RuleTarget, RuleTrigger,
@@ -255,7 +255,7 @@ fn delete_menu_item_falls_back_to_screen_selection_when_last_item_removed() {
 }
 
 #[test]
-fn rewrite_menu_action_screen_targets_updates_open_screen_actions() {
+fn rewrite_ui_action_surface_targets_updates_open_surface_actions_for_screens() {
     let mut settings = toki_core::menu::MenuSettings {
         pause_root_screen_id: "pause_menu".to_string(),
         gate_gameplay_when_open: true,
@@ -267,15 +267,15 @@ fn rewrite_menu_action_screen_targets_updates_open_screen_actions() {
             items: vec![MenuItemDefinition::Button {
                 text: "Inventory".to_string(),
                 border_style_override: None,
-                action: MenuAction::OpenScreen {
-                    screen_id: "inventory_menu".to_string(),
+                action: UiAction::OpenSurface {
+                    surface_id: "inventory_menu".to_string(),
                 },
             }],
         }],
         dialogs: vec![],
     };
 
-    InspectorSystem::rewrite_menu_action_screen_targets(
+    InspectorSystem::rewrite_ui_action_surface_targets(
         &mut settings,
         "inventory_menu",
         "items_menu",
@@ -286,15 +286,15 @@ fn rewrite_menu_action_screen_targets_updates_open_screen_actions() {
         MenuItemDefinition::Button {
             text: "Inventory".to_string(),
             border_style_override: None,
-            action: MenuAction::OpenScreen {
-                screen_id: "items_menu".to_string(),
+            action: UiAction::OpenSurface {
+                surface_id: "items_menu".to_string(),
             },
         }
     );
 }
 
 #[test]
-fn rewrite_menu_action_dialog_targets_updates_open_dialog_actions() {
+fn rewrite_ui_action_surface_targets_updates_open_surface_actions_for_dialogs() {
     let mut settings = toki_core::menu::MenuSettings {
         pause_root_screen_id: "pause_menu".to_string(),
         gate_gameplay_when_open: true,
@@ -306,8 +306,8 @@ fn rewrite_menu_action_dialog_targets_updates_open_dialog_actions() {
             items: vec![MenuItemDefinition::Button {
                 text: "Exit".to_string(),
                 border_style_override: None,
-                action: MenuAction::OpenDialog {
-                    dialog_id: "exit_confirm".to_string(),
+                action: UiAction::OpenSurface {
+                    surface_id: "exit_confirm".to_string(),
                 },
             }],
         }],
@@ -317,12 +317,12 @@ fn rewrite_menu_action_dialog_targets_updates_open_dialog_actions() {
             body: "Unsaved progress may be lost.".to_string(),
             confirm_text: "Exit".to_string(),
             cancel_text: "Cancel".to_string(),
-            confirm_action: MenuAction::CloseDialog,
-            cancel_action: MenuAction::CloseDialog,
+            confirm_action: UiAction::CloseSurface,
+            cancel_action: UiAction::CloseSurface,
         }],
     };
 
-    InspectorSystem::rewrite_menu_action_dialog_targets(
+    InspectorSystem::rewrite_ui_action_surface_targets(
         &mut settings,
         "exit_confirm",
         "quit_confirm",
@@ -333,8 +333,8 @@ fn rewrite_menu_action_dialog_targets_updates_open_dialog_actions() {
         MenuItemDefinition::Button {
             text: "Exit".to_string(),
             border_style_override: None,
-            action: MenuAction::OpenDialog {
-                dialog_id: "quit_confirm".to_string(),
+            action: UiAction::OpenSurface {
+                surface_id: "quit_confirm".to_string(),
             },
         }
     );

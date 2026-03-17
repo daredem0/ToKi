@@ -1,4 +1,5 @@
 use crate::text::{TextAnchor, TextItem, TextStyle};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct UiRect {
@@ -52,6 +53,32 @@ impl UiComposition {
     pub fn push(&mut self, block: UiBlock) {
         self.blocks.push(block);
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum UiAction {
+    #[serde(alias = "close_menu")]
+    CloseUi,
+    #[serde(alias = "close_dialog")]
+    CloseSurface,
+    #[serde(alias = "open_screen", alias = "open_dialog")]
+    OpenSurface {
+        #[serde(alias = "screen_id", alias = "dialog_id")]
+        surface_id: String,
+    },
+    Back,
+    #[serde(alias = "exit_game")]
+    ExitRuntime,
+    EmitEvent {
+        event_id: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UiCommand {
+    ExitRuntime,
+    EmitEvent { event_id: String },
 }
 
 #[cfg(test)]

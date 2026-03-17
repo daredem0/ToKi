@@ -116,6 +116,7 @@ struct App {
     splash_logo_loaded: bool,
     post_splash_sprite_texture_path: Option<PathBuf>,
     exit_requested: bool,
+    pending_ui_events: Vec<String>,
     asset_load_plan: RuntimeAssetLoadPlan,
     #[allow(dead_code)]
     decoded_project_cache: DecodedProjectCache,
@@ -196,6 +197,7 @@ impl App {
             splash_logo_loaded: false,
             post_splash_sprite_texture_path: None,
             exit_requested: false,
+            pending_ui_events: Vec::new(),
             asset_load_plan,
             decoded_project_cache,
             pack_mount,

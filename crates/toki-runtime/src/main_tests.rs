@@ -6,7 +6,7 @@ use super::{
     RuntimeConfigStartup,
 };
 use std::path::PathBuf;
-use toki_core::menu::{MenuAction, MenuItemDefinition, MenuScreenDefinition, MenuSettings};
+use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, MenuSettings, UiAction};
 use toki_runtime::{RuntimeAudioMixOptions, RuntimeDisplayOptions, RuntimeLaunchOptions};
 
 #[test]
@@ -110,7 +110,7 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
             items: vec![MenuItemDefinition::Button {
                 text: "Resume".to_string(),
                 border_style_override: None,
-                action: MenuAction::CloseMenu,
+                action: UiAction::CloseUi,
             }],
         }],
         dialogs: vec![],

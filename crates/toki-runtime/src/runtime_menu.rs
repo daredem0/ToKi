@@ -1,7 +1,7 @@
 use toki_core::menu::{
-    build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui, MenuCommand,
-    MenuInput,
+    build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui, MenuInput,
 };
+use toki_core::ui::UiCommand;
 
 use super::App;
 
@@ -55,16 +55,25 @@ impl App {
         }
     }
 
-    fn apply_menu_command(&mut self, command: MenuCommand) {
-        apply_menu_command(&mut self.exit_requested, command);
+    fn apply_menu_command(&mut self, command: UiCommand) {
+        apply_menu_command(
+            &mut self.exit_requested,
+            &mut self.pending_ui_events,
+            command,
+        );
     }
 }
 
-fn apply_menu_command(exit_requested: &mut bool, command: MenuCommand) {
+fn apply_menu_command(
+    exit_requested: &mut bool,
+    pending_ui_events: &mut Vec<String>,
+    command: UiCommand,
+) {
     match command {
-        MenuCommand::ExitRuntime => {
+        UiCommand::ExitRuntime => {
             *exit_requested = true;
         }
+        UiCommand::EmitEvent { event_id } => pending_ui_events.push(event_id),
     }
 }
 
@@ -72,9 +81,9 @@ fn apply_menu_command(exit_requested: &mut bool, command: MenuCommand) {
 mod tests {
     use super::*;
     use toki_core::menu::{
-        menu_fill_color_rgba, menu_hex_color_rgba, MenuAppearance, MenuCommand, MenuView,
-        MenuViewEntry,
+        menu_fill_color_rgba, menu_hex_color_rgba, MenuAppearance, MenuView, MenuViewEntry,
     };
+    use toki_core::ui::UiCommand;
 
     #[test]
     fn menu_hex_color_rgba_parses_valid_hex_triplet() {
@@ -93,10 +102,33 @@ mod tests {
     #[test]
     fn exit_runtime_menu_command_sets_exit_requested_flag() {
         let mut exit_requested = false;
+        let mut pending_ui_events = Vec::new();
 
-        apply_menu_command(&mut exit_requested, MenuCommand::ExitRuntime);
+        apply_menu_command(
+            &mut exit_requested,
+            &mut pending_ui_events,
+            UiCommand::ExitRuntime,
+        );
 
         assert!(exit_requested);
+        assert!(pending_ui_events.is_empty());
+    }
+
+    #[test]
+    fn emit_event_menu_command_is_queued_for_runtime_consumers() {
+        let mut exit_requested = false;
+        let mut pending_ui_events = Vec::new();
+
+        apply_menu_command(
+            &mut exit_requested,
+            &mut pending_ui_events,
+            UiCommand::EmitEvent {
+                event_id: "start_game".to_string(),
+            },
+        );
+
+        assert!(!exit_requested);
+        assert_eq!(pending_ui_events, vec!["start_game".to_string()]);
     }
 
     #[test]

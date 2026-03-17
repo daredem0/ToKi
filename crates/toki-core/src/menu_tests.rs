@@ -1,9 +1,9 @@
 use super::{
     apply_menu_opacity, build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui,
     menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba, menu_visual_metrics,
-    InventoryEntry, MenuAction, MenuAppearance, MenuBorderStyle, MenuCommand, MenuController,
-    MenuDialogDefinition, MenuInput, MenuItemDefinition, MenuListSource, MenuScreenDefinition,
-    MenuSettings, MenuView, MenuViewEntry,
+    InventoryEntry, MenuAppearance, MenuBorderStyle, MenuController, MenuDialogDefinition,
+    MenuInput, MenuItemDefinition, MenuListSource, MenuScreenDefinition, MenuSettings, MenuView,
+    MenuViewEntry, UiAction, UiCommand,
 };
 
 #[test]
@@ -116,13 +116,13 @@ fn navigation_skips_non_selectable_items() {
                 MenuItemDefinition::Button {
                     text: "Resume".to_string(),
                     border_style_override: None,
-                    action: MenuAction::CloseMenu,
+                    action: UiAction::CloseUi,
                 },
                 MenuItemDefinition::Button {
                     text: "Next".to_string(),
                     border_style_override: None,
-                    action: MenuAction::OpenScreen {
-                        screen_id: "custom".to_string(),
+                    action: UiAction::OpenSurface {
+                        surface_id: "custom".to_string(),
                     },
                 },
             ],
@@ -153,7 +153,7 @@ fn menu_controller_returns_exit_runtime_command_for_exit_game_action() {
             items: vec![MenuItemDefinition::Button {
                 text: "Exit".to_string(),
                 border_style_override: None,
-                action: MenuAction::ExitGame,
+                action: UiAction::ExitRuntime,
             }],
         }],
         dialogs: Vec::new(),
@@ -164,12 +164,45 @@ fn menu_controller_returns_exit_runtime_command_for_exit_game_action() {
 
     assert_eq!(
         controller.handle_input(MenuInput::Confirm),
-        Some(MenuCommand::ExitRuntime)
+        Some(UiCommand::ExitRuntime)
     );
     assert!(
         controller.is_open(),
         "menu stays open until runtime handles exit"
     );
+}
+
+#[test]
+fn menu_controller_returns_emit_event_command_for_generic_ui_event_action() {
+    let settings = MenuSettings {
+        pause_root_screen_id: "pause_menu".to_string(),
+        gate_gameplay_when_open: true,
+        appearance: Default::default(),
+        screens: vec![MenuScreenDefinition {
+            id: "pause_menu".to_string(),
+            title: "Paused".to_string(),
+            title_border_style_override: None,
+            items: vec![MenuItemDefinition::Button {
+                text: "Start".to_string(),
+                border_style_override: None,
+                action: UiAction::EmitEvent {
+                    event_id: "start_game".to_string(),
+                },
+            }],
+        }],
+        dialogs: Vec::new(),
+    };
+
+    let mut controller = MenuController::new(settings);
+    controller.open_pause_root();
+
+    assert_eq!(
+        controller.handle_input(MenuInput::Confirm),
+        Some(UiCommand::EmitEvent {
+            event_id: "start_game".to_string(),
+        })
+    );
+    assert!(controller.is_open());
 }
 
 #[test]
@@ -363,8 +396,8 @@ fn menu_controller_opens_dialog_and_back_dismisses_it() {
             items: vec![MenuItemDefinition::Button {
                 text: "Exit".to_string(),
                 border_style_override: None,
-                action: MenuAction::OpenDialog {
-                    dialog_id: "exit_confirm".to_string(),
+                action: UiAction::OpenSurface {
+                    surface_id: "exit_confirm".to_string(),
                 },
             }],
         }],
@@ -374,8 +407,8 @@ fn menu_controller_opens_dialog_and_back_dismisses_it() {
             body: "Unsaved progress may be lost.".to_string(),
             confirm_text: "Exit".to_string(),
             cancel_text: "Cancel".to_string(),
-            confirm_action: MenuAction::ExitGame,
-            cancel_action: MenuAction::CloseDialog,
+            confirm_action: UiAction::ExitRuntime,
+            cancel_action: UiAction::CloseSurface,
         }],
     };
     let mut controller = MenuController::new(settings);
@@ -403,8 +436,8 @@ fn menu_controller_dialog_confirm_returns_runtime_command() {
             items: vec![MenuItemDefinition::Button {
                 text: "Exit".to_string(),
                 border_style_override: None,
-                action: MenuAction::OpenDialog {
-                    dialog_id: "exit_confirm".to_string(),
+                action: UiAction::OpenSurface {
+                    surface_id: "exit_confirm".to_string(),
                 },
             }],
         }],
@@ -414,8 +447,8 @@ fn menu_controller_dialog_confirm_returns_runtime_command() {
             body: "Unsaved progress may be lost.".to_string(),
             confirm_text: "Exit".to_string(),
             cancel_text: "Cancel".to_string(),
-            confirm_action: MenuAction::ExitGame,
-            cancel_action: MenuAction::CloseDialog,
+            confirm_action: UiAction::ExitRuntime,
+            cancel_action: UiAction::CloseSurface,
         }],
     };
     let mut controller = MenuController::new(settings);
@@ -424,7 +457,7 @@ fn menu_controller_dialog_confirm_returns_runtime_command() {
 
     assert_eq!(
         controller.handle_input(MenuInput::Confirm),
-        Some(MenuCommand::ExitRuntime)
+        Some(UiCommand::ExitRuntime)
     );
 }
 

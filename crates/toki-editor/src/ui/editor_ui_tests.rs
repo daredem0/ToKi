@@ -1,7 +1,7 @@
 use glam::{IVec2, UVec2};
 use tempfile::tempdir;
 use toki_core::entity::{EntityAttributes, EntityKind};
-use toki_core::menu::{MenuAction, MenuItemDefinition, MenuScreenDefinition};
+use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 
 use super::{EditorUI, MapEditorDraft, Selection};
@@ -264,7 +264,7 @@ fn sample_project_with_menu_screens(screen_ids: &[&str]) -> Project {
             items: vec![MenuItemDefinition::Button {
                 text: "Resume".to_string(),
                 border_style_override: None,
-                action: MenuAction::CloseMenu,
+                action: UiAction::CloseUi,
             }],
         })
         .collect();
@@ -283,8 +283,8 @@ fn sample_project_with_menu_dialogs(dialog_ids: &[&str]) -> Project {
             body: "Are you sure?".to_string(),
             confirm_text: "Confirm".to_string(),
             cancel_text: "Cancel".to_string(),
-            confirm_action: MenuAction::CloseDialog,
-            cancel_action: MenuAction::CloseDialog,
+            confirm_action: UiAction::CloseSurface,
+            cancel_action: UiAction::CloseSurface,
         })
         .collect();
     project

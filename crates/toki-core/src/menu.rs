@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::text::{TextAnchor, TextStyle, TextWeight};
+pub use crate::ui::{UiAction, UiCommand};
 use crate::ui::{UiBlock, UiComposition, UiRect, UiTextBlock};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -186,8 +187,8 @@ pub struct MenuDialogDefinition {
     pub body: String,
     pub confirm_text: String,
     pub cancel_text: String,
-    pub confirm_action: MenuAction,
-    pub cancel_action: MenuAction,
+    pub confirm_action: UiAction,
+    pub cancel_action: UiAction,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -202,7 +203,7 @@ pub enum MenuItemDefinition {
         text: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         border_style_override: Option<MenuBorderStyle>,
-        action: MenuAction,
+        action: UiAction,
     },
     DynamicList {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -212,17 +213,6 @@ pub enum MenuItemDefinition {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         border_style_override: Option<MenuBorderStyle>,
     },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum MenuAction {
-    CloseMenu,
-    CloseDialog,
-    OpenScreen { screen_id: String },
-    OpenDialog { dialog_id: String },
-    Back,
-    ExitGame,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -237,11 +227,6 @@ pub enum MenuInput {
     Down,
     Confirm,
     Back,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MenuCommand {
-    ExitRuntime,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -442,7 +427,7 @@ impl MenuController {
         })
     }
 
-    pub fn handle_input(&mut self, input: MenuInput) -> Option<MenuCommand> {
+    pub fn handle_input(&mut self, input: MenuInput) -> Option<UiCommand> {
         if self.active_dialog.is_some() {
             return self.handle_dialog_input(input);
         }
@@ -465,7 +450,7 @@ impl MenuController {
         }
     }
 
-    fn handle_dialog_input(&mut self, input: MenuInput) -> Option<MenuCommand> {
+    fn handle_dialog_input(&mut self, input: MenuInput) -> Option<UiCommand> {
         match input {
             MenuInput::Up | MenuInput::Down => {
                 if let Some(active_dialog) = &mut self.active_dialog {
@@ -481,12 +466,12 @@ impl MenuController {
                 } else {
                     dialog.cancel_action
                 };
-                self.apply_action(&action, true)
+                self.apply_action(&action)
             }
             MenuInput::Back => {
                 let active_dialog = self.active_dialog.clone()?;
                 let dialog = self.dialog_map.get(&active_dialog.dialog_id)?.clone();
-                self.apply_action(&dialog.cancel_action, true)
+                self.apply_action(&dialog.cancel_action)
             }
         }
     }
@@ -499,7 +484,7 @@ impl MenuController {
         }
     }
 
-    fn confirm_current_selection(&mut self, current_screen_id: &str) -> Option<MenuCommand> {
+    fn confirm_current_selection(&mut self, current_screen_id: &str) -> Option<UiCommand> {
         let selected_index = *self
             .selected_index_by_screen
             .get(current_screen_id)
@@ -513,44 +498,49 @@ impl MenuController {
             action.clone()
         };
 
-        self.apply_action(&action, false)
+        self.apply_action(&action)
     }
 
-    fn apply_action(&mut self, action: &MenuAction, from_dialog: bool) -> Option<MenuCommand> {
+    fn apply_action(&mut self, action: &UiAction) -> Option<UiCommand> {
         match action {
-            MenuAction::CloseMenu => {
+            UiAction::CloseUi => {
                 self.close();
                 None
             }
-            MenuAction::CloseDialog => {
-                self.active_dialog = None;
-                None
-            }
-            MenuAction::OpenScreen { screen_id } => {
-                self.active_dialog = None;
-                if self.screen_map.contains_key(screen_id) {
-                    self.stack.push(screen_id.clone());
+            UiAction::CloseSurface => {
+                if self.active_dialog.is_some() {
+                    self.active_dialog = None;
+                } else if self.stack.len() > 1 {
+                    self.stack.pop();
+                } else {
+                    self.close();
                 }
                 None
             }
-            MenuAction::OpenDialog { dialog_id } => {
-                if self.dialog_map.contains_key(dialog_id) {
+            UiAction::OpenSurface { surface_id } => {
+                if self.dialog_map.contains_key(surface_id) {
                     self.active_dialog = Some(ActiveDialogState {
-                        dialog_id: dialog_id.clone(),
+                        dialog_id: surface_id.clone(),
                         confirm_selected: true,
                     });
+                } else if self.screen_map.contains_key(surface_id) {
+                    self.active_dialog = None;
+                    self.stack.push(surface_id.clone());
                 }
                 None
             }
-            MenuAction::Back => {
-                if from_dialog {
+            UiAction::Back => {
+                if self.active_dialog.is_some() {
                     self.active_dialog = None;
                 } else {
                     self.go_back();
                 }
                 None
             }
-            MenuAction::ExitGame => Some(MenuCommand::ExitRuntime),
+            UiAction::ExitRuntime => Some(UiCommand::ExitRuntime),
+            UiAction::EmitEvent { event_id } => Some(UiCommand::EmitEvent {
+                event_id: event_id.clone(),
+            }),
         }
     }
 
@@ -667,13 +657,13 @@ fn default_menu_screens() -> Vec<MenuScreenDefinition> {
                 MenuItemDefinition::Button {
                     text: "Resume".to_string(),
                     border_style_override: None,
-                    action: MenuAction::CloseMenu,
+                    action: UiAction::CloseUi,
                 },
                 MenuItemDefinition::Button {
                     text: "Inventory".to_string(),
                     border_style_override: None,
-                    action: MenuAction::OpenScreen {
-                        screen_id: "inventory_menu".to_string(),
+                    action: UiAction::OpenSurface {
+                        surface_id: "inventory_menu".to_string(),
                     },
                 },
             ],
@@ -692,7 +682,7 @@ fn default_menu_screens() -> Vec<MenuScreenDefinition> {
                 MenuItemDefinition::Button {
                     text: "Back".to_string(),
                     border_style_override: None,
-                    action: MenuAction::Back,
+                    action: UiAction::Back,
                 },
             ],
         },
