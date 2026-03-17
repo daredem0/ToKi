@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use toki_core::fonts::find_font_files;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::math::projection::{calculate_projection, ProjectionParameter};
@@ -51,6 +52,10 @@ trait RuntimeRenderBackend: std::fmt::Debug {
     fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
     fn add_filled_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
     fn finalize_debug_shapes(&mut self);
+    fn clear_ui_shapes(&mut self);
+    fn add_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
+    fn add_filled_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
+    fn finalize_ui_shapes(&mut self);
 }
 
 #[derive(Debug)]
@@ -173,6 +178,22 @@ impl RuntimeRenderBackend for WgpuRenderBackend {
 
     fn finalize_debug_shapes(&mut self) {
         self.gpu.finalize_debug_shapes();
+    }
+
+    fn clear_ui_shapes(&mut self) {
+        self.gpu.clear_ui_rects();
+    }
+
+    fn add_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+        self.gpu.add_ui_rect(x, y, width, height, color);
+    }
+
+    fn add_filled_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+        self.gpu.add_filled_ui_rect(x, y, width, height, color);
+    }
+
+    fn finalize_ui_shapes(&mut self) {
+        self.gpu.finalize_ui_rects();
     }
 }
 
@@ -481,6 +502,37 @@ impl RenderingSystem {
             backend.finalize_debug_shapes();
         }
     }
+
+    pub fn clear_ui_shapes(&mut self) {
+        if let Some(backend) = &mut self.backend {
+            backend.clear_ui_shapes();
+        }
+    }
+
+    pub fn add_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+        if let Some(backend) = &mut self.backend {
+            backend.add_ui_rect(x, y, width, height, color);
+        }
+    }
+
+    pub fn add_filled_ui_rect(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        color: [f32; 4],
+    ) {
+        if let Some(backend) = &mut self.backend {
+            backend.add_filled_ui_rect(x, y, width, height, color);
+        }
+    }
+
+    pub fn finalize_ui_shapes(&mut self) {
+        if let Some(backend) = &mut self.backend {
+            backend.finalize_ui_shapes();
+        }
+    }
 }
 
 /// Helper function to find atlas files by name in a directory (only .json supported)
@@ -514,27 +566,6 @@ fn find_image_for_atlas(atlas_path: &std::path::Path) -> Option<std::path::PathB
         }
     }
     None
-}
-
-fn find_font_files(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
-    if !dir.exists() {
-        return Vec::new();
-    }
-
-    let mut fonts: Vec<std::path::PathBuf> = std::fs::read_dir(dir)
-        .ok()
-        .into_iter()
-        .flat_map(|entries| entries.filter_map(Result::ok))
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.extension()
-                .and_then(|ext| ext.to_str())
-                .map(|ext| matches!(ext.to_ascii_lowercase().as_str(), "ttf" | "otf" | "ttc"))
-                .unwrap_or(false)
-        })
-        .collect();
-    fonts.sort();
-    fonts
 }
 
 #[cfg(test)]

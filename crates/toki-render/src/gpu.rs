@@ -4,6 +4,7 @@ use std::sync::Arc;
 use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
 use winit::window::Window;
 
+use toki_core::math::projection::screen_space_projection;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::sprite::SpriteFrame;
@@ -26,6 +27,7 @@ pub struct GpuState {
     sprite_pipeline: SpritePipeline,
     sprite_pipelines_by_texture: BTreeMap<PathBuf, SpritePipeline>,
     debug_pipeline: DebugPipeline,
+    ui_rect_pipeline: DebugPipeline,
     ui_debug_pipeline: DebugPipeline,
     text_renderer: GlyphonTextRenderer,
     text_items: Vec<TextItem>,
@@ -169,6 +171,32 @@ impl GpuState {
         self.debug_pipeline.update_vertices(&self.device);
     }
 
+    pub fn clear_ui_rects(&mut self) {
+        self.ui_rect_pipeline.clear();
+    }
+
+    pub fn add_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+        self.ui_rect_pipeline.add_rect(x, y, width, height, color);
+    }
+
+    pub fn add_filled_ui_rect(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        color: [f32; 4],
+    ) {
+        self.ui_rect_pipeline
+            .add_filled_rect(x, y, width, height, color);
+    }
+
+    pub fn finalize_ui_rects(&mut self) {
+        self.ui_rect_pipeline
+            .update_camera(&self.queue, screen_space_projection(self.config.width as f32, self.config.height as f32));
+        self.ui_rect_pipeline.update_vertices(&self.device);
+    }
+
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.config.width = new_size.width;
@@ -187,6 +215,7 @@ impl GpuState {
             SpritePipeline::new(&device, &queue, config.format, default_texture_path());
 
         let debug_pipeline = DebugPipeline::new(&device, config.format);
+        let ui_rect_pipeline = DebugPipeline::new(&device, config.format);
         let ui_debug_pipeline = DebugPipeline::new(&device, config.format);
         let text_renderer = GlyphonTextRenderer::new(&device, &queue, config.format);
 
@@ -199,6 +228,7 @@ impl GpuState {
             sprite_pipeline,
             sprite_pipelines_by_texture: BTreeMap::new(),
             debug_pipeline,
+            ui_rect_pipeline,
             ui_debug_pipeline,
             text_renderer,
             text_items: Vec::new(),
@@ -257,6 +287,7 @@ impl GpuState {
         let sprite_pipeline = SpritePipeline::new(&device, &queue, config.format, sprite_path);
 
         let debug_pipeline = DebugPipeline::new(&device, config.format);
+        let ui_rect_pipeline = DebugPipeline::new(&device, config.format);
         let ui_debug_pipeline = DebugPipeline::new(&device, config.format);
         let text_renderer = GlyphonTextRenderer::new(&device, &queue, config.format);
 
@@ -269,6 +300,7 @@ impl GpuState {
             sprite_pipeline,
             sprite_pipelines_by_texture: BTreeMap::new(),
             debug_pipeline,
+            ui_rect_pipeline,
             ui_debug_pipeline,
             text_renderer,
             text_items: Vec::new(),
@@ -373,6 +405,9 @@ impl GpuState {
             // Render debug shapes last (on top of everything)
             self.debug_pipeline.render(&mut render_pass);
 
+            // Render generic runtime UI rectangles in screen-space above world debug overlays.
+            self.ui_rect_pipeline.render(&mut render_pass);
+
             // Render UI background rectangles for text boxes in screen-space.
             self.ui_debug_pipeline.render(&mut render_pass);
 
@@ -406,7 +441,10 @@ impl GpuState {
             }
         }
         self.ui_debug_pipeline
-            .update_camera(&self.queue, glam::Mat4::IDENTITY);
+            .update_camera(
+                &self.queue,
+                screen_space_projection(self.config.width as f32, self.config.height as f32),
+            );
         self.ui_debug_pipeline.update_vertices(&self.device);
     }
 }

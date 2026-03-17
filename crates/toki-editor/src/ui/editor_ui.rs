@@ -176,6 +176,7 @@ pub struct EditorUI {
     pub multi_entity_delta_x_input: i32,
     pub multi_entity_delta_y_input: i32,
     pub multi_entity_inspector_selection_signature: Vec<EntityId>,
+    pub menu_preview_font_families: Vec<String>,
 }
 
 impl EditorUI {
@@ -266,6 +267,11 @@ impl EditorUI {
             multi_entity_delta_x_input: 0,
             multi_entity_delta_y_input: 0,
             multi_entity_inspector_selection_signature: Vec::new(),
+            menu_preview_font_families: vec![
+                "Sans".to_string(),
+                "Serif".to_string(),
+                "Mono".to_string(),
+            ],
         }
     }
 

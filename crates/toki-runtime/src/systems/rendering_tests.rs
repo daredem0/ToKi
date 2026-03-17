@@ -1,9 +1,8 @@
-use super::{
-    find_atlas_file, find_font_files, find_image_for_atlas, RenderingSystem, RuntimeRenderBackend,
-};
+use super::{find_atlas_file, find_image_for_atlas, RenderingSystem, RuntimeRenderBackend};
 use std::cell::{Cell, RefCell};
 use std::path::Path;
 use std::rc::Rc;
+use toki_core::fonts::find_font_files;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::sprite::SpriteFrame;
@@ -22,7 +21,9 @@ struct FakeBackend {
     sprite_count: Rc<Cell<usize>>,
     text_count: Rc<Cell<usize>>,
     debug_rect_count: Rc<Cell<usize>>,
+    ui_rect_count: Rc<Cell<usize>>,
     finalized_debug: Rc<Cell<usize>>,
+    finalized_ui: Rc<Cell<usize>>,
 }
 
 impl RuntimeRenderBackend for FakeBackend {
@@ -134,6 +135,29 @@ impl RuntimeRenderBackend for FakeBackend {
     fn finalize_debug_shapes(&mut self) {
         self.finalized_debug.set(self.finalized_debug.get() + 1);
     }
+
+    fn clear_ui_shapes(&mut self) {
+        self.ui_rect_count.set(0);
+    }
+
+    fn add_ui_rect(&mut self, _x: f32, _y: f32, _width: f32, _height: f32, _color: [f32; 4]) {
+        self.ui_rect_count.set(self.ui_rect_count.get() + 1);
+    }
+
+    fn add_filled_ui_rect(
+        &mut self,
+        _x: f32,
+        _y: f32,
+        _width: f32,
+        _height: f32,
+        _color: [f32; 4],
+    ) {
+        self.ui_rect_count.set(self.ui_rect_count.get() + 1);
+    }
+
+    fn finalize_ui_shapes(&mut self) {
+        self.finalized_ui.set(self.finalized_ui.get() + 1);
+    }
 }
 
 fn make_unique_temp_dir() -> std::path::PathBuf {
@@ -239,6 +263,8 @@ fn backend_seam_dispatches_runtime_render_commands() {
     let text_count = fake.text_count.clone();
     let debug_rect_count = fake.debug_rect_count.clone();
     let debug_finalize_counter = fake.finalized_debug.clone();
+    let ui_rect_count = fake.ui_rect_count.clone();
+    let ui_finalize_counter = fake.finalized_ui.clone();
 
     let mut rendering = RenderingSystem::new();
     rendering.backend = Some(Box::new(fake));
@@ -289,6 +315,10 @@ fn backend_seam_dispatches_runtime_render_commands() {
     rendering.add_debug_rect(0.0, 0.0, 16.0, 16.0, [1.0, 0.0, 0.0, 1.0]);
     rendering.add_filled_debug_rect(1.0, 1.0, 14.0, 14.0, [0.0, 1.0, 0.0, 1.0]);
     rendering.finalize_debug_shapes();
+    rendering.clear_ui_shapes();
+    rendering.add_ui_rect(4.0, 4.0, 12.0, 12.0, [1.0, 1.0, 1.0, 1.0]);
+    rendering.add_filled_ui_rect(5.0, 5.0, 10.0, 10.0, [0.0, 0.0, 0.0, 0.5]);
+    rendering.finalize_ui_shapes();
     rendering.draw();
 
     assert_eq!(projection_counter.get(), 1);
@@ -307,6 +337,8 @@ fn backend_seam_dispatches_runtime_render_commands() {
     assert_eq!(text_count.get(), 1);
     assert_eq!(debug_rect_count.get(), 2);
     assert_eq!(debug_finalize_counter.get(), 1);
+    assert_eq!(ui_rect_count.get(), 2);
+    assert_eq!(ui_finalize_counter.get(), 1);
 }
 
 #[test]

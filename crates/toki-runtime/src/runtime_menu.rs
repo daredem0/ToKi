@@ -1,12 +1,10 @@
-use toki_core::menu::{MenuBorderStyle, MenuCommand, MenuInput};
-use toki_core::text::{TextAnchor, TextBoxStyle, TextItem, TextStyle, TextWeight};
+use toki_core::menu::{
+    build_menu_layout, menu_border_color, menu_hex_color_rgba, tinted_menu_background,
+    MenuCommand, MenuInput,
+};
+use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
 
 use super::App;
-
-const MENU_TITLE_Y: f32 = 22.0;
-const MENU_ENTRIES_START_Y: f32 = 52.0;
-const MENU_ENTRY_SPACING_Y: f32 = 20.0;
-const MENU_HINT_Y_PADDING: f32 = 18.0;
 
 impl App {
     pub(super) fn is_menu_open(&self) -> bool {
@@ -46,11 +44,28 @@ impl App {
                 let size = self.camera_system.viewport_size();
                 glam::Vec2::new(size.x as f32, size.y as f32)
             });
-        let center_x = viewport.x * 0.5;
-
         let accent = menu_hex_color_rgba(&self.menu_system.settings().appearance.color_hex)
             .unwrap_or([0.49, 1.0, 0.49, 1.0]);
-        let appearance = &self.menu_system.settings().appearance;
+        let appearance = self.menu_system.settings().appearance.clone();
+        let layout = build_menu_layout(&view, &appearance, viewport);
+        let panel_rect = layout.panel;
+        self.rendering.add_filled_ui_rect(
+            panel_rect.x,
+            panel_rect.y,
+            panel_rect.width,
+            panel_rect.height,
+            tinted_menu_background(accent, 0.16, 0.88),
+        );
+        if let Some(border_color) = menu_border_color(appearance.border_style, accent, 0.95) {
+            self.rendering.add_ui_rect(
+                panel_rect.x,
+                panel_rect.y,
+                panel_rect.width,
+                panel_rect.height,
+                border_color,
+            );
+        }
+
         let title_style = TextStyle {
             font_family: appearance.font_family.clone(),
             size_px: appearance.font_size_px as f32 + 4.0,
@@ -70,72 +85,64 @@ impl App {
             weight: TextWeight::Bold,
             ..entry_style.clone()
         };
-        let title_box = TextBoxStyle {
-            padding: glam::Vec2::new(14.0, 10.0),
-            background_color: tinted_menu_background(accent, 0.16, 0.9),
-            border_color: menu_border_color(appearance.border_style, accent, 0.95),
-        };
-        let entry_box = TextBoxStyle {
-            padding: glam::Vec2::new(10.0, 6.0),
-            background_color: tinted_menu_background(accent, 0.08, 0.72),
-            border_color: menu_border_color(appearance.border_style, accent, 0.55),
-        };
-        let selected_box = TextBoxStyle {
-            background_color: tinted_menu_background(accent, 0.22, 0.88),
-            border_color: menu_border_color(appearance.border_style, accent, 0.95),
-            ..entry_box.clone()
-        };
+        self.render_menu_layout_rect(&layout.title.rect, tinted_menu_background(accent, 0.16, 0.9), menu_border_color(appearance.border_style, accent, 0.95));
 
         self.rendering.add_text_item(
             TextItem::new_screen(
-                view.title,
-                glam::Vec2::new(center_x, MENU_TITLE_Y),
+                layout.title.text,
+                glam::Vec2::new(layout.title.rect.center_x(), layout.title.rect.y + 10.0),
                 title_style,
             )
             .with_anchor(TextAnchor::TopCenter)
-            .with_layer(10)
-            .with_box_style(title_box),
+            .with_layer(10),
         );
 
-        for (index, entry) in view.entries.iter().enumerate() {
-            let prefix = if entry.selected { "> " } else { "  " };
+        for entry in &layout.entries {
+            self.render_menu_layout_rect(
+                &entry.rect,
+                if entry.selected {
+                    tinted_menu_background(accent, 0.22, 0.88)
+                } else if entry.selectable {
+                    tinted_menu_background(accent, 0.08, 0.72)
+                } else {
+                    [0.0, 0.0, 0.0, 0.45]
+                },
+                if entry.selectable {
+                    menu_border_color(
+                        appearance.border_style,
+                        accent,
+                        if entry.selected { 0.95 } else { 0.55 },
+                    )
+                } else {
+                    None
+                },
+            );
+
             let style = if entry.selected {
                 selected_style.clone()
             } else {
                 entry_style.clone()
             };
-            let box_style = if entry.selectable {
-                if entry.selected {
-                    selected_box.clone()
-                } else {
-                    entry_box.clone()
-                }
-            } else {
-                TextBoxStyle {
-                    background_color: [0.0, 0.0, 0.0, 0.45],
-                    border_color: menu_border_color(appearance.border_style, accent, 0.0),
-                    ..entry_box.clone()
-                }
-            };
             self.rendering.add_text_item(
                 TextItem::new_screen(
-                    format!("{prefix}{}", entry.text),
-                    glam::Vec2::new(
-                        center_x,
-                        MENU_ENTRIES_START_Y + index as f32 * MENU_ENTRY_SPACING_Y,
-                    ),
+                    if entry.selected {
+                        format!("> {}", entry.text)
+                    } else {
+                        format!("  {}", entry.text)
+                    },
+                    glam::Vec2::new(entry.rect.center_x(), entry.rect.y + 6.0),
                     style,
                 )
                 .with_anchor(TextAnchor::TopCenter)
-                .with_layer(10)
-                .with_box_style(box_style),
+                .with_layer(10),
             );
         }
 
+        self.render_menu_layout_rect(&layout.hint.rect, [0.0, 0.0, 0.0, 0.65], None);
         self.rendering.add_text_item(
             TextItem::new_screen(
-                "Esc: Back   Enter/Space: Select",
-                glam::Vec2::new(center_x, viewport.y - MENU_HINT_Y_PADDING),
+                layout.hint.text,
+                glam::Vec2::new(layout.hint.rect.center_x(), layout.hint.rect.y + 4.0),
                 TextStyle {
                     font_family: appearance.font_family.clone(),
                     size_px: (appearance.font_size_px as f32 - 2.0).max(10.0),
@@ -144,17 +151,26 @@ impl App {
                 },
             )
             .with_anchor(TextAnchor::BottomCenter)
-            .with_layer(10)
-            .with_box_style(TextBoxStyle {
-                padding: glam::Vec2::new(8.0, 4.0),
-                background_color: [0.0, 0.0, 0.0, 0.65],
-                border_color: menu_border_color(appearance.border_style, accent, 0.0),
-            }),
+            .with_layer(10),
         );
     }
 
     fn apply_menu_command(&mut self, command: MenuCommand) {
         apply_menu_command(&mut self.exit_requested, command);
+    }
+
+    fn render_menu_layout_rect(
+        &mut self,
+        rect: &toki_core::menu::MenuRect,
+        fill: [f32; 4],
+        border: Option<[f32; 4]>,
+    ) {
+        self.rendering
+            .add_filled_ui_rect(rect.x, rect.y, rect.width, rect.height, fill);
+        if let Some(border) = border {
+            self.rendering
+                .add_ui_rect(rect.x, rect.y, rect.width, rect.height, border);
+        }
     }
 }
 
@@ -166,46 +182,10 @@ fn apply_menu_command(exit_requested: &mut bool, command: MenuCommand) {
     }
 }
 
-fn menu_hex_color_rgba(hex: &str) -> Option<[f32; 4]> {
-    let trimmed = hex.trim().trim_start_matches('#');
-    if trimmed.len() != 6 {
-        return None;
-    }
-    let red = u8::from_str_radix(&trimmed[0..2], 16).ok()?;
-    let green = u8::from_str_radix(&trimmed[2..4], 16).ok()?;
-    let blue = u8::from_str_radix(&trimmed[4..6], 16).ok()?;
-    Some([
-        red as f32 / 255.0,
-        green as f32 / 255.0,
-        blue as f32 / 255.0,
-        1.0,
-    ])
-}
-
-fn tinted_menu_background(accent: [f32; 4], shade: f32, alpha: f32) -> [f32; 4] {
-    [
-        accent[0] * shade,
-        accent[1] * shade,
-        accent[2] * shade,
-        alpha,
-    ]
-}
-
-fn menu_border_color(
-    border_style: MenuBorderStyle,
-    accent: [f32; 4],
-    alpha: f32,
-) -> Option<[f32; 4]> {
-    match border_style {
-        MenuBorderStyle::Square if alpha > 0.0 => Some([accent[0], accent[1], accent[2], alpha]),
-        MenuBorderStyle::Square => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use toki_core::menu::MenuCommand;
+    use toki_core::menu::{MenuAppearance, MenuCommand, MenuView, MenuViewEntry};
 
     #[test]
     fn menu_hex_color_rgba_parses_valid_hex_triplet() {
@@ -228,5 +208,33 @@ mod tests {
         apply_menu_command(&mut exit_requested, MenuCommand::ExitRuntime);
 
         assert!(exit_requested);
+    }
+
+    #[test]
+    fn runtime_menu_layout_uses_shared_geometry() {
+        let layout = build_menu_layout(
+            &MenuView {
+                screen_id: "pause".to_string(),
+                title: "Paused".to_string(),
+                entries: vec![
+                    MenuViewEntry {
+                        text: "Resume".to_string(),
+                        selected: true,
+                        selectable: true,
+                    },
+                    MenuViewEntry {
+                        text: "Inventory".to_string(),
+                        selected: false,
+                        selectable: true,
+                    },
+                ],
+            },
+            &MenuAppearance::default(),
+            glam::Vec2::new(320.0, 180.0),
+        );
+
+        assert_eq!(layout.panel.width, 280.0);
+        assert_eq!(layout.entries.len(), 2);
+        assert!(layout.entries[0].rect.width > 200.0);
     }
 }

@@ -36,6 +36,73 @@ pub struct MenuAppearance {
     pub border_style: MenuBorderStyle,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MenuVisualMetrics {
+    pub panel_width_px: f32,
+    pub panel_inner_margin_px: f32,
+    pub title_size_delta_px: f32,
+    pub title_top_y_px: f32,
+    pub entries_start_y_px: f32,
+    pub entry_spacing_y_px: f32,
+    pub hint_bottom_padding_px: f32,
+    pub title_padding_px: glam::Vec2,
+    pub entry_padding_px: glam::Vec2,
+    pub hint_padding_px: glam::Vec2,
+}
+
+impl Default for MenuVisualMetrics {
+    fn default() -> Self {
+        Self {
+            panel_width_px: 280.0,
+            panel_inner_margin_px: 16.0,
+            title_size_delta_px: 4.0,
+            title_top_y_px: 22.0,
+            entries_start_y_px: 52.0,
+            entry_spacing_y_px: 20.0,
+            hint_bottom_padding_px: 18.0,
+            title_padding_px: glam::Vec2::new(14.0, 10.0),
+            entry_padding_px: glam::Vec2::new(10.0, 6.0),
+            hint_padding_px: glam::Vec2::new(8.0, 4.0),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MenuRect {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+impl MenuRect {
+    pub fn center_x(&self) -> f32 {
+        self.x + self.width * 0.5
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MenuLayoutBlock {
+    pub rect: MenuRect,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MenuEntryLayout {
+    pub rect: MenuRect,
+    pub text: String,
+    pub selected: bool,
+    pub selectable: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MenuLayout {
+    pub panel: MenuRect,
+    pub title: MenuLayoutBlock,
+    pub entries: Vec<MenuEntryLayout>,
+    pub hint: MenuLayoutBlock,
+}
+
 impl Default for MenuAppearance {
     fn default() -> Self {
         Self {
@@ -396,6 +463,126 @@ fn default_menu_screens() -> Vec<MenuScreenDefinition> {
             ],
         },
     ]
+}
+
+pub fn menu_visual_metrics() -> MenuVisualMetrics {
+    MenuVisualMetrics::default()
+}
+
+pub fn build_menu_layout(
+    view: &MenuView,
+    appearance: &MenuAppearance,
+    viewport: glam::Vec2,
+) -> MenuLayout {
+    let metrics = menu_visual_metrics();
+    let panel = menu_panel_rect(view, appearance.font_size_px as f32, viewport);
+    let content_x = panel.x + metrics.panel_inner_margin_px;
+    let content_width = (panel.width - metrics.panel_inner_margin_px * 2.0).max(1.0);
+    let title_height =
+        appearance.font_size_px as f32 + metrics.title_size_delta_px + metrics.title_padding_px.y * 2.0;
+    let title_rect = MenuRect {
+        x: content_x,
+        y: metrics.title_top_y_px,
+        width: content_width,
+        height: title_height,
+    };
+    let entry_height = appearance.font_size_px as f32 + metrics.entry_padding_px.y * 2.0;
+    let entries = view
+        .entries
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| MenuEntryLayout {
+            rect: MenuRect {
+                x: content_x,
+                y: metrics.entries_start_y_px + index as f32 * metrics.entry_spacing_y_px,
+                width: content_width,
+                height: entry_height,
+            },
+            text: entry.text.clone(),
+            selected: entry.selected,
+            selectable: entry.selectable,
+        })
+        .collect();
+    let hint_font_size = (appearance.font_size_px as f32 - 2.0).max(10.0);
+    let hint_height = hint_font_size + metrics.hint_padding_px.y * 2.0;
+    let hint_rect = MenuRect {
+        x: content_x,
+        y: viewport.y - metrics.hint_bottom_padding_px - hint_height,
+        width: content_width,
+        height: hint_height,
+    };
+
+    MenuLayout {
+        panel,
+        title: MenuLayoutBlock {
+            rect: title_rect,
+            text: view.title.clone(),
+        },
+        entries,
+        hint: MenuLayoutBlock {
+            rect: hint_rect,
+            text: "Esc: Back   Enter/Space: Select".to_string(),
+        },
+    }
+}
+
+fn menu_panel_rect(view: &MenuView, font_size_px: f32, viewport: glam::Vec2) -> MenuRect {
+    let metrics = menu_visual_metrics();
+    let last_entry_y = if view.entries.is_empty() {
+        metrics.entries_start_y_px
+    } else {
+        metrics.entries_start_y_px + (view.entries.len() - 1) as f32 * metrics.entry_spacing_y_px
+    };
+    let hint_size_px = (font_size_px - 2.0).max(10.0);
+    let bottom = (last_entry_y
+        + font_size_px
+        + metrics.entry_padding_px.y * 2.0
+        + 12.0)
+        .max(viewport.y - metrics.hint_bottom_padding_px - hint_size_px - metrics.hint_padding_px.y * 2.0 - 8.0);
+    let x = (viewport.x - metrics.panel_width_px) * 0.5;
+    let y = (metrics.title_top_y_px - metrics.panel_inner_margin_px).max(8.0);
+    MenuRect {
+        x,
+        y,
+        width: metrics.panel_width_px,
+        height: (bottom - y + metrics.panel_inner_margin_px).max(80.0),
+    }
+}
+
+pub fn menu_hex_color_rgba(hex: &str) -> Option<[f32; 4]> {
+    let trimmed = hex.trim().trim_start_matches('#');
+    if trimmed.len() != 6 {
+        return None;
+    }
+    let red = u8::from_str_radix(&trimmed[0..2], 16).ok()?;
+    let green = u8::from_str_radix(&trimmed[2..4], 16).ok()?;
+    let blue = u8::from_str_radix(&trimmed[4..6], 16).ok()?;
+    Some([
+        red as f32 / 255.0,
+        green as f32 / 255.0,
+        blue as f32 / 255.0,
+        1.0,
+    ])
+}
+
+pub fn tinted_menu_background(accent: [f32; 4], shade: f32, alpha: f32) -> [f32; 4] {
+    [
+        accent[0] * shade,
+        accent[1] * shade,
+        accent[2] * shade,
+        alpha,
+    ]
+}
+
+pub fn menu_border_color(
+    border_style: MenuBorderStyle,
+    accent: [f32; 4],
+    alpha: f32,
+) -> Option<[f32; 4]> {
+    match border_style {
+        MenuBorderStyle::Square if alpha > 0.0 => Some([accent[0], accent[1], accent[2], alpha]),
+        MenuBorderStyle::Square => None,
+    }
 }
 
 #[cfg(test)]

@@ -308,6 +308,7 @@ impl App {
                 }
             }
             self.rendering.finalize_debug_shapes();
+            self.rendering.clear_ui_shapes();
 
             if let Some(stats_line) = self.performance.stats_line() {
                 let hud_style = TextStyle {
@@ -324,6 +325,7 @@ impl App {
             }
 
             self.render_runtime_menu_overlay();
+            self.rendering.finalize_ui_shapes();
         }
 
         self.platform.request_redraw();

@@ -1,20 +1,16 @@
-use toki_core::math::projection::{calculate_projection, ProjectionParameter};
+use toki_core::math::projection::screen_space_projection;
 
 #[test]
-fn projection_matrix_scales_to_aspect_ratio() {
-    let params = ProjectionParameter {
-        width: 800,
-        height: 600,
-        desired_width: 160,
-        desired_height: 144,
-    };
+fn screen_space_projection_maps_viewport_corners_to_clip_space() {
+    let projection = screen_space_projection(320.0, 180.0);
 
-    let mat = calculate_projection(params);
+    let top_left = projection * glam::Vec4::new(0.0, 0.0, 0.0, 1.0);
+    let bottom_right = projection * glam::Vec4::new(320.0, 180.0, 0.0, 1.0);
+    let center = projection * glam::Vec4::new(160.0, 90.0, 0.0, 1.0);
 
-    // Check that the projection matrix is valid (non-zero scale components)
-    assert!(mat.x_axis.x.abs() > 0.0);
-    assert!(mat.y_axis.y.abs() > 0.0);
-
-    // Make sure it flips y (typical for OpenGL-style projections)
-    assert_eq!(mat.y_axis.y.signum(), -1.0);
+    assert_eq!(top_left.truncate(), glam::Vec3::new(-1.0, 1.0, 0.0));
+    assert_eq!(bottom_right.truncate(), glam::Vec3::new(1.0, -1.0, 0.0));
+    assert_eq!(center.truncate(), glam::Vec3::new(0.0, 0.0, 0.0));
+    assert_eq!(top_left.w, 1.0);
+    assert_eq!(bottom_right.w, 1.0);
 }

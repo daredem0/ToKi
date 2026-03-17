@@ -1,6 +1,8 @@
 use super::{
-    InventoryEntry, MenuAction, MenuCommand, MenuController, MenuInput, MenuItemDefinition,
-    MenuListSource, MenuScreenDefinition, MenuSettings,
+    build_menu_layout, menu_border_color, menu_hex_color_rgba, menu_visual_metrics,
+    tinted_menu_background, InventoryEntry, MenuAction, MenuAppearance, MenuBorderStyle,
+    MenuCommand, MenuController, MenuInput, MenuItemDefinition, MenuListSource,
+    MenuScreenDefinition, MenuSettings, MenuView, MenuViewEntry,
 };
 
 #[test]
@@ -167,4 +169,60 @@ fn menu_settings_default_includes_appearance_defaults() {
     assert_eq!(settings.appearance.font_family, "Sans");
     assert_eq!(settings.appearance.font_size_px, 14);
     assert_eq!(settings.appearance.color_hex, "#7CFF7C");
+}
+
+#[test]
+fn menu_hex_color_and_border_helpers_follow_shared_menu_visual_rules() {
+    let accent = menu_hex_color_rgba("#7CFF7C").expect("valid accent color");
+    assert_eq!(accent, [124.0 / 255.0, 1.0, 124.0 / 255.0, 1.0]);
+    assert_eq!(
+        menu_border_color(MenuBorderStyle::Square, accent, 0.95),
+        Some([124.0 / 255.0, 1.0, 124.0 / 255.0, 0.95])
+    );
+    assert_eq!(
+        tinted_menu_background(accent, 0.16, 0.9),
+        [accent[0] * 0.16, accent[1] * 0.16, accent[2] * 0.16, 0.9]
+    );
+}
+
+#[test]
+fn shared_menu_visual_metrics_match_runtime_overlay_defaults() {
+    let metrics = menu_visual_metrics();
+
+    assert_eq!(metrics.panel_width_px, 280.0);
+    assert_eq!(metrics.panel_inner_margin_px, 16.0);
+    assert_eq!(metrics.title_top_y_px, 22.0);
+    assert_eq!(metrics.entries_start_y_px, 52.0);
+    assert_eq!(metrics.entry_spacing_y_px, 20.0);
+    assert_eq!(metrics.hint_bottom_padding_px, 18.0);
+}
+
+#[test]
+fn build_menu_layout_uses_fixed_panel_width_and_shared_entry_geometry() {
+    let layout = build_menu_layout(
+        &MenuView {
+            screen_id: "pause".to_string(),
+            title: "Paused".to_string(),
+            entries: vec![
+                MenuViewEntry {
+                    text: "Resume".to_string(),
+                    selected: true,
+                    selectable: true,
+                },
+                MenuViewEntry {
+                    text: "Inventory".to_string(),
+                    selected: false,
+                    selectable: true,
+                },
+            ],
+        },
+        &MenuAppearance::default(),
+        glam::Vec2::new(320.0, 180.0),
+    );
+
+    assert_eq!(layout.panel.width, 280.0);
+    assert_eq!(layout.entries.len(), 2);
+    assert_eq!(layout.entries[0].rect.width, 248.0);
+    assert!(layout.entries[1].rect.y > layout.entries[0].rect.y);
+    assert_eq!(layout.title.rect.width, layout.entries[0].rect.width);
 }

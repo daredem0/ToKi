@@ -17,6 +17,7 @@ use crate::background_tasks::{
     BackgroundTaskManager, BackgroundTaskUpdate, ExportBundleJob, ValidateAssetsJob,
 };
 use crate::config::EditorConfig;
+use crate::fonts::{load_project_fonts_into_egui, menu_font_family_choices};
 use crate::logging::LogCapture;
 use crate::project::ProjectAssets;
 use crate::project::{ProjectManager, ProjectTemplateKind};
@@ -84,6 +85,8 @@ struct EditorApp {
     background_tasks: BackgroundTaskManager,
     /// Lazily loaded ToKi logo texture used for background task activity feedback.
     busy_logo_texture: Option<egui::TextureHandle>,
+    /// Caches which project's menu preview fonts have been registered with egui.
+    menu_font_project_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -119,7 +122,19 @@ impl EditorApp {
             startup_project_auto_open_done: false,
             background_tasks: BackgroundTaskManager::default(),
             busy_logo_texture: None,
+            menu_font_project_path: None,
         }
+    }
+
+    fn sync_project_menu_preview_fonts(&mut self, ctx: &egui::Context) {
+        let current_project_path = self.config.current_project_path().cloned();
+        if self.menu_font_project_path == current_project_path {
+            return;
+        }
+
+        let registry = load_project_fonts_into_egui(ctx, current_project_path.as_deref());
+        self.ui.menu_preview_font_families = menu_font_family_choices(&registry);
+        self.menu_font_project_path = current_project_path;
     }
 
     fn busy_logo_path() -> Option<std::path::PathBuf> {
@@ -621,6 +636,7 @@ impl EditorApp {
         if self.ui.background_task_running {
             self.ensure_busy_logo_texture(&egui_ctx);
         }
+        self.sync_project_menu_preview_fonts(&egui_ctx);
 
         let egui_winit = match &mut self.egui_winit {
             Some(egui) => egui,

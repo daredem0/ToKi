@@ -4458,6 +4458,7 @@ dependencies = [
  "blake3",
  "bytemuck",
  "fastrand",
+ "fontdb",
  "glam",
  "image",
  "serde",

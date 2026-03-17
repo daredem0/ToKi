@@ -4,6 +4,7 @@ use glyphon::{
     SwashCache, TextArea, TextAtlas, TextBounds, TextRenderer, Viewport, Weight,
 };
 use std::collections::HashSet;
+use toki_core::fonts::{builtin_font_family, BuiltinFontFamily};
 use toki_core::text::{TextAnchor, TextBoxStyle, TextItem, TextSlant, TextSpace, TextStyle};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -340,7 +341,13 @@ fn background_rect_for(
 }
 
 fn attrs_for_style(style: &TextStyle) -> Attrs<'_> {
-    let mut attrs = Attrs::new().family(Family::Name(&style.font_family));
+    let family = match builtin_font_family(&style.font_family) {
+        Some(BuiltinFontFamily::Sans) => Family::SansSerif,
+        Some(BuiltinFontFamily::Serif) => Family::Serif,
+        Some(BuiltinFontFamily::Mono) => Family::Monospace,
+        None => Family::Name(&style.font_family),
+    };
+    let mut attrs = Attrs::new().family(family);
     attrs = attrs.weight(match style.weight {
         toki_core::text::TextWeight::Normal => Weight::NORMAL,
         toki_core::text::TextWeight::Bold => Weight::BOLD,

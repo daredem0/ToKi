@@ -2,6 +2,7 @@ use anyhow::Result;
 mod background_tasks;
 mod config;
 mod editor_app;
+mod fonts;
 mod logging;
 use logging::LogCapture;
 mod project;
