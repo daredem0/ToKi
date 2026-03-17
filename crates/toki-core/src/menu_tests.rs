@@ -1,8 +1,8 @@
 use super::{
-    apply_menu_opacity, build_menu_layout, menu_border_color, menu_fill_color_rgba,
-    menu_hex_color_rgba, menu_visual_metrics, InventoryEntry, MenuAction, MenuAppearance,
-    MenuBorderStyle, MenuCommand, MenuController, MenuInput, MenuItemDefinition, MenuListSource,
-    MenuScreenDefinition, MenuSettings, MenuView, MenuViewEntry,
+    apply_menu_opacity, build_menu_layout, compose_menu_ui, menu_border_color,
+    menu_fill_color_rgba, menu_hex_color_rgba, menu_visual_metrics, InventoryEntry, MenuAction,
+    MenuAppearance, MenuBorderStyle, MenuCommand, MenuController, MenuInput, MenuItemDefinition,
+    MenuListSource, MenuScreenDefinition, MenuSettings, MenuView, MenuViewEntry,
 };
 
 #[test]
@@ -287,4 +287,61 @@ fn build_menu_layout_uses_fixed_panel_width_and_shared_entry_geometry() {
         appearance.footer_spacing_px as f32
     );
     assert!(layout.panel.height >= 144.0);
+}
+
+#[test]
+fn compose_menu_ui_builds_generic_blocks_for_runtime_and_preview() {
+    let appearance = MenuAppearance::default();
+    let layout = build_menu_layout(
+        &MenuView {
+            screen_id: "pause".to_string(),
+            title: "Paused".to_string(),
+            title_border_style_override: None,
+            entries: vec![
+                MenuViewEntry {
+                    text: "Resume".to_string(),
+                    selected: true,
+                    selectable: true,
+                    border_style_override: None,
+                },
+                MenuViewEntry {
+                    text: "Inventory".to_string(),
+                    selected: false,
+                    selectable: true,
+                    border_style_override: None,
+                },
+            ],
+        },
+        &appearance,
+        glam::Vec2::new(320.0, 180.0),
+    );
+
+    let composition = compose_menu_ui(&layout, &appearance);
+
+    assert_eq!(composition.blocks.len(), 5);
+    assert_eq!(composition.blocks[0].rect, layout.panel);
+    assert_eq!(
+        composition.blocks[1]
+            .text
+            .as_ref()
+            .expect("title text block")
+            .content,
+        "Paused"
+    );
+    assert_eq!(
+        composition.blocks[2]
+            .text
+            .as_ref()
+            .expect("selected entry")
+            .content,
+        "> Resume"
+    );
+    assert_eq!(
+        composition.blocks[4]
+            .text
+            .as_ref()
+            .expect("footer text")
+            .content,
+        appearance.footer_text
+    );
 }

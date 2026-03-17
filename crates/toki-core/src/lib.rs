@@ -18,6 +18,7 @@ pub mod fonts;
 pub mod menu;
 pub mod sprite;
 pub mod text;
+pub mod ui;
 
 pub mod animation;
 pub mod assets {

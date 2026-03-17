@@ -1,8 +1,4 @@
-use toki_core::menu::{
-    apply_menu_opacity, build_menu_layout, menu_border_color, menu_fill_color_rgba,
-    menu_hex_color_rgba, MenuCommand, MenuInput,
-};
-use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
+use toki_core::menu::{build_menu_layout, compose_menu_ui, MenuCommand, MenuInput};
 
 use super::App;
 
@@ -44,132 +40,14 @@ impl App {
                 let size = self.camera_system.viewport_size();
                 glam::Vec2::new(size.x as f32, size.y as f32)
             });
-        let border_color =
-            menu_hex_color_rgba(&self.menu_system.settings().appearance.border_color_hex)
-                .unwrap_or([0.49, 1.0, 0.49, 1.0]);
         let appearance = self.menu_system.settings().appearance.clone();
-        let opacity_alpha = (appearance.opacity_percent.clamp(0, 100) as f32) / 100.0;
-        let text_color = apply_menu_opacity(
-            menu_hex_color_rgba(&appearance.text_color_hex).unwrap_or([1.0, 1.0, 1.0, 1.0]),
-            appearance.opacity_percent,
-        );
         let layout = build_menu_layout(&view, &appearance, viewport);
-        let panel_rect = layout.panel;
-        self.render_menu_layout_rect(
-            &panel_rect,
-            menu_fill_color_rgba(
-                &appearance.menu_background_color_hex,
-                appearance.menu_background_transparent,
-                appearance.opacity_percent,
-            ),
-            menu_border_color(appearance.border_style, border_color, opacity_alpha),
-        );
-
-        let title_style = TextStyle {
-            font_family: appearance.font_family.clone(),
-            size_px: appearance.font_size_px as f32 + 4.0,
-            weight: TextWeight::Bold,
-            color: text_color,
-            ..TextStyle::default()
-        };
-        let entry_style = TextStyle {
-            font_family: appearance.font_family.clone(),
-            size_px: appearance.font_size_px as f32,
-            weight: TextWeight::Normal,
-            color: text_color,
-            ..TextStyle::default()
-        };
-        let selected_style = TextStyle {
-            color: text_color,
-            weight: TextWeight::Bold,
-            ..entry_style.clone()
-        };
-        self.render_menu_layout_rect(
-            &layout.title.rect,
-            menu_fill_color_rgba(
-                &appearance.title_background_color_hex,
-                appearance.title_background_transparent,
-                appearance.opacity_percent,
-            ),
-            menu_border_color(layout.title.border_style, border_color, opacity_alpha),
-        );
-
-        self.rendering.add_text_item(
-            TextItem::new_screen(
-                layout.title.text,
-                glam::Vec2::new(layout.title.rect.center_x(), layout.title.rect.y + 10.0),
-                title_style,
-            )
-            .with_anchor(TextAnchor::TopCenter)
-            .with_layer(10),
-        );
-
-        for entry in &layout.entries {
-            self.render_menu_layout_rect(
-                &entry.rect,
-                menu_fill_color_rgba(
-                    &appearance.entry_background_color_hex,
-                    appearance.entry_background_transparent,
-                    appearance.opacity_percent,
-                ),
-                menu_border_color(entry.border_style, border_color, opacity_alpha),
-            );
-
-            let style = if entry.selected {
-                selected_style.clone()
-            } else {
-                entry_style.clone()
-            };
-            self.rendering.add_text_item(
-                TextItem::new_screen(
-                    if entry.selected {
-                        format!("> {}", entry.text)
-                    } else {
-                        format!("  {}", entry.text)
-                    },
-                    glam::Vec2::new(entry.rect.center_x(), entry.rect.y + 6.0),
-                    style,
-                )
-                .with_anchor(TextAnchor::TopCenter)
-                .with_layer(10),
-            );
-        }
-
-        self.render_menu_layout_rect(&layout.hint.rect, None, None);
-        self.rendering.add_text_item(
-            TextItem::new_screen(
-                layout.hint.text,
-                glam::Vec2::new(layout.hint.rect.center_x(), layout.hint.rect.y + 4.0),
-                TextStyle {
-                    font_family: appearance.font_family.clone(),
-                    size_px: (appearance.font_size_px as f32 - 2.0).max(10.0),
-                    color: text_color,
-                    ..TextStyle::default()
-                },
-            )
-            .with_anchor(TextAnchor::BottomCenter)
-            .with_layer(10),
-        );
+        let composition = compose_menu_ui(&layout, &appearance);
+        self.rendering.render_ui_composition(&composition);
     }
 
     fn apply_menu_command(&mut self, command: MenuCommand) {
         apply_menu_command(&mut self.exit_requested, command);
-    }
-
-    fn render_menu_layout_rect(
-        &mut self,
-        rect: &toki_core::menu::MenuRect,
-        fill: Option<[f32; 4]>,
-        border: Option<[f32; 4]>,
-    ) {
-        if let Some(fill) = fill {
-            self.rendering
-                .add_filled_ui_rect(rect.x, rect.y, rect.width, rect.height, fill);
-        }
-        if let Some(border) = border {
-            self.rendering
-                .add_ui_rect(rect.x, rect.y, rect.width, rect.height, border);
-        }
     }
 }
 
@@ -184,7 +62,10 @@ fn apply_menu_command(exit_requested: &mut bool, command: MenuCommand) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use toki_core::menu::{MenuAppearance, MenuCommand, MenuView, MenuViewEntry};
+    use toki_core::menu::{
+        menu_fill_color_rgba, menu_hex_color_rgba, MenuAppearance, MenuCommand, MenuView,
+        MenuViewEntry,
+    };
 
     #[test]
     fn menu_hex_color_rgba_parses_valid_hex_triplet() {

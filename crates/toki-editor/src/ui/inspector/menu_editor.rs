@@ -112,11 +112,21 @@ impl InspectorSystem {
         egui::CollapsingHeader::new("Typography")
             .default_open(false)
             .show(ui, |ui| {
-                ui.label("Font Family");
-                if ui
-                    .text_edit_singleline(&mut appearance.font_family)
-                    .changed()
-                {
+                let font_choices = if ui_state.menu_preview_font_families.is_empty() {
+                    vec!["Sans".to_string(), "Serif".to_string(), "Mono".to_string()]
+                } else {
+                    ui_state.menu_preview_font_families.clone()
+                };
+                let mut selected_font_family = appearance.font_family.clone();
+                egui::ComboBox::from_label("Font Family")
+                    .selected_text(selected_font_family.clone())
+                    .show_ui(ui, |ui| {
+                        for family in &font_choices {
+                            ui.selectable_value(&mut selected_font_family, family.clone(), family);
+                        }
+                    });
+                if selected_font_family != appearance.font_family {
+                    appearance.font_family = selected_font_family;
                     appearance_changed = true;
                 }
 
@@ -526,16 +536,29 @@ impl InspectorSystem {
             return;
         }
 
-        egui::CollapsingHeader::new("Entry Summary")
+        let mut item_kind = {
+            let item = &project.metadata.runtime.menu.screens[screen_index].items[item_index];
+            MenuEditorItemKind::from_item(item)
+        };
+        let available_screen_ids = project
+            .metadata
+            .runtime
+            .menu
+            .screens
+            .iter()
+            .map(|screen| screen.id.clone())
+            .collect::<Vec<_>>();
+        let mut changed = false;
+        let mut has_missing_target_validation = false;
+        let mut missing_target_screen_id = String::new();
+
+        egui::CollapsingHeader::new("Entry")
             .default_open(false)
             .show(ui, |ui| {
                 ui.label(format!("Screen: {screen_id}"));
                 ui.label(format!("Position: {}", item_index + 1));
-            });
+                ui.separator();
 
-        egui::CollapsingHeader::new("Entry Actions")
-            .default_open(false)
-            .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     if ui.button("Move Up").clicked() {
                         Self::move_menu_item(ui_state, project, screen_index, item_index, -1);
@@ -552,15 +575,8 @@ impl InspectorSystem {
                         Self::delete_menu_item(ui_state, project, screen_index, item_index);
                     }
                 });
-            });
 
-        let mut item_kind = {
-            let item = &project.metadata.runtime.menu.screens[screen_index].items[item_index];
-            MenuEditorItemKind::from_item(item)
-        };
-        egui::CollapsingHeader::new("Entry Content")
-            .default_open(false)
-            .show(ui, |ui| {
+                ui.separator();
                 egui::ComboBox::from_label("Type")
                     .selected_text(item_kind.label())
                     .show_ui(ui, |ui| {
@@ -572,21 +588,9 @@ impl InspectorSystem {
                             "Inventory List",
                         );
                     });
-            });
-        Self::coerce_menu_item_kind(project, screen_index, item_index, item_kind);
+                Self::coerce_menu_item_kind(project, screen_index, item_index, item_kind);
 
-        let available_screen_ids = project
-            .metadata
-            .runtime
-            .menu
-            .screens
-            .iter()
-            .map(|screen| screen.id.clone())
-            .collect::<Vec<_>>();
-        let mut changed = false;
-        egui::CollapsingHeader::new("Entry Properties")
-            .default_open(false)
-            .show(ui, |ui| {
+                ui.separator();
                 match &mut project.metadata.runtime.menu.screens[screen_index].items[item_index] {
                     MenuItemDefinition::Label {
                         text,
@@ -618,6 +622,12 @@ impl InspectorSystem {
                         );
                         changed |=
                             Self::render_menu_action_editor(ui, &available_screen_ids, action);
+                        if let MenuAction::OpenScreen { screen_id } = action {
+                            if !available_screen_ids.iter().any(|id| id == screen_id) {
+                                has_missing_target_validation = true;
+                                missing_target_screen_id = screen_id.clone();
+                            }
+                        }
                     }
                     MenuItemDefinition::DynamicList {
                         heading,
@@ -672,21 +682,11 @@ impl InspectorSystem {
             Self::mark_menu_settings_changed(project);
         }
 
-        if let MenuItemDefinition::Button {
-            action: MenuAction::OpenScreen { screen_id },
-            ..
-        } = &project.metadata.runtime.menu.screens[screen_index].items[item_index]
-        {
-            if !Self::menu_screen_exists(&project.metadata.runtime.menu, screen_id) {
-                egui::CollapsingHeader::new("Entry Validation")
-                    .default_open(false)
-                    .show(ui, |ui| {
-                        ui.colored_label(
-                            egui::Color32::from_rgb(215, 120, 120),
-                            format!("Target screen '{screen_id}' does not exist."),
-                        );
-                    });
-            }
+        if has_missing_target_validation {
+            ui.colored_label(
+                egui::Color32::from_rgb(215, 120, 120),
+                format!("Target screen '{missing_target_screen_id}' does not exist."),
+            );
         }
     }
 

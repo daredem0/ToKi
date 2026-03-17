@@ -2,20 +2,9 @@ use super::super::editor_ui::{EditorUI, Selection};
 use crate::fonts::resolve_preview_font_family;
 use crate::project::Project;
 use toki_core::menu::{
-    apply_menu_opacity, build_menu_layout, menu_border_color, menu_fill_color_rgba,
-    menu_hex_color_rgba, MenuBorderStyle, MenuItemDefinition, MenuView, MenuViewEntry,
+    build_menu_layout, compose_menu_ui, MenuItemDefinition, MenuView, MenuViewEntry,
 };
-
-#[derive(Debug, Clone)]
-struct MenuPreviewTheme {
-    border_color: egui::Color32,
-    text_color: egui::Color32,
-    menu_background_color: Option<egui::Color32>,
-    title_background_color: Option<egui::Color32>,
-    entry_background_color: Option<egui::Color32>,
-    font_family: egui::FontFamily,
-    font_size: f32,
-}
+use toki_core::ui::{UiBlock, UiComposition};
 
 pub(super) fn render_menu_editor(
     ui: &mut egui::Ui,
@@ -89,81 +78,6 @@ pub(super) fn render_menu_editor(
         ui.label("Selected screen no longer exists.");
         return;
     };
-    let theme = MenuPreviewTheme {
-        border_color: menu_hex_color_rgba(
-            &project.metadata.runtime.menu.appearance.border_color_hex,
-        )
-        .map(|color| {
-            apply_menu_opacity(
-                color,
-                project.metadata.runtime.menu.appearance.opacity_percent,
-            )
-        })
-        .map(menu_preview_color32)
-        .unwrap_or(egui::Color32::from_rgb(124, 255, 124)),
-        text_color: menu_hex_color_rgba(&project.metadata.runtime.menu.appearance.text_color_hex)
-            .map(|color| {
-                apply_menu_opacity(
-                    color,
-                    project.metadata.runtime.menu.appearance.opacity_percent,
-                )
-            })
-            .map(menu_preview_color32)
-            .unwrap_or(egui::Color32::WHITE),
-        menu_background_color: menu_fill_color_rgba(
-            &project
-                .metadata
-                .runtime
-                .menu
-                .appearance
-                .menu_background_color_hex,
-            project
-                .metadata
-                .runtime
-                .menu
-                .appearance
-                .menu_background_transparent,
-            project.metadata.runtime.menu.appearance.opacity_percent,
-        )
-        .map(menu_preview_color32),
-        title_background_color: menu_fill_color_rgba(
-            &project
-                .metadata
-                .runtime
-                .menu
-                .appearance
-                .title_background_color_hex,
-            project
-                .metadata
-                .runtime
-                .menu
-                .appearance
-                .title_background_transparent,
-            project.metadata.runtime.menu.appearance.opacity_percent,
-        )
-        .map(menu_preview_color32),
-        entry_background_color: menu_fill_color_rgba(
-            &project
-                .metadata
-                .runtime
-                .menu
-                .appearance
-                .entry_background_color_hex,
-            project
-                .metadata
-                .runtime
-                .menu
-                .appearance
-                .entry_background_transparent,
-            project.metadata.runtime.menu.appearance.opacity_percent,
-        )
-        .map(menu_preview_color32),
-        font_family: resolve_preview_font_family(
-            &project.metadata.runtime.menu.appearance.font_family,
-            &ui_state.menu_preview_font_families,
-        ),
-        font_size: project.metadata.runtime.menu.appearance.font_size_px as f32,
-    };
     let selected_entry_index = match ui_state.selection.as_ref() {
         Some(Selection::MenuEntry {
             screen_id,
@@ -228,6 +142,7 @@ pub(super) fn render_menu_editor(
         &project.metadata.runtime.menu.appearance,
         glam::Vec2::new(available.x.max(320.0), available.y.max(240.0)),
     );
+    let composition = compose_menu_ui(&layout, &project.metadata.runtime.menu.appearance);
 
     let (rect, _response) = ui.allocate_exact_size(available, egui::Sense::hover());
     let painter = ui.painter_at(rect);
@@ -235,37 +150,14 @@ pub(super) fn render_menu_editor(
         rect.center().x - layout.panel.width * 0.5 - layout.panel.x,
         rect.center().y - layout.panel.height * 0.5 - layout.panel.y,
     );
-    let panel_rect = translated_rect(&layout.panel, origin);
-    if let Some(fill) = theme.menu_background_color {
-        painter.rect_filled(panel_rect, 0.0, fill);
-    }
-    painter.rect_stroke(
-        panel_rect,
-        0.0,
-        menu_preview_stroke(
-            project.metadata.runtime.menu.appearance.border_style,
-            theme.border_color,
-            1.5,
-        ),
-        egui::StrokeKind::Outside,
+    paint_ui_composition(
+        &painter,
+        &composition,
+        origin,
+        &ui_state.menu_preview_font_families,
     );
 
     let title_rect = translated_rect(&layout.title.rect, origin);
-    if let Some(fill) = theme.title_background_color {
-        painter.rect_filled(title_rect, 0.0, fill);
-    }
-    if let Some(border) = menu_border_color(
-        layout.title.border_style,
-        color32_to_rgba(theme.border_color),
-        1.0,
-    ) {
-        painter.rect_stroke(
-            title_rect,
-            0.0,
-            egui::Stroke::new(1.5, menu_preview_color32(border)),
-            egui::StrokeKind::Outside,
-        );
-    }
     if ui
         .interact(
             title_rect,
@@ -276,13 +168,6 @@ pub(super) fn render_menu_editor(
     {
         ui_state.select_menu_screen(screen.id.clone());
     }
-    painter.text(
-        title_rect.center_top() + egui::vec2(0.0, 10.0),
-        egui::Align2::CENTER_TOP,
-        &layout.title.text,
-        egui::FontId::new(theme.font_size + 4.0, theme.font_family.clone()),
-        theme.text_color,
-    );
 
     for (item_index, entry) in layout.entries.iter().enumerate() {
         let entry_rect = translated_rect(&entry.rect, origin);
@@ -290,53 +175,62 @@ pub(super) fn render_menu_editor(
         if ui.interact(entry_rect, id, egui::Sense::click()).clicked() {
             ui_state.select_menu_entry(screen.id.clone(), item_index);
         }
-        if let Some(fill) = theme.entry_background_color {
-            painter.rect_filled(entry_rect, 0.0, fill);
-        }
-        if let Some(border) =
-            menu_border_color(entry.border_style, color32_to_rgba(theme.border_color), 1.0)
-        {
-            painter.rect_stroke(
-                entry_rect,
-                0.0,
-                egui::Stroke::new(
-                    if entry.selected { 1.5 } else { 1.2 },
-                    menu_preview_color32(border),
-                ),
-                egui::StrokeKind::Outside,
-            );
-        }
-        painter.text(
-            entry_rect.center_top() + egui::vec2(0.0, 6.0),
-            egui::Align2::CENTER_TOP,
-            if entry.selected {
-                format!("> {}", entry.text)
-            } else {
-                format!("  {}", entry.text)
-            },
-            egui::FontId::new(theme.font_size, theme.font_family.clone()),
-            theme.text_color,
-        );
     }
-
-    let hint_rect = translated_rect(&layout.hint.rect, origin);
-    painter.text(
-        hint_rect.center_top() + egui::vec2(0.0, 4.0),
-        egui::Align2::CENTER_TOP,
-        &layout.hint.text,
-        egui::FontId::new((theme.font_size - 2.0).max(10.0), theme.font_family.clone()),
-        theme.text_color,
-    );
 }
 
-fn menu_preview_stroke(
-    border_style: MenuBorderStyle,
-    color: egui::Color32,
-    width: f32,
-) -> egui::Stroke {
-    match border_style {
-        MenuBorderStyle::None => egui::Stroke::NONE,
-        MenuBorderStyle::Square => egui::Stroke::new(width, color),
+fn paint_ui_composition(
+    painter: &egui::Painter,
+    composition: &UiComposition,
+    origin: egui::Vec2,
+    available_fonts: &[String],
+) {
+    for block in &composition.blocks {
+        paint_ui_block(painter, block, origin, available_fonts);
+    }
+}
+
+fn paint_ui_block(
+    painter: &egui::Painter,
+    block: &UiBlock,
+    origin: egui::Vec2,
+    available_fonts: &[String],
+) {
+    let rect = translated_rect(&block.rect, origin);
+    if let Some(fill) = block.fill_color {
+        painter.rect_filled(rect, 0.0, menu_preview_color32(fill));
+    }
+    if let Some(border) = block.border_color {
+        painter.rect_stroke(
+            rect,
+            0.0,
+            egui::Stroke::new(1.5, menu_preview_color32(border)),
+            egui::StrokeKind::Outside,
+        );
+    }
+    if let Some(text) = &block.text {
+        let pos = egui::pos2(text.position.x + origin.x, text.position.y + origin.y);
+        let font_family = resolve_preview_font_family(&text.style.font_family, available_fonts);
+        painter.text(
+            pos,
+            text_anchor_to_align2(text.anchor),
+            &text.content,
+            egui::FontId::new(text.style.size_px, font_family),
+            menu_preview_color32(text.style.color),
+        );
+    }
+}
+
+fn text_anchor_to_align2(anchor: toki_core::text::TextAnchor) -> egui::Align2 {
+    match anchor {
+        toki_core::text::TextAnchor::TopLeft => egui::Align2::LEFT_TOP,
+        toki_core::text::TextAnchor::TopCenter => egui::Align2::CENTER_TOP,
+        toki_core::text::TextAnchor::TopRight => egui::Align2::RIGHT_TOP,
+        toki_core::text::TextAnchor::CenterLeft => egui::Align2::LEFT_CENTER,
+        toki_core::text::TextAnchor::Center => egui::Align2::CENTER_CENTER,
+        toki_core::text::TextAnchor::CenterRight => egui::Align2::RIGHT_CENTER,
+        toki_core::text::TextAnchor::BottomLeft => egui::Align2::LEFT_BOTTOM,
+        toki_core::text::TextAnchor::BottomCenter => egui::Align2::CENTER_BOTTOM,
+        toki_core::text::TextAnchor::BottomRight => egui::Align2::RIGHT_BOTTOM,
     }
 }
 
@@ -347,15 +241,6 @@ fn menu_preview_color32(rgba: [f32; 4]) -> egui::Color32 {
         (rgba[2].clamp(0.0, 1.0) * 255.0).round() as u8,
         (rgba[3].clamp(0.0, 1.0) * 255.0).round() as u8,
     )
-}
-
-fn color32_to_rgba(color: egui::Color32) -> [f32; 4] {
-    [
-        color.r() as f32 / 255.0,
-        color.g() as f32 / 255.0,
-        color.b() as f32 / 255.0,
-        color.a() as f32 / 255.0,
-    ]
 }
 
 fn translated_rect(rect: &toki_core::menu::MenuRect, origin: egui::Vec2) -> egui::Rect {

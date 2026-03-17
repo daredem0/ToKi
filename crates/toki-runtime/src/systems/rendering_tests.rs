@@ -7,6 +7,7 @@ use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::sprite::SpriteFrame;
 use toki_core::text::{TextItem, TextStyle};
+use toki_core::ui::{UiBlock, UiComposition, UiRect, UiTextBlock};
 
 #[derive(Default, Debug)]
 struct FakeBackend {
@@ -339,6 +340,39 @@ fn backend_seam_dispatches_runtime_render_commands() {
     assert_eq!(debug_finalize_counter.get(), 1);
     assert_eq!(ui_rect_count.get(), 2);
     assert_eq!(ui_finalize_counter.get(), 1);
+}
+
+#[test]
+fn render_ui_composition_dispatches_rectangles_and_text() {
+    let fake = FakeBackend::default();
+    let ui_rect_count = fake.ui_rect_count.clone();
+    let text_count = fake.text_count.clone();
+    let mut rendering = RenderingSystem::new();
+    rendering.backend = Some(Box::new(fake));
+
+    let mut composition = UiComposition::default();
+    composition.push(UiBlock {
+        rect: UiRect {
+            x: 16.0,
+            y: 24.0,
+            width: 120.0,
+            height: 40.0,
+        },
+        fill_color: Some([0.1, 0.2, 0.3, 0.8]),
+        border_color: Some([0.9, 1.0, 0.9, 1.0]),
+        text: Some(UiTextBlock {
+            content: "Paused".to_string(),
+            position: glam::Vec2::new(76.0, 34.0),
+            anchor: toki_core::text::TextAnchor::TopCenter,
+            style: TextStyle::default(),
+            layer: 10,
+        }),
+    });
+
+    rendering.render_ui_composition(&composition);
+
+    assert_eq!(ui_rect_count.get(), 2);
+    assert_eq!(text_count.get(), 1);
 }
 
 #[test]

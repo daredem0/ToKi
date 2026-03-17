@@ -5,6 +5,7 @@ use toki_core::graphics::vertex::QuadVertex;
 use toki_core::math::projection::{calculate_projection, ProjectionParameter};
 use toki_core::sprite::SpriteFrame;
 use toki_core::text::TextItem;
+use toki_core::ui::UiComposition;
 use toki_render::GpuState;
 use winit::window::Window;
 
@@ -469,6 +470,32 @@ impl RenderingSystem {
     pub fn add_text_item(&mut self, text: TextItem) {
         if let Some(backend) = &mut self.backend {
             backend.add_text_item(text);
+        }
+    }
+
+    pub fn render_ui_composition(&mut self, composition: &UiComposition) {
+        for block in &composition.blocks {
+            if let Some(fill) = block.fill_color {
+                self.add_filled_ui_rect(
+                    block.rect.x,
+                    block.rect.y,
+                    block.rect.width,
+                    block.rect.height,
+                    fill,
+                );
+            }
+            if let Some(border) = block.border_color {
+                self.add_ui_rect(
+                    block.rect.x,
+                    block.rect.y,
+                    block.rect.width,
+                    block.rect.height,
+                    border,
+                );
+            }
+            if let Some(text) = &block.text {
+                self.add_text_item(text.to_text_item());
+            }
         }
     }
 
