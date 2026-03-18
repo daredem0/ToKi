@@ -53,24 +53,6 @@ pub struct EntityHealthBar {
     pub max: i32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProjectileRenderData {
-    pub entity_id: EntityId,
-    pub position: glam::IVec2,
-    pub size: glam::UVec2,
-    pub sheet: String,
-    pub object_name: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StaticEntityRenderData {
-    pub entity_id: EntityId,
-    pub position: glam::IVec2,
-    pub size: glam::UVec2,
-    pub sheet: String,
-    pub object_name: String,
-}
-
 /// Audio events that can be triggered by game logic
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AudioEvent {

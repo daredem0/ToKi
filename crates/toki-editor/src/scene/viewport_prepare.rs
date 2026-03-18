@@ -1,5 +1,6 @@
 use super::*;
 use crate::ui::editor_ui::PlacementPreviewVisual;
+use toki_core::sprite_render::{collect_map_object_sprite_render_requests, SpriteRenderOrigin};
 
 impl SceneViewport {
     pub(super) fn prepare_scene_data(
@@ -14,9 +15,8 @@ impl SceneViewport {
         let mut scene_data = SceneData::default();
 
         self.prepare_tilemap_data(&mut scene_data, project_path);
-        self.prepare_tilemap_object_data(&mut scene_data, project_path, project_assets);
         self.prepare_sprite_data(&mut scene_data, project_path, project_assets);
-        self.prepare_static_entity_sprite_data(&mut scene_data, project_assets);
+        self.prepare_tilemap_object_data(&mut scene_data, project_path, project_assets);
         self.prepare_preview_sprite_data(&mut scene_data, preview_data);
         self.prepare_drag_preview_sprite_data(
             &mut scene_data,
@@ -40,7 +40,7 @@ impl SceneViewport {
     pub(super) fn prepare_tilemap_object_data(
         &mut self,
         scene_data: &mut SceneData,
-        _project_path: Option<&std::path::Path>,
+        project_path: Option<&std::path::Path>,
         project_assets: &ProjectAssets,
     ) {
         let Some(tilemap) = self.scene_manager.tilemap().cloned() else {
@@ -50,17 +50,13 @@ impl SceneViewport {
             return;
         }
 
-        for object in &tilemap.objects {
-            if !object.visible {
-                continue;
-            }
-            let Some(sprite_instance) =
-                self.build_map_object_sprite_instance(project_assets, object)
-            else {
-                continue;
-            };
-            scene_data.sprites.push(sprite_instance);
-        }
+        let requests = collect_map_object_sprite_render_requests(&tilemap);
+        self.resolve_sprite_requests_into_scene_data(
+            scene_data,
+            project_path,
+            project_assets,
+            &requests,
+        );
     }
 
     pub(super) fn prepare_tilemap_data(
@@ -114,225 +110,58 @@ impl SceneViewport {
         project_path: Option<&std::path::Path>,
         project_assets: &ProjectAssets,
     ) {
-        let renderable_entities = self.scene_manager.game_state().get_renderable_entities();
+        let requests = self
+            .scene_manager
+            .game_state()
+            .get_sprite_render_requests()
+            .into_iter()
+            .filter(|request| match request.origin {
+                SpriteRenderOrigin::AnimatedEntity(entity_id)
+                | SpriteRenderOrigin::StaticEntity(entity_id)
+                | SpriteRenderOrigin::Projectile(entity_id) => {
+                    !self.suppressed_entity_ids.contains(&entity_id)
+                }
+                SpriteRenderOrigin::MapObject { .. } => true,
+            })
+            .collect::<Vec<_>>();
+
         tracing::trace!(
-            "Starting sprite rendering for {} renderable entities",
-            renderable_entities.len()
+            "Starting sprite rendering for {} logical sprite requests",
+            requests.len()
         );
 
-        if renderable_entities.is_empty() {
-            tracing::warn!("No renderable entities found - no sprites will be rendered");
+        if requests.is_empty() {
+            tracing::warn!("No sprite render requests found - no sprites will be rendered");
             return;
         }
 
-        for (entity_id, position, size) in renderable_entities {
-            if self.suppressed_entity_ids.contains(&entity_id) {
-                continue;
-            }
-            self.process_entity_sprite(
-                scene_data,
-                entity_id,
-                position,
-                size,
-                project_path,
-                project_assets,
-            );
-        }
+        self.resolve_sprite_requests_into_scene_data(
+            scene_data,
+            project_path,
+            project_assets,
+            &requests,
+        );
     }
 
-    pub(super) fn prepare_static_entity_sprite_data(
+    fn resolve_sprite_requests_into_scene_data(
         &mut self,
         scene_data: &mut SceneData,
-        project_assets: &ProjectAssets,
-    ) {
-        for entity in self
-            .scene_manager
-            .game_state()
-            .get_static_entity_renderables()
-        {
-            if self.suppressed_entity_ids.contains(&entity.entity_id) {
-                continue;
-            }
-            let Some(sprite_instance) = self.build_static_object_sprite_instance(
-                project_assets,
-                &entity.sheet,
-                &entity.object_name,
-                entity.position,
-                entity.size,
-            ) else {
-                continue;
-            };
-            scene_data.sprites.push(sprite_instance);
-        }
-    }
-
-    pub(super) fn process_entity_sprite(
-        &mut self,
-        scene_data: &mut SceneData,
-        entity_id: u32,
-        position: glam::IVec2,
-        size: glam::UVec2,
         project_path: Option<&std::path::Path>,
         project_assets: &ProjectAssets,
+        requests: &[toki_core::sprite_render::SpriteRenderRequest],
     ) {
-        tracing::trace!(
-            "Processing entity {} at ({}, {}) with size {}x{}",
-            entity_id,
-            position.x,
-            position.y,
-            size.x,
-            size.y
-        );
+        let (sprites, failures) =
+            self.resolve_sprite_requests_into_instances(project_assets, project_path, requests);
 
-        let Some(entity) = self
-            .scene_manager
-            .game_state()
-            .entity_manager()
-            .get_entity(entity_id)
-        else {
-            tracing::warn!("Entity {} not found in entity manager", entity_id);
-            return;
-        };
-
-        tracing::trace!(
-            "Found entity {} (type: {:?}, visible: {})",
-            entity_id,
-            entity.entity_kind,
-            entity.attributes.visible
-        );
-
-        let Some(animation_controller) = &entity.attributes.animation_controller else {
-            tracing::trace!(
-                "Entity {} has no animation controller - skipping sprite rendering",
-                entity_id
-            );
-            return;
-        };
-
-        tracing::trace!("Entity {} has animation controller", entity_id);
-
-        let atlas_name = match animation_controller.current_atlas_name() {
-            Ok(name) => name,
-            Err(_) => {
-                tracing::trace!(
-                    "Entity {} animation controller failed to provide atlas name",
-                    entity_id
-                );
-                return;
-            }
-        };
-
-        tracing::trace!("Entity {} requesting atlas: '{}'", entity_id, atlas_name);
-
-        self.load_and_create_sprite_instance(
-            scene_data,
-            entity_id,
-            position,
-            size,
-            &atlas_name,
-            (project_assets, project_path),
-        );
-    }
-
-    pub(super) fn load_and_create_sprite_instance(
-        &mut self,
-        scene_data: &mut SceneData,
-        entity_id: u32,
-        position: glam::IVec2,
-        size: glam::UVec2,
-        atlas_name: &str,
-        project_context: (&ProjectAssets, Option<&std::path::Path>),
-    ) {
-        let (project_assets, project_path) = project_context;
-        let atlas_name_clean = atlas_name.strip_suffix(".json").unwrap_or(atlas_name);
-        tracing::trace!(
-            "Cleaned atlas name: '{}' -> '{}'",
-            atlas_name,
-            atlas_name_clean
-        );
-        tracing::trace!(
-            "Available sprite atlases in ProjectAssets: {:?}",
-            project_assets.sprite_atlases.keys().collect::<Vec<_>>()
-        );
-
-        let Some(atlas_asset) = project_assets.sprite_atlases.get(atlas_name_clean) else {
-            tracing::error!(
-                "Sprite atlas '{}' not found in ProjectAssets (cleaned name: '{}')",
-                atlas_name,
-                atlas_name_clean
-            );
-            return;
-        };
-
-        tracing::trace!(
-            "Found atlas asset for '{}' at path: {}",
-            atlas_name_clean,
-            atlas_asset.path.display()
-        );
-
-        let sprite_atlas = match self.load_sprite_atlas_from_asset(atlas_asset, project_path) {
-            Ok(atlas) => atlas,
-            Err(error) => {
-                tracing::error!("Failed to load sprite atlas '{}': {}", atlas_name, error);
-                return;
-            }
-        };
-
-        let sprite_texture_size = sprite_atlas
-            .image_size()
-            .unwrap_or(glam::UVec2::new(64, 16));
-        tracing::trace!(
-            "Using sprite atlas '{}' with texture size {}x{} (cache hit: {})",
-            atlas_name,
-            sprite_texture_size.x,
-            sprite_texture_size.y,
-            self.loaded_sprite_atlases
-                .contains_key(&atlas_asset.path.to_string_lossy().to_string())
-        );
-        tracing::trace!("Atlas contains {} tiles", sprite_atlas.tiles.len());
-
-        let Some(frame) = self.scene_manager.game_state().get_entity_sprite_frame(
-            entity_id,
-            &sprite_atlas,
-            sprite_texture_size,
-        ) else {
+        for failure in failures {
             tracing::warn!(
-                "Failed to get sprite frame for entity {} - entity will not be rendered",
-                entity_id
+                "Editor viewport failed to resolve sprite render request for {:?}: {:?}",
+                failure.origin,
+                failure.error
             );
-            return;
-        };
+        }
 
-        let render_position_i32 = position;
-
-        let sprite_instance = toki_render::SpriteInstance {
-            frame,
-            position: render_position_i32,
-            size,
-            texture_path: atlas_asset
-                .path
-                .parent()
-                .map(|parent| parent.join(&sprite_atlas.image)),
-            flip_x: self
-                .scene_manager
-                .game_state()
-                .get_entity_sprite_flip_x(entity_id),
-        };
-
-        scene_data.sprites.push(sprite_instance);
-        let effective_scale = self.effective_camera_scale();
-        let viewport_x = (position.x - self.camera.position.x) as f32 / effective_scale;
-        let viewport_y = (position.y - self.camera.position.y) as f32 / effective_scale;
-
-        tracing::trace!("Added sprite instance for entity {} - entity world top-left: ({}, {}), viewport coords: ({:.1}, {:.1}), render position: ({}, {}), size: {}x{}",
-            entity_id, position.x, position.y, viewport_x, viewport_y, render_position_i32.x, render_position_i32.y, size.x, size.y);
-        tracing::trace!(
-            "Sprite frame UVs: u0={:.3}, v0={:.3}, u1={:.3}, v1={:.3}",
-            frame.u0,
-            frame.v0,
-            frame.u1,
-            frame.v1
-        );
+        scene_data.sprites.extend(sprites);
     }
 
     pub(super) fn prepare_preview_sprite_data(
@@ -380,6 +209,7 @@ impl SceneViewport {
         let Some(drag_preview_data) = drag_preview_data else {
             return;
         };
+        let sprite_requests = self.scene_manager.game_state().get_sprite_render_requests();
 
         for preview in drag_preview_data {
             let Some(entity) = self
@@ -392,36 +222,26 @@ impl SceneViewport {
             };
 
             let entity_size = entity.size;
-            if let Some(animation_controller) = &entity.attributes.animation_controller {
-                let Ok(atlas_name) = animation_controller.current_atlas_name() else {
-                    continue;
-                };
-                let atlas_name = atlas_name.to_string();
-
-                self.load_and_create_sprite_instance(
-                    scene_data,
-                    preview.entity_id,
-                    preview.world_position,
-                    entity_size,
-                    &atlas_name,
-                    (project_assets, project_path),
-                );
-            } else if let Some(static_object_render) =
-                entity.attributes.static_object_render.clone()
-            {
-                let Some(sprite_instance) = self.build_static_object_sprite_instance(
-                    project_assets,
-                    &static_object_render.sheet,
-                    &static_object_render.object_name,
-                    preview.world_position,
-                    entity_size,
-                ) else {
-                    continue;
-                };
-                scene_data.sprites.push(sprite_instance);
-            } else {
+            let Some(mut request) = sprite_requests
+                .iter()
+                .find(|request| match request.origin {
+                    SpriteRenderOrigin::AnimatedEntity(entity_id)
+                    | SpriteRenderOrigin::StaticEntity(entity_id)
+                    | SpriteRenderOrigin::Projectile(entity_id) => entity_id == preview.entity_id,
+                    SpriteRenderOrigin::MapObject { .. } => false,
+                })
+                .cloned()
+            else {
                 continue;
-            }
+            };
+            request.position = preview.world_position;
+            request.size = toki_core::sprite_render::SpriteRenderSize::Explicit(entity_size);
+            self.resolve_sprite_requests_into_scene_data(
+                scene_data,
+                project_path,
+                project_assets,
+                &[request],
+            );
 
             let outline_color = if preview.is_valid {
                 [0.0, 1.0, 0.0, 1.0]

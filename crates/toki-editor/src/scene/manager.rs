@@ -36,6 +36,18 @@ impl SceneManager {
         Ok(manager)
     }
 
+    #[cfg(test)]
+    pub fn with_game_state_and_resources(
+        game_state: GameState,
+        resources: ResourceManager,
+    ) -> Self {
+        Self {
+            game_state,
+            resources,
+            tilemap: None,
+        }
+    }
+
     /// Get reference to game state
     pub fn game_state(&self) -> &GameState {
         &self.game_state

@@ -4,6 +4,7 @@ use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::math::projection::{calculate_projection, ProjectionParameter};
 use toki_core::sprite::SpriteFrame;
+use toki_core::sprite_render::ResolvedSpriteRenderInstance;
 use toki_core::text::TextItem;
 use toki_core::ui::UiComposition;
 use toki_render::GpuState;
@@ -259,6 +260,11 @@ impl RenderingSystem {
         self.backend = Some(Box::new(backend));
     }
 
+    #[cfg(test)]
+    fn set_backend_for_tests(&mut self, backend: Box<dyn RuntimeRenderBackend>) {
+        self.backend = Some(backend);
+    }
+
     /// Initialize GPU state with custom textures (for editor use)
     pub fn initialize_gpu_with_textures(
         &mut self,
@@ -458,6 +464,20 @@ impl RenderingSystem {
     ) {
         if let Some(backend) = &mut self.backend {
             backend.add_sprite_with_texture(texture_path, frame, position, size, flip_x);
+        }
+    }
+
+    pub fn add_resolved_sprite(&mut self, sprite: &ResolvedSpriteRenderInstance) {
+        if let Some(texture_path) = sprite.texture_path.clone() {
+            self.add_sprite_with_texture(
+                texture_path,
+                sprite.frame,
+                sprite.position,
+                sprite.size,
+                sprite.flip_x,
+            );
+        } else {
+            self.add_sprite(sprite.frame, sprite.position, sprite.size, sprite.flip_x);
         }
     }
 

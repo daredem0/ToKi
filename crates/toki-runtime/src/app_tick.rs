@@ -1,6 +1,10 @@
 use std::time::Instant;
 
 use toki_core::camera::RuntimeState;
+use toki_core::sprite_render::{
+    collect_map_object_sprite_render_requests, resolve_sprite_render_requests,
+    sort_sprite_render_requests, SpriteRenderOrigin, SpriteResolveError,
+};
 use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
 use toki_core::{EventHandler, GameUpdateResult};
 
@@ -62,191 +66,7 @@ impl App {
             }
             self.rendering.clear_sprites();
             self.rendering.clear_text_items();
-
-            let renderable_entities = self.game_system.get_renderable_entities();
-            for (entity_id, position, size) in renderable_entities {
-                let Some(atlas_name) = self.game_system.get_entity_current_atlas_name(entity_id)
-                else {
-                    continue;
-                };
-                let Some(sprite_atlas) = self.resources.get_sprite_atlas(&atlas_name) else {
-                    tracing::warn!(
-                        "Entity {} requested missing sprite atlas '{}'",
-                        entity_id,
-                        atlas_name
-                    );
-                    continue;
-                };
-                let texture_size = sprite_atlas
-                    .image_size()
-                    .unwrap_or(glam::UVec2::new(64, 16));
-                if let Some(frame) =
-                    self.game_system
-                        .get_entity_sprite_frame(entity_id, sprite_atlas, texture_size)
-                {
-                    let flip_x = self.game_system.get_entity_sprite_flip_x(entity_id);
-                    if let Some(texture_path) =
-                        self.resources.get_sprite_texture_path(&atlas_name).cloned()
-                    {
-                        self.rendering.add_sprite_with_texture(
-                            texture_path,
-                            frame,
-                            position,
-                            size,
-                            flip_x,
-                        );
-                    } else {
-                        self.rendering.add_sprite(frame, position, size, flip_x);
-                    }
-                }
-            }
-
-            for entity in self.game_system.get_static_entity_renderables() {
-                let Some(object_sheet) = self.resources.get_object_sheet(&entity.sheet) else {
-                    tracing::warn!(
-                        "Entity {} requested missing object sheet '{}'",
-                        entity.entity_id,
-                        entity.sheet
-                    );
-                    continue;
-                };
-                let texture_size = object_sheet
-                    .image_size()
-                    .unwrap_or(glam::UVec2::new(16, 16));
-                let Some(uv_rect) = object_sheet.get_object_uvs(&entity.object_name, texture_size)
-                else {
-                    tracing::warn!(
-                        "Entity {} requested missing object '{}' in sheet '{}'",
-                        entity.entity_id,
-                        entity.object_name,
-                        entity.sheet
-                    );
-                    continue;
-                };
-                let frame = toki_core::sprite::SpriteFrame {
-                    u0: uv_rect[0],
-                    v0: uv_rect[1],
-                    u1: uv_rect[2],
-                    v1: uv_rect[3],
-                };
-                if let Some(texture_path) = self
-                    .resources
-                    .get_object_texture_path(&entity.sheet)
-                    .cloned()
-                {
-                    self.rendering.add_sprite_with_texture(
-                        texture_path,
-                        frame,
-                        entity.position,
-                        entity.size,
-                        false,
-                    );
-                } else {
-                    self.rendering
-                        .add_sprite(frame, entity.position, entity.size, false);
-                }
-            }
-
-            for projectile in self.game_system.get_projectile_renderables() {
-                let Some(object_sheet) = self.resources.get_object_sheet(&projectile.sheet) else {
-                    tracing::warn!(
-                        "Projectile {} requested missing object sheet '{}'",
-                        projectile.entity_id,
-                        projectile.sheet
-                    );
-                    continue;
-                };
-                let texture_size = object_sheet
-                    .image_size()
-                    .unwrap_or(glam::UVec2::new(16, 16));
-                let Some(uv_rect) =
-                    object_sheet.get_object_uvs(&projectile.object_name, texture_size)
-                else {
-                    tracing::warn!(
-                        "Projectile {} requested missing object '{}' in sheet '{}'",
-                        projectile.entity_id,
-                        projectile.object_name,
-                        projectile.sheet
-                    );
-                    continue;
-                };
-                let frame = toki_core::sprite::SpriteFrame {
-                    u0: uv_rect[0],
-                    v0: uv_rect[1],
-                    u1: uv_rect[2],
-                    v1: uv_rect[3],
-                };
-                if let Some(texture_path) = self
-                    .resources
-                    .get_object_texture_path(&projectile.sheet)
-                    .cloned()
-                {
-                    self.rendering.add_sprite_with_texture(
-                        texture_path,
-                        frame,
-                        projectile.position,
-                        projectile.size,
-                        false,
-                    );
-                } else {
-                    self.rendering
-                        .add_sprite(frame, projectile.position, projectile.size, false);
-                }
-            }
-
-            for object in &self.resources.get_tilemap().objects {
-                if !object.visible {
-                    continue;
-                }
-                let sheet_name = object
-                    .sheet
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .or_else(|| object.sheet.to_str());
-                let Some(sheet_name) = sheet_name else {
-                    continue;
-                };
-                let Some(object_sheet) = self.resources.get_object_sheet(sheet_name) else {
-                    tracing::warn!("Map object requested missing object sheet '{}'", sheet_name);
-                    continue;
-                };
-                let texture_size = object_sheet
-                    .image_size()
-                    .unwrap_or(glam::UVec2::new(16, 16));
-                let Some(uv_rect) = object_sheet.get_object_uvs(&object.object_name, texture_size)
-                else {
-                    tracing::warn!(
-                        "Map object '{}' missing from object sheet '{}'",
-                        object.object_name,
-                        sheet_name
-                    );
-                    continue;
-                };
-                let Some(rect) = object_sheet.get_object_rect(&object.object_name) else {
-                    continue;
-                };
-                let frame = toki_core::sprite::SpriteFrame {
-                    u0: uv_rect[0],
-                    v0: uv_rect[1],
-                    u1: uv_rect[2],
-                    v1: uv_rect[3],
-                };
-                let size = glam::UVec2::new(rect[2], rect[3]);
-                let position = object.position.as_ivec2();
-                if let Some(texture_path) =
-                    self.resources.get_object_texture_path(sheet_name).cloned()
-                {
-                    self.rendering.add_sprite_with_texture(
-                        texture_path,
-                        frame,
-                        position,
-                        size,
-                        false,
-                    );
-                } else {
-                    self.rendering.add_sprite(frame, position, size, false);
-                }
-            }
+            self.render_world_sprites();
 
             self.rendering.clear_debug_shapes();
             if self.launch_options.display.show_entity_health_bars {
@@ -390,5 +210,144 @@ impl App {
             self.camera_system.cached_visible_chunks(),
         );
         self.rendering.update_tilemap_vertices(&verts);
+    }
+
+    fn render_world_sprites(&mut self) {
+        let mut requests = self.game_system.get_sprite_render_requests();
+        requests.extend(collect_map_object_sprite_render_requests(
+            self.resources.get_tilemap(),
+        ));
+        sort_sprite_render_requests(&mut requests);
+
+        let (resolved, failures) = resolve_sprite_render_requests(&mut self.resources, &requests);
+        for failure in failures {
+            Self::log_sprite_resolve_failure(&failure.origin, &failure.error);
+        }
+        for sprite in resolved {
+            self.rendering.add_resolved_sprite(&sprite);
+        }
+    }
+
+    fn log_sprite_resolve_failure(origin: &SpriteRenderOrigin, error: &SpriteResolveError) {
+        match (origin, error) {
+            (
+                SpriteRenderOrigin::AnimatedEntity(entity_id),
+                SpriteResolveError::MissingAtlas { atlas_name },
+            ) => tracing::warn!(
+                "Entity {} requested missing sprite atlas '{}'",
+                entity_id,
+                atlas_name
+            ),
+            (
+                SpriteRenderOrigin::AnimatedEntity(entity_id),
+                SpriteResolveError::MissingAtlasTile {
+                    atlas_name,
+                    tile_name,
+                },
+            ) => tracing::warn!(
+                "Entity {} requested missing tile '{}' in atlas '{}'",
+                entity_id,
+                tile_name,
+                atlas_name
+            ),
+            (
+                SpriteRenderOrigin::StaticEntity(entity_id),
+                SpriteResolveError::MissingObjectSheet { sheet_name },
+            ) => tracing::warn!(
+                "Entity {} requested missing object sheet '{}'",
+                entity_id,
+                sheet_name
+            ),
+            (
+                SpriteRenderOrigin::StaticEntity(entity_id),
+                SpriteResolveError::MissingObject {
+                    sheet_name,
+                    object_name,
+                },
+            ) => tracing::warn!(
+                "Entity {} requested missing object '{}' in sheet '{}'",
+                entity_id,
+                object_name,
+                sheet_name
+            ),
+            (
+                SpriteRenderOrigin::Projectile(entity_id),
+                SpriteResolveError::MissingObjectSheet { sheet_name },
+            ) => tracing::warn!(
+                "Projectile {} requested missing object sheet '{}'",
+                entity_id,
+                sheet_name
+            ),
+            (
+                SpriteRenderOrigin::Projectile(entity_id),
+                SpriteResolveError::MissingObject {
+                    sheet_name,
+                    object_name,
+                },
+            ) => tracing::warn!(
+                "Projectile {} requested missing object '{}' in sheet '{}'",
+                entity_id,
+                object_name,
+                sheet_name
+            ),
+            (
+                SpriteRenderOrigin::MapObject {
+                    sheet_name,
+                    object_name: _,
+                    ..
+                },
+                SpriteResolveError::MissingObjectSheet { .. },
+            ) => tracing::warn!("Map object requested missing object sheet '{}'", sheet_name),
+            (
+                SpriteRenderOrigin::MapObject { sheet_name, .. },
+                SpriteResolveError::MissingObject { object_name, .. },
+            ) => tracing::warn!(
+                "Map object '{}' missing from object sheet '{}'",
+                object_name,
+                sheet_name
+            ),
+            (
+                SpriteRenderOrigin::AnimatedEntity(entity_id),
+                SpriteResolveError::AssetLoadFailed { message, .. },
+            ) => tracing::warn!(
+                "Entity {} sprite asset failed to load: {}",
+                entity_id,
+                message
+            ),
+            (
+                SpriteRenderOrigin::StaticEntity(entity_id),
+                SpriteResolveError::AssetLoadFailed { message, .. },
+            ) => tracing::warn!(
+                "Entity {} static sprite asset failed to load: {}",
+                entity_id,
+                message
+            ),
+            (
+                SpriteRenderOrigin::Projectile(entity_id),
+                SpriteResolveError::AssetLoadFailed { message, .. },
+            ) => tracing::warn!(
+                "Projectile {} sprite asset failed to load: {}",
+                entity_id,
+                message
+            ),
+            (
+                SpriteRenderOrigin::MapObject {
+                    object_name,
+                    sheet_name,
+                    ..
+                },
+                SpriteResolveError::AssetLoadFailed { message, .. },
+            ) => tracing::warn!(
+                "Map object '{}' in sheet '{}' failed to load: {}",
+                object_name,
+                sheet_name,
+                message
+            ),
+            (origin, error) => tracing::warn!(
+                "Failed to resolve sprite render request for {:?}: {:?}",
+                origin,
+                error
+            ),
+        }
     }
 }

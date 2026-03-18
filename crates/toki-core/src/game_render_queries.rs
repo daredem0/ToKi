@@ -1,8 +1,11 @@
-use super::{EntityHealthBar, GameState, ProjectileRenderData, StaticEntityRenderData};
+use super::{EntityHealthBar, GameState};
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::entity::EntityId;
 use crate::sprite::SpriteFrame;
+use crate::sprite_render::{
+    SpriteRenderOrigin, SpriteRenderRequest, SpriteRenderSize, SpriteSortKey, SpriteVisualRef,
+};
 
 impl GameState {
     /// Get sprite frame for a specific entity
@@ -163,49 +166,88 @@ impl GameState {
             .collect()
     }
 
-    pub fn get_projectile_renderables(&self) -> Vec<ProjectileRenderData> {
-        self.entity_manager
-            .active_entities()
-            .iter()
-            .filter_map(|&entity_id| {
-                let entity = self.entity_manager.get_entity(entity_id)?;
-                if !entity.attributes.visible || !entity.attributes.active {
-                    return None;
-                }
-                let projectile = entity.attributes.projectile.as_ref()?;
-                Some(ProjectileRenderData {
-                    entity_id,
-                    position: entity.position,
-                    size: entity.size,
-                    sheet: projectile.sheet.clone(),
-                    object_name: projectile.object_name.clone(),
-                })
-            })
-            .collect()
-    }
+    pub fn get_sprite_render_requests(&self) -> Vec<SpriteRenderRequest> {
+        let mut requests = Vec::new();
+        let mut animated_sequence = 0_u32;
+        let mut static_sequence = 0_u32;
+        let mut projectile_sequence = 0_u32;
 
-    pub fn get_static_entity_renderables(&self) -> Vec<StaticEntityRenderData> {
-        self.entity_manager
-            .active_entities()
-            .iter()
-            .filter_map(|&entity_id| {
-                let entity = self.entity_manager.get_entity(entity_id)?;
-                if !entity.attributes.visible || !entity.attributes.active {
-                    return None;
-                }
-                if entity.attributes.animation_controller.is_some() {
-                    return None;
-                }
-                let static_render = entity.attributes.static_object_render.as_ref()?;
-                Some(StaticEntityRenderData {
-                    entity_id,
+        for entity_id in self.entity_manager.active_entities() {
+            let Some(entity) = self.entity_manager.get_entity(entity_id) else {
+                continue;
+            };
+            if !entity.attributes.visible || !entity.attributes.active {
+                continue;
+            }
+
+            if let Some(animation_controller) = &entity.attributes.animation_controller {
+                let Ok(atlas_name) = animation_controller.current_atlas_name() else {
+                    continue;
+                };
+                let Ok(tile_name) = animation_controller.current_tile_name() else {
+                    continue;
+                };
+
+                requests.push(SpriteRenderRequest {
+                    origin: SpriteRenderOrigin::AnimatedEntity(entity_id),
+                    sort_key: SpriteSortKey {
+                        primary: 0,
+                        secondary: entity.attributes.render_layer,
+                        sequence: animated_sequence,
+                    },
+                    visual: SpriteVisualRef::AtlasTile {
+                        atlas_name,
+                        tile_name,
+                    },
                     position: entity.position,
-                    size: entity.size,
-                    sheet: static_render.sheet.clone(),
-                    object_name: static_render.object_name.clone(),
-                })
-            })
-            .collect()
+                    size: SpriteRenderSize::Explicit(entity.size),
+                    flip_x: Self::animation_state_flip_x(animation_controller.current_clip_state),
+                });
+                animated_sequence += 1;
+                continue;
+            }
+
+            if let Some(static_render) = &entity.attributes.static_object_render {
+                requests.push(SpriteRenderRequest {
+                    origin: SpriteRenderOrigin::StaticEntity(entity_id),
+                    sort_key: SpriteSortKey {
+                        primary: 1,
+                        secondary: entity.attributes.render_layer,
+                        sequence: static_sequence,
+                    },
+                    visual: SpriteVisualRef::ObjectSheetObject {
+                        sheet_name: static_render.sheet.clone(),
+                        object_name: static_render.object_name.clone(),
+                    },
+                    position: entity.position,
+                    size: SpriteRenderSize::Explicit(entity.size),
+                    flip_x: false,
+                });
+                static_sequence += 1;
+                continue;
+            }
+
+            if let Some(projectile) = &entity.attributes.projectile {
+                requests.push(SpriteRenderRequest {
+                    origin: SpriteRenderOrigin::Projectile(entity_id),
+                    sort_key: SpriteSortKey {
+                        primary: 2,
+                        secondary: entity.attributes.render_layer,
+                        sequence: projectile_sequence,
+                    },
+                    visual: SpriteVisualRef::ObjectSheetObject {
+                        sheet_name: projectile.sheet.clone(),
+                        object_name: projectile.object_name.clone(),
+                    },
+                    position: entity.position,
+                    size: SpriteRenderSize::Explicit(entity.size),
+                    flip_x: false,
+                });
+                projectile_sequence += 1;
+            }
+        }
+
+        requests
     }
 
     /// Get the current sprite frame for rendering with proper atlas lookup (legacy method for player)

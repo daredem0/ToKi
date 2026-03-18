@@ -1,11 +1,12 @@
 use toki_core::entity::MovementProfile;
 use toki_core::game::AudioEvent;
 use toki_core::menu::InventoryEntry;
+use toki_core::sprite_render::SpriteRenderRequest;
 use toki_core::{
     assets::atlas::AtlasMeta,
     assets::tilemap::TileMap,
     entity::Entity,
-    game::{EntityHealthBar, InputAction, ProjectileRenderData, StaticEntityRenderData},
+    game::{EntityHealthBar, InputAction},
     sprite::SpriteFrame,
     GameState, GameUpdateResult, InputKey,
 };
@@ -113,45 +114,12 @@ impl GameManager {
         }
     }
 
-    /// Get all renderable entities with their sprite data
-    pub fn get_renderable_entities(
-        &self,
-    ) -> Vec<(toki_core::entity::EntityId, glam::IVec2, glam::UVec2)> {
-        self.game_state.get_renderable_entities()
-    }
-
-    /// Get sprite frame for a specific entity
-    pub fn get_entity_sprite_frame(
-        &self,
-        entity_id: toki_core::entity::EntityId,
-        atlas: &AtlasMeta,
-        texture_size: glam::UVec2,
-    ) -> Option<SpriteFrame> {
-        self.game_state
-            .get_entity_sprite_frame(entity_id, atlas, texture_size)
-    }
-
-    pub fn get_entity_current_atlas_name(
-        &self,
-        entity_id: toki_core::entity::EntityId,
-    ) -> Option<String> {
-        self.game_state.get_entity_current_atlas_name(entity_id)
-    }
-
-    pub fn get_entity_sprite_flip_x(&self, entity_id: toki_core::entity::EntityId) -> bool {
-        self.game_state.get_entity_sprite_flip_x(entity_id)
+    pub fn get_sprite_render_requests(&self) -> Vec<SpriteRenderRequest> {
+        self.game_state.get_sprite_render_requests()
     }
 
     pub fn get_entity_health_bars(&self) -> Vec<EntityHealthBar> {
         self.game_state.get_entity_health_bars()
-    }
-
-    pub fn get_projectile_renderables(&self) -> Vec<ProjectileRenderData> {
-        self.game_state.get_projectile_renderables()
-    }
-
-    pub fn get_static_entity_renderables(&self) -> Vec<StaticEntityRenderData> {
-        self.game_state.get_static_entity_renderables()
     }
 
     /// Spawn an NPC that looks like the player

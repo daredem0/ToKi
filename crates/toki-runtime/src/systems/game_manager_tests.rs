@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::TileMap;
+use toki_core::sprite_render::{SpriteRenderOrigin, SpriteVisualRef};
 use toki_core::GameState;
 use winit::keyboard::KeyCode;
 
@@ -98,7 +99,7 @@ fn wrapper_methods_expose_core_entity_state() {
     let mut manager = GameManager::new(game_state);
 
     let npc_id = manager.spawn_player_like_npc(glam::IVec2::new(20, 12));
-    let renderable = manager.get_renderable_entities();
+    let renderable = manager.get_sprite_render_requests();
     let entities_for_camera = manager.entities_for_camera();
 
     assert_eq!(manager.player_id(), Some(player_id));
@@ -110,10 +111,16 @@ fn wrapper_methods_expose_core_entity_state() {
         .iter()
         .any(|entity| entity.id == player_id));
     assert!(entities_for_camera.iter().any(|entity| entity.id == npc_id));
+    assert!(renderable
+        .iter()
+        .any(|request| request.origin == SpriteRenderOrigin::AnimatedEntity(player_id)));
+    assert!(renderable
+        .iter()
+        .any(|request| request.origin == SpriteRenderOrigin::AnimatedEntity(npc_id)));
 }
 
 #[test]
-fn static_entity_renderable_wrappers_expose_object_sheet_backed_entities() {
+fn sprite_render_request_wrapper_exposes_object_sheet_backed_entities() {
     let mut game_state = GameState::new_empty();
     let pickup_definition = toki_core::entity::EntityDefinition {
         name: "coin_pickup_render".to_string(),
@@ -171,29 +178,19 @@ fn static_entity_renderable_wrappers_expose_object_sheet_backed_entities() {
         .expect("pickup should spawn");
     let manager = GameManager::new(game_state);
 
-    let renderable = manager.get_static_entity_renderables();
+    let renderable = manager.get_sprite_render_requests();
     assert_eq!(renderable.len(), 1);
-    assert_eq!(renderable[0].entity_id, pickup_id);
-    assert_eq!(renderable[0].sheet, "items");
-    assert_eq!(renderable[0].object_name, "coin");
-}
-
-#[test]
-fn sprite_frame_wrappers_resolve_from_atlas() {
-    let mut game_state = GameState::new_empty();
-    let player_id = game_state.spawn_player_at(glam::IVec2::new(0, 0));
-    let manager = GameManager::new(game_state);
-    let atlas = sample_atlas();
-    let texture_size = atlas.image_size().expect("atlas image size should exist");
-
-    let entity_frame = manager.get_entity_sprite_frame(player_id, &atlas, texture_size);
-    let entity_frame = entity_frame.expect("player frame should resolve from atlas");
-
-    let current_frame = manager.current_sprite_frame(&atlas, texture_size);
-    assert_eq!(current_frame.u0, entity_frame.u0);
-    assert_eq!(current_frame.v0, entity_frame.v0);
-    assert_eq!(current_frame.u1, entity_frame.u1);
-    assert_eq!(current_frame.v1, entity_frame.v1);
+    assert_eq!(
+        renderable[0].origin,
+        SpriteRenderOrigin::StaticEntity(pickup_id)
+    );
+    assert_eq!(
+        renderable[0].visual,
+        SpriteVisualRef::ObjectSheetObject {
+            sheet_name: "items".to_string(),
+            object_name: "coin".to_string(),
+        }
+    );
 }
 
 #[test]

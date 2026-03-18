@@ -19,6 +19,7 @@ pub mod project_runtime;
 pub mod fonts;
 pub mod menu;
 pub mod sprite;
+pub mod sprite_render;
 pub mod text;
 pub mod ui;
 

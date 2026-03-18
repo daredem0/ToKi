@@ -1,4 +1,15 @@
 use super::*;
+use toki_core::sprite::SpriteFrame;
+use toki_core::sprite_render::{
+    resolve_sprite_render_requests, ResolvedSpriteVisual, SpriteAssetResolver, SpriteRenderRequest,
+    SpriteResolveError, SpriteResolveFailure,
+};
+
+struct ViewportSpriteResolver<'a, 'b> {
+    viewport: &'a mut SceneViewport,
+    project_assets: &'b ProjectAssets,
+    project_path: Option<&'b std::path::Path>,
+}
 
 impl SceneViewport {
     pub(super) fn load_atlas_for_tilemap(
@@ -110,68 +121,29 @@ impl SceneViewport {
         Ok(atlas)
     }
 
-    pub(super) fn build_map_object_sprite_instance(
+    pub(super) fn resolve_sprite_requests_into_instances(
         &mut self,
         project_assets: &ProjectAssets,
-        object: &MapObjectInstance,
-    ) -> Option<toki_render::SpriteInstance> {
-        let sheet_name = object
-            .sheet
-            .file_stem()
-            .and_then(|name| name.to_str())
-            .or_else(|| object.sheet.to_str())?;
-        let object_sheet_asset = project_assets.object_sheets.get(sheet_name)?;
-        let object_sheet = self.load_object_sheet_from_asset(object_sheet_asset).ok()?;
-        let texture_size = object_sheet.image_size()?;
-        let rect = object_sheet.get_object_rect(&object.object_name)?;
-        let uv_rect = object_sheet.get_object_uvs(&object.object_name, texture_size)?;
-
-        Some(toki_render::SpriteInstance {
-            frame: toki_core::sprite::SpriteFrame {
-                u0: uv_rect[0],
-                v0: uv_rect[1],
-                u1: uv_rect[2],
-                v1: uv_rect[3],
-            },
-            position: object.position.as_ivec2(),
-            size: glam::UVec2::new(rect[2], rect[3]),
-            texture_path: object_sheet_asset
-                .path
-                .parent()
-                .map(|parent| parent.join(&object_sheet.image)),
-            flip_x: false,
-        })
-    }
-
-    pub(super) fn build_static_object_sprite_instance(
-        &mut self,
-        project_assets: &ProjectAssets,
-        sheet_name: &str,
-        object_name: &str,
-        position: glam::IVec2,
-        size: glam::UVec2,
-    ) -> Option<toki_render::SpriteInstance> {
-        let sheet_name = sheet_name.strip_suffix(".json").unwrap_or(sheet_name);
-        let object_sheet_asset = project_assets.object_sheets.get(sheet_name)?;
-        let object_sheet = self.load_object_sheet_from_asset(object_sheet_asset).ok()?;
-        let texture_size = object_sheet.image_size()?;
-        let uv_rect = object_sheet.get_object_uvs(object_name, texture_size)?;
-
-        Some(toki_render::SpriteInstance {
-            frame: toki_core::sprite::SpriteFrame {
-                u0: uv_rect[0],
-                v0: uv_rect[1],
-                u1: uv_rect[2],
-                v1: uv_rect[3],
-            },
-            position,
-            size,
-            texture_path: object_sheet_asset
-                .path
-                .parent()
-                .map(|parent| parent.join(&object_sheet.image)),
-            flip_x: false,
-        })
+        project_path: Option<&std::path::Path>,
+        requests: &[SpriteRenderRequest],
+    ) -> (Vec<toki_render::SpriteInstance>, Vec<SpriteResolveFailure>) {
+        let mut resolver = ViewportSpriteResolver {
+            viewport: self,
+            project_assets,
+            project_path,
+        };
+        let (resolved, failures) = resolve_sprite_render_requests(&mut resolver, requests);
+        let instances = resolved
+            .into_iter()
+            .map(|sprite| toki_render::SpriteInstance {
+                frame: sprite.frame,
+                position: sprite.position,
+                size: sprite.size,
+                texture_path: sprite.texture_path,
+                flip_x: sprite.flip_x,
+            })
+            .collect();
+        (instances, failures)
     }
 
     pub(super) fn load_object_sheet_from_asset(
@@ -196,5 +168,103 @@ impl SceneViewport {
         self.loaded_object_sheets
             .insert(object_sheet_key, object_sheet.clone());
         Ok(object_sheet)
+    }
+}
+
+impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
+    fn resolve_atlas_tile(
+        &mut self,
+        atlas_name: &str,
+        tile_name: &str,
+    ) -> Result<ResolvedSpriteVisual, SpriteResolveError> {
+        let atlas_name_clean = atlas_name.strip_suffix(".json").unwrap_or(atlas_name);
+        let atlas_asset = self
+            .project_assets
+            .sprite_atlases
+            .get(atlas_name_clean)
+            .ok_or_else(|| SpriteResolveError::MissingAtlas {
+                atlas_name: atlas_name.to_string(),
+            })?;
+        let atlas = self
+            .viewport
+            .load_sprite_atlas_from_asset(atlas_asset, self.project_path)
+            .map_err(|error| SpriteResolveError::AssetLoadFailed {
+                asset_kind: "sprite_atlas",
+                asset_name: atlas_name.to_string(),
+                message: error.to_string(),
+            })?;
+        let texture_size = atlas.image_size().unwrap_or(glam::UVec2::new(64, 16));
+        let uvs = atlas.get_tile_uvs(tile_name, texture_size).ok_or_else(|| {
+            SpriteResolveError::MissingAtlasTile {
+                atlas_name: atlas_name.to_string(),
+                tile_name: tile_name.to_string(),
+            }
+        })?;
+
+        Ok(ResolvedSpriteVisual {
+            frame: SpriteFrame {
+                u0: uvs[0],
+                v0: uvs[1],
+                u1: uvs[2],
+                v1: uvs[3],
+            },
+            intrinsic_size: atlas.tile_size,
+            texture_path: atlas_asset
+                .path
+                .parent()
+                .map(|parent| parent.join(&atlas.image)),
+        })
+    }
+
+    fn resolve_object_sheet_object(
+        &mut self,
+        sheet_name: &str,
+        object_name: &str,
+    ) -> Result<ResolvedSpriteVisual, SpriteResolveError> {
+        let sheet_name_clean = sheet_name.strip_suffix(".json").unwrap_or(sheet_name);
+        let object_sheet_asset = self
+            .project_assets
+            .object_sheets
+            .get(sheet_name_clean)
+            .ok_or_else(|| SpriteResolveError::MissingObjectSheet {
+                sheet_name: sheet_name.to_string(),
+            })?;
+        let object_sheet = self
+            .viewport
+            .load_object_sheet_from_asset(object_sheet_asset)
+            .map_err(|error| SpriteResolveError::AssetLoadFailed {
+                asset_kind: "object_sheet",
+                asset_name: sheet_name.to_string(),
+                message: error.to_string(),
+            })?;
+        let texture_size = object_sheet
+            .image_size()
+            .unwrap_or(glam::UVec2::new(16, 16));
+        let uvs = object_sheet
+            .get_object_uvs(object_name, texture_size)
+            .ok_or_else(|| SpriteResolveError::MissingObject {
+                sheet_name: sheet_name.to_string(),
+                object_name: object_name.to_string(),
+            })?;
+        let rect = object_sheet.get_object_rect(object_name).ok_or_else(|| {
+            SpriteResolveError::MissingObject {
+                sheet_name: sheet_name.to_string(),
+                object_name: object_name.to_string(),
+            }
+        })?;
+
+        Ok(ResolvedSpriteVisual {
+            frame: SpriteFrame {
+                u0: uvs[0],
+                v0: uvs[1],
+                u1: uvs[2],
+                v1: uvs[3],
+            },
+            intrinsic_size: glam::UVec2::new(rect[2], rect[3]),
+            texture_path: object_sheet_asset
+                .path
+                .parent()
+                .map(|parent| parent.join(&object_sheet.image)),
+        })
     }
 }

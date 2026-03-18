@@ -6,6 +6,7 @@ use toki_core::fonts::find_font_files;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::sprite::SpriteFrame;
+use toki_core::sprite_render::{ResolvedSpriteRenderInstance, SpriteRenderOrigin, SpriteSortKey};
 use toki_core::text::{TextItem, TextStyle};
 use toki_core::ui::{UiBlock, UiComposition, UiRect, UiTextBlock};
 
@@ -196,6 +197,38 @@ fn rendering_system_defaults_and_no_gpu_error_paths() {
         sprite_err.to_string().contains("GPU not initialized"),
         "unexpected error: {sprite_err}"
     );
+}
+
+#[test]
+fn resolved_sprite_instances_submit_through_the_shared_rendering_entrypoint() {
+    let sprite_count = Rc::new(Cell::new(0));
+    let mut rendering = RenderingSystem::new();
+    let backend = FakeBackend {
+        sprite_count: sprite_count.clone(),
+        ..FakeBackend::default()
+    };
+    rendering.set_backend_for_tests(Box::new(backend));
+
+    rendering.add_resolved_sprite(&ResolvedSpriteRenderInstance {
+        origin: SpriteRenderOrigin::AnimatedEntity(1),
+        sort_key: SpriteSortKey {
+            primary: 0,
+            secondary: 0,
+            sequence: 0,
+        },
+        frame: SpriteFrame {
+            u0: 0.0,
+            v0: 0.0,
+            u1: 1.0,
+            v1: 1.0,
+        },
+        position: glam::IVec2::new(4, 6),
+        size: glam::UVec2::new(16, 16),
+        texture_path: Some(std::path::PathBuf::from("sprites/player.png")),
+        flip_x: true,
+    });
+
+    assert_eq!(sprite_count.get(), 1);
 }
 
 #[test]

@@ -1254,11 +1254,22 @@ fn game_state_primary_action_spawns_projectile_when_authored() {
         .collect::<Vec<_>>();
     assert_eq!(projectile_ids.len(), 1);
 
-    let renderables = game_state.get_projectile_renderables();
-    assert_eq!(renderables.len(), 1);
-    assert_eq!(renderables[0].sheet, "fauna");
-    assert_eq!(renderables[0].object_name, "rock");
-    assert_eq!(renderables[0].position, IVec2::new(70, 60));
+    let renderables = game_state.get_sprite_render_requests();
+    let projectile = renderables
+        .iter()
+        .find(|request| {
+            request.origin
+                == toki_core::sprite_render::SpriteRenderOrigin::Projectile(projectile_ids[0])
+        })
+        .expect("projectile render request should exist");
+    assert_eq!(
+        projectile.visual,
+        toki_core::sprite_render::SpriteVisualRef::ObjectSheetObject {
+            sheet_name: "fauna".to_string(),
+            object_name: "rock".to_string(),
+        }
+    );
+    assert_eq!(projectile.position, IVec2::new(70, 60));
 }
 
 #[test]
@@ -1305,21 +1316,37 @@ fn game_state_projectile_moves_and_expires_after_lifetime() {
 
     game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
     game_state.update(world_bounds, &tilemap, &atlas);
-    assert_eq!(
-        game_state.get_projectile_renderables()[0].position,
-        IVec2::new(70, 60)
-    );
+    let projectile_position = game_state
+        .get_sprite_render_requests()
+        .into_iter()
+        .find_map(|request| match request.origin {
+            toki_core::sprite_render::SpriteRenderOrigin::Projectile(_) => Some(request.position),
+            _ => None,
+        })
+        .expect("projectile render request should exist");
+    assert_eq!(projectile_position, IVec2::new(70, 60));
 
     game_state.update(world_bounds, &tilemap, &atlas);
-    assert_eq!(
-        game_state.get_projectile_renderables()[0].position,
-        IVec2::new(74, 60)
-    );
+    let projectile_position = game_state
+        .get_sprite_render_requests()
+        .into_iter()
+        .find_map(|request| match request.origin {
+            toki_core::sprite_render::SpriteRenderOrigin::Projectile(_) => Some(request.position),
+            _ => None,
+        })
+        .expect("projectile render request should still exist");
+    assert_eq!(projectile_position, IVec2::new(74, 60));
 
     game_state.update(world_bounds, &tilemap, &atlas);
     game_state.update(world_bounds, &tilemap, &atlas);
     assert!(
-        game_state.get_projectile_renderables().is_empty(),
+        !game_state
+            .get_sprite_render_requests()
+            .into_iter()
+            .any(|request| matches!(
+                request.origin,
+                toki_core::sprite_render::SpriteRenderOrigin::Projectile(_)
+            )),
         "projectile should despawn after its lifetime expires"
     );
 }
@@ -1385,7 +1412,13 @@ fn game_state_projectile_applies_damage_and_despawns_on_hit() {
     assert_eq!(target.attributes.health, Some(17));
     assert_eq!(target.attributes.current_stat("health"), Some(17));
     assert!(
-        game_state.get_projectile_renderables().is_empty(),
+        !game_state
+            .get_sprite_render_requests()
+            .into_iter()
+            .any(|request| matches!(
+                request.origin,
+                toki_core::sprite_render::SpriteRenderOrigin::Projectile(_)
+            )),
         "projectile should despawn on hit"
     );
 }
@@ -1535,12 +1568,21 @@ fn game_state_static_entity_renderables_include_object_sheet_backed_entities() {
         .spawn_from_definition(&static_pickup, IVec2::new(32, 48))
         .expect("static pickup should spawn");
 
-    let static_renderables = game_state.get_static_entity_renderables();
-    assert_eq!(static_renderables.len(), 1);
-    assert_eq!(static_renderables[0].entity_id, entity_id);
-    assert_eq!(static_renderables[0].sheet, "items");
-    assert_eq!(static_renderables[0].object_name, "coin");
-    assert_eq!(static_renderables[0].position, IVec2::new(32, 48));
+    let static_renderables = game_state.get_sprite_render_requests();
+    let static_request = static_renderables
+        .iter()
+        .find(|request| {
+            request.origin == toki_core::sprite_render::SpriteRenderOrigin::StaticEntity(entity_id)
+        })
+        .expect("static entity request should exist");
+    assert_eq!(
+        static_request.visual,
+        toki_core::sprite_render::SpriteVisualRef::ObjectSheetObject {
+            sheet_name: "items".to_string(),
+            object_name: "coin".to_string(),
+        }
+    );
+    assert_eq!(static_request.position, IVec2::new(32, 48));
     assert!(game_state.get_renderable_entities().is_empty());
 }
 

@@ -3,9 +3,7 @@ use crate::project::ProjectAssets;
 use crate::scene::SceneManager;
 use crate::ui::editor_ui::PlacementPreviewVisual;
 use anyhow::Result;
-use toki_core::assets::{
-    atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::MapObjectInstance,
-};
+use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta};
 use toki_core::Camera;
 use toki_render::{OffscreenTarget, SceneData, SceneRenderer};
 
@@ -79,7 +77,13 @@ impl SceneViewport {
         sizing_mode: ViewportSizingMode,
     ) -> Result<Self> {
         let scene_manager = SceneManager::with_game_state(game_state)?;
+        Self::with_scene_manager_and_sizing_mode(scene_manager, sizing_mode)
+    }
 
+    fn with_scene_manager_and_sizing_mode(
+        scene_manager: SceneManager,
+        sizing_mode: ViewportSizingMode,
+    ) -> Result<Self> {
         // Initialize camera with default toki-runtime settings
         let mut camera = Camera::new();
         camera.viewport_size = glam::UVec2::new(160, 144); // Match toki-runtime native resolution
@@ -106,6 +110,15 @@ impl SceneViewport {
             loaded_sprite_atlases: std::collections::HashMap::new(),
             loaded_object_sheets: std::collections::HashMap::new(),
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_game_state_and_resources_for_tests(
+        game_state: toki_core::GameState,
+        resources: toki_core::ResourceManager,
+    ) -> Result<Self> {
+        let scene_manager = SceneManager::with_game_state_and_resources(game_state, resources);
+        Self::with_scene_manager_and_sizing_mode(scene_manager, ViewportSizingMode::Fixed)
     }
 
     /// Initialize the viewport with WGPU context
