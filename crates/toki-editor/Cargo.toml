@@ -15,7 +15,6 @@ editor = []
 
 [dependencies]
 anyhow = "1.0.99"
-toki-runtime = { path = "../toki-runtime", version = "0.1.0" }
 toki-core = { path = "../toki-core", version = "0.1.0" }
 toki-render = { path = "../toki-render", version = "0.1.0", features = ["editor"] }
 toki-schemas = { path = "../toki-schemas", version = "0.1.0" }

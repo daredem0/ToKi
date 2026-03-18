@@ -490,8 +490,10 @@ fn editor_session_state_tracks_loaded_scene_maps() {
 
 #[test]
 fn editor_session_state_tracks_last_loaded_scene() {
-    let mut session = super::EditorSessionState::default();
-    session.last_loaded_active_scene = Some("Main Scene".to_string());
+    let session = super::EditorSessionState {
+        last_loaded_active_scene: Some("Main Scene".to_string()),
+        ..Default::default()
+    };
 
     assert_eq!(
         session.last_loaded_active_scene,
@@ -517,8 +519,10 @@ fn editor_resource_cache_defaults_to_no_font_project_path() {
 
 #[test]
 fn editor_resource_cache_tracks_font_project_path() {
-    let mut cache = super::EditorResourceCache::default();
-    cache.menu_font_project_path = Some(PathBuf::from("/tmp/project"));
+    let cache = super::EditorResourceCache {
+        menu_font_project_path: Some(PathBuf::from("/tmp/project")),
+        ..Default::default()
+    };
 
     assert_eq!(
         cache.menu_font_project_path,
