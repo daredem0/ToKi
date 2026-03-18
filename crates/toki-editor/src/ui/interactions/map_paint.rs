@@ -1,5 +1,6 @@
 use glam::{UVec2, Vec2};
 use toki_core::assets::tilemap::TileMap;
+use toki_core::math::coordinates::world_to_tile_index;
 
 pub struct MapPaintInteraction;
 
@@ -23,18 +24,17 @@ impl MapPaintInteraction {
     }
 
     pub fn tile_position_at_world(tilemap: &TileMap, world_pos: Vec2) -> Option<UVec2> {
-        if world_pos.x < 0.0 || world_pos.y < 0.0 {
+        let tile_index = world_to_tile_index(world_pos, tilemap.tile_size);
+
+        if tile_index.x < 0
+            || tile_index.y < 0
+            || tile_index.x as u32 >= tilemap.size.x
+            || tile_index.y as u32 >= tilemap.size.y
+        {
             return None;
         }
 
-        let tile_x = (world_pos.x / tilemap.tile_size.x as f32).floor() as u32;
-        let tile_y = (world_pos.y / tilemap.tile_size.y as f32).floor() as u32;
-
-        if tile_x >= tilemap.size.x || tile_y >= tilemap.size.y {
-            return None;
-        }
-
-        Some(UVec2::new(tile_x, tile_y))
+        Some(tile_index.as_uvec2())
     }
 
     pub fn paint_tile(tilemap: &mut TileMap, tile_pos: UVec2, tile_name: &str) -> bool {

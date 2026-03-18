@@ -8,6 +8,7 @@ pub mod graphics {
 }
 
 pub mod math {
+    pub mod coordinates;
     pub mod projection;
 }
 pub mod errors;

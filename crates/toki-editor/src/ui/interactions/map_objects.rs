@@ -1,17 +1,15 @@
 use toki_core::assets::tilemap::{MapObjectInstance, TileMap};
+use toki_core::math::coordinates::world_to_tile_index;
 
 pub struct MapObjectInteraction;
 
 impl MapObjectInteraction {
     pub fn object_anchor_at_world(tilemap: &TileMap, world_pos: glam::Vec2) -> Option<glam::UVec2> {
-        if world_pos.x < 0.0 || world_pos.y < 0.0 {
+        let tile_index = world_to_tile_index(world_pos, tilemap.tile_size);
+        if tile_index.x < 0 || tile_index.y < 0 {
             return None;
         }
-
-        let tile_x = (world_pos.x / tilemap.tile_size.x as f32).floor() as u32;
-        let tile_y = (world_pos.y / tilemap.tile_size.y as f32).floor() as u32;
-        let tile_pos = glam::UVec2::new(tile_x, tile_y);
-        tilemap.tile_to_world(tile_pos)
+        tilemap.tile_to_world(tile_index.as_uvec2())
     }
 
     pub fn place_object(

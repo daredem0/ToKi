@@ -1,6 +1,7 @@
 use crate::config::EditorConfig;
 use glam::{UVec2, Vec2};
 use toki_core::assets::tilemap::TileMap;
+use toki_core::math::coordinates::snap_to_grid;
 
 pub struct GridInteraction;
 
@@ -32,7 +33,7 @@ impl GridInteraction {
             return world_pos;
         }
 
-        let snap_size = tilemap
+        let grid_size = tilemap
             .map(|map| map.tile_size)
             .unwrap_or_else(|| {
                 UVec2::new(
@@ -42,10 +43,7 @@ impl GridInteraction {
             })
             .max(UVec2::ONE);
 
-        Vec2::new(
-            (world_pos.x / snap_size.x as f32).floor() * snap_size.x as f32,
-            (world_pos.y / snap_size.y as f32).floor() * snap_size.y as f32,
-        )
+        snap_to_grid(world_pos, grid_size)
     }
 }
 
