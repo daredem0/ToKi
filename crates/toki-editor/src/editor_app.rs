@@ -630,7 +630,6 @@ impl ApplicationHandler for EditorApp {
                                 // Toggle debug collision rendering (same as toki-runtime)
                                 if let Some(viewport) = &mut self.viewports.scene {
                                     viewport
-                                        .scene_manager_mut()
                                         .game_state_mut()
                                         .handle_key_press(toki_core::InputKey::DebugToggle);
                                     tracing::info!("Toggled debug collision rendering via F4");
@@ -744,13 +743,9 @@ impl EditorApp {
                             let drag_preview_data =
                                 self.core.ui.placement.entity_move_drag.as_ref().and_then(|drag| {
                                     self.core.ui.placement.preview_position.map(|preview_position| {
-                                        let tilemap = scene_viewport.scene_manager().tilemap();
-                                        let terrain_atlas = tilemap.map(|_| {
-                                            scene_viewport
-                                                .scene_manager()
-                                                .resources()
-                                                .get_terrain_atlas()
-                                        });
+                                        let tilemap = scene_viewport.tilemap();
+                                        let terrain_atlas =
+                                            tilemap.map(|_| scene_viewport.resources().get_terrain_atlas());
                                         Self::build_drag_preview_sprites(
                                             drag,
                                             preview_position,
@@ -828,7 +823,7 @@ impl EditorApp {
 
         if self.core.ui.visibility.create_test_entities {
             if let Some(viewport) = &mut self.viewports.scene {
-                let game_state = viewport.scene_manager_mut().game_state_mut();
+                let game_state = viewport.game_state_mut();
                 let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
                 let _npc_id = game_state.spawn_player_like_npc(glam::IVec2::new(120, 72));
                 tracing::info!("Created test entities");

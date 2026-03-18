@@ -90,15 +90,9 @@ impl EditorApp {
         scene: &toki_core::Scene,
         scene_name: &str,
     ) {
-        viewport
-            .scene_manager_mut()
-            .game_state_mut()
-            .add_scene(scene.clone());
+        viewport.game_state_mut().add_scene(scene.clone());
 
-        match viewport
-            .scene_manager_mut()
-            .game_state_mut()
-            .load_scene(scene_name)
+        match viewport.game_state_mut().load_scene(scene_name)
         {
             Ok(()) => {
                 tracing::info!(
@@ -138,7 +132,7 @@ impl EditorApp {
             .join("tilemaps")
             .join(format!("{}.json", map_name));
 
-        match viewport.scene_manager_mut().load_tilemap(&map_file) {
+        match viewport.load_tilemap(&map_file) {
             Ok(()) => {
                 tracing::info!(
                     "Loaded active scene '{}' map '{}' into viewport",
@@ -160,7 +154,7 @@ impl EditorApp {
 
     pub(super) fn clear_viewport_scene(&mut self) {
         if let Some(viewport) = &mut self.viewports.scene {
-            viewport.scene_manager_mut().clear_tilemap();
+            viewport.clear_tilemap();
         }
         tracing::debug!("No active scene set, cleared viewport");
     }

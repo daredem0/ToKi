@@ -26,7 +26,7 @@ impl PanelSystem {
             .and_then(|path| {
                 map_editor_viewport
                     .as_ref()
-                    .and_then(|viewport| viewport.scene_manager().tilemap())
+                    .and_then(|viewport| viewport.tilemap())
                     .and_then(|tilemap| Self::load_map_editor_tile_names(path, tilemap).ok())
             })
             .unwrap_or_default();
@@ -161,7 +161,7 @@ impl PanelSystem {
         if let Err(error) = viewport.update() {
             tracing::error!("Map editor viewport update error: {error}");
         }
-        if let Some(tilemap) = viewport.scene_manager().tilemap() {
+        if let Some(tilemap) = viewport.tilemap() {
             ui_state.sync_selected_map_editor_object_from_tilemap(tilemap);
         }
         if Self::apply_pending_map_editor_object_edit(ui_state, viewport) {
@@ -233,7 +233,7 @@ impl PanelSystem {
                     if let Some(selected_object_index) =
                         Self::handle_map_editor_object_select(ui, viewport, &response, rect)
                     {
-                        if let Some(tilemap) = viewport.scene_manager().tilemap() {
+                        if let Some(tilemap) = viewport.tilemap() {
                             if let Some(object) = tilemap.objects.get(selected_object_index) {
                                 ui_state.select_map_editor_object(selected_object_index, object);
                             }
@@ -257,7 +257,7 @@ impl PanelSystem {
             MapEditorTool::Brush => {
                 let primary_down = ui.input(|input| input.pointer.primary_down());
                 if !primary_down {
-                    if let Some(tilemap) = viewport.scene_manager().tilemap() {
+                    if let Some(tilemap) = viewport.tilemap() {
                         ui_state.finish_map_editor_edit(tilemap);
                     } else {
                         ui_state.cancel_map_editor_edit();

@@ -22,7 +22,7 @@ impl PanelSystem {
         if !rect.contains(pointer_pos) {
             return;
         }
-        let Some(tilemap) = viewport.scene_manager().tilemap() else {
+        let Some(tilemap) = viewport.tilemap() else {
             return;
         };
         let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
@@ -114,7 +114,7 @@ impl PanelSystem {
         if !rect.contains(pointer_pos) {
             return;
         }
-        let Some(tilemap) = viewport.scene_manager().tilemap() else {
+        let Some(tilemap) = viewport.tilemap() else {
             return;
         };
         let Some((object_sheet, texture_path)) =

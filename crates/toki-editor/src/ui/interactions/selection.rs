@@ -172,7 +172,7 @@ impl SelectionInteraction {
         let drop_world_pos = GridInteraction::drag_target_world_position(
             viewport.screen_to_world_pos_raw(drop_pos, rect),
             drag_state.grab_offset,
-            viewport.scene_manager().tilemap(),
+            viewport.tilemap(),
             config,
         );
         let drop_world_pos_i32 = Self::drop_world_position_to_entity_position(drop_world_pos);
@@ -241,8 +241,8 @@ impl SelectionInteraction {
         entity: &Entity,
         world_pos_i32: glam::IVec2,
     ) -> bool {
-        if let Some(tilemap) = viewport.scene_manager().tilemap() {
-            let terrain_atlas = viewport.scene_manager().resources().get_terrain_atlas();
+        if let Some(tilemap) = viewport.tilemap() {
+            let terrain_atlas = viewport.resources().get_terrain_atlas();
             toki_core::collision::can_entity_move_to_position(
                 entity,
                 world_pos_i32,

@@ -198,7 +198,7 @@ impl PanelSystem {
     }
 
     fn effective_grid_size(viewport: &SceneViewport, config: &EditorConfig) -> glam::UVec2 {
-        viewport.scene_manager().tilemap().map_or_else(
+        viewport.tilemap().map_or_else(
             || {
                 glam::UVec2::new(
                     config.editor_settings.grid.grid_size[0],

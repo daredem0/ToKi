@@ -31,7 +31,7 @@ impl PlacementInteraction {
                 let world_pos = GridInteraction::drag_target_world_position(
                     cursor_world,
                     grab_offset,
-                    viewport.scene_manager().tilemap(),
+                    viewport.tilemap(),
                     config,
                 );
                 ui_state.placement.preview_position = Some(world_pos);
@@ -65,7 +65,7 @@ impl PlacementInteraction {
 
         let world_pos = GridInteraction::maybe_snap_world_position(
             viewport.screen_to_world_pos_raw(click_pos, rect),
-            viewport.scene_manager().tilemap(),
+            viewport.tilemap(),
             config,
         );
         tracing::info!(
@@ -134,9 +134,9 @@ impl PlacementInteraction {
         world_pos_i32: glam::IVec2,
         viewport: &SceneViewport,
     ) -> bool {
-        let tilemap = viewport.scene_manager().tilemap();
+        let tilemap = viewport.tilemap();
         let terrain_atlas =
-            tilemap.map(|_| viewport.scene_manager().resources().get_terrain_atlas());
+            tilemap.map(|_| viewport.resources().get_terrain_atlas());
         Self::create_entity_in_scene_with_collision_context(
             ui_state,
             entity_def,
@@ -238,8 +238,8 @@ impl PlacementInteraction {
         let world_pos_i32 = Self::placement_world_position_to_entity_position(world_pos);
 
         let collision_box = entity_def.get_collision_box();
-        if let Some(tilemap) = viewport.scene_manager().tilemap() {
-            let terrain_atlas = viewport.scene_manager().resources().get_terrain_atlas();
+        if let Some(tilemap) = viewport.tilemap() {
+            let terrain_atlas = viewport.resources().get_terrain_atlas();
             toki_core::collision::can_place_collision_box_at_position(
                 collision_box.as_ref(),
                 world_pos_i32,

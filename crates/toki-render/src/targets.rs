@@ -1,6 +1,14 @@
 use crate::RenderError;
-use std::sync::Arc;
-use winit::window::Window;
+
+/// Platform abstraction for surface creation.
+/// Implementors provide a pre-created wgpu surface and dimensions.
+/// This decouples the render layer from specific windowing systems like winit.
+pub trait SurfaceProvider {
+    /// Get the wgpu surface for rendering
+    fn surface(&self) -> &wgpu::Surface<'static>;
+    /// Get the current dimensions of the surface
+    fn dimensions(&self) -> (u32, u32);
+}
 
 /// Trait for different render targets (window surface, offscreen texture, etc.)
 pub trait RenderTarget {
@@ -21,123 +29,6 @@ pub trait RenderTarget {
 
     /// Handle resize events
     fn resize(&mut self, new_size: (u32, u32)) -> Result<(), RenderError>;
-}
-
-/// Render target for window surfaces (used by toki-runtime)
-pub struct WindowTarget {
-    surface: wgpu::Surface<'static>,
-    current_texture: Option<wgpu::SurfaceTexture>,
-    current_view: Option<wgpu::TextureView>,
-    config: wgpu::SurfaceConfiguration,
-    device: wgpu::Device,
-}
-
-impl WindowTarget {
-    pub fn new(
-        window: Arc<Window>,
-        device: wgpu::Device,
-        adapter: &wgpu::Adapter,
-    ) -> Result<Self, RenderError> {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::PRIMARY,
-            flags: wgpu::InstanceFlags::default(),
-            ..Default::default()
-        });
-
-        let surface = instance
-            .create_surface(Arc::clone(&window))
-            .map_err(|e| RenderError::Other(format!("Failed to create surface: {}", e)))?;
-
-        let surface_caps = surface.get_capabilities(adapter);
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .find(|f| f.is_srgb())
-            .copied()
-            .unwrap_or(surface_caps.formats[0]);
-
-        let size = window.inner_size();
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width: size.width.max(1),
-            height: size.height.max(1),
-            present_mode: surface_caps.present_modes[0],
-            alpha_mode: surface_caps.alpha_modes[0],
-            view_formats: vec![],
-            desired_maximum_frame_latency: 2,
-        };
-
-        surface.configure(&device, &config);
-
-        Ok(Self {
-            surface,
-            current_texture: None,
-            current_view: None,
-            config,
-            device,
-        })
-    }
-}
-
-impl RenderTarget for WindowTarget {
-    fn get_render_view(&mut self) -> Result<&wgpu::TextureView, RenderError> {
-        self.current_view.as_ref().ok_or_else(|| {
-            RenderError::Other("No current view available. Call begin_frame() first.".to_string())
-        })
-    }
-
-    fn size(&self) -> (u32, u32) {
-        (self.config.width, self.config.height)
-    }
-
-    fn begin_frame(&mut self) -> Result<(), RenderError> {
-        tracing::trace!("WindowTarget: Beginning frame");
-        let surface_texture = match self.surface.get_current_texture() {
-            Ok(texture) => texture,
-            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                tracing::debug!("WindowTarget: Surface lost/outdated, reconfiguring");
-                // Recreate surface on error
-                self.surface.configure(&self.device, &self.config);
-                return Err(RenderError::Other("Surface lost, reconfigured".to_string()));
-            }
-            Err(e) => {
-                return Err(RenderError::Other(format!(
-                    "Failed to get surface texture: {}",
-                    e
-                )))
-            }
-        };
-
-        let view = surface_texture
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        self.current_texture = Some(surface_texture);
-        self.current_view = Some(view);
-
-        Ok(())
-    }
-
-    fn end_frame(&mut self) -> Result<(), RenderError> {
-        if let Some(texture) = self.current_texture.take() {
-            tracing::trace!("WindowTarget: Presenting frame to window");
-            texture.present();
-        }
-        self.current_view = None;
-        Ok(())
-    }
-
-    fn format(&self) -> wgpu::TextureFormat {
-        self.config.format
-    }
-
-    fn resize(&mut self, new_size: (u32, u32)) -> Result<(), RenderError> {
-        self.config.width = new_size.0.max(1);
-        self.config.height = new_size.1.max(1);
-        self.surface.configure(&self.device, &self.config);
-        Ok(())
-    }
 }
 
 /// Render target for offscreen textures (used by toki-editor)

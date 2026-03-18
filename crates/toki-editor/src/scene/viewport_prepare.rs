@@ -43,7 +43,7 @@ impl SceneViewport {
         project_path: Option<&std::path::Path>,
         project_assets: &ProjectAssets,
     ) {
-        let Some(tilemap) = self.scene_manager.tilemap().cloned() else {
+        let Some(tilemap) = self.tilemap.as_ref().cloned() else {
             return;
         };
         if tilemap.objects.is_empty() {
@@ -64,8 +64,8 @@ impl SceneViewport {
         scene_data: &mut SceneData,
         project_path: Option<&std::path::Path>,
     ) {
-        let Some(tilemap) = self.scene_manager.tilemap().cloned() else {
-            tracing::trace!("No tilemap found in scene manager");
+        let Some(tilemap) = self.tilemap.as_ref().cloned() else {
+            tracing::trace!("No tilemap found in scene viewport");
             return;
         };
 
@@ -111,8 +111,7 @@ impl SceneViewport {
         project_assets: &ProjectAssets,
     ) {
         let requests = self
-            .scene_manager
-            .game_state()
+            .game_state
             .get_sprite_render_requests()
             .into_iter()
             .filter(|request| match request.origin {
@@ -209,14 +208,10 @@ impl SceneViewport {
         let Some(drag_preview_data) = drag_preview_data else {
             return;
         };
-        let sprite_requests = self.scene_manager.game_state().get_sprite_render_requests();
+        let sprite_requests = self.game_state.get_sprite_render_requests();
 
         for preview in drag_preview_data {
-            let Some(entity) = self
-                .scene_manager
-                .game_state()
-                .entity_manager()
-                .get_entity(preview.entity_id)
+            let Some(entity) = self.game_state.entity_manager().get_entity(preview.entity_id)
             else {
                 continue;
             };
@@ -261,10 +256,7 @@ impl SceneViewport {
     }
 
     pub(super) fn prepare_debug_shapes(&mut self, scene_data: &mut SceneData) {
-        if !self
-            .scene_manager
-            .game_state()
-            .is_debug_collision_rendering_enabled()
+        if !self.game_state.is_debug_collision_rendering_enabled()
         {
             return;
         }
@@ -281,7 +273,7 @@ impl SceneViewport {
         let entity_color = [1.0, 0.0, 0.0, 0.8];
         let trigger_tile_color = [1.0, 1.0, 0.0, 0.6];
 
-        let renderable_entities = self.scene_manager.game_state().get_renderable_entities();
+        let renderable_entities = self.game_state.get_renderable_entities();
         for (entity_id, position, size) in renderable_entities {
             let debug_shape = toki_render::DebugShape {
                 shape_type: toki_render::DebugShapeType::Rectangle,
@@ -300,7 +292,7 @@ impl SceneViewport {
             );
         }
 
-        let entity_boxes = self.scene_manager.game_state().get_entity_collision_boxes();
+        let entity_boxes = self.game_state.get_entity_collision_boxes();
         for (pos, size, is_trigger) in entity_boxes {
             let color = if is_trigger {
                 trigger_tile_color
@@ -334,10 +326,7 @@ impl SceneViewport {
         let solid_tile_color = [0.0, 0.0, 1.0, 0.6];
         let trigger_tile_color = [1.0, 1.0, 0.0, 0.6];
 
-        let solid_tiles = self
-            .scene_manager
-            .game_state()
-            .get_solid_tile_positions(tilemap, atlas);
+        let solid_tiles = self.game_state.get_solid_tile_positions(tilemap, atlas);
         for (tile_x, tile_y) in solid_tiles {
             let world_pos = glam::Vec2::new(
                 (tile_x * tilemap.tile_size.x) as f32,
@@ -353,10 +342,7 @@ impl SceneViewport {
             scene_data.debug_shapes.push(debug_shape);
         }
 
-        let trigger_tiles = self
-            .scene_manager
-            .game_state()
-            .get_trigger_tile_positions(tilemap, atlas);
+        let trigger_tiles = self.game_state.get_trigger_tile_positions(tilemap, atlas);
         for (tile_x, tile_y) in trigger_tiles {
             let world_pos = glam::Vec2::new(
                 (tile_x * tilemap.tile_size.x) as f32,

@@ -54,7 +54,7 @@ impl SceneViewport {
             } else {
                 "Not Ready"
             },
-            if self.scene_manager.tilemap().is_some() {
+            if self.tilemap.is_some() {
                 "Loaded"
             } else {
                 "None"

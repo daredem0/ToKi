@@ -274,10 +274,7 @@ fn viewport_resolves_shared_sprite_render_requests_for_static_entities() {
     let mut viewport =
         SceneViewport::with_game_state_and_resources_for_tests(game_state, resources)
             .expect("viewport should exist");
-    let requests = viewport
-        .scene_manager
-        .game_state()
-        .get_sprite_render_requests();
+    let requests = viewport.game_state().get_sprite_render_requests();
 
     let (sprites, failures) =
         viewport.resolve_sprite_requests_into_instances(&project_assets, Some(&tmp), &requests);

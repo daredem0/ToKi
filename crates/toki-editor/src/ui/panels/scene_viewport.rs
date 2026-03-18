@@ -17,7 +17,6 @@ impl PanelSystem {
         };
 
         let entity_count = viewport
-            .scene_manager()
             .game_state()
             .entity_manager()
             .active_entities()

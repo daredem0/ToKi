@@ -15,6 +15,6 @@ pub use pipelines::{
     debug::DebugPipeline, sprite::SpritePipeline, tilemap::TilemapPipeline, RenderPipeline,
 };
 pub use scene::{DebugShape, DebugShapeType, SceneData, SceneRenderer, SpriteInstance};
-pub use targets::{OffscreenTarget, RenderTarget, WindowTarget};
+pub use targets::{OffscreenTarget, RenderTarget, SurfaceProvider};
 pub use text::{GlyphonTextRenderer, TextBackgroundRect};
 pub use vertex::VertexLayout;

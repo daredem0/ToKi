@@ -1,10 +1,11 @@
 use crate::project::assets::{ObjectSheetAsset, SpriteAtlasAsset};
 use crate::project::ProjectAssets;
-use crate::scene::SceneManager;
 use crate::ui::editor_ui::PlacementPreviewVisual;
 use anyhow::Result;
+use std::path::Path;
+use toki_core::assets::tilemap::TileMap;
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta};
-use toki_core::Camera;
+use toki_core::{Camera, GameState, ResourceManager};
 use toki_render::{OffscreenTarget, SceneData, SceneRenderer};
 
 #[path = "viewport_assets.rs"]
@@ -38,7 +39,11 @@ pub enum ViewportSizingMode {
 
 /// Handles the scene viewport - integration between scene data and rendering
 pub struct SceneViewport {
-    scene_manager: SceneManager,
+    // Inlined from SceneManager (removed middle-man)
+    game_state: GameState,
+    resources: ResourceManager,
+    tilemap: Option<TileMap>,
+    // Rendering infrastructure
     scene_renderer: Option<SceneRenderer>,
     offscreen_target: Option<OffscreenTarget>,
     device: Option<wgpu::Device>,
@@ -64,24 +69,26 @@ pub struct SceneViewport {
 
 impl SceneViewport {
     /// Create viewport with existing game state
-    pub fn with_game_state(game_state: toki_core::GameState) -> Result<Self> {
+    pub fn with_game_state(game_state: GameState) -> Result<Self> {
         Self::with_game_state_and_sizing_mode(game_state, ViewportSizingMode::Fixed)
     }
 
-    pub fn with_game_state_responsive(game_state: toki_core::GameState) -> Result<Self> {
+    pub fn with_game_state_responsive(game_state: GameState) -> Result<Self> {
         Self::with_game_state_and_sizing_mode(game_state, ViewportSizingMode::Responsive)
     }
 
     fn with_game_state_and_sizing_mode(
-        game_state: toki_core::GameState,
+        game_state: GameState,
         sizing_mode: ViewportSizingMode,
     ) -> Result<Self> {
-        let scene_manager = SceneManager::with_game_state(game_state)?;
-        Self::with_scene_manager_and_sizing_mode(scene_manager, sizing_mode)
+        let resources = ResourceManager::load_all()
+            .map_err(|e| anyhow::anyhow!("Failed to load resources: {e}"))?;
+        Self::with_game_state_resources_and_sizing_mode(game_state, resources, sizing_mode)
     }
 
-    fn with_scene_manager_and_sizing_mode(
-        scene_manager: SceneManager,
+    fn with_game_state_resources_and_sizing_mode(
+        game_state: GameState,
+        resources: ResourceManager,
         sizing_mode: ViewportSizingMode,
     ) -> Result<Self> {
         // Initialize camera with default toki-runtime settings
@@ -90,8 +97,12 @@ impl SceneViewport {
         camera.scale = 1; // Default zoom same as toki-runtime
         camera.center_on(glam::IVec2::new(80, 72)); // Center on viewport
 
+        tracing::info!("Scene viewport created successfully");
+
         Ok(Self {
-            scene_manager,
+            game_state,
+            resources,
+            tilemap: None,
             scene_renderer: None,
             offscreen_target: None,
             device: None,
@@ -114,11 +125,10 @@ impl SceneViewport {
 
     #[cfg(test)]
     pub(crate) fn with_game_state_and_resources_for_tests(
-        game_state: toki_core::GameState,
-        resources: toki_core::ResourceManager,
+        game_state: GameState,
+        resources: ResourceManager,
     ) -> Result<Self> {
-        let scene_manager = SceneManager::with_game_state_and_resources(game_state, resources);
-        Self::with_scene_manager_and_sizing_mode(scene_manager, ViewportSizingMode::Fixed)
+        Self::with_game_state_resources_and_sizing_mode(game_state, resources, ViewportSizingMode::Fixed)
     }
 
     /// Initialize the viewport with WGPU context
@@ -387,14 +397,62 @@ impl SceneViewport {
         None
     }
 
-    /// Get reference to scene manager
-    pub fn scene_manager(&self) -> &SceneManager {
-        &self.scene_manager
+    /// Get reference to game state
+    pub fn game_state(&self) -> &GameState {
+        &self.game_state
     }
 
-    /// Get mutable reference to scene manager
-    pub fn scene_manager_mut(&mut self) -> &mut SceneManager {
-        &mut self.scene_manager
+    /// Get mutable reference to game state
+    pub fn game_state_mut(&mut self) -> &mut GameState {
+        &mut self.game_state
+    }
+
+    /// Get reference to resources
+    pub fn resources(&self) -> &ResourceManager {
+        &self.resources
+    }
+
+    /// Get reference to current tilemap
+    pub fn tilemap(&self) -> Option<&TileMap> {
+        self.tilemap.as_ref()
+    }
+
+    /// Get mutable reference to current tilemap
+    pub fn tilemap_mut(&mut self) -> Option<&mut TileMap> {
+        self.tilemap.as_mut()
+    }
+
+    /// Load a tilemap from file
+    pub fn load_tilemap<P: AsRef<Path>>(&mut self, map_path: P) -> Result<()> {
+        let tilemap = TileMap::load_from_file(&map_path)
+            .map_err(|e| anyhow::anyhow!("Failed to load tilemap: {}", e))?;
+
+        tilemap
+            .validate()
+            .map_err(|e| anyhow::anyhow!("Invalid tilemap: {}", e))?;
+
+        self.tilemap = Some(tilemap);
+        self.mark_dirty();
+        tracing::info!("Loaded tilemap from: {}", map_path.as_ref().display());
+        Ok(())
+    }
+
+    /// Set the current tilemap directly without loading from disk.
+    pub fn set_tilemap(&mut self, tilemap: TileMap) -> Result<()> {
+        tilemap
+            .validate()
+            .map_err(|e| anyhow::anyhow!("Invalid tilemap: {}", e))?;
+        self.tilemap = Some(tilemap);
+        self.mark_dirty();
+        tracing::info!("Set in-memory tilemap on scene viewport");
+        Ok(())
+    }
+
+    /// Clear the current tilemap
+    pub fn clear_tilemap(&mut self) {
+        self.tilemap = None;
+        self.mark_dirty();
+        tracing::info!("Cleared tilemap from scene viewport");
     }
 
     /// Get currently selected entity
@@ -421,11 +479,7 @@ impl SceneViewport {
         world_pos: glam::Vec2,
     ) -> Option<toki_core::entity::EntityId> {
         // Get entity IDs from the active scene
-        let entity_ids = self
-            .scene_manager
-            .game_state()
-            .entity_manager()
-            .active_entities();
+        let entity_ids = self.game_state.entity_manager().active_entities();
 
         // Convert world position to integer coordinates for comparison
         let world_pos_i32 = world_to_i32_floor(world_pos);
@@ -433,11 +487,7 @@ impl SceneViewport {
         // Iterate through entity IDs in reverse order (top layer first)
         // This ensures we select the topmost entity if they overlap
         for &entity_id in entity_ids.iter().rev() {
-            if let Some(entity) = self
-                .scene_manager
-                .game_state()
-                .entity_manager()
-                .get_entity(entity_id)
+            if let Some(entity) = self.game_state.entity_manager().get_entity(entity_id)
             {
                 if point_in_entity_bounds(world_pos_i32, entity.position, entity.size) {
                     tracing::debug!(

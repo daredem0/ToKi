@@ -81,7 +81,7 @@ impl EditorApp {
                     .join(format!("{}.json", map_name));
 
                 if let Some(viewport) = &mut self.viewports.scene {
-                    match viewport.scene_manager_mut().load_tilemap(&map_file) {
+                    match viewport.load_tilemap(&map_file) {
                         Ok(()) => {
                             tracing::info!(
                                 "Successfully loaded map '{}' from scene '{}' into viewport",
@@ -147,9 +147,7 @@ impl EditorApp {
                     return;
                 };
 
-                if let Err(error) = viewport
-                    .scene_manager_mut()
-                    .set_tilemap(draft.tilemap.clone())
+                if let Err(error) = viewport.set_tilemap(draft.tilemap.clone())
                 {
                     tracing::error!(
                         "Failed to load new map draft '{}' into map editor viewport: {}",
@@ -181,7 +179,7 @@ impl EditorApp {
             let live_tilemap = self
                 .viewports.map_editor
                 .as_ref()
-                .and_then(|viewport| viewport.scene_manager().tilemap());
+                .and_then(|viewport| viewport.tilemap());
             let tilemap_to_save = Self::tilemap_to_save_for_map_editor_draft(&draft, live_tilemap);
             match self
                 .core.project_manager
@@ -210,7 +208,7 @@ impl EditorApp {
         let Some(tilemap) = self
             .viewports.map_editor
             .as_ref()
-            .and_then(|viewport| viewport.scene_manager().tilemap().cloned())
+            .and_then(|viewport| viewport.tilemap().cloned())
         else {
             self.core.ui.map.save_requested = false;
             return;
@@ -266,8 +264,8 @@ impl EditorApp {
             .join("tilemaps")
             .join(format!("{}.json", map_name));
 
-        viewport.scene_manager_mut().clear_tilemap();
-        match viewport.scene_manager_mut().load_tilemap(&map_file) {
+        viewport.clear_tilemap();
+        match viewport.load_tilemap(&map_file) {
             Ok(()) => {
                 tracing::info!("Loaded map '{}' into map editor viewport", map_name);
                 self.core.ui.map.active_map = Some(map_name);
@@ -294,7 +292,7 @@ impl EditorApp {
             return;
         };
 
-        match viewport.scene_manager_mut().set_tilemap(tilemap) {
+        match viewport.set_tilemap(tilemap) {
             Ok(()) => viewport.mark_dirty(),
             Err(error) => tracing::error!(
                 "Failed to apply pending map editor undo/redo snapshot to viewport: {}",

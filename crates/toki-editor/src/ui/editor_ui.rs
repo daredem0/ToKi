@@ -645,9 +645,7 @@ impl EditorUI {
         }
 
         // Render hierarchy and inspector panels
-        let game_state = scene_viewport
-            .as_ref()
-            .map(|v| v.scene_manager().game_state());
+        let game_state = scene_viewport.as_ref().map(|v| v.game_state());
 
         if self.visibility.show_hierarchy {
             self.render_hierarchy_and_maps_combined_panel(ctx, game_state, config_readonly);

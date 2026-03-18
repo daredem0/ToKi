@@ -18,7 +18,7 @@ impl PanelSystem {
         let Some(edit) = ui_state.take_map_editor_object_property_edit_request() else {
             return false;
         };
-        let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
+        let Some(tilemap) = viewport.tilemap_mut() else {
             return false;
         };
         let Some(object) = tilemap.objects.get(edit.object_index) else {
@@ -82,7 +82,7 @@ impl PanelSystem {
         };
 
         let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
-        let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
+        let Some(tilemap) = viewport.tilemap_mut() else {
             return false;
         };
         if ui.input(|input| input.pointer.primary_pressed()) {
@@ -112,7 +112,7 @@ impl PanelSystem {
             return false;
         }
 
-        let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
+        let Some(tilemap) = viewport.tilemap_mut() else {
             return false;
         };
         ui_state.begin_map_editor_edit(tilemap);
@@ -150,7 +150,7 @@ impl PanelSystem {
             return false;
         };
         let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
-        let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
+        let Some(tilemap) = viewport.tilemap_mut() else {
             return false;
         };
         let Some(world_anchor) = MapObjectInteraction::object_anchor_at_world(tilemap, world_pos)
@@ -210,7 +210,7 @@ impl PanelSystem {
             return false;
         };
         let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
-        let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
+        let Some(tilemap) = viewport.tilemap_mut() else {
             return false;
         };
         let Some(object_index) = MapObjectInteraction::object_index_at_world(tilemap, world_pos)
@@ -243,7 +243,7 @@ impl PanelSystem {
 
         let pointer_pos = ui.input(|input| input.pointer.interact_pos())?;
         let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
-        let tilemap = viewport.scene_manager().tilemap()?;
+        let tilemap = viewport.tilemap()?;
         MapObjectInteraction::object_index_at_world(tilemap, world_pos)
     }
 
@@ -258,7 +258,7 @@ impl PanelSystem {
         }
 
         let world_pos = viewport.screen_to_world_pos_raw(drag_start_pos, rect);
-        let Some(tilemap) = viewport.scene_manager().tilemap() else {
+        let Some(tilemap) = viewport.tilemap() else {
             return;
         };
         let Some(object_index) = MapObjectInteraction::object_index_at_world(tilemap, world_pos)
@@ -288,7 +288,7 @@ impl PanelSystem {
         };
         let world_pos =
             viewport.screen_to_world_pos_raw(pointer_pos, rect) - drag_state.grab_offset;
-        let Some(tilemap) = viewport.scene_manager_mut().tilemap_mut() else {
+        let Some(tilemap) = viewport.tilemap_mut() else {
             return;
         };
         let Some(world_anchor) = MapObjectInteraction::object_anchor_at_world(tilemap, world_pos)
@@ -308,7 +308,7 @@ impl PanelSystem {
         viewport: &mut SceneViewport,
     ) -> bool {
         ui_state.finish_map_object_move_drag();
-        let Some(tilemap) = viewport.scene_manager().tilemap() else {
+        let Some(tilemap) = viewport.tilemap() else {
             ui_state.cancel_map_editor_edit();
             return false;
         };
@@ -336,7 +336,7 @@ impl PanelSystem {
             return Some(None);
         };
         let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
-        let Some(tilemap) = viewport.scene_manager().tilemap() else {
+        let Some(tilemap) = viewport.tilemap() else {
             return Some(None);
         };
         let Some(tile_pos) = MapPaintInteraction::tile_position_at_world(tilemap, world_pos) else {
@@ -378,7 +378,7 @@ impl PanelSystem {
 
         let pointer_pos = ui.input(|input| input.pointer.interact_pos())?;
         let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
-        let tilemap = viewport.scene_manager().tilemap()?;
+        let tilemap = viewport.tilemap()?;
         let tile_pos = MapPaintInteraction::tile_position_at_world(tilemap, world_pos)?;
         tilemap
             .get_tile_name(tile_pos.x, tile_pos.y)
