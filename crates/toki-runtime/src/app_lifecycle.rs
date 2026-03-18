@@ -144,7 +144,11 @@ impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let content_root = self.content_root_path().map(std::path::Path::to_path_buf);
 
-        self.platform.initialize_window(event_loop);
+        self.platform.initialize_window(
+            event_loop,
+            self.launch_options.display.resolution_width,
+            self.launch_options.display.resolution_height,
+        );
 
         if let Some(window) = self.platform.window_for_gpu() {
             if let Err(error) = self.rendering.initialize_gpu_with_textures(

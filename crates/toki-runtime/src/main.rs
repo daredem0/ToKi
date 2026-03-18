@@ -182,6 +182,12 @@ fn apply_runtime_config(
         if let Some(show_entity_health_bars) = display.show_entity_health_bars {
             launch_options.display.show_entity_health_bars = show_entity_health_bars;
         }
+        if let Some(resolution_width) = display.resolution_width {
+            launch_options.display.resolution_width = resolution_width;
+        }
+        if let Some(resolution_height) = display.resolution_height {
+            launch_options.display.resolution_height = resolution_height;
+        }
     }
     if let Some(menu) = config.menu {
         launch_options.menu = menu;
@@ -289,6 +295,8 @@ fn apply_project_runtime_settings_from_project_file_if_present(
     if should_apply_display {
         launch_options.display.show_entity_health_bars =
             metadata.runtime.display.show_entity_health_bars;
+        launch_options.display.resolution_width = metadata.runtime.display.resolution_width;
+        launch_options.display.resolution_height = metadata.runtime.display.resolution_height;
     }
     if should_apply_menu {
         launch_options.menu = metadata.runtime.menu;

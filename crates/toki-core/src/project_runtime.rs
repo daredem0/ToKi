@@ -1,6 +1,31 @@
 use crate::menu::MenuSettings;
 use serde::{Deserialize, Serialize};
 
+/// Project preset defining default settings for different game types.
+///
+/// Each preset provides sensible defaults for resolution and other settings.
+/// Projects can override individual values while inheriting the preset defaults.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ProjectPreset {
+    /// Top-down RPG style (Game Boy resolution: 160×144)
+    #[default]
+    Topdown,
+    // Future presets:
+    // Platformer (NES-like: 256×240)
+    // Widescreen (16:9 pixel art: 320×180)
+}
+
+impl ProjectPreset {
+    /// Returns the default resolution (width, height) for this preset.
+    pub const fn default_resolution(&self) -> (u32, u32) {
+        match self {
+            ProjectPreset::Topdown => (160, 144),
+            // Future: ProjectPreset::Platformer => (256, 240),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct ProjectRuntimeMetadata {
     #[serde(default)]
@@ -56,10 +81,36 @@ impl Default for RuntimeAudioMixSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeDisplaySettings {
     #[serde(default)]
     pub show_entity_health_bars: bool,
+    /// Viewport width in pixels (defaults to preset resolution)
+    #[serde(default = "default_resolution_width")]
+    pub resolution_width: u32,
+    /// Viewport height in pixels (defaults to preset resolution)
+    #[serde(default = "default_resolution_height")]
+    pub resolution_height: u32,
+}
+
+impl Default for RuntimeDisplaySettings {
+    fn default() -> Self {
+        Self {
+            show_entity_health_bars: false,
+            resolution_width: default_resolution_width(),
+            resolution_height: default_resolution_height(),
+        }
+    }
+}
+
+/// Default resolution width from Topdown preset (Game Boy: 160px)
+pub const fn default_resolution_width() -> u32 {
+    ProjectPreset::Topdown.default_resolution().0
+}
+
+/// Default resolution height from Topdown preset (Game Boy: 144px)
+pub const fn default_resolution_height() -> u32 {
+    ProjectPreset::Topdown.default_resolution().1
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -115,6 +166,10 @@ pub struct RuntimeConfigAudio {
 pub struct RuntimeConfigDisplay {
     #[serde(default)]
     pub show_entity_health_bars: Option<bool>,
+    #[serde(default)]
+    pub resolution_width: Option<u32>,
+    #[serde(default)]
+    pub resolution_height: Option<u32>,
 }
 
 pub const fn default_runtime_splash_duration_ms() -> u64 {

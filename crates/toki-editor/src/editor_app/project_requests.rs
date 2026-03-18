@@ -7,7 +7,29 @@ impl EditorApp {
         project_path: std::path::PathBuf,
         context: &str,
     ) {
-        match SceneViewport::with_game_state(game_state) {
+        let (resolution_width, resolution_height) = self
+            .core
+            .project_manager
+            .current_project
+            .as_ref()
+            .map(|p| {
+                (
+                    p.metadata.runtime.display.resolution_width,
+                    p.metadata.runtime.display.resolution_height,
+                )
+            })
+            .unwrap_or_else(|| {
+                (
+                    toki_core::project_runtime::default_resolution_width(),
+                    toki_core::project_runtime::default_resolution_height(),
+                )
+            });
+
+        match SceneViewport::with_game_state_and_resolution(
+            game_state,
+            resolution_width,
+            resolution_height,
+        ) {
             Ok(viewport) => {
                 self.viewports.scene = self.initialize_viewport(viewport);
                 self.session.last_loaded_active_scene = None;

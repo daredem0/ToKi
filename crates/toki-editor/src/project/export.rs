@@ -96,6 +96,8 @@ pub fn export_hybrid_bundle(
                 show_entity_health_bars: Some(
                     project.metadata.runtime.display.show_entity_health_bars,
                 ),
+                resolution_width: Some(project.metadata.runtime.display.resolution_width),
+                resolution_height: Some(project.metadata.runtime.display.resolution_height),
             }),
             menu: Some(project.metadata.runtime.menu.clone()),
         },

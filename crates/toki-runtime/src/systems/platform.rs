@@ -24,11 +24,15 @@ impl PlatformSystem {
         Self { window: None }
     }
 
-    /// Initialize the window with the given event loop
-    pub fn initialize_window(&mut self, event_loop: &ActiveEventLoop) {
-        // Initialize default window attributes
-        let window_attributes =
-            WindowAttributes::default().with_inner_size(LogicalSize::new(160.0, 144.0));
+    /// Initialize the window with the given event loop and resolution
+    pub fn initialize_window(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        resolution_width: u32,
+        resolution_height: u32,
+    ) {
+        let window_attributes = WindowAttributes::default()
+            .with_inner_size(LogicalSize::new(resolution_width as f64, resolution_height as f64));
 
         // Attempt to create a window with the given attributes
         let raw_window = event_loop.create_window(window_attributes).unwrap();

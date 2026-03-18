@@ -1,4 +1,38 @@
-use crate::project_runtime::{ProjectRuntimeMetadata, RuntimeConfigFile, RuntimeSettings};
+use crate::project_runtime::{
+    ProjectPreset, ProjectRuntimeMetadata, RuntimeConfigFile, RuntimeDisplaySettings,
+    RuntimeSettings,
+};
+
+#[test]
+fn project_preset_topdown_returns_gameboy_resolution() {
+    let preset = ProjectPreset::Topdown;
+    let (width, height) = preset.default_resolution();
+
+    assert_eq!(width, 160);
+    assert_eq!(height, 144);
+}
+
+#[test]
+fn runtime_display_settings_defaults_to_topdown_resolution() {
+    let display = RuntimeDisplaySettings::default();
+
+    assert_eq!(display.resolution_width, 160);
+    assert_eq!(display.resolution_height, 144);
+}
+
+#[test]
+fn runtime_display_settings_custom_resolution_overrides_default() {
+    let toml = r#"
+resolution_width = 256
+resolution_height = 224
+"#;
+
+    let display: RuntimeDisplaySettings =
+        toml::from_str(toml).expect("custom resolution should deserialize");
+
+    assert_eq!(display.resolution_width, 256);
+    assert_eq!(display.resolution_height, 224);
+}
 
 #[test]
 fn runtime_settings_defaults_match_engine_baseline() {
@@ -10,6 +44,8 @@ fn runtime_settings_defaults_match_engine_baseline() {
     assert_eq!(settings.audio.movement_percent, 100);
     assert_eq!(settings.audio.collision_percent, 100);
     assert!(!settings.display.show_entity_health_bars);
+    assert_eq!(settings.display.resolution_width, 160);
+    assert_eq!(settings.display.resolution_height, 144);
     assert_eq!(settings.menu.pause_root_screen_id, "pause_menu");
 }
 

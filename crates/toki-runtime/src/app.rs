@@ -77,9 +77,21 @@ impl Default for RuntimeAudioMixOptions {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeDisplayOptions {
     pub show_entity_health_bars: bool,
+    pub resolution_width: u32,
+    pub resolution_height: u32,
+}
+
+impl Default for RuntimeDisplayOptions {
+    fn default() -> Self {
+        Self {
+            show_entity_health_bars: false,
+            resolution_width: toki_core::project_runtime::default_resolution_width(),
+            resolution_height: toki_core::project_runtime::default_resolution_height(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -139,12 +151,13 @@ impl App {
             Self::build_startup_state(&launch_options);
         let game_system = GameManager::new(game_state);
 
-        let mut camera = Camera {
-            position: glam::IVec2::ZERO,
-            viewport_size: glam::UVec2::new(160, 144),
-            scale: 1,
-        };
-        camera.center_on(glam::IVec2::new(80, 72));
+        let resolution_width = launch_options.display.resolution_width;
+        let resolution_height = launch_options.display.resolution_height;
+        let mut camera = Camera::with_resolution(resolution_width, resolution_height);
+        camera.center_on(glam::IVec2::new(
+            (resolution_width / 2) as i32,
+            (resolution_height / 2) as i32,
+        ));
 
         let cam_controller = if let Some(player_id) = game_system.player_id() {
             CameraController {
@@ -186,7 +199,10 @@ impl App {
 
             // Grouped systems
             platform: PlatformSystem::new(),
-            rendering: RenderingSystem::new(),
+            rendering: RenderingSystem::new_with_desired_resolution(
+                resolution_width,
+                resolution_height,
+            ),
             timing: TimingSystem::new(),
             launch_options,
             menu_system,

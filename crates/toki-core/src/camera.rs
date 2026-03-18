@@ -1,4 +1,5 @@
 use crate::entity::{Entity, EntityId};
+use crate::project_runtime::{default_resolution_height, default_resolution_width};
 use glam;
 
 /// Converts a viewport-local position to world coordinates.
@@ -58,10 +59,16 @@ impl Default for Camera {
 }
 
 impl Camera {
+    /// Creates a camera with default resolution from project preset.
     pub fn new() -> Self {
+        Self::with_resolution(default_resolution_width(), default_resolution_height())
+    }
+
+    /// Creates a camera with the specified resolution.
+    pub fn with_resolution(width: u32, height: u32) -> Self {
         Self {
             position: glam::IVec2::ZERO,
-            viewport_size: glam::UVec2::new(160, 144),
+            viewport_size: glam::UVec2::new(width, height),
             scale: 1,
         }
     }

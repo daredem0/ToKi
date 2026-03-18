@@ -5,6 +5,7 @@ use anyhow::Result;
 use std::path::Path;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta};
+use toki_core::project_runtime::{default_resolution_height, default_resolution_width};
 use toki_core::{Camera, GameState, ResourceManager};
 use toki_render::{OffscreenTarget, SceneData, SceneRenderer};
 
@@ -68,36 +69,74 @@ pub struct SceneViewport {
 }
 
 impl SceneViewport {
-    /// Create viewport with existing game state
+    /// Create viewport with existing game state using default resolution
     pub fn with_game_state(game_state: GameState) -> Result<Self> {
-        Self::with_game_state_and_sizing_mode(game_state, ViewportSizingMode::Fixed)
+        Self::with_game_state_and_resolution(
+            game_state,
+            default_resolution_width(),
+            default_resolution_height(),
+        )
     }
 
+    /// Create viewport with existing game state and custom resolution
+    pub fn with_game_state_and_resolution(
+        game_state: GameState,
+        resolution_width: u32,
+        resolution_height: u32,
+    ) -> Result<Self> {
+        Self::with_options(
+            game_state,
+            ViewportSizingMode::Fixed,
+            resolution_width,
+            resolution_height,
+        )
+    }
+
+    /// Create responsive viewport with existing game state using default resolution
     pub fn with_game_state_responsive(game_state: GameState) -> Result<Self> {
-        Self::with_game_state_and_sizing_mode(game_state, ViewportSizingMode::Responsive)
+        Self::with_options(
+            game_state,
+            ViewportSizingMode::Responsive,
+            default_resolution_width(),
+            default_resolution_height(),
+        )
     }
 
-    fn with_game_state_and_sizing_mode(
+    fn with_options(
         game_state: GameState,
         sizing_mode: ViewportSizingMode,
+        resolution_width: u32,
+        resolution_height: u32,
     ) -> Result<Self> {
         let resources = ResourceManager::load_all()
             .map_err(|e| anyhow::anyhow!("Failed to load resources: {e}"))?;
-        Self::with_game_state_resources_and_sizing_mode(game_state, resources, sizing_mode)
+        Self::with_resources_and_options(
+            game_state,
+            resources,
+            sizing_mode,
+            resolution_width,
+            resolution_height,
+        )
     }
 
-    fn with_game_state_resources_and_sizing_mode(
+    fn with_resources_and_options(
         game_state: GameState,
         resources: ResourceManager,
         sizing_mode: ViewportSizingMode,
+        resolution_width: u32,
+        resolution_height: u32,
     ) -> Result<Self> {
-        // Initialize camera with default toki-runtime settings
-        let mut camera = Camera::new();
-        camera.viewport_size = glam::UVec2::new(160, 144); // Match toki-runtime native resolution
-        camera.scale = 1; // Default zoom same as toki-runtime
-        camera.center_on(glam::IVec2::new(80, 72)); // Center on viewport
+        let mut camera = Camera::with_resolution(resolution_width, resolution_height);
+        camera.scale = 1;
+        let center_x = (resolution_width / 2) as i32;
+        let center_y = (resolution_height / 2) as i32;
+        camera.center_on(glam::IVec2::new(center_x, center_y));
 
-        tracing::info!("Scene viewport created successfully");
+        tracing::info!(
+            "Scene viewport created with resolution {}x{}",
+            resolution_width,
+            resolution_height
+        );
 
         Ok(Self {
             game_state,
@@ -109,10 +148,10 @@ impl SceneViewport {
             queue: None,
             is_initialized: false,
             sizing_mode,
-            viewport_size: (160, 144), // Native runtime resolution
+            viewport_size: (resolution_width, resolution_height),
             requested_viewport_size: None,
             atlas_cache: None,
-            needs_render: true, // Initial render required
+            needs_render: true,
             camera,
             editor_zoom_scale: 1.0,
             last_mouse_pos: None,
@@ -128,7 +167,13 @@ impl SceneViewport {
         game_state: GameState,
         resources: ResourceManager,
     ) -> Result<Self> {
-        Self::with_game_state_resources_and_sizing_mode(game_state, resources, ViewportSizingMode::Fixed)
+        Self::with_resources_and_options(
+            game_state,
+            resources,
+            ViewportSizingMode::Fixed,
+            default_resolution_width(),
+            default_resolution_height(),
+        )
     }
 
     /// Initialize the viewport with WGPU context

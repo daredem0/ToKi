@@ -54,6 +54,22 @@ impl RenderingSystem {
         }
     }
 
+    /// Create a new RenderingSystem with the specified desired resolution.
+    /// The actual window size will be updated later via `update_window_size`.
+    pub fn new_with_desired_resolution(desired_width: u32, desired_height: u32) -> Self {
+        Self {
+            backend: None,
+            projection_params: ProjectionParameter {
+                width: desired_width,
+                height: desired_height,
+                desired_width,
+                desired_height,
+            },
+            loaded_tilemap_texture_path: None,
+            loaded_sprite_texture_path: None,
+        }
+    }
+
     /// Set new projection parameters at runtime
     pub fn set_projection_params(&mut self, params: ProjectionParameter) {
         self.projection_params = params;
