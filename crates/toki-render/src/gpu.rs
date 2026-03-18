@@ -443,6 +443,121 @@ impl GpuState {
     }
 }
 
+impl crate::RenderBackend for GpuState {
+    fn load_tilemap_texture(
+        &mut self,
+        texture_path: std::path::PathBuf,
+    ) -> Result<(), crate::RenderError> {
+        GpuState::load_tilemap_texture(self, texture_path)
+    }
+
+    fn load_sprite_texture(
+        &mut self,
+        texture_path: std::path::PathBuf,
+    ) -> Result<(), crate::RenderError> {
+        GpuState::load_sprite_texture(self, texture_path)
+    }
+
+    fn load_sprite_texture_rgba8(
+        &mut self,
+        image: &DecodedImage,
+    ) -> Result<(), crate::RenderError> {
+        GpuState::load_sprite_texture_rgba8(self, image)
+    }
+
+    fn load_font_file(
+        &mut self,
+        font_path: std::path::PathBuf,
+    ) -> Result<(), crate::RenderError> {
+        GpuState::load_font_file(self, &font_path)
+    }
+
+    fn update_projection(&mut self, mvp: glam::Mat4) {
+        GpuState::update_projection(self, mvp);
+    }
+
+    fn set_tilemap_render_enabled(&mut self, enabled: bool) {
+        GpuState::set_tilemap_render_enabled(self, enabled);
+    }
+
+    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        GpuState::resize(self, new_size);
+    }
+
+    fn draw(&mut self) {
+        GpuState::draw(self);
+    }
+
+    fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
+        GpuState::update_tilemap_vertices(self, vertices);
+    }
+
+    fn clear_sprites(&mut self) {
+        GpuState::clear_sprites(self);
+    }
+
+    fn add_sprite(
+        &mut self,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    ) {
+        GpuState::add_sprite_flipped(self, frame, position, size, flip_x);
+    }
+
+    fn add_sprite_with_texture(
+        &mut self,
+        texture_path: std::path::PathBuf,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    ) {
+        GpuState::add_sprite_with_texture_flipped(self, texture_path, frame, position, size, flip_x);
+    }
+
+    fn clear_text_items(&mut self) {
+        GpuState::clear_text_items(self);
+    }
+
+    fn add_text_item(&mut self, text: TextItem) {
+        GpuState::add_text_item(self, text);
+    }
+
+    fn clear_debug_shapes(&mut self) {
+        GpuState::clear_debug_shapes(self);
+    }
+
+    fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+        GpuState::add_debug_rect(self, x, y, width, height, color);
+    }
+
+    fn add_filled_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+        GpuState::add_filled_debug_rect(self, x, y, width, height, color);
+    }
+
+    fn finalize_debug_shapes(&mut self) {
+        GpuState::finalize_debug_shapes(self);
+    }
+
+    fn clear_ui_shapes(&mut self) {
+        GpuState::clear_ui_rects(self);
+    }
+
+    fn add_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+        GpuState::add_ui_rect(self, x, y, width, height, color);
+    }
+
+    fn add_filled_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
+        GpuState::add_filled_ui_rect(self, x, y, width, height, color);
+    }
+
+    fn finalize_ui_shapes(&mut self) {
+        GpuState::finalize_ui_rects(self);
+    }
+}
+
 #[cfg(test)]
 #[path = "gpu_tests.rs"]
 mod tests;

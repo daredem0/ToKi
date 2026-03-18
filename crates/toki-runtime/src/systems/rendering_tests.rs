@@ -1,4 +1,4 @@
-use super::{find_atlas_file, find_image_for_atlas, RenderingSystem, RuntimeRenderBackend};
+use super::{find_atlas_file, find_image_for_atlas, RenderingSystem};
 use std::cell::{Cell, RefCell};
 use std::path::Path;
 use std::rc::Rc;
@@ -9,6 +9,7 @@ use toki_core::sprite::SpriteFrame;
 use toki_core::sprite_render::{ResolvedSpriteRenderInstance, SpriteRenderOrigin, SpriteSortKey};
 use toki_core::text::{TextItem, TextStyle};
 use toki_core::ui::{UiBlock, UiComposition, UiRect, UiTextBlock};
+use toki_render::RenderBackend;
 
 #[derive(Default, Debug)]
 struct FakeBackend {
@@ -28,7 +29,7 @@ struct FakeBackend {
     finalized_ui: Rc<Cell<usize>>,
 }
 
-impl RuntimeRenderBackend for FakeBackend {
+impl RenderBackend for FakeBackend {
     fn load_tilemap_texture(
         &mut self,
         texture_path: std::path::PathBuf,

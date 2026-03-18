@@ -7,197 +7,8 @@ use toki_core::sprite::SpriteFrame;
 use toki_core::sprite_render::ResolvedSpriteRenderInstance;
 use toki_core::text::TextItem;
 use toki_core::ui::UiComposition;
-use toki_render::GpuState;
+use toki_render::{GpuState, RenderBackend};
 use winit::window::Window;
-
-trait RuntimeRenderBackend: std::fmt::Debug {
-    fn load_tilemap_texture(
-        &mut self,
-        texture_path: std::path::PathBuf,
-    ) -> Result<(), toki_render::RenderError>;
-    fn load_sprite_texture(
-        &mut self,
-        texture_path: std::path::PathBuf,
-    ) -> Result<(), toki_render::RenderError>;
-    fn load_sprite_texture_rgba8(
-        &mut self,
-        image: &DecodedImage,
-    ) -> Result<(), toki_render::RenderError>;
-    fn load_font_file(
-        &mut self,
-        font_path: std::path::PathBuf,
-    ) -> Result<(), toki_render::RenderError>;
-    fn update_projection(&mut self, mvp: glam::Mat4);
-    fn set_tilemap_render_enabled(&mut self, enabled: bool);
-    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>);
-    fn draw(&mut self);
-    fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]);
-    fn clear_sprites(&mut self);
-    fn add_sprite(
-        &mut self,
-        frame: SpriteFrame,
-        position: glam::IVec2,
-        size: glam::UVec2,
-        flip_x: bool,
-    );
-    fn add_sprite_with_texture(
-        &mut self,
-        texture_path: std::path::PathBuf,
-        frame: SpriteFrame,
-        position: glam::IVec2,
-        size: glam::UVec2,
-        flip_x: bool,
-    );
-    fn clear_text_items(&mut self);
-    fn add_text_item(&mut self, text: TextItem);
-    fn clear_debug_shapes(&mut self);
-    fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
-    fn add_filled_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
-    fn finalize_debug_shapes(&mut self);
-    fn clear_ui_shapes(&mut self);
-    fn add_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
-    fn add_filled_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]);
-    fn finalize_ui_shapes(&mut self);
-}
-
-#[derive(Debug)]
-struct WgpuRenderBackend {
-    gpu: GpuState,
-}
-
-impl WgpuRenderBackend {
-    fn new(window: Arc<Window>) -> Self {
-        Self {
-            gpu: GpuState::new(window),
-        }
-    }
-
-    fn new_with_textures(
-        window: Arc<Window>,
-        tilemap_texture: Option<std::path::PathBuf>,
-        sprite_texture: Option<std::path::PathBuf>,
-    ) -> Result<Self, toki_render::RenderError> {
-        Ok(Self {
-            gpu: GpuState::new_with_textures(window, tilemap_texture, sprite_texture)?,
-        })
-    }
-}
-
-impl RuntimeRenderBackend for WgpuRenderBackend {
-    fn load_tilemap_texture(
-        &mut self,
-        texture_path: std::path::PathBuf,
-    ) -> Result<(), toki_render::RenderError> {
-        self.gpu.load_tilemap_texture(texture_path)
-    }
-
-    fn load_sprite_texture(
-        &mut self,
-        texture_path: std::path::PathBuf,
-    ) -> Result<(), toki_render::RenderError> {
-        self.gpu.load_sprite_texture(texture_path)
-    }
-
-    fn load_sprite_texture_rgba8(
-        &mut self,
-        image: &DecodedImage,
-    ) -> Result<(), toki_render::RenderError> {
-        self.gpu.load_sprite_texture_rgba8(image)
-    }
-
-    fn load_font_file(
-        &mut self,
-        font_path: std::path::PathBuf,
-    ) -> Result<(), toki_render::RenderError> {
-        self.gpu.load_font_file(&font_path)
-    }
-
-    fn update_projection(&mut self, mvp: glam::Mat4) {
-        self.gpu.update_projection(mvp);
-    }
-
-    fn set_tilemap_render_enabled(&mut self, enabled: bool) {
-        self.gpu.set_tilemap_render_enabled(enabled);
-    }
-
-    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        self.gpu.resize(new_size);
-    }
-
-    fn draw(&mut self) {
-        self.gpu.draw();
-    }
-
-    fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
-        self.gpu.update_tilemap_vertices(vertices);
-    }
-
-    fn clear_sprites(&mut self) {
-        self.gpu.clear_sprites();
-    }
-
-    fn add_sprite(
-        &mut self,
-        frame: SpriteFrame,
-        position: glam::IVec2,
-        size: glam::UVec2,
-        flip_x: bool,
-    ) {
-        self.gpu.add_sprite_flipped(frame, position, size, flip_x);
-    }
-
-    fn add_sprite_with_texture(
-        &mut self,
-        texture_path: std::path::PathBuf,
-        frame: SpriteFrame,
-        position: glam::IVec2,
-        size: glam::UVec2,
-        flip_x: bool,
-    ) {
-        self.gpu
-            .add_sprite_with_texture_flipped(texture_path, frame, position, size, flip_x);
-    }
-
-    fn clear_text_items(&mut self) {
-        self.gpu.clear_text_items();
-    }
-
-    fn add_text_item(&mut self, text: TextItem) {
-        self.gpu.add_text_item(text);
-    }
-
-    fn clear_debug_shapes(&mut self) {
-        self.gpu.clear_debug_shapes();
-    }
-
-    fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        self.gpu.add_debug_rect(x, y, width, height, color);
-    }
-
-    fn add_filled_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        self.gpu.add_filled_debug_rect(x, y, width, height, color);
-    }
-
-    fn finalize_debug_shapes(&mut self) {
-        self.gpu.finalize_debug_shapes();
-    }
-
-    fn clear_ui_shapes(&mut self) {
-        self.gpu.clear_ui_rects();
-    }
-
-    fn add_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        self.gpu.add_ui_rect(x, y, width, height, color);
-    }
-
-    fn add_filled_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
-        self.gpu.add_filled_ui_rect(x, y, width, height, color);
-    }
-
-    fn finalize_ui_shapes(&mut self) {
-        self.gpu.finalize_ui_rects();
-    }
-}
 
 /// Rendering system that manages GPU state and projection calculations.
 ///
@@ -205,7 +16,7 @@ impl RuntimeRenderBackend for WgpuRenderBackend {
 /// graphics operations while abstracting GPU implementation details.
 #[derive(Debug)]
 pub struct RenderingSystem {
-    backend: Option<Box<dyn RuntimeRenderBackend>>,
+    backend: Option<Box<dyn RenderBackend>>,
     projection_params: ProjectionParameter,
     loaded_tilemap_texture_path: Option<std::path::PathBuf>,
     loaded_sprite_texture_path: Option<std::path::PathBuf>,
@@ -256,12 +67,12 @@ impl RenderingSystem {
 
     /// Initialize GPU state with the given window (uses default textures)
     pub fn initialize_gpu(&mut self, window: Arc<Window>) {
-        let backend = WgpuRenderBackend::new(window);
-        self.backend = Some(Box::new(backend));
+        let gpu = GpuState::new(window);
+        self.backend = Some(Box::new(gpu));
     }
 
     #[cfg(test)]
-    fn set_backend_for_tests(&mut self, backend: Box<dyn RuntimeRenderBackend>) {
+    fn set_backend_for_tests(&mut self, backend: Box<dyn RenderBackend>) {
         self.backend = Some(backend);
     }
 
@@ -272,11 +83,10 @@ impl RenderingSystem {
         tilemap_texture: Option<std::path::PathBuf>,
         sprite_texture: Option<std::path::PathBuf>,
     ) -> Result<(), toki_render::RenderError> {
-        let backend =
-            WgpuRenderBackend::new_with_textures(window, tilemap_texture, sprite_texture)?;
+        let gpu = GpuState::new_with_textures(window, tilemap_texture, sprite_texture)?;
         self.loaded_tilemap_texture_path = None;
         self.loaded_sprite_texture_path = None;
-        self.backend = Some(Box::new(backend));
+        self.backend = Some(Box::new(gpu));
         Ok(())
     }
 
