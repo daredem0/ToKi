@@ -1,8 +1,8 @@
 use super::*;
-use toki_core::sprite::SpriteFrame;
 use toki_core::sprite_render::{
-    resolve_sprite_render_requests, ResolvedSpriteVisual, SpriteAssetResolver, SpriteRenderRequest,
-    SpriteResolveError, SpriteResolveFailure,
+    resolve_atlas_tile_frame, resolve_object_sheet_frame, resolve_sprite_render_requests,
+    ResolvedSpriteVisual, SpriteAssetResolver, SpriteRenderRequest, SpriteResolveError,
+    SpriteResolveFailure,
 };
 
 struct ViewportSpriteResolver<'a, 'b> {
@@ -193,22 +193,11 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
                 asset_name: atlas_name.to_string(),
                 message: error.to_string(),
             })?;
-        let texture_size = atlas.image_size().unwrap_or(glam::UVec2::new(64, 16));
-        let uvs = atlas.get_tile_uvs(tile_name, texture_size).ok_or_else(|| {
-            SpriteResolveError::MissingAtlasTile {
-                atlas_name: atlas_name.to_string(),
-                tile_name: tile_name.to_string(),
-            }
-        })?;
+        let (frame, intrinsic_size) = resolve_atlas_tile_frame(&atlas, atlas_name, tile_name)?;
 
         Ok(ResolvedSpriteVisual {
-            frame: SpriteFrame {
-                u0: uvs[0],
-                v0: uvs[1],
-                u1: uvs[2],
-                v1: uvs[3],
-            },
-            intrinsic_size: atlas.tile_size,
+            frame,
+            intrinsic_size,
             texture_path: atlas_asset
                 .path
                 .parent()
@@ -237,30 +226,12 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
                 asset_name: sheet_name.to_string(),
                 message: error.to_string(),
             })?;
-        let texture_size = object_sheet
-            .image_size()
-            .unwrap_or(glam::UVec2::new(16, 16));
-        let uvs = object_sheet
-            .get_object_uvs(object_name, texture_size)
-            .ok_or_else(|| SpriteResolveError::MissingObject {
-                sheet_name: sheet_name.to_string(),
-                object_name: object_name.to_string(),
-            })?;
-        let rect = object_sheet.get_object_rect(object_name).ok_or_else(|| {
-            SpriteResolveError::MissingObject {
-                sheet_name: sheet_name.to_string(),
-                object_name: object_name.to_string(),
-            }
-        })?;
+        let (frame, intrinsic_size) =
+            resolve_object_sheet_frame(&object_sheet, sheet_name, object_name)?;
 
         Ok(ResolvedSpriteVisual {
-            frame: SpriteFrame {
-                u0: uvs[0],
-                v0: uvs[1],
-                u1: uvs[2],
-                v1: uvs[3],
-            },
-            intrinsic_size: glam::UVec2::new(rect[2], rect[3]),
+            frame,
+            intrinsic_size,
             texture_path: object_sheet_asset
                 .path
                 .parent()

@@ -1,6 +1,7 @@
 use crate::project_assets::{
     classify_sprite_metadata_file, discover_audio_files, discover_sprite_metadata,
-    resolve_project_resource_paths, ProjectAudioFormat, SpriteMetadataFileKind,
+    resolve_project_resource_paths, scene_file_path, tilemap_file_path, ProjectAudioFormat,
+    SpriteMetadataFileKind,
 };
 use std::fs;
 
@@ -159,4 +160,21 @@ fn resolve_project_resource_paths_discovers_project_assets() {
     );
     assert_eq!(resolved.sprite_atlas_paths.len(), 1);
     assert_eq!(resolved.object_sheet_paths.len(), 1);
+}
+
+#[test]
+fn scene_file_path_returns_canonical_path() {
+    let project = std::path::Path::new("/projects/my_game");
+    let path = scene_file_path(project, "Main Scene");
+    assert_eq!(path, project.join("scenes").join("Main Scene.json"));
+}
+
+#[test]
+fn tilemap_file_path_returns_canonical_path() {
+    let project = std::path::Path::new("/projects/my_game");
+    let path = tilemap_file_path(project, "Level 1");
+    assert_eq!(
+        path,
+        project.join("assets").join("tilemaps").join("Level 1.json")
+    );
 }

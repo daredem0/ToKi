@@ -55,6 +55,25 @@ pub fn first_existing_path(candidates: &[PathBuf]) -> Option<PathBuf> {
     candidates.iter().find(|path| path.exists()).cloned()
 }
 
+/// Returns the canonical path for a scene file in a project.
+///
+/// Scene files are stored as `{project_path}/scenes/{scene_name}.json`.
+pub fn scene_file_path(project_path: &Path, scene_name: &str) -> PathBuf {
+    project_path
+        .join("scenes")
+        .join(format!("{scene_name}.json"))
+}
+
+/// Returns the canonical path for a tilemap file in a project.
+///
+/// Tilemap files are stored as `{project_path}/assets/tilemaps/{map_name}.json`.
+pub fn tilemap_file_path(project_path: &Path, map_name: &str) -> PathBuf {
+    project_path
+        .join("assets")
+        .join("tilemaps")
+        .join(format!("{map_name}.json"))
+}
+
 pub fn find_json_files(dir: &Path) -> Result<Vec<PathBuf>, ProjectAssetError> {
     if !dir.exists() {
         return Ok(Vec::new());

@@ -40,8 +40,8 @@ mod app_tick;
 #[path = "runtime_menu.rs"]
 mod runtime_menu;
 
-use app_bootstrap::first_existing_path;
 use app_splash::{ResolvedSplashConfig, SplashPolicy};
+use toki_core::project_assets::first_existing_path;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeSplashOptions {

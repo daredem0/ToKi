@@ -1,4 +1,5 @@
 use super::*;
+use toki_core::project_assets::tilemap_file_path;
 
 impl EditorApp {
     pub(super) fn resolve_scene_map_to_load(
@@ -127,10 +128,7 @@ impl EditorApp {
             return;
         };
 
-        let map_file = project_path
-            .join("assets")
-            .join("tilemaps")
-            .join(format!("{}.json", map_name));
+        let map_file = tilemap_file_path(project_path, map_name);
 
         match viewport.load_tilemap(&map_file) {
             Ok(()) => {

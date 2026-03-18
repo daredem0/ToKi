@@ -1,9 +1,11 @@
 use super::{
-    collect_map_object_sprite_render_requests, resolve_sprite_render_request,
-    resolve_sprite_render_requests, sort_sprite_render_requests, ResolvedSpriteVisual,
-    SpriteAssetResolver, SpriteRenderOrigin, SpriteRenderRequest, SpriteRenderSize,
-    SpriteResolveError, SpriteSortKey, SpriteVisualRef,
+    collect_map_object_sprite_render_requests, resolve_atlas_tile_frame,
+    resolve_object_sheet_frame, resolve_sprite_render_request, resolve_sprite_render_requests,
+    sort_sprite_render_requests, ResolvedSpriteVisual, SpriteAssetResolver, SpriteRenderOrigin,
+    SpriteRenderRequest, SpriteRenderSize, SpriteResolveError, SpriteSortKey, SpriteVisualRef,
 };
+use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
+use crate::assets::object_sheet::{ObjectSheetMeta, ObjectSheetType, ObjectSpriteInfo};
 use crate::assets::tilemap::{MapObjectInstance, TileMap};
 use crate::sprite::SpriteFrame;
 use std::path::PathBuf;
@@ -242,4 +244,113 @@ fn sort_requests_orders_by_shared_sort_key() {
 
     assert_eq!(requests[0].origin, SpriteRenderOrigin::AnimatedEntity(2));
     assert_eq!(requests[1].origin, SpriteRenderOrigin::AnimatedEntity(1));
+}
+
+#[test]
+fn resolve_atlas_tile_frame_returns_frame_and_intrinsic_size() {
+    use std::collections::HashMap;
+
+    // Build atlas with tiles arranged in 4x4 grid to give us 64x64 texture size
+    let mut tiles = HashMap::new();
+    tiles.insert(
+        "idle".to_string(),
+        TileInfo {
+            position: glam::UVec2::new(0, 0),
+            properties: TileProperties::default(),
+        },
+    );
+    // Add a tile at position (3, 3) to make image_size() return 64x64
+    tiles.insert(
+        "padding".to_string(),
+        TileInfo {
+            position: glam::UVec2::new(3, 3),
+            properties: TileProperties::default(),
+        },
+    );
+
+    let atlas = AtlasMeta {
+        image: PathBuf::from("creatures.png"),
+        tile_size: glam::UVec2::new(16, 16),
+        tiles,
+    };
+
+    let (frame, intrinsic_size) =
+        resolve_atlas_tile_frame(&atlas, "creatures", "idle").expect("should resolve");
+
+    assert_eq!(intrinsic_size, glam::UVec2::new(16, 16));
+    assert!((frame.u0 - 0.0).abs() < 0.01);
+    assert!((frame.v0 - 0.0).abs() < 0.01);
+    assert!((frame.u1 - 0.25).abs() < 0.01);
+    assert!((frame.v1 - 0.25).abs() < 0.01);
+}
+
+#[test]
+fn resolve_atlas_tile_frame_returns_error_for_missing_tile() {
+    let atlas = AtlasMeta {
+        image: PathBuf::from("creatures.png"),
+        tile_size: glam::UVec2::new(16, 16),
+        tiles: std::collections::HashMap::new(),
+    };
+
+    let result = resolve_atlas_tile_frame(&atlas, "creatures", "missing_tile");
+
+    assert!(matches!(
+        result,
+        Err(SpriteResolveError::MissingAtlasTile { .. })
+    ));
+}
+
+#[test]
+fn resolve_object_sheet_frame_returns_frame_and_object_size() {
+    use std::collections::HashMap;
+
+    let mut objects = HashMap::new();
+    objects.insert(
+        "coin".to_string(),
+        ObjectSpriteInfo {
+            position: glam::UVec2::new(0, 0),
+            size_tiles: glam::UVec2::new(2, 1),
+        },
+    );
+    // Add an object to make image_size() return 64x32
+    objects.insert(
+        "padding".to_string(),
+        ObjectSpriteInfo {
+            position: glam::UVec2::new(2, 1),
+            size_tiles: glam::UVec2::new(2, 1),
+        },
+    );
+
+    let object_sheet = ObjectSheetMeta {
+        sheet_type: ObjectSheetType::Objects,
+        image: PathBuf::from("items.png"),
+        tile_size: glam::UVec2::new(16, 16),
+        objects,
+    };
+
+    let (frame, intrinsic_size) =
+        resolve_object_sheet_frame(&object_sheet, "items", "coin").expect("should resolve");
+
+    assert_eq!(intrinsic_size, glam::UVec2::new(32, 16));
+    assert!((frame.u0 - 0.0).abs() < 0.01);
+    assert!((frame.v0 - 0.0).abs() < 0.01);
+    assert!((frame.u1 - 0.5).abs() < 0.01);
+    assert!((frame.v1 - 0.5).abs() < 0.01);
+}
+
+#[test]
+fn resolve_object_sheet_frame_returns_error_for_missing_object() {
+    let object_sheet = ObjectSheetMeta {
+        sheet_type: ObjectSheetType::Objects,
+        image: PathBuf::from("items.png"),
+        tile_size: glam::UVec2::new(16, 16),
+        objects: std::collections::HashMap::new(),
+    };
+
+    let result = resolve_object_sheet_frame(&object_sheet, "items", "missing_object");
+
+    assert!(matches!(
+        result,
+        Err(SpriteResolveError::MissingObject { .. })
+    ));
 }

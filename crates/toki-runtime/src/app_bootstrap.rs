@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use toki_core::project_assets::{first_existing_path, scene_file_path};
 use toki_core::{GameState, Scene};
 use toki_render::RenderError;
 
@@ -172,9 +173,7 @@ impl App {
         scene_name: &str,
         decoded_project_cache: &mut DecodedProjectCache,
     ) -> Result<Scene, String> {
-        let scene_path = project_path
-            .join("scenes")
-            .join(format!("{scene_name}.json"));
+        let scene_path = scene_file_path(project_path, scene_name);
         decoded_project_cache.load_scene_from_path(&scene_path)
     }
 
@@ -217,8 +216,4 @@ impl App {
         ]);
         (tilemap_texture, sprite_texture)
     }
-}
-
-pub(super) fn first_existing_path(candidates: &[PathBuf]) -> Option<PathBuf> {
-    candidates.iter().find(|path| path.exists()).cloned()
 }

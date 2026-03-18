@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
+use toki_core::AssetCache;
 use toki_core::Scene;
 use toki_render::RenderError;
 
@@ -73,77 +73,59 @@ pub fn common_preloaded_sfx_names() -> Vec<String> {
         .collect()
 }
 
+/// Cache for decoded project assets to avoid re-reading files.
+///
+/// Uses the generic `AssetCache` from toki-core to eliminate duplicate
+/// get-or-load patterns for different asset types.
 #[derive(Debug, Default)]
 pub struct DecodedProjectCache {
-    scenes: HashMap<PathBuf, Scene>,
-    tilemaps: HashMap<PathBuf, TileMap>,
-    atlases: HashMap<PathBuf, AtlasMeta>,
-    object_sheets: HashMap<PathBuf, ObjectSheetMeta>,
+    scenes: AssetCache<PathBuf, Scene>,
+    tilemaps: AssetCache<PathBuf, TileMap>,
+    atlases: AssetCache<PathBuf, AtlasMeta>,
+    object_sheets: AssetCache<PathBuf, ObjectSheetMeta>,
 }
 
 impl DecodedProjectCache {
     pub fn load_scene_from_path(&mut self, scene_path: &Path) -> Result<Scene, String> {
-        if let Some(scene) = self.scenes.get(scene_path) {
-            return Ok(scene.clone());
-        }
-
-        let json = fs::read_to_string(scene_path).map_err(|error| {
-            format!(
-                "Could not read scene file '{}': {}",
-                scene_path.display(),
-                error
-            )
-        })?;
-        let scene = serde_json::from_str::<Scene>(&json).map_err(|error| {
-            format!(
-                "Could not parse scene file '{}': {}",
-                scene_path.display(),
-                error
-            )
-        })?;
-        self.scenes.insert(scene_path.to_path_buf(), scene.clone());
-        Ok(scene)
+        self.scenes
+            .get_or_load(scene_path.to_path_buf(), |path| {
+                let json = fs::read_to_string(path).map_err(|error| {
+                    format!("Could not read scene file '{}': {}", path.display(), error)
+                })?;
+                serde_json::from_str::<Scene>(&json).map_err(|error| {
+                    format!("Could not parse scene file '{}': {}", path.display(), error)
+                })
+            })
     }
 
     pub fn load_tilemap_from_path(
         &mut self,
         tilemap_path: &Path,
     ) -> Result<TileMap, toki_core::CoreError> {
-        if let Some(tilemap) = self.tilemaps.get(tilemap_path) {
-            return Ok(tilemap.clone());
-        }
-
-        let tilemap = TileMap::load_from_file(tilemap_path)?;
         self.tilemaps
-            .insert(tilemap_path.to_path_buf(), tilemap.clone());
-        Ok(tilemap)
+            .get_or_load(tilemap_path.to_path_buf(), |path| {
+                TileMap::load_from_file(path)
+            })
     }
 
     pub fn load_atlas_from_path(
         &mut self,
         atlas_path: &Path,
     ) -> Result<AtlasMeta, toki_core::CoreError> {
-        if let Some(atlas) = self.atlases.get(atlas_path) {
-            return Ok(atlas.clone());
-        }
-
-        let atlas = AtlasMeta::load_from_file(atlas_path)?;
-        self.atlases.insert(atlas_path.to_path_buf(), atlas.clone());
-        Ok(atlas)
+        self.atlases
+            .get_or_load(atlas_path.to_path_buf(), |path| {
+                AtlasMeta::load_from_file(path)
+            })
     }
 
     pub fn load_object_sheet_from_path(
         &mut self,
         object_sheet_path: &Path,
     ) -> Result<ObjectSheetMeta, toki_core::CoreError> {
-        if let Some(object_sheet) = self.object_sheets.get(object_sheet_path) {
-            return Ok(object_sheet.clone());
-        }
-
-        let object_sheet = ObjectSheetMeta::load_from_file(object_sheet_path)?;
         self.object_sheets
-            .insert(object_sheet_path.to_path_buf(), object_sheet.clone());
-        Ok(object_sheet)
+            .get_or_load(object_sheet_path.to_path_buf(), |path| {
+                ObjectSheetMeta::load_from_file(path)
+            })
     }
 }
 
