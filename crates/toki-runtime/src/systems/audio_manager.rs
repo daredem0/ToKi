@@ -34,59 +34,22 @@ struct AudioChannel {
     cooldown_duration: Option<Duration>,
 }
 
-pub struct AudioManager {
-    manager: KiraAudioManager,
+/// Asset discovery and caching for audio files.
+pub(crate) struct AudioAssetCache {
     assets_root: PathBuf,
-
-    // Cached sounds - hot SFX loaded at startup, cold SFX loaded lazily on first play
     preloaded_sounds: HashMap<String, StaticSoundData>,
     sfx_paths: HashMap<String, String>,
-
-    // Music paths - discovered at startup, loaded on demand
     music_paths: HashMap<String, String>,
-
-    // Audio channels with policies
-    channels: HashMap<String, AudioChannel>,
-    master_volume_percent: u8,
-    channel_volume_percents: HashMap<String, u8>,
-    listener_position: Option<glam::IVec2>,
 }
 
-impl AudioManager {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let current_dir = std::env::current_dir()?;
-        Self::new_with_assets_root(current_dir)
-    }
-
-    pub fn new_with_assets_root(
-        assets_root: impl Into<PathBuf>,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        let preload_names = common_preloaded_sfx_names();
-        Self::new_with_assets_root_and_preload_names(assets_root, &preload_names)
-    }
-
-    pub fn new_with_assets_root_and_preload_names(
-        assets_root: impl Into<PathBuf>,
-        preload_names: &[String],
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        let manager = KiraAudioManager::new(AudioManagerSettings::default())?;
-        let assets_root = assets_root.into();
-        let mut system = Self {
-            manager,
+impl AudioAssetCache {
+    fn new(assets_root: PathBuf) -> Self {
+        Self {
             assets_root,
             preloaded_sounds: HashMap::new(),
             sfx_paths: HashMap::new(),
             music_paths: HashMap::new(),
-            channels: HashMap::new(),
-            master_volume_percent: 100,
-            channel_volume_percents: HashMap::new(),
-            listener_position: None,
-        };
-
-        system.scan_and_preload_sfx(preload_names)?;
-        system.scan_music_files()?;
-
-        Ok(system)
+        }
     }
 
     fn scan_and_preload_sfx(
@@ -148,8 +111,52 @@ impl AudioManager {
         Ok(())
     }
 
-    /// Create or configure an audio channel with a specific playback policy
-    pub fn set_channel_policy(&mut self, channel: &str, policy: PlaybackPolicy) {
+    fn get_preloaded_sound(&self, name: &str) -> Option<&StaticSoundData> {
+        self.preloaded_sounds.get(name)
+    }
+
+    fn get_sfx_path(&self, name: &str) -> Option<&String> {
+        self.sfx_paths.get(name)
+    }
+
+    fn get_music_path(&self, name: &str) -> Option<&String> {
+        self.music_paths.get(name)
+    }
+
+    fn insert_preloaded_sound(&mut self, name: String, data: StaticSoundData) {
+        self.preloaded_sounds.insert(name, data);
+    }
+
+    fn sfx_paths(&self) -> &HashMap<String, String> {
+        &self.sfx_paths
+    }
+
+    fn music_paths(&self) -> &HashMap<String, String> {
+        &self.music_paths
+    }
+}
+
+/// Audio playback state: kira manager, channels, and volume settings.
+pub(crate) struct AudioPlaybackState {
+    manager: KiraAudioManager,
+    channels: HashMap<String, AudioChannel>,
+    master_volume_percent: u8,
+    channel_volume_percents: HashMap<String, u8>,
+    listener_position: Option<glam::IVec2>,
+}
+
+impl AudioPlaybackState {
+    fn new(manager: KiraAudioManager) -> Self {
+        Self {
+            manager,
+            channels: HashMap::new(),
+            master_volume_percent: 100,
+            channel_volume_percents: HashMap::new(),
+            listener_position: None,
+        }
+    }
+
+    fn set_channel_policy(&mut self, channel: &str, policy: PlaybackPolicy) {
         tracing::trace!("Setting channel '{}' policy to {:?}", channel, policy);
         self.channels.insert(
             channel.to_string(),
@@ -163,26 +170,28 @@ impl AudioManager {
         );
     }
 
-    pub fn set_channel_volume_percent(&mut self, channel: &str, percent: u8) {
+    fn set_channel_volume_percent(&mut self, channel: &str, percent: u8) {
         self.channel_volume_percents
             .insert(channel.to_string(), percent.min(100));
     }
 
-    pub fn set_master_volume_percent(&mut self, percent: u8) {
+    fn set_master_volume_percent(&mut self, percent: u8) {
         self.master_volume_percent = percent.min(100);
     }
 
-    pub fn set_listener_position(&mut self, listener_position: Option<glam::IVec2>) {
+    fn set_listener_position(&mut self, listener_position: Option<glam::IVec2>) {
         self.listener_position = listener_position;
     }
 
-    /// Set a cooldown duration for a channel to prevent rapid-fire sounds
-    pub fn set_channel_cooldown(&mut self, channel: &str, cooldown: Duration) {
+    fn listener_position(&self) -> Option<glam::IVec2> {
+        self.listener_position
+    }
+
+    fn set_channel_cooldown(&mut self, channel: &str, cooldown: Duration) {
         if let Some(channel_data) = self.channels.get_mut(channel) {
             channel_data.cooldown_duration = Some(cooldown);
             tracing::trace!("Set cooldown for channel '{}' to {:?}", channel, cooldown);
         } else {
-            // Create channel with default policy and cooldown
             self.channels.insert(
                 channel.to_string(),
                 AudioChannel {
@@ -197,20 +206,17 @@ impl AudioManager {
         }
     }
 
-    /// Stop all sounds in a specific channel
-    pub fn stop_channel(&mut self, channel: &str) {
+    fn stop_channel(&mut self, channel: &str) {
         if let Some(channel_data) = self.channels.get_mut(channel) {
             let total_stopped =
                 channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
             tracing::debug!("Stopping {} sounds in channel '{}'", total_stopped, channel);
 
-            // Stop all static sound handles
             for handle in &mut channel_data.active_handles {
                 handle.stop(Tween::default());
             }
             channel_data.active_handles.clear();
 
-            // Stop all streaming handles
             for handle in &mut channel_data.active_streaming_handles {
                 handle.stop(Tween::default());
             }
@@ -220,13 +226,11 @@ impl AudioManager {
         }
     }
 
-    /// Clean up finished sound handles from all channels
     fn cleanup_finished_sounds(&mut self) {
         for (channel_name, channel) in &mut self.channels {
             let initial_static = channel.active_handles.len();
             let initial_streaming = channel.active_streaming_handles.len();
 
-            // Trace: log states before cleanup
             if initial_static > 0 || initial_streaming > 0 {
                 tracing::trace!(
                     "Channel '{}' before cleanup: {} static, {} streaming",
@@ -265,6 +269,100 @@ impl AudioManager {
         }
     }
 
+    fn channel_volume_for(&self, channel: &str) -> Decibels {
+        let master = percent_to_decibels(self.master_volume_percent);
+        let percent = self
+            .channel_volume_percents
+            .get(channel)
+            .copied()
+            .unwrap_or(100);
+        master + percent_to_decibels(percent)
+    }
+
+    fn has_channel(&self, channel: &str) -> bool {
+        self.channels.contains_key(channel)
+    }
+
+    fn get_channel_mut(&mut self, channel: &str) -> Option<&mut AudioChannel> {
+        self.channels.get_mut(channel)
+    }
+
+    fn play_static_sound(
+        &mut self,
+        sound_data: StaticSoundData,
+    ) -> Result<StaticSoundHandle, Box<dyn std::error::Error>> {
+        Ok(self.manager.play(sound_data)?)
+    }
+
+    fn play_streaming_sound(
+        &mut self,
+        sound_data: StreamingSoundData<FromFileError>,
+    ) -> Result<StreamingSoundHandle<FromFileError>, Box<dyn std::error::Error>> {
+        Ok(self.manager.play(sound_data)?)
+    }
+}
+
+pub struct AudioManager {
+    cache: AudioAssetCache,
+    playback: AudioPlaybackState,
+}
+
+impl AudioManager {
+    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        let current_dir = std::env::current_dir()?;
+        Self::new_with_assets_root(current_dir)
+    }
+
+    pub fn new_with_assets_root(
+        assets_root: impl Into<PathBuf>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let preload_names = common_preloaded_sfx_names();
+        Self::new_with_assets_root_and_preload_names(assets_root, &preload_names)
+    }
+
+    pub fn new_with_assets_root_and_preload_names(
+        assets_root: impl Into<PathBuf>,
+        preload_names: &[String],
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let manager = KiraAudioManager::new(AudioManagerSettings::default())?;
+        let assets_root = assets_root.into();
+
+        let mut cache = AudioAssetCache::new(assets_root);
+        let playback = AudioPlaybackState::new(manager);
+
+        cache.scan_and_preload_sfx(preload_names)?;
+        cache.scan_music_files()?;
+
+        Ok(Self { cache, playback })
+    }
+
+    /// Create or configure an audio channel with a specific playback policy
+    pub fn set_channel_policy(&mut self, channel: &str, policy: PlaybackPolicy) {
+        self.playback.set_channel_policy(channel, policy);
+    }
+
+    pub fn set_channel_volume_percent(&mut self, channel: &str, percent: u8) {
+        self.playback.set_channel_volume_percent(channel, percent);
+    }
+
+    pub fn set_master_volume_percent(&mut self, percent: u8) {
+        self.playback.set_master_volume_percent(percent);
+    }
+
+    pub fn set_listener_position(&mut self, listener_position: Option<glam::IVec2>) {
+        self.playback.set_listener_position(listener_position);
+    }
+
+    /// Set a cooldown duration for a channel to prevent rapid-fire sounds
+    pub fn set_channel_cooldown(&mut self, channel: &str, cooldown: Duration) {
+        self.playback.set_channel_cooldown(channel, cooldown);
+    }
+
+    /// Stop all sounds in a specific channel
+    pub fn stop_channel(&mut self, channel: &str) {
+        self.playback.stop_channel(channel);
+    }
+
     /// Play sound in a specific channel with channel policy enforcement
     pub fn play_sound_in_channel(
         &mut self,
@@ -283,19 +381,19 @@ impl AudioManager {
         if gain <= 0.0 {
             return Ok(());
         }
-        self.cleanup_finished_sounds();
+        self.playback.cleanup_finished_sounds();
 
         // Get or create channel with default Overlap policy
-        if !self.channels.contains_key(channel) {
+        if !self.playback.has_channel(channel) {
             tracing::trace!(
                 "Creating new channel '{}' with default Overlap policy",
                 channel
             );
-            self.set_channel_policy(channel, PlaybackPolicy::Overlap);
+            self.playback.set_channel_policy(channel, PlaybackPolicy::Overlap);
         }
 
-        let channel_gain = self.channel_volume_for(channel) + amplitude_to_decibels(gain);
-        let channel_data = self.channels.get_mut(channel).unwrap();
+        let channel_gain = self.playback.channel_volume_for(channel) + amplitude_to_decibels(gain);
+        let channel_data = self.playback.get_channel_mut(channel).unwrap();
         let active_count =
             channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
 
@@ -325,7 +423,6 @@ impl AudioManager {
                     active_count,
                     name
                 );
-                // Stop all existing sounds in this channel
                 for handle in &mut channel_data.active_handles {
                     handle.stop(Tween::default());
                 }
@@ -336,7 +433,6 @@ impl AudioManager {
                 channel_data.active_streaming_handles.clear();
             }
             PlaybackPolicy::IgnoreIfPlaying => {
-                // Don't play if any sound is still active in this channel
                 if !channel_data.active_handles.is_empty()
                     || !channel_data.active_streaming_handles.is_empty()
                 {
@@ -365,8 +461,9 @@ impl AudioManager {
         }
 
         // Try preloaded SFX first (fast path)
-        if let Some(sound_data) = self.preloaded_sounds.get(name) {
-            let handle = self.manager.play(sound_data.volume(channel_gain))?;
+        if let Some(sound_data) = self.cache.get_preloaded_sound(name) {
+            let handle = self.playback.play_static_sound(sound_data.volume(channel_gain))?;
+            let channel_data = self.playback.get_channel_mut(channel).unwrap();
             channel_data.active_handles.push(handle);
             channel_data.last_played = Some(Instant::now());
             let new_total =
@@ -380,11 +477,12 @@ impl AudioManager {
             return Ok(());
         }
 
-        if let Some(path) = self.sfx_paths.get(name) {
-            let sound_data = StaticSoundData::from_file(path)?;
-            self.preloaded_sounds
-                .insert(name.to_string(), sound_data.clone());
-            let handle = self.manager.play(sound_data.volume(channel_gain))?;
+        // Try loading from SFX paths (lazy load and cache)
+        if let Some(path) = self.cache.get_sfx_path(name).cloned() {
+            let sound_data = StaticSoundData::from_file(&path)?;
+            self.cache.insert_preloaded_sound(name.to_string(), sound_data.clone());
+            let handle = self.playback.play_static_sound(sound_data.volume(channel_gain))?;
+            let channel_data = self.playback.get_channel_mut(channel).unwrap();
             channel_data.active_handles.push(handle);
             channel_data.last_played = Some(Instant::now());
             let new_total =
@@ -409,19 +507,19 @@ impl AudioManager {
         name: &str,
         volume: f32,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.cleanup_finished_sounds();
+        self.playback.cleanup_finished_sounds();
 
         // Get or create channel with default Exclusive policy for music
-        if !self.channels.contains_key(channel) {
+        if !self.playback.has_channel(channel) {
             tracing::trace!(
                 "Creating new music channel '{}' with default Exclusive policy",
                 channel
             );
-            self.set_channel_policy(channel, PlaybackPolicy::Exclusive);
+            self.playback.set_channel_policy(channel, PlaybackPolicy::Exclusive);
         }
 
-        let channel_gain = self.channel_volume_for(channel);
-        let channel_data = self.channels.get_mut(channel).unwrap();
+        let channel_gain = self.playback.channel_volume_for(channel);
+        let channel_data = self.playback.get_channel_mut(channel).unwrap();
         let active_count =
             channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
 
@@ -430,7 +528,6 @@ impl AudioManager {
             PlaybackPolicy::Exclusive => {
                 tracing::debug!("Music channel '{}' policy=Exclusive: stopping {} active sounds before playing '{}'",
                     channel, active_count, name);
-                // Stop all existing sounds in this channel
                 for handle in &mut channel_data.active_handles {
                     handle.stop(Tween::default());
                 }
@@ -465,7 +562,7 @@ impl AudioManager {
         }
 
         // Try on-demand music loading
-        if let Some(path) = self.music_paths.get(name) {
+        if let Some(path) = self.cache.get_music_path(name).cloned() {
             tracing::trace!(
                 "Playing theme '{}' with volume: {:?} in channel '{}'",
                 name,
@@ -473,13 +570,14 @@ impl AudioManager {
                 channel
             );
             let start = std::time::Instant::now();
-            let sound_data = StreamingSoundData::from_file(path)?.with_settings(
+            let sound_data = StreamingSoundData::from_file(&path)?.with_settings(
                 StreamingSoundSettings::new()
                     .loop_region(..)
                     .volume(amplitude_to_decibels(volume) + channel_gain),
             );
 
-            let handle = self.manager.play(sound_data)?;
+            let handle = self.playback.play_streaming_sound(sound_data)?;
+            let channel_data = self.playback.get_channel_mut(channel).unwrap();
             channel_data.active_streaming_handles.push(handle);
 
             let duration = start.elapsed();
@@ -517,22 +615,12 @@ impl AudioManager {
     pub fn list_available_sounds(&self) {
         tracing::info!(
             "Available SFX: {:?}",
-            self.sfx_paths.keys().collect::<Vec<_>>()
+            self.cache.sfx_paths().keys().collect::<Vec<_>>()
         );
         tracing::info!(
             "Available Music: {:?}",
-            self.music_paths.keys().collect::<Vec<_>>()
+            self.cache.music_paths().keys().collect::<Vec<_>>()
         );
-    }
-
-    fn channel_volume_for(&self, channel: &str) -> Decibels {
-        let master = percent_to_decibels(self.master_volume_percent);
-        let percent = self
-            .channel_volume_percents
-            .get(channel)
-            .copied()
-            .unwrap_or(100);
-        master + percent_to_decibels(percent)
     }
 }
 
@@ -614,12 +702,12 @@ fn amplitude_to_decibels(amplitude: f32) -> Decibels {
 impl std::fmt::Debug for AudioManager {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AudioManager")
-            .field("preloaded_sounds_count", &self.preloaded_sounds.len())
-            .field("sfx_paths_count", &self.sfx_paths.len())
-            .field("music_paths_count", &self.music_paths.len())
-            .field("channels_count", &self.channels.len())
-            .field("master_volume_percent", &self.master_volume_percent)
-            .field("channel_volume_percents", &self.channel_volume_percents)
+            .field("preloaded_sounds_count", &self.cache.preloaded_sounds.len())
+            .field("sfx_paths_count", &self.cache.sfx_paths.len())
+            .field("music_paths_count", &self.cache.music_paths.len())
+            .field("channels_count", &self.playback.channels.len())
+            .field("master_volume_percent", &self.playback.master_volume_percent)
+            .field("channel_volume_percents", &self.playback.channel_volume_percents)
             .finish()
     }
 }
@@ -638,8 +726,8 @@ impl EventHandler<AudioEvent> for AudioManager {
                     AudioEventChannel::Collision => ("collision", PlaybackPolicy::Exclusive),
                 };
 
-                if !self.channels.contains_key(channel_name) {
-                    self.set_channel_policy(channel_name, policy);
+                if !self.playback.has_channel(channel_name) {
+                    self.playback.set_channel_policy(channel_name, policy);
                     tracing::trace!(
                         "Initialized '{}' channel with {:?} policy",
                         channel_name,
@@ -648,7 +736,7 @@ impl EventHandler<AudioEvent> for AudioManager {
                 }
 
                 let Some(gain) =
-                    spatial_attenuation(self.listener_position, *source_position, *hearing_radius)
+                    spatial_attenuation(self.playback.listener_position(), *source_position, *hearing_radius)
                 else {
                     return;
                 };
