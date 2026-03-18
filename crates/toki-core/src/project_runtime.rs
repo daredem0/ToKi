@@ -94,6 +94,12 @@ pub struct RuntimeDisplaySettings {
     /// Zoom level as percentage (100 = 1.0x, 200 = 2.0x, etc.)
     #[serde(default = "default_zoom_percent")]
     pub zoom_percent: u32,
+    /// Enable vsync (ties frame rate to display refresh rate)
+    #[serde(default = "default_vsync")]
+    pub vsync: bool,
+    /// Target frames per second when vsync is disabled (0 = unlimited)
+    #[serde(default = "default_target_fps")]
+    pub target_fps: u32,
 }
 
 impl Default for RuntimeDisplaySettings {
@@ -103,6 +109,8 @@ impl Default for RuntimeDisplaySettings {
             resolution_width: default_resolution_width(),
             resolution_height: default_resolution_height(),
             zoom_percent: default_zoom_percent(),
+            vsync: default_vsync(),
+            target_fps: default_target_fps(),
         }
     }
 }
@@ -183,6 +191,10 @@ pub struct RuntimeConfigDisplay {
     pub resolution_height: Option<u32>,
     #[serde(default)]
     pub zoom_percent: Option<u32>,
+    #[serde(default)]
+    pub vsync: Option<bool>,
+    #[serde(default)]
+    pub target_fps: Option<u32>,
 }
 
 pub const fn default_runtime_splash_duration_ms() -> u64 {
@@ -196,6 +208,16 @@ pub const fn default_runtime_audio_mix_percent() -> u8 {
 /// Default zoom level (100 = 1.0x, no zoom)
 pub const fn default_zoom_percent() -> u32 {
     100
+}
+
+/// Default vsync setting (enabled)
+pub const fn default_vsync() -> bool {
+    true
+}
+
+/// Default target FPS when vsync is disabled
+pub const fn default_target_fps() -> u32 {
+    60
 }
 
 #[cfg(test)]

@@ -11,8 +11,8 @@ use toki_render::RenderError;
 
 use crate::systems::AudioManager;
 use crate::systems::{
-    CameraManager, DecodedProjectCache, GameManager, PerformanceMonitor, PlatformSystem,
-    RenderingSystem, ResourceManager, RuntimeAssetLoadPlan,
+    CameraManager, DecodedProjectCache, FrameLimiter, GameManager, PerformanceMonitor,
+    PlatformSystem, RenderingSystem, ResourceManager, RuntimeAssetLoadPlan,
 };
 
 const COMMUNITY_SPLASH_MIN_DURATION_MS: u64 = 3000;
@@ -84,6 +84,12 @@ pub struct RuntimeDisplayOptions {
     pub resolution_height: u32,
     /// Zoom level as percentage (100 = 1.0x, 200 = 2.0x, etc.)
     pub zoom_percent: u32,
+    /// Enable vsync (ties frame rate to display refresh rate).
+    /// When enabled, frame limiter is bypassed.
+    pub vsync: bool,
+    /// Target frames per second when vsync is disabled.
+    /// Set to 0 for unlimited frame rate.
+    pub target_fps: u32,
 }
 
 impl Default for RuntimeDisplayOptions {
@@ -93,6 +99,8 @@ impl Default for RuntimeDisplayOptions {
             resolution_width: toki_core::project_runtime::default_resolution_width(),
             resolution_height: toki_core::project_runtime::default_resolution_height(),
             zoom_percent: toki_core::project_runtime::default_zoom_percent(),
+            vsync: true,
+            target_fps: 60,
         }
     }
 }
@@ -129,6 +137,7 @@ struct App {
     platform: PlatformSystem,
     rendering: RenderingSystem,
     timing: TimingSystem,
+    frame_limiter: FrameLimiter,
     launch_options: RuntimeLaunchOptions,
     menu_system: MenuController,
     splash_policy: SplashPolicy,
@@ -201,6 +210,13 @@ impl App {
             .set_channel_volume_percent("collision", launch_options.audio_mix.collision_percent);
         let menu_system = MenuController::new(launch_options.menu.clone());
 
+        // Frame limiter: only active when vsync is disabled
+        let frame_limiter = if launch_options.display.vsync {
+            FrameLimiter::new_unlimited()
+        } else {
+            FrameLimiter::new_with_target_fps(launch_options.display.target_fps)
+        };
+
         Self {
             // Core systems
             game_system,
@@ -216,6 +232,7 @@ impl App {
                 resolution_height,
             ),
             timing: TimingSystem::new(),
+            frame_limiter,
             launch_options,
             menu_system,
             splash_policy,

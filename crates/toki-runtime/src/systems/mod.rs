@@ -1,6 +1,7 @@
 pub mod asset_loading;
 pub mod audio_manager;
 pub mod camera_manager;
+pub mod frame_limiter;
 pub mod game_manager;
 pub mod performance;
 pub mod platform;
@@ -10,6 +11,7 @@ pub mod resources;
 pub use asset_loading::{DecodedProjectCache, RuntimeAssetLoadPlan};
 pub use audio_manager::AudioManager;
 pub use camera_manager::CameraManager;
+pub use frame_limiter::FrameLimiter;
 pub use game_manager::GameManager;
 pub use performance::PerformanceMonitor;
 pub use platform::PlatformSystem;

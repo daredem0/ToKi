@@ -99,6 +99,8 @@ pub fn export_hybrid_bundle(
                 resolution_width: Some(project.metadata.runtime.display.resolution_width),
                 resolution_height: Some(project.metadata.runtime.display.resolution_height),
                 zoom_percent: Some(project.metadata.runtime.display.zoom_percent),
+                vsync: Some(project.metadata.runtime.display.vsync),
+                target_fps: Some(project.metadata.runtime.display.target_fps),
             }),
             menu: Some(project.metadata.runtime.menu.clone()),
         },

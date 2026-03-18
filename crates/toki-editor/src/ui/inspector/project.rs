@@ -85,6 +85,27 @@ impl InspectorSystem {
                     "Show Entity Health Bars",
                 )
                 .changed();
+
+            ui.separator();
+            ui.label("Frame Rate");
+            changed |= ui.checkbox(&mut draft.vsync, "VSync").changed();
+
+            ui.add_enabled_ui(!draft.vsync, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Target FPS:");
+                    if ui
+                        .add(
+                            egui::DragValue::new(&mut draft.target_fps)
+                                .speed(1.0)
+                                .range(0..=240),
+                        )
+                        .changed()
+                    {
+                        changed = true;
+                    }
+                });
+                ui.label("Set to 0 for unlimited frame rate.");
+            });
         });
 
         ui.separator();
@@ -229,6 +250,14 @@ impl InspectorSystem {
         }
         if project.metadata.runtime.display.zoom_percent != draft.zoom_percent {
             project.metadata.runtime.display.zoom_percent = draft.zoom_percent;
+            changed = true;
+        }
+        if project.metadata.runtime.display.vsync != draft.vsync {
+            project.metadata.runtime.display.vsync = draft.vsync;
+            changed = true;
+        }
+        if project.metadata.runtime.display.target_fps != draft.target_fps {
+            project.metadata.runtime.display.target_fps = draft.target_fps;
             changed = true;
         }
         if project.audio_config().master_percent != draft.master_mix_percent {

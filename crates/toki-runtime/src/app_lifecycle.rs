@@ -218,6 +218,7 @@ impl ApplicationHandler for App {
             return;
         }
 
+        // Process game ticks at fixed rate (60 FPS game logic)
         let mut tick_count = 0;
         while self.timing.should_tick() {
             let tick_start = Instant::now();
@@ -230,6 +231,14 @@ impl ApplicationHandler for App {
                 break;
             }
         }
+
+        // Visual frame rate limiting (separate from game tick rate)
+        let now = Instant::now();
+        let wait_duration = self.frame_limiter.next_frame(now);
+        if !wait_duration.is_zero() {
+            std::thread::sleep(wait_duration);
+        }
+
         self.platform.request_redraw();
     }
 
