@@ -1667,6 +1667,14 @@ fn game_state_blocked_player_input_still_updates_facing_direction() {
         frame_duration_ms: 180.0,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
+    // Walk animation plays when trying to move (intent-based), even if blocked
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::WalkRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
     controller.play(AnimationState::IdleDown);
 
     let player_id = game_state.player_id().expect("player id should exist");
@@ -1700,7 +1708,8 @@ fn game_state_blocked_player_input_still_updates_facing_direction() {
         .as_ref()
         .expect("player controller should exist")
         .current_clip_state;
-    assert_eq!(current_state, AnimationState::IdleRight);
+    // Now uses intent-based animation: shows WalkRight when trying to move right
+    assert_eq!(current_state, AnimationState::WalkRight);
 }
 
 #[test]
@@ -2457,7 +2466,7 @@ fn game_state_entity_speed_fractional_rounds_down() {
 }
 
 #[test]
-fn game_state_entity_speed_below_one_does_not_move() {
+fn game_state_entity_speed_below_one_accumulates_movement() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
     let player_id = game_state.player_id().expect("player should exist");
@@ -2472,11 +2481,80 @@ fn game_state_entity_speed_below_one_does_not_move() {
 
     let initial_position = game_state.player_position();
     game_state.handle_key_press(InputKey::Left);
-    let result = game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
 
-    // Should not move (0.5 truncated to 0)
-    assert!(!result.player_moved);
+    // First update: accumulate 0.5, not enough to move
+    let result1 =
+        game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    assert!(!result1.player_moved);
     assert_eq!(game_state.player_position(), initial_position);
+
+    // Second update: accumulate another 0.5, now 1.0 - should move 1 pixel
+    let result2 =
+        game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    assert!(result2.player_moved);
+    assert_eq!(game_state.player_position().x, initial_position.x - 1);
+}
+
+#[test]
+fn game_state_entity_speed_fractional_accumulates_remainder() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player_id = game_state.player_id().expect("player should exist");
+
+    // Set player speed to 1.5 pixels per tick
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .attributes
+        .speed = 1.5;
+
+    let initial_position = game_state.player_position();
+    game_state.handle_key_press(InputKey::Right);
+
+    // First update: 1.5 -> move 1, accumulate 0.5
+    game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    assert_eq!(game_state.player_position().x, initial_position.x + 1);
+
+    // Second update: 0.5 + 1.5 = 2.0 -> move 2, accumulate 0
+    game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    assert_eq!(game_state.player_position().x, initial_position.x + 3);
+}
+
+#[test]
+fn game_state_entity_speed_accumulator_resets_on_direction_change() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player_id = game_state.player_id().expect("player should exist");
+
+    // Set player speed to 0.5 pixels per tick
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .attributes
+        .speed = 0.5;
+
+    let initial_position = game_state.player_position();
+    game_state.handle_key_press(InputKey::Left);
+
+    // First update: accumulate 0.5 left
+    game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    assert_eq!(game_state.player_position(), initial_position);
+
+    // Change direction to right
+    game_state.handle_key_release(InputKey::Left);
+    game_state.handle_key_press(InputKey::Right);
+
+    // Second update: should start fresh at 0.5 right, not move
+    game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    assert_eq!(game_state.player_position(), initial_position);
+
+    // Third update: now 1.0 accumulated right, should move right
+    let result =
+        game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    assert!(result.player_moved);
+    assert_eq!(game_state.player_position().x, initial_position.x + 1);
 }
 
 #[test]

@@ -180,9 +180,12 @@ impl GameState {
                     } else {
                         actual_player_delta
                     };
+                    // Use intent (direction keys held) for animation, not actual pixel movement.
+                    // This ensures walking animation plays during sub-pixel accumulation.
+                    let is_trying_to_move = intended_player_delta != glam::IVec2::ZERO;
                     let desired_player_animation = Self::resolve_animation_state(
                         animation_controller,
-                        result.player_moved,
+                        is_trying_to_move,
                         player_delta,
                     );
                     if animation_controller.current_clip_state != desired_player_animation {

@@ -325,6 +325,7 @@ fn solid_entity(id: u32, position: IVec2) -> Entity {
         audio: toki_core::entity::EntityAudioSettings::default(),
         attributes: EntityAttributes::default(),
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
+        movement_accumulator: glam::Vec2::ZERO,
     }
 }
 

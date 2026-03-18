@@ -69,6 +69,7 @@ fn solid_entity() -> Entity {
         audio: crate::entity::EntityAudioSettings::default(),
         attributes: EntityAttributes::default(),
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
+        movement_accumulator: glam::Vec2::ZERO,
     }
 }
 

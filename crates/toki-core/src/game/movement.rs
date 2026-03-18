@@ -21,68 +21,68 @@ impl GameState {
         delta
     }
 
-    fn candidate_input_position(
-        current_position: glam::IVec2,
-        key: InputKey,
-        world_bounds: glam::UVec2,
-        entity_speed: f32,
-        entity_size: glam::UVec2,
-    ) -> glam::IVec2 {
-        let movement_step = entity_speed as i32;
-        let max_x = (world_bounds.x as i32 - entity_size.x as i32).max(0);
-        let max_y = (world_bounds.y as i32 - entity_size.y as i32).max(0);
-
-        match key {
-            InputKey::Up => glam::IVec2::new(
-                current_position.x,
-                (current_position.y - movement_step).max(0),
-            ),
-            InputKey::Left => glam::IVec2::new(
-                (current_position.x - movement_step).max(0),
-                current_position.y,
-            ),
-            InputKey::Down => glam::IVec2::new(
-                current_position.x,
-                (current_position.y + movement_step).min(max_y),
-            ),
-            InputKey::Right => glam::IVec2::new(
-                (current_position.x + movement_step).min(max_x),
-                current_position.y,
-            ),
-            InputKey::DebugToggle => current_position,
+    /// Update movement accumulator for one axis and return pixels to move.
+    /// Resets accumulator if direction changes (sign flip).
+    fn update_axis_accumulator(accumulator: &mut f32, speed: f32, direction: i32) -> i32 {
+        if direction == 0 {
+            *accumulator = 0.0;
+            return 0;
         }
+
+        let direction_sign = direction.signum() as f32;
+        let accumulator_sign = accumulator.signum();
+
+        // Reset if direction changed (sign flip)
+        if accumulator_sign != 0.0 && accumulator_sign != direction_sign {
+            *accumulator = 0.0;
+        }
+
+        *accumulator += speed * direction_sign;
+        let whole_pixels = accumulator.trunc() as i32;
+        *accumulator -= whole_pixels as f32;
+        whole_pixels
     }
 
-    fn apply_input_to_entity(
+    fn apply_accumulated_movement(
         &mut self,
         entity_id: EntityId,
-        key: InputKey,
+        direction: glam::IVec2,
         world_bounds: glam::UVec2,
         tilemap: &TileMap,
         atlas: &AtlasMeta,
         result: &mut GameUpdateResult<AudioEvent>,
-    ) {
-        if matches!(key, InputKey::DebugToggle) {
-            return;
-        }
-
+    ) -> bool {
         let Some(entity) = self.entity_manager.get_entity(entity_id) else {
-            return;
+            return false;
         };
 
         let current_position = entity.position;
         let entity_speed = entity.attributes.speed;
         let entity_size = entity.size;
+        let mut accumulator = entity.movement_accumulator;
 
-        let new_position = Self::candidate_input_position(
-            current_position,
-            key,
-            world_bounds,
-            entity_speed,
-            entity_size,
+        let pixels_x = Self::update_axis_accumulator(&mut accumulator.x, entity_speed, direction.x);
+        let pixels_y = Self::update_axis_accumulator(&mut accumulator.y, entity_speed, direction.y);
+
+        // Store updated accumulator
+        if let Some(entity) = self.entity_manager.get_entity_mut(entity_id) {
+            entity.movement_accumulator = accumulator;
+        }
+
+        if pixels_x == 0 && pixels_y == 0 {
+            return false;
+        }
+
+        let max_x = (world_bounds.x as i32 - entity_size.x as i32).max(0);
+        let max_y = (world_bounds.y as i32 - entity_size.y as i32).max(0);
+
+        let new_position = glam::IVec2::new(
+            (current_position.x + pixels_x).clamp(0, max_x),
+            (current_position.y + pixels_y).clamp(0, max_y),
         );
+
         if new_position == current_position {
-            return;
+            return false;
         }
 
         if self.can_entity_move_to_position(entity_id, new_position, tilemap, atlas) {
@@ -92,8 +92,10 @@ impl GameState {
                 entity.position = new_position;
                 entity_audio.last_collision_state = false;
             }
+            true
         } else {
             self.handle_entity_collision_blocked(entity_id, result);
+            false
         }
     }
 
@@ -288,17 +290,16 @@ impl GameState {
                 continue;
             };
             let held_keys = self.held_keys_for_profile(Self::effective_movement_profile(entity));
-            intended_deltas.insert(entity_id, Self::movement_delta_from_keys(&held_keys));
-            for key in held_keys {
-                self.apply_input_to_entity(
-                    entity_id,
-                    key,
-                    world_bounds,
-                    tilemap,
-                    atlas,
-                    &mut result,
-                );
-            }
+            let direction = Self::movement_delta_from_keys(&held_keys);
+            intended_deltas.insert(entity_id, direction);
+            self.apply_accumulated_movement(
+                entity_id,
+                direction,
+                world_bounds,
+                tilemap,
+                atlas,
+                &mut result,
+            );
         }
 
         for &entity_id in &controlled_entity_ids {
@@ -322,16 +323,19 @@ impl GameState {
             {
                 if !Self::action_animation_locks_locomotion(animation_controller) {
                     let actual_delta = final_position - initial_position;
+                    let intended_delta = intended_deltas
+                        .get(&entity_id)
+                        .copied()
+                        .unwrap_or(glam::IVec2::ZERO);
                     let delta = if actual_delta == glam::IVec2::ZERO {
-                        intended_deltas
-                            .get(&entity_id)
-                            .copied()
-                            .unwrap_or(glam::IVec2::ZERO)
+                        intended_delta
                     } else {
                         actual_delta
                     };
+                    // Use intent for animation, not actual pixel movement (sub-pixel accumulation)
+                    let is_trying_to_move = intended_delta != glam::IVec2::ZERO;
                     let desired_animation =
-                        Self::resolve_animation_state(animation_controller, entity_moved, delta);
+                        Self::resolve_animation_state(animation_controller, is_trying_to_move, delta);
                     if animation_controller.current_clip_state != desired_animation {
                         animation_controller.play(desired_animation);
                     }

@@ -114,6 +114,7 @@ fn create_test_entity() -> Entity {
         },
         attributes,
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
+        movement_accumulator: glam::Vec2::ZERO,
     }
 }
 
@@ -176,6 +177,7 @@ fn test_entity_minimal_fields() {
         audio: EntityAudioSettings::default(),
         attributes: EntityAttributes::default(),
         collision_box: None,
+        movement_accumulator: glam::Vec2::ZERO,
     };
 
     let json = serde_json::to_string_pretty(&entity).unwrap();

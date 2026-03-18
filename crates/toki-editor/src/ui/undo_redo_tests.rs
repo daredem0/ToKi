@@ -18,6 +18,7 @@ fn sample_entity(id: u32, position: IVec2) -> Entity {
         audio: toki_core::entity::EntityAudioSettings::default(),
         attributes: EntityAttributes::default(),
         collision_box: None,
+        movement_accumulator: glam::Vec2::ZERO,
     }
 }
 

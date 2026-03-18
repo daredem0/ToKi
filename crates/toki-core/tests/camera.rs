@@ -16,6 +16,7 @@ fn create_test_entity(id: EntityId, position: IVec2) -> Entity {
         audio: EntityAudioSettings::default(),
         attributes: EntityAttributes::default(),
         collision_box: None,
+        movement_accumulator: glam::Vec2::ZERO,
     }
 }
 

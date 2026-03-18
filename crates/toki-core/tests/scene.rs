@@ -47,6 +47,7 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
             has_inventory: false,
         },
         collision_box: None,
+        movement_accumulator: glam::Vec2::ZERO,
     }
 }
 

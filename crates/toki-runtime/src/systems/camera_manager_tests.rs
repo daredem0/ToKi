@@ -50,6 +50,7 @@ fn update_with_follow_mode_moves_camera_and_view_matrix_matches() {
         attributes: EntityAttributes::default(),
         collision_box: None,
         definition_name: None,
+        movement_accumulator: glam::Vec2::ZERO,
     };
     let runtime = RuntimeState {
         entities: &[entity],

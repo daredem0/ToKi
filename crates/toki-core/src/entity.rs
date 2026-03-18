@@ -88,6 +88,10 @@ pub struct Entity {
     pub audio: EntityAudioSettings,
     pub attributes: EntityAttributes,
     pub collision_box: Option<CollisionBox>,
+    /// Runtime-only accumulator for sub-pixel movement.
+    /// Allows speeds < 1.0 to accumulate over frames until a full pixel is reached.
+    #[serde(skip, default)]
+    pub movement_accumulator: glam::Vec2,
 }
 
 /// Runtime audio component attached to an entity.
@@ -470,6 +474,7 @@ impl EntityManager {
             audio: EntityAudioSettings::default(),
             attributes,
             collision_box,
+            movement_accumulator: glam::Vec2::ZERO,
         };
         self.audio_components
             .insert(id, EntityAudioComponent::default());
@@ -961,6 +966,7 @@ impl EntityDefinition {
             },
             attributes,
             collision_box,
+            movement_accumulator: glam::Vec2::ZERO,
         })
     }
 
