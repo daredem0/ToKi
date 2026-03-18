@@ -81,15 +81,7 @@ pub struct AudioAsset {
     /// Full path to audio file
     pub path: PathBuf,
     /// Audio file format
-    pub format: AudioFormat,
-}
-
-/// Supported audio formats
-#[derive(Debug, Clone, PartialEq)]
-pub enum AudioFormat {
-    Ogg,
-    Wav,
-    Mp3,
+    pub format: ProjectAudioFormat,
 }
 
 /// Entity definition asset information
@@ -286,7 +278,7 @@ impl ProjectAssets {
             let audio_asset = AudioAsset {
                 name: asset.name.clone(),
                 path: asset.path.clone(),
-                format: AudioFormat::from(asset.format),
+                format: asset.format,
             };
 
             audio_map.insert(asset.name.clone(), audio_asset);
@@ -487,16 +479,6 @@ impl ProjectAssets {
         }
 
         Ok(categories)
-    }
-}
-
-impl From<ProjectAudioFormat> for AudioFormat {
-    fn from(value: ProjectAudioFormat) -> Self {
-        match value {
-            ProjectAudioFormat::Ogg => Self::Ogg,
-            ProjectAudioFormat::Wav => Self::Wav,
-            ProjectAudioFormat::Mp3 => Self::Mp3,
-        }
     }
 }
 

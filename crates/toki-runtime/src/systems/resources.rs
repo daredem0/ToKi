@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
 pub use toki_core::project_assets::{
-    classify_sprite_metadata_file, find_first_json_file, first_existing_path,
+    classify_sprite_metadata_file, find_first_json_file, first_existing_path, normalize_asset_name,
     resolve_atlas_texture_path, resolve_object_sheet_texture_path, resolve_project_resource_paths,
     resolve_tilemap_atlas_path, ResolvedProjectResourcePaths, SpriteMetadataFileKind,
 };
@@ -134,40 +134,32 @@ impl ResourceManager {
     }
 
     pub fn get_sprite_atlas(&self, atlas_name: &str) -> Option<&AtlasMeta> {
-        self.sprite_atlases.get(atlas_name).or_else(|| {
-            atlas_name
-                .strip_suffix(".json")
-                .and_then(|trimmed| self.sprite_atlases.get(trimmed))
-        })
+        let normalized = normalize_asset_name(atlas_name);
+        self.sprite_atlases
+            .get(atlas_name)
+            .or_else(|| self.sprite_atlases.get(normalized))
     }
 
     pub fn get_sprite_texture_path(&self, atlas_name: &str) -> Option<&std::path::PathBuf> {
+        let normalized = normalize_asset_name(atlas_name);
         self.sprite_texture_paths
             .get(atlas_name)
-            .or_else(|| {
-                atlas_name
-                    .strip_suffix(".json")
-                    .and_then(|trimmed| self.sprite_texture_paths.get(trimmed))
-            })
+            .or_else(|| self.sprite_texture_paths.get(normalized))
             .and_then(|path| path.as_ref())
     }
 
     pub fn get_object_sheet(&self, sheet_name: &str) -> Option<&ObjectSheetMeta> {
-        self.object_sheets.get(sheet_name).or_else(|| {
-            sheet_name
-                .strip_suffix(".json")
-                .and_then(|trimmed| self.object_sheets.get(trimmed))
-        })
+        let normalized = normalize_asset_name(sheet_name);
+        self.object_sheets
+            .get(sheet_name)
+            .or_else(|| self.object_sheets.get(normalized))
     }
 
     pub fn get_object_texture_path(&self, sheet_name: &str) -> Option<&std::path::PathBuf> {
+        let normalized = normalize_asset_name(sheet_name);
         self.object_texture_paths
             .get(sheet_name)
-            .or_else(|| {
-                sheet_name
-                    .strip_suffix(".json")
-                    .and_then(|trimmed| self.object_texture_paths.get(trimmed))
-            })
+            .or_else(|| self.object_texture_paths.get(normalized))
             .and_then(|path| path.as_ref())
     }
 

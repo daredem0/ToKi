@@ -1,5 +1,6 @@
 use super::*;
 use crate::ui::editor_ui::PlacementPreviewVisual;
+use toki_core::project_assets::normalize_asset_name;
 
 impl EditorApp {
     pub(super) fn load_preview_sprite_frame_static(
@@ -35,10 +36,7 @@ impl EditorApp {
         };
 
         if let Some(static_object) = &entity_def.rendering.static_object {
-            let sheet_name = static_object
-                .sheet
-                .strip_suffix(".json")
-                .unwrap_or(&static_object.sheet);
+            let sheet_name = normalize_asset_name(&static_object.sheet);
             let object_sheet_asset = project_assets.object_sheets.get(sheet_name)?;
             let object_sheet =
                 match toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(
@@ -78,7 +76,7 @@ impl EditorApp {
         }
 
         let atlas_name = &entity_def.animations.atlas_name;
-        let atlas_name_clean = atlas_name.strip_suffix(".json").unwrap_or(atlas_name);
+        let atlas_name_clean = normalize_asset_name(atlas_name);
         let atlas_asset = project_assets.sprite_atlases.get(atlas_name_clean)?;
 
         let sprite_atlas =

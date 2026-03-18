@@ -1,4 +1,5 @@
 use super::*;
+use toki_core::project_assets::normalize_asset_name;
 use toki_core::sprite_render::{
     resolve_atlas_tile_frame, resolve_object_sheet_frame, resolve_sprite_render_requests,
     ResolvedSpriteVisual, SpriteAssetResolver, SpriteRenderRequest, SpriteResolveError,
@@ -177,7 +178,7 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
         atlas_name: &str,
         tile_name: &str,
     ) -> Result<ResolvedSpriteVisual, SpriteResolveError> {
-        let atlas_name_clean = atlas_name.strip_suffix(".json").unwrap_or(atlas_name);
+        let atlas_name_clean = normalize_asset_name(atlas_name);
         let atlas_asset = self
             .project_assets
             .sprite_atlases
@@ -210,7 +211,7 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
         sheet_name: &str,
         object_name: &str,
     ) -> Result<ResolvedSpriteVisual, SpriteResolveError> {
-        let sheet_name_clean = sheet_name.strip_suffix(".json").unwrap_or(sheet_name);
+        let sheet_name_clean = normalize_asset_name(sheet_name);
         let object_sheet_asset = self
             .project_assets
             .object_sheets

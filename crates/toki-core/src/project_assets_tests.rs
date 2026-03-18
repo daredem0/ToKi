@@ -1,9 +1,48 @@
 use crate::project_assets::{
     classify_sprite_metadata_file, discover_audio_files, discover_sprite_metadata,
-    resolve_project_resource_paths, scene_file_path, tilemap_file_path, ProjectAudioFormat,
-    SpriteMetadataFileKind,
+    normalize_asset_name, resolve_project_resource_paths, scene_file_path, tilemap_file_path,
+    ProjectAudioFormat, SpriteMetadataFileKind,
 };
 use std::fs;
+
+// ============================================================================
+// normalize_asset_name tests
+// ============================================================================
+
+#[test]
+fn normalize_asset_name_strips_json_suffix() {
+    assert_eq!(normalize_asset_name("terrain.json"), "terrain");
+}
+
+#[test]
+fn normalize_asset_name_preserves_name_without_suffix() {
+    assert_eq!(normalize_asset_name("terrain"), "terrain");
+}
+
+#[test]
+fn normalize_asset_name_only_strips_final_json_suffix() {
+    assert_eq!(normalize_asset_name("data.json.backup"), "data.json.backup");
+}
+
+#[test]
+fn normalize_asset_name_handles_empty_string() {
+    assert_eq!(normalize_asset_name(""), "");
+}
+
+#[test]
+fn normalize_asset_name_handles_just_json() {
+    assert_eq!(normalize_asset_name(".json"), "");
+}
+
+#[test]
+fn normalize_asset_name_case_sensitive() {
+    // .JSON is not stripped (only lowercase .json is)
+    assert_eq!(normalize_asset_name("terrain.JSON"), "terrain.JSON");
+}
+
+// ============================================================================
+// Existing tests
+// ============================================================================
 
 #[test]
 fn classify_sprite_metadata_file_distinguishes_atlases_and_object_sheets() {

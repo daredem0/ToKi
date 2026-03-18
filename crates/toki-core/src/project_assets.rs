@@ -55,6 +55,21 @@ pub fn first_existing_path(candidates: &[PathBuf]) -> Option<PathBuf> {
     candidates.iter().find(|path| path.exists()).cloned()
 }
 
+/// Normalizes an asset name by stripping the `.json` suffix if present.
+///
+/// This utility consolidates the common pattern of removing `.json` extensions
+/// when looking up assets by name.
+///
+/// # Examples
+/// ```
+/// use toki_core::project_assets::normalize_asset_name;
+/// assert_eq!(normalize_asset_name("terrain.json"), "terrain");
+/// assert_eq!(normalize_asset_name("terrain"), "terrain");
+/// ```
+pub fn normalize_asset_name(name: &str) -> &str {
+    name.strip_suffix(".json").unwrap_or(name)
+}
+
 /// Returns the canonical path for a scene file in a project.
 ///
 /// Scene files are stored as `{project_path}/scenes/{scene_name}.json`.
