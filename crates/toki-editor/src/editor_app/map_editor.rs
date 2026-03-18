@@ -6,6 +6,8 @@ impl EditorApp {
         name: &str,
         width: u32,
         height: u32,
+        tile_width: u32,
+        tile_height: u32,
     ) -> Result<MapEditorDraft> {
         if name.trim().is_empty() {
             return Err(anyhow::anyhow!("Map name cannot be empty"));
@@ -45,7 +47,7 @@ impl EditorApp {
 
         let tilemap = TileMap {
             size: glam::UVec2::new(width.max(1), height.max(1)),
-            tile_size: atlas_meta.tile_size,
+            tile_size: glam::UVec2::new(tile_width.max(1), tile_height.max(1)),
             atlas: PathBuf::from(
                 atlas_asset
                     .path
@@ -139,6 +141,8 @@ impl EditorApp {
             &request.name,
             request.width,
             request.height,
+            request.tile_width,
+            request.tile_height,
         ) {
             Ok(draft) => {
                 let Some(viewport) = &mut self.viewports.map_editor else {

@@ -125,6 +125,8 @@ pub struct NewMapRequest {
     pub name: String,
     pub width: u32,
     pub height: u32,
+    pub tile_width: u32,
+    pub tile_height: u32,
 }
 
 impl EditorUI {
@@ -177,6 +179,8 @@ impl EditorUI {
             name,
             width: self.map.new_map_width.max(1),
             height: self.map.new_map_height.max(1),
+            tile_width: self.map.new_map_tile_width.max(1),
+            tile_height: self.map.new_map_tile_height.max(1),
         });
         self.map.show_new_map_dialog = false;
     }

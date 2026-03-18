@@ -105,16 +105,30 @@ impl PanelSystem {
                     ui.text_edit_singleline(&mut ui_state.map.new_map_name);
                     ui.separator();
                     ui.horizontal(|ui| {
-                        ui.label("Width");
+                        ui.label("Map Size (tiles):");
                         ui.add(
                             egui::DragValue::new(&mut ui_state.map.new_map_width)
                                 .range(1..=512)
                                 .speed(1),
                         );
-                        ui.label("Height");
+                        ui.label("×");
                         ui.add(
                             egui::DragValue::new(&mut ui_state.map.new_map_height)
                                 .range(1..=512)
+                                .speed(1),
+                        );
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Tile Size (px):");
+                        ui.add(
+                            egui::DragValue::new(&mut ui_state.map.new_map_tile_width)
+                                .range(1..=256)
+                                .speed(1),
+                        );
+                        ui.label("×");
+                        ui.add(
+                            egui::DragValue::new(&mut ui_state.map.new_map_tile_height)
+                                .range(1..=256)
                                 .speed(1),
                         );
                     });
