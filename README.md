@@ -5,46 +5,51 @@
 [![Docs](https://img.shields.io/badge/docs-github%20pages-2ea44f?logo=github)](https://daredem0.github.io/toki/)
 [![Release](https://img.shields.io/github/v/release/daredem0/toki)](https://github.com/daredem0/toki/releases)
 [![License](https://img.shields.io/badge/license-MPL--2.0%20libs%20%7C%20community%2Fcommercial%20apps-blue)](./README.md#license)
-[![Rust Edition](https://img.shields.io/badge/rust-2024%20edition-black?logo=rust)](https://www.rust-lang.org/)
+[![Rust Edition](https://img.shields.io/badge/rust-2021%20edition-black?logo=rust)](https://www.rust-lang.org/)
 
 <p align="center">
   <img src="./assets/TokiLogo.png" alt="ToKi Logo" width="320" />
 </p>
 
-**ToKi** is a lightweight, pixel-perfect 2D game engine and editor inspired by the visual and design constraints of the original Nintendo Game Boy.  
-It provides a modular toolkit for making retro-style games with clean pixel graphics, tilemaps, animations, and visual scripting — all self-contained and offline.
+**ToKi** is a lightweight 2D game engine and editor for Game Boy-style top-down games.  
+It is aimed at small, self-contained pixel-art projects that want an integrated workflow for gameplay code, authored assets, scene editing, map editing, runtime UI, and export.
+
+The project is built as a modular Rust workspace with a shared core, a renderer, a runtime application, and a GUI-first editor. The overall direction is an engine that provides reusable building blocks instead of hardcoded game-specific features, while still staying focused on retro-style top-down games rather than trying to be a fully general-purpose engine.
+
+**Status:** ToKi is still a work in progress. The core architecture and many major systems are in place, but the engine is still evolving and some areas are incomplete, being actively refactored, or not yet stabilized.
 
 ---
 
-## ✨ Features (WIP)
+## ✨ Current Capabilities
 
--  Game Boy–style sprite rendering (160×144 resolution)
--  Animation system with frame timing + loop control
--  Pixel-perfect camera & scaling (integer nearest-neighbor)
--  Modular architecture: core, render, editor, runtime
-- CLI-free, GUI-focused editor with interactive viewport
-- Tilemap + chunked rendering engine
-- Entity system with JSON-based definitions
-- Asset management with automatic project scanning
-- JSON schema validation for all asset types
-- Scene management with serialization support
-- Visual rules editor (no-code logic) - planned
-- One-click export to native binary - planned
+- Modular workspace split into `toki-core`, `toki-render`, `toki-runtime`, `toki-editor`, and `toki-schemas`
+- Pixel-art runtime with configurable resolution, zoom, timing mode, and optional frame limiting
+- Animated sprite-atlas rendering and static object-sheet rendering
+- Tilemap rendering with chunk caching and camera-follow support
+- Scene/entity system with JSON-based project assets
+- Projectile, pickup, and minimal inventory runtime support
+- Visual editor with scene hierarchy, map editor, entity placement, inspector-driven asset editing, and runtime menu editor
+- Shared runtime/editor menu and dialog composition pipeline
+- Runtime pause menu, inventory view, confirmation dialogs, and clean exit actions
+- Project-scoped font discovery from `assets/fonts`
+- Project validation against JSON schemas
+- Hybrid bundle export with `.pak` packaging and generated `runtime_config.json`
 
 ---
 
-## 📁 Crate Structure
+## 📁 Workspace Layout
 
 ```bash
 toki/
 ├── crates/
-│   ├── toki-core     # Data models, math, animation, entity system, scene management
+│   ├── toki-core     # Shared game logic, asset/runtime models, UI composition, rules
 │   ├── toki-schemas  # Canonical JSON schemas for asset validation
-│   ├── toki-render   # WGPU-based renderer with scene rendering support  
-│   ├── toki-runtime  # Game loop & logic runtime
-│   └── toki-editor   # Editor UI with interactive viewport and asset management
-├── example_project/  # Sample project demonstrating asset structure
-└── assets/           # Sprites, atlases, maps (JSON/PNG)
+│   ├── toki-render   # WGPU rendering backend and low-level GPU integration
+│   ├── toki-runtime  # Runtime app shell, input loop, audio, loading, pack startup
+│   └── toki-editor   # GUI editor, viewport tools, inspectors, project workflow
+├── example_project/  # Sample ToKi project used for manual/runtime testing
+├── docs/             # Design and architecture documentation
+└── assets/           # Workspace assets such as logo and documentation images
 ```
 
 ## 🧪 Running & Testing
@@ -55,6 +60,11 @@ just build
 just run-editor
 just run-runtime
 just test
+```
+
+To run the runtime directly against the sample project:
+```bash
+cargo run -p toki-runtime -- --project example_project/NewProject --scene "Main Scene"
 ```
 
 ### ✅ Quality & Important Targets
@@ -115,12 +125,19 @@ cargo release 0.0.13 --workspace --no-publish --execute
 
 ### 🎮 Editor Features
 - **Interactive Viewport**: Mouse drag camera controls with configurable speed
-- **Asset Management**: Automatic discovery of scenes, entities, atlases, and maps
+- **Asset Management**: Automatic discovery of scenes, entities, tilemaps, atlases, object sheets, audio, and entity definitions
 - **Entity Palette**: Drag-and-drop entity placement from definitions
-- **Scene Hierarchy**: Visual scene management with entity organization
+- **Scene Hierarchy**: Visual scene management with scene entities, scene items, and optional runtime entities
+- **Map Editor**: Tile painting, object placement, and viewport-based editing
+- **Menu Editor**: Visual menu preview with inspector-driven editing for screens, entries, and dialogs
+- **Project Export**: Hybrid bundle export with runtime config and `.pak` payload generation
 - **Asset Validation**: Edit → "Validate Project Assets" for schema compliance checking
 
 ### ⌨️ Runtime Hotkeys
+- `W` / `A` / `S` / `D`: Move player
+- `Space`: Trigger primary action
+- `Escape`: Open or close the runtime menu / dialog flow
+- `F4`: Toggle collision debug rendering
 - `F3`: Toggle in-window performance HUD text
 - `F7`: Toggle console performance log output
 - `F5`: Save game state to `savegame.json`
@@ -133,7 +150,7 @@ cargo release 0.0.13 --workspace --no-publish --execute
 ## Committing
 Commit Message Shape Rules
 
-1. First line format: `&lt;Prefix&gt;: Brief summary` (no trailing period).
+1. First line format: `<Prefix>: Brief summary` (no trailing period).
 2. Allowed prefixes: Add:, Change:, Fix:, Refactor:, Doc:, chore.
 3. Leave exactly one blank line after the first line.
 4. Body uses dash bullets ("- "), one change per line, no extra blank lines between bullets.
