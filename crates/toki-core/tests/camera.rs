@@ -1,5 +1,7 @@
 use glam::{IVec2, UVec2};
-use toki_core::camera::{Camera, CameraController, CameraMode, RuntimeState};
+use toki_core::camera::{
+    viewport_to_world, world_to_viewport, Camera, CameraController, CameraMode, RuntimeState,
+};
 use toki_core::entity::{Entity, EntityAttributes, EntityAudioSettings, EntityId, EntityKind};
 
 fn create_test_entity(id: EntityId, position: IVec2) -> Entity {
@@ -307,4 +309,179 @@ fn camera_clamp_to_world_bounds_valid_position_unchanged() {
 
     // Position should remain unchanged as it's valid
     assert_eq!(camera.position, IVec2::new(100, 50));
+}
+
+// ============================================================================
+// Coordinate conversion tests (Step 12 refactoring)
+// ============================================================================
+
+#[test]
+fn viewport_to_world_at_origin_with_no_offset() {
+    let camera = Camera::new(); // position (0,0), scale 1
+    let viewport_pos = glam::Vec2::new(80.0, 72.0); // center of 160x144 viewport
+
+    let world_pos = camera.viewport_to_world(viewport_pos);
+
+    assert_eq!(world_pos, glam::Vec2::new(80.0, 72.0));
+}
+
+#[test]
+fn viewport_to_world_with_camera_offset() {
+    let mut camera = Camera::new();
+    camera.position = IVec2::new(100, 50);
+
+    let viewport_pos = glam::Vec2::new(0.0, 0.0);
+    let world_pos = camera.viewport_to_world(viewport_pos);
+
+    // Viewport origin maps to camera position
+    assert_eq!(world_pos, glam::Vec2::new(100.0, 50.0));
+}
+
+#[test]
+fn viewport_to_world_with_scale() {
+    let mut camera = Camera::new();
+    camera.scale = 2;
+    camera.position = IVec2::new(0, 0);
+
+    let viewport_pos = glam::Vec2::new(10.0, 5.0);
+    let world_pos = camera.viewport_to_world(viewport_pos);
+
+    // With scale 2, one viewport pixel = 2 world pixels
+    assert_eq!(world_pos, glam::Vec2::new(20.0, 10.0));
+}
+
+#[test]
+fn viewport_to_world_with_offset_and_scale() {
+    let mut camera = Camera::new();
+    camera.position = IVec2::new(50, 30);
+    camera.scale = 2;
+
+    let viewport_pos = glam::Vec2::new(10.0, 5.0);
+    let world_pos = camera.viewport_to_world(viewport_pos);
+
+    // world = camera_pos + viewport_pos * scale
+    // = (50, 30) + (10, 5) * 2 = (50 + 20, 30 + 10) = (70, 40)
+    assert_eq!(world_pos, glam::Vec2::new(70.0, 40.0));
+}
+
+#[test]
+fn world_to_viewport_at_origin() {
+    let camera = Camera::new(); // position (0,0), scale 1
+    let world_pos = glam::Vec2::new(80.0, 72.0);
+
+    let viewport_pos = camera.world_to_viewport(world_pos);
+
+    assert_eq!(viewport_pos, glam::Vec2::new(80.0, 72.0));
+}
+
+#[test]
+fn world_to_viewport_with_camera_offset() {
+    let mut camera = Camera::new();
+    camera.position = IVec2::new(100, 50);
+
+    let world_pos = glam::Vec2::new(100.0, 50.0);
+    let viewport_pos = camera.world_to_viewport(world_pos);
+
+    // World position at camera origin maps to viewport origin
+    assert_eq!(viewport_pos, glam::Vec2::new(0.0, 0.0));
+}
+
+#[test]
+fn world_to_viewport_with_scale() {
+    let mut camera = Camera::new();
+    camera.scale = 2;
+    camera.position = IVec2::new(0, 0);
+
+    let world_pos = glam::Vec2::new(20.0, 10.0);
+    let viewport_pos = camera.world_to_viewport(world_pos);
+
+    // With scale 2, 20 world pixels = 10 viewport pixels
+    assert_eq!(viewport_pos, glam::Vec2::new(10.0, 5.0));
+}
+
+#[test]
+fn world_to_viewport_with_offset_and_scale() {
+    let mut camera = Camera::new();
+    camera.position = IVec2::new(50, 30);
+    camera.scale = 2;
+
+    let world_pos = glam::Vec2::new(70.0, 40.0);
+    let viewport_pos = camera.world_to_viewport(world_pos);
+
+    // viewport = (world - camera_pos) / scale
+    // = ((70, 40) - (50, 30)) / 2 = (20, 10) / 2 = (10, 5)
+    assert_eq!(viewport_pos, glam::Vec2::new(10.0, 5.0));
+}
+
+#[test]
+fn viewport_to_world_and_back_roundtrips() {
+    let mut camera = Camera::new();
+    camera.position = IVec2::new(123, 456);
+    camera.scale = 3;
+
+    let original = glam::Vec2::new(45.5, 67.25);
+    let world_pos = camera.viewport_to_world(original);
+    let back = camera.world_to_viewport(world_pos);
+
+    assert!((back.x - original.x).abs() < 0.001);
+    assert!((back.y - original.y).abs() < 0.001);
+}
+
+#[test]
+fn world_to_viewport_and_back_roundtrips() {
+    let mut camera = Camera::new();
+    camera.position = IVec2::new(200, 100);
+    camera.scale = 2;
+
+    let original = glam::Vec2::new(300.0, 200.0);
+    let viewport_pos = camera.world_to_viewport(original);
+    let back = camera.viewport_to_world(viewport_pos);
+
+    assert!((back.x - original.x).abs() < 0.001);
+    assert!((back.y - original.y).abs() < 0.001);
+}
+
+// ============================================================================
+// Standalone utility function tests (for float scale support)
+// ============================================================================
+
+#[test]
+fn standalone_viewport_to_world_with_float_scale() {
+    let camera_position = IVec2::new(100, 50);
+    let viewport_pos = glam::Vec2::new(10.0, 20.0);
+    let scale = 1.5_f32;
+
+    let world_pos = viewport_to_world(viewport_pos, camera_position, scale);
+
+    // world = camera_pos + viewport * scale
+    // = (100, 50) + (10, 20) * 1.5 = (100 + 15, 50 + 30) = (115, 80)
+    assert!((world_pos.x - 115.0).abs() < 0.001);
+    assert!((world_pos.y - 80.0).abs() < 0.001);
+}
+
+#[test]
+fn standalone_world_to_viewport_with_float_scale() {
+    let camera_position = IVec2::new(100, 50);
+    let world_pos = glam::Vec2::new(115.0, 80.0);
+    let scale = 1.5_f32;
+
+    let viewport_pos = world_to_viewport(world_pos, camera_position, scale);
+
+    // viewport = (world - camera_pos) / scale
+    // = ((115, 80) - (100, 50)) / 1.5 = (15, 30) / 1.5 = (10, 20)
+    assert!((viewport_pos.x - 10.0).abs() < 0.001);
+    assert!((viewport_pos.y - 20.0).abs() < 0.001);
+}
+
+#[test]
+fn standalone_functions_roundtrip_with_fractional_scale() {
+    let camera_position = IVec2::new(50, 75);
+    let scale = 0.8_f32;
+
+    let original = glam::Vec2::new(45.5, 67.25);
+    let world_pos = viewport_to_world(original, camera_position, scale);
+    let back = world_to_viewport(world_pos, camera_position, scale);
+
+    assert!((back.x - original.x).abs() < 0.001);
+    assert!((back.y - original.y).abs() < 0.001);
 }
