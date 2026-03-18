@@ -218,17 +218,35 @@ impl ApplicationHandler for App {
             return;
         }
 
-        // Process game ticks at fixed rate (60 FPS game logic)
-        let mut tick_count = 0;
-        while self.timing.should_tick() {
-            let tick_start = Instant::now();
-            self.tick();
-            let tick_time = tick_start.elapsed();
-            self.performance.record_tick_time(tick_time);
-            self.timing.consume_timestep();
-            tick_count += 1;
-            if tick_count > 10 {
-                break;
+        match self.launch_options.display.timing_mode {
+            toki_core::TimingMode::Fixed => {
+                // Process game ticks at fixed rate (60 FPS game logic)
+                let mut tick_count = 0;
+                while self.timing.should_tick() {
+                    let tick_start = Instant::now();
+                    self.tick();
+                    let tick_time = tick_start.elapsed();
+                    self.performance.record_tick_time(tick_time);
+                    self.timing.consume_timestep();
+                    tick_count += 1;
+                    if tick_count > 10 {
+                        break;
+                    }
+                }
+            }
+            toki_core::TimingMode::Delta => {
+                // Process single tick with actual elapsed time
+                let now = Instant::now();
+                let delta_ms = self
+                    .last_tick_instant
+                    .map(|last| now.duration_since(last).as_secs_f32() * 1000.0)
+                    .unwrap_or(toki_core::DEFAULT_TIMESTEP_MS);
+                self.last_tick_instant = Some(now);
+
+                let tick_start = Instant::now();
+                self.tick_with_delta(delta_ms);
+                let tick_time = tick_start.elapsed();
+                self.performance.record_tick_time(tick_time);
             }
         }
 

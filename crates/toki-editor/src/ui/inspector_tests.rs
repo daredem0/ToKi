@@ -188,6 +188,7 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
         zoom_percent: 100,
         vsync: true,
         target_fps: 60,
+        timing_mode: toki_core::TimingMode::Fixed,
         master_mix_percent: 85,
         music_mix_percent: 70,
         movement_mix_percent: 55,

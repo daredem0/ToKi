@@ -1,6 +1,23 @@
 use crate::menu::MenuSettings;
 use serde::{Deserialize, Serialize};
 
+/// Controls how game logic timing is handled.
+///
+/// This affects how movement, animation, and other time-dependent systems behave.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum TimingMode {
+    /// Fixed timestep: game logic always runs at 60 FPS (16.67ms per tick).
+    /// Deterministic - same inputs produce same outputs.
+    /// Best for physics, networking, and replays.
+    #[default]
+    Fixed,
+    /// Delta timestep: game logic scales with actual elapsed time.
+    /// Movement and animation are multiplied by delta factor.
+    /// Smoother on variable frame rates but non-deterministic.
+    Delta,
+}
+
 /// Project preset defining default settings for different game types.
 ///
 /// Each preset provides sensible defaults for resolution and other settings.
@@ -100,6 +117,9 @@ pub struct RuntimeDisplaySettings {
     /// Target frames per second when vsync is disabled (0 = unlimited)
     #[serde(default = "default_target_fps")]
     pub target_fps: u32,
+    /// Timing mode for game logic (fixed or delta timestep)
+    #[serde(default)]
+    pub timing_mode: TimingMode,
 }
 
 impl Default for RuntimeDisplaySettings {
@@ -111,6 +131,7 @@ impl Default for RuntimeDisplaySettings {
             zoom_percent: default_zoom_percent(),
             vsync: default_vsync(),
             target_fps: default_target_fps(),
+            timing_mode: TimingMode::default(),
         }
     }
 }
@@ -195,6 +216,8 @@ pub struct RuntimeConfigDisplay {
     pub vsync: Option<bool>,
     #[serde(default)]
     pub target_fps: Option<u32>,
+    #[serde(default)]
+    pub timing_mode: Option<TimingMode>,
 }
 
 pub const fn default_runtime_splash_duration_ms() -> u64 {

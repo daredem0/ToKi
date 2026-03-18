@@ -16,6 +16,7 @@ pub use errors::CoreError;
 pub mod pack;
 pub mod project_assets;
 pub mod project_runtime;
+pub use project_runtime::TimingMode;
 
 pub mod fonts;
 pub mod menu;
@@ -38,7 +39,7 @@ pub mod events;
 pub use events::{EventHandler, EventQueue, GameEvent, GameUpdateResult};
 
 pub mod game;
-pub use game::{GameState, InputAction, InputKey};
+pub use game::{GameState, InputAction, InputKey, DEFAULT_TIMESTEP_MS};
 
 pub mod timing;
 pub use timing::{TimestepIterator, TimingSystem};

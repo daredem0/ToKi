@@ -145,6 +145,7 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
                 zoom_percent: None,
                 vsync: None,
                 target_fps: None,
+                timing_mode: None,
             }),
             menu: Some(configured_menu.clone()),
         },
@@ -205,6 +206,7 @@ fn apply_runtime_config_keeps_existing_paths_and_scene_but_updates_splash_durati
                 zoom_percent: None,
                 vsync: None,
                 target_fps: None,
+                timing_mode: None,
             }),
             menu: Some(MenuSettings {
                 pause_root_screen_id: "override".to_string(),
@@ -436,6 +438,7 @@ fn apply_project_runtime_settings_do_not_override_existing_launch_audio_mix() {
             zoom_percent: 100,
             vsync: true,
             target_fps: 60,
+            timing_mode: toki_core::TimingMode::Fixed,
         },
         menu: MenuSettings {
             pause_root_screen_id: "cli_pause".to_string(),

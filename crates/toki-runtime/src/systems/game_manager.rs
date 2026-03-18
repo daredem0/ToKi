@@ -40,7 +40,7 @@ impl GameManager {
         Self { game_state }
     }
 
-    /// Update the game state by one tick
+    /// Update the game state by one fixed tick (16.67ms assumed)
     /// Returns GameUpdateResult with movement info and audio events
     pub fn update(
         &mut self,
@@ -49,6 +49,19 @@ impl GameManager {
         atlas: &AtlasMeta,
     ) -> GameUpdateResult<AudioEvent> {
         self.game_state.update(world_bounds, tilemap, atlas)
+    }
+
+    /// Update the game state with delta time scaling
+    /// Movement and animation are scaled proportionally to elapsed time
+    pub fn update_with_delta(
+        &mut self,
+        delta_ms: f32,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> GameUpdateResult<AudioEvent> {
+        self.game_state
+            .update_with_delta(delta_ms, world_bounds, tilemap, atlas)
     }
 
     /// Handle winit keyboard input events, translating to core InputKey events

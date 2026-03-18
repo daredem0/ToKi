@@ -19,6 +19,10 @@ mod render_queries;
 mod rules;
 mod scene;
 
+/// Default timestep in milliseconds for fixed 60 FPS game logic.
+/// Used as the baseline for delta time scaling.
+pub const DEFAULT_TIMESTEP_MS: f32 = 16.667;
+
 /// Core input keys abstraction (platform-independent)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum InputKey {
@@ -259,6 +263,169 @@ impl GameState {
         }
 
         result
+    }
+
+    /// Update game state with delta time scaling.
+    ///
+    /// This method scales movement speed proportionally to the elapsed time,
+    /// allowing for variable frame rate game logic while maintaining consistent
+    /// perceived movement speed.
+    ///
+    /// # Arguments
+    /// * `delta_ms` - Elapsed time since last update in milliseconds
+    /// * `world_bounds` - World boundary constraints
+    /// * `tilemap` - Current tilemap for collision detection
+    /// * `atlas` - Atlas metadata for tile properties
+    pub fn update_with_delta(
+        &mut self,
+        delta_ms: f32,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> GameUpdateResult<AudioEvent> {
+        let time_scale = delta_ms / DEFAULT_TIMESTEP_MS;
+        self.update_internal(time_scale, delta_ms, world_bounds, tilemap, atlas)
+    }
+
+    /// Internal update implementation that accepts time scaling parameters.
+    fn update_internal(
+        &mut self,
+        time_scale: f32,
+        animation_delta_ms: f32,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> GameUpdateResult<AudioEvent> {
+        let mut result = GameUpdateResult::new();
+        let mut rule_commands = Vec::new();
+        self.rule_runtime.frame_collision_detected = false;
+        self.rule_runtime.frame_damage_detected = false;
+        self.rule_runtime.frame_death_detected = false;
+
+        if !self.rule_runtime.started {
+            self.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut rule_commands);
+            self.rule_runtime.started = true;
+        }
+        self.collect_rule_commands_for_trigger(RuleTrigger::OnUpdate, &mut rule_commands);
+        self.collect_rule_commands_for_key_triggers(&mut rule_commands);
+        let (mut pending_rule_animations, mut pending_scene_switch) =
+            self.apply_rule_commands(rule_commands, &mut result);
+
+        let initial_player_position = self
+            .player_id
+            .and_then(|player_id| self.entity_manager.get_entity(player_id))
+            .map(|entity| entity.position)
+            .unwrap_or(glam::IVec2::ZERO);
+
+        let input_result = self.process_input_scaled(world_bounds, tilemap, atlas, time_scale);
+        result.player_moved = input_result.player_moved;
+        result.add_events(input_result.events);
+
+        if self.apply_rule_velocities(world_bounds, tilemap, atlas, &mut result) {
+            result.player_moved = true;
+        }
+
+        let intended_player_delta = self
+            .player_id
+            .and_then(|player_id| self.entity_manager.get_entity(player_id))
+            .map(|entity| self.held_keys_for_profile(Self::effective_movement_profile(entity)))
+            .map(|keys| Self::movement_delta_from_keys(&keys))
+            .unwrap_or(glam::IVec2::ZERO);
+
+        self.update_player_animation(initial_player_position, intended_player_delta);
+        self.process_profile_actions();
+        self.update_projectiles(tilemap, atlas);
+        self.collect_overlapping_pickups();
+        self.resolve_pending_stat_changes();
+
+        // Update NPC AI
+        self.update_npc_ai(world_bounds, tilemap, atlas, &mut result);
+
+        let mut reactive_rule_commands: Vec<rules::RuleCommand> = Vec::new();
+        self.collect_reactive_rule_commands(&result, tilemap, atlas, &mut reactive_rule_commands);
+        let (mut reactive_animations, reactive_scene_switch) =
+            self.apply_rule_commands(reactive_rule_commands, &mut result);
+        if pending_scene_switch.is_none() {
+            pending_scene_switch = reactive_scene_switch;
+        }
+        pending_rule_animations.append(&mut reactive_animations);
+
+        self.apply_rule_animations(pending_rule_animations);
+
+        // Update entity animation timing with actual delta
+        let completed_animation_loops = self.entity_manager.update_animations(animation_delta_ms);
+        for (entity_id, completed_loops) in completed_animation_loops {
+            self.emit_animation_loop_movement_audio(entity_id, completed_loops, &mut result);
+        }
+
+        if let Some(scene_name) = pending_scene_switch {
+            self.apply_rule_scene_switch(&scene_name);
+        }
+
+        result
+    }
+
+    /// Helper to update player animation based on movement intent.
+    fn update_player_animation(
+        &mut self,
+        initial_player_position: glam::IVec2,
+        intended_player_delta: glam::IVec2,
+    ) {
+        let Some(player_entity) = self.entity_manager.get_player_mut() else {
+            return;
+        };
+        let Some(animation_controller) = &mut player_entity.attributes.animation_controller else {
+            return;
+        };
+        if Self::action_animation_locks_locomotion(animation_controller) {
+            return;
+        }
+
+        let actual_player_delta = player_entity.position - initial_player_position;
+        let player_delta = if actual_player_delta == glam::IVec2::ZERO {
+            intended_player_delta
+        } else {
+            actual_player_delta
+        };
+        let is_trying_to_move = intended_player_delta != glam::IVec2::ZERO;
+        let desired_player_animation =
+            Self::resolve_animation_state(animation_controller, is_trying_to_move, player_delta);
+        if animation_controller.current_clip_state != desired_player_animation {
+            tracing::debug!(
+                "Changing clip from  {:?} to {:?}",
+                animation_controller.current_clip_state,
+                desired_player_animation
+            );
+            animation_controller.play(desired_player_animation);
+        }
+    }
+
+    /// Collect reactive rule commands based on game events this frame.
+    fn collect_reactive_rule_commands(
+        &mut self,
+        result: &GameUpdateResult<AudioEvent>,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+        reactive_rule_commands: &mut Vec<rules::RuleCommand>,
+    ) {
+        if result.player_moved {
+            self.collect_rule_commands_for_trigger(
+                RuleTrigger::OnPlayerMove,
+                reactive_rule_commands,
+            );
+        }
+        if self.rule_runtime.frame_collision_detected {
+            self.collect_rule_commands_for_trigger(RuleTrigger::OnCollision, reactive_rule_commands);
+        }
+        if self.rule_runtime.frame_damage_detected {
+            self.collect_rule_commands_for_trigger(RuleTrigger::OnDamaged, reactive_rule_commands);
+        }
+        if self.rule_runtime.frame_death_detected {
+            self.collect_rule_commands_for_trigger(RuleTrigger::OnDeath, reactive_rule_commands);
+        }
+        if self.any_entity_overlaps_trigger_tile(tilemap, atlas) {
+            self.collect_rule_commands_for_trigger(RuleTrigger::OnTrigger, reactive_rule_commands);
+        }
     }
 
     /// Update NPC AI - makes NPCs move randomly every few frames

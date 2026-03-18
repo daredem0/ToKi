@@ -106,6 +106,41 @@ impl InspectorSystem {
                 });
                 ui.label("Set to 0 for unlimited frame rate.");
             });
+
+            ui.separator();
+            ui.label("Game Logic Timing");
+            ui.horizontal(|ui| {
+                ui.label("Timing Mode:");
+                let current_label = match draft.timing_mode {
+                    toki_core::TimingMode::Fixed => "Fixed (60 FPS)",
+                    toki_core::TimingMode::Delta => "Delta",
+                };
+                egui::ComboBox::from_id_salt("timing_mode")
+                    .selected_text(current_label)
+                    .show_ui(ui, |ui| {
+                        if ui
+                            .selectable_value(
+                                &mut draft.timing_mode,
+                                toki_core::TimingMode::Fixed,
+                                "Fixed (60 FPS)",
+                            )
+                            .changed()
+                        {
+                            changed = true;
+                        }
+                        if ui
+                            .selectable_value(
+                                &mut draft.timing_mode,
+                                toki_core::TimingMode::Delta,
+                                "Delta",
+                            )
+                            .changed()
+                        {
+                            changed = true;
+                        }
+                    });
+            });
+            ui.label("Fixed: Deterministic, 60 ticks/sec. Delta: Scales with frame time.");
         });
 
         ui.separator();
@@ -258,6 +293,10 @@ impl InspectorSystem {
         }
         if project.metadata.runtime.display.target_fps != draft.target_fps {
             project.metadata.runtime.display.target_fps = draft.target_fps;
+            changed = true;
+        }
+        if project.metadata.runtime.display.timing_mode != draft.timing_mode {
+            project.metadata.runtime.display.timing_mode = draft.timing_mode;
             changed = true;
         }
         if project.audio_config().master_percent != draft.master_mix_percent {

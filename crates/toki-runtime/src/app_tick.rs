@@ -12,6 +12,14 @@ use super::App;
 
 impl App {
     pub(super) fn tick(&mut self) {
+        self.tick_internal(None)
+    }
+
+    pub(super) fn tick_with_delta(&mut self, delta_ms: f32) {
+        self.tick_internal(Some(delta_ms))
+    }
+
+    fn tick_internal(&mut self, delta_ms: Option<f32>) {
         let tick_start = Instant::now();
         tracing::trace!("TICK @ {:?}", tick_start);
 
@@ -21,6 +29,13 @@ impl App {
         );
         let game_result = if self.should_gate_gameplay_for_menu() {
             GameUpdateResult::new()
+        } else if let Some(delta) = delta_ms {
+            self.game_system.update_with_delta(
+                delta,
+                world_bounds,
+                self.resources.get_tilemap(),
+                self.resources.get_terrain_atlas(),
+            )
         } else {
             self.game_system.update(
                 world_bounds,

@@ -43,7 +43,7 @@ impl GameState {
         whole_pixels
     }
 
-    fn apply_accumulated_movement(
+    fn apply_accumulated_movement_scaled(
         &mut self,
         entity_id: EntityId,
         direction: glam::IVec2,
@@ -51,13 +51,14 @@ impl GameState {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
         result: &mut GameUpdateResult<AudioEvent>,
+        time_scale: f32,
     ) -> bool {
         let Some(entity) = self.entity_manager.get_entity(entity_id) else {
             return false;
         };
 
         let current_position = entity.position;
-        let entity_speed = entity.attributes.speed;
+        let entity_speed = entity.attributes.speed * time_scale;
         let entity_size = entity.size;
         let mut accumulator = entity.movement_accumulator;
 
@@ -269,6 +270,17 @@ impl GameState {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> GameUpdateResult<AudioEvent> {
+        self.process_input_scaled(world_bounds, tilemap, atlas, 1.0)
+    }
+
+    /// Process input with time scaling for delta timestep mode.
+    pub(super) fn process_input_scaled(
+        &mut self,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+        time_scale: f32,
+    ) -> GameUpdateResult<AudioEvent> {
         let controlled_entity_ids = self.controlled_input_entity_ids();
         if controlled_entity_ids.is_empty() {
             return GameUpdateResult::new();
@@ -292,13 +304,14 @@ impl GameState {
             let held_keys = self.held_keys_for_profile(Self::effective_movement_profile(entity));
             let direction = Self::movement_delta_from_keys(&held_keys);
             intended_deltas.insert(entity_id, direction);
-            self.apply_accumulated_movement(
+            self.apply_accumulated_movement_scaled(
                 entity_id,
                 direction,
                 world_bounds,
                 tilemap,
                 atlas,
                 &mut result,
+                time_scale,
             );
         }
 

@@ -101,6 +101,7 @@ pub fn export_hybrid_bundle(
                 zoom_percent: Some(project.metadata.runtime.display.zoom_percent),
                 vsync: Some(project.metadata.runtime.display.vsync),
                 target_fps: Some(project.metadata.runtime.display.target_fps),
+                timing_mode: Some(project.metadata.runtime.display.timing_mode),
             }),
             menu: Some(project.metadata.runtime.menu.clone()),
         },

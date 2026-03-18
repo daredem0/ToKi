@@ -2622,3 +2622,157 @@ fn game_state_entity_size_used_for_bottom_boundary_clamping() {
     // Should be clamped at world_height - entity_size (100 - 24 = 76)
     assert_eq!(game_state.player_position().y, 76);
 }
+
+// ============================================================================
+// Delta timestep tests
+// ============================================================================
+
+use toki_core::DEFAULT_TIMESTEP_MS;
+
+#[test]
+fn update_with_delta_at_default_timestep_matches_fixed_update() {
+    // Create two identical game states
+    let mut fixed_state = GameState::new(create_test_sprite());
+    let mut delta_state = GameState::new(create_test_sprite());
+
+    let world_bounds = UVec2::new(1000, 1000);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    // Press right on both
+    fixed_state.handle_key_press(InputKey::Right);
+    delta_state.handle_key_press(InputKey::Right);
+
+    // Update fixed state with update()
+    fixed_state.update(world_bounds, &tilemap, &atlas);
+
+    // Update delta state with update_with_delta at default timestep
+    delta_state.update_with_delta(DEFAULT_TIMESTEP_MS, world_bounds, &tilemap, &atlas);
+
+    // Positions should match
+    assert_eq!(fixed_state.player_position(), delta_state.player_position());
+}
+
+#[test]
+fn update_with_delta_double_timestep_moves_further() {
+    let mut game_state = GameState::new(create_test_sprite());
+    let player_id = game_state.player_id().unwrap();
+
+    // Set speed to 1.0 for predictable movement
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .attributes
+        .speed = 1.0;
+
+    let world_bounds = UVec2::new(1000, 1000);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+    let initial_position = game_state.player_position();
+
+    game_state.handle_key_press(InputKey::Right);
+
+    // Update with 2x delta (33.33ms)
+    game_state.update_with_delta(DEFAULT_TIMESTEP_MS * 2.0, world_bounds, &tilemap, &atlas);
+
+    // Should have moved 2 pixels (speed 1.0 * 2.0 scale factor = 2 pixels)
+    let position_after = game_state.player_position();
+    assert_eq!(position_after.x - initial_position.x, 2);
+}
+
+#[test]
+fn update_with_delta_half_timestep_moves_less() {
+    let mut game_state = GameState::new(create_test_sprite());
+    let player_id = game_state.player_id().unwrap();
+
+    // Speed = 2.0 means 2 pixels per frame at 60fps
+    // At half delta (8.33ms), accumulator gets 1.0, which is 1 whole pixel
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .attributes
+        .speed = 2.0;
+
+    let world_bounds = UVec2::new(1000, 1000);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+    let initial_position = game_state.player_position();
+
+    game_state.handle_key_press(InputKey::Right);
+
+    // Update with 0.5x delta (8.33ms)
+    game_state.update_with_delta(DEFAULT_TIMESTEP_MS * 0.5, world_bounds, &tilemap, &atlas);
+
+    // Should have moved 1 pixel (speed 2.0 * 0.5 scale = 1 pixel)
+    let position_after = game_state.player_position();
+    assert_eq!(position_after.x - initial_position.x, 1);
+}
+
+#[test]
+fn update_with_delta_accumulates_fractional_movement() {
+    let mut game_state = GameState::new(create_test_sprite());
+    let player_id = game_state.player_id().unwrap();
+
+    // Speed = 1.0 means 1 pixel per frame at 60fps
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .attributes
+        .speed = 1.0;
+
+    let world_bounds = UVec2::new(1000, 1000);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+    let initial_position = game_state.player_position();
+
+    game_state.handle_key_press(InputKey::Right);
+
+    // Update with 0.5x delta twice - should accumulate to 1 pixel total
+    game_state.update_with_delta(DEFAULT_TIMESTEP_MS * 0.5, world_bounds, &tilemap, &atlas);
+    let position_after_first = game_state.player_position();
+    // First update: accumulator = 0.5, no whole pixel
+    assert_eq!(position_after_first.x - initial_position.x, 0);
+
+    game_state.update_with_delta(DEFAULT_TIMESTEP_MS * 0.5, world_bounds, &tilemap, &atlas);
+    let position_after_second = game_state.player_position();
+    // Second update: accumulator = 1.0, extracts 1 whole pixel
+    assert_eq!(position_after_second.x - initial_position.x, 1);
+}
+
+#[test]
+fn update_with_delta_scales_animation_timing() {
+    let mut game_state = GameState::new(create_test_sprite());
+
+    let world_bounds = UVec2::new(1000, 1000);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    // Get initial frame timer
+    let initial_frame_timer = game_state
+        .player_entity()
+        .and_then(|e| e.attributes.animation_controller.as_ref())
+        .map(|c| c.frame_timer)
+        .unwrap_or(0.0);
+
+    // Update with 2x delta (33.33ms)
+    game_state.update_with_delta(DEFAULT_TIMESTEP_MS * 2.0, world_bounds, &tilemap, &atlas);
+
+    // Animation frame_timer should have advanced by approximately 33.33ms
+    // (unless it wrapped around due to frame advancement)
+    let final_frame_timer = game_state
+        .player_entity()
+        .and_then(|e| e.attributes.animation_controller.as_ref())
+        .map(|c| c.frame_timer)
+        .unwrap_or(0.0);
+
+    // The frame_timer accumulates delta until it exceeds frame_duration,
+    // then it wraps. We verify it changed from the initial value.
+    // With 33.33ms added to initial 0.0, we expect some accumulation.
+    assert!(
+        final_frame_timer > 0.0 || initial_frame_timer != final_frame_timer,
+        "Animation timing should have changed"
+    );
+}

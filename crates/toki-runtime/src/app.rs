@@ -90,6 +90,8 @@ pub struct RuntimeDisplayOptions {
     /// Target frames per second when vsync is disabled.
     /// Set to 0 for unlimited frame rate.
     pub target_fps: u32,
+    /// Timing mode for game logic (fixed or delta timestep).
+    pub timing_mode: toki_core::TimingMode,
 }
 
 impl Default for RuntimeDisplayOptions {
@@ -101,6 +103,7 @@ impl Default for RuntimeDisplayOptions {
             zoom_percent: toki_core::project_runtime::default_zoom_percent(),
             vsync: true,
             target_fps: 60,
+            timing_mode: toki_core::TimingMode::default(),
         }
     }
 }
@@ -148,6 +151,8 @@ struct App {
     post_splash_sprite_texture_path: Option<PathBuf>,
     exit_requested: bool,
     pending_ui_events: Vec<String>,
+    /// Last tick instant for delta time calculation in delta timing mode
+    last_tick_instant: Option<Instant>,
     asset_load_plan: RuntimeAssetLoadPlan,
     #[allow(dead_code)]
     decoded_project_cache: DecodedProjectCache,
@@ -243,6 +248,7 @@ impl App {
             post_splash_sprite_texture_path: None,
             exit_requested: false,
             pending_ui_events: Vec::new(),
+            last_tick_instant: None,
             asset_load_plan,
             decoded_project_cache,
             pack_mount,
