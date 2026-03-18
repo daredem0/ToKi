@@ -354,3 +354,144 @@ fn resolve_object_sheet_frame_returns_error_for_missing_object() {
         Err(SpriteResolveError::MissingObject { .. })
     ));
 }
+
+mod format_sprite_resolve_failure_tests {
+    use super::*;
+    use crate::sprite_render::format_sprite_resolve_failure;
+
+    #[test]
+    fn animated_entity_missing_atlas_formats_correctly() {
+        let origin = SpriteRenderOrigin::AnimatedEntity(42);
+        let error = SpriteResolveError::MissingAtlas {
+            atlas_name: "creatures".to_string(),
+        };
+
+        let message = format_sprite_resolve_failure(&origin, &error);
+
+        assert!(message.contains("42"));
+        assert!(message.contains("creatures"));
+        assert!(message.contains("atlas"));
+    }
+
+    #[test]
+    fn animated_entity_missing_tile_formats_correctly() {
+        let origin = SpriteRenderOrigin::AnimatedEntity(7);
+        let error = SpriteResolveError::MissingAtlasTile {
+            atlas_name: "creatures".to_string(),
+            tile_name: "slime/idle_0".to_string(),
+        };
+
+        let message = format_sprite_resolve_failure(&origin, &error);
+
+        assert!(message.contains("7"));
+        assert!(message.contains("slime/idle_0"));
+        assert!(message.contains("creatures"));
+    }
+
+    #[test]
+    fn static_entity_missing_sheet_formats_correctly() {
+        let origin = SpriteRenderOrigin::StaticEntity(99);
+        let error = SpriteResolveError::MissingObjectSheet {
+            sheet_name: "items".to_string(),
+        };
+
+        let message = format_sprite_resolve_failure(&origin, &error);
+
+        assert!(message.contains("99"));
+        assert!(message.contains("items"));
+        assert!(message.contains("sheet"));
+    }
+
+    #[test]
+    fn static_entity_missing_object_formats_correctly() {
+        let origin = SpriteRenderOrigin::StaticEntity(5);
+        let error = SpriteResolveError::MissingObject {
+            sheet_name: "items".to_string(),
+            object_name: "coin".to_string(),
+        };
+
+        let message = format_sprite_resolve_failure(&origin, &error);
+
+        assert!(message.contains("5"));
+        assert!(message.contains("coin"));
+        assert!(message.contains("items"));
+    }
+
+    #[test]
+    fn projectile_missing_sheet_formats_correctly() {
+        let origin = SpriteRenderOrigin::Projectile(123);
+        let error = SpriteResolveError::MissingObjectSheet {
+            sheet_name: "projectiles".to_string(),
+        };
+
+        let message = format_sprite_resolve_failure(&origin, &error);
+
+        assert!(message.contains("123"));
+        assert!(message.contains("projectiles"));
+        assert!(message.contains("Projectile"));
+    }
+
+    #[test]
+    fn projectile_missing_object_formats_correctly() {
+        let origin = SpriteRenderOrigin::Projectile(456);
+        let error = SpriteResolveError::MissingObject {
+            sheet_name: "projectiles".to_string(),
+            object_name: "arrow".to_string(),
+        };
+
+        let message = format_sprite_resolve_failure(&origin, &error);
+
+        assert!(message.contains("456"));
+        assert!(message.contains("arrow"));
+        assert!(message.contains("projectiles"));
+    }
+
+    #[test]
+    fn map_object_missing_sheet_formats_correctly() {
+        let origin = SpriteRenderOrigin::MapObject {
+            sheet_name: "decorations".to_string(),
+            object_name: "tree".to_string(),
+            position: glam::IVec2::new(100, 200),
+        };
+        let error = SpriteResolveError::MissingObjectSheet {
+            sheet_name: "decorations".to_string(),
+        };
+
+        let message = format_sprite_resolve_failure(&origin, &error);
+
+        assert!(message.contains("decorations"));
+        assert!(message.contains("sheet"));
+    }
+
+    #[test]
+    fn map_object_missing_object_formats_correctly() {
+        let origin = SpriteRenderOrigin::MapObject {
+            sheet_name: "decorations".to_string(),
+            object_name: "tree".to_string(),
+            position: glam::IVec2::new(100, 200),
+        };
+        let error = SpriteResolveError::MissingObject {
+            sheet_name: "decorations".to_string(),
+            object_name: "tree".to_string(),
+        };
+
+        let message = format_sprite_resolve_failure(&origin, &error);
+
+        assert!(message.contains("tree"));
+        assert!(message.contains("decorations"));
+    }
+
+    #[test]
+    fn asset_load_failed_formats_with_message() {
+        let origin = SpriteRenderOrigin::AnimatedEntity(1);
+        let error = SpriteResolveError::AssetLoadFailed {
+            asset_kind: "sprite_atlas",
+            asset_name: "creatures".to_string(),
+            message: "file not found".to_string(),
+        };
+
+        let message = format_sprite_resolve_failure(&origin, &error);
+
+        assert!(message.contains("file not found"));
+    }
+}

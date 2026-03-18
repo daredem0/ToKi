@@ -1,6 +1,8 @@
 use super::*;
 use crate::ui::editor_ui::PlacementPreviewVisual;
-use toki_core::sprite_render::{collect_map_object_sprite_render_requests, SpriteRenderOrigin};
+use toki_core::sprite_render::{
+    collect_map_object_sprite_render_requests, format_sprite_resolve_failure, SpriteRenderOrigin,
+};
 
 impl SceneViewport {
     pub(super) fn prepare_scene_data(
@@ -154,9 +156,8 @@ impl SceneViewport {
 
         for failure in failures {
             tracing::warn!(
-                "Editor viewport failed to resolve sprite render request for {:?}: {:?}",
-                failure.origin,
-                failure.error
+                "Editor viewport: {}",
+                format_sprite_resolve_failure(&failure.origin, &failure.error)
             );
         }
 

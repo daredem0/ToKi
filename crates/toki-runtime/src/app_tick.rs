@@ -2,8 +2,8 @@ use std::time::Instant;
 
 use toki_core::camera::RuntimeState;
 use toki_core::sprite_render::{
-    collect_map_object_sprite_render_requests, resolve_sprite_render_requests,
-    sort_sprite_render_requests, SpriteRenderOrigin, SpriteResolveError,
+    collect_map_object_sprite_render_requests, format_sprite_resolve_failure,
+    resolve_sprite_render_requests, sort_sprite_render_requests,
 };
 use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
 use toki_core::{EventHandler, GameUpdateResult};
@@ -221,133 +221,10 @@ impl App {
 
         let (resolved, failures) = resolve_sprite_render_requests(&mut self.resources, &requests);
         for failure in failures {
-            Self::log_sprite_resolve_failure(&failure.origin, &failure.error);
+            tracing::warn!("{}", format_sprite_resolve_failure(&failure.origin, &failure.error));
         }
         for sprite in resolved {
             self.rendering.add_resolved_sprite(&sprite);
-        }
-    }
-
-    fn log_sprite_resolve_failure(origin: &SpriteRenderOrigin, error: &SpriteResolveError) {
-        match (origin, error) {
-            (
-                SpriteRenderOrigin::AnimatedEntity(entity_id),
-                SpriteResolveError::MissingAtlas { atlas_name },
-            ) => tracing::warn!(
-                "Entity {} requested missing sprite atlas '{}'",
-                entity_id,
-                atlas_name
-            ),
-            (
-                SpriteRenderOrigin::AnimatedEntity(entity_id),
-                SpriteResolveError::MissingAtlasTile {
-                    atlas_name,
-                    tile_name,
-                },
-            ) => tracing::warn!(
-                "Entity {} requested missing tile '{}' in atlas '{}'",
-                entity_id,
-                tile_name,
-                atlas_name
-            ),
-            (
-                SpriteRenderOrigin::StaticEntity(entity_id),
-                SpriteResolveError::MissingObjectSheet { sheet_name },
-            ) => tracing::warn!(
-                "Entity {} requested missing object sheet '{}'",
-                entity_id,
-                sheet_name
-            ),
-            (
-                SpriteRenderOrigin::StaticEntity(entity_id),
-                SpriteResolveError::MissingObject {
-                    sheet_name,
-                    object_name,
-                },
-            ) => tracing::warn!(
-                "Entity {} requested missing object '{}' in sheet '{}'",
-                entity_id,
-                object_name,
-                sheet_name
-            ),
-            (
-                SpriteRenderOrigin::Projectile(entity_id),
-                SpriteResolveError::MissingObjectSheet { sheet_name },
-            ) => tracing::warn!(
-                "Projectile {} requested missing object sheet '{}'",
-                entity_id,
-                sheet_name
-            ),
-            (
-                SpriteRenderOrigin::Projectile(entity_id),
-                SpriteResolveError::MissingObject {
-                    sheet_name,
-                    object_name,
-                },
-            ) => tracing::warn!(
-                "Projectile {} requested missing object '{}' in sheet '{}'",
-                entity_id,
-                object_name,
-                sheet_name
-            ),
-            (
-                SpriteRenderOrigin::MapObject {
-                    sheet_name,
-                    object_name: _,
-                    ..
-                },
-                SpriteResolveError::MissingObjectSheet { .. },
-            ) => tracing::warn!("Map object requested missing object sheet '{}'", sheet_name),
-            (
-                SpriteRenderOrigin::MapObject { sheet_name, .. },
-                SpriteResolveError::MissingObject { object_name, .. },
-            ) => tracing::warn!(
-                "Map object '{}' missing from object sheet '{}'",
-                object_name,
-                sheet_name
-            ),
-            (
-                SpriteRenderOrigin::AnimatedEntity(entity_id),
-                SpriteResolveError::AssetLoadFailed { message, .. },
-            ) => tracing::warn!(
-                "Entity {} sprite asset failed to load: {}",
-                entity_id,
-                message
-            ),
-            (
-                SpriteRenderOrigin::StaticEntity(entity_id),
-                SpriteResolveError::AssetLoadFailed { message, .. },
-            ) => tracing::warn!(
-                "Entity {} static sprite asset failed to load: {}",
-                entity_id,
-                message
-            ),
-            (
-                SpriteRenderOrigin::Projectile(entity_id),
-                SpriteResolveError::AssetLoadFailed { message, .. },
-            ) => tracing::warn!(
-                "Projectile {} sprite asset failed to load: {}",
-                entity_id,
-                message
-            ),
-            (
-                SpriteRenderOrigin::MapObject {
-                    object_name,
-                    sheet_name,
-                    ..
-                },
-                SpriteResolveError::AssetLoadFailed { message, .. },
-            ) => tracing::warn!(
-                "Map object '{}' in sheet '{}' failed to load: {}",
-                object_name,
-                sheet_name,
-                message
-            ),
-            (origin, error) => tracing::warn!(
-                "Failed to resolve sprite render request for {:?}: {:?}",
-                origin,
-                error
-            ),
         }
     }
 }

@@ -231,6 +231,104 @@ pub fn resolve_sprite_render_requests(
     (resolved, failures)
 }
 
+/// Formats a human-readable message describing a sprite resolution failure.
+///
+/// This consolidates the duplicate logging logic between runtime and editor,
+/// providing consistent error messages for sprite rendering issues.
+pub fn format_sprite_resolve_failure(origin: &SpriteRenderOrigin, error: &SpriteResolveError) -> String {
+    match (origin, error) {
+        (
+            SpriteRenderOrigin::AnimatedEntity(entity_id),
+            SpriteResolveError::MissingAtlas { atlas_name },
+        ) => format!(
+            "Entity {} requested missing sprite atlas '{}'",
+            entity_id, atlas_name
+        ),
+        (
+            SpriteRenderOrigin::AnimatedEntity(entity_id),
+            SpriteResolveError::MissingAtlasTile { atlas_name, tile_name },
+        ) => format!(
+            "Entity {} requested missing tile '{}' in atlas '{}'",
+            entity_id, tile_name, atlas_name
+        ),
+        (
+            SpriteRenderOrigin::StaticEntity(entity_id),
+            SpriteResolveError::MissingObjectSheet { sheet_name },
+        ) => format!(
+            "Entity {} requested missing object sheet '{}'",
+            entity_id, sheet_name
+        ),
+        (
+            SpriteRenderOrigin::StaticEntity(entity_id),
+            SpriteResolveError::MissingObject { sheet_name, object_name },
+        ) => format!(
+            "Entity {} requested missing object '{}' in sheet '{}'",
+            entity_id, object_name, sheet_name
+        ),
+        (
+            SpriteRenderOrigin::Projectile(entity_id),
+            SpriteResolveError::MissingObjectSheet { sheet_name },
+        ) => format!(
+            "Projectile {} requested missing object sheet '{}'",
+            entity_id, sheet_name
+        ),
+        (
+            SpriteRenderOrigin::Projectile(entity_id),
+            SpriteResolveError::MissingObject { sheet_name, object_name },
+        ) => format!(
+            "Projectile {} requested missing object '{}' in sheet '{}'",
+            entity_id, object_name, sheet_name
+        ),
+        (
+            SpriteRenderOrigin::MapObject { sheet_name, .. },
+            SpriteResolveError::MissingObjectSheet { .. },
+        ) => format!(
+            "Map object requested missing object sheet '{}'",
+            sheet_name
+        ),
+        (
+            SpriteRenderOrigin::MapObject { sheet_name, .. },
+            SpriteResolveError::MissingObject { object_name, .. },
+        ) => format!(
+            "Map object '{}' missing from object sheet '{}'",
+            object_name, sheet_name
+        ),
+        (
+            SpriteRenderOrigin::AnimatedEntity(entity_id),
+            SpriteResolveError::AssetLoadFailed { message, .. },
+        ) => format!(
+            "Entity {} sprite asset failed to load: {}",
+            entity_id, message
+        ),
+        (
+            SpriteRenderOrigin::StaticEntity(entity_id),
+            SpriteResolveError::AssetLoadFailed { message, .. },
+        ) => format!(
+            "Entity {} static sprite asset failed to load: {}",
+            entity_id, message
+        ),
+        (
+            SpriteRenderOrigin::Projectile(entity_id),
+            SpriteResolveError::AssetLoadFailed { message, .. },
+        ) => format!(
+            "Projectile {} sprite asset failed to load: {}",
+            entity_id, message
+        ),
+        (
+            SpriteRenderOrigin::MapObject { object_name, sheet_name, .. },
+            SpriteResolveError::AssetLoadFailed { message, .. },
+        ) => format!(
+            "Map object '{}' in sheet '{}' failed to load: {}",
+            object_name, sheet_name, message
+        ),
+        // Fallback for any combinations not explicitly handled
+        _ => format!(
+            "Failed to resolve sprite render request for {:?}: {:?}",
+            origin, error
+        ),
+    }
+}
+
 pub fn collect_map_object_sprite_render_requests(tilemap: &TileMap) -> Vec<SpriteRenderRequest> {
     tilemap
         .objects
