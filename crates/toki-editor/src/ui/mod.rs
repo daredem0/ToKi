@@ -2,6 +2,7 @@ pub mod editor_domain;
 pub mod editor_ui;
 pub mod hierarchy;
 pub mod inspector;
+pub mod inspector_trait;
 pub mod interactions;
 pub mod menus;
 pub mod panels;

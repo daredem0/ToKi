@@ -21,11 +21,14 @@ use toki_core::rules::{
 };
 
 mod assets;
+mod domain_inspectors;
 mod entities;
 mod map_editor;
 mod menu_editor;
 mod project;
 mod rules;
+
+pub use domain_inspectors::*;
 
 /// Handles inspector panel rendering for assets and entities
 pub struct InspectorSystem;
@@ -315,6 +318,7 @@ impl InspectorSystem {
         project: Option<&mut Project>,
         config: Option<&EditorConfig>,
     ) {
+        // Handle special editor modes first
         if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::MapEditor {
             Self::render_map_editor_command_palette(ui_state, ui, ctx, config);
             return;
@@ -325,160 +329,21 @@ impl InspectorSystem {
             return;
         }
 
+        // Use trait-based dispatch for selection inspectors
+        use super::inspector_trait::InspectorContext;
+
         let current_selection = ui_state.selection.clone();
-        match current_selection.as_ref() {
-            Some(Selection::Scene(scene_name)) => {
-                ui.heading(format!("🎬 {}", scene_name));
-                ui.separator();
+        let mut inspector = create_inspector_for_selection(current_selection.as_ref());
 
-                if let Some(scene) = ui_state.get_scene(scene_name) {
-                    ui.horizontal(|ui| {
-                        ui.label("Maps:");
-                        ui.label(format!("{}", scene.maps.len()));
-                    });
+        let mut inspector_ctx = InspectorContext {
+            ui_state,
+            ctx,
+            game_state,
+            project,
+            config,
+        };
 
-                    ui.horizontal(|ui| {
-                        ui.label("Entities:");
-                        ui.label(format!("{}", scene.entities.len()));
-                    });
-
-                    ui.separator();
-                    ui.label("Scene Actions:");
-
-                    if ui.button("🗺 Add Map").clicked() {
-                        tracing::info!("Add Map to scene: {}", scene_name);
-                    }
-
-                    if ui.button("👤 Add Entity").clicked() {
-                        tracing::info!("Add Entity to scene: {}", scene_name);
-                    }
-                }
-
-                if let Some(scene_index) = ui_state
-                    .scenes
-                    .iter()
-                    .position(|scene| scene.name == *scene_name)
-                {
-                    ui.separator();
-                    let before_rules = ui_state.scenes[scene_index].rules.clone();
-                    let mut edited_rules = before_rules.clone();
-                    let rules_changed =
-                        Self::render_scene_rules_editor(ui, scene_name, &mut edited_rules, config);
-                    if rules_changed && edited_rules != before_rules {
-                        let before_graph = ui_state.rule_graph_for_scene(scene_name).cloned();
-                        let after_graph = RuleGraph::from_rule_set(&edited_rules);
-                        let before_layout =
-                            ui_state.graph.layouts_by_scene.get(scene_name).cloned();
-                        let (zoom, pan) = ui_state.graph_view_for_scene(scene_name);
-                        let _ = ui_state.execute_scene_rules_graph_command(
-                            scene_name,
-                            SceneRulesGraphCommandData {
-                                before_rule_set: before_rules,
-                                after_rule_set: edited_rules,
-                                before_graph,
-                                after_graph,
-                                before_layout,
-                                zoom,
-                                pan,
-                            },
-                        );
-                    }
-                }
-            }
-            Some(Selection::RuleGraphNode {
-                scene_name,
-                node_key,
-            }) => {
-                ui.heading("🧩 Scene Rule Node");
-                ui.label(format!("Scene: {}", scene_name));
-                ui.monospace(node_key);
-                ui.separator();
-
-                let changed = Self::render_selected_rule_graph_node_editor(
-                    ui, ui_state, scene_name, node_key, config,
-                );
-
-                if changed {
-                    ui_state.scene_content_changed = true;
-                }
-            }
-            Some(Selection::Map(scene_name, map_name)) => {
-                ui.heading(format!("🗺️ {}", map_name));
-                ui.label(format!("Scene: {}", scene_name));
-                ui.separator();
-
-                Self::render_map_details(
-                    ui,
-                    map_name,
-                    config,
-                    Some(scene_name),
-                    &mut ui_state.map.load_requested,
-                );
-            }
-            Some(Selection::Entity(entity_id)) => {
-                let mut entity_changed = false;
-                if ui_state.has_multi_entity_selection() {
-                    ui.heading(format!(
-                        "👥 {} Entities",
-                        ui_state.selected_entity_ids().len()
-                    ));
-                    ui.separator();
-                    entity_changed = Self::render_multi_scene_entity_editor(ui, ui_state);
-                } else {
-                    ui.separator();
-                    ui.heading(format!("👤 Entity {}", entity_id));
-                    ui.separator();
-                    if let Some(scene_entity) =
-                        Self::find_selected_scene_entity(ui_state, *entity_id)
-                    {
-                        let mut draft = EntityPropertyDraft::from_entity(&scene_entity);
-                        if Self::render_scene_entity_editor(ui, &mut draft, config) {
-                            entity_changed = Self::apply_entity_property_draft_with_undo(
-                                ui_state, *entity_id, &draft,
-                            );
-                        }
-                    } else {
-                        ui.label("Runtime-only entity (read-only)");
-                        ui.separator();
-                        Self::render_runtime_entity_read_only(ui, game_state, *entity_id);
-                    }
-                }
-
-                if entity_changed {
-                    ui_state.scene_content_changed = true;
-                }
-            }
-            Some(Selection::StandaloneMap(map_name)) => {
-                ui.heading(format!("🗺️ {}", map_name));
-                ui.label("(Standalone map - not in scene)");
-                ui.separator();
-
-                Self::render_map_details(
-                    ui,
-                    map_name,
-                    config,
-                    None,
-                    &mut ui_state.map.load_requested,
-                );
-            }
-            Some(Selection::EntityDefinition(entity_name)) => {
-                ui.heading(format!("🤖 {}", entity_name));
-                ui.label("Entity Definition");
-                ui.separator();
-
-                Self::render_entity_definition_details(ui, entity_name, config);
-            }
-            Some(Selection::MenuScreen(_))
-            | Some(Selection::MenuDialog(_))
-            | Some(Selection::MenuEntry { .. }) => {
-                ui.label("Menu selection available only in Menu Editor.");
-            }
-            None => {
-                ui.label("No selection");
-                ui.separator();
-                ui.label("Click on an item in the hierarchy to inspect it.");
-            }
-        }
+        inspector.render(ui, &mut inspector_ctx);
     }
 
     fn discover_audio_asset_names(dir: &std::path::Path) -> Vec<String> {
