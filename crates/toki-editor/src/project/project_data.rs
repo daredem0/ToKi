@@ -191,6 +191,22 @@ impl Project {
         self.is_dirty = false;
     }
 
+    /// Get a reference to the runtime audio configuration.
+    ///
+    /// This accessor reduces message chain depth from
+    /// `project.metadata.runtime.audio` to `project.audio_config()`.
+    pub fn audio_config(&self) -> &toki_core::project_runtime::RuntimeAudioMixSettings {
+        &self.metadata.runtime.audio
+    }
+
+    /// Get a mutable reference to the runtime audio configuration.
+    ///
+    /// This accessor reduces message chain depth from
+    /// `project.metadata.runtime.audio` to `project.audio_config_mut()`.
+    pub fn audio_config_mut(&mut self) -> &mut toki_core::project_runtime::RuntimeAudioMixSettings {
+        &mut self.metadata.runtime.audio
+    }
+
     /// Load project metadata from project.toml
     pub fn load_metadata(&mut self) -> Result<()> {
         let project_file = self.project_file_path();

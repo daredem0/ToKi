@@ -33,6 +33,17 @@ pub use domain_inspectors::*;
 /// Handles inspector panel rendering for assets and entities
 pub struct InspectorSystem;
 
+/// Value object grouping collision-related entity properties
+#[derive(Debug, Clone)]
+pub struct CollisionDraft {
+    pub enabled: bool,
+    pub offset_x: i32,
+    pub offset_y: i32,
+    pub size_x: i64,
+    pub size_y: i64,
+    pub trigger: bool,
+}
+
 #[derive(Debug, Clone)]
 struct EntityPropertyDraft {
     category: String,
@@ -60,12 +71,7 @@ struct EntityPropertyDraft {
     health_value: i64,
     attack_power_enabled: bool,
     attack_power_value: i64,
-    collision_enabled: bool,
-    collision_offset_x: i32,
-    collision_offset_y: i32,
-    collision_size_x: i64,
-    collision_size_y: i64,
-    collision_trigger: bool,
+    collision: CollisionDraft,
 }
 
 #[derive(Debug, Clone)]
@@ -137,31 +143,24 @@ struct RuleAudioChoices {
 
 impl EntityPropertyDraft {
     fn from_entity(entity: &toki_core::entity::Entity) -> Self {
-        let (
-            collision_enabled,
-            collision_offset_x,
-            collision_offset_y,
-            collision_size_x,
-            collision_size_y,
-            collision_trigger,
-        ) = if let Some(collision_box) = &entity.collision_box {
-            (
-                true,
-                collision_box.offset.x,
-                collision_box.offset.y,
-                collision_box.size.x as i64,
-                collision_box.size.y as i64,
-                collision_box.trigger,
-            )
+        let collision = if let Some(collision_box) = &entity.collision_box {
+            CollisionDraft {
+                enabled: true,
+                offset_x: collision_box.offset.x,
+                offset_y: collision_box.offset.y,
+                size_x: collision_box.size.x as i64,
+                size_y: collision_box.size.y as i64,
+                trigger: collision_box.trigger,
+            }
         } else {
-            (
-                false,
-                0,
-                0,
-                entity.size.x as i64,
-                entity.size.y as i64,
-                false,
-            )
+            CollisionDraft {
+                enabled: false,
+                offset_x: 0,
+                offset_y: 0,
+                size_x: entity.size.x as i64,
+                size_y: entity.size.y as i64,
+                trigger: false,
+            }
         };
 
         let (health_enabled, health_value) = match entity.attributes.health {
@@ -208,12 +207,7 @@ impl EntityPropertyDraft {
             health_value,
             attack_power_enabled,
             attack_power_value,
-            collision_enabled,
-            collision_offset_x,
-            collision_offset_y,
-            collision_size_x,
-            collision_size_y,
-            collision_trigger,
+            collision,
         }
     }
 }
@@ -226,10 +220,10 @@ impl ProjectSettingsDraft {
             description: project.metadata.project.description.clone(),
             splash_duration_ms: project.metadata.runtime.splash.duration_ms,
             show_entity_health_bars: project.metadata.runtime.display.show_entity_health_bars,
-            master_mix_percent: project.metadata.runtime.audio.master_percent,
-            music_mix_percent: project.metadata.runtime.audio.music_percent,
-            movement_mix_percent: project.metadata.runtime.audio.movement_percent,
-            collision_mix_percent: project.metadata.runtime.audio.collision_percent,
+            master_mix_percent: project.audio_config().master_percent,
+            music_mix_percent: project.audio_config().music_percent,
+            movement_mix_percent: project.audio_config().movement_percent,
+            collision_mix_percent: project.audio_config().collision_percent,
         }
     }
 }

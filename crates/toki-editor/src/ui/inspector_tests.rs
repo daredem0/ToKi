@@ -100,12 +100,12 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
     draft.health_value = -4;
     draft.attack_power_enabled = true;
     draft.attack_power_value = 12;
-    draft.collision_enabled = true;
-    draft.collision_offset_x = 3;
-    draft.collision_offset_y = -2;
-    draft.collision_size_x = 0;
-    draft.collision_size_y = -7;
-    draft.collision_trigger = true;
+    draft.collision.enabled = true;
+    draft.collision.offset_x = 3;
+    draft.collision.offset_y = -2;
+    draft.collision.size_x = 0;
+    draft.collision.size_y = -7;
+    draft.collision.trigger = true;
 
     let changed = InspectorSystem::apply_entity_property_draft(&mut entity, &draft);
 
@@ -161,7 +161,7 @@ fn apply_entity_property_draft_disables_health_and_collision() {
     let mut draft = EntityPropertyDraft::from_entity(&entity);
     draft.health_enabled = false;
     draft.attack_power_enabled = false;
-    draft.collision_enabled = false;
+    draft.collision.enabled = false;
 
     let changed = InspectorSystem::apply_entity_property_draft(&mut entity, &draft);
 
@@ -1039,4 +1039,39 @@ fn save_entity_definition_persists_audio_updates() {
         reloaded.attributes.stats.get(ATTACK_POWER_STAT_ID).copied(),
         Some(14)
     );
+}
+
+#[test]
+fn collision_draft_groups_collision_fields() {
+    use super::CollisionDraft;
+
+    let draft = CollisionDraft {
+        enabled: true,
+        offset_x: 4,
+        offset_y: 8,
+        size_x: 12,
+        size_y: 14,
+        trigger: true,
+    };
+
+    assert!(draft.enabled);
+    assert_eq!(draft.offset_x, 4);
+    assert_eq!(draft.offset_y, 8);
+    assert_eq!(draft.size_x, 12);
+    assert_eq!(draft.size_y, 14);
+    assert!(draft.trigger);
+}
+
+#[test]
+fn entity_property_draft_uses_collision_draft() {
+    let entity = sample_entity_with_id(1);
+    let draft = EntityPropertyDraft::from_entity(&entity);
+
+    // Access collision properties through the grouped struct
+    assert!(draft.collision.enabled);
+    assert_eq!(draft.collision.offset_x, 0);
+    assert_eq!(draft.collision.offset_y, 0);
+    assert_eq!(draft.collision.size_x, 16);
+    assert_eq!(draft.collision.size_y, 16);
+    assert!(!draft.collision.trigger);
 }

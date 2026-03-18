@@ -797,3 +797,33 @@ fn submit_new_project_request_requires_non_empty_name() {
 
     assert!(ui.project.new_project_submit_requested.is_none(), "should not create request with empty name");
 }
+
+#[test]
+fn map_load_request_stores_scene_and_map_name() {
+    use super::MapLoadRequest;
+
+    let request = MapLoadRequest {
+        scene_name: "overworld".to_string(),
+        map_name: "forest".to_string(),
+    };
+
+    assert_eq!(request.scene_name, "overworld");
+    assert_eq!(request.map_name, "forest");
+}
+
+#[test]
+fn map_editor_load_requested_uses_struct_instead_of_tuple() {
+    use super::MapLoadRequest;
+
+    let mut ui = EditorUI::new();
+    assert!(ui.map.load_requested.is_none());
+
+    ui.map.load_requested = Some(MapLoadRequest {
+        scene_name: "main_scene".to_string(),
+        map_name: "town_map".to_string(),
+    });
+
+    let request = ui.map.load_requested.as_ref().unwrap();
+    assert_eq!(request.scene_name, "main_scene");
+    assert_eq!(request.map_name, "town_map");
+}

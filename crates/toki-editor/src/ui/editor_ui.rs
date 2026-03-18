@@ -313,9 +313,16 @@ impl Default for GraphEditorState {
     }
 }
 
+/// Request to load a map from a specific scene
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MapLoadRequest {
+    pub scene_name: String,
+    pub map_name: String,
+}
+
 /// Map editor state: tilemap editing tools, selection, drafts, and history
 pub struct MapEditorState {
-    pub load_requested: Option<(String, String)>, // (scene_name, map_name)
+    pub load_requested: Option<MapLoadRequest>,
     pub active_map: Option<String>,
     pub map_load_requested: Option<String>,
     pub draft: Option<MapEditorDraft>,

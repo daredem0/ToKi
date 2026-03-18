@@ -87,10 +87,10 @@ pub fn export_hybrid_bundle(
                 duration_ms: Some(splash_duration_ms),
             }),
             audio: Some(RuntimeConfigAudio {
-                master_percent: Some(project.metadata.runtime.audio.master_percent),
-                music_percent: Some(project.metadata.runtime.audio.music_percent),
-                movement_percent: Some(project.metadata.runtime.audio.movement_percent),
-                collision_percent: Some(project.metadata.runtime.audio.collision_percent),
+                master_percent: Some(project.audio_config().master_percent),
+                music_percent: Some(project.audio_config().music_percent),
+                movement_percent: Some(project.audio_config().movement_percent),
+                collision_percent: Some(project.audio_config().collision_percent),
             }),
             display: Some(RuntimeConfigDisplay {
                 show_entity_health_bars: Some(

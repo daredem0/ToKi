@@ -255,16 +255,16 @@ impl InspectorSystem {
         ui.separator();
         ui.label("Collision");
         changed |= ui
-            .checkbox(&mut draft.collision_enabled, "Enabled")
+            .checkbox(&mut draft.collision.enabled, "Enabled")
             .changed();
-        if draft.collision_enabled {
+        if draft.collision.enabled {
             ui.horizontal(|ui| {
                 ui.label("Offset:");
                 changed |= ui
-                    .add(egui::DragValue::new(&mut draft.collision_offset_x).speed(1.0))
+                    .add(egui::DragValue::new(&mut draft.collision.offset_x).speed(1.0))
                     .changed();
                 changed |= ui
-                    .add(egui::DragValue::new(&mut draft.collision_offset_y).speed(1.0))
+                    .add(egui::DragValue::new(&mut draft.collision.offset_y).speed(1.0))
                     .changed();
             });
 
@@ -272,14 +272,14 @@ impl InspectorSystem {
                 ui.label("Size:");
                 changed |= ui
                     .add(
-                        egui::DragValue::new(&mut draft.collision_size_x)
+                        egui::DragValue::new(&mut draft.collision.size_x)
                             .speed(1.0)
                             .range(1..=i64::MAX),
                     )
                     .changed();
                 changed |= ui
                     .add(
-                        egui::DragValue::new(&mut draft.collision_size_y)
+                        egui::DragValue::new(&mut draft.collision.size_y)
                             .speed(1.0)
                             .range(1..=i64::MAX),
                     )
@@ -287,7 +287,7 @@ impl InspectorSystem {
             });
 
             changed |= ui
-                .checkbox(&mut draft.collision_trigger, "Trigger")
+                .checkbox(&mut draft.collision.trigger, "Trigger")
                 .changed();
         }
 
@@ -864,7 +864,7 @@ impl InspectorSystem {
             new_attack_power,
         );
 
-        if draft.collision_enabled {
+        if draft.collision.enabled {
             if entity.collision_box.is_none() {
                 entity.collision_box =
                     Some(toki_core::collision::CollisionBox::solid_box(entity.size));
@@ -874,16 +874,16 @@ impl InspectorSystem {
             if let Some(collision_box) = entity.collision_box.as_mut() {
                 changed |= set_if_changed(
                     &mut collision_box.offset,
-                    glam::IVec2::new(draft.collision_offset_x, draft.collision_offset_y),
+                    glam::IVec2::new(draft.collision.offset_x, draft.collision.offset_y),
                 );
                 changed |= set_if_changed(
                     &mut collision_box.size,
                     glam::UVec2::new(
-                        clamp_to_min_one_u32(draft.collision_size_x),
-                        clamp_to_min_one_u32(draft.collision_size_y),
+                        clamp_to_min_one_u32(draft.collision.size_x),
+                        clamp_to_min_one_u32(draft.collision.size_y),
                     ),
                 );
-                changed |= set_if_changed(&mut collision_box.trigger, draft.collision_trigger);
+                changed |= set_if_changed(&mut collision_box.trigger, draft.collision.trigger);
             }
         } else if entity.collision_box.is_some() {
             entity.collision_box = None;

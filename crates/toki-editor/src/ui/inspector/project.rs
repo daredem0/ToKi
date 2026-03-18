@@ -178,20 +178,20 @@ impl InspectorSystem {
                 draft.show_entity_health_bars;
             changed = true;
         }
-        if project.metadata.runtime.audio.master_percent != draft.master_mix_percent {
-            project.metadata.runtime.audio.master_percent = draft.master_mix_percent;
+        if project.audio_config().master_percent != draft.master_mix_percent {
+            project.audio_config_mut().master_percent = draft.master_mix_percent;
             changed = true;
         }
-        if project.metadata.runtime.audio.music_percent != draft.music_mix_percent {
-            project.metadata.runtime.audio.music_percent = draft.music_mix_percent;
+        if project.audio_config().music_percent != draft.music_mix_percent {
+            project.audio_config_mut().music_percent = draft.music_mix_percent;
             changed = true;
         }
-        if project.metadata.runtime.audio.movement_percent != draft.movement_mix_percent {
-            project.metadata.runtime.audio.movement_percent = draft.movement_mix_percent;
+        if project.audio_config().movement_percent != draft.movement_mix_percent {
+            project.audio_config_mut().movement_percent = draft.movement_mix_percent;
             changed = true;
         }
-        if project.metadata.runtime.audio.collision_percent != draft.collision_mix_percent {
-            project.metadata.runtime.audio.collision_percent = draft.collision_mix_percent;
+        if project.audio_config().collision_percent != draft.collision_mix_percent {
+            project.audio_config_mut().collision_percent = draft.collision_mix_percent;
             changed = true;
         }
 

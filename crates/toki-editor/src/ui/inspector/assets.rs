@@ -1,4 +1,5 @@
 use super::*;
+use crate::ui::editor_ui::MapLoadRequest;
 
 impl InspectorSystem {
     pub(super) fn render_map_details(
@@ -6,7 +7,7 @@ impl InspectorSystem {
         map_name: &str,
         config: Option<&EditorConfig>,
         scene_name: Option<&str>,
-        map_load_requested: &mut Option<(String, String)>,
+        map_load_requested: &mut Option<MapLoadRequest>,
     ) {
         // Try to load and show map details
         if let Some(config) = config {
@@ -94,10 +95,10 @@ impl InspectorSystem {
                                                 map_name,
                                                 scene_name
                                             );
-                                            *map_load_requested = Some((
-                                                scene_name.to_string(),
-                                                map_name.to_string(),
-                                            ));
+                                            *map_load_requested = Some(MapLoadRequest {
+                                                scene_name: scene_name.to_string(),
+                                                map_name: map_name.to_string(),
+                                            });
                                         }
                                     } else {
                                         ui.label("(Not associated with a scene)");

@@ -112,3 +112,27 @@ fn new_project_uses_derived_editor_version() {
         env!("TOKI_VERSION")
     );
 }
+
+#[test]
+fn audio_config_accessor_reduces_message_chain() {
+    let mut project = Project::new("Demo".to_string(), PathBuf::from("/tmp/Demo"));
+    project.metadata.runtime.audio.master_percent = 75;
+    project.metadata.runtime.audio.music_percent = 60;
+
+    // Use accessor instead of deep navigation
+    let audio = project.audio_config();
+    assert_eq!(audio.master_percent, 75);
+    assert_eq!(audio.music_percent, 60);
+}
+
+#[test]
+fn audio_config_mut_accessor_allows_modification() {
+    let mut project = Project::new("Demo".to_string(), PathBuf::from("/tmp/Demo"));
+
+    // Use mutable accessor instead of deep navigation
+    project.audio_config_mut().master_percent = 50;
+    project.audio_config_mut().music_percent = 40;
+
+    assert_eq!(project.metadata.runtime.audio.master_percent, 50);
+    assert_eq!(project.metadata.runtime.audio.music_percent, 40);
+}

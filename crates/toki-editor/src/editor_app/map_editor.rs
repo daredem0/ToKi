@@ -73,7 +73,9 @@ impl EditorApp {
 
     pub(super) fn handle_map_requests(&mut self) {
         // Handle Map Loading request
-        if let Some((scene_name, map_name)) = self.core.ui.map.load_requested.take() {
+        if let Some(request) = self.core.ui.map.load_requested.take() {
+            let scene_name = request.scene_name;
+            let map_name = request.map_name;
             if let Some(config) = self.core.config.current_project_path() {
                 let map_file = config
                     .join("assets")
