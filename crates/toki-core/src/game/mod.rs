@@ -10,22 +10,14 @@ use crate::events::{GameEvent, GameUpdateResult};
 use crate::rules::{RuleSet, RuleTrigger};
 use crate::scene_manager::SceneManager;
 
-#[path = "game_animation.rs"]
-mod game_animation;
-#[path = "game_combat.rs"]
-mod game_combat;
-#[path = "game_input.rs"]
-mod game_input;
-#[path = "game_inventory.rs"]
-mod game_inventory;
-#[path = "game_movement.rs"]
-mod game_movement;
-#[path = "game_render_queries.rs"]
-mod game_render_queries;
-#[path = "game_rules.rs"]
-mod game_rules;
-#[path = "game_scene.rs"]
-mod game_scene;
+mod animation;
+mod combat;
+mod input;
+mod inventory;
+mod movement;
+mod render_queries;
+mod rules;
+mod scene;
 
 /// Core input keys abstraction (platform-independent)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -131,8 +123,8 @@ pub struct GameState {
     pending_stat_changes: Vec<StatChangeRequest>,
 }
 
-use game_combat::StatChangeRequest;
-use game_rules::RuleRuntimeState;
+use combat::StatChangeRequest;
+use rules::RuleRuntimeState;
 
 impl GameState {
     fn effective_movement_profile(entity: &Entity) -> MovementProfile {

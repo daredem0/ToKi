@@ -3,7 +3,7 @@ use crate::collision;
 use crate::collision::CollisionBox;
 use crate::entity::{Entity, EntityId, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID};
 
-use super::game_animation::FacingDirection;
+use super::animation::FacingDirection;
 use super::{GameState, InputAction};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
