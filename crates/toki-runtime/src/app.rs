@@ -82,6 +82,8 @@ pub struct RuntimeDisplayOptions {
     pub show_entity_health_bars: bool,
     pub resolution_width: u32,
     pub resolution_height: u32,
+    /// Zoom level as percentage (100 = 1.0x, 200 = 2.0x, etc.)
+    pub zoom_percent: u32,
 }
 
 impl Default for RuntimeDisplayOptions {
@@ -90,7 +92,15 @@ impl Default for RuntimeDisplayOptions {
             show_entity_health_bars: false,
             resolution_width: toki_core::project_runtime::default_resolution_width(),
             resolution_height: toki_core::project_runtime::default_resolution_height(),
+            zoom_percent: toki_core::project_runtime::default_zoom_percent(),
         }
+    }
+}
+
+impl RuntimeDisplayOptions {
+    /// Returns the zoom level as a float (1.0 = 100%, 2.0 = 200%, etc.)
+    pub fn zoom_factor(&self) -> f32 {
+        self.zoom_percent as f32 / 100.0
     }
 }
 
@@ -153,7 +163,9 @@ impl App {
 
         let resolution_width = launch_options.display.resolution_width;
         let resolution_height = launch_options.display.resolution_height;
-        let mut camera = Camera::with_resolution(resolution_width, resolution_height);
+        let zoom_factor = launch_options.display.zoom_factor();
+        let mut camera =
+            Camera::with_resolution_and_zoom(resolution_width, resolution_height, zoom_factor);
         camera.center_on(glam::IVec2::new(
             (resolution_width / 2) as i32,
             (resolution_height / 2) as i32,

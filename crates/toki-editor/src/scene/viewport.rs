@@ -127,7 +127,7 @@ impl SceneViewport {
         resolution_height: u32,
     ) -> Result<Self> {
         let mut camera = Camera::with_resolution(resolution_width, resolution_height);
-        camera.scale = 1;
+        camera.zoom = 1.0;
         let center_x = (resolution_width / 2) as i32;
         let center_y = (resolution_height / 2) as i32;
         camera.center_on(glam::IVec2::new(center_x, center_y));
@@ -212,7 +212,9 @@ impl SceneViewport {
     }
 
     fn effective_camera_scale(&self) -> f32 {
-        self.camera.scale as f32 * self.editor_zoom_scale
+        // In editor mode, we use the editor's zoom scale for viewing
+        // The camera.zoom is for game runtime zoom-in effect
+        (1.0 / self.camera.zoom) * self.editor_zoom_scale
     }
 
     fn calculate_editor_projection(&self) -> glam::Mat4 {

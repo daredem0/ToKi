@@ -98,6 +98,7 @@ pub fn export_hybrid_bundle(
                 ),
                 resolution_width: Some(project.metadata.runtime.display.resolution_width),
                 resolution_height: Some(project.metadata.runtime.display.resolution_height),
+                zoom_percent: Some(project.metadata.runtime.display.zoom_percent),
             }),
             menu: Some(project.metadata.runtime.menu.clone()),
         },

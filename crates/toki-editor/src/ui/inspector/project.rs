@@ -41,6 +41,53 @@ impl InspectorSystem {
         });
 
         ui.separator();
+        ui.collapsing("Display", |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Resolution Width:");
+                changed |= ui
+                    .add(
+                        egui::DragValue::new(&mut draft.resolution_width)
+                            .speed(1.0)
+                            .range(1..=1920),
+                    )
+                    .changed();
+            });
+            ui.horizontal(|ui| {
+                ui.label("Resolution Height:");
+                changed |= ui
+                    .add(
+                        egui::DragValue::new(&mut draft.resolution_height)
+                            .speed(1.0)
+                            .range(1..=1080),
+                    )
+                    .changed();
+            });
+            ui.horizontal(|ui| {
+                ui.label("Zoom:");
+                let zoom_float = draft.zoom_percent as f32 / 100.0;
+                let mut zoom_display = zoom_float;
+                if ui
+                    .add(
+                        egui::DragValue::new(&mut zoom_display)
+                            .speed(0.1)
+                            .range(0.1..=10.0)
+                            .suffix("x"),
+                    )
+                    .changed()
+                {
+                    draft.zoom_percent = (zoom_display * 100.0).round() as u32;
+                    changed = true;
+                }
+            });
+            changed |= ui
+                .checkbox(
+                    &mut draft.show_entity_health_bars,
+                    "Show Entity Health Bars",
+                )
+                .changed();
+        });
+
+        ui.separator();
         ui.collapsing("Runtime", |ui| {
             ui.horizontal(|ui| {
                 ui.label("Splash Duration (ms):");
@@ -52,12 +99,6 @@ impl InspectorSystem {
                     )
                     .changed();
             });
-            changed |= ui
-                .checkbox(
-                    &mut draft.show_entity_health_bars,
-                    "Show Entity Health Bars",
-                )
-                .changed();
         });
 
         ui.separator();
@@ -176,6 +217,18 @@ impl InspectorSystem {
         {
             project.metadata.runtime.display.show_entity_health_bars =
                 draft.show_entity_health_bars;
+            changed = true;
+        }
+        if project.metadata.runtime.display.resolution_width != draft.resolution_width {
+            project.metadata.runtime.display.resolution_width = draft.resolution_width;
+            changed = true;
+        }
+        if project.metadata.runtime.display.resolution_height != draft.resolution_height {
+            project.metadata.runtime.display.resolution_height = draft.resolution_height;
+            changed = true;
+        }
+        if project.metadata.runtime.display.zoom_percent != draft.zoom_percent {
+            project.metadata.runtime.display.zoom_percent = draft.zoom_percent;
             changed = true;
         }
         if project.audio_config().master_percent != draft.master_mix_percent {

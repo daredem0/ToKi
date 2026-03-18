@@ -144,6 +144,7 @@ impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let content_root = self.content_root_path().map(std::path::Path::to_path_buf);
 
+        // Window size is the game resolution (zoom affects camera view, not window size)
         self.platform.initialize_window(
             event_loop,
             self.launch_options.display.resolution_width,

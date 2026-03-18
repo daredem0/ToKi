@@ -7,7 +7,7 @@ fn sample_camera_manager() -> CameraManager {
     let camera = Camera {
         position: glam::IVec2::new(0, 0),
         viewport_size: glam::UVec2::new(32, 32),
-        scale: 1,
+        zoom: 1.0,
     };
     let controller = CameraController {
         mode: CameraMode::FreeScroll,
@@ -59,7 +59,41 @@ fn update_with_follow_mode_moves_camera_and_view_matrix_matches() {
     assert!(changed);
     let position = manager.position();
     let view = manager.view_matrix();
-    let expected =
+    // With zoom = 1.0, the view matrix should be scale(1) * translate(-pos)
+    let translation =
         glam::Mat4::from_translation(glam::vec3(-(position.x as f32), -(position.y as f32), 0.0));
+    let scale = glam::Mat4::from_scale(glam::vec3(1.0, 1.0, 1.0));
+    let expected = scale * translation;
     assert_eq!(view, expected);
+}
+
+#[test]
+fn view_matrix_includes_zoom_scale() {
+    let camera = Camera {
+        position: glam::IVec2::new(100, 50),
+        viewport_size: glam::UVec2::new(160, 144),
+        zoom: 2.0,
+    };
+    let controller = CameraController {
+        mode: CameraMode::FreeScroll,
+    };
+    let manager = CameraManager::new(camera, controller);
+
+    let view = manager.view_matrix();
+    // View matrix should be: scale(zoom) * translate(-position)
+    let translation = glam::Mat4::from_translation(glam::vec3(-100.0, -50.0, 0.0));
+    let scale = glam::Mat4::from_scale(glam::vec3(2.0, 2.0, 1.0));
+    let expected = scale * translation;
+    assert_eq!(view, expected);
+
+    // Verify that a world point is transformed correctly:
+    // World point (100, 50) should map to origin (0, 0) after translation, then scaled
+    let point = glam::vec4(100.0, 50.0, 0.0, 1.0);
+    let transformed = view * point;
+    assert_eq!(transformed, glam::vec4(0.0, 0.0, 0.0, 1.0));
+
+    // World point (108, 50) should be 8 pixels right of camera, scaled by 2 = 16 screen pixels
+    let point2 = glam::vec4(108.0, 50.0, 0.0, 1.0);
+    let transformed2 = view * point2;
+    assert_eq!(transformed2, glam::vec4(16.0, 0.0, 0.0, 1.0));
 }

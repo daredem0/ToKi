@@ -88,13 +88,18 @@ impl CameraManager {
         self.camera.viewport_size
     }
 
-    /// Create view matrix for rendering
+    /// Create view matrix for rendering.
+    /// Combines translation (camera position) and scale (zoom factor).
+    /// Zoom > 1 means zoomed in (world appears larger), zoom < 1 means zoomed out.
     pub fn view_matrix(&self) -> glam::Mat4 {
-        glam::Mat4::from_translation(glam::vec3(
+        let translation = glam::Mat4::from_translation(glam::vec3(
             -(self.camera.position.x as f32),
             -(self.camera.position.y as f32),
             0.0,
-        ))
+        ));
+        let scale = glam::Mat4::from_scale(glam::vec3(self.camera.zoom, self.camera.zoom, 1.0));
+        // Apply translation first (move to camera origin), then scale
+        scale * translation
     }
 
     /// Get camera projection matrix

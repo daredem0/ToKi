@@ -188,6 +188,9 @@ fn apply_runtime_config(
         if let Some(resolution_height) = display.resolution_height {
             launch_options.display.resolution_height = resolution_height;
         }
+        if let Some(zoom_percent) = display.zoom_percent {
+            launch_options.display.zoom_percent = zoom_percent;
+        }
     }
     if let Some(menu) = config.menu {
         launch_options.menu = menu;
@@ -297,6 +300,7 @@ fn apply_project_runtime_settings_from_project_file_if_present(
             metadata.runtime.display.show_entity_health_bars;
         launch_options.display.resolution_width = metadata.runtime.display.resolution_width;
         launch_options.display.resolution_height = metadata.runtime.display.resolution_height;
+        launch_options.display.zoom_percent = metadata.runtime.display.zoom_percent;
     }
     if should_apply_menu {
         launch_options.menu = metadata.runtime.menu;

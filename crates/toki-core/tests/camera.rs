@@ -24,7 +24,7 @@ fn camera_new_has_correct_defaults() {
     let camera = Camera::new();
     assert_eq!(camera.position, IVec2::ZERO);
     assert_eq!(camera.viewport_size, UVec2::new(160, 144));
-    assert_eq!(camera.scale, 1);
+    assert_eq!(camera.zoom, 1.0);
 }
 
 #[test]
@@ -34,7 +34,7 @@ fn camera_default_matches_new() {
 
     assert_eq!(camera_new.position, camera_default.position);
     assert_eq!(camera_new.viewport_size, camera_default.viewport_size);
-    assert_eq!(camera_new.scale, camera_default.scale);
+    assert_eq!(camera_new.zoom, camera_default.zoom);
 }
 
 #[test]
@@ -58,8 +58,10 @@ fn camera_center_on_positions_correctly() {
 
     camera.center_on(target);
 
-    // Target should be at viewport center
-    let expected_pos = target - camera.viewport_size.as_ivec2() / 2;
+    // With zoom = 1.0, visible area is viewport_size
+    // Center on target: position = target - visible_size / 2
+    let visible_size = camera.visible_world_size();
+    let expected_pos = target - IVec2::new(visible_size.x as i32 / 2, visible_size.y as i32 / 2);
     assert_eq!(camera.position, expected_pos);
     assert_eq!(camera.position, IVec2::new(20, 28)); // 100 - 160/2, 100 - 144/2
 }
@@ -69,7 +71,7 @@ fn camera_center_on_with_different_viewport_sizes() {
     let mut camera = Camera {
         position: IVec2::ZERO,
         viewport_size: UVec2::new(320, 240),
-        scale: 1,
+        zoom: 1.0,
     };
 
     camera.center_on(IVec2::new(200, 150));
@@ -107,17 +109,16 @@ fn camera_calculate_projection_with_offset() {
 }
 
 #[test]
-fn camera_calculate_projection_with_scale() {
+fn camera_calculate_projection_with_zoom() {
     let mut camera = Camera::new();
-    camera.scale = 2;
+    camera.zoom = 2.0; // Zoom in 2x, showing half the world
 
     let projection = camera.calculate_projection();
 
     // Matrix should be valid
     assert!(projection.determinant() != 0.0);
 
-    // Scale affects the projection bounds
-    // With scale 2, the viewport covers 2x the area
+    // With zoom 2, the viewport covers half the area (zoomed in)
     let test_point = projection * glam::Vec4::new(0.0, 0.0, 0.0, 1.0);
     assert_eq!(test_point.w, 1.0);
 }
@@ -157,7 +158,9 @@ fn camera_controller_follow_entity_updates_position() {
     controller.update(&mut camera, &runtime);
 
     // Camera should be centered on entity
-    let expected_pos = IVec2::new(200, 150) - camera.viewport_size.as_ivec2() / 2;
+    let visible_size = camera.visible_world_size();
+    let expected_pos =
+        IVec2::new(200, 150) - IVec2::new(visible_size.x as i32 / 2, visible_size.y as i32 / 2);
     assert_eq!(camera.position, expected_pos);
 }
 
@@ -202,7 +205,9 @@ fn camera_controller_follow_entity_with_multiple_entities() {
     controller.update(&mut camera, &runtime);
 
     // Should follow entity with ID 1
-    let expected_pos = IVec2::new(300, 200) - camera.viewport_size.as_ivec2() / 2;
+    let visible_size = camera.visible_world_size();
+    let expected_pos =
+        IVec2::new(300, 200) - IVec2::new(visible_size.x as i32 / 2, visible_size.y as i32 / 2);
     assert_eq!(camera.position, expected_pos);
 }
 
@@ -218,18 +223,19 @@ fn entity_position_conversion() {
 fn camera_bounds_calculations() {
     let mut camera = Camera::new();
     camera.position = IVec2::new(100, 50);
-    camera.scale = 2;
+    camera.zoom = 0.5; // Zoom out: showing 2x more world (like old scale = 2)
 
     // Calculate viewport bounds in world space
+    let visible_size = camera.visible_world_size();
     let left = camera.position.x as f32;
     let top = camera.position.y as f32;
-    let right = left + (camera.viewport_size.x * camera.scale) as f32;
-    let bottom = top + (camera.viewport_size.y * camera.scale) as f32;
+    let right = left + visible_size.x;
+    let bottom = top + visible_size.y;
 
     assert_eq!(left, 100.0);
     assert_eq!(top, 50.0);
-    assert_eq!(right, 420.0); // 100 + 160 * 2
-    assert_eq!(bottom, 338.0); // 50 + 144 * 2
+    assert_eq!(right, 420.0); // 100 + 160 / 0.5 = 100 + 320
+    assert_eq!(bottom, 338.0); // 50 + 144 / 0.5 = 50 + 288
 }
 
 #[test]
@@ -253,21 +259,22 @@ fn camera_clamp_to_world_bounds_max_boundary() {
     camera.clamp_to_world_bounds(world_size);
 
     // Should be clamped to max valid position
-    // max_x = (500 - 160 * 1).max(0) = 340
-    // max_y = (400 - 144 * 1).max(0) = 256
+    // visible_size = viewport / zoom = 160 / 1.0 = 160
+    // max_x = (500 - 160).max(0) = 340
+    // max_y = (400 - 144).max(0) = 256
     assert_eq!(camera.position, IVec2::new(340, 256));
 }
 
 #[test]
-fn camera_clamp_to_world_bounds_with_scale() {
+fn camera_clamp_to_world_bounds_with_zoom_out() {
     let mut camera = Camera::new();
-    camera.scale = 2;
+    camera.zoom = 0.5; // Zoom out: visible area is 2x larger (like old scale = 2)
     camera.position = IVec2::new(1000, 800); // Out of bounds
 
     let world_size = UVec2::new(500, 400);
     camera.clamp_to_world_bounds(world_size);
 
-    // With scale 2, viewport is 320x288
+    // With zoom 0.5, visible area is 320x288
     // max_x = (500 - 320).max(0) = 180
     // max_y = (400 - 288).max(0) = 112
     assert_eq!(camera.position, IVec2::new(180, 112));
@@ -312,12 +319,12 @@ fn camera_clamp_to_world_bounds_valid_position_unchanged() {
 }
 
 // ============================================================================
-// Coordinate conversion tests (Step 12 refactoring)
+// Coordinate conversion tests
 // ============================================================================
 
 #[test]
 fn viewport_to_world_at_origin_with_no_offset() {
-    let camera = Camera::new(); // position (0,0), scale 1
+    let camera = Camera::new(); // position (0,0), zoom 1.0
     let viewport_pos = glam::Vec2::new(80.0, 72.0); // center of 160x144 viewport
 
     let world_pos = camera.viewport_to_world(viewport_pos);
@@ -338,35 +345,36 @@ fn viewport_to_world_with_camera_offset() {
 }
 
 #[test]
-fn viewport_to_world_with_scale() {
+fn viewport_to_world_with_zoom_out() {
     let mut camera = Camera::new();
-    camera.scale = 2;
+    camera.zoom = 0.5; // Zoom out: 1 viewport pixel = 2 world pixels
     camera.position = IVec2::new(0, 0);
 
     let viewport_pos = glam::Vec2::new(10.0, 5.0);
     let world_pos = camera.viewport_to_world(viewport_pos);
 
-    // With scale 2, one viewport pixel = 2 world pixels
+    // With zoom 0.5, effective scale is 1/0.5 = 2
+    // One viewport pixel = 2 world pixels
     assert_eq!(world_pos, glam::Vec2::new(20.0, 10.0));
 }
 
 #[test]
-fn viewport_to_world_with_offset_and_scale() {
+fn viewport_to_world_with_offset_and_zoom_out() {
     let mut camera = Camera::new();
     camera.position = IVec2::new(50, 30);
-    camera.scale = 2;
+    camera.zoom = 0.5; // Zoom out: effective scale = 2
 
     let viewport_pos = glam::Vec2::new(10.0, 5.0);
     let world_pos = camera.viewport_to_world(viewport_pos);
 
-    // world = camera_pos + viewport_pos * scale
+    // world = camera_pos + viewport_pos * (1/zoom)
     // = (50, 30) + (10, 5) * 2 = (50 + 20, 30 + 10) = (70, 40)
     assert_eq!(world_pos, glam::Vec2::new(70.0, 40.0));
 }
 
 #[test]
 fn world_to_viewport_at_origin() {
-    let camera = Camera::new(); // position (0,0), scale 1
+    let camera = Camera::new(); // position (0,0), zoom 1.0
     let world_pos = glam::Vec2::new(80.0, 72.0);
 
     let viewport_pos = camera.world_to_viewport(world_pos);
@@ -387,29 +395,29 @@ fn world_to_viewport_with_camera_offset() {
 }
 
 #[test]
-fn world_to_viewport_with_scale() {
+fn world_to_viewport_with_zoom_out() {
     let mut camera = Camera::new();
-    camera.scale = 2;
+    camera.zoom = 0.5; // Zoom out: 2 world pixels = 1 viewport pixel
     camera.position = IVec2::new(0, 0);
 
     let world_pos = glam::Vec2::new(20.0, 10.0);
     let viewport_pos = camera.world_to_viewport(world_pos);
 
-    // With scale 2, 20 world pixels = 10 viewport pixels
+    // With zoom 0.5, 20 world pixels = 10 viewport pixels
     assert_eq!(viewport_pos, glam::Vec2::new(10.0, 5.0));
 }
 
 #[test]
-fn world_to_viewport_with_offset_and_scale() {
+fn world_to_viewport_with_offset_and_zoom_out() {
     let mut camera = Camera::new();
     camera.position = IVec2::new(50, 30);
-    camera.scale = 2;
+    camera.zoom = 0.5; // Zoom out: effective scale = 2
 
     let world_pos = glam::Vec2::new(70.0, 40.0);
     let viewport_pos = camera.world_to_viewport(world_pos);
 
-    // viewport = (world - camera_pos) / scale
-    // = ((70, 40) - (50, 30)) / 2 = (20, 10) / 2 = (10, 5)
+    // viewport = (world - camera_pos) * zoom
+    // = ((70, 40) - (50, 30)) * 0.5 = (20, 10) * 0.5 = (10, 5)
     assert_eq!(viewport_pos, glam::Vec2::new(10.0, 5.0));
 }
 
@@ -417,7 +425,7 @@ fn world_to_viewport_with_offset_and_scale() {
 fn viewport_to_world_and_back_roundtrips() {
     let mut camera = Camera::new();
     camera.position = IVec2::new(123, 456);
-    camera.scale = 3;
+    camera.zoom = 3.0; // Zoom in 3x
 
     let original = glam::Vec2::new(45.5, 67.25);
     let world_pos = camera.viewport_to_world(original);
@@ -431,7 +439,7 @@ fn viewport_to_world_and_back_roundtrips() {
 fn world_to_viewport_and_back_roundtrips() {
     let mut camera = Camera::new();
     camera.position = IVec2::new(200, 100);
-    camera.scale = 2;
+    camera.zoom = 0.5; // Zoom out
 
     let original = glam::Vec2::new(300.0, 200.0);
     let viewport_pos = camera.world_to_viewport(original);
@@ -484,4 +492,44 @@ fn standalone_functions_roundtrip_with_fractional_scale() {
 
     assert!((back.x - original.x).abs() < 0.001);
     assert!((back.y - original.y).abs() < 0.001);
+}
+
+// ============================================================================
+// Zoom-specific tests
+// ============================================================================
+
+#[test]
+fn camera_zoom_in_shows_less_world() {
+    let mut camera = Camera::new(); // 160x144 viewport
+    camera.zoom = 2.0; // Zoom in 2x
+
+    let visible = camera.visible_world_size();
+
+    // With zoom 2, we see half the world
+    assert_eq!(visible.x, 80.0); // 160 / 2
+    assert_eq!(visible.y, 72.0); // 144 / 2
+}
+
+#[test]
+fn camera_zoom_out_shows_more_world() {
+    let mut camera = Camera::new(); // 160x144 viewport
+    camera.zoom = 0.5; // Zoom out
+
+    let visible = camera.visible_world_size();
+
+    // With zoom 0.5, we see twice the world
+    assert_eq!(visible.x, 320.0); // 160 / 0.5
+    assert_eq!(visible.y, 288.0); // 144 / 0.5
+}
+
+#[test]
+fn camera_center_on_with_zoom_in() {
+    let mut camera = Camera::new();
+    camera.zoom = 2.0; // Zoom in 2x, visible area is 80x72
+
+    camera.center_on(IVec2::new(100, 100));
+
+    // With zoom 2, visible size is 80x72
+    // position = target - visible_size / 2 = (100, 100) - (40, 36) = (60, 64)
+    assert_eq!(camera.position, IVec2::new(60, 64));
 }

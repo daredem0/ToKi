@@ -91,6 +91,9 @@ pub struct RuntimeDisplaySettings {
     /// Viewport height in pixels (defaults to preset resolution)
     #[serde(default = "default_resolution_height")]
     pub resolution_height: u32,
+    /// Zoom level as percentage (100 = 1.0x, 200 = 2.0x, etc.)
+    #[serde(default = "default_zoom_percent")]
+    pub zoom_percent: u32,
 }
 
 impl Default for RuntimeDisplaySettings {
@@ -99,7 +102,15 @@ impl Default for RuntimeDisplaySettings {
             show_entity_health_bars: false,
             resolution_width: default_resolution_width(),
             resolution_height: default_resolution_height(),
+            zoom_percent: default_zoom_percent(),
         }
+    }
+}
+
+impl RuntimeDisplaySettings {
+    /// Returns the zoom level as a float (1.0 = 100%, 2.0 = 200%, etc.)
+    pub fn zoom_factor(&self) -> f32 {
+        self.zoom_percent as f32 / 100.0
     }
 }
 
@@ -170,6 +181,8 @@ pub struct RuntimeConfigDisplay {
     pub resolution_width: Option<u32>,
     #[serde(default)]
     pub resolution_height: Option<u32>,
+    #[serde(default)]
+    pub zoom_percent: Option<u32>,
 }
 
 pub const fn default_runtime_splash_duration_ms() -> u64 {
@@ -177,6 +190,11 @@ pub const fn default_runtime_splash_duration_ms() -> u64 {
 }
 
 pub const fn default_runtime_audio_mix_percent() -> u8 {
+    100
+}
+
+/// Default zoom level (100 = 1.0x, no zoom)
+pub const fn default_zoom_percent() -> u32 {
     100
 }
 
