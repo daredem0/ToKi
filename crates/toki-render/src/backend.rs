@@ -43,7 +43,13 @@ pub trait RenderBackend: std::fmt::Debug {
     fn clear_sprites(&mut self);
 
     /// Add a sprite to be rendered
-    fn add_sprite(&mut self, frame: SpriteFrame, position: glam::IVec2, size: glam::UVec2, flip_x: bool);
+    fn add_sprite(
+        &mut self,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    );
 
     /// Add a sprite with a specific texture
     fn add_sprite_with_texture(

@@ -534,8 +534,7 @@ impl SceneViewport {
         // Iterate through entity IDs in reverse order (top layer first)
         // This ensures we select the topmost entity if they overlap
         for &entity_id in entity_ids.iter().rev() {
-            if let Some(entity) = self.game_state.entity_manager().get_entity(entity_id)
-            {
+            if let Some(entity) = self.game_state.entity_manager().get_entity(entity_id) {
                 if point_in_entity_bounds(world_pos_i32, entity.position, entity.size) {
                     tracing::debug!(
                         "Entity hit detected: ID={}, position=({}, {}), size={}x{}, click=({}, {})",

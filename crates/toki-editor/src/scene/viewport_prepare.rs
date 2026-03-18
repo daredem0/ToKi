@@ -212,7 +212,10 @@ impl SceneViewport {
         let sprite_requests = self.game_state.get_sprite_render_requests();
 
         for preview in drag_preview_data {
-            let Some(entity) = self.game_state.entity_manager().get_entity(preview.entity_id)
+            let Some(entity) = self
+                .game_state
+                .entity_manager()
+                .get_entity(preview.entity_id)
             else {
                 continue;
             };
@@ -257,8 +260,7 @@ impl SceneViewport {
     }
 
     pub(super) fn prepare_debug_shapes(&mut self, scene_data: &mut SceneData) {
-        if !self.game_state.is_debug_collision_rendering_enabled()
-        {
+        if !self.game_state.is_debug_collision_rendering_enabled() {
             return;
         }
 

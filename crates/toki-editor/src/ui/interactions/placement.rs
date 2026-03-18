@@ -135,8 +135,7 @@ impl PlacementInteraction {
         viewport: &SceneViewport,
     ) -> bool {
         let tilemap = viewport.tilemap();
-        let terrain_atlas =
-            tilemap.map(|_| viewport.resources().get_terrain_atlas());
+        let terrain_atlas = tilemap.map(|_| viewport.resources().get_terrain_atlas());
         Self::create_entity_in_scene_with_collision_context(
             ui_state,
             entity_def,

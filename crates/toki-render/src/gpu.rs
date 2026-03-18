@@ -465,10 +465,7 @@ impl crate::RenderBackend for GpuState {
         GpuState::load_sprite_texture_rgba8(self, image)
     }
 
-    fn load_font_file(
-        &mut self,
-        font_path: std::path::PathBuf,
-    ) -> Result<(), crate::RenderError> {
+    fn load_font_file(&mut self, font_path: std::path::PathBuf) -> Result<(), crate::RenderError> {
         GpuState::load_font_file(self, &font_path)
     }
 
@@ -514,7 +511,14 @@ impl crate::RenderBackend for GpuState {
         size: glam::UVec2,
         flip_x: bool,
     ) {
-        GpuState::add_sprite_with_texture_flipped(self, texture_path, frame, position, size, flip_x);
+        GpuState::add_sprite_with_texture_flipped(
+            self,
+            texture_path,
+            frame,
+            position,
+            size,
+            flip_x,
+        );
     }
 
     fn clear_text_items(&mut self) {

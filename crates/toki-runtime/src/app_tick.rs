@@ -236,7 +236,10 @@ impl App {
 
         let (resolved, failures) = resolve_sprite_render_requests(&mut self.resources, &requests);
         for failure in failures {
-            tracing::warn!("{}", format_sprite_resolve_failure(&failure.origin, &failure.error));
+            tracing::warn!(
+                "{}",
+                format_sprite_resolve_failure(&failure.origin, &failure.error)
+            );
         }
         for sprite in resolved {
             self.rendering.add_resolved_sprite(&sprite);

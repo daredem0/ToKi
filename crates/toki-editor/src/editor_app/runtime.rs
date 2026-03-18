@@ -17,7 +17,11 @@ impl EditorApp {
             return;
         };
 
-        if let Err(error) = self.core.project_manager.save_current_project(&self.core.ui.scenes) {
+        if let Err(error) = self
+            .core
+            .project_manager
+            .save_current_project(&self.core.ui.scenes)
+        {
             tracing::error!(
                 "Cannot play scene '{}': failed to save current project state: {}",
                 active_scene_name,
@@ -29,7 +33,8 @@ impl EditorApp {
         let map_name = self
             .find_scene_by_name(&active_scene_name)
             .and_then(|scene| {
-                self.session.loaded_scene_maps
+                self.session
+                    .loaded_scene_maps
                     .get(&active_scene_name)
                     .cloned()
                     .filter(|map| scene.maps.iter().any(|scene_map| scene_map == map))
@@ -37,7 +42,8 @@ impl EditorApp {
             });
 
         let splash_duration_ms = self
-            .core.project_manager
+            .core
+            .project_manager
             .current_project
             .as_ref()
             .map(|project| project.metadata.runtime.splash.duration_ms);
@@ -80,7 +86,11 @@ impl EditorApp {
             return;
         };
 
-        if let Err(error) = self.core.project_manager.save_current_project(&self.core.ui.scenes) {
+        if let Err(error) = self
+            .core
+            .project_manager
+            .save_current_project(&self.core.ui.scenes)
+        {
             tracing::error!(
                 "Cannot export game: failed to save current project state: {}",
                 error
@@ -106,7 +116,8 @@ impl EditorApp {
 
         let startup_scene = self.core.ui.active_scene.as_deref();
         let splash_duration_ms = self
-            .core.project_manager
+            .core
+            .project_manager
             .current_project
             .as_ref()
             .map(|project| project.metadata.runtime.splash.duration_ms)

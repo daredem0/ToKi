@@ -1,6 +1,6 @@
+use super::editor_ui::EditorUI;
 use crate::config::EditorConfig;
 use crate::project::Project;
-use super::editor_ui::EditorUI;
 
 /// Context passed to inspectors containing all commonly needed references.
 /// This bundles the arguments that would otherwise be passed individually.

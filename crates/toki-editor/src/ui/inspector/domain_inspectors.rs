@@ -43,7 +43,11 @@ impl Inspector for EntityInspector {
             } else {
                 ui.label("Runtime-only entity (read-only)");
                 ui.separator();
-                InspectorSystem::render_runtime_entity_read_only(ui, ctx.game_state, self.entity_id);
+                InspectorSystem::render_runtime_entity_read_only(
+                    ui,
+                    ctx.game_state,
+                    self.entity_id,
+                );
             }
         }
 
@@ -306,18 +310,18 @@ use super::super::inspector_trait::NoSelectionInspector;
 /// This factory replaces the large match statement in render_selection_inspector_contents.
 pub fn create_inspector_for_selection(selection: Option<&Selection>) -> Box<dyn Inspector> {
     match selection {
-        Some(Selection::Scene(scene_name)) => {
-            Box::new(SceneInspector::new(scene_name.clone()))
-        }
-        Some(Selection::RuleGraphNode { scene_name, node_key }) => {
-            Box::new(RuleGraphNodeInspector::new(scene_name.clone(), node_key.clone()))
-        }
+        Some(Selection::Scene(scene_name)) => Box::new(SceneInspector::new(scene_name.clone())),
+        Some(Selection::RuleGraphNode {
+            scene_name,
+            node_key,
+        }) => Box::new(RuleGraphNodeInspector::new(
+            scene_name.clone(),
+            node_key.clone(),
+        )),
         Some(Selection::Map(scene_name, map_name)) => {
             Box::new(MapInspector::new(scene_name.clone(), map_name.clone()))
         }
-        Some(Selection::Entity(entity_id)) => {
-            Box::new(EntityInspector::new(*entity_id))
-        }
+        Some(Selection::Entity(entity_id)) => Box::new(EntityInspector::new(*entity_id)),
         Some(Selection::StandaloneMap(map_name)) => {
             Box::new(StandaloneMapInspector::new(map_name.clone()))
         }
@@ -326,9 +330,7 @@ pub fn create_inspector_for_selection(selection: Option<&Selection>) -> Box<dyn 
         }
         Some(Selection::MenuScreen(_))
         | Some(Selection::MenuDialog(_))
-        | Some(Selection::MenuEntry { .. }) => {
-            Box::new(MenuSelectionInspector)
-        }
+        | Some(Selection::MenuEntry { .. }) => Box::new(MenuSelectionInspector),
         None => Box::new(NoSelectionInspector),
     }
 }

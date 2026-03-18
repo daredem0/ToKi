@@ -248,7 +248,7 @@ pub struct EntityAttributes {
     pub health: Option<u32>,
     #[serde(default, skip_serializing_if = "EntityStats::is_empty")]
     pub stats: EntityStats,
-    pub speed: f32, // Movement speed in pixels per tick
+    pub speed: f32,  // Movement speed in pixels per tick
     pub solid: bool, // Can we collide with other entities
 
     // Rendering

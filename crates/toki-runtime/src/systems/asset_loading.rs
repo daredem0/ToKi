@@ -87,15 +87,14 @@ pub struct DecodedProjectCache {
 
 impl DecodedProjectCache {
     pub fn load_scene_from_path(&mut self, scene_path: &Path) -> Result<Scene, String> {
-        self.scenes
-            .get_or_load(scene_path.to_path_buf(), |path| {
-                let json = fs::read_to_string(path).map_err(|error| {
-                    format!("Could not read scene file '{}': {}", path.display(), error)
-                })?;
-                serde_json::from_str::<Scene>(&json).map_err(|error| {
-                    format!("Could not parse scene file '{}': {}", path.display(), error)
-                })
+        self.scenes.get_or_load(scene_path.to_path_buf(), |path| {
+            let json = fs::read_to_string(path).map_err(|error| {
+                format!("Could not read scene file '{}': {}", path.display(), error)
+            })?;
+            serde_json::from_str::<Scene>(&json).map_err(|error| {
+                format!("Could not parse scene file '{}': {}", path.display(), error)
             })
+        })
     }
 
     pub fn load_tilemap_from_path(
@@ -112,10 +111,9 @@ impl DecodedProjectCache {
         &mut self,
         atlas_path: &Path,
     ) -> Result<AtlasMeta, toki_core::CoreError> {
-        self.atlases
-            .get_or_load(atlas_path.to_path_buf(), |path| {
-                AtlasMeta::load_from_file(path)
-            })
+        self.atlases.get_or_load(atlas_path.to_path_buf(), |path| {
+            AtlasMeta::load_from_file(path)
+        })
     }
 
     pub fn load_object_sheet_from_path(

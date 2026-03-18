@@ -415,7 +415,10 @@ impl GameState {
             );
         }
         if self.rule_runtime.frame_collision_detected {
-            self.collect_rule_commands_for_trigger(RuleTrigger::OnCollision, reactive_rule_commands);
+            self.collect_rule_commands_for_trigger(
+                RuleTrigger::OnCollision,
+                reactive_rule_commands,
+            );
         }
         if self.rule_runtime.frame_damage_detected {
             self.collect_rule_commands_for_trigger(RuleTrigger::OnDamaged, reactive_rule_commands);

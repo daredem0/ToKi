@@ -31,7 +31,8 @@ impl EditorApp {
     }
 
     pub(super) fn should_reload_scene(&self, current_scene: &Option<String>) -> bool {
-        *current_scene != self.session.last_loaded_active_scene || self.core.ui.scene_content_changed
+        *current_scene != self.session.last_loaded_active_scene
+            || self.core.ui.scene_content_changed
     }
 
     pub(super) fn update_scene_state(&mut self, current_scene: &Option<String>) {
@@ -66,7 +67,11 @@ impl EditorApp {
         };
 
         let project_path = self.core.config.current_project_path().cloned();
-        let preferred_map = self.session.loaded_scene_maps.get(scene_name).map(String::as_str);
+        let preferred_map = self
+            .session
+            .loaded_scene_maps
+            .get(scene_name)
+            .map(String::as_str);
         let map_to_load = Self::resolve_scene_map_to_load(&active_scene, preferred_map);
 
         Self::load_scene_into_gamestate(viewport, &active_scene, scene_name);
@@ -93,8 +98,7 @@ impl EditorApp {
     ) {
         viewport.game_state_mut().add_scene(scene.clone());
 
-        match viewport.game_state_mut().load_scene(scene_name)
-        {
+        match viewport.game_state_mut().load_scene(scene_name) {
             Ok(()) => {
                 tracing::info!(
                     "Loaded active scene '{}' with {} entities into GameState",

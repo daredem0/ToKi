@@ -237,7 +237,10 @@ impl PlacementState {
     pub fn enter_placement_mode(&mut self, entity_definition: String) {
         self.mode = true;
         self.entity_definition = Some(entity_definition);
-        tracing::info!("Entered placement mode for entity: {:?}", self.entity_definition.as_ref().unwrap());
+        tracing::info!(
+            "Entered placement mode for entity: {:?}",
+            self.entity_definition.as_ref().unwrap()
+        );
     }
 
     pub fn exit_placement_mode(&mut self) {
@@ -518,7 +521,8 @@ impl EditorUI {
         suggested_parent_directory: Option<PathBuf>,
         suggested_name: String,
     ) {
-        self.project.begin_new_project_dialog(template, suggested_parent_directory, suggested_name);
+        self.project
+            .begin_new_project_dialog(template, suggested_parent_directory, suggested_name);
     }
 
     pub fn submit_new_project_request(&mut self) {

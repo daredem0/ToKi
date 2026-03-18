@@ -203,7 +203,8 @@ impl EditorUI {
             return format!("{}*", draft.name);
         }
 
-        self.map.active_map
+        self.map
+            .active_map
             .clone()
             .unwrap_or_else(|| "No map selected".to_string())
     }
@@ -469,8 +470,7 @@ impl EditorUI {
     }
 
     pub fn undo(&mut self) -> bool {
-        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map.history.can_undo()
-        {
+        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map.history.can_undo() {
             let mut history = std::mem::take(&mut self.map.history);
             let undone = history.undo(self);
             self.map.history = history;
@@ -483,8 +483,7 @@ impl EditorUI {
     }
 
     pub fn undo_with_project(&mut self, project: &mut crate::project::Project) -> bool {
-        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map.history.can_undo()
-        {
+        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map.history.can_undo() {
             let mut history = std::mem::take(&mut self.map.history);
             let undone = history.undo(self);
             self.map.history = history;
@@ -497,8 +496,7 @@ impl EditorUI {
     }
 
     pub fn redo(&mut self) -> bool {
-        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map.history.can_redo()
-        {
+        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map.history.can_redo() {
             let mut history = std::mem::take(&mut self.map.history);
             let redone = history.redo(self);
             self.map.history = history;
@@ -511,8 +509,7 @@ impl EditorUI {
     }
 
     pub fn redo_with_project(&mut self, project: &mut crate::project::Project) -> bool {
-        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map.history.can_redo()
-        {
+        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map.history.can_redo() {
             let mut history = std::mem::take(&mut self.map.history);
             let redone = history.redo(self);
             self.map.history = history;

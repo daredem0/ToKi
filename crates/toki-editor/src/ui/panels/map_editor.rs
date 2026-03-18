@@ -60,8 +60,8 @@ impl PanelSystem {
                             return;
                         }
                         for map_name in map_names {
-                            let is_selected = ui_state.map.active_map.as_deref()
-                                == Some(map_name.as_str());
+                            let is_selected =
+                                ui_state.map.active_map.as_deref() == Some(map_name.as_str());
                             if ui.selectable_label(is_selected, map_name).clicked() && !is_selected
                             {
                                 ui_state.map.active_map = Some(map_name.clone());

@@ -14,11 +14,7 @@ impl InspectorSystem {
             ui.selectable_value(&mut ui_state.map.tool, MapEditorTool::Drag, "Drag");
             ui.selectable_value(&mut ui_state.map.tool, MapEditorTool::Brush, "Brush");
             ui.selectable_value(&mut ui_state.map.tool, MapEditorTool::Fill, "Fill");
-            ui.selectable_value(
-                &mut ui_state.map.tool,
-                MapEditorTool::PickTile,
-                "Pick Tile",
-            );
+            ui.selectable_value(&mut ui_state.map.tool, MapEditorTool::PickTile, "Pick Tile");
             ui.selectable_value(
                 &mut ui_state.map.tool,
                 MapEditorTool::PlaceObject,
@@ -205,9 +201,8 @@ impl InspectorSystem {
                             )
                             .show_ui(ui, |ui| {
                                 for sheet_name in &sheet_names {
-                                    let is_selected =
-                                        ui_state.map.selected_object_sheet.as_deref()
-                                            == Some(sheet_name.as_str());
+                                    let is_selected = ui_state.map.selected_object_sheet.as_deref()
+                                        == Some(sheet_name.as_str());
                                     if ui.selectable_label(is_selected, sheet_name).clicked() {
                                         ui_state.map.selected_object_sheet =
                                             Some(sheet_name.clone());
@@ -229,9 +224,8 @@ impl InspectorSystem {
                             )
                             .show_ui(ui, |ui| {
                                 for object_name in &object_names {
-                                    let is_selected =
-                                        ui_state.map.selected_object_name.as_deref()
-                                            == Some(object_name.as_str());
+                                    let is_selected = ui_state.map.selected_object_name.as_deref()
+                                        == Some(object_name.as_str());
                                     if ui.selectable_label(is_selected, object_name).clicked() {
                                         ui_state.map.selected_object_name =
                                             Some(object_name.clone());

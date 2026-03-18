@@ -92,7 +92,8 @@ impl EditorApp {
                                 map_name,
                                 scene_name
                             );
-                            self.session.loaded_scene_maps
+                            self.session
+                                .loaded_scene_maps
                                 .insert(scene_name.clone(), map_name.clone());
                             // Mark viewport as needing re-render
                             viewport.mark_dirty();
@@ -153,8 +154,7 @@ impl EditorApp {
                     return;
                 };
 
-                if let Err(error) = viewport.set_tilemap(draft.tilemap.clone())
-                {
+                if let Err(error) = viewport.set_tilemap(draft.tilemap.clone()) {
                     tracing::error!(
                         "Failed to load new map draft '{}' into map editor viewport: {}",
                         draft.name,
@@ -183,12 +183,14 @@ impl EditorApp {
 
         if let Some(draft) = self.core.ui.map.draft.clone() {
             let live_tilemap = self
-                .viewports.map_editor
+                .viewports
+                .map_editor
                 .as_ref()
                 .and_then(|viewport| viewport.tilemap());
             let tilemap_to_save = Self::tilemap_to_save_for_map_editor_draft(&draft, live_tilemap);
             match self
-                .core.project_manager
+                .core
+                .project_manager
                 .save_tilemap_asset(&draft.name, &tilemap_to_save)
             {
                 Ok(_) => {
@@ -212,7 +214,8 @@ impl EditorApp {
             return;
         };
         let Some(tilemap) = self
-            .viewports.map_editor
+            .viewports
+            .map_editor
             .as_ref()
             .and_then(|viewport| viewport.tilemap().cloned())
         else {
@@ -221,7 +224,8 @@ impl EditorApp {
         };
 
         match self
-            .core.project_manager
+            .core
+            .project_manager
             .save_tilemap_asset(&active_map_name, &tilemap)
         {
             Ok(_) => {

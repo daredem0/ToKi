@@ -389,7 +389,8 @@ impl AudioManager {
                 "Creating new channel '{}' with default Overlap policy",
                 channel
             );
-            self.playback.set_channel_policy(channel, PlaybackPolicy::Overlap);
+            self.playback
+                .set_channel_policy(channel, PlaybackPolicy::Overlap);
         }
 
         let channel_gain = self.playback.channel_volume_for(channel) + amplitude_to_decibels(gain);
@@ -462,7 +463,9 @@ impl AudioManager {
 
         // Try preloaded SFX first (fast path)
         if let Some(sound_data) = self.cache.get_preloaded_sound(name) {
-            let handle = self.playback.play_static_sound(sound_data.volume(channel_gain))?;
+            let handle = self
+                .playback
+                .play_static_sound(sound_data.volume(channel_gain))?;
             let channel_data = self.playback.get_channel_mut(channel).unwrap();
             channel_data.active_handles.push(handle);
             channel_data.last_played = Some(Instant::now());
@@ -480,8 +483,11 @@ impl AudioManager {
         // Try loading from SFX paths (lazy load and cache)
         if let Some(path) = self.cache.get_sfx_path(name).cloned() {
             let sound_data = StaticSoundData::from_file(&path)?;
-            self.cache.insert_preloaded_sound(name.to_string(), sound_data.clone());
-            let handle = self.playback.play_static_sound(sound_data.volume(channel_gain))?;
+            self.cache
+                .insert_preloaded_sound(name.to_string(), sound_data.clone());
+            let handle = self
+                .playback
+                .play_static_sound(sound_data.volume(channel_gain))?;
             let channel_data = self.playback.get_channel_mut(channel).unwrap();
             channel_data.active_handles.push(handle);
             channel_data.last_played = Some(Instant::now());
@@ -515,7 +521,8 @@ impl AudioManager {
                 "Creating new music channel '{}' with default Exclusive policy",
                 channel
             );
-            self.playback.set_channel_policy(channel, PlaybackPolicy::Exclusive);
+            self.playback
+                .set_channel_policy(channel, PlaybackPolicy::Exclusive);
         }
 
         let channel_gain = self.playback.channel_volume_for(channel);
@@ -706,8 +713,14 @@ impl std::fmt::Debug for AudioManager {
             .field("sfx_paths_count", &self.cache.sfx_paths.len())
             .field("music_paths_count", &self.cache.music_paths.len())
             .field("channels_count", &self.playback.channels.len())
-            .field("master_volume_percent", &self.playback.master_volume_percent)
-            .field("channel_volume_percents", &self.playback.channel_volume_percents)
+            .field(
+                "master_volume_percent",
+                &self.playback.master_volume_percent,
+            )
+            .field(
+                "channel_volume_percents",
+                &self.playback.channel_volume_percents,
+            )
             .finish()
     }
 }
@@ -735,9 +748,11 @@ impl EventHandler<AudioEvent> for AudioManager {
                     );
                 }
 
-                let Some(gain) =
-                    spatial_attenuation(self.playback.listener_position(), *source_position, *hearing_radius)
-                else {
+                let Some(gain) = spatial_attenuation(
+                    self.playback.listener_position(),
+                    *source_position,
+                    *hearing_radius,
+                ) else {
                     return;
                 };
 

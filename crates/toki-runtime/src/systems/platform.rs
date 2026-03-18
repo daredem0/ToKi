@@ -31,8 +31,10 @@ impl PlatformSystem {
         resolution_width: u32,
         resolution_height: u32,
     ) {
-        let window_attributes = WindowAttributes::default()
-            .with_inner_size(LogicalSize::new(resolution_width as f64, resolution_height as f64));
+        let window_attributes = WindowAttributes::default().with_inner_size(LogicalSize::new(
+            resolution_width as f64,
+            resolution_height as f64,
+        ));
 
         // Attempt to create a window with the given attributes
         let raw_window = event_loop.create_window(window_attributes).unwrap();

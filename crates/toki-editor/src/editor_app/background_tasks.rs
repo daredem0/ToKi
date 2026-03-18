@@ -11,15 +11,22 @@ impl EditorApp {
         match update {
             BackgroundTaskUpdate::Started { kind, message } => {
                 self.core.ui.project.background_task_running = true;
-                self.core.ui.project.background_task_status = Some(format!("{}: {}", kind.label(), message));
+                self.core.ui.project.background_task_status =
+                    Some(format!("{}: {}", kind.label(), message));
                 tracing::info!(
                     "{}",
-                    self.core.ui.project.background_task_status.as_deref().unwrap_or("")
+                    self.core
+                        .ui
+                        .project
+                        .background_task_status
+                        .as_deref()
+                        .unwrap_or("")
                 );
             }
             BackgroundTaskUpdate::Progress { kind, message } => {
                 self.core.ui.project.background_task_running = true;
-                self.core.ui.project.background_task_status = Some(format!("{}: {}", kind.label(), message));
+                self.core.ui.project.background_task_status =
+                    Some(format!("{}: {}", kind.label(), message));
             }
             BackgroundTaskUpdate::Completed { kind, message } => {
                 self.core.ui.project.background_task_running = false;

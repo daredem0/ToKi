@@ -246,10 +246,10 @@ mod tests {
     #[test]
     fn various_fps_values_produce_correct_durations() {
         let test_cases = [
-            (30, 33_333_333u64),  // 30 FPS = ~33.33ms
-            (60, 16_666_666u64),  // 60 FPS = ~16.67ms
-            (120, 8_333_333u64),  // 120 FPS = ~8.33ms
-            (144, 6_944_444u64),  // 144 FPS = ~6.94ms
+            (30, 33_333_333u64), // 30 FPS = ~33.33ms
+            (60, 16_666_666u64), // 60 FPS = ~16.67ms
+            (120, 8_333_333u64), // 120 FPS = ~8.33ms
+            (144, 6_944_444u64), // 144 FPS = ~6.94ms
         ];
 
         for (fps, expected_ns) in test_cases {

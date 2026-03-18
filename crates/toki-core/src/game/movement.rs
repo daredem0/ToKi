@@ -347,8 +347,11 @@ impl GameState {
                     };
                     // Use intent for animation, not actual pixel movement (sub-pixel accumulation)
                     let is_trying_to_move = intended_delta != glam::IVec2::ZERO;
-                    let desired_animation =
-                        Self::resolve_animation_state(animation_controller, is_trying_to_move, delta);
+                    let desired_animation = Self::resolve_animation_state(
+                        animation_controller,
+                        is_trying_to_move,
+                        delta,
+                    );
                     if animation_controller.current_clip_state != desired_animation {
                         animation_controller.play(desired_animation);
                     }

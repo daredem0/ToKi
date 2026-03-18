@@ -235,10 +235,7 @@ fn finalize_saved_map_editor_draft_requests_reload_from_disk() {
     assert!(!ui.has_unsaved_map_editor_draft());
     assert!(!ui.has_unsaved_map_editor_changes());
     assert_eq!(ui.map.active_map.as_deref(), Some("draft_map"));
-    assert_eq!(
-        ui.map.map_load_requested.as_deref(),
-        Some("draft_map")
-    );
+    assert_eq!(ui.map.map_load_requested.as_deref(), Some("draft_map"));
 }
 
 #[test]
@@ -393,10 +390,7 @@ fn sync_map_editor_object_sheet_selection_picks_first_sorted_sheet() {
         "props".to_string(),
     ]);
 
-    assert_eq!(
-        ui.map.selected_object_sheet.as_deref(),
-        Some("fauna")
-    );
+    assert_eq!(ui.map.selected_object_sheet.as_deref(), Some("fauna"));
 }
 
 #[test]
@@ -445,7 +439,8 @@ fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
     ui.select_map_editor_object(0, &object);
     assert!(ui.map.selected_tile_info.is_none());
     assert_eq!(
-        ui.map.selected_object_info
+        ui.map
+            .selected_object_info
             .as_ref()
             .map(|selected| selected.object_name.as_str()),
         Some("bush")
@@ -465,7 +460,8 @@ fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
 
     ui.sync_selected_map_editor_object_from_tilemap(&tilemap);
     let selected = ui
-        .map.selected_object_info
+        .map
+        .selected_object_info
         .as_ref()
         .expect("selected object should remain");
     assert_eq!(selected.position, glam::UVec2::new(32, 32));
@@ -488,7 +484,8 @@ fn queue_map_editor_object_property_edit_updates_selected_object_info() {
     ui.queue_map_editor_object_property_edit(2, false, true);
 
     let selected = ui
-        .map.selected_object_info
+        .map
+        .selected_object_info
         .as_ref()
         .expect("selected object should exist");
     assert!(!selected.visible);
@@ -517,7 +514,8 @@ fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
     });
 
     let before = ui
-        .map.draft
+        .map
+        .draft
         .as_ref()
         .expect("draft should exist")
         .tilemap
@@ -582,15 +580,36 @@ fn editor_ui_default_visibility_flags() {
     let ui = EditorUI::new();
 
     // Default visibility settings
-    assert!(ui.visibility.show_hierarchy, "hierarchy panel should be visible by default");
-    assert!(ui.visibility.show_inspector, "inspector panel should be visible by default");
-    assert!(ui.visibility.show_maps, "maps panel should be visible by default");
-    assert!(ui.visibility.show_console, "console panel should be visible by default");
+    assert!(
+        ui.visibility.show_hierarchy,
+        "hierarchy panel should be visible by default"
+    );
+    assert!(
+        ui.visibility.show_inspector,
+        "inspector panel should be visible by default"
+    );
+    assert!(
+        ui.visibility.show_maps,
+        "maps panel should be visible by default"
+    );
+    assert!(
+        ui.visibility.show_console,
+        "console panel should be visible by default"
+    );
 
     // Non-default visibility settings
-    assert!(!ui.visibility.show_runtime_entities, "runtime entities should be hidden by default");
-    assert!(!ui.visibility.should_exit, "should_exit should be false by default");
-    assert!(!ui.visibility.create_test_entities, "create_test_entities should be false by default");
+    assert!(
+        !ui.visibility.show_runtime_entities,
+        "runtime entities should be hidden by default"
+    );
+    assert!(
+        !ui.visibility.should_exit,
+        "should_exit should be false by default"
+    );
+    assert!(
+        !ui.visibility.create_test_entities,
+        "create_test_entities should be false by default"
+    );
 }
 
 #[test]
@@ -607,9 +626,18 @@ fn apply_config_sets_visibility_flags() {
 
     ui.apply_config(&config);
 
-    assert!(!ui.visibility.show_hierarchy, "hierarchy visibility should match config");
-    assert!(!ui.visibility.show_inspector, "inspector visibility should match config");
-    assert!(!ui.visibility.show_console, "console visibility should match config");
+    assert!(
+        !ui.visibility.show_hierarchy,
+        "hierarchy visibility should match config"
+    );
+    assert!(
+        !ui.visibility.show_inspector,
+        "inspector visibility should match config"
+    );
+    assert!(
+        !ui.visibility.show_console,
+        "console visibility should match config"
+    );
 }
 
 #[test]
@@ -625,9 +653,15 @@ fn apply_config_preserves_non_config_visibility_flags() {
     ui.apply_config(&config);
 
     // These flags are not controlled by config and should be preserved
-    assert!(ui.visibility.show_runtime_entities, "show_runtime_entities should be preserved");
+    assert!(
+        ui.visibility.show_runtime_entities,
+        "show_runtime_entities should be preserved"
+    );
     assert!(ui.visibility.should_exit, "should_exit should be preserved");
-    assert!(ui.visibility.create_test_entities, "create_test_entities should be preserved");
+    assert!(
+        ui.visibility.create_test_entities,
+        "create_test_entities should be preserved"
+    );
 }
 
 // =============================================================================
@@ -747,7 +781,10 @@ fn begin_new_project_dialog_sets_up_dialog_state() {
     );
 
     assert!(ui.project.show_new_project_dialog);
-    assert_eq!(ui.project.new_project_template, ProjectTemplateKind::TopDownStarter);
+    assert_eq!(
+        ui.project.new_project_template,
+        ProjectTemplateKind::TopDownStarter
+    );
     assert_eq!(
         ui.project.new_project_parent_directory.as_deref(),
         Some(std::path::Path::new("/home/user/projects"))
@@ -768,8 +805,15 @@ fn submit_new_project_request_creates_request_and_closes_dialog() {
 
     ui.submit_new_project_request();
 
-    assert!(!ui.project.show_new_project_dialog, "dialog should close after submit");
-    let request = ui.project.new_project_submit_requested.as_ref().expect("request should exist");
+    assert!(
+        !ui.project.show_new_project_dialog,
+        "dialog should close after submit"
+    );
+    let request = ui
+        .project
+        .new_project_submit_requested
+        .as_ref()
+        .expect("request should exist");
     assert_eq!(request.name, "TestProject");
     assert_eq!(request.parent_path, PathBuf::from("/home/user"));
     assert_eq!(request.template, ProjectTemplateKind::Empty);
@@ -783,7 +827,10 @@ fn submit_new_project_request_requires_parent_directory() {
 
     ui.submit_new_project_request();
 
-    assert!(ui.project.new_project_submit_requested.is_none(), "should not create request without parent");
+    assert!(
+        ui.project.new_project_submit_requested.is_none(),
+        "should not create request without parent"
+    );
 }
 
 #[test]
@@ -796,7 +843,10 @@ fn submit_new_project_request_requires_non_empty_name() {
 
     ui.submit_new_project_request();
 
-    assert!(ui.project.new_project_submit_requested.is_none(), "should not create request with empty name");
+    assert!(
+        ui.project.new_project_submit_requested.is_none(),
+        "should not create request with empty name"
+    );
 }
 
 #[test]

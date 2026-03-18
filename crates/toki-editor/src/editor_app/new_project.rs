@@ -16,7 +16,8 @@ impl EditorApp {
 
         let create_result = match template {
             ProjectTemplateKind::Empty => self
-                .core.project_manager
+                .core
+                .project_manager
                 .create_new_project(project_name.clone(), parent_path.clone()),
             ProjectTemplateKind::TopDownStarter => {
                 self.core.project_manager.create_new_project_with_template(

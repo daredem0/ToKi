@@ -478,7 +478,9 @@ fn editor_session_state_defaults_to_startup_auto_open_not_done() {
 #[test]
 fn editor_session_state_tracks_loaded_scene_maps() {
     let mut session = super::EditorSessionState::default();
-    session.loaded_scene_maps.insert("Main Scene".to_string(), "main_map".to_string());
+    session
+        .loaded_scene_maps
+        .insert("Main Scene".to_string(), "main_map".to_string());
 
     assert_eq!(
         session.loaded_scene_maps.get("Main Scene"),

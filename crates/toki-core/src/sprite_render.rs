@@ -160,12 +160,12 @@ pub fn resolve_object_sheet_frame(
             sheet_name: sheet_name.to_string(),
             object_name: object_name.to_string(),
         })?;
-    let rect = object_sheet
-        .get_object_rect(object_name)
-        .ok_or_else(|| SpriteResolveError::MissingObject {
+    let rect = object_sheet.get_object_rect(object_name).ok_or_else(|| {
+        SpriteResolveError::MissingObject {
             sheet_name: sheet_name.to_string(),
             object_name: object_name.to_string(),
-        })?;
+        }
+    })?;
 
     Ok((
         SpriteFrame {
@@ -235,7 +235,10 @@ pub fn resolve_sprite_render_requests(
 ///
 /// This consolidates the duplicate logging logic between runtime and editor,
 /// providing consistent error messages for sprite rendering issues.
-pub fn format_sprite_resolve_failure(origin: &SpriteRenderOrigin, error: &SpriteResolveError) -> String {
+pub fn format_sprite_resolve_failure(
+    origin: &SpriteRenderOrigin,
+    error: &SpriteResolveError,
+) -> String {
     match (origin, error) {
         (
             SpriteRenderOrigin::AnimatedEntity(entity_id),
@@ -246,7 +249,10 @@ pub fn format_sprite_resolve_failure(origin: &SpriteRenderOrigin, error: &Sprite
         ),
         (
             SpriteRenderOrigin::AnimatedEntity(entity_id),
-            SpriteResolveError::MissingAtlasTile { atlas_name, tile_name },
+            SpriteResolveError::MissingAtlasTile {
+                atlas_name,
+                tile_name,
+            },
         ) => format!(
             "Entity {} requested missing tile '{}' in atlas '{}'",
             entity_id, tile_name, atlas_name
@@ -260,7 +266,10 @@ pub fn format_sprite_resolve_failure(origin: &SpriteRenderOrigin, error: &Sprite
         ),
         (
             SpriteRenderOrigin::StaticEntity(entity_id),
-            SpriteResolveError::MissingObject { sheet_name, object_name },
+            SpriteResolveError::MissingObject {
+                sheet_name,
+                object_name,
+            },
         ) => format!(
             "Entity {} requested missing object '{}' in sheet '{}'",
             entity_id, object_name, sheet_name
@@ -274,7 +283,10 @@ pub fn format_sprite_resolve_failure(origin: &SpriteRenderOrigin, error: &Sprite
         ),
         (
             SpriteRenderOrigin::Projectile(entity_id),
-            SpriteResolveError::MissingObject { sheet_name, object_name },
+            SpriteResolveError::MissingObject {
+                sheet_name,
+                object_name,
+            },
         ) => format!(
             "Projectile {} requested missing object '{}' in sheet '{}'",
             entity_id, object_name, sheet_name
@@ -282,10 +294,7 @@ pub fn format_sprite_resolve_failure(origin: &SpriteRenderOrigin, error: &Sprite
         (
             SpriteRenderOrigin::MapObject { sheet_name, .. },
             SpriteResolveError::MissingObjectSheet { .. },
-        ) => format!(
-            "Map object requested missing object sheet '{}'",
-            sheet_name
-        ),
+        ) => format!("Map object requested missing object sheet '{}'", sheet_name),
         (
             SpriteRenderOrigin::MapObject { sheet_name, .. },
             SpriteResolveError::MissingObject { object_name, .. },
@@ -315,7 +324,11 @@ pub fn format_sprite_resolve_failure(origin: &SpriteRenderOrigin, error: &Sprite
             entity_id, message
         ),
         (
-            SpriteRenderOrigin::MapObject { object_name, sheet_name, .. },
+            SpriteRenderOrigin::MapObject {
+                object_name,
+                sheet_name,
+                ..
+            },
             SpriteResolveError::AssetLoadFailed { message, .. },
         ) => format!(
             "Map object '{}' in sheet '{}' failed to load: {}",

@@ -263,7 +263,8 @@ impl EditorApp {
 
     fn sync_ui_graph_layouts_from_project(&mut self) {
         let (graph_layouts, rule_graph_drafts) = self
-            .core.project_manager
+            .core
+            .project_manager
             .current_project
             .as_ref()
             .map(|project| {
@@ -274,7 +275,8 @@ impl EditorApp {
             })
             .unwrap_or_default();
         self.core.ui.load_graph_layouts_from_project(&graph_layouts);
-        self.core.ui
+        self.core
+            .ui
             .load_rule_graph_drafts_from_project(&rule_graph_drafts);
     }
 
@@ -398,7 +400,8 @@ impl EditorApp {
         };
 
         project.metadata.editor.graph_layouts = self.core.ui.export_graph_layouts_for_project();
-        project.metadata.editor.rule_graph_drafts = self.core.ui.export_rule_graph_drafts_for_project();
+        project.metadata.editor.rule_graph_drafts =
+            self.core.ui.export_rule_graph_drafts_for_project();
         match project.save_metadata() {
             Ok(()) => self.core.ui.clear_graph_layout_dirty(),
             Err(error) => tracing::warn!(
@@ -574,7 +577,8 @@ impl ApplicationHandler for EditorApp {
                         match shortcut {
                             EditorShortcutAction::Undo => {
                                 let undone = self
-                                    .core.project_manager
+                                    .core
+                                    .project_manager
                                     .current_project
                                     .as_mut()
                                     .map(|project| self.core.ui.undo_with_project(project))
@@ -585,7 +589,8 @@ impl ApplicationHandler for EditorApp {
                             }
                             EditorShortcutAction::Redo => {
                                 let redone = self
-                                    .core.project_manager
+                                    .core
+                                    .project_manager
                                     .current_project
                                     .as_mut()
                                     .map(|project| self.core.ui.redo_with_project(project))
@@ -607,7 +612,8 @@ impl ApplicationHandler for EditorApp {
                         match key_code {
                             KeyCode::Escape => event_loop.exit(),
                             KeyCode::F1 => {
-                                self.core.ui.visibility.show_hierarchy = !self.core.ui.visibility.show_hierarchy;
+                                self.core.ui.visibility.show_hierarchy =
+                                    !self.core.ui.visibility.show_hierarchy;
                                 tracing::info!(
                                     "Toggled hierarchy panel: {}",
                                     self.core.ui.visibility.show_hierarchy
@@ -617,7 +623,8 @@ impl ApplicationHandler for EditorApp {
                                 }
                             }
                             KeyCode::F2 => {
-                                self.core.ui.visibility.show_inspector = !self.core.ui.visibility.show_inspector;
+                                self.core.ui.visibility.show_inspector =
+                                    !self.core.ui.visibility.show_inspector;
                                 tracing::info!(
                                     "Toggled inspector panel: {}",
                                     self.core.ui.visibility.show_inspector
@@ -699,7 +706,9 @@ impl EditorApp {
 
         // Load sprite frame cache if needed (before render loop to avoid borrowing issues)
         let project_path = self.core.config.current_project_path();
-        if self.core.ui.is_in_placement_mode() && self.core.ui.placement.preview_cached_frame.is_none() {
+        if self.core.ui.is_in_placement_mode()
+            && self.core.ui.placement.preview_cached_frame.is_none()
+        {
             if let (Some(entity_def), Some(project_path), Some(project_assets)) = (
                 &self.core.ui.placement.entity_definition,
                 &project_path,
@@ -740,19 +749,27 @@ impl EditorApp {
                                 None
                             };
 
-                            let drag_preview_data =
-                                self.core.ui.placement.entity_move_drag.as_ref().and_then(|drag| {
-                                    self.core.ui.placement.preview_position.map(|preview_position| {
-                                        let tilemap = scene_viewport.tilemap();
-                                        let terrain_atlas =
-                                            tilemap.map(|_| scene_viewport.resources().get_terrain_atlas());
-                                        Self::build_drag_preview_sprites(
-                                            drag,
-                                            preview_position,
-                                            tilemap,
-                                            terrain_atlas,
-                                        )
-                                    })
+                            let drag_preview_data = self
+                                .core
+                                .ui
+                                .placement
+                                .entity_move_drag
+                                .as_ref()
+                                .and_then(|drag| {
+                                    self.core.ui.placement.preview_position.map(
+                                        |preview_position| {
+                                            let tilemap = scene_viewport.tilemap();
+                                            let terrain_atlas = tilemap.map(|_| {
+                                                scene_viewport.resources().get_terrain_atlas()
+                                            });
+                                            Self::build_drag_preview_sprites(
+                                                drag,
+                                                preview_position,
+                                                tilemap,
+                                                terrain_atlas,
+                                            )
+                                        },
+                                    )
                                 });
 
                             if let Err(e) = scene_viewport.render_to_texture(
@@ -795,11 +812,15 @@ impl EditorApp {
         }
 
         // Run egui UI
-        let available_map_names = self.core.project_manager.get_project_assets().map(|assets| {
-            let mut names = assets.tilemaps.keys().cloned().collect::<Vec<_>>();
-            names.sort();
-            names
-        });
+        let available_map_names = self
+            .core
+            .project_manager
+            .get_project_assets()
+            .map(|assets| {
+                let mut names = assets.tilemaps.keys().cloned().collect::<Vec<_>>();
+                names.sort();
+                names
+            });
         let full_output = egui_ctx.run(raw_input, |ctx| {
             // Render UI - viewport will use the pre-rendered texture
             self.core.ui.render(
@@ -857,14 +878,16 @@ impl EditorApp {
         self.handle_map_editor_map_requests();
 
         if self
-            .viewports.scene
+            .viewports
+            .scene
             .as_ref()
             .is_some_and(crate::scene::SceneViewport::needs_render)
         {
             window.request_redraw();
         }
         if self
-            .viewports.map_editor
+            .viewports
+            .map_editor
             .as_ref()
             .is_some_and(crate::scene::SceneViewport::needs_render)
         {

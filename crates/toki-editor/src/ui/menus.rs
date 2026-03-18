@@ -130,7 +130,10 @@ impl MenuSystem {
                     ui.checkbox(&mut ui_state.visibility.show_hierarchy, "Hierarchy");
                     ui.checkbox(&mut ui_state.visibility.show_inspector, "Inspector");
                     ui.checkbox(&mut ui_state.visibility.show_maps, "Maps");
-                    ui.checkbox(&mut ui_state.visibility.show_runtime_entities, "Show runtime entities");
+                    ui.checkbox(
+                        &mut ui_state.visibility.show_runtime_entities,
+                        "Show runtime entities",
+                    );
                     ui.checkbox(&mut ui_state.visibility.show_console, "Console");
                 });
 
@@ -145,7 +148,9 @@ impl MenuSystem {
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui_state.project.background_task_running && ui.button("Cancel Task").clicked() {
+                    if ui_state.project.background_task_running
+                        && ui.button("Cancel Task").clicked()
+                    {
                         ui_state.project.cancel_background_task_requested = true;
                     }
                     if let Some(status) = &ui_state.project.background_task_status {

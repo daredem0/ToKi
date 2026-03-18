@@ -46,7 +46,8 @@ impl EditorUI {
     }
 
     pub fn graph_layout_position(&self, scene_name: &str, node_key: &str) -> Option<[f32; 2]> {
-        self.graph.layouts_by_scene
+        self.graph
+            .layouts_by_scene
             .get(scene_name)
             .and_then(|layout| layout.node_positions.get(node_key).copied())
     }
@@ -81,7 +82,8 @@ impl EditorUI {
         base_layout: Option<SceneGraphLayout>,
     ) -> SceneGraphLayout {
         let mut layout = base_layout.unwrap_or_else(|| {
-            self.graph.layouts_by_scene
+            self.graph
+                .layouts_by_scene
                 .get(scene_name)
                 .cloned()
                 .unwrap_or_default()
@@ -130,7 +132,8 @@ impl EditorUI {
             },
         };
         if needs_rebuild {
-            self.graph.rule_graphs_by_scene
+            self.graph
+                .rule_graphs_by_scene
                 .insert(scene_name.to_string(), RuleGraph::from_rule_set(rule_set));
         }
     }

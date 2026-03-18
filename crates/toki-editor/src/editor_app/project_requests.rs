@@ -163,7 +163,8 @@ impl EditorApp {
         if self.core.ui.project.new_project_requested {
             self.core.ui.project.new_project_requested = false;
             let suggested_parent = self
-                .core.config
+                .core
+                .config
                 .current_project_path()
                 .map(|path| Self::suggested_new_project_parent_path(path.as_path()));
             let suggested_name = Self::next_available_project_name(
@@ -182,7 +183,8 @@ impl EditorApp {
         if self.core.ui.project.new_top_down_project_requested {
             self.core.ui.project.new_top_down_project_requested = false;
             let suggested_parent = self
-                .core.config
+                .core
+                .config
                 .current_project_path()
                 .map(|path| Self::suggested_new_project_parent_path(path.as_path()));
             let suggested_name = Self::next_available_project_name(

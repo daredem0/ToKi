@@ -2437,7 +2437,11 @@ fn game_state_entity_speed_controls_movement_distance() {
 
     let initial_position = game_state.player_position();
     game_state.handle_key_press(InputKey::Right);
-    game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    game_state.update(
+        UVec2::new(1000, 1000),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
 
     // Should have moved 3 pixels (entity speed), not 1 pixel (old hardcoded)
     assert_eq!(game_state.player_position().x, initial_position.x + 3);
@@ -2459,7 +2463,11 @@ fn game_state_entity_speed_fractional_rounds_down() {
 
     let initial_position = game_state.player_position();
     game_state.handle_key_press(InputKey::Down);
-    game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    game_state.update(
+        UVec2::new(1000, 1000),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
 
     // Should move 1 pixel (1.7 truncated to 1)
     assert_eq!(game_state.player_position().y, initial_position.y + 1);
@@ -2483,14 +2491,20 @@ fn game_state_entity_speed_below_one_accumulates_movement() {
     game_state.handle_key_press(InputKey::Left);
 
     // First update: accumulate 0.5, not enough to move
-    let result1 =
-        game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    let result1 = game_state.update(
+        UVec2::new(1000, 1000),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
     assert!(!result1.player_moved);
     assert_eq!(game_state.player_position(), initial_position);
 
     // Second update: accumulate another 0.5, now 1.0 - should move 1 pixel
-    let result2 =
-        game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    let result2 = game_state.update(
+        UVec2::new(1000, 1000),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
     assert!(result2.player_moved);
     assert_eq!(game_state.player_position().x, initial_position.x - 1);
 }
@@ -2513,11 +2527,19 @@ fn game_state_entity_speed_fractional_accumulates_remainder() {
     game_state.handle_key_press(InputKey::Right);
 
     // First update: 1.5 -> move 1, accumulate 0.5
-    game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    game_state.update(
+        UVec2::new(1000, 1000),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
     assert_eq!(game_state.player_position().x, initial_position.x + 1);
 
     // Second update: 0.5 + 1.5 = 2.0 -> move 2, accumulate 0
-    game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    game_state.update(
+        UVec2::new(1000, 1000),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
     assert_eq!(game_state.player_position().x, initial_position.x + 3);
 }
 
@@ -2539,7 +2561,11 @@ fn game_state_entity_speed_accumulator_resets_on_direction_change() {
     game_state.handle_key_press(InputKey::Left);
 
     // First update: accumulate 0.5 left
-    game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    game_state.update(
+        UVec2::new(1000, 1000),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
     assert_eq!(game_state.player_position(), initial_position);
 
     // Change direction to right
@@ -2547,12 +2573,19 @@ fn game_state_entity_speed_accumulator_resets_on_direction_change() {
     game_state.handle_key_press(InputKey::Right);
 
     // Second update: should start fresh at 0.5 right, not move
-    game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    game_state.update(
+        UVec2::new(1000, 1000),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
     assert_eq!(game_state.player_position(), initial_position);
 
     // Third update: now 1.0 accumulated right, should move right
-    let result =
-        game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+    let result = game_state.update(
+        UVec2::new(1000, 1000),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
     assert!(result.player_moved);
     assert_eq!(game_state.player_position().x, initial_position.x + 1);
 }
