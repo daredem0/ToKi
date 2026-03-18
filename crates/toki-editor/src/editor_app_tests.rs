@@ -451,3 +451,122 @@ fn load_preview_sprite_frame_static_supports_object_sheet_backed_entities() {
     assert_eq!(preview.size, UVec2::new(16, 16));
     assert!(preview.texture_path.is_some());
 }
+
+// =============================================================================
+// EditorSessionState tests
+// =============================================================================
+
+#[test]
+fn editor_session_state_defaults_to_no_loaded_scene() {
+    let session = super::EditorSessionState::default();
+    assert!(session.last_loaded_active_scene.is_none());
+}
+
+#[test]
+fn editor_session_state_defaults_to_empty_loaded_maps() {
+    let session = super::EditorSessionState::default();
+    assert!(session.loaded_scene_maps.is_empty());
+}
+
+#[test]
+fn editor_session_state_defaults_to_startup_auto_open_not_done() {
+    let session = super::EditorSessionState::default();
+    assert!(!session.startup_project_auto_open_done);
+}
+
+#[test]
+fn editor_session_state_tracks_loaded_scene_maps() {
+    let mut session = super::EditorSessionState::default();
+    session.loaded_scene_maps.insert("Main Scene".to_string(), "main_map".to_string());
+
+    assert_eq!(
+        session.loaded_scene_maps.get("Main Scene"),
+        Some(&"main_map".to_string())
+    );
+}
+
+#[test]
+fn editor_session_state_tracks_last_loaded_scene() {
+    let mut session = super::EditorSessionState::default();
+    session.last_loaded_active_scene = Some("Main Scene".to_string());
+
+    assert_eq!(
+        session.last_loaded_active_scene,
+        Some("Main Scene".to_string())
+    );
+}
+
+// =============================================================================
+// EditorResourceCache tests
+// =============================================================================
+
+#[test]
+fn editor_resource_cache_defaults_to_no_texture() {
+    let cache = super::EditorResourceCache::default();
+    assert!(cache.busy_logo_texture.is_none());
+}
+
+#[test]
+fn editor_resource_cache_defaults_to_no_font_project_path() {
+    let cache = super::EditorResourceCache::default();
+    assert!(cache.menu_font_project_path.is_none());
+}
+
+#[test]
+fn editor_resource_cache_tracks_font_project_path() {
+    let mut cache = super::EditorResourceCache::default();
+    cache.menu_font_project_path = Some(PathBuf::from("/tmp/project"));
+
+    assert_eq!(
+        cache.menu_font_project_path,
+        Some(PathBuf::from("/tmp/project"))
+    );
+}
+
+// =============================================================================
+// EditorPlatform tests
+// =============================================================================
+
+#[test]
+fn editor_platform_defaults_to_uninitialized() {
+    let platform = super::EditorPlatform::default();
+    assert!(platform.window.is_none());
+    assert!(platform.renderer.is_none());
+    assert!(platform.egui_winit.is_none());
+}
+
+// =============================================================================
+// EditorViewports tests
+// =============================================================================
+
+#[test]
+fn editor_viewports_defaults_to_no_viewports() {
+    let viewports = super::EditorViewports::default();
+    assert!(viewports.scene.is_none());
+    assert!(viewports.map_editor.is_none());
+}
+
+// =============================================================================
+// EditorCore tests
+// =============================================================================
+
+#[test]
+fn editor_core_has_default_config() {
+    let core = super::EditorCore::default();
+    // Config should have default editor settings
+    assert_eq!(core.config.editor_settings.window_size, [1200, 800]);
+}
+
+#[test]
+fn editor_core_has_default_ui() {
+    let core = super::EditorCore::default();
+    // UI starts with default scene active
+    assert_eq!(core.ui.active_scene, Some("Main Scene".to_string()));
+}
+
+#[test]
+fn editor_core_has_empty_project_manager() {
+    let core = super::EditorCore::default();
+    // Project manager should have no current project by default
+    assert!(core.project_manager.current_project.is_none());
+}

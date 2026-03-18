@@ -73,14 +73,14 @@ impl EditorApp {
 
     pub(super) fn handle_map_requests(&mut self) {
         // Handle Map Loading request
-        if let Some((scene_name, map_name)) = self.ui.map.load_requested.take() {
-            if let Some(config) = self.config.current_project_path() {
+        if let Some((scene_name, map_name)) = self.core.ui.map.load_requested.take() {
+            if let Some(config) = self.core.config.current_project_path() {
                 let map_file = config
                     .join("assets")
                     .join("tilemaps")
                     .join(format!("{}.json", map_name));
 
-                if let Some(viewport) = &mut self.scene_viewport {
+                if let Some(viewport) = &mut self.viewports.scene {
                     match viewport.scene_manager_mut().load_tilemap(&map_file) {
                         Ok(()) => {
                             tracing::info!(
@@ -88,7 +88,7 @@ impl EditorApp {
                                 map_name,
                                 scene_name
                             );
-                            self.loaded_scene_maps
+                            self.session.loaded_scene_maps
                                 .insert(scene_name.clone(), map_name.clone());
                             // Mark viewport as needing re-render
                             viewport.mark_dirty();
@@ -120,11 +120,11 @@ impl EditorApp {
     }
 
     pub(super) fn handle_new_map_editor_requests(&mut self) {
-        let Some(request) = self.ui.map.new_map_requested.take() else {
+        let Some(request) = self.core.ui.map.new_map_requested.take() else {
             return;
         };
 
-        let Some(project_assets) = self.project_manager.get_project_assets() else {
+        let Some(project_assets) = self.core.project_manager.get_project_assets() else {
             tracing::warn!(
                 "No project assets available for new map request '{}'",
                 request.name
@@ -139,7 +139,7 @@ impl EditorApp {
             request.height,
         ) {
             Ok(draft) => {
-                let Some(viewport) = &mut self.map_editor_viewport else {
+                let Some(viewport) = &mut self.viewports.map_editor else {
                     tracing::warn!(
                         "No map editor viewport available for new map '{}'",
                         request.name
@@ -159,7 +159,7 @@ impl EditorApp {
                     return;
                 }
 
-                self.ui.set_map_editor_draft(draft);
+                self.core.ui.set_map_editor_draft(draft);
                 viewport.mark_dirty();
             }
             Err(error) => {
@@ -173,23 +173,23 @@ impl EditorApp {
     }
 
     pub(super) fn handle_save_map_editor_request(&mut self) {
-        if !self.ui.map.save_requested {
+        if !self.core.ui.map.save_requested {
             return;
         }
 
-        if let Some(draft) = self.ui.map.draft.clone() {
+        if let Some(draft) = self.core.ui.map.draft.clone() {
             let live_tilemap = self
-                .map_editor_viewport
+                .viewports.map_editor
                 .as_ref()
                 .and_then(|viewport| viewport.scene_manager().tilemap());
             let tilemap_to_save = Self::tilemap_to_save_for_map_editor_draft(&draft, live_tilemap);
             match self
-                .project_manager
+                .core.project_manager
                 .save_tilemap_asset(&draft.name, &tilemap_to_save)
             {
                 Ok(_) => {
                     tracing::info!("Saved map editor draft '{}'", draft.name);
-                    self.ui.finalize_saved_map_editor_draft(draft.name);
+                    self.core.ui.finalize_saved_map_editor_draft(draft.name);
                 }
                 Err(error) => {
                     tracing::error!(
@@ -197,32 +197,32 @@ impl EditorApp {
                         draft.name,
                         error
                     );
-                    self.ui.map.save_requested = false;
+                    self.core.ui.map.save_requested = false;
                 }
             }
             return;
         }
 
-        let Some(active_map_name) = self.ui.map.active_map.clone() else {
-            self.ui.map.save_requested = false;
+        let Some(active_map_name) = self.core.ui.map.active_map.clone() else {
+            self.core.ui.map.save_requested = false;
             return;
         };
         let Some(tilemap) = self
-            .map_editor_viewport
+            .viewports.map_editor
             .as_ref()
             .and_then(|viewport| viewport.scene_manager().tilemap().cloned())
         else {
-            self.ui.map.save_requested = false;
+            self.core.ui.map.save_requested = false;
             return;
         };
 
         match self
-            .project_manager
+            .core.project_manager
             .save_tilemap_asset(&active_map_name, &tilemap)
         {
             Ok(_) => {
                 tracing::info!("Saved map editor asset '{}'", active_map_name);
-                self.ui.finalize_saved_existing_map();
+                self.core.ui.finalize_saved_existing_map();
             }
             Err(error) => {
                 tracing::error!(
@@ -230,22 +230,22 @@ impl EditorApp {
                     active_map_name,
                     error
                 );
-                self.ui.map.save_requested = false;
+                self.core.ui.map.save_requested = false;
             }
         }
     }
 
     pub(super) fn handle_map_editor_map_requests(&mut self) {
-        if self.ui.has_unsaved_map_editor_draft() {
-            self.ui.map.map_load_requested = None;
+        if self.core.ui.has_unsaved_map_editor_draft() {
+            self.core.ui.map.map_load_requested = None;
             return;
         }
 
-        let Some(map_name) = self.ui.map.map_load_requested.take() else {
+        let Some(map_name) = self.core.ui.map.map_load_requested.take() else {
             return;
         };
 
-        let Some(project_path) = self.config.current_project_path().cloned() else {
+        let Some(project_path) = self.core.config.current_project_path().cloned() else {
             tracing::warn!(
                 "No project loaded for map editor loading request: '{}'",
                 map_name
@@ -253,7 +253,7 @@ impl EditorApp {
             return;
         };
 
-        let Some(viewport) = &mut self.map_editor_viewport else {
+        let Some(viewport) = &mut self.viewports.map_editor else {
             tracing::warn!(
                 "No map editor viewport available for loading map '{}'",
                 map_name
@@ -270,9 +270,9 @@ impl EditorApp {
         match viewport.scene_manager_mut().load_tilemap(&map_file) {
             Ok(()) => {
                 tracing::info!("Loaded map '{}' into map editor viewport", map_name);
-                self.ui.map.active_map = Some(map_name);
-                self.ui.clear_map_editor_dirty();
-                self.ui.clear_map_editor_history();
+                self.core.ui.map.active_map = Some(map_name);
+                self.core.ui.clear_map_editor_dirty();
+                self.core.ui.clear_map_editor_history();
                 viewport.mark_dirty();
             }
             Err(e) => {
@@ -286,11 +286,11 @@ impl EditorApp {
     }
 
     pub(super) fn handle_pending_map_editor_tilemap_sync(&mut self) {
-        let Some(tilemap) = self.ui.take_pending_map_editor_tilemap_sync() else {
+        let Some(tilemap) = self.core.ui.take_pending_map_editor_tilemap_sync() else {
             return;
         };
 
-        let Some(viewport) = &mut self.map_editor_viewport else {
+        let Some(viewport) = &mut self.viewports.map_editor else {
             return;
         };
 

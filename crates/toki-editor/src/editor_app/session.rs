@@ -15,7 +15,7 @@ impl EditorApp {
     }
 
     pub(super) fn handle_active_scene_map_loading(&mut self) {
-        let current_active_scene = self.ui.active_scene.clone();
+        let current_active_scene = self.core.ui.active_scene.clone();
 
         if !self.should_reload_scene(&current_active_scene) {
             return;
@@ -30,19 +30,19 @@ impl EditorApp {
     }
 
     pub(super) fn should_reload_scene(&self, current_scene: &Option<String>) -> bool {
-        *current_scene != self.last_loaded_active_scene || self.ui.scene_content_changed
+        *current_scene != self.session.last_loaded_active_scene || self.core.ui.scene_content_changed
     }
 
     pub(super) fn update_scene_state(&mut self, current_scene: &Option<String>) {
-        self.last_loaded_active_scene = current_scene.clone();
-        self.ui.scene_content_changed = false;
+        self.session.last_loaded_active_scene = current_scene.clone();
+        self.core.ui.scene_content_changed = false;
 
         tracing::info!(
             "Active scene or content changed, reloading map for scene: {:?}",
             current_scene
         );
 
-        if let Some(viewport) = &mut self.scene_viewport {
+        if let Some(viewport) = &mut self.viewports.scene {
             viewport.mark_dirty();
         }
     }
@@ -60,12 +60,12 @@ impl EditorApp {
             active_scene.maps
         );
 
-        let Some(viewport) = &mut self.scene_viewport else {
+        let Some(viewport) = &mut self.viewports.scene else {
             return;
         };
 
-        let project_path = self.config.current_project_path().cloned();
-        let preferred_map = self.loaded_scene_maps.get(scene_name).map(String::as_str);
+        let project_path = self.core.config.current_project_path().cloned();
+        let preferred_map = self.session.loaded_scene_maps.get(scene_name).map(String::as_str);
         let map_to_load = Self::resolve_scene_map_to_load(&active_scene, preferred_map);
 
         Self::load_scene_into_gamestate(viewport, &active_scene, scene_name);
@@ -77,12 +77,12 @@ impl EditorApp {
         );
 
         if preferred_map.is_some() && map_to_load.as_deref() != preferred_map {
-            self.loaded_scene_maps.remove(scene_name);
+            self.session.loaded_scene_maps.remove(scene_name);
         }
     }
 
     pub(super) fn find_scene_by_name(&self, scene_name: &str) -> Option<&toki_core::Scene> {
-        self.ui.scenes.iter().find(|s| s.name == scene_name)
+        self.core.ui.scenes.iter().find(|s| s.name == scene_name)
     }
 
     pub(super) fn load_scene_into_gamestate(
@@ -159,7 +159,7 @@ impl EditorApp {
     }
 
     pub(super) fn clear_viewport_scene(&mut self) {
-        if let Some(viewport) = &mut self.scene_viewport {
+        if let Some(viewport) = &mut self.viewports.scene {
             viewport.scene_manager_mut().clear_tilemap();
         }
         tracing::debug!("No active scene set, cleared viewport");

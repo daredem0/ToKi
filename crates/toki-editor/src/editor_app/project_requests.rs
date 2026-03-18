@@ -9,12 +9,12 @@ impl EditorApp {
     ) {
         match SceneViewport::with_game_state(game_state) {
             Ok(viewport) => {
-                self.scene_viewport = self.initialize_viewport(viewport);
-                self.last_loaded_active_scene = None;
-                self.loaded_scene_maps.clear();
+                self.viewports.scene = self.initialize_viewport(viewport);
+                self.session.last_loaded_active_scene = None;
+                self.session.loaded_scene_maps.clear();
 
-                self.config.set_project_path(project_path);
-                if let Err(error) = self.config.save() {
+                self.core.config.set_project_path(project_path);
+                if let Err(error) = self.core.config.save() {
                     tracing::warn!(
                         "Failed to save config after activating {}: {}",
                         context,
@@ -22,13 +22,13 @@ impl EditorApp {
                     );
                 }
 
-                if let Some(project) = self.project_manager.current_project.as_ref() {
-                    self.ui.set_title(&project.name.to_string());
+                if let Some(project) = self.core.project_manager.current_project.as_ref() {
+                    self.core.ui.set_title(&project.name.to_string());
                 }
 
-                match self.project_manager.load_scenes() {
+                match self.core.project_manager.load_scenes() {
                     Ok(loaded_scenes) => {
-                        self.ui.load_scenes_from_project(loaded_scenes);
+                        self.core.ui.load_scenes_from_project(loaded_scenes);
                         tracing::info!("Loaded scenes into UI hierarchy");
                     }
                     Err(error) => {
@@ -50,7 +50,7 @@ impl EditorApp {
     }
 
     pub(super) fn open_project_at_path(&mut self, project_path: std::path::PathBuf) {
-        match self.project_manager.open_project(project_path.clone()) {
+        match self.core.project_manager.open_project(project_path.clone()) {
             Ok(game_state) => {
                 self.activate_loaded_project(game_state, project_path, "opened project");
                 tracing::info!("Opened project successfully");
@@ -62,9 +62,9 @@ impl EditorApp {
     }
 
     pub(super) fn handle_open_project_request(&mut self) {
-        self.ui.project.open_project_requested = false;
+        self.core.ui.project.open_project_requested = false;
 
-        let project_path = if let Some(config_path) = &self.config.project_path {
+        let project_path = if let Some(config_path) = &self.core.config.project_path {
             tracing::info!("Opening project from config: {:?}", config_path);
             Some(config_path.clone())
         } else {
@@ -81,7 +81,7 @@ impl EditorApp {
     }
 
     pub(super) fn handle_browse_for_project_request(&mut self) {
-        self.ui.project.browse_for_project_requested = false;
+        self.core.ui.project.browse_for_project_requested = false;
 
         if let Some(project_path) = rfd::FileDialog::new()
             .set_title("Browse for ToKi Project")
@@ -94,19 +94,19 @@ impl EditorApp {
     }
 
     pub(super) fn handle_save_project_request(&mut self) {
-        self.ui.project.save_project_requested = false;
+        self.core.ui.project.save_project_requested = false;
 
-        if let Some(project) = self.project_manager.current_project.as_mut() {
-            project.metadata.editor.graph_layouts = self.ui.export_graph_layouts_for_project();
+        if let Some(project) = self.core.project_manager.current_project.as_mut() {
+            project.metadata.editor.graph_layouts = self.core.ui.export_graph_layouts_for_project();
             project.metadata.editor.rule_graph_drafts =
-                self.ui.export_rule_graph_drafts_for_project();
+                self.core.ui.export_rule_graph_drafts_for_project();
         }
 
-        let scenes = &self.ui.scenes;
-        match self.project_manager.save_current_project(scenes) {
+        let scenes = &self.core.ui.scenes;
+        match self.core.project_manager.save_current_project(scenes) {
             Ok(_) => {
                 tracing::info!("Project saved successfully");
-                self.ui.clear_graph_layout_dirty();
+                self.core.ui.clear_graph_layout_dirty();
             }
             Err(error) => {
                 tracing::error!("Failed to save project: {}", error);
@@ -115,11 +115,11 @@ impl EditorApp {
     }
 
     pub(super) fn handle_init_project_request(&mut self) {
-        self.ui.project.init_config_requested = false;
+        self.core.ui.project.init_config_requested = false;
 
         match EditorConfig::init_default_config() {
             Ok(new_config) => {
-                self.config = new_config;
+                self.core.config = new_config;
                 tracing::info!("Config initialized successfully");
             }
             Err(error) => {
@@ -131,17 +131,17 @@ impl EditorApp {
     pub(super) fn handle_project_requests(&mut self, _event_loop: &ActiveEventLoop) {
         self.poll_background_task_updates();
 
-        if self.ui.project.cancel_background_task_requested {
-            self.ui.project.cancel_background_task_requested = false;
+        if self.core.ui.project.cancel_background_task_requested {
+            self.core.ui.project.cancel_background_task_requested = false;
             if self.background_tasks.request_cancel() {
                 tracing::info!("Background task cancellation requested");
             }
         }
 
-        if self.ui.project.new_project_requested {
-            self.ui.project.new_project_requested = false;
+        if self.core.ui.project.new_project_requested {
+            self.core.ui.project.new_project_requested = false;
             let suggested_parent = self
-                .config
+                .core.config
                 .current_project_path()
                 .map(|path| Self::suggested_new_project_parent_path(path.as_path()));
             let suggested_name = Self::next_available_project_name(
@@ -150,17 +150,17 @@ impl EditorApp {
                     .unwrap_or_else(|| std::path::Path::new(".")),
                 "NewProject",
             );
-            self.ui.begin_new_project_dialog(
+            self.core.ui.begin_new_project_dialog(
                 ProjectTemplateKind::Empty,
                 suggested_parent,
                 suggested_name,
             );
         }
 
-        if self.ui.project.new_top_down_project_requested {
-            self.ui.project.new_top_down_project_requested = false;
+        if self.core.ui.project.new_top_down_project_requested {
+            self.core.ui.project.new_top_down_project_requested = false;
             let suggested_parent = self
-                .config
+                .core.config
                 .current_project_path()
                 .map(|path| Self::suggested_new_project_parent_path(path.as_path()));
             let suggested_name = Self::next_available_project_name(
@@ -169,51 +169,51 @@ impl EditorApp {
                     .unwrap_or_else(|| std::path::Path::new(".")),
                 "NewProject",
             );
-            self.ui.begin_new_project_dialog(
+            self.core.ui.begin_new_project_dialog(
                 ProjectTemplateKind::TopDownStarter,
                 suggested_parent,
                 suggested_name,
             );
         }
 
-        if let Some(request) = self.ui.project.new_project_submit_requested.take() {
+        if let Some(request) = self.core.ui.project.new_project_submit_requested.take() {
             self.handle_new_project_requested(request.template, request.parent_path, request.name);
         }
 
-        if self.ui.project.open_project_requested {
+        if self.core.ui.project.open_project_requested {
             self.handle_open_project_request();
         }
 
-        if self.ui.project.browse_for_project_requested {
+        if self.core.ui.project.browse_for_project_requested {
             self.handle_browse_for_project_request();
         }
 
-        if self.ui.project.save_project_requested {
+        if self.core.ui.project.save_project_requested {
             self.handle_save_project_request();
         }
 
-        if self.ui.project.export_project_requested {
+        if self.core.ui.project.export_project_requested {
             self.handle_export_project_request();
         }
 
-        if self.ui.project.init_config_requested {
+        if self.core.ui.project.init_config_requested {
             self.handle_init_project_request();
         }
 
-        if self.ui.project.validate_assets_requested {
+        if self.core.ui.project.validate_assets_requested {
             self.handle_validate_assets_request();
         }
     }
 
     pub(super) fn handle_validate_assets_request(&mut self) {
-        self.ui.project.validate_assets_requested = false;
+        self.core.ui.project.validate_assets_requested = false;
 
         if self.background_tasks.is_running() {
             tracing::warn!("Cannot validate assets: another background task is running");
             return;
         }
 
-        let Some(project_path) = self.config.current_project_path().cloned() else {
+        let Some(project_path) = self.core.config.current_project_path().cloned() else {
             tracing::warn!("No project loaded - cannot validate assets");
             return;
         };

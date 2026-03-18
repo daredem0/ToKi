@@ -49,24 +49,68 @@ pub fn run_editor(log_capture: Option<LogCapture>) -> Result<()> {
     Ok(())
 }
 
+/// Session state: tracks loaded scenes and maps across the editor session.
+#[derive(Default)]
+pub(crate) struct EditorSessionState {
+    /// Track last loaded active scene to avoid unnecessary reloading.
+    pub last_loaded_active_scene: Option<String>,
+    /// Remembers the currently loaded map per scene for viewport reloads.
+    pub loaded_scene_maps: HashMap<String, String>,
+    /// Ensures startup auto-open from config only runs once.
+    pub startup_project_auto_open_done: bool,
+}
+
+/// Resource cache: lazily loaded editor resources and their tracking state.
+#[derive(Default)]
+pub(crate) struct EditorResourceCache {
+    /// Lazily loaded ToKi logo texture used for background task activity feedback.
+    pub busy_logo_texture: Option<egui::TextureHandle>,
+    /// Caches which project's menu preview fonts have been registered with egui.
+    pub menu_font_project_path: Option<PathBuf>,
+}
+
+/// Platform layer: window, renderer, and egui integration.
+/// These are initialized together during application startup.
+#[derive(Default)]
+pub(crate) struct EditorPlatform {
+    pub window: Option<Arc<Window>>,
+    pub renderer: Option<WindowRenderer>,
+    pub egui_winit: Option<egui_winit::State>,
+}
+
+/// Viewport management: scene preview and map editor viewports.
+#[derive(Default)]
+pub(crate) struct EditorViewports {
+    pub scene: Option<SceneViewport>,
+    pub map_editor: Option<SceneViewport>,
+}
+
+/// Editor core: project management, UI state, and configuration.
+pub(crate) struct EditorCore {
+    pub project_manager: ProjectManager,
+    pub ui: EditorUI,
+    pub config: EditorConfig,
+}
+
+impl Default for EditorCore {
+    fn default() -> Self {
+        Self {
+            project_manager: ProjectManager::new(),
+            ui: EditorUI::new(),
+            config: EditorConfig::default(),
+        }
+    }
+}
+
 struct EditorApp {
-    // Core components
-    window: Option<Arc<Window>>,
-    renderer: Option<WindowRenderer>,
-    ui: EditorUI,
+    /// Platform layer: window, renderer, egui integration.
+    platform: EditorPlatform,
 
-    // egui integration
-    egui_winit: Option<egui_winit::State>,
+    /// Viewport management: scene and map editor viewports.
+    viewports: EditorViewports,
 
-    // Scene viewport integration
-    scene_viewport: Option<SceneViewport>,
-    map_editor_viewport: Option<SceneViewport>,
-
-    // Project management
-    project_manager: ProjectManager,
-
-    // Editor configuration
-    config: EditorConfig,
+    /// Editor core: project management, UI state, configuration.
+    core: EditorCore,
 
     /// Logging
     log_capture: Option<LogCapture>,
@@ -74,19 +118,14 @@ struct EditorApp {
     /// Keyboard modifiers state
     modifiers: ModifiersState,
 
-    /// Track last loaded active scene to avoid unnecessary reloading
-    last_loaded_active_scene: Option<String>,
+    /// Session state: loaded scenes, maps, and startup flags.
+    session: EditorSessionState,
 
-    /// Remembers the currently loaded map per scene for viewport reloads.
-    loaded_scene_maps: HashMap<String, String>,
-    /// Ensures startup auto-open from config only runs once.
-    startup_project_auto_open_done: bool,
     /// Runs long-running editor operations off the UI thread.
     background_tasks: BackgroundTaskManager,
-    /// Lazily loaded ToKi logo texture used for background task activity feedback.
-    busy_logo_texture: Option<egui::TextureHandle>,
-    /// Caches which project's menu preview fonts have been registered with egui.
-    menu_font_project_path: Option<PathBuf>,
+
+    /// Resource cache: lazily loaded editor resources.
+    resources: EditorResourceCache,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,34 +146,30 @@ impl EditorApp {
         ui.apply_config(&config);
 
         Self {
-            window: None,
-            renderer: None,
-            ui,
-            egui_winit: None,
-            scene_viewport: None,
-            map_editor_viewport: None,
-            project_manager: ProjectManager::new(),
-            config,
+            platform: EditorPlatform::default(),
+            viewports: EditorViewports::default(),
+            core: EditorCore {
+                project_manager: ProjectManager::new(),
+                ui,
+                config,
+            },
             log_capture,
             modifiers: ModifiersState::default(),
-            last_loaded_active_scene: None,
-            loaded_scene_maps: HashMap::new(),
-            startup_project_auto_open_done: false,
+            session: EditorSessionState::default(),
             background_tasks: BackgroundTaskManager::default(),
-            busy_logo_texture: None,
-            menu_font_project_path: None,
+            resources: EditorResourceCache::default(),
         }
     }
 
     fn sync_project_menu_preview_fonts(&mut self, ctx: &egui::Context) {
-        let current_project_path = self.config.current_project_path().cloned();
-        if self.menu_font_project_path == current_project_path {
+        let current_project_path = self.core.config.current_project_path().cloned();
+        if self.resources.menu_font_project_path == current_project_path {
             return;
         }
 
         let registry = load_project_fonts_into_egui(ctx, current_project_path.as_deref());
-        self.ui.menu_preview_font_families = menu_font_family_choices(&registry);
-        self.menu_font_project_path = current_project_path;
+        self.core.ui.menu_preview_font_families = menu_font_family_choices(&registry);
+        self.resources.menu_font_project_path = current_project_path;
     }
 
     fn busy_logo_path() -> Option<std::path::PathBuf> {
@@ -148,7 +183,7 @@ impl EditorApp {
     }
 
     fn ensure_busy_logo_texture(&mut self, ctx: &egui::Context) {
-        if self.busy_logo_texture.is_some() {
+        if self.resources.busy_logo_texture.is_some() {
             return;
         }
 
@@ -173,13 +208,13 @@ impl EditorApp {
             [decoded.width as usize, decoded.height as usize],
             &decoded.data,
         );
-        self.busy_logo_texture =
+        self.resources.busy_logo_texture =
             Some(ctx.load_texture("toki_busy_logo", color_image, egui::TextureOptions::LINEAR));
     }
 
     /// Helper method to initialize a viewport with WGPU context
     fn initialize_viewport(&self, mut viewport: SceneViewport) -> Option<SceneViewport> {
-        if let Some(renderer) = &self.renderer {
+        if let Some(renderer) = &self.platform.renderer {
             match pollster::block_on(
                 viewport.initialize(renderer.device().clone(), renderer.queue().clone()),
             ) {
@@ -228,7 +263,7 @@ impl EditorApp {
 
     fn sync_ui_graph_layouts_from_project(&mut self) {
         let (graph_layouts, rule_graph_drafts) = self
-            .project_manager
+            .core.project_manager
             .current_project
             .as_ref()
             .map(|project| {
@@ -238,13 +273,13 @@ impl EditorApp {
                 )
             })
             .unwrap_or_default();
-        self.ui.load_graph_layouts_from_project(&graph_layouts);
-        self.ui
+        self.core.ui.load_graph_layouts_from_project(&graph_layouts);
+        self.core.ui
             .load_rule_graph_drafts_from_project(&rule_graph_drafts);
     }
 
     fn migrate_legacy_graph_layouts_into_project(&mut self) {
-        let Some(project) = self.project_manager.current_project.as_mut() else {
+        let Some(project) = self.core.project_manager.current_project.as_mut() else {
             return;
         };
 
@@ -351,21 +386,21 @@ impl EditorApp {
     }
 
     fn persist_graph_layout_metadata_if_needed(&mut self, egui_ctx: &egui::Context) {
-        if !self.ui.is_graph_layout_dirty() {
+        if !self.core.ui.is_graph_layout_dirty() {
             return;
         }
         if egui_ctx.input(|input| input.pointer.any_down()) {
             return;
         }
 
-        let Some(project) = self.project_manager.current_project.as_mut() else {
+        let Some(project) = self.core.project_manager.current_project.as_mut() else {
             return;
         };
 
-        project.metadata.editor.graph_layouts = self.ui.export_graph_layouts_for_project();
-        project.metadata.editor.rule_graph_drafts = self.ui.export_rule_graph_drafts_for_project();
+        project.metadata.editor.graph_layouts = self.core.ui.export_graph_layouts_for_project();
+        project.metadata.editor.rule_graph_drafts = self.core.ui.export_rule_graph_drafts_for_project();
         match project.save_metadata() {
-            Ok(()) => self.ui.clear_graph_layout_dirty(),
+            Ok(()) => self.core.ui.clear_graph_layout_dirty(),
             Err(error) => tracing::warn!(
                 "Failed to persist scene graph layout to project metadata: {}",
                 error
@@ -377,7 +412,7 @@ impl EditorApp {
 impl ApplicationHandler for EditorApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         // Create window using config settings
-        let [width, height] = self.config.editor_settings.window_size;
+        let [width, height] = self.core.config.editor_settings.window_size;
         let window_attributes = winit::window::Window::default_attributes()
             .with_title("ToKi Editor")
             .with_inner_size(winit::dpi::PhysicalSize::new(width, height));
@@ -413,21 +448,21 @@ impl ApplicationHandler for EditorApp {
         );
 
         // Store components
-        self.window = Some(window.clone());
-        self.renderer = Some(renderer);
-        self.egui_winit = Some(egui_winit);
+        self.platform.window = Some(window.clone());
+        self.platform.renderer = Some(renderer);
+        self.platform.egui_winit = Some(egui_winit);
 
         // Initialize scene viewport with empty game state and WGPU context
         let game_state = GameState::new_empty();
         match SceneViewport::with_game_state(game_state) {
             Ok(mut viewport) => {
                 // Initialize the scene viewport with WGPU context from renderer
-                if let Some(renderer) = &self.renderer {
+                if let Some(renderer) = &self.platform.renderer {
                     match pollster::block_on(
                         viewport.initialize(renderer.device().clone(), renderer.queue().clone()),
                     ) {
                         Ok(()) => {
-                            self.scene_viewport = Some(viewport);
+                            self.viewports.scene = Some(viewport);
                             tracing::info!("Scene viewport initialized with unified rendering");
                         }
                         Err(e) => {
@@ -446,12 +481,12 @@ impl ApplicationHandler for EditorApp {
         let map_editor_state = GameState::new_empty();
         match SceneViewport::with_game_state_responsive(map_editor_state) {
             Ok(mut viewport) => {
-                if let Some(renderer) = &self.renderer {
+                if let Some(renderer) = &self.platform.renderer {
                     match pollster::block_on(
                         viewport.initialize(renderer.device().clone(), renderer.queue().clone()),
                     ) {
                         Ok(()) => {
-                            self.map_editor_viewport = Some(viewport);
+                            self.viewports.map_editor = Some(viewport);
                             tracing::info!("Map editor viewport initialized");
                         }
                         Err(e) => {
@@ -472,11 +507,11 @@ impl ApplicationHandler for EditorApp {
         }
 
         tracing::info!("Editor initialized successfully");
-        if !self.startup_project_auto_open_done {
-            self.startup_project_auto_open_done = true;
-            if self.config.has_project_path() {
+        if !self.session.startup_project_auto_open_done {
+            self.session.startup_project_auto_open_done = true;
+            if self.core.config.has_project_path() {
                 tracing::info!("Auto-opening last project from config on startup");
-                self.ui.project.open_project_requested = true;
+                self.core.ui.project.open_project_requested = true;
             }
         }
         window.request_redraw();
@@ -490,8 +525,8 @@ impl ApplicationHandler for EditorApp {
     ) {
         // Handle egui events first
         let mut needs_repaint = false;
-        if let Some(egui_winit) = &mut self.egui_winit {
-            if let Some(window) = &self.window {
+        if let Some(egui_winit) = &mut self.platform.egui_winit {
+            if let Some(window) = &self.platform.window {
                 let event_response = egui_winit.on_window_event(window, &event);
                 if event_response.repaint {
                     needs_repaint = true;
@@ -511,9 +546,9 @@ impl ApplicationHandler for EditorApp {
 
             WindowEvent::KeyboardInput { event, .. } => {
                 if event.state.is_pressed() {
-                    let active_viewport = match self.ui.center_panel_tab {
-                        CenterPanelTab::SceneViewport => self.scene_viewport.as_mut(),
-                        CenterPanelTab::MapEditor => self.map_editor_viewport.as_mut(),
+                    let active_viewport = match self.core.ui.center_panel_tab {
+                        CenterPanelTab::SceneViewport => self.viewports.scene.as_mut(),
+                        CenterPanelTab::MapEditor => self.viewports.map_editor.as_mut(),
                         CenterPanelTab::SceneGraph
                         | CenterPanelTab::SceneRules
                         | CenterPanelTab::MenuEditor => None,
@@ -525,7 +560,7 @@ impl ApplicationHandler for EditorApp {
                             Modifiers::from(self.modifiers),
                             true,
                         ) {
-                            if let Some(window) = &self.window {
+                            if let Some(window) = &self.platform.window {
                                 window.request_redraw();
                             }
                             return;
@@ -539,28 +574,28 @@ impl ApplicationHandler for EditorApp {
                         match shortcut {
                             EditorShortcutAction::Undo => {
                                 let undone = self
-                                    .project_manager
+                                    .core.project_manager
                                     .current_project
                                     .as_mut()
-                                    .map(|project| self.ui.undo_with_project(project))
-                                    .unwrap_or_else(|| self.ui.undo());
+                                    .map(|project| self.core.ui.undo_with_project(project))
+                                    .unwrap_or_else(|| self.core.ui.undo());
                                 if undone {
                                     tracing::info!("Undo applied via Ctrl+Z");
                                 }
                             }
                             EditorShortcutAction::Redo => {
                                 let redone = self
-                                    .project_manager
+                                    .core.project_manager
                                     .current_project
                                     .as_mut()
-                                    .map(|project| self.ui.redo_with_project(project))
-                                    .unwrap_or_else(|| self.ui.redo());
+                                    .map(|project| self.core.ui.redo_with_project(project))
+                                    .unwrap_or_else(|| self.core.ui.redo());
                                 if redone {
                                     tracing::info!("Redo applied via Ctrl+Y/Ctrl+Shift+Z");
                                 }
                             }
                         }
-                        if let Some(window) = &self.window {
+                        if let Some(window) = &self.platform.window {
                             window.request_redraw();
                         }
                         return;
@@ -572,34 +607,34 @@ impl ApplicationHandler for EditorApp {
                         match key_code {
                             KeyCode::Escape => event_loop.exit(),
                             KeyCode::F1 => {
-                                self.ui.visibility.show_hierarchy = !self.ui.visibility.show_hierarchy;
+                                self.core.ui.visibility.show_hierarchy = !self.core.ui.visibility.show_hierarchy;
                                 tracing::info!(
                                     "Toggled hierarchy panel: {}",
-                                    self.ui.visibility.show_hierarchy
+                                    self.core.ui.visibility.show_hierarchy
                                 );
-                                if let Some(window) = &self.window {
+                                if let Some(window) = &self.platform.window {
                                     window.request_redraw();
                                 }
                             }
                             KeyCode::F2 => {
-                                self.ui.visibility.show_inspector = !self.ui.visibility.show_inspector;
+                                self.core.ui.visibility.show_inspector = !self.core.ui.visibility.show_inspector;
                                 tracing::info!(
                                     "Toggled inspector panel: {}",
-                                    self.ui.visibility.show_inspector
+                                    self.core.ui.visibility.show_inspector
                                 );
-                                if let Some(window) = &self.window {
+                                if let Some(window) = &self.platform.window {
                                     window.request_redraw();
                                 }
                             }
                             KeyCode::F4 => {
                                 // Toggle debug collision rendering (same as toki-runtime)
-                                if let Some(viewport) = &mut self.scene_viewport {
+                                if let Some(viewport) = &mut self.viewports.scene {
                                     viewport
                                         .scene_manager_mut()
                                         .game_state_mut()
                                         .handle_key_press(toki_core::InputKey::DebugToggle);
                                     tracing::info!("Toggled debug collision rendering via F4");
-                                    if let Some(window) = &self.window {
+                                    if let Some(window) = &self.platform.window {
                                         window.request_redraw();
                                     }
                                 }
@@ -611,10 +646,10 @@ impl ApplicationHandler for EditorApp {
             }
 
             WindowEvent::Resized(new_size) => {
-                if let Some(renderer) = &mut self.renderer {
+                if let Some(renderer) = &mut self.platform.renderer {
                     renderer.resize(new_size);
                 }
-                if let Some(window) = &self.window {
+                if let Some(window) = &self.platform.window {
                     window.request_redraw();
                 }
             }
@@ -628,7 +663,7 @@ impl ApplicationHandler for EditorApp {
 
         // Request repaint if egui or our events need it
         if needs_repaint {
-            if let Some(window) = &self.window {
+            if let Some(window) = &self.platform.window {
                 window.request_redraw();
             }
         }
@@ -637,20 +672,20 @@ impl ApplicationHandler for EditorApp {
 
 impl EditorApp {
     fn render(&mut self, event_loop: &ActiveEventLoop) {
-        let window = match &self.window {
+        let window = match &self.platform.window {
             Some(window) => window.clone(),
             None => return, // Not initialized yet
         };
-        let egui_ctx = match self.egui_winit.as_ref() {
+        let egui_ctx = match self.platform.egui_winit.as_ref() {
             Some(egui) => egui.egui_ctx().clone(),
             None => return, // Not initialized yet
         };
-        if self.ui.project.background_task_running {
+        if self.core.ui.project.background_task_running {
             self.ensure_busy_logo_texture(&egui_ctx);
         }
         self.sync_project_menu_preview_fonts(&egui_ctx);
 
-        let egui_winit = match &mut self.egui_winit {
+        let egui_winit = match &mut self.platform.egui_winit {
             Some(egui) => egui,
             None => return, // Not initialized yet
         };
@@ -658,43 +693,43 @@ impl EditorApp {
         // Prepare egui input
         let raw_input = egui_winit.take_egui_input(&window);
 
-        let renderer = match &mut self.renderer {
+        let renderer = match &mut self.platform.renderer {
             Some(renderer) => renderer,
             None => return, // Not initialized yet
         };
 
         // Load sprite frame cache if needed (before render loop to avoid borrowing issues)
-        let project_path = self.config.current_project_path();
-        if self.ui.is_in_placement_mode() && self.ui.placement.preview_cached_frame.is_none() {
+        let project_path = self.core.config.current_project_path();
+        if self.core.ui.is_in_placement_mode() && self.core.ui.placement.preview_cached_frame.is_none() {
             if let (Some(entity_def), Some(project_path), Some(project_assets)) = (
-                &self.ui.placement.entity_definition,
+                &self.core.ui.placement.entity_definition,
                 &project_path,
-                self.project_manager.get_project_assets(),
+                self.core.project_manager.get_project_assets(),
             ) {
                 let cached_frame = EditorApp::load_preview_sprite_frame_static(
                     entity_def,
                     project_path.as_path(),
                     project_assets,
                 );
-                self.ui.placement.preview_cached_frame = cached_frame;
+                self.core.ui.placement.preview_cached_frame = cached_frame;
             }
         }
 
         // Pre-render active center viewport to texture before egui UI.
         if let Some(project_path) = &project_path {
-            if let Some(project_assets) = self.project_manager.get_project_assets() {
-                match self.ui.center_panel_tab {
+            if let Some(project_assets) = self.core.project_manager.get_project_assets() {
+                match self.core.ui.center_panel_tab {
                     CenterPanelTab::SceneViewport => {
-                        if let Some(scene_viewport) = &mut self.scene_viewport {
-                            let preview_data = if self.ui.is_in_placement_mode() {
-                                if self.ui.placement.entity_move_drag.is_none() {
+                        if let Some(scene_viewport) = &mut self.viewports.scene {
+                            let preview_data = if self.core.ui.is_in_placement_mode() {
+                                if self.core.ui.placement.entity_move_drag.is_none() {
                                     if let (Some(_entity_def), Some(position), Some(cached_frame)) = (
-                                        &self.ui.placement.entity_definition,
-                                        &self.ui.placement.preview_position,
-                                        &self.ui.placement.preview_cached_frame,
+                                        &self.core.ui.placement.entity_definition,
+                                        &self.core.ui.placement.preview_position,
+                                        &self.core.ui.placement.preview_cached_frame,
                                     ) {
                                         let is_valid =
-                                            self.ui.placement.preview_valid.unwrap_or(true);
+                                            self.core.ui.placement.preview_valid.unwrap_or(true);
                                         Some((*position, cached_frame.clone(), is_valid))
                                     } else {
                                         None
@@ -707,8 +742,8 @@ impl EditorApp {
                             };
 
                             let drag_preview_data =
-                                self.ui.placement.entity_move_drag.as_ref().and_then(|drag| {
-                                    self.ui.placement.preview_position.map(|preview_position| {
+                                self.core.ui.placement.entity_move_drag.as_ref().and_then(|drag| {
+                                    self.core.ui.placement.preview_position.map(|preview_position| {
                                         let tilemap = scene_viewport.scene_manager().tilemap();
                                         let terrain_atlas = tilemap.map(|_| {
                                             scene_viewport
@@ -737,7 +772,7 @@ impl EditorApp {
                         }
                     }
                     CenterPanelTab::MapEditor => {
-                        if let Some(map_editor_viewport) = &mut self.map_editor_viewport {
+                        if let Some(map_editor_viewport) = &mut self.viewports.map_editor {
                             if let Err(e) = map_editor_viewport.render_to_texture(
                                 project_path.as_path(),
                                 project_assets,
@@ -756,49 +791,49 @@ impl EditorApp {
                     | CenterPanelTab::SceneRules
                     | CenterPanelTab::MenuEditor => {}
                 }
-            } else if self.project_manager.current_project.is_some() {
+            } else if self.core.project_manager.current_project.is_some() {
                 tracing::warn!(
                     "No project assets available for viewport rendering {:?}",
-                    self.project_manager.current_project
+                    self.core.project_manager.current_project
                 );
             }
         }
 
         // Run egui UI
-        let available_map_names = self.project_manager.get_project_assets().map(|assets| {
+        let available_map_names = self.core.project_manager.get_project_assets().map(|assets| {
             let mut names = assets.tilemaps.keys().cloned().collect::<Vec<_>>();
             names.sort();
             names
         });
         let full_output = egui_ctx.run(raw_input, |ctx| {
             // Render UI - viewport will use the pre-rendered texture
-            self.ui.render(
+            self.core.ui.render(
                 ctx,
-                self.scene_viewport.as_mut(),
-                self.map_editor_viewport.as_mut(),
-                self.project_manager.current_project.as_mut(),
+                self.viewports.scene.as_mut(),
+                self.viewports.map_editor.as_mut(),
+                self.core.project_manager.current_project.as_mut(),
                 available_map_names.clone(),
-                Some(&mut self.config),
+                Some(&mut self.core.config),
                 self.log_capture.as_ref(),
                 None, // Can't pass renderer due to borrow issues
-                self.busy_logo_texture.as_ref(),
+                self.resources.busy_logo_texture.as_ref(),
             );
         });
 
         // Handle UI requests
-        if self.ui.visibility.should_exit {
+        if self.core.ui.visibility.should_exit {
             event_loop.exit();
             return;
         }
 
-        if self.ui.visibility.create_test_entities {
-            if let Some(viewport) = &mut self.scene_viewport {
+        if self.core.ui.visibility.create_test_entities {
+            if let Some(viewport) = &mut self.viewports.scene {
                 let game_state = viewport.scene_manager_mut().game_state_mut();
                 let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
                 let _npc_id = game_state.spawn_player_like_npc(glam::IVec2::new(120, 72));
                 tracing::info!("Created test entities");
             }
-            self.ui.visibility.create_test_entities = false;
+            self.core.ui.visibility.create_test_entities = false;
         }
 
         // Handle platform output (cursor, clipboard, etc.)
@@ -827,14 +862,14 @@ impl EditorApp {
         self.handle_map_editor_map_requests();
 
         if self
-            .scene_viewport
+            .viewports.scene
             .as_ref()
             .is_some_and(crate::scene::SceneViewport::needs_render)
         {
             window.request_redraw();
         }
         if self
-            .map_editor_viewport
+            .viewports.map_editor
             .as_ref()
             .is_some_and(crate::scene::SceneViewport::needs_render)
         {
