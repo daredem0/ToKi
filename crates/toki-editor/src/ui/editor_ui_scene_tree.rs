@@ -205,7 +205,6 @@ impl EditorUI {
                                                         selection_changes.push(
                                                             super::Selection::Entity(*entity_id),
                                                         );
-                                                        self.selected_entity_id = Some(*entity_id);
                                                     }
 
                                                     ui.with_layout(

@@ -79,8 +79,8 @@ fn add_entity_to_selection_preserves_existing_and_avoids_duplicates() {
     ui.add_entity_to_selection(2);
     ui.add_entity_to_selection(1);
 
-    assert_eq!(ui.selected_entity_ids, vec![1, 2]);
-    assert_eq!(ui.selected_entity_id, Some(1));
+    assert_eq!(ui.selected_entity_ids(), &[1, 2]);
+    assert_eq!(ui.selected_entity_id(), Some(1));
 }
 
 #[test]

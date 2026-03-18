@@ -46,8 +46,7 @@ impl EditorUI {
         } else if let Some(first_dialog_id) = dialogs.first().map(|dialog| dialog.id.clone()) {
             self.selection = Some(Selection::MenuDialog(first_dialog_id));
         }
-        self.selected_entity_id = None;
-        self.selected_entity_ids.clear();
+        self.clear_entity_selection_state();
     }
 
     pub fn clear_menu_editor_selection(&mut self) {
@@ -62,20 +61,17 @@ impl EditorUI {
     }
 
     pub fn select_menu_screen(&mut self, screen_id: impl Into<String>) {
-        self.selected_entity_id = None;
-        self.selected_entity_ids.clear();
+        self.clear_entity_selection_state();
         self.selection = Some(Selection::MenuScreen(screen_id.into()));
     }
 
     pub fn select_menu_dialog(&mut self, dialog_id: impl Into<String>) {
-        self.selected_entity_id = None;
-        self.selected_entity_ids.clear();
+        self.clear_entity_selection_state();
         self.selection = Some(Selection::MenuDialog(dialog_id.into()));
     }
 
     pub fn select_menu_entry(&mut self, screen_id: impl Into<String>, item_index: usize) {
-        self.selected_entity_id = None;
-        self.selected_entity_ids.clear();
+        self.clear_entity_selection_state();
         self.selection = Some(Selection::MenuEntry {
             screen_id: screen_id.into(),
             item_index,

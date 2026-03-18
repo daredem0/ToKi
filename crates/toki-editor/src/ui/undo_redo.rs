@@ -1,8 +1,10 @@
 use super::editor_ui::EditorUI;
 use super::rule_graph::RuleGraph;
+use crate::project::Project;
 use crate::project::SceneGraphLayout;
 use glam::IVec2;
 use toki_core::entity::{Entity, EntityId};
+use toki_core::menu::MenuSettings;
 use toki_core::rules::RuleSet;
 
 #[derive(Debug, Clone, Default)]
@@ -12,25 +14,36 @@ pub struct UndoRedoHistory {
 }
 
 impl UndoRedoHistory {
-    pub fn execute(&mut self, command: EditorCommand, ui_state: &mut EditorUI) -> bool {
-        if command.apply(ui_state) {
+    pub fn execute(
+        &mut self,
+        command: EditorCommand,
+        ui_state: &mut EditorUI,
+        project: Option<&mut Project>,
+    ) -> bool {
+        if command.apply(ui_state, project) {
             self.undo_stack.push(command);
             self.redo_stack.clear();
-            ui_state.scene_content_changed = true;
+            self.undo_stack
+                .last()
+                .expect("command just pushed")
+                .mark_post_apply(ui_state);
             true
         } else {
             false
         }
     }
 
-    pub fn undo(&mut self, ui_state: &mut EditorUI) -> bool {
+    pub fn undo(&mut self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
         let Some(command) = self.undo_stack.pop() else {
             return false;
         };
 
-        if command.undo(ui_state) {
+        if command.undo(ui_state, project) {
             self.redo_stack.push(command);
-            ui_state.scene_content_changed = true;
+            self.redo_stack
+                .last()
+                .expect("command just pushed")
+                .mark_post_apply(ui_state);
             true
         } else {
             self.undo_stack.push(command);
@@ -38,14 +51,17 @@ impl UndoRedoHistory {
         }
     }
 
-    pub fn redo(&mut self, ui_state: &mut EditorUI) -> bool {
+    pub fn redo(&mut self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
         let Some(command) = self.redo_stack.pop() else {
             return false;
         };
 
-        if command.apply(ui_state) {
+        if command.apply(ui_state, project) {
             self.undo_stack.push(command);
-            ui_state.scene_content_changed = true;
+            self.undo_stack
+                .last()
+                .expect("command just pushed")
+                .mark_post_apply(ui_state);
             true
         } else {
             self.redo_stack.push(command);
@@ -74,6 +90,7 @@ pub enum EditorCommand {
     MoveEntities(Box<MoveEntitiesCommand>),
     UpdateEntities(Box<UpdateEntitiesCommand>),
     UpdateSceneRulesGraph(Box<UpdateSceneRulesGraphCommand>),
+    UpdateMenuSettings(Box<UpdateMenuSettingsCommand>),
 }
 
 impl EditorCommand {
@@ -138,23 +155,42 @@ impl EditorCommand {
         }))
     }
 
-    pub fn apply(&self, ui_state: &mut EditorUI) -> bool {
+    pub fn update_menu_settings(before: MenuSettings, after: MenuSettings) -> Self {
+        Self::UpdateMenuSettings(Box::new(UpdateMenuSettingsCommand { before, after }))
+    }
+
+    pub fn apply(&self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
         match self {
             Self::AddEntity(command) => command.apply(ui_state),
             Self::RemoveEntity(command) => command.apply(ui_state),
             Self::MoveEntities(command) => command.apply(ui_state),
             Self::UpdateEntities(command) => command.apply(ui_state),
             Self::UpdateSceneRulesGraph(command) => command.apply(ui_state),
+            Self::UpdateMenuSettings(command) => command.apply(project),
         }
     }
 
-    pub fn undo(&self, ui_state: &mut EditorUI) -> bool {
+    pub fn undo(&self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
         match self {
             Self::AddEntity(command) => command.undo(ui_state),
             Self::RemoveEntity(command) => command.undo(ui_state),
             Self::MoveEntities(command) => command.undo(ui_state),
             Self::UpdateEntities(command) => command.undo(ui_state),
             Self::UpdateSceneRulesGraph(command) => command.undo(ui_state),
+            Self::UpdateMenuSettings(command) => command.undo(project),
+        }
+    }
+
+    fn mark_post_apply(&self, ui_state: &mut EditorUI) {
+        if matches!(
+            self,
+            Self::AddEntity(_)
+                | Self::RemoveEntity(_)
+                | Self::MoveEntities(_)
+                | Self::UpdateEntities(_)
+                | Self::UpdateSceneRulesGraph(_)
+        ) {
+            ui_state.scene_content_changed = true;
         }
     }
 }
@@ -181,6 +217,37 @@ impl EntityPosition {
 pub struct AddEntityCommand {
     scene_name: String,
     entity: Entity,
+}
+
+#[derive(Debug, Clone)]
+pub struct UpdateMenuSettingsCommand {
+    before: MenuSettings,
+    after: MenuSettings,
+}
+
+impl UpdateMenuSettingsCommand {
+    fn apply(&self, project: Option<&mut Project>) -> bool {
+        let Some(project) = project else {
+            return false;
+        };
+        project.metadata.runtime.menu = self.after.clone();
+        mark_project_dirty(project);
+        true
+    }
+
+    fn undo(&self, project: Option<&mut Project>) -> bool {
+        let Some(project) = project else {
+            return false;
+        };
+        project.metadata.runtime.menu = self.before.clone();
+        mark_project_dirty(project);
+        true
+    }
+}
+
+fn mark_project_dirty(project: &mut Project) {
+    project.metadata.project.modified = chrono::Utc::now();
+    project.is_dirty = true;
 }
 
 impl AddEntityCommand {

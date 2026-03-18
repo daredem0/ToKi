@@ -105,7 +105,8 @@ fn apply_graph_transition(
             before_layout,
             Some(after_layout),
         ),
-        ui_state
+        ui_state,
+        None
     ));
 }
 
@@ -126,17 +127,19 @@ fn execute_clears_redo_stack_when_new_command_is_applied() {
 
     assert!(history.execute(
         EditorCommand::add_entity("Main Scene", sample_entity(1, IVec2::new(1, 1))),
-        &mut ui_state
+        &mut ui_state,
+        None
     ));
     assert!(history.can_undo());
     assert!(!history.can_redo());
 
-    assert!(history.undo(&mut ui_state));
+    assert!(history.undo(&mut ui_state, None));
     assert!(history.can_redo());
 
     assert!(history.execute(
         EditorCommand::add_entity("Main Scene", sample_entity(2, IVec2::new(2, 2))),
-        &mut ui_state
+        &mut ui_state,
+        None
     ));
     assert!(history.can_undo());
     assert!(!history.can_redo());
@@ -150,13 +153,13 @@ fn add_entity_command_supports_undo_and_redo() {
     let mut history = UndoRedoHistory::default();
 
     let command = EditorCommand::add_entity("Main Scene", sample_entity(7, IVec2::new(4, 8)));
-    assert!(history.execute(command, &mut ui_state));
+    assert!(history.execute(command, &mut ui_state, None));
     assert_eq!(main_scene_entities(&ui_state).len(), 1);
 
-    assert!(history.undo(&mut ui_state));
+    assert!(history.undo(&mut ui_state, None));
     assert!(main_scene_entities(&ui_state).is_empty());
 
-    assert!(history.redo(&mut ui_state));
+    assert!(history.redo(&mut ui_state, None));
     assert_eq!(main_scene_entities(&ui_state).len(), 1);
 }
 
@@ -186,7 +189,7 @@ fn move_entities_command_round_trips_positions() {
             EntityPosition::new(2, IVec2::new(35, 37)),
         ],
     );
-    assert!(history.execute(command, &mut ui_state));
+    assert!(history.execute(command, &mut ui_state, None));
 
     let entities = main_scene_entities(&ui_state);
     assert_eq!(
@@ -206,7 +209,7 @@ fn move_entities_command_round_trips_positions() {
         IVec2::new(35, 37)
     );
 
-    assert!(history.undo(&mut ui_state));
+    assert!(history.undo(&mut ui_state, None));
     let entities = main_scene_entities(&ui_state);
     assert_eq!(
         entities
@@ -246,7 +249,7 @@ fn update_entities_command_restores_previous_state_on_undo() {
 
     let command =
         EditorCommand::update_entities("Main Scene", vec![before.clone()], vec![after.clone()]);
-    assert!(history.execute(command, &mut ui_state));
+    assert!(history.execute(command, &mut ui_state, None));
 
     let entity = main_scene_entities(&ui_state)
         .into_iter()
@@ -255,7 +258,7 @@ fn update_entities_command_restores_previous_state_on_undo() {
     assert!(!entity.attributes.visible);
     assert_eq!(entity.attributes.render_layer, 9);
 
-    assert!(history.undo(&mut ui_state));
+    assert!(history.undo(&mut ui_state, None));
     let entity = main_scene_entities(&ui_state)
         .into_iter()
         .find(|entity| entity.id == 42)
@@ -295,14 +298,14 @@ fn remove_entities_command_restores_original_order_on_undo() {
             },
         ],
     );
-    assert!(history.execute(command, &mut ui_state));
+    assert!(history.execute(command, &mut ui_state, None));
     let ids = main_scene_entities(&ui_state)
         .into_iter()
         .map(|entity| entity.id)
         .collect::<Vec<_>>();
     assert_eq!(ids, vec![2]);
 
-    assert!(history.undo(&mut ui_state));
+    assert!(history.undo(&mut ui_state, None));
     let ids = main_scene_entities(&ui_state)
         .into_iter()
         .map(|entity| entity.id)
@@ -316,7 +319,7 @@ fn execute_noop_command_does_not_affect_history() {
     let mut history = UndoRedoHistory::default();
 
     let command = EditorCommand::add_entity("Missing Scene", sample_entity(1, IVec2::new(0, 0)));
-    assert!(!history.execute(command, &mut ui_state));
+    assert!(!history.execute(command, &mut ui_state, None));
     assert_eq!(history.undo_stack.len(), 0);
     assert_eq!(history.redo_stack.len(), 0);
     assert!(!history.can_undo());
@@ -363,7 +366,7 @@ fn update_scene_rules_graph_command_round_trips_rules_graph_and_layout() {
         before_layout,
         Some(after_layout.clone()),
     );
-    assert!(history.execute(command, &mut ui_state));
+    assert!(history.execute(command, &mut ui_state, None));
 
     let scene = ui_state
         .scenes
@@ -383,7 +386,7 @@ fn update_scene_rules_graph_command_round_trips_rules_graph_and_layout() {
     assert_eq!(layout.zoom, after_layout.zoom);
     assert_eq!(layout.pan, after_layout.pan);
 
-    assert!(history.undo(&mut ui_state));
+    assert!(history.undo(&mut ui_state, None));
     let scene = ui_state
         .scenes
         .iter()
@@ -426,12 +429,12 @@ fn graph_connect_and_disconnect_operations_are_undoable() {
         .iter()
         .any(|edge| edge.from == condition && edge.to == action));
 
-    assert!(history.undo(&mut ui_state));
+    assert!(history.undo(&mut ui_state, None));
     assert!(!scene_graph(&ui_state)
         .edges
         .iter()
         .any(|edge| edge.from == condition && edge.to == action));
-    assert!(history.undo(&mut ui_state));
+    assert!(history.undo(&mut ui_state, None));
     assert!(scene_graph(&ui_state)
         .edges
         .iter()
@@ -465,9 +468,9 @@ fn graph_node_rule_deletion_is_undoable() {
     });
     assert_eq!(scene_rules(&ui_state).rules.len(), 1);
 
-    assert!(history.undo(&mut ui_state));
+    assert!(history.undo(&mut ui_state, None));
     assert_eq!(scene_rules(&ui_state).rules.len(), 2);
-    assert!(history.redo(&mut ui_state));
+    assert!(history.redo(&mut ui_state, None));
     assert_eq!(scene_rules(&ui_state).rules.len(), 1);
 }
 
@@ -511,7 +514,7 @@ fn layout_reset_like_updates_are_undoable() {
     assert_eq!(updated_layout.zoom, 0.8);
     assert_eq!(updated_layout.pan, [16.0, 16.0]);
 
-    assert!(history.undo(&mut ui_state));
+    assert!(history.undo(&mut ui_state, None));
     let restored_layout = ui_state
         .graph_layouts_by_scene
         .get("Main Scene")
@@ -552,7 +555,7 @@ fn inspector_like_node_edit_updates_are_undoable() {
         RuleAction::PlayMusic { track_id } if track_id == "lavandia"
     ));
 
-    assert!(history.undo(&mut ui_state));
+    assert!(history.undo(&mut ui_state, None));
     assert!(matches!(
         &scene_rules(&ui_state).rules[0].actions[0],
         RuleAction::PlaySound { .. }

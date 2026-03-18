@@ -312,7 +312,7 @@ impl InspectorSystem {
             return false;
         };
 
-        let selected_ids = ui_state.selected_entity_ids.clone();
+        let selected_ids = ui_state.selected_entity_ids_vec();
         let selected_set: HashSet<_> = selected_ids.iter().copied().collect();
         let selected_entities = {
             let scene = &ui_state.scenes[scene_index];

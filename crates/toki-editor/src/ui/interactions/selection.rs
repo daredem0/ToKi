@@ -101,7 +101,6 @@ impl SelectionInteraction {
             ui_state.set_single_entity_selection(entity_id);
         } else {
             ui_state.selection = Some(crate::ui::editor_ui::Selection::Entity(entity_id));
-            ui_state.selected_entity_id = Some(entity_id);
         }
         ui_state.enter_placement_mode(entity_def_name.clone());
         let grab_offset = world_pos - entity.position.as_vec2();
@@ -205,7 +204,6 @@ impl SelectionInteraction {
                     ui_state.selection = Some(crate::ui::editor_ui::Selection::Entity(
                         drag_state.entity.id,
                     ));
-                    ui_state.selected_entity_id = Some(drag_state.entity.id);
                 }
                 tracing::info!(
                     "Dropped {} dragged entities with anchor {} at ({}, {})",
@@ -348,8 +346,8 @@ impl SelectionInteraction {
         clicked_entity: &Entity,
         clicked_entity_id: toki_core::entity::EntityId,
     ) -> Vec<Entity> {
-        if ui_state.selected_entity_ids.len() <= 1
-            || !ui_state.selected_entity_ids.contains(&clicked_entity_id)
+        if ui_state.selected_entity_ids().len() <= 1
+            || !ui_state.selected_entity_ids().contains(&clicked_entity_id)
         {
             return vec![clicked_entity.clone()];
         }
@@ -359,7 +357,7 @@ impl SelectionInteraction {
         };
 
         let selected_set = ui_state
-            .selected_entity_ids
+            .selected_entity_ids()
             .iter()
             .copied()
             .collect::<std::collections::HashSet<_>>();

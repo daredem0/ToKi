@@ -1,6 +1,6 @@
 use super::{EditorUI, InspectorSystem, Selection};
 use crate::project::Project;
-use chrono::Utc;
+use crate::ui::undo_redo::EditorCommand;
 use toki_core::menu::{
     MenuBorderStyle, MenuDialogDefinition, MenuItemDefinition, MenuListSource,
     MenuScreenDefinition, MenuSettings, UiAction,
@@ -75,6 +75,7 @@ impl InspectorSystem {
         ui: &mut egui::Ui,
         project: &mut Project,
     ) {
+        let before_settings = project.metadata.runtime.menu.clone();
         let available_screen_ids = project
             .metadata
             .runtime
@@ -88,15 +89,11 @@ impl InspectorSystem {
         egui::CollapsingHeader::new("Runtime Menu Settings")
             .default_open(false)
             .show(ui, |ui| {
-                if ui
-                    .checkbox(
-                        &mut project.metadata.runtime.menu.gate_gameplay_when_open,
-                        "Gate gameplay while menu is open",
-                    )
-                    .changed()
-                {
-                    Self::mark_menu_settings_changed(project);
-                }
+                ui.checkbox(
+                    &mut project.metadata.runtime.menu.gate_gameplay_when_open,
+                    "Gate gameplay while menu is open",
+                )
+                .changed();
 
                 let mut pause_root = project.metadata.runtime.menu.pause_root_screen_id.clone();
                 egui::ComboBox::from_label("Pause Root Screen")
@@ -108,7 +105,6 @@ impl InspectorSystem {
                     });
                 if pause_root != project.metadata.runtime.menu.pause_root_screen_id {
                     project.metadata.runtime.menu.pause_root_screen_id = pause_root;
-                    Self::mark_menu_settings_changed(project);
                 }
             });
 
@@ -387,8 +383,8 @@ impl InspectorSystem {
 
         if appearance_changed {
             project.metadata.runtime.menu.appearance = appearance;
-            Self::mark_menu_settings_changed(project);
         }
+        Self::commit_menu_settings_change(ui_state, project, before_settings);
 
         egui::CollapsingHeader::new("Screens")
             .default_open(false)
@@ -412,6 +408,7 @@ impl InspectorSystem {
         project: &mut Project,
         screen_id: &str,
     ) {
+        let before_settings = project.metadata.runtime.menu.clone();
         let Some(screen_index) = Self::selected_menu_screen_index(project, screen_id) else {
             ui.label("Selected screen no longer exists.");
             return;
@@ -460,7 +457,7 @@ impl InspectorSystem {
             ui_state.select_menu_screen(normalized);
         }
         if changed {
-            Self::mark_menu_settings_changed(project);
+            Self::commit_menu_settings_change(ui_state, project, before_settings);
         }
 
         egui::CollapsingHeader::new("Screen Actions")
@@ -532,6 +529,7 @@ impl InspectorSystem {
         project: &mut Project,
         dialog_id: &str,
     ) {
+        let before_settings = project.metadata.runtime.menu.clone();
         let Some(dialog_index) = Self::selected_menu_dialog_index(project, dialog_id) else {
             ui.label("Selected dialog no longer exists.");
             return;
@@ -641,7 +639,7 @@ impl InspectorSystem {
             ui_state.select_menu_dialog(normalized);
         }
         if changed {
-            Self::mark_menu_settings_changed(project);
+            Self::commit_menu_settings_change(ui_state, project, before_settings);
         }
         if duplicate_dialog {
             Self::duplicate_menu_dialog(ui_state, project, dialog_index);
@@ -658,6 +656,7 @@ impl InspectorSystem {
         screen_id: &str,
         item_index: usize,
     ) {
+        let before_settings = project.metadata.runtime.menu.clone();
         let Some(screen_index) = Self::selected_menu_screen_index(project, screen_id) else {
             ui.label("Selected screen no longer exists.");
             return;
@@ -736,7 +735,7 @@ impl InspectorSystem {
                             "Inventory List",
                         );
                     });
-                Self::coerce_menu_item_kind(project, screen_index, item_index, item_kind);
+                Self::coerce_menu_item_kind(ui_state, project, screen_index, item_index, item_kind);
 
                 ui.separator();
                 match &mut project.metadata.runtime.menu.screens[screen_index].items[item_index] {
@@ -830,7 +829,7 @@ impl InspectorSystem {
                 }
             });
         if changed {
-            Self::mark_menu_settings_changed(project);
+            Self::commit_menu_settings_change(ui_state, project, before_settings);
         }
 
         if has_missing_target_validation {
@@ -954,6 +953,7 @@ impl InspectorSystem {
     }
 
     pub(crate) fn add_menu_screen(ui_state: &mut EditorUI, project: &mut Project) {
+        let before_settings = project.metadata.runtime.menu.clone();
         let next_id = Self::next_menu_screen_id(&project.metadata.runtime.menu);
         project
             .metadata
@@ -973,11 +973,12 @@ impl InspectorSystem {
         if project.metadata.runtime.menu.screens.len() == 1 {
             project.metadata.runtime.menu.pause_root_screen_id = next_id.clone();
         }
-        Self::mark_menu_settings_changed(project);
+        Self::commit_menu_settings_change(ui_state, project, before_settings);
         ui_state.select_menu_screen(next_id);
     }
 
     pub(crate) fn add_menu_dialog(ui_state: &mut EditorUI, project: &mut Project) {
+        let before_settings = project.metadata.runtime.menu.clone();
         let next_id = Self::next_menu_dialog_id(&project.metadata.runtime.menu);
         project
             .metadata
@@ -993,11 +994,12 @@ impl InspectorSystem {
                 confirm_action: UiAction::CloseSurface,
                 cancel_action: UiAction::CloseSurface,
             });
-        Self::mark_menu_settings_changed(project);
+        Self::commit_menu_settings_change(ui_state, project, before_settings);
         ui_state.select_menu_dialog(next_id);
     }
 
     fn duplicate_menu_screen(ui_state: &mut EditorUI, project: &mut Project, screen_index: usize) {
+        let before_settings = project.metadata.runtime.menu.clone();
         let original = project.metadata.runtime.menu.screens[screen_index].clone();
         let mut duplicate = original.clone();
         duplicate.id =
@@ -1010,11 +1012,12 @@ impl InspectorSystem {
             .menu
             .screens
             .insert(insert_index, duplicate.clone());
-        Self::mark_menu_settings_changed(project);
+        Self::commit_menu_settings_change(ui_state, project, before_settings);
         ui_state.select_menu_screen(duplicate.id);
     }
 
     fn duplicate_menu_dialog(ui_state: &mut EditorUI, project: &mut Project, dialog_index: usize) {
+        let before_settings = project.metadata.runtime.menu.clone();
         let original = project.metadata.runtime.menu.dialogs[dialog_index].clone();
         let mut duplicate = original.clone();
         duplicate.id =
@@ -1027,7 +1030,7 @@ impl InspectorSystem {
             .menu
             .dialogs
             .insert(insert_index, duplicate.clone());
-        Self::mark_menu_settings_changed(project);
+        Self::commit_menu_settings_change(ui_state, project, before_settings);
         ui_state.select_menu_dialog(duplicate.id);
     }
 
@@ -1036,6 +1039,7 @@ impl InspectorSystem {
         project: &mut Project,
         screen_index: usize,
     ) -> bool {
+        let before_settings = project.metadata.runtime.menu.clone();
         let removed = project.metadata.runtime.menu.screens.remove(screen_index);
         Self::remove_ui_action_surface_targets(&mut project.metadata.runtime.menu, &removed.id);
         if project.metadata.runtime.menu.pause_root_screen_id == removed.id {
@@ -1048,15 +1052,16 @@ impl InspectorSystem {
                 .map(|screen| screen.id.clone())
                 .unwrap_or_default();
         }
-        Self::mark_menu_settings_changed(project);
+        Self::commit_menu_settings_change(ui_state, project, before_settings);
         ui_state.sync_menu_editor_selection(Some(project));
         true
     }
 
     fn delete_menu_dialog(ui_state: &mut EditorUI, project: &mut Project, dialog_index: usize) {
+        let before_settings = project.metadata.runtime.menu.clone();
         let removed = project.metadata.runtime.menu.dialogs.remove(dialog_index);
         Self::remove_ui_action_surface_targets(&mut project.metadata.runtime.menu, &removed.id);
-        Self::mark_menu_settings_changed(project);
+        Self::commit_menu_settings_change(ui_state, project, before_settings);
         ui_state.sync_menu_editor_selection(Some(project));
     }
 
@@ -1065,6 +1070,7 @@ impl InspectorSystem {
         project: &mut Project,
         item: MenuItemDefinition,
     ) {
+        let before_settings = project.metadata.runtime.menu.clone();
         let Some(screen_id) = ui_state.selected_menu_screen_id().map(str::to_string) else {
             return;
         };
@@ -1074,7 +1080,7 @@ impl InspectorSystem {
         let screen = &mut project.metadata.runtime.menu.screens[screen_index];
         let item_index = screen.items.len();
         screen.items.push(item);
-        Self::mark_menu_settings_changed(project);
+        Self::commit_menu_settings_change(ui_state, project, before_settings);
         ui_state.select_menu_entry(screen_id, item_index);
     }
 
@@ -1084,11 +1090,12 @@ impl InspectorSystem {
         screen_index: usize,
         item_index: usize,
     ) {
+        let before_settings = project.metadata.runtime.menu.clone();
         let item = project.metadata.runtime.menu.screens[screen_index].items[item_index].clone();
         project.metadata.runtime.menu.screens[screen_index]
             .items
             .insert(item_index + 1, item);
-        Self::mark_menu_settings_changed(project);
+        Self::commit_menu_settings_change(ui_state, project, before_settings);
         let screen_id = project.metadata.runtime.menu.screens[screen_index]
             .id
             .clone();
@@ -1101,12 +1108,13 @@ impl InspectorSystem {
         screen_index: usize,
         item_index: usize,
     ) {
+        let before_settings = project.metadata.runtime.menu.clone();
         let (screen_id, remaining_len) = {
             let screen = &mut project.metadata.runtime.menu.screens[screen_index];
             screen.items.remove(item_index);
             (screen.id.clone(), screen.items.len())
         };
-        Self::mark_menu_settings_changed(project);
+        Self::commit_menu_settings_change(ui_state, project, before_settings);
         if item_index < remaining_len {
             ui_state.select_menu_entry(screen_id, item_index);
         } else {
@@ -1121,6 +1129,7 @@ impl InspectorSystem {
         item_index: usize,
         direction: isize,
     ) {
+        let before_settings = project.metadata.runtime.menu.clone();
         let next_index = item_index as isize + direction;
         let item_count = project.metadata.runtime.menu.screens[screen_index]
             .items
@@ -1133,16 +1142,18 @@ impl InspectorSystem {
             screen.items.swap(item_index, next_index as usize);
             screen.id.clone()
         };
-        Self::mark_menu_settings_changed(project);
+        Self::commit_menu_settings_change(ui_state, project, before_settings);
         ui_state.select_menu_entry(screen_id, next_index as usize);
     }
 
     fn coerce_menu_item_kind(
+        ui_state: &mut EditorUI,
         project: &mut Project,
         screen_index: usize,
         item_index: usize,
         kind: MenuEditorItemKind,
     ) {
+        let before_settings = project.metadata.runtime.menu.clone();
         let next_item = match kind {
             MenuEditorItemKind::Label => MenuItemDefinition::Label {
                 text: "Text".to_string(),
@@ -1169,7 +1180,7 @@ impl InspectorSystem {
             return;
         }
         project.metadata.runtime.menu.screens[screen_index].items[item_index] = next_item;
-        Self::mark_menu_settings_changed(project);
+        Self::commit_menu_settings_change(ui_state, project, before_settings);
     }
 
     fn normalize_menu_screen_id(input: &str) -> String {
@@ -1295,9 +1306,20 @@ impl InspectorSystem {
         }
     }
 
-    fn mark_menu_settings_changed(project: &mut Project) {
-        project.metadata.project.modified = Utc::now();
-        project.is_dirty = true;
+    fn commit_menu_settings_change(
+        ui_state: &mut EditorUI,
+        project: &mut Project,
+        before_settings: MenuSettings,
+    ) {
+        let after_settings = project.metadata.runtime.menu.clone();
+        if before_settings == after_settings {
+            return;
+        }
+
+        ui_state.execute_command_with_project(
+            project,
+            EditorCommand::update_menu_settings(before_settings, after_settings),
+        );
     }
 
     fn is_valid_menu_hex_color(hex: &str) -> bool {

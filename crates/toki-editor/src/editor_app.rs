@@ -538,12 +538,24 @@ impl ApplicationHandler for EditorApp {
                     {
                         match shortcut {
                             EditorShortcutAction::Undo => {
-                                if self.ui.undo() {
+                                let undone = self
+                                    .project_manager
+                                    .current_project
+                                    .as_mut()
+                                    .map(|project| self.ui.undo_with_project(project))
+                                    .unwrap_or_else(|| self.ui.undo());
+                                if undone {
                                     tracing::info!("Undo applied via Ctrl+Z");
                                 }
                             }
                             EditorShortcutAction::Redo => {
-                                if self.ui.redo() {
+                                let redone = self
+                                    .project_manager
+                                    .current_project
+                                    .as_mut()
+                                    .map(|project| self.ui.redo_with_project(project))
+                                    .unwrap_or_else(|| self.ui.redo());
+                                if redone {
                                     tracing::info!("Redo applied via Ctrl+Y/Ctrl+Shift+Z");
                                 }
                             }

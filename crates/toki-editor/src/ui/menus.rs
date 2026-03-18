@@ -8,6 +8,7 @@ impl MenuSystem {
     pub fn render_top_menu(
         ui_state: &mut super::EditorUI,
         ctx: &egui::Context,
+        mut project: Option<&mut crate::project::Project>,
         config: Option<&EditorConfig>,
         busy_logo_texture: Option<&egui::TextureHandle>,
     ) {
@@ -92,7 +93,10 @@ impl MenuSystem {
                     if ui
                         .add_enabled(ui_state.can_undo(), egui::Button::new("Undo (Ctrl+Z)"))
                         .clicked()
-                        && ui_state.undo()
+                        && project
+                            .as_mut()
+                            .map(|project| ui_state.undo_with_project(project))
+                            .unwrap_or_else(|| ui_state.undo())
                     {
                         tracing::info!("Undo command applied");
                     }
@@ -102,7 +106,10 @@ impl MenuSystem {
                             egui::Button::new("Redo (Ctrl+Y / Ctrl+Shift+Z)"),
                         )
                         .clicked()
-                        && ui_state.redo()
+                        && project
+                            .as_mut()
+                            .map(|project| ui_state.redo_with_project(project))
+                            .unwrap_or_else(|| ui_state.redo())
                     {
                         tracing::info!("Redo command applied");
                     }

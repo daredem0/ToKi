@@ -443,7 +443,18 @@ impl EditorUI {
 
     pub fn execute_command(&mut self, command: EditorCommand) -> bool {
         let mut history = std::mem::take(&mut self.command_history);
-        let changed = history.execute(command, self);
+        let changed = history.execute(command, self, None);
+        self.command_history = history;
+        changed
+    }
+
+    pub fn execute_command_with_project(
+        &mut self,
+        project: &mut crate::project::Project,
+        command: EditorCommand,
+    ) -> bool {
+        let mut history = std::mem::take(&mut self.command_history);
+        let changed = history.execute(command, self, Some(project));
         self.command_history = history;
         changed
     }
@@ -457,7 +468,21 @@ impl EditorUI {
             return undone;
         }
         let mut history = std::mem::take(&mut self.command_history);
-        let undone = history.undo(self);
+        let undone = history.undo(self, None);
+        self.command_history = history;
+        undone
+    }
+
+    pub fn undo_with_project(&mut self, project: &mut crate::project::Project) -> bool {
+        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map_editor_history.can_undo()
+        {
+            let mut history = std::mem::take(&mut self.map_editor_history);
+            let undone = history.undo(self);
+            self.map_editor_history = history;
+            return undone;
+        }
+        let mut history = std::mem::take(&mut self.command_history);
+        let undone = history.undo(self, Some(project));
         self.command_history = history;
         undone
     }
@@ -471,7 +496,21 @@ impl EditorUI {
             return redone;
         }
         let mut history = std::mem::take(&mut self.command_history);
-        let redone = history.redo(self);
+        let redone = history.redo(self, None);
+        self.command_history = history;
+        redone
+    }
+
+    pub fn redo_with_project(&mut self, project: &mut crate::project::Project) -> bool {
+        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map_editor_history.can_redo()
+        {
+            let mut history = std::mem::take(&mut self.map_editor_history);
+            let redone = history.redo(self);
+            self.map_editor_history = history;
+            return redone;
+        }
+        let mut history = std::mem::take(&mut self.command_history);
+        let redone = history.redo(self, Some(project));
         self.command_history = history;
         redone
     }

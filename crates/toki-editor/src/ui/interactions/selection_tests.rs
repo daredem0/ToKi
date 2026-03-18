@@ -364,12 +364,12 @@ fn apply_click_selection_plain_click_replaces_with_single_entity() {
     let mut ui_state = EditorUI::new();
     ui_state.set_single_entity_selection(1);
     ui_state.toggle_entity_selection(2);
-    assert_eq!(ui_state.selected_entity_ids, vec![1, 2]);
+    assert_eq!(ui_state.selected_entity_ids(), &[1, 2]);
 
     SelectionInteraction::apply_click_selection(&mut ui_state, Some(7), false);
 
-    assert_eq!(ui_state.selected_entity_id, Some(7));
-    assert_eq!(ui_state.selected_entity_ids, vec![7]);
+    assert_eq!(ui_state.selected_entity_id(), Some(7));
+    assert_eq!(ui_state.selected_entity_ids(), &[7]);
 }
 
 #[test]
@@ -378,11 +378,11 @@ fn apply_click_selection_ctrl_click_toggles_entity_membership() {
     ui_state.set_single_entity_selection(3);
 
     SelectionInteraction::apply_click_selection(&mut ui_state, Some(5), true);
-    assert_eq!(ui_state.selected_entity_ids, vec![3, 5]);
+    assert_eq!(ui_state.selected_entity_ids(), &[3, 5]);
 
     SelectionInteraction::apply_click_selection(&mut ui_state, Some(3), true);
-    assert_eq!(ui_state.selected_entity_ids, vec![5]);
-    assert_eq!(ui_state.selected_entity_id, Some(5));
+    assert_eq!(ui_state.selected_entity_ids(), &[5]);
+    assert_eq!(ui_state.selected_entity_id(), Some(5));
 }
 
 #[test]
@@ -391,7 +391,7 @@ fn apply_click_selection_plain_click_on_empty_clears_selection() {
     ui_state.set_single_entity_selection(3);
     SelectionInteraction::apply_click_selection(&mut ui_state, None, false);
     assert!(ui_state.selection.is_none());
-    assert!(ui_state.selected_entity_ids.is_empty());
+    assert!(ui_state.selected_entity_ids().is_empty());
 }
 
 #[test]
@@ -402,7 +402,7 @@ fn apply_click_selection_ctrl_click_on_empty_keeps_selection() {
 
     SelectionInteraction::apply_click_selection(&mut ui_state, None, true);
 
-    assert_eq!(ui_state.selected_entity_ids, vec![9, 10]);
+    assert_eq!(ui_state.selected_entity_ids(), &[9, 10]);
 }
 
 #[test]
@@ -454,7 +454,7 @@ fn apply_marquee_selection_ctrl_adds_without_duplicate_entries() {
     ui_state.set_single_entity_selection(5);
 
     SelectionInteraction::apply_marquee_selection(&mut ui_state, vec![5, 7], true);
-    assert_eq!(ui_state.selected_entity_ids, vec![5, 7]);
+    assert_eq!(ui_state.selected_entity_ids(), &[5, 7]);
 }
 
 #[test]
@@ -464,9 +464,9 @@ fn apply_marquee_selection_without_ctrl_replaces_and_clears_on_empty() {
     ui_state.toggle_entity_selection(3);
 
     SelectionInteraction::apply_marquee_selection(&mut ui_state, vec![10, 11], false);
-    assert_eq!(ui_state.selected_entity_ids, vec![10, 11]);
+    assert_eq!(ui_state.selected_entity_ids(), &[10, 11]);
 
     SelectionInteraction::apply_marquee_selection(&mut ui_state, Vec::new(), false);
-    assert!(ui_state.selected_entity_ids.is_empty());
+    assert!(ui_state.selected_entity_ids().is_empty());
     assert!(ui_state.selection.is_none());
 }

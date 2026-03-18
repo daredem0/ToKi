@@ -96,6 +96,12 @@ pub struct NewProjectRequest {
     pub name: String,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct EntitySelectionState {
+    primary: Option<EntityId>,
+    ids: Vec<EntityId>,
+}
+
 /// Manages the editor's UI state and rendering
 pub struct EditorUI {
     // Scene management
@@ -104,9 +110,8 @@ pub struct EditorUI {
     pub active_scene: Option<String>, // Name of currently active scene
     pub scene_content_changed: bool,  // Flag to signal that scene content changed
 
-    // Legacy entity selection (keep for backward compatibility)
-    pub selected_entity_id: Option<EntityId>,
-    pub selected_entity_ids: Vec<EntityId>,
+    // Entity selection
+    entity_selection: EntitySelectionState,
 
     // UI Panel visibility
     pub show_hierarchy: bool,
@@ -202,9 +207,8 @@ impl EditorUI {
             active_scene: Some("Main Scene".to_string()), // Default scene starts active
             scene_content_changed: false,
 
-            // Legacy fields (keep for backward compatibility)
-            selected_entity_id: None,
-            selected_entity_ids: Vec::new(),
+            // Entity selection
+            entity_selection: EntitySelectionState::default(),
 
             // UI Panel visibility
             show_hierarchy: true,
@@ -323,20 +327,18 @@ impl EditorUI {
 
     pub fn set_selection(&mut self, selection: Selection) {
         if let Selection::Entity(entity_id) = selection {
-            self.selected_entity_id = Some(entity_id);
-            self.selected_entity_ids = vec![entity_id];
+            self.entity_selection.primary = Some(entity_id);
+            self.entity_selection.ids = vec![entity_id];
             self.selection = Some(Selection::Entity(entity_id));
             return;
         }
-        self.selected_entity_id = None;
-        self.selected_entity_ids.clear();
+        self.clear_entity_selection_state();
         self.selection = Some(selection);
     }
 
     pub fn clear_selection(&mut self) {
         self.selection = None;
-        self.selected_entity_id = None;
-        self.selected_entity_ids.clear();
+        self.entity_selection = EntitySelectionState::default();
     }
 
     pub fn begin_new_project_dialog(
@@ -371,43 +373,48 @@ impl EditorUI {
     }
 
     pub fn set_single_entity_selection(&mut self, entity_id: EntityId) {
-        self.selected_entity_id = Some(entity_id);
-        self.selected_entity_ids.clear();
-        self.selected_entity_ids.push(entity_id);
+        self.entity_selection.primary = Some(entity_id);
+        self.entity_selection.ids.clear();
+        self.entity_selection.ids.push(entity_id);
         self.selection = Some(Selection::Entity(entity_id));
     }
 
     pub fn toggle_entity_selection(&mut self, entity_id: EntityId) {
         if let Some(index) = self
-            .selected_entity_ids
+            .entity_selection
+            .ids
             .iter()
             .position(|id| *id == entity_id)
         {
-            self.selected_entity_ids.remove(index);
-            if self.selected_entity_ids.is_empty() {
+            self.entity_selection.ids.remove(index);
+            if self.entity_selection.ids.is_empty() {
                 self.clear_selection();
                 return;
             }
-            if self.selected_entity_id == Some(entity_id) {
-                if let Some(last_selected) = self.selected_entity_ids.last().copied() {
-                    self.selected_entity_id = Some(last_selected);
+            if self.entity_selection.primary == Some(entity_id) {
+                if let Some(last_selected) = self.entity_selection.ids.last().copied() {
+                    self.entity_selection.primary = Some(last_selected);
                     self.selection = Some(Selection::Entity(last_selected));
                 }
             }
             return;
         }
 
-        self.selected_entity_ids.push(entity_id);
-        self.selected_entity_id = Some(entity_id);
+        self.entity_selection.ids.push(entity_id);
+        self.entity_selection.primary = Some(entity_id);
         self.selection = Some(Selection::Entity(entity_id));
     }
 
     pub fn has_multi_entity_selection(&self) -> bool {
-        self.selected_entity_ids.len() > 1
+        self.entity_selection.ids.len() > 1
     }
 
     pub fn clear_entity_selection(&mut self) {
         self.clear_selection();
+    }
+
+    pub(crate) fn clear_entity_selection_state(&mut self) {
+        self.entity_selection = EntitySelectionState::default();
     }
 
     pub fn enter_placement_mode(&mut self, entity_definition: String) {
@@ -466,11 +473,24 @@ impl EditorUI {
     }
 
     pub fn add_entity_to_selection(&mut self, entity_id: EntityId) {
-        if !self.selected_entity_ids.contains(&entity_id) {
-            self.selected_entity_ids.push(entity_id);
+        if !self.entity_selection.ids.contains(&entity_id) {
+            self.entity_selection.ids.push(entity_id);
         }
-        self.selected_entity_id = Some(entity_id);
+        self.entity_selection.primary = Some(entity_id);
         self.selection = Some(Selection::Entity(entity_id));
+    }
+
+    #[cfg(test)]
+    pub fn selected_entity_id(&self) -> Option<EntityId> {
+        self.entity_selection.primary
+    }
+
+    pub fn selected_entity_ids(&self) -> &[EntityId] {
+        &self.entity_selection.ids
+    }
+
+    pub fn selected_entity_ids_vec(&self) -> Vec<EntityId> {
+        self.entity_selection.ids.clone()
     }
 
     /// Render the entire UI
@@ -488,7 +508,13 @@ impl EditorUI {
         busy_logo_texture: Option<&egui::TextureHandle>,
     ) {
         let config_readonly = config.as_deref();
-        MenuSystem::render_top_menu(self, ctx, config_readonly, busy_logo_texture);
+        MenuSystem::render_top_menu(
+            self,
+            ctx,
+            project.as_deref_mut(),
+            config_readonly,
+            busy_logo_texture,
+        );
 
         // Render log panel first to claim full width at bottom
         if self.show_console {

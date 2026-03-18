@@ -1,3 +1,7 @@
+use super::editor_domain::{
+    animation_state_label, animation_state_options, RuleActionEditorKind as RuleActionKind,
+    RuleConditionEditorKind as RuleConditionKind, RuleTriggerEditorKind as RuleTriggerKind,
+};
 use super::editor_ui::{EditorUI, MapEditorTool, SceneRulesGraphCommandData, Selection};
 use super::rule_graph::{RuleGraph, RuleGraphNodeKind};
 use super::undo_redo::EditorCommand;
@@ -99,77 +103,6 @@ impl MultiEntityBatchEdit {
             && self.set_render_layer.is_none()
             && self.position_delta.is_none()
     }
-}
-
-fn animation_state_label(state: AnimationState) -> &'static str {
-    match state {
-        AnimationState::Idle => "Idle",
-        AnimationState::Walk => "Walk",
-        AnimationState::Attack => "Attack",
-        AnimationState::IdleDown => "Idle Down",
-        AnimationState::IdleUp => "Idle Up",
-        AnimationState::IdleLeft => "Idle Left",
-        AnimationState::IdleRight => "Idle Right",
-        AnimationState::WalkDown => "Walk Down",
-        AnimationState::WalkUp => "Walk Up",
-        AnimationState::WalkLeft => "Walk Left",
-        AnimationState::WalkRight => "Walk Right",
-        AnimationState::AttackDown => "Attack Down",
-        AnimationState::AttackUp => "Attack Up",
-        AnimationState::AttackLeft => "Attack Left",
-        AnimationState::AttackRight => "Attack Right",
-    }
-}
-
-fn animation_state_options() -> [AnimationState; 15] {
-    [
-        AnimationState::Idle,
-        AnimationState::Walk,
-        AnimationState::Attack,
-        AnimationState::IdleDown,
-        AnimationState::IdleUp,
-        AnimationState::IdleLeft,
-        AnimationState::IdleRight,
-        AnimationState::WalkDown,
-        AnimationState::WalkUp,
-        AnimationState::WalkLeft,
-        AnimationState::WalkRight,
-        AnimationState::AttackDown,
-        AnimationState::AttackUp,
-        AnimationState::AttackLeft,
-        AnimationState::AttackRight,
-    ]
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RuleActionKind {
-    PlaySound,
-    PlayMusic,
-    PlayAnimation,
-    SetVelocity,
-    Spawn,
-    DestroySelf,
-    SwitchScene,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RuleConditionKind {
-    Always,
-    TargetExists,
-    KeyHeld,
-    EntityActive,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RuleTriggerKind {
-    Start,
-    Update,
-    PlayerMove,
-    Key,
-    Collision,
-    Damaged,
-    Death,
-    Trigger,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -487,7 +420,7 @@ impl InspectorSystem {
                 if ui_state.has_multi_entity_selection() {
                     ui.heading(format!(
                         "👥 {} Entities",
-                        ui_state.selected_entity_ids.len()
+                        ui_state.selected_entity_ids().len()
                     ));
                     ui.separator();
                     entity_changed = Self::render_multi_scene_entity_editor(ui, ui_state);

@@ -230,6 +230,32 @@ fn add_menu_screen_selects_new_screen_and_marks_project_dirty() {
 }
 
 #[test]
+fn add_menu_screen_routes_through_command_history_and_supports_undo_redo() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+    let mut project = Project::new("Demo".to_string(), temp_dir.path().join("Demo"));
+    let initial_screens = project.metadata.runtime.menu.screens.len();
+    let mut ui = EditorUI::new();
+
+    InspectorSystem::add_menu_screen(&mut ui, &mut project);
+
+    assert_eq!(
+        project.metadata.runtime.menu.screens.len(),
+        initial_screens + 1
+    );
+    assert!(ui.can_undo());
+
+    assert!(ui.undo_with_project(&mut project));
+    assert_eq!(project.metadata.runtime.menu.screens.len(), initial_screens);
+    assert!(ui.can_redo());
+
+    assert!(ui.redo_with_project(&mut project));
+    assert_eq!(
+        project.metadata.runtime.menu.screens.len(),
+        initial_screens + 1
+    );
+}
+
+#[test]
 fn delete_menu_item_falls_back_to_screen_selection_when_last_item_removed() {
     let temp_dir = tempfile::tempdir().expect("temp dir should be created");
     let mut project = Project::new("Demo".to_string(), temp_dir.path().join("Demo"));
