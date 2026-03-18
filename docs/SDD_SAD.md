@@ -11,8 +11,6 @@ This document describes the implemented architecture of `ToKi` for engineering a
 - runtime orchestration
 - editor orchestration
 
-This revision reflects the codebase after the map-editor, object-sheet, multi-atlas, audio-mixer, and control-role refactors that are being prepared for the `0.1.0` release.
-
 Primary readers:
 
 - engine contributors extending simulation, rendering, or runtime bootstrap
@@ -59,12 +57,12 @@ flowchart LR
 
 Main persisted surfaces:
 
-- `project.toml`: project metadata, runtime settings, editor settings, mixer configuration
+- `project.toml`: project metadata, runtime settings (display, audio, splash, menu, timing mode)
 - `scenes/*.json`: scene documents referencing maps and containing scene entities and rules
 - `entities/*.json`: entity definitions used for placement and spawning
 - `assets/tilemaps/*.json`: tilemap assets with tile grid plus map-owned object instances
 - `assets/sprites/*.json`: sprite atlases and object sheets
-- `assets/audio/**/*`: music and sound effects
+- `assets/audio/**/*`: music and sound effects (sfx/, music/ subdirectories)
 - `toki_editor_config.json`: editor-local configuration outside project scope
 
 ## 3. Architectural Overview
@@ -81,12 +79,12 @@ The codebase follows a layered architecture with an explicit design-time/runtime
 
 ```mermaid
 flowchart TD
-    L1[Schema Layer\ntoki-schemas]
-    L2[Project and Persistence Layer\nproject.toml, scenes, entities, tilemaps, atlases, object sheets]
-    L3[Core Domain Layer\ntoki-core]
-    L4[Render Infrastructure Layer\ntoki-render]
-    L5[Runtime Shell\ntoki-runtime]
-    L6[Editor Shell\ntoki-editor]
+    L1[Schema Layer<br>toki-schemas]
+    L2[Project and Persistence Layer<br>project.toml, scenes, entities, tilemaps, atlases, object sheets]
+    L3[Core Domain Layer<br>toki-core]
+    L4[Render Infrastructure Layer<br>toki-render]
+    L5[Runtime Shell<br>toki-runtime]
+    L6[Editor Shell<br>toki-editor]
 
     L1 --> L2
     L2 --> L3
@@ -144,12 +142,11 @@ flowchart TD
     RUNTIME[crates/toki-runtime]
     EDITOR[crates/toki-editor]
 
-    CORE --> RENDER
-    CORE --> RUNTIME
-    CORE --> EDITOR
-    RENDER --> RUNTIME
-    RENDER --> EDITOR
-    SCHEMAS --> EDITOR
+    EDITOR --> SCHEMAS
+    EDITOR --> CORE
+    EDITOR --> RENDER
+    RUNTIME --> CORE
+    RUNTIME --> RENDER
 ```
 
 Practical note:
@@ -188,7 +185,14 @@ Key areas:
 | File/module | Responsibility |
 |---|---|
 | `src/entity.rs` | runtime `Entity`, `EntityManager`, `EntityDefinition`, control roles, AI behavior, movement profiles, entity audio settings |
-| `src/game.rs` | `GameState`, input processing, scene loading, rule execution, movement/collision gating, audio event emission |
+| `src/game/` | modularized `GameState` with focused submodules (see below) |
+| `src/project_runtime.rs` | shared runtime/project configuration contract used by editor and runtime |
+| `src/project_assets.rs` | shared project asset discovery, path resolution, and classification helpers |
+| `src/rules.rs` | `Rule`, `RuleTrigger`, `RuleCondition`, `RuleAction` definitions |
+| `src/menu.rs` | `MenuSettings`, `MenuAppearance`, screen/dialog definitions, visual metrics |
+| `src/ui.rs` | generic UI composition blocks plus shared UI action/command model |
+| `src/sprite_render.rs` | shared sprite render request, resolution, and failure-reporting pipeline |
+| `src/fonts.rs` | shared project-font discovery and built-in family resolution |
 | `src/scene.rs` | persisted scene document |
 | `src/scene_manager.rs` | loaded scene registry and active-scene selection |
 | `src/collision.rs` | tile, entity, and map-object collision helpers |
@@ -198,6 +202,20 @@ Key areas:
 | `src/assets/object_sheet.rs` | named placeable static object definitions |
 | `src/serialization.rs` | save/load helpers for runtime and authored data |
 | `src/pack.rs` | bundle-manifest and pack-format helpers shared with runtime |
+
+The `src/game/` module is decomposed into focused submodules:
+
+| Submodule | Responsibility |
+|---|---|
+| `mod.rs` | `GameState` struct, core update loop, input routing, audio dispatch |
+| `movement.rs` | accumulated movement, axis alignment, collision gating, movement audio |
+| `combat.rs` | stat changes, damage, primary action, hitbox collision detection |
+| `rules.rs` | rule execution, condition evaluation, action buffering |
+| `scene.rs` | scene loading, entity instantiation, rule initialization |
+| `animation.rs` | animation state selection, facing direction, locomotion state |
+| `input.rs` | input state management, movement mapping |
+| `inventory.rs` | pickup collection, item management |
+| `render_queries.rs` | health bar queries, visible entity collection, debug data |
 
 Important authority rules:
 
@@ -214,6 +232,7 @@ Key areas:
 
 | File/module | Responsibility |
 |---|---|
+| `src/backend.rs` | renderer backend trait used by runtime abstractions and tests |
 | `src/scene.rs` | `SceneRenderer`, `SceneData`, sprite/debug-shape scene submission |
 | `src/gpu.rs` | runtime-oriented `GpuState` orchestration |
 | `src/targets.rs` | window and offscreen targets |
@@ -221,11 +240,11 @@ Key areas:
 | `src/text.rs` | glyph-based text layout and anchoring |
 | `src/draw.rs` | low-level sprite draw helpers including flip handling |
 
-Current architectural state:
+Render orchestration:
 
-- `SceneRenderer` is the reusable editor-side rendering abstraction and can render mixed textures/atlases
-- `GpuState` remains the direct runtime rendering path
-- both are valid current entrypoints, but render orchestration is still split between them
+- `SceneRenderer` is the editor-side rendering abstraction for mixed textures/atlases
+- `GpuState` is the runtime rendering path
+- both are valid entrypoints; shared sprite extraction and shared UI composition reduce drift, but tilemap/offscreen orchestration is still split between them (see Section 8.2)
 
 #### `toki-runtime`
 
@@ -236,14 +255,20 @@ Key areas:
 | File/module | Responsibility |
 |---|---|
 | `src/main.rs` | CLI parsing, runtime config loading, derived-version startup log |
-| `src/app.rs` | winit lifecycle, splash flow, startup-state construction, frame update/render loop |
+| `src/app.rs` | runtime shell wiring, launch options, top-level app state |
+| `src/app_bootstrap.rs` | startup-state construction from project or pack |
+| `src/app_lifecycle.rs` | winit lifecycle, resize/input/redraw handling |
+| `src/app_splash.rs` | splash policy, layout, and splash rendering helpers |
+| `src/app_tick.rs` | per-frame simulation and render orchestration |
 | `src/pack.rs` | `.toki.pak` extraction and validation |
+| `src/runtime_menu.rs` | runtime menu/dialog rendering and UI command application |
 | `src/systems/resources.rs` | runtime resource loading for atlases, object sheets, tilemaps, and textures |
 | `src/systems/game_manager.rs` | key translation and bridge into `GameState` |
 | `src/systems/camera_manager.rs` | follow camera and visible-chunk updates |
 | `src/systems/rendering.rs` | render submission and projection updates |
 | `src/systems/audio_manager.rs` | mixer, preload policy, channel routing, spatial attenuation |
 | `src/systems/asset_loading.rs` | preload planning and decoded-project caching |
+| `src/systems/frame_limiter.rs` | frame limiting when vsync is disabled |
 | `src/systems/platform.rs` | platform/window hooks |
 | `src/systems/performance.rs` | HUD/console/frame stats |
 
@@ -263,14 +288,24 @@ Key areas:
 | File/module | Responsibility |
 |---|---|
 | `src/main.rs` | editor bootstrap and logging setup |
-| `src/editor_app.rs` | top-level orchestration, viewport creation, project requests, scene/map synchronization |
+| `src/editor_app.rs` | top-level orchestration and grouped subsystem ownership |
+| `src/editor_app/session.rs` | scene/map synchronization and viewport loading |
+| `src/editor_app/project_requests.rs` | open/save/export/play project workflows |
+| `src/editor_app/new_project.rs` | new-project creation flow and modal workflow |
+| `src/editor_app/runtime.rs` | runtime launch requests from the editor |
 | `src/project/project_data.rs` | `project.toml` model, runtime settings, project-level audio mixer settings |
 | `src/project/manager.rs` | create/open/save project, save tilemaps, load assets |
 | `src/project/assets.rs` | discovery of scenes, tilemaps, sprite atlases, object sheets, audio, entities |
+| `src/project/export.rs` | hybrid bundle export and runtime-config emission |
 | `src/scene/viewport.rs` | offscreen viewport, scene/map rendering bridge, preview overlays |
-| `src/ui/editor_ui.rs` | editor UI state including scene tab, map editor tab, project panel, map-editor history |
-| `src/ui/inspector.rs` | scene/entity/map/project inspectors and map-editor tool palette |
-| `src/ui/panels.rs` | central panel rendering and viewport interaction routing |
+| `src/ui/editor_ui.rs` | editor UI state and high-level selection/view state |
+| `src/ui/editor_domain.rs` | shared editor-domain helpers and vocabulary |
+| `src/ui/undo_redo.rs` | editor command history for scene, map, and menu mutations |
+| `src/ui/inspector.rs` | inspector routing across domain-specific inspectors |
+| `src/ui/inspector/domain_inspectors.rs` | shared inspector trait implementations |
+| `src/ui/inspector/menu_editor.rs` | menu/dialog authoring inspector |
+| `src/ui/panels.rs` | central panel routing across scene, map, graph, and menu surfaces |
+| `src/ui/panels/menu_editor.rs` | visual menu/dialog preview surface |
 | `src/ui/hierarchy.rs` | left navigation for scenes, maps, and entity palette |
 | `src/ui/interactions/selection.rs` | scene-entity selection and drag-move |
 | `src/ui/interactions/placement.rs` | entity placement previews and placement validation |
@@ -281,8 +316,9 @@ Key areas:
 Current editor boundary:
 
 - scene composition and map editing are separate workflows
-- project settings, including audio mixer settings, are edited in the right-side project panel
-- the map editor is now an independent asset editor rather than a scene-dependent mode
+- project settings, including runtime display/audio settings, are edited in the right-side project panel
+- runtime menu and dialog authoring is handled through the dedicated Menu Editor plus the shared right-side inspector
+- the map editor operates as an independent asset editor, not a scene-dependent mode
 
 ## 5. Domain Model Decomposition
 
@@ -320,7 +356,7 @@ Key authored asset meanings:
 
 ### 5.2 Entity model
 
-The entity model is no longer based on the old authored `player` vs `npc` split.
+The entity model separates identity from behavior.
 
 Important concepts:
 
@@ -341,7 +377,7 @@ This separation matters:
 
 ### 5.3 Map model
 
-`TileMap` now owns both terrain tiles and static map objects.
+`TileMap` owns both terrain tiles and static map objects.
 
 ```mermaid
 flowchart LR
@@ -378,20 +414,93 @@ Audio has three layers of control:
 | entity defaults | movement sound, collision sound, hearing radius, trigger mode |
 | scene/map runtime events | actual `AudioEvent::PlaySound` or `BackgroundMusic` dispatch |
 
-Movement audio is no longer tied only to input. It can be emitted from:
+Movement audio can be emitted from multiple sources:
 
 - direct input-driven movement
 - AI wander movement
 - rule-driven velocity movement
 - animation-loop-triggered locomotion events
 
+Per-entity audio configuration:
+
+| Setting | Purpose |
+|---|---|
+| `movement_sound` | sound ID to play during movement |
+| `movement_sound_trigger` | `Distance` (every N pixels) or `AnimationLoop` (on animation frame completion) |
+| `footstep_trigger_distance` | distance threshold for distance-based triggers (default: 32.0) |
+| `collision_sound` | sound ID for collision events |
+| `hearing_radius` | spatial attenuation radius in pixels (default: 192) |
+
 Spatial attenuation is listener-relative and currently uses the current player position as the listener.
+
+### 5.5 Rules model
+
+Rules enable scene-specific behaviors without code changes. Each scene can define rules that respond to triggers and execute actions.
+
+| Component | Purpose |
+|---|---|
+| `Rule` | named rule with trigger, conditions, actions, priority, and one-time flag |
+| `RuleTrigger` | event that activates the rule |
+| `RuleCondition` | prerequisite checks before action execution |
+| `RuleAction` | effect to apply when rule fires |
+
+Supported triggers:
+
+- `OnStart` - scene initialization
+- `OnUpdate` - every frame
+- `OnPlayerMove` - player movement input
+- `OnKey { key }` - specific key press
+- `OnCollision` - entity collision event
+- `OnDamaged` - entity receives damage
+- `OnDeath` - entity health reaches zero
+- `OnTrigger` - trigger zone activation
+
+Supported actions:
+
+- `PlaySound { channel, sound_id }` - play sound effect
+- `PlayMusic { track_id }` - switch background music
+- `PlayAnimation { target, state }` - change entity animation
+- `SetVelocity { target, velocity }` - apply movement velocity
+- `Spawn { entity_type, position }` - create new entity
+- `DestroySelf { target }` - remove entity
+- `SwitchScene { scene_name }` - transition to another scene
+
+Rules execute in priority order and can be marked `once: true` to fire only on first trigger.
+
+### 5.6 Menu model
+
+The menu system is project-configurable and supports runtime customization.
+
+| Component | Purpose |
+|---|---|
+| `MenuSettings` | root menu configuration in `project.toml` |
+| `MenuAppearance` | visual styling (fonts, colors, spacing, opacity, borders) |
+| `MenuScreenDefinition` | screen layout with title, entries, and bindings |
+| `MenuDialogDefinition` | modal dialog definitions |
+| `MenuBorderStyle` | rendering style for menu borders |
+| `UiAction` / `UiCommand` | generic interaction model shared by screens and dialogs |
+
+Appearance settings include:
+
+- font family and size
+- five color values (border, text, three backgrounds)
+- transparent background toggles
+- menu dimensions (width/height percent)
+- spacing values (title, button, footer)
+- opacity and border style
+
+Menu/dialog rendering is intentionally shared across runtime and editor:
+
+- menu and dialog definitions live in `toki-core::menu`
+- generic UI blocks live in `toki-core::ui`
+- runtime and editor both compose those definitions into `UiComposition`
+- dialogs and screens emit generic `UiAction` values rather than menu-specific commands
 
 ## 6. Dynamic View
 
 ### 6.1 Runtime startup
 
-Runtime now supports both project-directory and packed-bundle startup.
+Runtime supports both project-directory and packed-bundle startup.
 
 ```mermaid
 sequenceDiagram
@@ -437,7 +546,8 @@ sequenceDiagram
     G-->>A: GameUpdateResult<AudioEvent>
     A->>AU: dispatch music and sound events with channel mix and distance attenuation
     A->>C: update follow camera and visible chunks
-    A->>RS: submit tilemap, entities, map objects, text, debug overlays
+    A->>RS: submit tilemap plus resolved sprite render instances
+    A->>RS: submit text, UI composition, and debug overlays
     A->>RS: draw frame
 ```
 
@@ -447,6 +557,19 @@ Behavioral notes:
 - solid map objects, solid entities, and solid tiles all participate in blocking
 - left-facing directional animation uses render-time flip state rather than duplicated art
 - map-owned object-sheet instances render in runtime as part of the map
+- runtime and editor both use the shared sprite-render request pipeline for world sprites
+- runtime menus and dialogs render through the shared UI composition path rather than a menu-specific renderer
+
+Timing modes:
+
+The runtime supports two timing modes configured in `project.toml`:
+
+| Mode | Update path | Behavior |
+|---|---|---|
+| `Fixed` (default) | `GameState::update()` | 60 FPS fixed timestep (16.67ms per tick) |
+| `Delta` | `GameState::update_with_delta(delta_ms)` | variable timestep with frame-rate scaling |
+
+In delta mode, movement speeds and animation deltas scale proportionally to elapsed time. Movement uses sub-pixel accumulation per axis with sign-flip reset on direction change.
 
 ### 6.3 Editor project-open flow
 
@@ -537,10 +660,36 @@ Current map-editor tools:
 
 The right-side panel has two distinct responsibilities:
 
-- `Inspector`: selection-driven editing
-- `Project`: project-wide settings such as metadata, splash duration, and audio mixer
+- `Inspector`: selection-driven editing of the current selection (entity, scene, map object, menu surface, menu entry)
+- `Project`: project-wide settings (metadata, splash duration, audio mixer, display settings)
 
-This is an important layering improvement. Project-level settings no longer have to masquerade as scene or entity settings.
+### 6.7 Runtime menu and dialog workflow
+
+The runtime menu flow is project-authored but executed through shared core types.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant RT as toki-runtime
+    participant MC as MenuController
+    participant UI as UiComposition
+
+    U->>RT: press Escape
+    RT->>MC: open pause root / route menu input
+    MC-->>RT: current screen or dialog view
+    RT->>UI: build menu/dialog layout and composition
+    RT->>RT: render shared UI blocks and text
+    U->>RT: confirm selection
+    RT->>MC: handle input
+    MC-->>RT: UiCommand
+```
+
+Current properties:
+
+- project menus are authored in `project.toml`
+- the editor previews those menus through the same layout/composition logic used by runtime
+- confirmation dialogs are authored separately from menu screens but use the same action model
+- runtime currently consumes `UiCommand::ExitRuntime` directly and queues `UiCommand::EmitEvent` for downstream consumers
 
 ## 7. Layering Rules and Architectural Invariants
 
@@ -558,7 +707,7 @@ This is an important layering improvement. Project-level settings no longer have
 | Invariant | Definition | Enforced by |
 |---|---|---|
 | I1 | canonical JSON schemas come from one place only | `toki-schemas` |
-| I2 | runtime truth lives in `GameState` / `EntityManager`, not in UI or renderer | `toki-core/src/game.rs`, `toki-core/src/entity.rs` |
+| I2 | runtime truth lives in `GameState` / `EntityManager`, not in UI or renderer | `toki-core/src/game/`, `toki-core/src/entity.rs` |
 | I3 | player identity derives from `control_role`, not authored category | scene loading and entity manager player tracking |
 | I4 | movement behavior derives from `movement_profile`, not player identity | `GameState` input routing |
 | I5 | autonomous behavior derives from `ai_behavior`, not category alone | `GameState::update_npc_ai` path |
@@ -570,15 +719,14 @@ This is an important layering improvement. Project-level settings no longer have
 
 The architecture is coherent, but a few seams are still visible and should remain explicit.
 
-### 8.1 Resource loading overlap
+### 8.1 Duplicate resource-manager ownership
 
-There is still overlap between:
+There are still two `ResourceManager` implementations in the workspace:
 
-- `toki-core::resources`
-- `toki-runtime::systems::resources`
-- editor-side project asset discovery
+- `toki-core::resources::ResourceManager`
+- `toki-runtime::systems::resources::ResourceManager`
 
-The system works, but asset-resolution responsibilities are split across layers more than ideal.
+This is the main remaining resource-loading debt. The runtime manager owns the richer multi-atlas/object-sheet path, while the core manager still exists and is used by editor-facing code. The duplication is narrower than before, but authority is not yet fully unified.
 
 ### 8.2 Render entrypoint split
 
@@ -587,7 +735,7 @@ Rendering is still shared across two orchestration styles:
 - `SceneRenderer` for editor/offscreen composition
 - `GpuState` for runtime-direct rendering
 
-This is acceptable, but it is still a consolidation target.
+Recent refactors reduced duplication by moving sprite extraction into `toki-core::sprite_render` and menu/dialog composition into `toki-core::ui`, but tilemap/offscreen orchestration and some backend-specific state still remain split.
 
 ### 8.3 Validation depth
 
@@ -601,6 +749,10 @@ Schema validation exists and is useful, but deeper semantic validation remains l
 ### 8.4 Runtime/editor object editing asymmetry
 
 Map objects are fully editable in the map editor and render in runtime, but scene-viewport editing of map objects is still behind scene-entity editing in ergonomics.
+
+### 8.5 Scene-path authority mismatch
+
+Project metadata supports explicit scene-path mapping in `project.toml`, but runtime startup still resolves scenes through the canonical `scenes/{name}.json` path. This works for convention-following projects, but it is still a correctness gap between editor/project metadata and runtime bootstrap.
 
 ## 9. Build, Test, and Release Architecture
 
@@ -619,27 +771,27 @@ Release structure:
 - shared workspace versioning in root `Cargo.toml`
 - changelog-driven release prep in `CHANGELOG.md`
 - build scripts in editor/runtime derive `TOKI_VERSION`
-- runtime and editor now surface derived version information in UX/logging instead of only computing it invisibly
+- derived version displayed in splash screen and startup logs
 
 ## 10. Architecture Summary
 
-`ToKi` is no longer just a minimal scene/entity editor with a demo runtime. The current implemented architecture has six visible layers:
+The architecture consists of six layers:
 
-1. schema ownership
-2. authored project assets and persistence
-3. shared core simulation and asset semantics
-4. reusable render infrastructure
-5. runtime orchestration
-6. editor orchestration
+1. **Schema layer** (`toki-schemas`) - canonical JSON schema definitions
+2. **Persistence layer** - `project.toml`, scene/entity/map/atlas JSON files
+3. **Core domain layer** (`toki-core`) - simulation, collision, rules, entity management
+4. **Render infrastructure layer** (`toki-render`) - WGPU pipelines, text layout, render targets
+5. **Runtime shell** (`toki-runtime`) - game execution, audio playback, input handling
+6. **Editor shell** (`toki-editor`) - project management, scene/map editing, asset inspection
 
-That layering is now visible in the codebase and should stay visible in future work.
+Key architectural decisions:
 
-The strongest current architectural moves are:
-
-- explicit separation of control role, movement profile, AI behavior, and category
-- independent map-asset editing rather than overloading scene editing
-- distinct asset types for tile atlases versus object sheets
-- project-level audio and runtime configuration separated from scene/entity settings
-- runtime startup that can load a project directory or a packaged game
-
-The main remaining work is consolidation and semantic hardening, not architectural reinvention.
+- `control_role`, `movement_profile`, `ai_behavior`, and `category` are independent concerns
+- map editing operates on map assets directly, separate from scene editing
+- tile atlases and object sheets are distinct asset types
+- project-level configuration (audio, display, menu) is separate from scene/entity settings
+- runtime accepts both project directories and packed bundles
+- `GameState` is modularized into focused submodules (movement, combat, rules, scene, input)
+- timing supports fixed timestep (60 FPS) or delta-scaled modes
+- rules system enables declarative scene behaviors without code changes
+- runtime and editor now share menu/dialog composition and sprite-render request resolution through `toki-core`
