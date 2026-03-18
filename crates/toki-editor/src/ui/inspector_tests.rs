@@ -28,7 +28,7 @@ fn sample_entity_with_id(id: u32) -> toki_core::entity::Entity {
         EntityAttributes {
             health: Some(25),
             stats: toki_core::entity::EntityStats::from_legacy_health(Some(25)),
-            speed: 3,
+            speed: 3.0,
             solid: true,
             visible: true,
             animation_controller: None,
@@ -94,7 +94,7 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
     draft.footstep_trigger_distance = -5.0;
     draft.movement_sound = "sfx_custom_step".to_string();
     draft.has_inventory = true;
-    draft.speed = -10;
+    draft.speed = -10.0;
     draft.render_layer = 8;
     draft.health_enabled = true;
     draft.health_value = -4;
@@ -132,7 +132,7 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
         Some("sfx_custom_step")
     );
     assert!(entity.attributes.has_inventory);
-    assert_eq!(entity.attributes.speed, 0);
+    assert_eq!(entity.attributes.speed, 0.0);
     assert_eq!(entity.attributes.render_layer, 8);
     assert_eq!(entity.attributes.health, Some(0));
     assert_eq!(entity.attributes.current_stat(HEALTH_STAT_ID), Some(0));
@@ -991,7 +991,7 @@ fn save_entity_definition_persists_audio_updates() {
         attributes: toki_core::entity::AttributesDef {
             health: Some(100),
             stats: std::collections::HashMap::from([(ATTACK_POWER_STAT_ID.to_string(), 14)]),
-            speed: 2,
+            speed: 2.0,
             solid: true,
             active: true,
             can_move: true,

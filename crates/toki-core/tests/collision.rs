@@ -179,8 +179,9 @@ fn collision_small_entity_can_move_on_non_solid_tiles() {
     let final_pos = game_state.player_position();
 
     // Should have moved because tile at (0, 16) is floor
+    // Player has default speed of 2.0, so moves 2 pixels
     assert_ne!(initial_pos, final_pos);
-    assert_eq!(final_pos.y, initial_pos.y + 1); // Moved down by 1 pixel
+    assert_eq!(final_pos.y, initial_pos.y + 2); // Moved down by 2 pixels (default speed)
 }
 
 #[test]

@@ -279,11 +279,6 @@ impl GameState {
         }
     }
 
-    /// Get sprite size for rendering calculations
-    pub fn sprite_size(&self) -> u32 {
-        self.sprite_size
-    }
-
     /// Check if debug collision rendering is enabled
     pub fn is_debug_collision_rendering_enabled(&self) -> bool {
         self.debug_collision_rendering

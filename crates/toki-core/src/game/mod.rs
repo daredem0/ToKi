@@ -98,10 +98,6 @@ pub struct GameState {
     #[serde(skip, default)]
     pending_profile_actions: HashMap<MovementProfile, HashSet<InputAction>>,
 
-    /// Game configuration constants
-    movement_step: i32,
-    sprite_size: u32,
-
     /// Debug rendering flags
     #[serde(default)]
     debug_collision_rendering: bool,
@@ -296,13 +292,15 @@ impl GameState {
             .collect();
 
         for npc_id in npc_entity_ids {
-            let Some(current_position) = self
-                .entity_manager
-                .get_entity(npc_id)
-                .map(|entity| entity.position)
-            else {
+            let Some(npc_entity) = self.entity_manager.get_entity(npc_id) else {
                 continue;
             };
+
+            let current_position = npc_entity.position;
+            // NPC wander uses entity speed * 5 for larger jumps
+            let movement_step = (npc_entity.attributes.speed * 5.0) as i32;
+            let max_x = (world_bounds.x as i32 - npc_entity.size.x as i32).max(0);
+            let max_y = (world_bounds.y as i32 - npc_entity.size.y as i32).max(0);
 
             // Choose random direction: 0=up, 1=down, 2=left, 3=right, 4=stay
             let random_direction = fastrand::u32(0..5);
@@ -310,20 +308,18 @@ impl GameState {
             let new_position = match random_direction {
                 0 => glam::IVec2::new(
                     current_position.x,
-                    (current_position.y - self.movement_step * 5).max(0),
+                    (current_position.y - movement_step).max(0),
                 ),
                 1 => glam::IVec2::new(
                     current_position.x,
-                    (current_position.y + self.movement_step * 5)
-                        .min(world_bounds.y as i32 - self.sprite_size as i32),
+                    (current_position.y + movement_step).min(max_y),
                 ),
                 2 => glam::IVec2::new(
-                    (current_position.x - self.movement_step * 5).max(0),
+                    (current_position.x - movement_step).max(0),
                     current_position.y,
                 ),
                 3 => glam::IVec2::new(
-                    (current_position.x + self.movement_step * 5)
-                        .min(world_bounds.x as i32 - self.sprite_size as i32),
+                    (current_position.x + movement_step).min(max_x),
                     current_position.y,
                 ),
                 4 => current_position, // Stay in place

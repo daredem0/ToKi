@@ -144,7 +144,7 @@ impl GameState {
         let debug_lifetime_ticks = spec.lifetime_ticks;
 
         let attributes = crate::entity::EntityAttributes {
-            speed: 0,
+            speed: 0.0,
             solid: false,
             visible: true,
             can_move: false,

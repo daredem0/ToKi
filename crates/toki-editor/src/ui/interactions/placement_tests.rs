@@ -26,7 +26,7 @@ fn sample_entity_definition(name: &str) -> EntityDefinition {
         attributes: AttributesDef {
             health: Some(10),
             stats: std::collections::HashMap::new(),
-            speed: 1,
+            speed: 1.0,
             solid: true,
             active: true,
             can_move: false,

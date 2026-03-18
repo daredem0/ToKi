@@ -141,11 +141,6 @@ impl GameManager {
         self.game_state.player_position()
     }
 
-    /// Get sprite size for rendering calculations
-    pub fn sprite_size(&self) -> u32 {
-        self.game_state.sprite_size()
-    }
-
     /// Get the player entity ID
     pub fn player_id(&self) -> Option<toki_core::entity::EntityId> {
         self.game_state.player_id()

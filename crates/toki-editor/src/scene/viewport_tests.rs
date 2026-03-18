@@ -230,7 +230,7 @@ fn viewport_resolves_shared_sprite_render_requests_for_static_entities() {
         attributes: toki_core::entity::AttributesDef {
             health: None,
             stats: HashMap::new(),
-            speed: 0,
+            speed: 0.0,
             solid: false,
             active: true,
             can_move: false,

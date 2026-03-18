@@ -104,7 +104,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
         attributes: AttributesDef {
             health: Some(100),
             stats: std::collections::HashMap::new(),
-            speed: 2,
+            speed: 2.0,
             solid: true,
             active: true,
             can_move: true,
@@ -165,7 +165,6 @@ fn game_state_new_initializes_correctly() {
         game_state.player_entity().unwrap().position,
         initial_position
     );
-    assert_eq!(game_state.sprite_size(), 16);
 }
 
 #[test]
@@ -239,7 +238,7 @@ fn game_state_movement_up() {
     assert!(result.player_moved);
     assert_eq!(game_state.player_position().x, initial_position.x); // X unchanged
     assert!(game_state.player_position().y < initial_position.y); // Y decreased (up)
-    assert_eq!(game_state.player_position().y, initial_position.y - 1); // Moved 1 pixel
+    assert_eq!(game_state.player_position().y, initial_position.y - 2); // Moved 2 pixels (default speed)
 }
 
 #[test]
@@ -255,7 +254,7 @@ fn game_state_movement_down() {
     assert!(result.player_moved);
     assert_eq!(game_state.player_position().x, initial_position.x); // X unchanged
     assert!(game_state.player_position().y > initial_position.y); // Y increased (down)
-    assert_eq!(game_state.player_position().y, initial_position.y + 1); // Moved 1 pixel
+    assert_eq!(game_state.player_position().y, initial_position.y + 2); // Moved 2 pixels (default speed)
 }
 
 #[test]
@@ -271,7 +270,7 @@ fn game_state_movement_left() {
     assert!(result.player_moved);
     assert!(game_state.player_position().x < initial_position.x); // X decreased (left)
     assert_eq!(game_state.player_position().y, initial_position.y); // Y unchanged
-    assert_eq!(game_state.player_position().x, initial_position.x - 1); // Moved 1 pixel
+    assert_eq!(game_state.player_position().x, initial_position.x - 2); // Moved 2 pixels (default speed)
 }
 
 #[test]
@@ -287,7 +286,7 @@ fn game_state_movement_right() {
     assert!(result.player_moved);
     assert!(game_state.player_position().x > initial_position.x); // X increased (right)
     assert_eq!(game_state.player_position().y, initial_position.y); // Y unchanged
-    assert_eq!(game_state.player_position().x, initial_position.x + 1); // Moved 1 pixel
+    assert_eq!(game_state.player_position().x, initial_position.x + 2); // Moved 2 pixels (default speed)
 }
 
 #[test]
@@ -304,8 +303,8 @@ fn game_state_diagonal_movement() {
     let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
 
     assert!(result.player_moved);
-    assert_eq!(game_state.player_position().x, initial_position.x + 1); // Moved right
-    assert_eq!(game_state.player_position().y, initial_position.y - 1); // Moved up
+    assert_eq!(game_state.player_position().x, initial_position.x + 2); // Moved right (2 pixels)
+    assert_eq!(game_state.player_position().y, initial_position.y - 2); // Moved up (2 pixels)
 }
 
 #[test]
@@ -367,8 +366,9 @@ fn game_state_world_bounds_right_boundary() {
         game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
 
-    // Should be clamped at world_width - sprite_size
-    let expected_max_x = world_bounds.x as i32 - game_state.sprite_size() as i32;
+    // Should be clamped at world_width - entity_size (16x16 from sprite)
+    let player_size = game_state.player_entity().unwrap().size;
+    let expected_max_x = world_bounds.x as i32 - player_size.x as i32;
     assert_eq!(game_state.player_position().x, expected_max_x);
 
     // One more update should not move further
@@ -389,8 +389,9 @@ fn game_state_world_bounds_bottom_boundary() {
         game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     }
 
-    // Should be clamped at world_height - sprite_size
-    let expected_max_y = world_bounds.y as i32 - game_state.sprite_size() as i32;
+    // Should be clamped at world_height - entity_size (16x16 from sprite)
+    let player_size = game_state.player_entity().unwrap().size;
+    let expected_max_y = world_bounds.y as i32 - player_size.y as i32;
     assert_eq!(game_state.player_position().y, expected_max_y);
 
     // One more update should not move further
@@ -1528,7 +1529,7 @@ fn game_state_static_entity_renderables_include_object_sheet_backed_entities() {
         attributes: AttributesDef {
             health: None,
             stats: std::collections::HashMap::new(),
-            speed: 0,
+            speed: 0.0,
             solid: false,
             active: true,
             can_move: false,
@@ -1728,7 +1729,7 @@ fn game_state_player_can_move_through_non_solid_entity() {
             .get_entity(player_id)
             .expect("player should exist")
             .position,
-        IVec2::new(1, 0)
+        IVec2::new(2, 0) // Moved 2 pixels right (default speed)
     );
 }
 
@@ -1868,7 +1869,7 @@ fn game_state_legacy_default_player_profile_still_moves() {
     );
 
     assert!(result.player_moved);
-    assert_eq!(game_state.player_position().x, initial_position.x + 1);
+    assert_eq!(game_state.player_position().x, initial_position.x + 2); // 2 pixels (default speed)
 }
 
 #[test]
@@ -1911,7 +1912,7 @@ fn game_state_non_player_entity_with_player_wasd_profile_moves_from_input() {
             .get_entity(npc_id)
             .expect("npc should exist")
             .position,
-        IVec2::new(33, 32)
+        IVec2::new(34, 32) // Moved 2 pixels right (default speed)
     );
 }
 
@@ -1947,7 +1948,7 @@ fn game_state_multiple_player_wasd_entities_move_together() {
             .get_entity(first_id)
             .expect("first entity should exist")
             .position,
-        IVec2::new(11, 11)
+        IVec2::new(12, 12) // Moved 2 pixels diagonal (default speed)
     );
     assert_eq!(
         game_state
@@ -1955,7 +1956,7 @@ fn game_state_multiple_player_wasd_entities_move_together() {
             .get_entity(second_id)
             .expect("second entity should exist")
             .position,
-        IVec2::new(41, 11)
+        IVec2::new(42, 12) // Moved 2 pixels diagonal (default speed)
     );
 }
 
@@ -1990,7 +1991,7 @@ fn game_state_profile_scoped_input_moves_only_matching_profile_entities() {
             .get_entity(controlled_id)
             .expect("controlled entity should exist")
             .position,
-        IVec2::new(11, 10)
+        IVec2::new(12, 10) // Moved 2 pixels right (default speed)
     );
     assert_eq!(
         game_state
@@ -2148,7 +2149,7 @@ fn game_state_player_entity_attributes() {
 
     // Check player entity has correct attributes from factory method
     assert_eq!(player_entity.attributes.health, Some(100));
-    assert_eq!(player_entity.attributes.speed, 2);
+    assert_eq!(player_entity.attributes.speed, 2.0);
     assert!(player_entity.attributes.active);
     assert!(player_entity.attributes.can_move);
     assert!(player_entity.attributes.solid);
@@ -2405,4 +2406,141 @@ fn game_state_emits_collision_audio_event_with_component_sound_id() {
             } if sound_id == "sfx_custom_collision"
         )
     }));
+}
+
+// =============================================================================
+// Entity-based movement tests (speed and size from entity, not global)
+// =============================================================================
+
+#[test]
+fn game_state_entity_speed_controls_movement_distance() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player_id = game_state.player_id().expect("player should exist");
+
+    // Set player speed to 3.0 pixels per tick
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .attributes
+        .speed = 3.0;
+
+    let initial_position = game_state.player_position();
+    game_state.handle_key_press(InputKey::Right);
+    game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+
+    // Should have moved 3 pixels (entity speed), not 1 pixel (old hardcoded)
+    assert_eq!(game_state.player_position().x, initial_position.x + 3);
+}
+
+#[test]
+fn game_state_entity_speed_fractional_rounds_down() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player_id = game_state.player_id().expect("player should exist");
+
+    // Set player speed to 1.7 pixels per tick
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .attributes
+        .speed = 1.7;
+
+    let initial_position = game_state.player_position();
+    game_state.handle_key_press(InputKey::Down);
+    game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+
+    // Should move 1 pixel (1.7 truncated to 1)
+    assert_eq!(game_state.player_position().y, initial_position.y + 1);
+}
+
+#[test]
+fn game_state_entity_speed_below_one_does_not_move() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player_id = game_state.player_id().expect("player should exist");
+
+    // Set player speed to 0.5 pixels per tick
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .attributes
+        .speed = 0.5;
+
+    let initial_position = game_state.player_position();
+    game_state.handle_key_press(InputKey::Left);
+    let result = game_state.update(UVec2::new(1000, 1000), &create_test_tilemap(), &create_test_atlas());
+
+    // Should not move (0.5 truncated to 0)
+    assert!(!result.player_moved);
+    assert_eq!(game_state.player_position(), initial_position);
+}
+
+#[test]
+fn game_state_entity_size_used_for_right_boundary_clamping() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player_id = game_state.player_id().expect("player should exist");
+
+    // Set player to have a 32x32 size (larger than default 16x16)
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .size = UVec2::new(32, 32);
+
+    // Also set speed high so we reach boundary quickly
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .attributes
+        .speed = 10.0;
+
+    game_state.handle_key_press(InputKey::Right);
+    let world_bounds = UVec2::new(100, 100);
+
+    // Move right until boundary
+    for _ in 0..50 {
+        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    }
+
+    // Should be clamped at world_width - entity_size (100 - 32 = 68)
+    assert_eq!(game_state.player_position().x, 68);
+}
+
+#[test]
+fn game_state_entity_size_used_for_bottom_boundary_clamping() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player_id = game_state.player_id().expect("player should exist");
+
+    // Set player to have a 24x24 size
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .size = UVec2::new(24, 24);
+
+    // Set speed high
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .attributes
+        .speed = 10.0;
+
+    game_state.handle_key_press(InputKey::Down);
+    let world_bounds = UVec2::new(100, 100);
+
+    // Move down until boundary
+    for _ in 0..50 {
+        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    }
+
+    // Should be clamped at world_height - entity_size (100 - 24 = 76)
+    assert_eq!(game_state.player_position().y, 76);
 }

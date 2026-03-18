@@ -37,7 +37,7 @@ fn sample_entity_definition(name: &str, category: &str, size: [u32; 2]) -> Entit
         attributes: AttributesDef {
             health: Some(50),
             stats: std::collections::HashMap::new(),
-            speed: 1,
+            speed: 1.0,
             solid: true,
             active: true,
             can_move: false,

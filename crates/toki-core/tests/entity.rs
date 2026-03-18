@@ -16,7 +16,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
         attributes: AttributesDef {
             health: Some(100),
             stats: std::collections::HashMap::new(),
-            speed: 2,
+            speed: 2.0,
             solid: true,
             active: true,
             can_move: true,
@@ -65,7 +65,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
 fn player_definition() -> EntityDefinition {
     let mut def = test_definition("player", "human");
     def.attributes.health = Some(100);
-    def.attributes.speed = 2;
+    def.attributes.speed = 2.0;
     def.attributes.solid = true;
     def.attributes.can_move = true;
     def
@@ -74,7 +74,7 @@ fn player_definition() -> EntityDefinition {
 fn npc_definition(animation_name: &str) -> EntityDefinition {
     let mut def = test_definition("npc", "creature");
     def.attributes.health = Some(50);
-    def.attributes.speed = 1;
+    def.attributes.speed = 1.0;
     def.attributes.solid = true;
     def.attributes.can_move = false;
     def.animations.clips = vec![AnimationClipDef {
@@ -210,7 +210,7 @@ fn test_spawn_player() {
         ControlRole::PlayerCharacter
     );
     assert_eq!(player.attributes.health, Some(100));
-    assert_eq!(player.attributes.speed, 2);
+    assert_eq!(player.attributes.speed, 2.0);
     assert!(player.attributes.active);
     assert!(player.attributes.can_move);
 
@@ -391,7 +391,7 @@ fn test_entity_attributes_defaults() {
     let attributes = EntityAttributes::default();
 
     assert_eq!(attributes.health, None);
-    assert_eq!(attributes.speed, 2);
+    assert_eq!(attributes.speed, 2.0);
     assert!(attributes.solid);
     assert!(attributes.visible);
     assert!(attributes.active);
@@ -421,8 +421,8 @@ fn test_factory_method_differences() {
     assert_eq!(decoration.attributes.health, None);
 
     // Check speed differences
-    assert_eq!(player.attributes.speed, 2);
-    assert_eq!(npc.attributes.speed, 1);
+    assert_eq!(player.attributes.speed, 2.0);
+    assert_eq!(npc.attributes.speed, 1.0);
 
     // Check movement differences
     assert!(player.attributes.can_move);

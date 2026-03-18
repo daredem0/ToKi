@@ -62,8 +62,8 @@ impl InspectorSystem {
                 changed |= ui
                     .add(
                         egui::DragValue::new(&mut draft.speed)
-                            .speed(1.0)
-                            .range(0..=i64::MAX),
+                            .speed(0.1)
+                            .range(0.0..=1000.0),
                     )
                     .changed();
             });
@@ -837,7 +837,7 @@ impl InspectorSystem {
         changed |= set_if_changed(&mut entity.attributes.has_inventory, draft.has_inventory);
         changed |= set_if_changed(
             &mut entity.attributes.speed,
-            clamp_to_non_negative_u32(draft.speed),
+            draft.speed.max(0.0) as f32,
         );
         changed |= set_if_changed(&mut entity.attributes.render_layer, draft.render_layer);
 

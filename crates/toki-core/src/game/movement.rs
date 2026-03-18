@@ -22,28 +22,31 @@ impl GameState {
     }
 
     fn candidate_input_position(
-        &self,
         current_position: glam::IVec2,
         key: InputKey,
         world_bounds: glam::UVec2,
+        entity_speed: f32,
+        entity_size: glam::UVec2,
     ) -> glam::IVec2 {
+        let movement_step = entity_speed as i32;
+        let max_x = (world_bounds.x as i32 - entity_size.x as i32).max(0);
+        let max_y = (world_bounds.y as i32 - entity_size.y as i32).max(0);
+
         match key {
             InputKey::Up => glam::IVec2::new(
                 current_position.x,
-                (current_position.y - self.movement_step).max(0),
+                (current_position.y - movement_step).max(0),
             ),
             InputKey::Left => glam::IVec2::new(
-                (current_position.x - self.movement_step).max(0),
+                (current_position.x - movement_step).max(0),
                 current_position.y,
             ),
             InputKey::Down => glam::IVec2::new(
                 current_position.x,
-                (current_position.y + self.movement_step)
-                    .min(world_bounds.y as i32 - self.sprite_size as i32),
+                (current_position.y + movement_step).min(max_y),
             ),
             InputKey::Right => glam::IVec2::new(
-                (current_position.x + self.movement_step)
-                    .min(world_bounds.x as i32 - self.sprite_size as i32),
+                (current_position.x + movement_step).min(max_x),
                 current_position.y,
             ),
             InputKey::DebugToggle => current_position,
@@ -63,15 +66,21 @@ impl GameState {
             return;
         }
 
-        let Some(current_position) = self
-            .entity_manager
-            .get_entity(entity_id)
-            .map(|entity| entity.position)
-        else {
+        let Some(entity) = self.entity_manager.get_entity(entity_id) else {
             return;
         };
 
-        let new_position = self.candidate_input_position(current_position, key, world_bounds);
+        let current_position = entity.position;
+        let entity_speed = entity.attributes.speed;
+        let entity_size = entity.size;
+
+        let new_position = Self::candidate_input_position(
+            current_position,
+            key,
+            world_bounds,
+            entity_speed,
+            entity_size,
+        );
         if new_position == current_position {
             return;
         }

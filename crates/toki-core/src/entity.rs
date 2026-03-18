@@ -244,7 +244,7 @@ pub struct EntityAttributes {
     pub health: Option<u32>,
     #[serde(default, skip_serializing_if = "EntityStats::is_empty")]
     pub stats: EntityStats,
-    pub speed: u32,  // We only move in full pixels
+    pub speed: f32, // Movement speed in pixels per tick
     pub solid: bool, // Can we collide with other entities
 
     // Rendering
@@ -326,7 +326,7 @@ impl Default for EntityAttributes {
         Self {
             health: None,
             stats: EntityStats::default(),
-            speed: 2,
+            speed: 2.0,
             solid: true,
             visible: true,
             animation_controller: None,
@@ -753,7 +753,7 @@ pub struct AttributesDef {
     pub health: Option<u32>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub stats: HashMap<String, i32>,
-    pub speed: u32,
+    pub speed: f32,
     pub solid: bool,
     pub active: bool,
     pub can_move: bool,

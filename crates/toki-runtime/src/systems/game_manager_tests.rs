@@ -104,7 +104,6 @@ fn wrapper_methods_expose_core_entity_state() {
 
     assert_eq!(manager.player_id(), Some(player_id));
     assert_eq!(manager.player_position(), glam::IVec2::new(10, 12));
-    assert_eq!(manager.sprite_size(), 16);
     assert_eq!(renderable.len(), 2);
     assert_eq!(entities_for_camera.len(), 2);
     assert!(entities_for_camera
@@ -138,7 +137,7 @@ fn sprite_render_request_wrapper_exposes_object_sheet_backed_entities() {
         attributes: toki_core::entity::AttributesDef {
             health: None,
             stats: HashMap::new(),
-            speed: 0,
+            speed: 0.0,
             solid: false,
             active: true,
             can_move: false,
@@ -266,7 +265,7 @@ fn player_wasd_profile_moves_from_wasd_keys() {
             .get_entity(player_id)
             .expect("player should exist")
             .position,
-        glam::IVec2::new(1, 0)
+        glam::IVec2::new(2, 0) // Moved 2 pixels right (default speed)
     );
 }
 

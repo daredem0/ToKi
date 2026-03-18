@@ -20,7 +20,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
         attributes: AttributesDef {
             health: Some(100),
             stats: std::collections::HashMap::new(),
-            speed: 2,
+            speed: 2.0,
             solid: true,
             active: true,
             can_move: true,
@@ -80,7 +80,7 @@ fn create_test_entity() -> Entity {
     let attributes = EntityAttributes {
         health: Some(100),
         stats: toki_core::entity::EntityStats::from_legacy_health(Some(100)),
-        speed: 5,
+        speed: 5.0,
         solid: true,
         visible: true,
         animation_controller: Some(controller),

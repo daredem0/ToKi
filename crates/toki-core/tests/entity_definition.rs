@@ -17,7 +17,7 @@ fn test_entity_definition_create_entity_basic() {
         attributes: AttributesDef {
             health: Some(100),
             stats: std::collections::HashMap::new(),
-            speed: 2,
+            speed: 2.0,
             solid: true,
             active: true,
             can_move: true,
@@ -87,7 +87,7 @@ fn test_entity_definition_create_entity_basic() {
 
     // Check attributes
     assert_eq!(entity.attributes.health, Some(100));
-    assert_eq!(entity.attributes.speed, 2);
+    assert_eq!(entity.attributes.speed, 2.0);
     assert!(entity.attributes.solid);
     assert!(entity.attributes.visible);
     assert_eq!(entity.attributes.render_layer, 1);
@@ -146,7 +146,7 @@ fn test_entity_definition_create_npc_entity() {
         attributes: AttributesDef {
             health: Some(50),
             stats: std::collections::HashMap::new(),
-            speed: 1,
+            speed: 1.0,
             solid: true,
             active: true,
             can_move: false,
@@ -208,7 +208,7 @@ fn test_entity_definition_create_npc_entity() {
         entity.attributes.movement_profile,
         MovementProfile::LegacyDefault
     );
-    assert_eq!(entity.attributes.speed, 1);
+    assert_eq!(entity.attributes.speed, 1.0);
 
     // Check no collision since disabled
     assert!(entity.collision_box.is_none());
@@ -293,7 +293,7 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
         attributes: AttributesDef {
             health: Some(25),
             stats: std::collections::HashMap::new(),
-            speed: 2,
+            speed: 2.0,
             solid: true,
             active: true,
             can_move: true,
@@ -417,7 +417,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
         attributes: AttributesDef {
             health: Some(100),
             stats: std::collections::HashMap::new(),
-            speed: 2,
+            speed: 2.0,
             solid: true,
             active: true,
             can_move: true,
@@ -503,7 +503,7 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
         attributes: AttributesDef {
             health: Some(100),
             stats: std::collections::HashMap::new(),
-            speed: 2,
+            speed: 2.0,
             solid: true,
             active: true,
             can_move: true,
@@ -598,7 +598,7 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
         attributes: AttributesDef {
             health: Some(25),
             stats: std::collections::HashMap::new(),
-            speed: 1,
+            speed: 1.0,
             solid: true,
             active: true,
             can_move: true,
@@ -662,7 +662,7 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
         attributes: AttributesDef {
             health: Some(30),
             stats: std::collections::HashMap::from([(ATTACK_POWER_STAT_ID.to_string(), 17)]),
-            speed: 2,
+            speed: 2.0,
             solid: true,
             active: true,
             can_move: true,
@@ -727,7 +727,7 @@ fn test_entity_definition_copies_authored_primary_projectile() {
         attributes: AttributesDef {
             health: Some(30),
             stats: std::collections::HashMap::from([(ATTACK_POWER_STAT_ID.to_string(), 8)]),
-            speed: 2,
+            speed: 2.0,
             solid: true,
             active: true,
             can_move: true,
@@ -807,7 +807,7 @@ fn test_entity_definition_copies_authored_pickup() {
         attributes: AttributesDef {
             health: None,
             stats: std::collections::HashMap::new(),
-            speed: 0,
+            speed: 0.0,
             solid: false,
             active: true,
             can_move: false,
@@ -877,7 +877,7 @@ fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type()
         attributes: AttributesDef {
             health: None,
             stats: std::collections::HashMap::new(),
-            speed: 1,
+            speed: 1.0,
             solid: false,
             active: true,
             can_move: false,
@@ -931,7 +931,7 @@ fn test_entity_definition_invalid_animation_state() {
         attributes: AttributesDef {
             health: None,
             stats: std::collections::HashMap::new(),
-            speed: 1,
+            speed: 1.0,
             solid: false,
             active: true,
             can_move: false,
@@ -988,7 +988,7 @@ fn test_entity_definition_invalid_loop_mode() {
         attributes: AttributesDef {
             health: None,
             stats: std::collections::HashMap::new(),
-            speed: 1,
+            speed: 1.0,
             solid: false,
             active: true,
             can_move: false,
@@ -1045,7 +1045,7 @@ fn test_entity_definition_serialization() {
         attributes: AttributesDef {
             health: None,
             stats: std::collections::HashMap::new(),
-            speed: 0,
+            speed: 0.0,
             solid: false,
             active: false,
             can_move: false,
@@ -1114,7 +1114,7 @@ fn test_entity_definition_create_audio_component() {
         attributes: AttributesDef {
             health: Some(100),
             stats: std::collections::HashMap::new(),
-            speed: 2,
+            speed: 2.0,
             solid: true,
             active: true,
             can_move: true,

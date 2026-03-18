@@ -399,7 +399,7 @@ fn load_preview_sprite_frame_static_supports_object_sheet_backed_entities() {
         attributes: AttributesDef {
             health: None,
             stats: HashMap::new(),
-            speed: 0,
+            speed: 0.0,
             solid: false,
             active: true,
             can_move: false,
