@@ -476,7 +476,7 @@ impl ApplicationHandler for EditorApp {
             self.startup_project_auto_open_done = true;
             if self.config.has_project_path() {
                 tracing::info!("Auto-opening last project from config on startup");
-                self.ui.open_project_requested = true;
+                self.ui.project.open_project_requested = true;
             }
         }
         window.request_redraw();
@@ -572,20 +572,20 @@ impl ApplicationHandler for EditorApp {
                         match key_code {
                             KeyCode::Escape => event_loop.exit(),
                             KeyCode::F1 => {
-                                self.ui.show_hierarchy = !self.ui.show_hierarchy;
+                                self.ui.visibility.show_hierarchy = !self.ui.visibility.show_hierarchy;
                                 tracing::info!(
                                     "Toggled hierarchy panel: {}",
-                                    self.ui.show_hierarchy
+                                    self.ui.visibility.show_hierarchy
                                 );
                                 if let Some(window) = &self.window {
                                     window.request_redraw();
                                 }
                             }
                             KeyCode::F2 => {
-                                self.ui.show_inspector = !self.ui.show_inspector;
+                                self.ui.visibility.show_inspector = !self.ui.visibility.show_inspector;
                                 tracing::info!(
                                     "Toggled inspector panel: {}",
-                                    self.ui.show_inspector
+                                    self.ui.visibility.show_inspector
                                 );
                                 if let Some(window) = &self.window {
                                     window.request_redraw();
@@ -645,7 +645,7 @@ impl EditorApp {
             Some(egui) => egui.egui_ctx().clone(),
             None => return, // Not initialized yet
         };
-        if self.ui.background_task_running {
+        if self.ui.project.background_task_running {
             self.ensure_busy_logo_texture(&egui_ctx);
         }
         self.sync_project_menu_preview_fonts(&egui_ctx);
@@ -665,9 +665,9 @@ impl EditorApp {
 
         // Load sprite frame cache if needed (before render loop to avoid borrowing issues)
         let project_path = self.config.current_project_path();
-        if self.ui.is_in_placement_mode() && self.ui.placement_preview_cached_frame.is_none() {
+        if self.ui.is_in_placement_mode() && self.ui.placement.preview_cached_frame.is_none() {
             if let (Some(entity_def), Some(project_path), Some(project_assets)) = (
-                &self.ui.placement_entity_definition,
+                &self.ui.placement.entity_definition,
                 &project_path,
                 self.project_manager.get_project_assets(),
             ) {
@@ -676,7 +676,7 @@ impl EditorApp {
                     project_path.as_path(),
                     project_assets,
                 );
-                self.ui.placement_preview_cached_frame = cached_frame;
+                self.ui.placement.preview_cached_frame = cached_frame;
             }
         }
 
@@ -687,14 +687,14 @@ impl EditorApp {
                     CenterPanelTab::SceneViewport => {
                         if let Some(scene_viewport) = &mut self.scene_viewport {
                             let preview_data = if self.ui.is_in_placement_mode() {
-                                if self.ui.entity_move_drag.is_none() {
+                                if self.ui.placement.entity_move_drag.is_none() {
                                     if let (Some(_entity_def), Some(position), Some(cached_frame)) = (
-                                        &self.ui.placement_entity_definition,
-                                        &self.ui.placement_preview_position,
-                                        &self.ui.placement_preview_cached_frame,
+                                        &self.ui.placement.entity_definition,
+                                        &self.ui.placement.preview_position,
+                                        &self.ui.placement.preview_cached_frame,
                                     ) {
                                         let is_valid =
-                                            self.ui.placement_preview_valid.unwrap_or(true);
+                                            self.ui.placement.preview_valid.unwrap_or(true);
                                         Some((*position, cached_frame.clone(), is_valid))
                                     } else {
                                         None
@@ -707,8 +707,8 @@ impl EditorApp {
                             };
 
                             let drag_preview_data =
-                                self.ui.entity_move_drag.as_ref().and_then(|drag| {
-                                    self.ui.placement_preview_position.map(|preview_position| {
+                                self.ui.placement.entity_move_drag.as_ref().and_then(|drag| {
+                                    self.ui.placement.preview_position.map(|preview_position| {
                                         let tilemap = scene_viewport.scene_manager().tilemap();
                                         let terrain_atlas = tilemap.map(|_| {
                                             scene_viewport
@@ -786,19 +786,19 @@ impl EditorApp {
         });
 
         // Handle UI requests
-        if self.ui.should_exit {
+        if self.ui.visibility.should_exit {
             event_loop.exit();
             return;
         }
 
-        if self.ui.create_test_entities {
+        if self.ui.visibility.create_test_entities {
             if let Some(viewport) = &mut self.scene_viewport {
                 let game_state = viewport.scene_manager_mut().game_state_mut();
                 let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
                 let _npc_id = game_state.spawn_player_like_npc(glam::IVec2::new(120, 72));
                 tracing::info!("Created test entities");
             }
-            self.ui.create_test_entities = false;
+            self.ui.visibility.create_test_entities = false;
         }
 
         // Handle platform output (cursor, clipboard, etc.)

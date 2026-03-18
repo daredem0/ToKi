@@ -11,31 +11,31 @@ impl InspectorSystem {
         ui.separator();
         ui.label("Command Palette");
         ui.horizontal(|ui| {
-            ui.selectable_value(&mut ui_state.map_editor_tool, MapEditorTool::Drag, "Drag");
-            ui.selectable_value(&mut ui_state.map_editor_tool, MapEditorTool::Brush, "Brush");
-            ui.selectable_value(&mut ui_state.map_editor_tool, MapEditorTool::Fill, "Fill");
+            ui.selectable_value(&mut ui_state.map.tool, MapEditorTool::Drag, "Drag");
+            ui.selectable_value(&mut ui_state.map.tool, MapEditorTool::Brush, "Brush");
+            ui.selectable_value(&mut ui_state.map.tool, MapEditorTool::Fill, "Fill");
             ui.selectable_value(
-                &mut ui_state.map_editor_tool,
+                &mut ui_state.map.tool,
                 MapEditorTool::PickTile,
                 "Pick Tile",
             );
             ui.selectable_value(
-                &mut ui_state.map_editor_tool,
+                &mut ui_state.map.tool,
                 MapEditorTool::PlaceObject,
                 "Place Object",
             );
             ui.selectable_value(
-                &mut ui_state.map_editor_tool,
+                &mut ui_state.map.tool,
                 MapEditorTool::DeleteObject,
                 "Delete",
             );
         });
         ui.separator();
 
-        match ui_state.map_editor_tool {
+        match ui_state.map.tool {
             MapEditorTool::Drag => {
                 ui.label("Primary drag pans the map editor camera.");
-                if let Some(selected_object) = ui_state.map_editor_selected_object_info.clone() {
+                if let Some(selected_object) = ui_state.map.selected_object_info.clone() {
                     ui.separator();
                     ui.label("Object Info");
                     ui.horizontal(|ui| {
@@ -72,7 +72,7 @@ impl InspectorSystem {
                             solid,
                         );
                     }
-                } else if let Some(tile_info) = &ui_state.map_editor_selected_tile_info {
+                } else if let Some(tile_info) = &ui_state.map.selected_tile_info {
                     ui.separator();
                     ui.label("Tile Info");
                     ui.horizontal(|ui| {
@@ -96,7 +96,7 @@ impl InspectorSystem {
                 }
             }
             MapEditorTool::Brush | MapEditorTool::Fill => {
-                ui.label(match ui_state.map_editor_tool {
+                ui.label(match ui_state.map.tool {
                     MapEditorTool::Brush => "Primary click/drag paints tiles.",
                     MapEditorTool::Fill => "Primary click fills the whole map.",
                     MapEditorTool::Drag
@@ -113,25 +113,26 @@ impl InspectorSystem {
                         egui::ComboBox::from_id_salt("inspector_map_editor_brush_tile_selector")
                             .selected_text(
                                 ui_state
-                                    .map_editor_selected_tile
+                                    .map
+                                    .selected_tile
                                     .as_deref()
                                     .unwrap_or("No tile selected"),
                             )
                             .show_ui(ui, |ui| {
                                 for tile_name in &tile_names {
-                                    let is_selected = ui_state.map_editor_selected_tile.as_deref()
+                                    let is_selected = ui_state.map.selected_tile.as_deref()
                                         == Some(tile_name.as_str());
                                     if ui.selectable_label(is_selected, tile_name).clicked() {
-                                        ui_state.map_editor_selected_tile = Some(tile_name.clone());
+                                        ui_state.map.selected_tile = Some(tile_name.clone());
                                     }
                                 }
                             });
                     });
                     ui.horizontal(|ui| {
-                        if ui_state.map_editor_tool == MapEditorTool::Brush {
+                        if ui_state.map.tool == MapEditorTool::Brush {
                             ui.label("Brush Size:");
                             ui.add(
-                                egui::DragValue::new(&mut ui_state.map_editor_brush_size_tiles)
+                                egui::DragValue::new(&mut ui_state.map.brush_size_tiles)
                                     .range(1..=32)
                                     .speed(1),
                             );
@@ -139,7 +140,7 @@ impl InspectorSystem {
                         }
                     });
 
-                    if let Some(tile_name) = ui_state.map_editor_selected_tile.clone() {
+                    if let Some(tile_name) = ui_state.map.selected_tile.clone() {
                         ui.horizontal(|ui| {
                             ui.label(format!("Selected Tile: {}", tile_name));
                             Self::render_map_editor_selected_tile_preview(
@@ -168,7 +169,7 @@ impl InspectorSystem {
                 } else {
                     ui.label("No atlas tiles available for the current map.");
                 }
-                ui.label(match ui_state.map_editor_tool {
+                ui.label(match ui_state.map.tool {
                     MapEditorTool::Brush => "Secondary drag pans the camera.",
                     MapEditorTool::Fill => "Secondary drag pans the camera.",
                     MapEditorTool::Drag
@@ -180,7 +181,7 @@ impl InspectorSystem {
             MapEditorTool::PickTile => {
                 ui.label("Click a tile in the map to pick it.");
                 ui.label("After picking, the tool switches back to Brush automatically.");
-                if let Some(tile_name) = ui_state.map_editor_selected_tile.as_deref() {
+                if let Some(tile_name) = ui_state.map.selected_tile.as_deref() {
                     ui.separator();
                     ui.label(format!("Current Brush Tile: {}", tile_name));
                 }
@@ -197,19 +198,20 @@ impl InspectorSystem {
                         egui::ComboBox::from_id_salt("inspector_map_editor_object_sheet_selector")
                             .selected_text(
                                 ui_state
-                                    .map_editor_selected_object_sheet
+                                    .map
+                                    .selected_object_sheet
                                     .as_deref()
                                     .unwrap_or("No object sheet selected"),
                             )
                             .show_ui(ui, |ui| {
                                 for sheet_name in &sheet_names {
                                     let is_selected =
-                                        ui_state.map_editor_selected_object_sheet.as_deref()
+                                        ui_state.map.selected_object_sheet.as_deref()
                                             == Some(sheet_name.as_str());
                                     if ui.selectable_label(is_selected, sheet_name).clicked() {
-                                        ui_state.map_editor_selected_object_sheet =
+                                        ui_state.map.selected_object_sheet =
                                             Some(sheet_name.clone());
-                                        ui_state.map_editor_selected_object_name = None;
+                                        ui_state.map.selected_object_name = None;
                                     }
                                 }
                             });
@@ -220,24 +222,25 @@ impl InspectorSystem {
                         egui::ComboBox::from_id_salt("inspector_map_editor_object_selector")
                             .selected_text(
                                 ui_state
-                                    .map_editor_selected_object_name
+                                    .map
+                                    .selected_object_name
                                     .as_deref()
                                     .unwrap_or("No object selected"),
                             )
                             .show_ui(ui, |ui| {
                                 for object_name in &object_names {
                                     let is_selected =
-                                        ui_state.map_editor_selected_object_name.as_deref()
+                                        ui_state.map.selected_object_name.as_deref()
                                             == Some(object_name.as_str());
                                     if ui.selectable_label(is_selected, object_name).clicked() {
-                                        ui_state.map_editor_selected_object_name =
+                                        ui_state.map.selected_object_name =
                                             Some(object_name.clone());
                                     }
                                 }
                             });
                     });
 
-                    if let Some(object_name) = ui_state.map_editor_selected_object_name.clone() {
+                    if let Some(object_name) = ui_state.map.selected_object_name.clone() {
                         ui.horizontal(|ui| {
                             ui.label(format!("Selected Object: {}", object_name));
                             Self::render_map_editor_selected_object_preview(
@@ -291,10 +294,10 @@ impl InspectorSystem {
     )> {
         let project_path = config?.current_project_path()?;
 
-        let tilemap = if let Some(draft) = &ui_state.map_editor_draft {
+        let tilemap = if let Some(draft) = &ui_state.map.draft {
             draft.tilemap.clone()
         } else {
-            let active_map = ui_state.map_editor_active_map.as_ref()?;
+            let active_map = ui_state.map.active_map.as_ref()?;
             toki_core::assets::tilemap::TileMap::load_from_file(
                 project_path
                     .join("assets")
@@ -365,7 +368,8 @@ impl InspectorSystem {
             .map(|(name, _, _)| name.clone())
             .collect::<Vec<_>>();
         let selected_sheet_name = ui_state
-            .map_editor_selected_object_sheet
+            .map
+            .selected_object_sheet
             .clone()
             .unwrap_or_else(|| sheet_names[0].clone());
 
@@ -559,10 +563,10 @@ impl InspectorSystem {
         ctx: &egui::Context,
         texture_path: &std::path::Path,
     ) -> Option<egui::TextureHandle> {
-        if ui_state.map_editor_brush_preview_image_path.as_deref() == Some(texture_path)
-            && ui_state.map_editor_brush_preview_texture.is_some()
+        if ui_state.map.brush_preview_image_path.as_deref() == Some(texture_path)
+            && ui_state.map.brush_preview_texture.is_some()
         {
-            return ui_state.map_editor_brush_preview_texture.clone();
+            return ui_state.map.brush_preview_texture.clone();
         }
 
         let decoded = toki_core::graphics::image::load_image_rgba8(texture_path).ok()?;
@@ -572,8 +576,8 @@ impl InspectorSystem {
         );
         let key = format!("map_editor_brush_preview:{}", texture_path.display());
         let texture = ctx.load_texture(key, color_image, egui::TextureOptions::NEAREST);
-        ui_state.map_editor_brush_preview_image_path = Some(texture_path.to_path_buf());
-        ui_state.map_editor_brush_preview_texture = Some(texture.clone());
+        ui_state.map.brush_preview_image_path = Some(texture_path.to_path_buf());
+        ui_state.map.brush_preview_texture = Some(texture.clone());
         Some(texture)
     }
 }

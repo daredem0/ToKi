@@ -140,10 +140,10 @@ impl PanelSystem {
             return false;
         }
 
-        let Some(object_sheet_name) = ui_state.map_editor_selected_object_sheet.clone() else {
+        let Some(object_sheet_name) = ui_state.map.selected_object_sheet.clone() else {
             return false;
         };
-        let Some(object_name) = ui_state.map_editor_selected_object_name.clone() else {
+        let Some(object_name) = ui_state.map.selected_object_name.clone() else {
             return false;
         };
         let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {
@@ -280,7 +280,7 @@ impl PanelSystem {
         viewport: &mut SceneViewport,
         rect: egui::Rect,
     ) {
-        let Some(drag_state) = ui_state.map_object_move_drag else {
+        let Some(drag_state) = ui_state.map.object_move_drag else {
             return;
         };
         let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {

@@ -18,11 +18,11 @@ impl MenuSystem {
                 ui.menu_button("File", |ui| {
                     if ui.button("New Empty Project...").clicked() {
                         tracing::info!("New Empty Project clicked");
-                        ui_state.new_project_requested = true;
+                        ui_state.project.new_project_requested = true;
                     }
                     if ui.button("New Top-Down Starter...").clicked() {
                         tracing::info!("New Top-Down Starter clicked");
-                        ui_state.new_top_down_project_requested = true;
+                        ui_state.project.new_top_down_project_requested = true;
                     }
 
                     // Auto-open the project from config
@@ -32,25 +32,25 @@ impl MenuSystem {
                                 tracing::info!(
                                     "Open Project clicked - opening project from config"
                                 );
-                                ui_state.open_project_requested = true;
+                                ui_state.project.open_project_requested = true;
                             }
                             if ui.button("Browse for Project...").clicked() {
                                 tracing::info!("Browse for Project clicked");
-                                ui_state.browse_for_project_requested = true;
+                                ui_state.project.browse_for_project_requested = true;
                             }
                         } else if ui.button("Open Project...").clicked() {
                             tracing::info!("Open Project... clicked - no project path in config");
-                            ui_state.browse_for_project_requested = true;
+                            ui_state.project.browse_for_project_requested = true;
                         }
                     } else if ui.button("Open Project...").clicked() {
                         tracing::info!("Open Project... clicked - no config available");
-                        ui_state.browse_for_project_requested = true;
+                        ui_state.project.browse_for_project_requested = true;
                     }
 
                     ui.separator();
                     if ui.button("Save Project").clicked() {
                         tracing::info!("Save Project clicked");
-                        ui_state.save_project_requested = true;
+                        ui_state.project.save_project_requested = true;
                     }
                     if ui
                         .add_enabled(
@@ -60,32 +60,32 @@ impl MenuSystem {
                         .clicked()
                     {
                         tracing::info!("Save Map clicked");
-                        ui_state.map_editor_save_requested = true;
+                        ui_state.map.save_requested = true;
                     }
                     if ui
                         .add_enabled(
-                            !ui_state.background_task_running,
+                            !ui_state.project.background_task_running,
                             egui::Button::new("Export Game..."),
                         )
                         .clicked()
                     {
                         tracing::info!("Export Game clicked");
-                        ui_state.export_project_requested = true;
+                        ui_state.project.export_project_requested = true;
                     }
                     ui.separator();
                     if ui.button("Create Test Entities").clicked() {
                         tracing::info!("Create Test Entities clicked");
-                        ui_state.create_test_entities = true;
+                        ui_state.visibility.create_test_entities = true;
                     }
                     ui.separator();
                     if ui.button("Init Config").clicked() {
                         tracing::info!("Init Config clicked");
-                        ui_state.init_config_requested = true;
+                        ui_state.project.init_config_requested = true;
                     }
                     ui.separator();
                     if ui.button("Exit").clicked() {
                         tracing::info!("Exit clicked");
-                        ui_state.should_exit = true;
+                        ui_state.visibility.should_exit = true;
                     }
                 });
 
@@ -116,22 +116,22 @@ impl MenuSystem {
                     ui.separator();
                     if ui
                         .add_enabled(
-                            !ui_state.background_task_running,
+                            !ui_state.project.background_task_running,
                             egui::Button::new("Validate Project Assets"),
                         )
                         .clicked()
                     {
                         tracing::info!("Validate Project Assets clicked");
-                        ui_state.validate_assets_requested = true;
+                        ui_state.project.validate_assets_requested = true;
                     }
                 });
 
                 ui.menu_button("View", |ui| {
-                    ui.checkbox(&mut ui_state.show_hierarchy, "Hierarchy");
-                    ui.checkbox(&mut ui_state.show_inspector, "Inspector");
-                    ui.checkbox(&mut ui_state.show_maps, "Maps");
-                    ui.checkbox(&mut ui_state.show_runtime_entities, "Show runtime entities");
-                    ui.checkbox(&mut ui_state.show_console, "Console");
+                    ui.checkbox(&mut ui_state.visibility.show_hierarchy, "Hierarchy");
+                    ui.checkbox(&mut ui_state.visibility.show_inspector, "Inspector");
+                    ui.checkbox(&mut ui_state.visibility.show_maps, "Maps");
+                    ui.checkbox(&mut ui_state.visibility.show_runtime_entities, "Show runtime entities");
+                    ui.checkbox(&mut ui_state.visibility.show_console, "Console");
                 });
 
                 ui.separator();
@@ -141,24 +141,24 @@ impl MenuSystem {
                     .add_enabled(can_play_scene, egui::Button::new("▶ Play Scene"))
                     .clicked()
                 {
-                    ui_state.play_scene_requested = true;
+                    ui_state.project.play_scene_requested = true;
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui_state.background_task_running && ui.button("Cancel Task").clicked() {
-                        ui_state.cancel_background_task_requested = true;
+                    if ui_state.project.background_task_running && ui.button("Cancel Task").clicked() {
+                        ui_state.project.cancel_background_task_requested = true;
                     }
-                    if let Some(status) = &ui_state.background_task_status {
+                    if let Some(status) = &ui_state.project.background_task_status {
                         ui.label(status);
                     }
-                    if ui_state.background_task_running {
+                    if ui_state.project.background_task_running {
                         ui.separator();
                         Self::render_busy_logo(ui, ctx, busy_logo_texture);
                     }
                 });
             });
 
-            if let Some(window_title) = &ui_state.window_title {
+            if let Some(window_title) = &ui_state.project.window_title {
                 ui.painter().text(
                     panel_rect.center(),
                     egui::Align2::CENTER_CENTER,
@@ -169,13 +169,13 @@ impl MenuSystem {
             }
         });
 
-        if ui_state.show_new_project_dialog {
+        if ui_state.project.show_new_project_dialog {
             Self::render_new_project_dialog(ui_state, ctx);
         }
     }
 
     fn render_new_project_dialog(ui_state: &mut super::EditorUI, ctx: &egui::Context) {
-        let mut open = ui_state.show_new_project_dialog;
+        let mut open = ui_state.project.show_new_project_dialog;
         let mut create_clicked = false;
         let mut cancel_clicked = false;
         egui::Window::new("New Project")
@@ -185,16 +185,17 @@ impl MenuSystem {
             .show(ctx, |ui| {
                 ui.label(format!(
                     "Template: {}",
-                    ui_state.new_project_template.label()
+                    ui_state.project.new_project_template.label()
                 ));
                 ui.separator();
 
                 ui.label("Project Name");
-                ui.text_edit_singleline(&mut ui_state.new_project_name);
+                ui.text_edit_singleline(&mut ui_state.project.new_project_name);
                 ui.separator();
 
                 ui.label("Parent Folder");
                 let parent_label = ui_state
+                    .project
                     .new_project_parent_directory
                     .as_ref()
                     .map(|path| path.display().to_string())
@@ -203,16 +204,16 @@ impl MenuSystem {
                 if ui.button("Browse...").clicked() {
                     let mut dialog =
                         rfd::FileDialog::new().set_title("Select folder for new project");
-                    if let Some(parent) = ui_state.new_project_parent_directory.as_deref() {
+                    if let Some(parent) = ui_state.project.new_project_parent_directory.as_deref() {
                         dialog = dialog.set_directory(parent);
                     }
                     if let Some(folder) = dialog.pick_folder() {
-                        ui_state.new_project_parent_directory = Some(folder);
+                        ui_state.project.new_project_parent_directory = Some(folder);
                     }
                 }
 
-                let can_create = ui_state.new_project_parent_directory.is_some()
-                    && !ui_state.new_project_name.trim().is_empty();
+                let can_create = ui_state.project.new_project_parent_directory.is_some()
+                    && !ui_state.project.new_project_name.trim().is_empty();
                 if !can_create {
                     ui.colored_label(
                         egui::Color32::from_rgb(215, 120, 120),
@@ -241,7 +242,7 @@ impl MenuSystem {
         if cancel_clicked {
             open = false;
         }
-        ui_state.show_new_project_dialog = open;
+        ui_state.project.show_new_project_dialog = open;
     }
 
     fn render_busy_logo(

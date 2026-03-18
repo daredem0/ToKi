@@ -368,7 +368,7 @@ impl InspectorSystem {
                         let before_graph = ui_state.rule_graph_for_scene(scene_name).cloned();
                         let after_graph = RuleGraph::from_rule_set(&edited_rules);
                         let before_layout =
-                            ui_state.graph_layouts_by_scene.get(scene_name).cloned();
+                            ui_state.graph.layouts_by_scene.get(scene_name).cloned();
                         let (zoom, pan) = ui_state.graph_view_for_scene(scene_name);
                         let _ = ui_state.execute_scene_rules_graph_command(
                             scene_name,
@@ -412,7 +412,7 @@ impl InspectorSystem {
                     map_name,
                     config,
                     Some(scene_name),
-                    &mut ui_state.map_load_requested,
+                    &mut ui_state.map.load_requested,
                 );
             }
             Some(Selection::Entity(entity_id)) => {
@@ -458,7 +458,7 @@ impl InspectorSystem {
                     map_name,
                     config,
                     None,
-                    &mut ui_state.map_load_requested,
+                    &mut ui_state.map.load_requested,
                 );
             }
             Some(Selection::EntityDefinition(entity_name)) => {

@@ -102,6 +102,278 @@ pub struct EntitySelectionState {
     ids: Vec<EntityId>,
 }
 
+/// UI panel visibility and editor lifecycle flags
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UIVisibilityState {
+    pub show_hierarchy: bool,
+    pub show_inspector: bool,
+    pub show_maps: bool,
+    pub show_runtime_entities: bool,
+    pub should_exit: bool,
+    pub show_console: bool,
+    pub create_test_entities: bool,
+}
+
+impl Default for UIVisibilityState {
+    fn default() -> Self {
+        Self {
+            show_hierarchy: true,
+            show_inspector: true,
+            show_maps: true,
+            show_runtime_entities: false,
+            should_exit: false,
+            show_console: true,
+            create_test_entities: false,
+        }
+    }
+}
+
+/// Project management state: project lifecycle, dialogs, and background tasks
+#[derive(Debug, Clone)]
+pub struct ProjectEditorState {
+    // Project request flags
+    pub new_project_requested: bool,
+    pub new_top_down_project_requested: bool,
+    pub open_project_requested: bool,
+    pub browse_for_project_requested: bool,
+    pub save_project_requested: bool,
+    pub export_project_requested: bool,
+    pub play_scene_requested: bool,
+    pub init_config_requested: bool,
+    pub validate_assets_requested: bool,
+
+    // New project dialog state
+    pub show_new_project_dialog: bool,
+    pub new_project_template: ProjectTemplateKind,
+    pub new_project_parent_directory: Option<PathBuf>,
+    pub new_project_name: String,
+    pub new_project_submit_requested: Option<NewProjectRequest>,
+
+    // Background task state
+    pub background_task_running: bool,
+    pub background_task_status: Option<String>,
+    pub cancel_background_task_requested: bool,
+
+    // Window state
+    pub window_title: Option<String>,
+}
+
+impl Default for ProjectEditorState {
+    fn default() -> Self {
+        Self {
+            new_project_requested: false,
+            new_top_down_project_requested: false,
+            open_project_requested: false,
+            browse_for_project_requested: false,
+            save_project_requested: false,
+            export_project_requested: false,
+            play_scene_requested: false,
+            init_config_requested: false,
+            validate_assets_requested: false,
+            show_new_project_dialog: false,
+            new_project_template: ProjectTemplateKind::Empty,
+            new_project_parent_directory: None,
+            new_project_name: "NewProject".to_string(),
+            new_project_submit_requested: None,
+            background_task_running: false,
+            background_task_status: None,
+            cancel_background_task_requested: false,
+            window_title: Some("No project open".to_string()),
+        }
+    }
+}
+
+impl ProjectEditorState {
+    pub fn begin_new_project_dialog(
+        &mut self,
+        template: ProjectTemplateKind,
+        suggested_parent_directory: Option<PathBuf>,
+        suggested_name: String,
+    ) {
+        self.show_new_project_dialog = true;
+        self.new_project_template = template;
+        self.new_project_parent_directory = suggested_parent_directory;
+        if !suggested_name.trim().is_empty() {
+            self.new_project_name = suggested_name;
+        }
+    }
+
+    pub fn submit_new_project_request(&mut self) {
+        let Some(parent_path) = self.new_project_parent_directory.clone() else {
+            return;
+        };
+        let name = self.new_project_name.trim().to_string();
+        if name.is_empty() {
+            return;
+        }
+
+        self.new_project_submit_requested = Some(NewProjectRequest {
+            template: self.new_project_template,
+            parent_path,
+            name,
+        });
+        self.show_new_project_dialog = false;
+    }
+
+    /// Sets the window title
+    pub fn set_window_title(&mut self, title: &str) {
+        self.window_title = Some(title.to_string());
+    }
+}
+
+/// Entity placement and drag interaction state
+#[derive(Debug, Clone, Default)]
+pub struct PlacementState {
+    pub mode: bool,
+    pub entity_definition: Option<String>,
+    pub preview_position: Option<glam::Vec2>,
+    pub preview_cached_frame: Option<PlacementPreviewVisual>,
+    pub preview_valid: Option<bool>,
+    pub entity_move_drag: Option<EntityMoveDragState>,
+    pub marquee_selection: Option<MarqueeSelectionState>,
+}
+
+impl PlacementState {
+    pub fn enter_placement_mode(&mut self, entity_definition: String) {
+        self.mode = true;
+        self.entity_definition = Some(entity_definition);
+        tracing::info!("Entered placement mode for entity: {:?}", self.entity_definition.as_ref().unwrap());
+    }
+
+    pub fn exit_placement_mode(&mut self) {
+        if self.mode {
+            tracing::info!("Exiting placement mode");
+        }
+        self.mode = false;
+        self.entity_definition = None;
+        self.preview_position = None;
+        self.preview_cached_frame = None;
+        self.preview_valid = None;
+        self.entity_move_drag = None;
+        self.marquee_selection = None;
+    }
+
+    pub fn is_in_placement_mode(&self) -> bool {
+        self.mode
+    }
+
+    pub fn begin_entity_move_drag(&mut self, drag_state: EntityMoveDragState) {
+        self.entity_move_drag = Some(drag_state);
+    }
+
+    pub fn is_entity_move_drag_active(&self) -> bool {
+        self.entity_move_drag.is_some()
+    }
+
+    pub fn start_marquee_selection(&mut self, start: egui::Pos2) {
+        self.marquee_selection = Some(MarqueeSelectionState {
+            start_screen: start,
+            current_screen: start,
+        });
+    }
+
+    pub fn update_marquee_selection(&mut self, current: egui::Pos2) {
+        if let Some(marquee) = self.marquee_selection.as_mut() {
+            marquee.current_screen = current;
+        }
+    }
+
+    pub fn finish_marquee_selection(&mut self) -> Option<MarqueeSelectionState> {
+        self.marquee_selection.take()
+    }
+
+    pub fn is_marquee_selection_active(&self) -> bool {
+        self.marquee_selection.is_some()
+    }
+}
+
+/// Scene graph editor state: connection mode, view state, and persistent layouts
+#[derive(Debug, Clone)]
+pub struct GraphEditorState {
+    pub connect_from_node: Option<u64>,
+    pub connect_to_node: Option<u64>,
+    pub canvas_zoom: f32,
+    pub canvas_pan: [f32; 2],
+    pub layouts_by_scene: HashMap<String, SceneGraphLayout>,
+    pub layout_dirty: bool,
+    pub rule_graphs_by_scene: HashMap<String, RuleGraph>,
+}
+
+impl Default for GraphEditorState {
+    fn default() -> Self {
+        Self {
+            connect_from_node: None,
+            connect_to_node: None,
+            canvas_zoom: 1.0,
+            canvas_pan: [16.0, 16.0],
+            layouts_by_scene: HashMap::new(),
+            layout_dirty: false,
+            rule_graphs_by_scene: HashMap::new(),
+        }
+    }
+}
+
+/// Map editor state: tilemap editing tools, selection, drafts, and history
+pub struct MapEditorState {
+    pub load_requested: Option<(String, String)>, // (scene_name, map_name)
+    pub active_map: Option<String>,
+    pub map_load_requested: Option<String>,
+    pub draft: Option<MapEditorDraft>,
+    pub dirty: bool,
+    pub selected_tile: Option<String>,
+    pub selected_object_sheet: Option<String>,
+    pub selected_object_name: Option<String>,
+    pub tool: MapEditorTool,
+    pub brush_size_tiles: u32,
+    pub brush_preview_image_path: Option<PathBuf>,
+    pub brush_preview_texture: Option<egui::TextureHandle>,
+    pub selected_tile_info: Option<MapEditorTileInfo>,
+    pub selected_object_info: Option<MapEditorObjectInfo>,
+    pub show_new_map_dialog: bool,
+    pub new_map_name: String,
+    pub new_map_width: u32,
+    pub new_map_height: u32,
+    pub new_map_requested: Option<NewMapRequest>,
+    pub save_requested: bool,
+    pub history: MapEditorHistory,
+    pub pending_tilemap_sync: Option<TileMap>,
+    pub edit_before: Option<TileMap>,
+    pub object_move_drag: Option<MapObjectMoveDragState>,
+    pub object_edit_requested: Option<MapEditorObjectPropertyEditRequest>,
+}
+
+impl Default for MapEditorState {
+    fn default() -> Self {
+        Self {
+            load_requested: None,
+            active_map: None,
+            map_load_requested: None,
+            draft: None,
+            dirty: false,
+            selected_tile: None,
+            selected_object_sheet: None,
+            selected_object_name: None,
+            tool: MapEditorTool::Drag,
+            brush_size_tiles: 1,
+            brush_preview_image_path: None,
+            brush_preview_texture: None,
+            selected_tile_info: None,
+            selected_object_info: None,
+            show_new_map_dialog: false,
+            new_map_name: "new_map".to_string(),
+            new_map_width: 32,
+            new_map_height: 32,
+            new_map_requested: None,
+            save_requested: false,
+            history: MapEditorHistory::default(),
+            pending_tilemap_sync: None,
+            edit_before: None,
+            object_move_drag: None,
+            object_edit_requested: None,
+        }
+    }
+}
+
 /// Manages the editor's UI state and rendering
 pub struct EditorUI {
     // Scene management
@@ -114,80 +386,24 @@ pub struct EditorUI {
     entity_selection: EntitySelectionState,
 
     // UI Panel visibility
-    pub show_hierarchy: bool,
-    pub show_inspector: bool,
-    pub show_maps: bool,
-    pub show_runtime_entities: bool,
-    pub should_exit: bool,
-    pub show_console: bool,
-    pub create_test_entities: bool,
+    pub visibility: UIVisibilityState,
 
-    // Project management flags
-    pub new_project_requested: bool,
-    pub new_top_down_project_requested: bool,
-    pub show_new_project_dialog: bool,
-    pub new_project_template: ProjectTemplateKind,
-    pub new_project_parent_directory: Option<PathBuf>,
-    pub new_project_name: String,
-    pub new_project_submit_requested: Option<NewProjectRequest>,
-    pub open_project_requested: bool,
-    pub browse_for_project_requested: bool,
-    pub save_project_requested: bool,
-    pub export_project_requested: bool,
-    pub play_scene_requested: bool,
-    pub init_config_requested: bool,
-    pub window_title: Option<String>,
-    pub background_task_running: bool,
-    pub background_task_status: Option<String>,
-    pub cancel_background_task_requested: bool,
+    // Project management
+    pub project: ProjectEditorState,
+
     pub right_panel_tab: RightPanelTab,
 
-    // Map loading request
-    pub map_load_requested: Option<(String, String)>, // (scene_name, map_name)
-    pub map_editor_active_map: Option<String>,
-    pub map_editor_map_load_requested: Option<String>,
-    pub map_editor_draft: Option<MapEditorDraft>,
-    pub map_editor_dirty: bool,
-    pub map_editor_selected_tile: Option<String>,
-    pub map_editor_selected_object_sheet: Option<String>,
-    pub map_editor_selected_object_name: Option<String>,
-    pub map_editor_tool: MapEditorTool,
-    pub map_editor_brush_size_tiles: u32,
-    pub map_editor_brush_preview_image_path: Option<PathBuf>,
-    pub map_editor_brush_preview_texture: Option<egui::TextureHandle>,
-    pub map_editor_selected_tile_info: Option<MapEditorTileInfo>,
-    pub map_editor_selected_object_info: Option<MapEditorObjectInfo>,
-    pub map_editor_show_new_map_dialog: bool,
-    pub map_editor_new_map_name: String,
-    pub map_editor_new_map_width: u32,
-    pub map_editor_new_map_height: u32,
-    pub map_editor_new_map_requested: Option<NewMapRequest>,
-    pub map_editor_save_requested: bool,
-    pub map_editor_history: MapEditorHistory,
-    pub map_editor_pending_tilemap_sync: Option<TileMap>,
-    pub map_editor_edit_before: Option<TileMap>,
-    pub map_object_move_drag: Option<MapObjectMoveDragState>,
-    pub map_editor_object_edit_requested: Option<MapEditorObjectPropertyEditRequest>,
-
-    // Asset validation
-    pub validate_assets_requested: bool,
+    // Map editor state
+    pub map: MapEditorState,
 
     // Entity placement system
-    pub placement_mode: bool,
-    pub placement_entity_definition: Option<String>,
-    pub placement_preview_position: Option<glam::Vec2>, // World coordinates for preview
-    pub placement_preview_cached_frame: Option<PlacementPreviewVisual>, // Cached preview visual for placement
-    pub placement_preview_valid: Option<bool>, // Whether the current preview position is valid for placement
-    pub entity_move_drag: Option<EntityMoveDragState>, // Active drag-move operation for existing scene entities
-    pub marquee_selection: Option<MarqueeSelectionState>, // Active marquee-selection rectangle in viewport
-    pub center_panel_tab: CenterPanelTab,                 // Active tab in center workspace
-    pub graph_connect_from_node: Option<u64>,             // Scene graph connect source node
-    pub graph_connect_to_node: Option<u64>,               // Scene graph connect target node
-    pub graph_canvas_zoom: f32,                           // Scene graph canvas zoom factor
-    pub graph_canvas_pan: [f32; 2], // Scene graph canvas pan offset (screen-space)
-    pub graph_layouts_by_scene: HashMap<String, SceneGraphLayout>, // Persisted scene graph layouts loaded from project
-    pub graph_layout_dirty: bool, // Graph layout changed and should be flushed into project metadata
-    pub rule_graphs_by_scene: HashMap<String, RuleGraph>, // In-memory scene graph drafts (can contain detached nodes)
+    pub placement: PlacementState,
+
+    pub center_panel_tab: CenterPanelTab, // Active tab in center workspace
+
+    // Scene graph editor state
+    pub graph: GraphEditorState,
+
     pub command_history: UndoRedoHistory, // Undo/redo command history for scene mutations
 
     // Multi-entity inspector draft state
@@ -211,80 +427,24 @@ impl EditorUI {
             entity_selection: EntitySelectionState::default(),
 
             // UI Panel visibility
-            show_hierarchy: true,
-            show_inspector: true,
-            show_maps: true,
-            show_runtime_entities: false,
-            should_exit: false,
-            show_console: true,
-            create_test_entities: false,
+            visibility: UIVisibilityState::default(),
 
-            // Project management flags
-            new_project_requested: false,
-            new_top_down_project_requested: false,
-            show_new_project_dialog: false,
-            new_project_template: ProjectTemplateKind::Empty,
-            new_project_parent_directory: None,
-            new_project_name: "NewProject".to_string(),
-            new_project_submit_requested: None,
-            open_project_requested: false,
-            browse_for_project_requested: false,
-            save_project_requested: false,
-            export_project_requested: false,
-            play_scene_requested: false,
-            init_config_requested: false,
-            window_title: Some("No project open".to_string()),
-            background_task_running: false,
-            background_task_status: None,
-            cancel_background_task_requested: false,
+            // Project management
+            project: ProjectEditorState::default(),
+
             right_panel_tab: RightPanelTab::Inspector,
 
-            // Map loading request
-            map_load_requested: None,
-            map_editor_active_map: None,
-            map_editor_map_load_requested: None,
-            map_editor_draft: None,
-            map_editor_dirty: false,
-            map_editor_selected_tile: None,
-            map_editor_selected_object_sheet: None,
-            map_editor_selected_object_name: None,
-            map_editor_tool: MapEditorTool::Drag,
-            map_editor_brush_size_tiles: 1,
-            map_editor_brush_preview_image_path: None,
-            map_editor_brush_preview_texture: None,
-            map_editor_selected_tile_info: None,
-            map_editor_selected_object_info: None,
-            map_editor_show_new_map_dialog: false,
-            map_editor_new_map_name: "new_map".to_string(),
-            map_editor_new_map_width: 32,
-            map_editor_new_map_height: 32,
-            map_editor_new_map_requested: None,
-            map_editor_save_requested: false,
-            map_editor_history: MapEditorHistory::default(),
-            map_editor_pending_tilemap_sync: None,
-            map_editor_edit_before: None,
-            map_object_move_drag: None,
-            map_editor_object_edit_requested: None,
-
-            // Asset validation
-            validate_assets_requested: false,
+            // Map editor state
+            map: MapEditorState::default(),
 
             // Entity placement system
-            placement_mode: false,
-            placement_entity_definition: None,
-            placement_preview_position: None,
-            placement_preview_cached_frame: None,
-            placement_preview_valid: None,
-            entity_move_drag: None,
-            marquee_selection: None,
+            placement: PlacementState::default(),
+
             center_panel_tab: CenterPanelTab::SceneViewport,
-            graph_connect_from_node: None,
-            graph_connect_to_node: None,
-            graph_canvas_zoom: 1.0,
-            graph_canvas_pan: [16.0, 16.0],
-            graph_layouts_by_scene: HashMap::new(),
-            graph_layout_dirty: false,
-            rule_graphs_by_scene: HashMap::new(),
+
+            // Scene graph editor state
+            graph: GraphEditorState::default(),
+
             command_history: UndoRedoHistory::default(),
             multi_entity_render_layer_input: 0,
             multi_entity_delta_x_input: 0,
@@ -311,7 +471,7 @@ impl EditorUI {
     pub fn load_scenes_from_project(&mut self, loaded_scenes: Vec<Scene>) {
         tracing::info!("Loading {} scenes into UI hierarchy", loaded_scenes.len());
         self.scenes = loaded_scenes;
-        self.rule_graphs_by_scene.clear();
+        self.graph.rule_graphs_by_scene.clear();
         self.command_history.clear();
 
         let current_active_missing = self
@@ -347,29 +507,11 @@ impl EditorUI {
         suggested_parent_directory: Option<PathBuf>,
         suggested_name: String,
     ) {
-        self.show_new_project_dialog = true;
-        self.new_project_template = template;
-        self.new_project_parent_directory = suggested_parent_directory;
-        if !suggested_name.trim().is_empty() {
-            self.new_project_name = suggested_name;
-        }
+        self.project.begin_new_project_dialog(template, suggested_parent_directory, suggested_name);
     }
 
     pub fn submit_new_project_request(&mut self) {
-        let Some(parent_path) = self.new_project_parent_directory.clone() else {
-            return;
-        };
-        let name = self.new_project_name.trim().to_string();
-        if name.is_empty() {
-            return;
-        }
-
-        self.new_project_submit_requested = Some(NewProjectRequest {
-            template: self.new_project_template,
-            parent_path,
-            name,
-        });
-        self.show_new_project_dialog = false;
+        self.project.submit_new_project_request();
     }
 
     pub fn set_single_entity_selection(&mut self, entity_id: EntityId) {
@@ -418,58 +560,39 @@ impl EditorUI {
     }
 
     pub fn enter_placement_mode(&mut self, entity_definition: String) {
-        self.placement_mode = true;
-        self.placement_entity_definition = Some(entity_definition);
-        tracing::info!(
-            "Entered placement mode for entity: {}",
-            self.placement_entity_definition.as_ref().unwrap()
-        );
+        self.placement.enter_placement_mode(entity_definition);
     }
 
     pub fn exit_placement_mode(&mut self) {
-        if self.placement_mode {
-            tracing::info!("Exited placement mode");
-        }
-        self.placement_mode = false;
-        self.placement_entity_definition = None;
-        self.placement_preview_position = None;
-        self.placement_preview_cached_frame = None;
-        self.placement_preview_valid = None;
-        self.entity_move_drag = None;
-        self.marquee_selection = None;
+        self.placement.exit_placement_mode();
     }
 
     pub fn is_in_placement_mode(&self) -> bool {
-        self.placement_mode
+        self.placement.is_in_placement_mode()
     }
 
     pub fn begin_entity_move_drag(&mut self, drag_state: EntityMoveDragState) {
-        self.entity_move_drag = Some(drag_state);
+        self.placement.begin_entity_move_drag(drag_state);
     }
 
     pub fn is_entity_move_drag_active(&self) -> bool {
-        self.entity_move_drag.is_some()
+        self.placement.is_entity_move_drag_active()
     }
 
     pub fn start_marquee_selection(&mut self, start: egui::Pos2) {
-        self.marquee_selection = Some(MarqueeSelectionState {
-            start_screen: start,
-            current_screen: start,
-        });
+        self.placement.start_marquee_selection(start);
     }
 
     pub fn update_marquee_selection(&mut self, current: egui::Pos2) {
-        if let Some(marquee) = self.marquee_selection.as_mut() {
-            marquee.current_screen = current;
-        }
+        self.placement.update_marquee_selection(current);
     }
 
     pub fn finish_marquee_selection(&mut self) -> Option<MarqueeSelectionState> {
-        self.marquee_selection.take()
+        self.placement.finish_marquee_selection()
     }
 
     pub fn is_marquee_selection_active(&self) -> bool {
-        self.marquee_selection.is_some()
+        self.placement.is_marquee_selection_active()
     }
 
     pub fn add_entity_to_selection(&mut self, entity_id: EntityId) {
@@ -517,7 +640,7 @@ impl EditorUI {
         );
 
         // Render log panel first to claim full width at bottom
-        if self.show_console {
+        if self.visibility.show_console {
             PanelSystem::render_log_panel(self, ctx, log_capture);
         }
 
@@ -526,11 +649,11 @@ impl EditorUI {
             .as_ref()
             .map(|v| v.scene_manager().game_state());
 
-        if self.show_hierarchy {
+        if self.visibility.show_hierarchy {
             self.render_hierarchy_and_maps_combined_panel(ctx, game_state, config_readonly);
         }
 
-        if self.show_inspector {
+        if self.visibility.show_inspector {
             InspectorSystem::render_inspector_panel(
                 self,
                 ctx,
@@ -559,13 +682,13 @@ impl EditorUI {
 
     /// Apply config settings to UI state
     pub fn apply_config(&mut self, config: &crate::config::EditorConfig) {
-        self.show_hierarchy = config.editor_settings.panels.hierarchy_visible;
-        self.show_inspector = config.editor_settings.panels.inspector_visible;
-        self.show_console = config.editor_settings.panels.console_visible;
+        self.visibility.show_hierarchy = config.editor_settings.panels.hierarchy_visible;
+        self.visibility.show_inspector = config.editor_settings.panels.inspector_visible;
+        self.visibility.show_console = config.editor_settings.panels.console_visible;
     }
 
     pub fn set_title(&mut self, title: &str) {
-        self.window_title = Some(title.to_string());
+        self.project.set_window_title(title);
     }
 }
 

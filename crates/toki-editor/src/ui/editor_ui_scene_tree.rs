@@ -174,7 +174,7 @@ impl EditorUI {
                         );
                     }
 
-                    if self.show_runtime_entities {
+                    if self.visibility.show_runtime_entities {
                         egui::CollapsingHeader::new("Runtime Entities:")
                             .id_salt(format!("runtime_entities_{}", scene.name))
                             .default_open(false)

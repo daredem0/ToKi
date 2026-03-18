@@ -19,7 +19,7 @@ impl InspectorSystem {
         let scene_rules = ui_state.scenes[scene_index].rules.clone();
         let before_rules = scene_rules.clone();
         let before_graph = ui_state.rule_graph_for_scene(scene_name).cloned();
-        let before_layout = ui_state.graph_layouts_by_scene.get(scene_name).cloned();
+        let before_layout = ui_state.graph.layouts_by_scene.get(scene_name).cloned();
         ui_state.sync_rule_graph_with_rule_set(scene_name, &scene_rules);
 
         let audio_choices = Self::load_rule_audio_choices(config);

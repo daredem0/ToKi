@@ -31,7 +31,7 @@ impl EditorUI {
                         ui.heading("Assets");
                         ui.separator();
 
-                        if self.show_maps {
+                        if self.visibility.show_maps {
                             self.render_standalone_maps_section(ui, config);
                         }
 

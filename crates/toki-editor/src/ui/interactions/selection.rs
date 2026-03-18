@@ -112,6 +112,7 @@ impl SelectionInteraction {
         });
         viewport.suppress_entity_rendering_many(
             ui_state
+                .placement
                 .entity_move_drag
                 .as_ref()
                 .into_iter()
@@ -153,7 +154,7 @@ impl SelectionInteraction {
         rect: egui::Rect,
         config: Option<&EditorConfig>,
     ) {
-        let Some(drag_state) = ui_state.entity_move_drag.clone() else {
+        let Some(drag_state) = ui_state.placement.entity_move_drag.clone() else {
             return;
         };
 

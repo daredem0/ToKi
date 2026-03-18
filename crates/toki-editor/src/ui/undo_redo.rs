@@ -470,25 +470,27 @@ fn apply_scene_rules_graph_snapshot(
     match graph {
         Some(graph) => {
             ui_state
+                .graph
                 .rule_graphs_by_scene
                 .insert(scene_name.to_string(), graph);
         }
         None => {
-            ui_state.rule_graphs_by_scene.remove(scene_name);
+            ui_state.graph.rule_graphs_by_scene.remove(scene_name);
         }
     }
 
     match layout {
         Some(layout) => {
             ui_state
-                .graph_layouts_by_scene
+                .graph
+                .layouts_by_scene
                 .insert(scene_name.to_string(), layout);
         }
         None => {
-            ui_state.graph_layouts_by_scene.remove(scene_name);
+            ui_state.graph.layouts_by_scene.remove(scene_name);
         }
     }
-    ui_state.graph_layout_dirty = true;
+    ui_state.graph.layout_dirty = true;
     true
 }
 

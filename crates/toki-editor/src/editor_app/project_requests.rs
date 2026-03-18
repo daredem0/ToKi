@@ -62,7 +62,7 @@ impl EditorApp {
     }
 
     pub(super) fn handle_open_project_request(&mut self) {
-        self.ui.open_project_requested = false;
+        self.ui.project.open_project_requested = false;
 
         let project_path = if let Some(config_path) = &self.config.project_path {
             tracing::info!("Opening project from config: {:?}", config_path);
@@ -81,7 +81,7 @@ impl EditorApp {
     }
 
     pub(super) fn handle_browse_for_project_request(&mut self) {
-        self.ui.browse_for_project_requested = false;
+        self.ui.project.browse_for_project_requested = false;
 
         if let Some(project_path) = rfd::FileDialog::new()
             .set_title("Browse for ToKi Project")
@@ -94,7 +94,7 @@ impl EditorApp {
     }
 
     pub(super) fn handle_save_project_request(&mut self) {
-        self.ui.save_project_requested = false;
+        self.ui.project.save_project_requested = false;
 
         if let Some(project) = self.project_manager.current_project.as_mut() {
             project.metadata.editor.graph_layouts = self.ui.export_graph_layouts_for_project();
@@ -115,7 +115,7 @@ impl EditorApp {
     }
 
     pub(super) fn handle_init_project_request(&mut self) {
-        self.ui.init_config_requested = false;
+        self.ui.project.init_config_requested = false;
 
         match EditorConfig::init_default_config() {
             Ok(new_config) => {
@@ -131,15 +131,15 @@ impl EditorApp {
     pub(super) fn handle_project_requests(&mut self, _event_loop: &ActiveEventLoop) {
         self.poll_background_task_updates();
 
-        if self.ui.cancel_background_task_requested {
-            self.ui.cancel_background_task_requested = false;
+        if self.ui.project.cancel_background_task_requested {
+            self.ui.project.cancel_background_task_requested = false;
             if self.background_tasks.request_cancel() {
                 tracing::info!("Background task cancellation requested");
             }
         }
 
-        if self.ui.new_project_requested {
-            self.ui.new_project_requested = false;
+        if self.ui.project.new_project_requested {
+            self.ui.project.new_project_requested = false;
             let suggested_parent = self
                 .config
                 .current_project_path()
@@ -157,8 +157,8 @@ impl EditorApp {
             );
         }
 
-        if self.ui.new_top_down_project_requested {
-            self.ui.new_top_down_project_requested = false;
+        if self.ui.project.new_top_down_project_requested {
+            self.ui.project.new_top_down_project_requested = false;
             let suggested_parent = self
                 .config
                 .current_project_path()
@@ -176,37 +176,37 @@ impl EditorApp {
             );
         }
 
-        if let Some(request) = self.ui.new_project_submit_requested.take() {
+        if let Some(request) = self.ui.project.new_project_submit_requested.take() {
             self.handle_new_project_requested(request.template, request.parent_path, request.name);
         }
 
-        if self.ui.open_project_requested {
+        if self.ui.project.open_project_requested {
             self.handle_open_project_request();
         }
 
-        if self.ui.browse_for_project_requested {
+        if self.ui.project.browse_for_project_requested {
             self.handle_browse_for_project_request();
         }
 
-        if self.ui.save_project_requested {
+        if self.ui.project.save_project_requested {
             self.handle_save_project_request();
         }
 
-        if self.ui.export_project_requested {
+        if self.ui.project.export_project_requested {
             self.handle_export_project_request();
         }
 
-        if self.ui.init_config_requested {
+        if self.ui.project.init_config_requested {
             self.handle_init_project_request();
         }
 
-        if self.ui.validate_assets_requested {
+        if self.ui.project.validate_assets_requested {
             self.handle_validate_assets_request();
         }
     }
 
     pub(super) fn handle_validate_assets_request(&mut self) {
-        self.ui.validate_assets_requested = false;
+        self.ui.project.validate_assets_requested = false;
 
         if self.background_tasks.is_running() {
             tracing::warn!("Cannot validate assets: another background task is running");

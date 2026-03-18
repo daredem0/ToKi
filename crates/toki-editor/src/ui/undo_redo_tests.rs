@@ -75,7 +75,7 @@ fn apply_graph_transition(
 ) {
     let before_rule_set = scene_rules(ui_state);
     let before_graph = ui_state.rule_graph_for_scene("Main Scene").cloned();
-    let before_layout = ui_state.graph_layouts_by_scene.get("Main Scene").cloned();
+    let before_layout = ui_state.graph.layouts_by_scene.get("Main Scene").cloned();
     let mut after_graph = before_graph
         .clone()
         .unwrap_or_else(|| RuleGraph::from_rule_set(&before_rule_set));
@@ -379,7 +379,8 @@ fn update_scene_rules_graph_command_round_trips_rules_graph_and_layout() {
         after_graph.as_ref()
     );
     let layout = ui_state
-        .graph_layouts_by_scene
+        .graph
+        .layouts_by_scene
         .get("Main Scene")
         .expect("graph layout should exist");
     assert_eq!(layout.node_positions, after_layout.node_positions);
@@ -394,7 +395,7 @@ fn update_scene_rules_graph_command_round_trips_rules_graph_and_layout() {
         .expect("main scene should exist");
     assert_eq!(scene.rules, before_rule_set);
     assert!(ui_state.rule_graph_for_scene("Main Scene").is_none());
-    assert!(!ui_state.graph_layouts_by_scene.contains_key("Main Scene"));
+    assert!(!ui_state.graph.layouts_by_scene.contains_key("Main Scene"));
 }
 
 #[test]
@@ -496,7 +497,8 @@ fn layout_reset_like_updates_are_undoable() {
         }
     }
     ui_state
-        .graph_layouts_by_scene
+        .graph
+        .layouts_by_scene
         .insert("Main Scene".to_string(), initial_layout.clone());
 
     apply_graph_transition(&mut history, &mut ui_state, 0.8, [16.0, 16.0], |graph| {
@@ -508,7 +510,8 @@ fn layout_reset_like_updates_are_undoable() {
         }
     });
     let updated_layout = ui_state
-        .graph_layouts_by_scene
+        .graph
+        .layouts_by_scene
         .get("Main Scene")
         .expect("updated layout should exist");
     assert_eq!(updated_layout.zoom, 0.8);
@@ -516,7 +519,8 @@ fn layout_reset_like_updates_are_undoable() {
 
     assert!(history.undo(&mut ui_state, None));
     let restored_layout = ui_state
-        .graph_layouts_by_scene
+        .graph
+        .layouts_by_scene
         .get("Main Scene")
         .expect("restored layout should exist");
     assert_eq!(restored_layout.zoom, initial_layout.zoom);

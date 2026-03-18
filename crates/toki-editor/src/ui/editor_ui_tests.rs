@@ -174,14 +174,14 @@ fn sync_map_editor_selection_picks_sorted_first_map_and_requests_load() {
 
     ui.sync_map_editor_selection(&maps);
 
-    assert_eq!(ui.map_editor_active_map.as_deref(), Some("alpha"));
-    assert_eq!(ui.map_editor_map_load_requested.as_deref(), Some("alpha"));
+    assert_eq!(ui.map.active_map.as_deref(), Some("alpha"));
+    assert_eq!(ui.map.map_load_requested.as_deref(), Some("alpha"));
 }
 
 #[test]
 fn sync_map_editor_selection_preserves_existing_valid_choice() {
     let mut ui = EditorUI::new();
-    ui.map_editor_active_map = Some("middle".to_string());
+    ui.map.active_map = Some("middle".to_string());
     let maps = vec![
         "zeta".to_string(),
         "alpha".to_string(),
@@ -190,8 +190,8 @@ fn sync_map_editor_selection_preserves_existing_valid_choice() {
 
     ui.sync_map_editor_selection(&maps);
 
-    assert_eq!(ui.map_editor_active_map.as_deref(), Some("middle"));
-    assert!(ui.map_editor_map_load_requested.is_none());
+    assert_eq!(ui.map.active_map.as_deref(), Some("middle"));
+    assert!(ui.map.map_load_requested.is_none());
 }
 
 #[test]
@@ -210,8 +210,8 @@ fn sync_map_editor_selection_preserves_unsaved_draft() {
 
     ui.sync_map_editor_selection(&["alpha".to_string(), "zeta".to_string()]);
 
-    assert_eq!(ui.map_editor_active_map.as_deref(), Some("draft_map"));
-    assert!(ui.map_editor_map_load_requested.is_none());
+    assert_eq!(ui.map.active_map.as_deref(), Some("draft_map"));
+    assert!(ui.map.map_load_requested.is_none());
     assert!(ui.has_unsaved_map_editor_draft());
 }
 
@@ -233,9 +233,9 @@ fn finalize_saved_map_editor_draft_requests_reload_from_disk() {
 
     assert!(!ui.has_unsaved_map_editor_draft());
     assert!(!ui.has_unsaved_map_editor_changes());
-    assert_eq!(ui.map_editor_active_map.as_deref(), Some("draft_map"));
+    assert_eq!(ui.map.active_map.as_deref(), Some("draft_map"));
     assert_eq!(
-        ui.map_editor_map_load_requested.as_deref(),
+        ui.map.map_load_requested.as_deref(),
         Some("draft_map")
     );
 }
@@ -243,13 +243,13 @@ fn finalize_saved_map_editor_draft_requests_reload_from_disk() {
 #[test]
 fn sync_map_editor_selection_preserves_dirty_loaded_map() {
     let mut ui = EditorUI::new();
-    ui.map_editor_active_map = Some("middle".to_string());
+    ui.map.active_map = Some("middle".to_string());
     ui.mark_map_editor_dirty();
 
     ui.sync_map_editor_selection(&["alpha".to_string(), "middle".to_string()]);
 
-    assert_eq!(ui.map_editor_active_map.as_deref(), Some("middle"));
-    assert!(ui.map_editor_map_load_requested.is_none());
+    assert_eq!(ui.map.active_map.as_deref(), Some("middle"));
+    assert!(ui.map.map_load_requested.is_none());
 }
 
 fn sample_project_with_menu_screens(screen_ids: &[&str]) -> Project {
@@ -371,15 +371,15 @@ fn sync_map_editor_brush_selection_picks_first_sorted_tile() {
         "bush".to_string(),
     ]);
 
-    assert_eq!(ui.map_editor_selected_tile.as_deref(), Some("bush"));
+    assert_eq!(ui.map.selected_tile.as_deref(), Some("bush"));
 }
 
 #[test]
 fn map_editor_defaults_to_drag_tool() {
     let ui = EditorUI::new();
-    assert_eq!(ui.map_editor_tool, super::MapEditorTool::Drag);
-    assert_eq!(ui.map_editor_brush_size_tiles, 1);
-    assert!(ui.map_editor_selected_tile_info.is_none());
+    assert_eq!(ui.map.tool, super::MapEditorTool::Drag);
+    assert_eq!(ui.map.brush_size_tiles, 1);
+    assert!(ui.map.selected_tile_info.is_none());
 }
 
 #[test]
@@ -393,7 +393,7 @@ fn sync_map_editor_object_sheet_selection_picks_first_sorted_sheet() {
     ]);
 
     assert_eq!(
-        ui.map_editor_selected_object_sheet.as_deref(),
+        ui.map.selected_object_sheet.as_deref(),
         Some("fauna")
     );
 }
@@ -408,24 +408,24 @@ fn sync_map_editor_object_selection_picks_first_sorted_object() {
         "flower".to_string(),
     ]);
 
-    assert_eq!(ui.map_editor_selected_object_name.as_deref(), Some("bush"));
+    assert_eq!(ui.map.selected_object_name.as_deref(), Some("bush"));
 }
 
 #[test]
 fn pick_map_editor_tile_sets_selected_tile_and_switches_back_to_brush() {
     let mut ui = EditorUI::new();
-    ui.map_editor_tool = super::MapEditorTool::PickTile;
+    ui.map.tool = super::MapEditorTool::PickTile;
 
     ui.pick_map_editor_tile("water".to_string());
 
-    assert_eq!(ui.map_editor_selected_tile.as_deref(), Some("water"));
-    assert_eq!(ui.map_editor_tool, super::MapEditorTool::Brush);
+    assert_eq!(ui.map.selected_tile.as_deref(), Some("water"));
+    assert_eq!(ui.map.tool, super::MapEditorTool::Brush);
 }
 
 #[test]
 fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
     let mut ui = EditorUI::new();
-    ui.map_editor_selected_tile_info = Some(super::MapEditorTileInfo {
+    ui.map.selected_tile_info = Some(super::MapEditorTileInfo {
         tile_x: 1,
         tile_y: 2,
         tile_name: "grass".to_string(),
@@ -442,9 +442,9 @@ fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
     };
 
     ui.select_map_editor_object(0, &object);
-    assert!(ui.map_editor_selected_tile_info.is_none());
+    assert!(ui.map.selected_tile_info.is_none());
     assert_eq!(
-        ui.map_editor_selected_object_info
+        ui.map.selected_object_info
             .as_ref()
             .map(|selected| selected.object_name.as_str()),
         Some("bush")
@@ -464,7 +464,7 @@ fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
 
     ui.sync_selected_map_editor_object_from_tilemap(&tilemap);
     let selected = ui
-        .map_editor_selected_object_info
+        .map.selected_object_info
         .as_ref()
         .expect("selected object should remain");
     assert_eq!(selected.position, glam::UVec2::new(32, 32));
@@ -487,7 +487,7 @@ fn queue_map_editor_object_property_edit_updates_selected_object_info() {
     ui.queue_map_editor_object_property_edit(2, false, true);
 
     let selected = ui
-        .map_editor_selected_object_info
+        .map.selected_object_info
         .as_ref()
         .expect("selected object should exist");
     assert!(!selected.visible);
@@ -516,7 +516,7 @@ fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
     });
 
     let before = ui
-        .map_editor_draft
+        .map.draft
         .as_ref()
         .expect("draft should exist")
         .tilemap
@@ -561,7 +561,7 @@ fn map_editor_can_undo_prefers_map_history_when_map_editor_tab_is_active() {
             objects: vec![],
         },
     });
-    let before = ui.map_editor_draft.as_ref().unwrap().tilemap.clone();
+    let before = ui.map.draft.as_ref().unwrap().tilemap.clone();
     let mut after = before.clone();
     after.tiles[0] = "water".to_string();
     ui.begin_map_editor_edit(&before);
@@ -570,4 +570,230 @@ fn map_editor_can_undo_prefers_map_history_when_map_editor_tab_is_active() {
     assert!(ui.can_undo());
     assert!(ui.undo());
     assert!(ui.take_pending_map_editor_tilemap_sync().is_some());
+}
+
+// =============================================================================
+// UIVisibilityState regression tests
+// =============================================================================
+
+#[test]
+fn editor_ui_default_visibility_flags() {
+    let ui = EditorUI::new();
+
+    // Default visibility settings
+    assert!(ui.visibility.show_hierarchy, "hierarchy panel should be visible by default");
+    assert!(ui.visibility.show_inspector, "inspector panel should be visible by default");
+    assert!(ui.visibility.show_maps, "maps panel should be visible by default");
+    assert!(ui.visibility.show_console, "console panel should be visible by default");
+
+    // Non-default visibility settings
+    assert!(!ui.visibility.show_runtime_entities, "runtime entities should be hidden by default");
+    assert!(!ui.visibility.should_exit, "should_exit should be false by default");
+    assert!(!ui.visibility.create_test_entities, "create_test_entities should be false by default");
+}
+
+#[test]
+fn apply_config_sets_visibility_flags() {
+    use crate::config::EditorConfig;
+
+    let mut ui = EditorUI::new();
+
+    // Create config with inverted visibility
+    let mut config = EditorConfig::default();
+    config.editor_settings.panels.hierarchy_visible = false;
+    config.editor_settings.panels.inspector_visible = false;
+    config.editor_settings.panels.console_visible = false;
+
+    ui.apply_config(&config);
+
+    assert!(!ui.visibility.show_hierarchy, "hierarchy visibility should match config");
+    assert!(!ui.visibility.show_inspector, "inspector visibility should match config");
+    assert!(!ui.visibility.show_console, "console visibility should match config");
+}
+
+#[test]
+fn apply_config_preserves_non_config_visibility_flags() {
+    use crate::config::EditorConfig;
+
+    let mut ui = EditorUI::new();
+    ui.visibility.show_runtime_entities = true;
+    ui.visibility.should_exit = true;
+    ui.visibility.create_test_entities = true;
+
+    let config = EditorConfig::default();
+    ui.apply_config(&config);
+
+    // These flags are not controlled by config and should be preserved
+    assert!(ui.visibility.show_runtime_entities, "show_runtime_entities should be preserved");
+    assert!(ui.visibility.should_exit, "should_exit should be preserved");
+    assert!(ui.visibility.create_test_entities, "create_test_entities should be preserved");
+}
+
+// =============================================================================
+// PlacementState regression tests
+// =============================================================================
+
+#[test]
+fn placement_mode_default_is_inactive() {
+    let ui = EditorUI::new();
+
+    assert!(!ui.placement.mode);
+    assert!(!ui.is_in_placement_mode());
+    assert!(ui.placement.entity_definition.is_none());
+    assert!(ui.placement.preview_position.is_none());
+    assert!(ui.placement.preview_cached_frame.is_none());
+    assert!(ui.placement.preview_valid.is_none());
+    assert!(ui.placement.entity_move_drag.is_none());
+    assert!(ui.placement.marquee_selection.is_none());
+}
+
+#[test]
+fn enter_placement_mode_sets_mode_and_definition() {
+    let mut ui = EditorUI::new();
+
+    ui.enter_placement_mode("player".to_string());
+
+    assert!(ui.placement.mode);
+    assert!(ui.is_in_placement_mode());
+    assert_eq!(ui.placement.entity_definition.as_deref(), Some("player"));
+}
+
+#[test]
+fn exit_placement_mode_clears_all_placement_state() {
+    let mut ui = EditorUI::new();
+
+    // Setup placement mode with various state
+    ui.enter_placement_mode("player".to_string());
+    ui.placement.preview_position = Some(glam::Vec2::new(10.0, 20.0));
+    ui.placement.preview_valid = Some(true);
+
+    ui.exit_placement_mode();
+
+    assert!(!ui.placement.mode);
+    assert!(!ui.is_in_placement_mode());
+    assert!(ui.placement.entity_definition.is_none());
+    assert!(ui.placement.preview_position.is_none());
+    assert!(ui.placement.preview_cached_frame.is_none());
+    assert!(ui.placement.preview_valid.is_none());
+    assert!(ui.placement.entity_move_drag.is_none());
+    assert!(ui.placement.marquee_selection.is_none());
+}
+
+#[test]
+fn entity_move_drag_lifecycle() {
+    use super::EntityMoveDragState;
+
+    let mut ui = EditorUI::new();
+    assert!(!ui.is_entity_move_drag_active());
+
+    let drag_state = EntityMoveDragState {
+        scene_name: "Main Scene".to_string(),
+        entity: sample_entity(1, IVec2::new(10, 20)),
+        dragged_entities: vec![],
+        grab_offset: glam::Vec2::new(5.0, 5.0),
+    };
+    ui.begin_entity_move_drag(drag_state);
+
+    assert!(ui.is_entity_move_drag_active());
+    assert!(ui.placement.entity_move_drag.is_some());
+
+    // exit_placement_mode also clears drag
+    ui.exit_placement_mode();
+    assert!(!ui.is_entity_move_drag_active());
+}
+
+// =============================================================================
+// ProjectEditorState regression tests
+// =============================================================================
+
+#[test]
+fn project_editor_state_defaults() {
+    let ui = EditorUI::new();
+
+    // All project request flags should be false by default
+    assert!(!ui.project.new_project_requested);
+    assert!(!ui.project.new_top_down_project_requested);
+    assert!(!ui.project.show_new_project_dialog);
+    assert!(!ui.project.open_project_requested);
+    assert!(!ui.project.browse_for_project_requested);
+    assert!(!ui.project.save_project_requested);
+    assert!(!ui.project.export_project_requested);
+    assert!(!ui.project.play_scene_requested);
+    assert!(!ui.project.init_config_requested);
+    assert!(!ui.project.background_task_running);
+    assert!(!ui.project.cancel_background_task_requested);
+    assert!(!ui.project.validate_assets_requested);
+
+    // Other project state defaults
+    assert_eq!(ui.project.new_project_name, "NewProject");
+    assert!(ui.project.new_project_parent_directory.is_none());
+    assert!(ui.project.new_project_submit_requested.is_none());
+    assert!(ui.project.background_task_status.is_none());
+    assert!(ui.project.window_title.is_some());
+}
+
+#[test]
+fn begin_new_project_dialog_sets_up_dialog_state() {
+    use crate::project::ProjectTemplateKind;
+    use std::path::PathBuf;
+
+    let mut ui = EditorUI::new();
+
+    ui.begin_new_project_dialog(
+        ProjectTemplateKind::TopDownStarter,
+        Some(PathBuf::from("/home/user/projects")),
+        "MyGame".to_string(),
+    );
+
+    assert!(ui.project.show_new_project_dialog);
+    assert_eq!(ui.project.new_project_template, ProjectTemplateKind::TopDownStarter);
+    assert_eq!(
+        ui.project.new_project_parent_directory.as_deref(),
+        Some(std::path::Path::new("/home/user/projects"))
+    );
+    assert_eq!(ui.project.new_project_name, "MyGame");
+}
+
+#[test]
+fn submit_new_project_request_creates_request_and_closes_dialog() {
+    use crate::project::ProjectTemplateKind;
+    use std::path::PathBuf;
+
+    let mut ui = EditorUI::new();
+    ui.project.show_new_project_dialog = true;
+    ui.project.new_project_template = ProjectTemplateKind::Empty;
+    ui.project.new_project_parent_directory = Some(PathBuf::from("/home/user"));
+    ui.project.new_project_name = "TestProject".to_string();
+
+    ui.submit_new_project_request();
+
+    assert!(!ui.project.show_new_project_dialog, "dialog should close after submit");
+    let request = ui.project.new_project_submit_requested.as_ref().expect("request should exist");
+    assert_eq!(request.name, "TestProject");
+    assert_eq!(request.parent_path, PathBuf::from("/home/user"));
+    assert_eq!(request.template, ProjectTemplateKind::Empty);
+}
+
+#[test]
+fn submit_new_project_request_requires_parent_directory() {
+    let mut ui = EditorUI::new();
+    ui.project.new_project_name = "TestProject".to_string();
+    ui.project.new_project_parent_directory = None;
+
+    ui.submit_new_project_request();
+
+    assert!(ui.project.new_project_submit_requested.is_none(), "should not create request without parent");
+}
+
+#[test]
+fn submit_new_project_request_requires_non_empty_name() {
+    use std::path::PathBuf;
+
+    let mut ui = EditorUI::new();
+    ui.project.new_project_parent_directory = Some(PathBuf::from("/home/user"));
+    ui.project.new_project_name = "   ".to_string(); // whitespace only
+
+    ui.submit_new_project_request();
+
+    assert!(ui.project.new_project_submit_requested.is_none(), "should not create request with empty name");
 }

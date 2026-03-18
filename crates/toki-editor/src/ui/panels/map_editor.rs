@@ -45,7 +45,7 @@ impl PanelSystem {
                 )
                 .clicked()
             {
-                ui_state.map_editor_save_requested = true;
+                ui_state.map.save_requested = true;
             }
             ui.separator();
             ui.label("Map:");
@@ -60,12 +60,12 @@ impl PanelSystem {
                             return;
                         }
                         for map_name in map_names {
-                            let is_selected = ui_state.map_editor_active_map.as_deref()
+                            let is_selected = ui_state.map.active_map.as_deref()
                                 == Some(map_name.as_str());
                             if ui.selectable_label(is_selected, map_name).clicked() && !is_selected
                             {
-                                ui_state.map_editor_active_map = Some(map_name.clone());
-                                ui_state.map_editor_map_load_requested = Some(map_name.clone());
+                                ui_state.map.active_map = Some(map_name.clone());
+                                ui_state.map.map_load_requested = Some(map_name.clone());
                             }
                         }
                     }
@@ -73,15 +73,15 @@ impl PanelSystem {
 
             if ui_state.has_unsaved_map_editor_draft() {
                 ui.label("Unsaved draft");
-            } else if ui_state.map_editor_dirty {
+            } else if ui_state.map.dirty {
                 ui.label("Unsaved changes");
-            } else if let Some(active_map) = ui_state.map_editor_active_map.as_deref() {
+            } else if let Some(active_map) = ui_state.map.active_map.as_deref() {
                 ui.label(format!("Editing asset: {}", active_map));
             }
         });
         ui.horizontal(|ui| {
             ui.label("Tool:");
-            ui.label(match ui_state.map_editor_tool {
+            ui.label(match ui_state.map.tool {
                 MapEditorTool::Drag => "Drag",
                 MapEditorTool::Brush => "Brush",
                 MapEditorTool::Fill => "Fill",
@@ -92,8 +92,8 @@ impl PanelSystem {
         });
         ui.separator();
 
-        if ui_state.map_editor_show_new_map_dialog {
-            let mut open = ui_state.map_editor_show_new_map_dialog;
+        if ui_state.map.show_new_map_dialog {
+            let mut open = ui_state.map.show_new_map_dialog;
             let mut create_clicked = false;
             let mut cancel_clicked = false;
             egui::Window::new("New Map")
@@ -102,18 +102,18 @@ impl PanelSystem {
                 .open(&mut open)
                 .show(ui.ctx(), |ui| {
                     ui.label("Name");
-                    ui.text_edit_singleline(&mut ui_state.map_editor_new_map_name);
+                    ui.text_edit_singleline(&mut ui_state.map.new_map_name);
                     ui.separator();
                     ui.horizontal(|ui| {
                         ui.label("Width");
                         ui.add(
-                            egui::DragValue::new(&mut ui_state.map_editor_new_map_width)
+                            egui::DragValue::new(&mut ui_state.map.new_map_width)
                                 .range(1..=512)
                                 .speed(1),
                         );
                         ui.label("Height");
                         ui.add(
-                            egui::DragValue::new(&mut ui_state.map_editor_new_map_height)
+                            egui::DragValue::new(&mut ui_state.map.new_map_height)
                                 .range(1..=512)
                                 .speed(1),
                         );
@@ -136,7 +136,7 @@ impl PanelSystem {
             if cancel_clicked {
                 open = false;
             }
-            ui_state.map_editor_show_new_map_dialog = open;
+            ui_state.map.show_new_map_dialog = open;
         }
 
         let Some(viewport) = map_editor_viewport else {
@@ -171,7 +171,7 @@ impl PanelSystem {
         let (rect, response) =
             ui.allocate_exact_size(available_size, egui::Sense::click_and_drag());
 
-        match ui_state.map_editor_tool {
+        match ui_state.map.tool {
             MapEditorTool::Drag => {
                 ui_state.cancel_map_editor_edit();
                 if response.drag_started() {
@@ -227,7 +227,7 @@ impl PanelSystem {
             Self::paint_map_editor_object_preview(ui, ui_state, viewport, rect, project_path);
         }
 
-        match ui_state.map_editor_tool {
+        match ui_state.map.tool {
             MapEditorTool::Drag => {
                 if response.clicked() {
                     if let Some(selected_object_index) =
@@ -247,7 +247,7 @@ impl PanelSystem {
                             rect,
                             project_path,
                         ) {
-                            ui_state.map_editor_selected_tile_info = tile_info;
+                            ui_state.map.selected_tile_info = tile_info;
                         }
                     } else {
                         ui_state.clear_map_editor_object_selection();
@@ -263,7 +263,7 @@ impl PanelSystem {
                         ui_state.cancel_map_editor_edit();
                     }
                 }
-                if let Some(selected_tile) = ui_state.map_editor_selected_tile.clone() {
+                if let Some(selected_tile) = ui_state.map.selected_tile.clone() {
                     if Self::handle_map_editor_brush_paint(
                         ui,
                         ui_state,
@@ -271,14 +271,14 @@ impl PanelSystem {
                         &response,
                         rect,
                         &selected_tile,
-                        ui_state.map_editor_brush_size_tiles,
+                        ui_state.map.brush_size_tiles,
                     ) {
                         ui_state.mark_map_editor_dirty();
                     }
                 }
             }
             MapEditorTool::Fill => {
-                if let Some(selected_tile) = ui_state.map_editor_selected_tile.clone() {
+                if let Some(selected_tile) = ui_state.map.selected_tile.clone() {
                     if Self::handle_map_editor_fill_paint(
                         ui,
                         ui_state,

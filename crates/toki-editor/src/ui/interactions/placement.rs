@@ -23,6 +23,7 @@ impl PlacementInteraction {
             if let Some(hover_pos) = response.hover_pos() {
                 let cursor_world = viewport.screen_to_world_pos_raw(hover_pos, rect);
                 let grab_offset = ui_state
+                    .placement
                     .entity_move_drag
                     .as_ref()
                     .map(|drag| drag.grab_offset)
@@ -33,15 +34,15 @@ impl PlacementInteraction {
                     viewport.scene_manager().tilemap(),
                     config,
                 );
-                ui_state.placement_preview_position = Some(world_pos);
+                ui_state.placement.preview_position = Some(world_pos);
 
                 let is_valid =
                     Self::check_placement_validity(ui_state, viewport, world_pos, config);
-                ui_state.placement_preview_valid = Some(is_valid);
+                ui_state.placement.preview_valid = Some(is_valid);
                 viewport.mark_dirty();
             } else {
-                ui_state.placement_preview_position = None;
-                ui_state.placement_preview_valid = None;
+                ui_state.placement.preview_position = None;
+                ui_state.placement.preview_valid = None;
                 viewport.mark_dirty();
             }
         }
@@ -57,7 +58,7 @@ impl PlacementInteraction {
     ) {
         tracing::info!("Placement click detected at screen pos: {:?}", click_pos);
 
-        let Some(entity_def_name) = &ui_state.placement_entity_definition.clone() else {
+        let Some(entity_def_name) = &ui_state.placement.entity_definition.clone() else {
             tracing::warn!("No entity definition for placement");
             return;
         };
@@ -217,7 +218,7 @@ impl PlacementInteraction {
         world_pos: glam::Vec2,
         config: Option<&EditorConfig>,
     ) -> bool {
-        let Some(entity_def_name) = &ui_state.placement_entity_definition else {
+        let Some(entity_def_name) = &ui_state.placement.entity_definition else {
             return false;
         };
 

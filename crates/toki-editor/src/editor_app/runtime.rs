@@ -3,10 +3,10 @@ use std::process::Command;
 
 impl EditorApp {
     pub(super) fn handle_play_scene_request(&mut self) {
-        if !self.ui.play_scene_requested {
+        if !self.ui.project.play_scene_requested {
             return;
         }
-        self.ui.play_scene_requested = false;
+        self.ui.project.play_scene_requested = false;
 
         let Some(project_path) = self.config.current_project_path().cloned() else {
             tracing::warn!("Cannot play scene: no project is currently open");
@@ -65,10 +65,10 @@ impl EditorApp {
     }
 
     pub(super) fn handle_export_project_request(&mut self) {
-        if !self.ui.export_project_requested {
+        if !self.ui.project.export_project_requested {
             return;
         }
-        self.ui.export_project_requested = false;
+        self.ui.project.export_project_requested = false;
 
         if self.background_tasks.is_running() {
             tracing::warn!("Cannot export game: another background task is running");

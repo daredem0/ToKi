@@ -31,13 +31,14 @@ impl PanelSystem {
             return;
         };
 
-        let mut connect_from = ui_state.graph_connect_from_node;
-        let mut connect_to = ui_state.graph_connect_to_node;
+        let mut connect_from = ui_state.graph.connect_from_node;
+        let mut connect_to = ui_state.graph.connect_to_node;
         let (mut graph_zoom, mut graph_pan) = ui_state.graph_view_for_scene(&active_scene_name);
         let before_rule_set = ui_state.scenes[scene_index].rules.clone();
         let before_graph_snapshot = ui_state.rule_graph_for_scene(&active_scene_name).cloned();
         let before_layout_snapshot = ui_state
-            .graph_layouts_by_scene
+            .graph
+            .layouts_by_scene
             .get(&active_scene_name)
             .cloned();
         let mut scene_changed = false;
@@ -657,10 +658,10 @@ impl PanelSystem {
             }
         }
 
-        ui_state.graph_connect_from_node = connect_from;
-        ui_state.graph_connect_to_node = connect_to;
-        ui_state.graph_canvas_zoom = graph_zoom;
-        ui_state.graph_canvas_pan = graph_pan;
+        ui_state.graph.connect_from_node = connect_from;
+        ui_state.graph.connect_to_node = connect_to;
+        ui_state.graph.canvas_zoom = graph_zoom;
+        ui_state.graph.canvas_pan = graph_pan;
         ui_state.set_graph_view_for_scene(&active_scene_name, graph_zoom, graph_pan);
         if scene_changed {
             ui_state.scene_content_changed = true;

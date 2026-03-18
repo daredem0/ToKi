@@ -73,7 +73,7 @@ impl EditorApp {
 
     pub(super) fn handle_map_requests(&mut self) {
         // Handle Map Loading request
-        if let Some((scene_name, map_name)) = self.ui.map_load_requested.take() {
+        if let Some((scene_name, map_name)) = self.ui.map.load_requested.take() {
             if let Some(config) = self.config.current_project_path() {
                 let map_file = config
                     .join("assets")
@@ -120,7 +120,7 @@ impl EditorApp {
     }
 
     pub(super) fn handle_new_map_editor_requests(&mut self) {
-        let Some(request) = self.ui.map_editor_new_map_requested.take() else {
+        let Some(request) = self.ui.map.new_map_requested.take() else {
             return;
         };
 
@@ -173,11 +173,11 @@ impl EditorApp {
     }
 
     pub(super) fn handle_save_map_editor_request(&mut self) {
-        if !self.ui.map_editor_save_requested {
+        if !self.ui.map.save_requested {
             return;
         }
 
-        if let Some(draft) = self.ui.map_editor_draft.clone() {
+        if let Some(draft) = self.ui.map.draft.clone() {
             let live_tilemap = self
                 .map_editor_viewport
                 .as_ref()
@@ -197,14 +197,14 @@ impl EditorApp {
                         draft.name,
                         error
                     );
-                    self.ui.map_editor_save_requested = false;
+                    self.ui.map.save_requested = false;
                 }
             }
             return;
         }
 
-        let Some(active_map_name) = self.ui.map_editor_active_map.clone() else {
-            self.ui.map_editor_save_requested = false;
+        let Some(active_map_name) = self.ui.map.active_map.clone() else {
+            self.ui.map.save_requested = false;
             return;
         };
         let Some(tilemap) = self
@@ -212,7 +212,7 @@ impl EditorApp {
             .as_ref()
             .and_then(|viewport| viewport.scene_manager().tilemap().cloned())
         else {
-            self.ui.map_editor_save_requested = false;
+            self.ui.map.save_requested = false;
             return;
         };
 
@@ -230,18 +230,18 @@ impl EditorApp {
                     active_map_name,
                     error
                 );
-                self.ui.map_editor_save_requested = false;
+                self.ui.map.save_requested = false;
             }
         }
     }
 
     pub(super) fn handle_map_editor_map_requests(&mut self) {
         if self.ui.has_unsaved_map_editor_draft() {
-            self.ui.map_editor_map_load_requested = None;
+            self.ui.map.map_load_requested = None;
             return;
         }
 
-        let Some(map_name) = self.ui.map_editor_map_load_requested.take() else {
+        let Some(map_name) = self.ui.map.map_load_requested.take() else {
             return;
         };
 
@@ -270,7 +270,7 @@ impl EditorApp {
         match viewport.scene_manager_mut().load_tilemap(&map_file) {
             Ok(()) => {
                 tracing::info!("Loaded map '{}' into map editor viewport", map_name);
-                self.ui.map_editor_active_map = Some(map_name);
+                self.ui.map.active_map = Some(map_name);
                 self.ui.clear_map_editor_dirty();
                 self.ui.clear_map_editor_history();
                 viewport.mark_dirty();
