@@ -7,6 +7,47 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-03-19
+
+### Added
+- Added project-wide health and damage stat support, including optional attack animations driven by primary-action input and sample player attack clips.
+- Added authored projectile support with runtime spawning, movement, collision, damage, lifetime expiry, and object-sheet rendering.
+- Added collectible world-item pickups with minimal inventory stacking and static object-sheet-backed entity rendering.
+- Added a first runtime menu/UI stack with pause menus, inventory views, confirmation dialogs, generic UI actions/commands, and clean runtime exit handling.
+- Added a visual Menu Editor tab in the editor with preview-based menu/dialog authoring and inspector-driven configuration.
+- Added extensive runtime menu appearance controls, including font selection, colors, opacity, border style, spacing, footer text, and viewport-relative sizing.
+- Added shared project-font discovery from `assets/fonts` for editor preview and runtime menu rendering.
+- Added optional frame limiting when vsync is disabled and introduced fixed-vs-delta timing mode selection at the project/runtime level.
+- Added configurable viewport resolution, zoom, tile-size selection for new maps, and arbitrary viewport sizing with a 160×144 default.
+- Added reusable workspace infrastructure including a generic asset cache, shared project-runtime config model, shared project-asset resolution helpers, and a shared sprite-render request pipeline.
+
+### Changed
+- Refactored `GameState` into focused `game/` submodules for scene, input, movement, animation, combat, rules, inventory, and render-query responsibilities.
+- Refactored the runtime app shell into dedicated bootstrap, lifecycle, splash, and tick modules and replaced the previous render-backend wrapper with a proper trait abstraction.
+- Refactored the editor app into grouped subsystems and split viewport, hierarchy, inspector, scene-graph, and map-editor code into focused modules.
+- Changed runtime and editor world-sprite rendering to use one shared sprite-render extraction/resolution model instead of parallel implementations.
+- Changed runtime/editor menu rendering to use shared UI composition and layout logic so preview and runtime behavior stay aligned.
+- Changed asset handling to share more implementation between runtime and editor, including normalized asset names, shared scene-path utilities, and shared audio/sprite metadata classification.
+- Changed camera and viewport handling to use shared camera/viewport calculation paths and configurable runtime/editor display parameters.
+- Changed movement to support sub-pixel accumulation and intent-driven animation selection instead of relying on older hardcoded movement constants.
+- Changed scene hierarchy and asset-palette ergonomics with clearer grouping for scene entities/items, collapsible sections, runtime-entity visibility toggles, and cleaner icon usage.
+- Changed project creation flow to an explicit editor-owned modal with template selection, naming, and folder selection instead of silently creating nested default paths.
+
+### Fixed
+- Fixed menu preview/runtime mismatches in layout, font handling, border/background rendering, and screen centering.
+- Fixed a runtime menu rendering crash caused by using the wrong rectangle-rendering path and introduced a dedicated runtime UI rectangle layer.
+- Fixed font preview crashes in the editor by unifying editor/runtime font handling and providing shared font-family resolution.
+- Fixed project-creation behavior that could create accidental nested `NewProject/NewProject` trees.
+- Fixed stale scene-hierarchy and menu-editor interaction issues, including widget-ID collisions in dialog entry editing.
+
+### Docs
+- Updated `README.md` to reflect the current product surface, workspace structure, editor/runtime capabilities, and work-in-progress status.
+- Updated `docs/SDD_SAD.md` to match the current architecture, including shared menu/UI composition, shared sprite-render flow, current runtime/editor decomposition, and the remaining known seams.
+
+### Tests
+- Added broad regression coverage for the new health/damage, projectile, pickup/inventory, menu/dialog, timing, frame-limiter, shared asset/config, and shared sprite-render workflows.
+- Expanded runtime, editor, render, and core test coverage around the refactored subsystem boundaries to lock in the new architecture.
+
 ## [0.1.0] - 2026-03-15
 
 ### Added
