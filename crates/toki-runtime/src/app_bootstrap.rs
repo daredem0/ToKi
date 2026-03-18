@@ -1,10 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use toki_core::assets::object_sheet::ObjectSheetMeta;
 use toki_core::{GameState, Scene};
 use toki_render::RenderError;
 
-use crate::systems::resources::resolve_project_resource_paths;
 use crate::systems::{DecodedProjectCache, ResourceManager, RuntimeAssetLoadPlan};
 
 use super::{App, RuntimeLaunchOptions};
@@ -156,48 +154,11 @@ impl App {
         map_name: Option<&str>,
         decoded_project_cache: &mut DecodedProjectCache,
     ) -> Result<(ResourceManager, RuntimeAssetLoadPlan), RenderError> {
-        let resolved = resolve_project_resource_paths(project_path, map_name)?;
-        let tilemap = decoded_project_cache.load_tilemap_from_path(&resolved.tilemap_path)?;
-        tilemap.validate()?;
-        let terrain_atlas =
-            decoded_project_cache.load_atlas_from_path(&resolved.terrain_atlas_path)?;
-        let mut sprite_atlases = std::collections::HashMap::new();
-        let mut sprite_texture_paths = std::collections::HashMap::new();
-        let mut object_sheets = std::collections::HashMap::new();
-        let mut object_texture_paths = std::collections::HashMap::new();
-        for atlas_path in &resolved.sprite_atlas_paths {
-            let atlas = decoded_project_cache.load_atlas_from_path(atlas_path)?;
-            let texture_path = crate::systems::resources::resolve_atlas_texture_path(atlas_path)?;
-            if let Some(file_name) = atlas_path.file_name().and_then(|name| name.to_str()) {
-                sprite_atlases.insert(file_name.to_string(), atlas.clone());
-                sprite_texture_paths.insert(file_name.to_string(), texture_path.clone());
-            }
-            if let Some(stem) = atlas_path.file_stem().and_then(|name| name.to_str()) {
-                sprite_atlases.insert(stem.to_string(), atlas);
-                sprite_texture_paths.insert(stem.to_string(), texture_path);
-            }
-        }
-        for object_sheet_path in &resolved.object_sheet_paths {
-            let object_sheet = ObjectSheetMeta::load_from_file(object_sheet_path)?;
-            let texture_path =
-                crate::systems::resources::resolve_object_sheet_texture_path(object_sheet_path)?;
-            if let Some(file_name) = object_sheet_path.file_name().and_then(|name| name.to_str()) {
-                object_sheets.insert(file_name.to_string(), object_sheet.clone());
-                object_texture_paths.insert(file_name.to_string(), texture_path.clone());
-            }
-            if let Some(stem) = object_sheet_path.file_stem().and_then(|name| name.to_str()) {
-                object_sheets.insert(stem.to_string(), object_sheet);
-                object_texture_paths.insert(stem.to_string(), texture_path);
-            }
-        }
-        let resources = ResourceManager::from_preloaded(
-            terrain_atlas,
-            sprite_atlases,
-            sprite_texture_paths,
-            object_sheets,
-            object_texture_paths,
-            tilemap,
-        );
+        let (resources, resolved) = ResourceManager::load_for_project_with_cache(
+            project_path,
+            map_name,
+            decoded_project_cache,
+        )?;
         let asset_load_plan = RuntimeAssetLoadPlan::from_resolved_paths(
             scene_name.map(str::to_string),
             map_name.map(str::to_string),

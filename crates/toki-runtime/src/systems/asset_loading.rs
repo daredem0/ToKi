@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
+use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
 use toki_core::Scene;
 use toki_render::RenderError;
 
@@ -37,7 +37,8 @@ impl RuntimeAssetLoadPlan {
         scene_name: Option<&str>,
         map_name: Option<&str>,
     ) -> Result<Self, RenderError> {
-        let resolved = resolve_project_resource_paths(project_path, map_name)?;
+        let resolved = resolve_project_resource_paths(project_path, map_name)
+            .map_err(|error| RenderError::Other(error.to_string()))?;
         Ok(Self::from_resolved_paths(
             scene_name.map(str::to_string),
             map_name.map(str::to_string),
@@ -77,6 +78,7 @@ pub struct DecodedProjectCache {
     scenes: HashMap<PathBuf, Scene>,
     tilemaps: HashMap<PathBuf, TileMap>,
     atlases: HashMap<PathBuf, AtlasMeta>,
+    object_sheets: HashMap<PathBuf, ObjectSheetMeta>,
 }
 
 impl DecodedProjectCache {
@@ -128,6 +130,20 @@ impl DecodedProjectCache {
         let atlas = AtlasMeta::load_from_file(atlas_path)?;
         self.atlases.insert(atlas_path.to_path_buf(), atlas.clone());
         Ok(atlas)
+    }
+
+    pub fn load_object_sheet_from_path(
+        &mut self,
+        object_sheet_path: &Path,
+    ) -> Result<ObjectSheetMeta, toki_core::CoreError> {
+        if let Some(object_sheet) = self.object_sheets.get(object_sheet_path) {
+            return Ok(object_sheet.clone());
+        }
+
+        let object_sheet = ObjectSheetMeta::load_from_file(object_sheet_path)?;
+        self.object_sheets
+            .insert(object_sheet_path.to_path_buf(), object_sheet.clone());
+        Ok(object_sheet)
     }
 }
 

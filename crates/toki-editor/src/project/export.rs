@@ -1,60 +1,21 @@
 use crate::project::Project;
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use toki_core::menu::MenuSettings;
 use toki_core::pack::{
     hash_bytes, infer_pack_asset_type, recommended_pack_compression, PackCompression, PakEntry,
     PakManifest, PAK_MAGIC, PAK_VERSION,
+};
+use toki_core::project_runtime::{
+    RuntimeConfigAudio, RuntimeConfigDisplay, RuntimeConfigFile, RuntimeConfigPack,
+    RuntimeConfigSplash, RuntimeConfigStartup,
 };
 
 #[derive(Debug, Clone)]
 struct SourceFile {
     absolute_path: PathBuf,
     relative_path: PathBuf,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct RuntimeBundleConfig {
-    pub version: u32,
-    pub bundle_name: String,
-    pub pack: RuntimeBundlePackConfig,
-    pub startup: RuntimeBundleStartupConfig,
-    pub splash: RuntimeBundleSplashConfig,
-    pub audio: RuntimeBundleAudioConfig,
-    pub display: RuntimeBundleDisplayConfig,
-    pub menu: MenuSettings,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct RuntimeBundlePackConfig {
-    pub path: String,
-    pub enabled: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct RuntimeBundleStartupConfig {
-    pub scene: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct RuntimeBundleSplashConfig {
-    pub duration_ms: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct RuntimeBundleAudioConfig {
-    pub master_percent: u8,
-    pub music_percent: u8,
-    pub movement_percent: u8,
-    pub collision_percent: u8,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct RuntimeBundleDisplayConfig {
-    pub show_entity_health_bars: bool,
 }
 
 pub fn export_hybrid_bundle(
@@ -112,29 +73,31 @@ pub fn export_hybrid_bundle(
     write_project_pak(&pak_path, &source_files)?;
     write_runtime_bundle_config(
         &bundle_dir,
-        &RuntimeBundleConfig {
+        &RuntimeConfigFile {
             version: 1,
-            bundle_name: project.name.clone(),
-            pack: RuntimeBundlePackConfig {
+            bundle_name: Some(project.name.clone()),
+            pack: Some(RuntimeConfigPack {
                 path: "game.toki.pak".to_string(),
                 enabled: true,
-            },
-            startup: RuntimeBundleStartupConfig {
+            }),
+            startup: Some(RuntimeConfigStartup {
                 scene: startup_scene.map(str::to_string),
-            },
-            splash: RuntimeBundleSplashConfig {
-                duration_ms: splash_duration_ms,
-            },
-            audio: RuntimeBundleAudioConfig {
-                master_percent: project.metadata.runtime.audio.master_percent,
-                music_percent: project.metadata.runtime.audio.music_percent,
-                movement_percent: project.metadata.runtime.audio.movement_percent,
-                collision_percent: project.metadata.runtime.audio.collision_percent,
-            },
-            display: RuntimeBundleDisplayConfig {
-                show_entity_health_bars: project.metadata.runtime.display.show_entity_health_bars,
-            },
-            menu: project.metadata.runtime.menu.clone(),
+            }),
+            splash: Some(RuntimeConfigSplash {
+                duration_ms: Some(splash_duration_ms),
+            }),
+            audio: Some(RuntimeConfigAudio {
+                master_percent: Some(project.metadata.runtime.audio.master_percent),
+                music_percent: Some(project.metadata.runtime.audio.music_percent),
+                movement_percent: Some(project.metadata.runtime.audio.movement_percent),
+                collision_percent: Some(project.metadata.runtime.audio.collision_percent),
+            }),
+            display: Some(RuntimeConfigDisplay {
+                show_entity_health_bars: Some(
+                    project.metadata.runtime.display.show_entity_health_bars,
+                ),
+            }),
+            menu: Some(project.metadata.runtime.menu.clone()),
         },
     )?;
 
@@ -162,7 +125,7 @@ fn copy_bundle_legal_documents(bundle_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn write_runtime_bundle_config(bundle_dir: &Path, config: &RuntimeBundleConfig) -> Result<()> {
+fn write_runtime_bundle_config(bundle_dir: &Path, config: &RuntimeConfigFile) -> Result<()> {
     let config_path = bundle_dir.join("runtime_config.json");
     let content = serde_json::to_vec_pretty(config)?;
     fs::write(&config_path, content).with_context(|| {

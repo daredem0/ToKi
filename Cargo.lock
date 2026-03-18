@@ -4466,6 +4466,7 @@ dependencies = [
  "serde_with",
  "tempfile",
  "thiserror 2.0.14",
+ "toml",
  "tracing",
  "zstd",
 ]

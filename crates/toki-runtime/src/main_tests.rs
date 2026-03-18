@@ -1,12 +1,14 @@
 use super::{
     apply_project_runtime_settings_from_project_file_if_present, apply_runtime_config,
     auto_detect_project_launch_options, detect_first_scene_name,
-    load_runtime_config_from_candidates, option_value, parse_launch_options, RuntimeConfig,
-    RuntimeConfigAudio, RuntimeConfigDisplay, RuntimeConfigPack, RuntimeConfigSplash,
-    RuntimeConfigStartup,
+    load_runtime_config_from_candidates, option_value, parse_launch_options,
 };
 use std::path::PathBuf;
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, MenuSettings, UiAction};
+use toki_core::project_runtime::{
+    RuntimeConfigAudio, RuntimeConfigDisplay, RuntimeConfigFile, RuntimeConfigPack,
+    RuntimeConfigSplash, RuntimeConfigStartup,
+};
 use toki_runtime::{RuntimeAudioMixOptions, RuntimeDisplayOptions, RuntimeLaunchOptions};
 
 #[test]
@@ -117,7 +119,7 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
     };
     apply_runtime_config(
         &mut options,
-        RuntimeConfig {
+        RuntimeConfigFile {
             version: 1,
             bundle_name: Some("Demo".to_string()),
             pack: Some(RuntimeConfigPack {
@@ -172,7 +174,7 @@ fn apply_runtime_config_keeps_existing_paths_and_scene_but_updates_splash_durati
 
     apply_runtime_config(
         &mut options,
-        RuntimeConfig {
+        RuntimeConfigFile {
             version: 1,
             bundle_name: Some("Demo".to_string()),
             pack: Some(RuntimeConfigPack {
@@ -224,7 +226,7 @@ fn apply_runtime_config_ignores_disabled_pack_entry() {
     let mut options = RuntimeLaunchOptions::default();
     apply_runtime_config(
         &mut options,
-        RuntimeConfig {
+        RuntimeConfigFile {
             version: 1,
             bundle_name: Some("Demo".to_string()),
             pack: Some(RuntimeConfigPack {

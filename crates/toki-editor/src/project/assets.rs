@@ -3,7 +3,9 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use toki_core::{assets::atlas::AtlasMeta, assets::object_sheet::ObjectSheetMeta};
+use toki_core::project_assets::{
+    classify_sprite_metadata_file, discover_audio_files, ProjectAudioFormat, SpriteMetadataFileKind,
+};
 use toki_core::{entity::EntityDefinition, Scene};
 
 /// Asset discovery and management for project
@@ -88,7 +90,6 @@ pub enum AudioFormat {
     Ogg,
     Wav,
     Mp3,
-    Unknown,
 }
 
 /// Entity definition asset information
@@ -281,34 +282,15 @@ impl ProjectAssets {
         dir: &Path,
         audio_map: &mut HashMap<String, AudioAsset>,
     ) -> Result<()> {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
+        for asset in discover_audio_files(dir)? {
+            let audio_asset = AudioAsset {
+                name: asset.name.clone(),
+                path: asset.path.clone(),
+                format: AudioFormat::from(asset.format),
+            };
 
-            if path.is_file() {
-                if let (Some(stem), Some(ext)) = (
-                    path.file_stem().and_then(|s| s.to_str()),
-                    path.extension().and_then(|s| s.to_str()),
-                ) {
-                    let format = match ext.to_lowercase().as_str() {
-                        "ogg" => AudioFormat::Ogg,
-                        "wav" => AudioFormat::Wav,
-                        "mp3" => AudioFormat::Mp3,
-                        _ => AudioFormat::Unknown,
-                    };
-
-                    if format != AudioFormat::Unknown {
-                        let audio_asset = AudioAsset {
-                            name: stem.to_string(),
-                            path: path.clone(),
-                            format,
-                        };
-
-                        audio_map.insert(stem.to_string(), audio_asset);
-                        tracing::info!("🎵 Found audio file: '{}' at {:?}", stem, path);
-                    }
-                }
-            }
+            audio_map.insert(asset.name.clone(), audio_asset);
+            tracing::info!("🎵 Found audio file: '{}' at {:?}", asset.name, asset.path);
         }
 
         Ok(())
@@ -508,30 +490,14 @@ impl ProjectAssets {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SpriteMetadataFileKind {
-    Atlas,
-    ObjectSheet,
-    Unknown,
-}
-
-fn classify_sprite_metadata_file(path: &Path) -> Result<SpriteMetadataFileKind> {
-    let json_data = fs::read_to_string(path)?;
-
-    if let Ok(object_sheet) = serde_json::from_str::<ObjectSheetMeta>(&json_data) {
-        if matches!(
-            object_sheet.sheet_type,
-            toki_core::assets::object_sheet::ObjectSheetType::Objects
-        ) {
-            return Ok(SpriteMetadataFileKind::ObjectSheet);
+impl From<ProjectAudioFormat> for AudioFormat {
+    fn from(value: ProjectAudioFormat) -> Self {
+        match value {
+            ProjectAudioFormat::Ogg => Self::Ogg,
+            ProjectAudioFormat::Wav => Self::Wav,
+            ProjectAudioFormat::Mp3 => Self::Mp3,
         }
     }
-
-    if serde_json::from_str::<AtlasMeta>(&json_data).is_ok() {
-        return Ok(SpriteMetadataFileKind::Atlas);
-    }
-
-    Ok(SpriteMetadataFileKind::Unknown)
 }
 
 #[cfg(test)]

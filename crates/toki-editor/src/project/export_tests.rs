@@ -1,8 +1,9 @@
-use super::{collect_source_files, export_hybrid_bundle, RuntimeBundleConfig};
+use super::{collect_source_files, export_hybrid_bundle};
 use crate::project::Project;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
 use toki_core::pack::{PackAssetType, PackCompression, PakManifest, PAK_MAGIC, PAK_VERSION};
+use toki_core::project_runtime::RuntimeConfigFile;
 
 #[test]
 fn collect_source_files_returns_sorted_relative_paths() {
@@ -142,22 +143,85 @@ fn export_hybrid_bundle_writes_runtime_and_pak_manifest() {
             && entry.hash.is_some()
             && entry.stored_size == entry.size));
 
-    let runtime_config: RuntimeBundleConfig =
+    let runtime_config: RuntimeConfigFile =
         serde_json::from_str(&fs::read_to_string(config_path).expect("read config"))
             .expect("parse config");
     assert_eq!(runtime_config.version, 1);
-    assert_eq!(runtime_config.pack.path, "game.toki.pak");
-    assert!(runtime_config.pack.enabled);
-    assert_eq!(runtime_config.startup.scene.as_deref(), Some("Main Scene"));
-    assert_eq!(runtime_config.splash.duration_ms, 3000);
-    assert_eq!(runtime_config.audio.master_percent, 80);
-    assert_eq!(runtime_config.audio.music_percent, 65);
-    assert_eq!(runtime_config.audio.movement_percent, 40);
-    assert_eq!(runtime_config.audio.collision_percent, 25);
-    assert!(runtime_config.display.show_entity_health_bars);
-    assert_eq!(runtime_config.menu.pause_root_screen_id, "pause_menu");
-    assert!(runtime_config.menu.gate_gameplay_when_open);
-    assert_eq!(runtime_config.menu.screens.len(), 2);
+    assert_eq!(
+        runtime_config.pack.as_ref().map(|pack| pack.path.as_str()),
+        Some("game.toki.pak")
+    );
+    assert_eq!(
+        runtime_config.pack.as_ref().map(|pack| pack.enabled),
+        Some(true)
+    );
+    assert_eq!(
+        runtime_config
+            .startup
+            .as_ref()
+            .and_then(|startup| startup.scene.as_deref()),
+        Some("Main Scene")
+    );
+    assert_eq!(
+        runtime_config
+            .splash
+            .as_ref()
+            .and_then(|splash| splash.duration_ms),
+        Some(3000)
+    );
+    assert_eq!(
+        runtime_config
+            .audio
+            .as_ref()
+            .and_then(|audio| audio.master_percent),
+        Some(80)
+    );
+    assert_eq!(
+        runtime_config
+            .audio
+            .as_ref()
+            .and_then(|audio| audio.music_percent),
+        Some(65)
+    );
+    assert_eq!(
+        runtime_config
+            .audio
+            .as_ref()
+            .and_then(|audio| audio.movement_percent),
+        Some(40)
+    );
+    assert_eq!(
+        runtime_config
+            .audio
+            .as_ref()
+            .and_then(|audio| audio.collision_percent),
+        Some(25)
+    );
+    assert_eq!(
+        runtime_config
+            .display
+            .as_ref()
+            .and_then(|display| display.show_entity_health_bars),
+        Some(true)
+    );
+    assert_eq!(
+        runtime_config
+            .menu
+            .as_ref()
+            .map(|menu| menu.pause_root_screen_id.as_str()),
+        Some("pause_menu")
+    );
+    assert_eq!(
+        runtime_config
+            .menu
+            .as_ref()
+            .map(|menu| menu.gate_gameplay_when_open),
+        Some(true)
+    );
+    assert_eq!(
+        runtime_config.menu.as_ref().map(|menu| menu.screens.len()),
+        Some(2)
+    );
 }
 
 #[test]

@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use toki_core::menu::MenuSettings;
+use toki_core::project_runtime::RuntimeSettings;
 
 /// Main project data structure
 #[allow(dead_code)]
@@ -66,78 +66,6 @@ pub struct AssetConfig {
     pub tilemaps: String,
     /// Audio directory relative to project root
     pub audio: String,
-}
-
-/// Runtime-specific settings
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct RuntimeSettings {
-    /// Splash screen settings for runtime startup
-    #[serde(default)]
-    pub splash: RuntimeSplashSettings,
-    /// Global channel mixer settings
-    #[serde(default)]
-    pub audio: RuntimeAudioMixSettings,
-    /// Project-wide display toggles for runtime presentation
-    #[serde(default)]
-    pub display: RuntimeDisplaySettings,
-    /// Runtime menu definitions and defaults
-    #[serde(default)]
-    pub menu: MenuSettings,
-}
-
-/// Runtime audio mixer settings
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct RuntimeAudioMixSettings {
-    #[serde(default = "default_runtime_audio_mix_percent")]
-    pub master_percent: u8,
-    #[serde(default = "default_runtime_audio_mix_percent")]
-    pub music_percent: u8,
-    #[serde(default = "default_runtime_audio_mix_percent")]
-    pub movement_percent: u8,
-    #[serde(default = "default_runtime_audio_mix_percent")]
-    pub collision_percent: u8,
-}
-
-impl Default for RuntimeAudioMixSettings {
-    fn default() -> Self {
-        Self {
-            master_percent: default_runtime_audio_mix_percent(),
-            music_percent: default_runtime_audio_mix_percent(),
-            movement_percent: default_runtime_audio_mix_percent(),
-            collision_percent: default_runtime_audio_mix_percent(),
-        }
-    }
-}
-
-/// Runtime display settings
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct RuntimeDisplaySettings {
-    #[serde(default)]
-    pub show_entity_health_bars: bool,
-}
-
-/// Runtime splash settings (community-safe subset)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RuntimeSplashSettings {
-    /// Splash duration in milliseconds
-    #[serde(default = "default_runtime_splash_duration_ms")]
-    pub duration_ms: u64,
-}
-
-impl Default for RuntimeSplashSettings {
-    fn default() -> Self {
-        Self {
-            duration_ms: default_runtime_splash_duration_ms(),
-        }
-    }
-}
-
-fn default_runtime_splash_duration_ms() -> u64 {
-    3000
-}
-
-fn default_runtime_audio_mix_percent() -> u8 {
-    100
 }
 
 /// Editor-specific settings

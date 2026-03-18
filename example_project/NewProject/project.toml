@@ -2,13 +2,13 @@
 name = "TopDownBundle"
 version = "1.0.0"
 created = "2025-08-28T20:32:34.920817717Z"
-modified = "2026-03-17T22:35:42.925752917Z"
+modified = "2026-03-18T08:19:29.487505437Z"
 toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-"Main Scene" = "scenes/mainscene.json"
 main = "scenes/main.json"
+"Main Scene" = "scenes/mainscene.json"
 "Scene 2" = "scenes/scene2.json"
 
 [assets]
@@ -138,36 +138,36 @@ pan = [
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
+"node:3" = [
+    430.0,
+    50.0,
+]
 "node:2" = [
     800.0,
     50.0,
 ]
-"node:3" = [
+"node:6" = [
     430.0,
-    50.0,
+    106.0,
 ]
 "node:5" = [
     800.0,
     106.0,
 ]
+"node:1" = [
+    48.04502868652344,
+    -53.77464294433594,
+]
 "node:4" = [
     60.0,
-    106.0,
-]
-"node:1" = [
-    110.08570861816406,
-    34.51572799682617,
-]
-"node:6" = [
-    430.0,
     106.0,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 1
 position = [
-    110.08570861816406,
-    34.51572799682617,
+    48.04502868652344,
+    -53.77464294433594,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]

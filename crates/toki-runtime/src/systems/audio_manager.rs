@@ -5,11 +5,11 @@ use kira::{
     AudioManager as KiraAudioManager, AudioManagerSettings, Decibels, Tween,
 };
 use std::collections::HashMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use toki_core::{
     game::{AudioChannel as AudioEventChannel, AudioEvent},
+    project_assets::{discover_audio_files, ProjectAssetError, ProjectAudioFormat},
     EventHandler,
 };
 
@@ -562,26 +562,16 @@ fn spatial_attenuation(
 }
 
 fn discover_ogg_assets(dir: &Path) -> Result<Vec<(String, PathBuf)>, std::io::Error> {
-    let mut discovered = Vec::new();
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("ogg"))
-        {
-            if let Some(name) = path
-                .file_stem()
-                .and_then(|stem| stem.to_str())
-                .map(str::to_string)
-            {
-                discovered.push((name, path));
-            }
-        }
-    }
-    discovered.sort_by(|(a, _), (b, _)| a.cmp(b));
-    Ok(discovered)
+    let discovered = discover_audio_files(dir).map_err(|error| match error {
+        ProjectAssetError::Io(io) => io,
+        other => std::io::Error::other(other.to_string()),
+    })?;
+
+    Ok(discovered
+        .into_iter()
+        .filter(|asset| asset.format == ProjectAudioFormat::Ogg)
+        .map(|asset| (asset.name, asset.path))
+        .collect())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

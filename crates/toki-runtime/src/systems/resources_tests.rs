@@ -68,7 +68,9 @@ fn find_first_json_file_returns_sorted_first_json_entry() {
     fs::write(dir.join("a_map.json"), "{}").expect("a map");
     fs::write(dir.join("note.txt"), "ignore").expect("txt");
 
-    let first = find_first_json_file(&dir).expect("json file should be found");
+    let first = find_first_json_file(&dir)
+        .expect("json file lookup should succeed")
+        .expect("json file should be found");
     assert_eq!(
         first.file_name().and_then(|name| name.to_str()),
         Some("a_map.json")

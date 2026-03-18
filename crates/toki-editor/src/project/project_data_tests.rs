@@ -1,5 +1,6 @@
-use super::{Project, ProjectMetadata, RuntimeSettings};
+use super::{Project, ProjectMetadata};
 use std::path::PathBuf;
+use toki_core::project_runtime::RuntimeSettings;
 
 #[test]
 fn project_metadata_deserialization_defaults_runtime_settings() {

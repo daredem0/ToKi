@@ -1,54 +1,13 @@
 use anyhow::Result;
 use std::path::PathBuf;
 use toki_core::menu::MenuSettings;
+use toki_core::project_runtime::{ProjectRuntimeMetadata, RuntimeConfigFile};
 use tracing_subscriber::EnvFilter;
 
 use toki_runtime::{
     run_minimal_window, run_minimal_window_with_options, RuntimeAudioMixOptions,
     RuntimeDisplayOptions, RuntimeLaunchOptions,
 };
-
-#[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
-struct RuntimeConfig {
-    version: u32,
-    #[allow(dead_code)]
-    bundle_name: Option<String>,
-    pack: Option<RuntimeConfigPack>,
-    startup: Option<RuntimeConfigStartup>,
-    splash: Option<RuntimeConfigSplash>,
-    audio: Option<RuntimeConfigAudio>,
-    display: Option<RuntimeConfigDisplay>,
-    menu: Option<MenuSettings>,
-}
-
-#[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
-struct RuntimeConfigPack {
-    path: String,
-    enabled: bool,
-}
-
-#[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
-struct RuntimeConfigStartup {
-    scene: Option<String>,
-}
-
-#[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
-struct RuntimeConfigSplash {
-    duration_ms: Option<u64>,
-}
-
-#[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
-struct RuntimeConfigAudio {
-    master_percent: Option<u8>,
-    music_percent: Option<u8>,
-    movement_percent: Option<u8>,
-    collision_percent: Option<u8>,
-}
-
-#[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
-struct RuntimeConfigDisplay {
-    show_entity_health_bars: Option<bool>,
-}
 
 fn main() -> Result<()> {
     let mut env_filter =
@@ -184,7 +143,7 @@ fn apply_runtime_config_if_present(
 
 fn apply_runtime_config(
     launch_options: &mut RuntimeLaunchOptions,
-    config: RuntimeConfig,
+    config: RuntimeConfigFile,
     config_dir: &std::path::Path,
 ) {
     if launch_options.project_path.is_none() {
@@ -229,7 +188,7 @@ fn apply_runtime_config(
     }
 }
 
-fn load_runtime_config() -> Option<(RuntimeConfig, PathBuf)> {
+fn load_runtime_config() -> Option<(RuntimeConfigFile, PathBuf)> {
     let mut candidates = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
@@ -242,13 +201,15 @@ fn load_runtime_config() -> Option<(RuntimeConfig, PathBuf)> {
     load_runtime_config_from_candidates(&candidates)
 }
 
-fn load_runtime_config_from_candidates(candidates: &[PathBuf]) -> Option<(RuntimeConfig, PathBuf)> {
+fn load_runtime_config_from_candidates(
+    candidates: &[PathBuf],
+) -> Option<(RuntimeConfigFile, PathBuf)> {
     for path in candidates {
         if !path.exists() {
             continue;
         }
         match std::fs::read_to_string(path) {
-            Ok(content) => match serde_json::from_str::<RuntimeConfig>(&content) {
+            Ok(content) => match serde_json::from_str::<RuntimeConfigFile>(&content) {
                 Ok(config) => {
                     let dir = path.parent().map(std::path::Path::to_path_buf)?;
                     return Some((config, dir));
@@ -290,44 +251,6 @@ fn auto_detect_project_launch_options(
     }
 
     launch_options
-}
-
-#[derive(Debug, serde::Deserialize, Default)]
-struct ProjectRuntimeMetadata {
-    #[serde(default)]
-    runtime: ProjectRuntimeSettings,
-}
-
-#[derive(Debug, serde::Deserialize, Default)]
-struct ProjectRuntimeSettings {
-    #[serde(default)]
-    audio: ProjectRuntimeAudioSettings,
-    #[serde(default)]
-    display: ProjectRuntimeDisplaySettings,
-    #[serde(default)]
-    menu: MenuSettings,
-}
-
-#[derive(Debug, serde::Deserialize, Default)]
-struct ProjectRuntimeAudioSettings {
-    #[serde(default = "default_project_audio_percent")]
-    master_percent: u8,
-    #[serde(default = "default_project_audio_percent")]
-    music_percent: u8,
-    #[serde(default = "default_project_audio_percent")]
-    movement_percent: u8,
-    #[serde(default = "default_project_audio_percent")]
-    collision_percent: u8,
-}
-
-#[derive(Debug, serde::Deserialize, Default)]
-struct ProjectRuntimeDisplaySettings {
-    #[serde(default)]
-    show_entity_health_bars: bool,
-}
-
-fn default_project_audio_percent() -> u8 {
-    100
 }
 
 fn apply_project_runtime_settings_from_project_file_if_present(

@@ -13,6 +13,8 @@ pub mod math {
 pub mod errors;
 pub use errors::CoreError;
 pub mod pack;
+pub mod project_assets;
+pub mod project_runtime;
 
 pub mod fonts;
 pub mod menu;
