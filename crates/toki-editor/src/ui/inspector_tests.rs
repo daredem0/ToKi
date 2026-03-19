@@ -351,6 +351,7 @@ fn rewrite_ui_action_surface_targets_updates_open_surface_actions_for_dialogs() 
             cancel_text: "Cancel".to_string(),
             confirm_action: UiAction::CloseSurface,
             cancel_action: UiAction::CloseSurface,
+            hide_main_menu: false,
         }],
     };
 

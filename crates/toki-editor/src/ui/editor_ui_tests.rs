@@ -283,6 +283,7 @@ fn sample_project_with_menu_dialogs(dialog_ids: &[&str]) -> Project {
             cancel_text: "Cancel".to_string(),
             confirm_action: UiAction::CloseSurface,
             cancel_action: UiAction::CloseSurface,
+            hide_main_menu: false,
         })
         .collect();
     project

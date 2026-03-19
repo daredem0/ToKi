@@ -409,6 +409,7 @@ fn menu_controller_opens_dialog_and_back_dismisses_it() {
             cancel_text: "Cancel".to_string(),
             confirm_action: UiAction::ExitRuntime,
             cancel_action: UiAction::CloseSurface,
+            hide_main_menu: false,
         }],
     };
     let mut controller = MenuController::new(settings);
@@ -449,6 +450,7 @@ fn menu_controller_dialog_confirm_returns_runtime_command() {
             cancel_text: "Cancel".to_string(),
             confirm_action: UiAction::ExitRuntime,
             cancel_action: UiAction::CloseSurface,
+            hide_main_menu: false,
         }],
     };
     let mut controller = MenuController::new(settings);
@@ -472,6 +474,7 @@ fn compose_dialog_ui_builds_generic_blocks_for_dialog_overlay() {
             confirm_text: "Exit".to_string(),
             cancel_text: "Cancel".to_string(),
             confirm_selected: true,
+            hide_main_menu: false,
         },
         &appearance,
         glam::Vec2::new(320.0, 180.0),

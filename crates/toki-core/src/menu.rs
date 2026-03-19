@@ -189,6 +189,8 @@ pub struct MenuDialogDefinition {
     pub cancel_text: String,
     pub confirm_action: UiAction,
     pub cancel_action: UiAction,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hide_main_menu: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -253,6 +255,7 @@ pub struct MenuDialogView {
     pub confirm_text: String,
     pub cancel_text: String,
     pub confirm_selected: bool,
+    pub hide_main_menu: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -424,6 +427,7 @@ impl MenuController {
             confirm_text: dialog.confirm_text.clone(),
             cancel_text: dialog.cancel_text.clone(),
             confirm_selected: active_dialog.confirm_selected,
+            hide_main_menu: dialog.hide_main_menu,
         })
     }
 

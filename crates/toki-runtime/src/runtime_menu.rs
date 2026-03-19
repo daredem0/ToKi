@@ -44,11 +44,19 @@ impl App {
                 glam::Vec2::new(size.x as f32, size.y as f32)
             });
         let appearance = self.menu_system.settings().appearance.clone();
-        let layout = build_menu_layout(&view, &appearance, viewport);
-        let composition = compose_menu_ui(&layout, &appearance);
-        self.rendering.render_ui_composition(&composition);
 
-        if let Some(dialog_view) = self.menu_system.current_dialog_view() {
+        let dialog_view = self.menu_system.current_dialog_view();
+        let should_hide_main_menu = dialog_view
+            .as_ref()
+            .is_some_and(|d| d.hide_main_menu);
+
+        if !should_hide_main_menu {
+            let layout = build_menu_layout(&view, &appearance, viewport);
+            let composition = compose_menu_ui(&layout, &appearance);
+            self.rendering.render_ui_composition(&composition);
+        }
+
+        if let Some(dialog_view) = dialog_view {
             let dialog_layout = build_dialog_layout(&dialog_view, &appearance, viewport);
             let dialog_composition = compose_dialog_ui(&dialog_layout, &appearance);
             self.rendering.render_ui_composition(&dialog_composition);

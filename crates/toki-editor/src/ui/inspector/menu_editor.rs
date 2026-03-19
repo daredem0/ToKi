@@ -620,6 +620,15 @@ impl InspectorSystem {
                 });
 
                 ui.separator();
+                if ui
+                    .checkbox(&mut dialog.hide_main_menu, "Hide Main Menu")
+                    .on_hover_text("Hide the main menu behind this dialog")
+                    .changed()
+                {
+                    changed = true;
+                }
+
+                ui.separator();
                 ui.horizontal(|ui| {
                     if ui.button("Duplicate Dialog").clicked() {
                         duplicate_dialog = true;
@@ -993,6 +1002,7 @@ impl InspectorSystem {
                 cancel_text: "Cancel".to_string(),
                 confirm_action: UiAction::CloseSurface,
                 cancel_action: UiAction::CloseSurface,
+                hide_main_menu: false,
             });
         Self::commit_menu_settings_change(ui_state, project, before_settings);
         ui_state.select_menu_dialog(next_id);

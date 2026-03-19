@@ -130,6 +130,7 @@ pub(super) fn render_menu_editor(
                     confirm_text: dialog.confirm_text.clone(),
                     cancel_text: dialog.cancel_text.clone(),
                     confirm_selected: true,
+                    hide_main_menu: dialog.hide_main_menu,
                 },
                 &project.metadata.runtime.menu.appearance,
                 viewport,
