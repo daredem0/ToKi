@@ -37,6 +37,7 @@ use toki_core::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Selection {
     Scene(String),
+    ScenePlayerEntry(String),
     SceneAnchor {
         scene_name: String,
         anchor_id: String,
@@ -632,10 +633,7 @@ impl EditorUI {
         self.placement.enter_placement_mode(entity_definition);
     }
 
-    pub fn enter_scene_anchor_placement_mode(
-        &mut self,
-        draft: SceneAnchorPlacementDraft,
-    ) {
+    pub fn enter_scene_anchor_placement_mode(&mut self, draft: SceneAnchorPlacementDraft) {
         self.placement.enter_scene_anchor_placement_mode(draft);
     }
 

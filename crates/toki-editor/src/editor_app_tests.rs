@@ -13,7 +13,7 @@ use toki_core::entity::{
     EntityDefinition, EntityKind, MovementProfile, MovementSoundTrigger, PickupDef, RenderingDef,
     StaticObjectRenderDef,
 };
-use toki_core::scene::{SceneAnchor, SceneAnchorKind};
+use toki_core::scene::{SceneAnchor, SceneAnchorKind, ScenePlayerEntry};
 use toki_core::Scene;
 use winit::keyboard::ModifiersState;
 
@@ -456,6 +456,323 @@ fn load_preview_sprite_frame_static_supports_object_sheet_backed_entities() {
 }
 
 #[test]
+fn build_scene_player_overlay_sprites_uses_scene_player_entry_spawn_point() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should exist");
+    let project_path = temp_dir.path().to_path_buf();
+    fs::create_dir_all(project_path.join("entities")).expect("entities dir should exist");
+    fs::create_dir_all(project_path.join("assets/sprites")).expect("sprites dir should exist");
+    fs::write(
+        project_path.join("assets/sprites/items.json"),
+        r#"{
+            "sheet_type": "objects",
+            "image": "items.png",
+            "tile_size": [16, 16],
+            "objects": {
+                "hero_idle": {
+                    "position": [0, 0],
+                    "size_tiles": [1, 1]
+                }
+            }
+        }"#,
+    )
+    .expect("object sheet should be written");
+
+    let entity_def = EntityDefinition {
+        name: "player".to_string(),
+        display_name: "Player".to_string(),
+        description: "Scene player preview".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+            static_object: Some(StaticObjectRenderDef {
+                sheet: "items".to_string(),
+                object_name: "hero_idle".to_string(),
+            }),
+        },
+        attributes: AttributesDef {
+            health: None,
+            stats: HashMap::new(),
+            speed: 0.0,
+            solid: false,
+            active: true,
+            can_move: false,
+            ai_behavior: AiBehavior::None,
+            movement_profile: MovementProfile::None,
+            primary_projectile: None,
+            pickup: None,
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: "step".to_string(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "".to_string(),
+            clips: vec![],
+            default_state: "".to_string(),
+        },
+        category: "character".to_string(),
+        tags: vec![],
+    };
+    fs::write(
+        project_path.join("entities/player.json"),
+        serde_json::to_string_pretty(&entity_def).expect("entity json should serialize"),
+    )
+    .expect("entity definition should be written");
+
+    let mut project_assets = ProjectAssets::new(project_path.clone());
+    project_assets
+        .scan_assets()
+        .expect("project assets should scan");
+
+    let mut ui_state = crate::ui::EditorUI::new();
+    let mut scene = Scene::new("Main Scene".to_string());
+    scene.anchors.push(SceneAnchor {
+        id: "spawn_a".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(64, 80),
+        facing: None,
+    });
+    scene.player_entry = Some(ScenePlayerEntry {
+        entity_definition_name: "player".to_string(),
+        spawn_point_id: "spawn_a".to_string(),
+    });
+    ui_state.scenes = vec![scene];
+    ui_state.active_scene = Some("Main Scene".to_string());
+
+    let sprites = EditorApp::build_scene_player_overlay_sprites(
+        &ui_state,
+        &project_path,
+        &project_assets,
+        &mut HashMap::new(),
+    );
+
+    assert_eq!(sprites.len(), 1);
+    assert_eq!(sprites[0].world_position, IVec2::new(64, 80));
+    assert_eq!(sprites[0].visual.size, UVec2::new(16, 16));
+}
+
+#[test]
+fn build_scene_player_overlay_sprites_skips_when_scene_already_contains_authored_player_entity() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should exist");
+    let project_path = temp_dir.path().to_path_buf();
+    fs::create_dir_all(project_path.join("entities")).expect("entities dir should exist");
+    fs::create_dir_all(project_path.join("assets/sprites")).expect("sprites dir should exist");
+    fs::write(
+        project_path.join("assets/sprites/items.json"),
+        r#"{
+            "sheet_type": "objects",
+            "image": "items.png",
+            "tile_size": [16, 16],
+            "objects": {
+                "hero_idle": {
+                    "position": [0, 0],
+                    "size_tiles": [1, 1]
+                }
+            }
+        }"#,
+    )
+    .expect("object sheet should be written");
+    fs::write(
+        project_path.join("entities/player.json"),
+        serde_json::to_string_pretty(&EntityDefinition {
+            name: "player".to_string(),
+            display_name: "Player".to_string(),
+            description: String::new(),
+            rendering: RenderingDef {
+                size: [16, 16],
+                render_layer: 0,
+                visible: true,
+                static_object: Some(StaticObjectRenderDef {
+                    sheet: "items".to_string(),
+                    object_name: "hero_idle".to_string(),
+                }),
+            },
+            attributes: AttributesDef {
+                health: None,
+                stats: HashMap::new(),
+                speed: 0.0,
+                solid: false,
+                active: true,
+                can_move: false,
+                ai_behavior: AiBehavior::None,
+                movement_profile: MovementProfile::None,
+                primary_projectile: None,
+                pickup: None,
+                has_inventory: false,
+            },
+            collision: CollisionDef {
+                enabled: true,
+                offset: [0, 0],
+                size: [16, 16],
+                trigger: false,
+            },
+            audio: AudioDef {
+                footstep_trigger_distance: 16.0,
+                hearing_radius: 192,
+                movement_sound_trigger: MovementSoundTrigger::Distance,
+                movement_sound: "step".to_string(),
+                collision_sound: None,
+            },
+            animations: AnimationsDef {
+                atlas_name: "".to_string(),
+                clips: vec![],
+                default_state: "".to_string(),
+            },
+            category: "character".to_string(),
+            tags: vec![],
+        })
+        .expect("entity json should serialize"),
+    )
+    .expect("entity definition should be written");
+
+    let mut project_assets = ProjectAssets::new(project_path.clone());
+    project_assets
+        .scan_assets()
+        .expect("project assets should scan");
+
+    let mut ui_state = crate::ui::EditorUI::new();
+    let mut scene = Scene::new("Main Scene".to_string());
+    scene.anchors.push(SceneAnchor {
+        id: "spawn_a".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(64, 80),
+        facing: None,
+    });
+    scene.player_entry = Some(ScenePlayerEntry {
+        entity_definition_name: "player".to_string(),
+        spawn_point_id: "spawn_a".to_string(),
+    });
+    let mut placed_player = solid_entity(1, IVec2::new(64, 80));
+    placed_player.control_role = toki_core::entity::ControlRole::PlayerCharacter;
+    scene.entities.push(placed_player);
+    ui_state.scenes = vec![scene];
+    ui_state.active_scene = Some("Main Scene".to_string());
+
+    let sprites = EditorApp::build_scene_player_overlay_sprites(
+        &ui_state,
+        &project_path,
+        &project_assets,
+        &mut HashMap::new(),
+    );
+
+    assert!(sprites.is_empty());
+}
+
+#[test]
+fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should exist");
+    let project_path = temp_dir.path().to_path_buf();
+    fs::create_dir_all(project_path.join("entities")).expect("entities dir should exist");
+    fs::create_dir_all(project_path.join("assets/sprites")).expect("sprites dir should exist");
+    fs::write(
+        project_path.join("assets/sprites/items.json"),
+        r#"{
+            "sheet_type": "objects",
+            "image": "items.png",
+            "tile_size": [16, 16],
+            "objects": {
+                "hero_idle": {
+                    "position": [0, 0],
+                    "size_tiles": [1, 1]
+                }
+            }
+        }"#,
+    )
+    .expect("object sheet should be written");
+    fs::write(
+        project_path.join("entities/player.json"),
+        serde_json::to_string_pretty(&EntityDefinition {
+            name: "player".to_string(),
+            display_name: "Player".to_string(),
+            description: String::new(),
+            rendering: RenderingDef {
+                size: [16, 16],
+                render_layer: 0,
+                visible: true,
+                static_object: Some(StaticObjectRenderDef {
+                    sheet: "items".to_string(),
+                    object_name: "hero_idle".to_string(),
+                }),
+            },
+            attributes: AttributesDef {
+                health: None,
+                stats: HashMap::new(),
+                speed: 0.0,
+                solid: false,
+                active: true,
+                can_move: false,
+                ai_behavior: AiBehavior::None,
+                movement_profile: MovementProfile::None,
+                primary_projectile: None,
+                pickup: None,
+                has_inventory: false,
+            },
+            collision: CollisionDef {
+                enabled: true,
+                offset: [0, 0],
+                size: [16, 16],
+                trigger: false,
+            },
+            audio: AudioDef {
+                footstep_trigger_distance: 16.0,
+                hearing_radius: 192,
+                movement_sound_trigger: MovementSoundTrigger::Distance,
+                movement_sound: "step".to_string(),
+                collision_sound: None,
+            },
+            animations: AnimationsDef {
+                atlas_name: "".to_string(),
+                clips: vec![],
+                default_state: "".to_string(),
+            },
+            category: "character".to_string(),
+            tags: vec![],
+        })
+        .expect("entity json should serialize"),
+    )
+    .expect("entity definition should be written");
+
+    let mut project_assets = ProjectAssets::new(project_path.clone());
+    project_assets
+        .scan_assets()
+        .expect("project assets should scan");
+
+    let mut app = super::EditorApp::new(None);
+    let first = super::EditorApp::cached_preview_sprite_frame(
+        &mut app.resources.preview_sprite_frames,
+        "player",
+        &project_path,
+        &project_assets,
+    )
+    .expect("first cached load should succeed");
+
+    fs::remove_file(project_path.join("entities/player.json"))
+        .expect("entity definition should be removable after caching");
+
+    let second = super::EditorApp::cached_preview_sprite_frame(
+        &mut app.resources.preview_sprite_frames,
+        "player",
+        &project_path,
+        &project_assets,
+    )
+    .expect("cached preview should still be returned");
+
+    assert_eq!(first.size, second.size);
+    assert_eq!(first.texture_path, second.texture_path);
+}
+
+#[test]
 fn build_scene_anchor_overlay_lines_use_grid_sized_crossmark() {
     let mut config = crate::config::EditorConfig::default();
     config.editor_settings.grid.grid_size = [24, 32];
@@ -508,7 +825,8 @@ fn build_scene_anchor_overlay_lines_prefer_tilemap_tile_size() {
     ui_state.scenes = vec![scene];
     ui_state.active_scene = Some("Main Scene".to_string());
 
-    let lines = EditorApp::build_scene_anchor_overlay_lines(&ui_state, Some(&tilemap), Some(&config));
+    let lines =
+        EditorApp::build_scene_anchor_overlay_lines(&ui_state, Some(&tilemap), Some(&config));
 
     assert_eq!(lines.len(), 2);
     assert_eq!(lines[0].end - lines[0].start, glam::Vec2::new(40.0, 48.0));
@@ -611,6 +929,12 @@ fn editor_resource_cache_defaults_to_no_texture() {
 fn editor_resource_cache_defaults_to_no_font_project_path() {
     let cache = super::EditorResourceCache::default();
     assert!(cache.menu_font_project_path.is_none());
+}
+
+#[test]
+fn editor_resource_cache_defaults_to_empty_preview_sprite_cache() {
+    let cache = super::EditorResourceCache::default();
+    assert!(cache.preview_sprite_frames.is_empty());
 }
 
 #[test]

@@ -336,8 +336,7 @@ impl SceneRenderer {
         // Add debug shapes
         tracing::trace!(
             "Adding {} debug shapes and {} overlay shapes to pipeline",
-            scene_data.debug_shapes.len()
-            ,
+            scene_data.debug_shapes.len(),
             scene_data.overlay_shapes.len()
         );
         self.debug_pipeline.clear();
@@ -461,8 +460,7 @@ impl SceneRenderer {
         // Add debug shapes
         tracing::trace!(
             "Adding {} debug shapes and {} overlay shapes to pipeline",
-            scene_data.debug_shapes.len()
-            ,
+            scene_data.debug_shapes.len(),
             scene_data.overlay_shapes.len()
         );
         self.debug_pipeline.clear();

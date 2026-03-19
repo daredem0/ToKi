@@ -307,7 +307,10 @@ impl InspectorSystem {
     pub(in super::super) fn scene_switch_target_scene_names(
         scenes: &[toki_core::Scene],
     ) -> Vec<String> {
-        let mut names = scenes.iter().map(|scene| scene.name.clone()).collect::<Vec<_>>();
+        let mut names = scenes
+            .iter()
+            .map(|scene| scene.name.clone())
+            .collect::<Vec<_>>();
         names.sort();
         names
     }
@@ -322,9 +325,7 @@ impl InspectorSystem {
         let mut ids = scene
             .anchors
             .iter()
-            .filter(|anchor| {
-                matches!(anchor.kind, toki_core::scene::SceneAnchorKind::SpawnPoint)
-            })
+            .filter(|anchor| matches!(anchor.kind, toki_core::scene::SceneAnchorKind::SpawnPoint))
             .map(|anchor| anchor.id.clone())
             .collect::<Vec<_>>();
         ids.sort();

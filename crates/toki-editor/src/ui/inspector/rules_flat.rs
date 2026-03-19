@@ -307,58 +307,58 @@ impl InspectorSystem {
         ui.horizontal(|ui| {
             ui.label("Type:");
             egui::ComboBox::from_id_salt(format!("rule_action_kind_{id_salt}"))
-            .selected_text(Self::action_kind_label(current_kind))
-            .show_ui(ui, |ui| {
-                changed |= ui
-                    .selectable_value(
-                        &mut selected_kind,
-                        RuleActionKind::PlaySound,
-                        Self::action_kind_label(RuleActionKind::PlaySound),
-                    )
-                    .changed();
-                changed |= ui
-                    .selectable_value(
-                        &mut selected_kind,
-                        RuleActionKind::PlayMusic,
-                        Self::action_kind_label(RuleActionKind::PlayMusic),
-                    )
-                    .changed();
-                changed |= ui
-                    .selectable_value(
-                        &mut selected_kind,
-                        RuleActionKind::PlayAnimation,
-                        Self::action_kind_label(RuleActionKind::PlayAnimation),
-                    )
-                    .changed();
-                changed |= ui
-                    .selectable_value(
-                        &mut selected_kind,
-                        RuleActionKind::SetVelocity,
-                        Self::action_kind_label(RuleActionKind::SetVelocity),
-                    )
-                    .changed();
-                changed |= ui
-                    .selectable_value(
-                        &mut selected_kind,
-                        RuleActionKind::Spawn,
-                        Self::action_kind_label(RuleActionKind::Spawn),
-                    )
-                    .changed();
-                changed |= ui
-                    .selectable_value(
-                        &mut selected_kind,
-                        RuleActionKind::DestroySelf,
-                        Self::action_kind_label(RuleActionKind::DestroySelf),
-                    )
-                    .changed();
-                changed |= ui
-                    .selectable_value(
-                        &mut selected_kind,
-                        RuleActionKind::SwitchScene,
-                        Self::action_kind_label(RuleActionKind::SwitchScene),
-                    )
-                    .changed();
-            });
+                .selected_text(Self::action_kind_label(current_kind))
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            RuleActionKind::PlaySound,
+                            Self::action_kind_label(RuleActionKind::PlaySound),
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            RuleActionKind::PlayMusic,
+                            Self::action_kind_label(RuleActionKind::PlayMusic),
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            RuleActionKind::PlayAnimation,
+                            Self::action_kind_label(RuleActionKind::PlayAnimation),
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            RuleActionKind::SetVelocity,
+                            Self::action_kind_label(RuleActionKind::SetVelocity),
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            RuleActionKind::Spawn,
+                            Self::action_kind_label(RuleActionKind::Spawn),
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            RuleActionKind::DestroySelf,
+                            Self::action_kind_label(RuleActionKind::DestroySelf),
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            RuleActionKind::SwitchScene,
+                            Self::action_kind_label(RuleActionKind::SwitchScene),
+                        )
+                        .changed();
+                });
         });
         if selected_kind != current_kind {
             Self::switch_action_kind(action, selected_kind);
@@ -369,18 +369,18 @@ impl InspectorSystem {
                 ui.horizontal(|ui| {
                     ui.label("Channel:");
                     egui::ComboBox::from_id_salt(format!("rule_sound_channel_{id_salt}"))
-                    .selected_text(match channel {
-                        RuleSoundChannel::Movement => "Movement",
-                        RuleSoundChannel::Collision => "Collision",
-                    })
-                    .show_ui(ui, |ui| {
-                        changed |= ui
-                            .selectable_value(channel, RuleSoundChannel::Movement, "Movement")
-                            .changed();
-                        changed |= ui
-                            .selectable_value(channel, RuleSoundChannel::Collision, "Collision")
-                            .changed();
-                    });
+                        .selected_text(match channel {
+                            RuleSoundChannel::Movement => "Movement",
+                            RuleSoundChannel::Collision => "Collision",
+                        })
+                        .show_ui(ui, |ui| {
+                            changed |= ui
+                                .selectable_value(channel, RuleSoundChannel::Movement, "Movement")
+                                .changed();
+                            changed |= ui
+                                .selectable_value(channel, RuleSoundChannel::Collision, "Collision")
+                                .changed();
+                        });
                 });
 
                 ui.horizontal(|ui| {
@@ -422,18 +422,18 @@ impl InspectorSystem {
                 ui.horizontal(|ui| {
                     ui.label("State:");
                     egui::ComboBox::from_id_salt(format!("rule_animation_state_{id_salt}"))
-                    .selected_text(animation_state_label(*state))
-                    .show_ui(ui, |ui| {
-                        for candidate in animation_state_options() {
-                            changed |= ui
-                                .selectable_value(
-                                    state,
-                                    candidate,
-                                    animation_state_label(candidate),
-                                )
-                                .changed();
-                        }
-                    });
+                        .selected_text(animation_state_label(*state))
+                        .show_ui(ui, |ui| {
+                            for candidate in animation_state_options() {
+                                changed |= ui
+                                    .selectable_value(
+                                        state,
+                                        candidate,
+                                        animation_state_label(candidate),
+                                    )
+                                    .changed();
+                            }
+                        });
                 });
             }
             RuleAction::SetVelocity { target, velocity } => {
@@ -462,24 +462,24 @@ impl InspectorSystem {
                 ui.horizontal(|ui| {
                     ui.label("Entity Type:");
                     egui::ComboBox::from_id_salt(format!("rule_spawn_type_{id_salt}"))
-                    .selected_text(Self::spawn_entity_type_label(*entity_type))
-                    .show_ui(ui, |ui| {
-                        for candidate in [
-                            RuleSpawnEntityType::PlayerLikeNpc,
-                            RuleSpawnEntityType::Npc,
-                            RuleSpawnEntityType::Item,
-                            RuleSpawnEntityType::Decoration,
-                            RuleSpawnEntityType::Trigger,
-                        ] {
-                            changed |= ui
-                                .selectable_value(
-                                    entity_type,
-                                    candidate,
-                                    Self::spawn_entity_type_label(candidate),
-                                )
-                                .changed();
-                        }
-                    });
+                        .selected_text(Self::spawn_entity_type_label(*entity_type))
+                        .show_ui(ui, |ui| {
+                            for candidate in [
+                                RuleSpawnEntityType::PlayerLikeNpc,
+                                RuleSpawnEntityType::Npc,
+                                RuleSpawnEntityType::Item,
+                                RuleSpawnEntityType::Decoration,
+                                RuleSpawnEntityType::Trigger,
+                            ] {
+                                changed |= ui
+                                    .selectable_value(
+                                        entity_type,
+                                        candidate,
+                                        Self::spawn_entity_type_label(candidate),
+                                    )
+                                    .changed();
+                            }
+                        });
                 });
 
                 ui.horizontal(|ui| {

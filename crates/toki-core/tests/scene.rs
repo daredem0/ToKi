@@ -4,7 +4,7 @@ use toki_core::entity::{
     AiBehavior, ControlRole, Entity, EntityAttributes, EntityKind, MovementProfile,
 };
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
-use toki_core::scene::{Scene, SceneAnchor, SceneAnchorFacing, SceneAnchorKind};
+use toki_core::scene::{Scene, SceneAnchor, SceneAnchorFacing, SceneAnchorKind, ScenePlayerEntry};
 
 fn create_test_entity(id: u32, position: IVec2) -> Entity {
     let mut controller = AnimationController::new();
@@ -64,6 +64,7 @@ fn test_scene_new() {
     assert!(scene.camera_scale.is_none());
     assert!(scene.background_music_track_id.is_none());
     assert!(scene.anchors.is_empty());
+    assert!(scene.player_entry.is_none());
 }
 
 #[test]
@@ -80,6 +81,7 @@ fn test_scene_with_maps() {
     assert!(scene.camera_scale.is_none());
     assert!(scene.background_music_track_id.is_none());
     assert!(scene.anchors.is_empty());
+    assert!(scene.player_entry.is_none());
 }
 
 #[test]
@@ -236,6 +238,10 @@ fn test_scene_serialization() {
         position: IVec2::new(128, 96),
         facing: Some(SceneAnchorFacing::Right),
     });
+    scene.player_entry = Some(ScenePlayerEntry {
+        entity_definition_name: "player".to_string(),
+        spawn_point_id: "from_forest".to_string(),
+    });
 
     let entity = create_test_entity(1, IVec2::new(50, 75));
     scene.add_entity(entity);
@@ -255,6 +261,7 @@ fn test_scene_serialization() {
         deserialized.background_music_track_id
     );
     assert_eq!(scene.anchors, deserialized.anchors);
+    assert_eq!(scene.player_entry, deserialized.player_entry);
     assert_eq!(scene.entities.len(), deserialized.entities.len());
     assert_eq!(scene.entities[0].id, deserialized.entities[0].id);
     assert_eq!(
@@ -346,6 +353,32 @@ fn test_scene_anchor_management() {
 
     assert!(scene.remove_anchor("from_cave"));
     assert!(scene.anchors.is_empty());
+}
+
+#[test]
+fn test_scene_player_entry_is_optional() {
+    let scene = Scene::new("optional_player".to_string());
+    assert!(scene.player_entry.is_none());
+}
+
+#[test]
+fn test_scene_player_entry_roundtrip() {
+    let mut scene = Scene::new("player_entry_scene".to_string());
+    scene.player_entry = Some(ScenePlayerEntry {
+        entity_definition_name: "player_knight".to_string(),
+        spawn_point_id: "main_spawn".to_string(),
+    });
+
+    let json = serde_json::to_string_pretty(&scene).unwrap();
+    let deserialized: Scene = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(
+        deserialized.player_entry,
+        Some(ScenePlayerEntry {
+            entity_definition_name: "player_knight".to_string(),
+            spawn_point_id: "main_spawn".to_string(),
+        })
+    );
 }
 
 #[test]

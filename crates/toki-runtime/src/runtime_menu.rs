@@ -46,9 +46,7 @@ impl App {
         let appearance = self.menu_system.settings().appearance.clone();
 
         let dialog_view = self.menu_system.current_dialog_view();
-        let should_hide_main_menu = dialog_view
-            .as_ref()
-            .is_some_and(|d| d.hide_main_menu);
+        let should_hide_main_menu = dialog_view.as_ref().is_some_and(|d| d.hide_main_menu);
 
         if !should_hide_main_menu {
             let layout = build_menu_layout(&view, &appearance, viewport);

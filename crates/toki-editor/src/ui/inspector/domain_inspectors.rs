@@ -1,7 +1,7 @@
 use super::super::inspector_trait::{Inspector, InspectorContext};
 use super::InspectorSystem;
-use toki_core::entity::EntityId;
-use toki_core::scene::{SceneAnchorFacing, SceneAnchorKind};
+use toki_core::entity::{ControlRole, EntityId};
+use toki_core::scene::{SceneAnchorFacing, SceneAnchorKind, ScenePlayerEntry};
 
 /// Inspector for single or multi-entity selection.
 pub struct EntityInspector {
@@ -72,6 +72,170 @@ impl SceneInspector {
     pub fn new(scene_name: String) -> Self {
         Self { scene_name }
     }
+
+    fn scene_has_authored_player_entity(scene: &toki_core::Scene) -> bool {
+        scene
+            .entities
+            .iter()
+            .any(|entity| entity.control_role == ControlRole::PlayerCharacter)
+    }
+
+    fn render_scene_player_entry_editor(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        scene: &toki_core::Scene,
+        ctx: &mut InspectorContext<'_>,
+    ) -> bool {
+        ui.label("Scene Player Entry:");
+
+        let entity_definition_names = ctx
+            .project
+            .as_ref()
+            .map(|project| {
+                InspectorSystem::discover_entity_definition_names(
+                    project.path.join("entities").as_path(),
+                )
+            })
+            .unwrap_or_default();
+        let spawn_point_ids = scene
+            .anchors
+            .iter()
+            .filter(|anchor| anchor.kind == SceneAnchorKind::SpawnPoint)
+            .map(|anchor| anchor.id.clone())
+            .collect::<Vec<_>>();
+        let has_authored_player_entity = Self::scene_has_authored_player_entity(scene);
+
+        if has_authored_player_entity {
+            ui.colored_label(
+                egui::Color32::YELLOW,
+                "This scene already contains a placed player entity. Scene Player Entry preview stays disabled until that authored player entity is removed.",
+            );
+        }
+
+        match scene.player_entry.clone() {
+            Some(current_entry) => {
+                let mut edited_entry = current_entry.clone();
+                let mut entry_changed = false;
+
+                ui.horizontal(|ui| {
+                    ui.label("Entity Definition:");
+                    egui::ComboBox::from_id_salt(("scene_player_entity_definition", scene_name))
+                        .selected_text(edited_entry.entity_definition_name.as_str())
+                        .show_ui(ui, |ui| {
+                            for entity_definition_name in &entity_definition_names {
+                                entry_changed |= ui
+                                    .selectable_value(
+                                        &mut edited_entry.entity_definition_name,
+                                        entity_definition_name.clone(),
+                                        entity_definition_name,
+                                    )
+                                    .changed();
+                            }
+                        });
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Spawn Point:");
+                    egui::ComboBox::from_id_salt(("scene_player_spawn_point", scene_name))
+                        .selected_text(edited_entry.spawn_point_id.as_str())
+                        .show_ui(ui, |ui| {
+                            for spawn_point_id in &spawn_point_ids {
+                                entry_changed |= ui
+                                    .selectable_value(
+                                        &mut edited_entry.spawn_point_id,
+                                        spawn_point_id.clone(),
+                                        spawn_point_id,
+                                    )
+                                    .changed();
+                            }
+                        });
+                });
+
+                if entry_changed {
+                    let before_scene = scene.clone();
+                    let mut after_scene = before_scene.clone();
+                    after_scene.player_entry = Some(edited_entry);
+                    if ctx.ui_state.execute_command(
+                        crate::ui::undo_redo::EditorCommand::update_scene(
+                            scene_name.to_string(),
+                            before_scene,
+                            after_scene,
+                        ),
+                    ) {
+                        return true;
+                    }
+                }
+
+                if entity_definition_names.is_empty() {
+                    ui.label("No entity definitions found in this project.");
+                }
+                if spawn_point_ids.is_empty() {
+                    ui.label("Add a spawn point before assigning a scene player entry.");
+                }
+
+                if ui.button("➖ Remove Scene Player Entry").clicked() {
+                    let before_scene = scene.clone();
+                    let mut after_scene = before_scene.clone();
+                    after_scene.player_entry = None;
+                    if ctx.ui_state.execute_command(
+                        crate::ui::undo_redo::EditorCommand::update_scene(
+                            scene_name.to_string(),
+                            before_scene,
+                            after_scene,
+                        ),
+                    ) {
+                        if matches!(
+                            ctx.ui_state.selection,
+                            Some(crate::ui::editor_ui::Selection::ScenePlayerEntry(ref selected_scene))
+                                if selected_scene == scene_name
+                        ) {
+                            ctx.ui_state
+                                .set_selection(crate::ui::editor_ui::Selection::Scene(
+                                    scene_name.to_string(),
+                                ));
+                        }
+                        return true;
+                    }
+                }
+            }
+            None => {
+                if entity_definition_names.is_empty() {
+                    ui.label("No entity definitions found in this project.");
+                }
+                if spawn_point_ids.is_empty() {
+                    ui.label("Add a spawn point before creating a scene player entry.");
+                }
+
+                let can_add_scene_player_entry =
+                    !entity_definition_names.is_empty() && !spawn_point_ids.is_empty();
+                if ui
+                    .add_enabled(
+                        can_add_scene_player_entry,
+                        egui::Button::new("➕ Add Scene Player Entry"),
+                    )
+                    .clicked()
+                {
+                    let before_scene = scene.clone();
+                    let mut after_scene = before_scene.clone();
+                    after_scene.player_entry = Some(ScenePlayerEntry {
+                        entity_definition_name: entity_definition_names[0].clone(),
+                        spawn_point_id: spawn_point_ids[0].clone(),
+                    });
+                    if ctx.ui_state.execute_command(
+                        crate::ui::undo_redo::EditorCommand::update_scene(
+                            scene_name.to_string(),
+                            before_scene,
+                            after_scene,
+                        ),
+                    ) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
+    }
 }
 
 impl Inspector for SceneInspector {
@@ -104,8 +268,9 @@ impl Inspector for SceneInspector {
             if background_music_changed {
                 let before_scene = scene.clone();
                 let mut after_scene = before_scene.clone();
-                after_scene.background_music_track_id = (!background_music_track_id.trim().is_empty())
-                    .then(|| background_music_track_id.trim().to_string());
+                after_scene.background_music_track_id =
+                    (!background_music_track_id.trim().is_empty())
+                        .then(|| background_music_track_id.trim().to_string());
                 if ctx
                     .ui_state
                     .execute_command(crate::ui::undo_redo::EditorCommand::update_scene(
@@ -116,6 +281,11 @@ impl Inspector for SceneInspector {
                 {
                     return true;
                 }
+            }
+
+            ui.separator();
+            if Self::render_scene_player_entry_editor(ui, &self.scene_name, &scene, ctx) {
+                return true;
             }
 
             ui.separator();
@@ -150,10 +320,11 @@ impl Inspector for SceneInspector {
                     )
                     .clicked()
                 {
-                    ctx.ui_state.set_selection(crate::ui::editor_ui::Selection::SceneAnchor {
-                        scene_name: self.scene_name.clone(),
-                        anchor_id: anchor.id.clone(),
-                    });
+                    ctx.ui_state
+                        .set_selection(crate::ui::editor_ui::Selection::SceneAnchor {
+                            scene_name: self.scene_name.clone(),
+                            anchor_id: anchor.id.clone(),
+                        });
                 }
             }
 
@@ -297,29 +468,33 @@ impl Inspector for SceneAnchorInspector {
         ui.horizontal(|ui| {
             ui.label("Facing:");
             let mut facing = edited_anchor.facing;
-            egui::ComboBox::from_id_salt(("scene_anchor_facing", &self.scene_name, &self.anchor_id))
-                .selected_text(match facing {
-                    None => "<none>",
-                    Some(SceneAnchorFacing::Up) => "Up",
-                    Some(SceneAnchorFacing::Down) => "Down",
-                    Some(SceneAnchorFacing::Left) => "Left",
-                    Some(SceneAnchorFacing::Right) => "Right",
-                })
-                .show_ui(ui, |ui| {
-                    changed |= ui.selectable_value(&mut facing, None, "<none>").changed();
-                    changed |= ui
-                        .selectable_value(&mut facing, Some(SceneAnchorFacing::Up), "Up")
-                        .changed();
-                    changed |= ui
-                        .selectable_value(&mut facing, Some(SceneAnchorFacing::Down), "Down")
-                        .changed();
-                    changed |= ui
-                        .selectable_value(&mut facing, Some(SceneAnchorFacing::Left), "Left")
-                        .changed();
-                    changed |= ui
-                        .selectable_value(&mut facing, Some(SceneAnchorFacing::Right), "Right")
-                        .changed();
-                });
+            egui::ComboBox::from_id_salt((
+                "scene_anchor_facing",
+                &self.scene_name,
+                &self.anchor_id,
+            ))
+            .selected_text(match facing {
+                None => "<none>",
+                Some(SceneAnchorFacing::Up) => "Up",
+                Some(SceneAnchorFacing::Down) => "Down",
+                Some(SceneAnchorFacing::Left) => "Left",
+                Some(SceneAnchorFacing::Right) => "Right",
+            })
+            .show_ui(ui, |ui| {
+                changed |= ui.selectable_value(&mut facing, None, "<none>").changed();
+                changed |= ui
+                    .selectable_value(&mut facing, Some(SceneAnchorFacing::Up), "Up")
+                    .changed();
+                changed |= ui
+                    .selectable_value(&mut facing, Some(SceneAnchorFacing::Down), "Down")
+                    .changed();
+                changed |= ui
+                    .selectable_value(&mut facing, Some(SceneAnchorFacing::Left), "Left")
+                    .changed();
+                changed |= ui
+                    .selectable_value(&mut facing, Some(SceneAnchorFacing::Right), "Right")
+                    .changed();
+            });
             edited_anchor.facing = facing;
         });
 
@@ -343,14 +518,18 @@ impl Inspector for SceneAnchorInspector {
         if delete_requested {
             let mut after_scene = before_scene.clone();
             after_scene.anchors.remove(anchor_index);
-            if ctx.ui_state.execute_command(crate::ui::undo_redo::EditorCommand::update_scene(
-                self.scene_name.clone(),
-                before_scene,
-                after_scene,
-            )) {
-                ctx.ui_state.set_selection(crate::ui::editor_ui::Selection::Scene(
+            if ctx
+                .ui_state
+                .execute_command(crate::ui::undo_redo::EditorCommand::update_scene(
                     self.scene_name.clone(),
-                ));
+                    before_scene,
+                    after_scene,
+                ))
+            {
+                ctx.ui_state
+                    .set_selection(crate::ui::editor_ui::Selection::Scene(
+                        self.scene_name.clone(),
+                    ));
                 return true;
             }
             return false;
@@ -359,16 +538,20 @@ impl Inspector for SceneAnchorInspector {
         if changed {
             let mut after_scene = before_scene.clone();
             after_scene.anchors[anchor_index] = edited_anchor.clone();
-            if ctx.ui_state.execute_command(crate::ui::undo_redo::EditorCommand::update_scene(
-                self.scene_name.clone(),
-                before_scene,
-                after_scene,
-            )) {
+            if ctx
+                .ui_state
+                .execute_command(crate::ui::undo_redo::EditorCommand::update_scene(
+                    self.scene_name.clone(),
+                    before_scene,
+                    after_scene,
+                ))
+            {
                 self.anchor_id = edited_anchor.id.clone();
-                ctx.ui_state.set_selection(crate::ui::editor_ui::Selection::SceneAnchor {
-                    scene_name: self.scene_name.clone(),
-                    anchor_id: edited_anchor.id,
-                });
+                ctx.ui_state
+                    .set_selection(crate::ui::editor_ui::Selection::SceneAnchor {
+                        scene_name: self.scene_name.clone(),
+                        anchor_id: edited_anchor.id,
+                    });
                 return true;
             }
         }
@@ -378,6 +561,97 @@ impl Inspector for SceneAnchorInspector {
 
     fn name(&self) -> &'static str {
         "SceneAnchor"
+    }
+}
+
+pub struct ScenePlayerEntryInspector {
+    scene_name: String,
+}
+
+impl ScenePlayerEntryInspector {
+    pub fn new(scene_name: String) -> Self {
+        Self { scene_name }
+    }
+}
+
+impl Inspector for ScenePlayerEntryInspector {
+    fn render(&mut self, ui: &mut egui::Ui, ctx: &mut InspectorContext<'_>) -> bool {
+        ui.heading("🧍 Scene Player");
+        ui.label(format!("Scene: {}", self.scene_name));
+        ui.separator();
+
+        let Some(scene) = ctx.ui_state.get_scene(&self.scene_name).cloned() else {
+            ui.label("Scene not found.");
+            return false;
+        };
+
+        let changed =
+            SceneInspector::render_scene_player_entry_editor(ui, &self.scene_name, &scene, ctx);
+
+        if changed {
+            return true;
+        }
+
+        if let Some(player_entry) = scene.player_entry.as_ref() {
+            ui.separator();
+            ui.heading(format!("🤖 {}", player_entry.entity_definition_name));
+            ui.label("Player Entity Definition");
+            ui.separator();
+
+            if let Some(config) = ctx.config {
+                if let Some(project_path) = config.current_project_path() {
+                    let entity_file = project_path
+                        .join("entities")
+                        .join(format!("{}.json", player_entry.entity_definition_name));
+                    match std::fs::read_to_string(&entity_file) {
+                        Ok(content) => match serde_json::from_str::<
+                            toki_core::entity::EntityDefinition,
+                        >(&content)
+                        {
+                            Ok(mut definition) => {
+                                let mut draft =
+                                    super::EntityPropertyDraft::from_entity_definition(&definition);
+                                if InspectorSystem::render_entity_definition_property_editor(
+                                    ui, &mut draft, ctx.config,
+                                ) && InspectorSystem::apply_entity_property_draft_to_definition(
+                                        &mut definition,
+                                        &draft,
+                                    )
+                                {
+                                    if let Err(err) = InspectorSystem::save_entity_definition(
+                                        &definition,
+                                        &entity_file,
+                                    ) {
+                                        ui.colored_label(egui::Color32::RED, err);
+                                    } else {
+                                        ctx.ui_state.scene_content_changed = true;
+                                        return true;
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                ui.colored_label(
+                                    egui::Color32::RED,
+                                    format!("Failed to parse entity definition: {err}"),
+                                );
+                            }
+                        },
+                        Err(err) => {
+                            ui.colored_label(
+                                egui::Color32::RED,
+                                format!("Failed to read entity definition: {err}"),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    fn name(&self) -> &'static str {
+        "ScenePlayerEntry"
     }
 }
 
@@ -538,6 +812,9 @@ use super::super::inspector_trait::NoSelectionInspector;
 pub fn create_inspector_for_selection(selection: Option<&Selection>) -> Box<dyn Inspector> {
     match selection {
         Some(Selection::Scene(scene_name)) => Box::new(SceneInspector::new(scene_name.clone())),
+        Some(Selection::ScenePlayerEntry(scene_name)) => {
+            Box::new(ScenePlayerEntryInspector::new(scene_name.clone()))
+        }
         Some(Selection::SceneAnchor {
             scene_name,
             anchor_id,
@@ -584,6 +861,13 @@ mod tests {
         let selection = Selection::Scene("TestScene".to_string());
         let inspector = create_inspector_for_selection(Some(&selection));
         assert_eq!(inspector.name(), "Scene");
+    }
+
+    #[test]
+    fn create_inspector_for_scene_player_entry_returns_scene_player_entry_inspector() {
+        let selection = Selection::ScenePlayerEntry("TestScene".to_string());
+        let inspector = create_inspector_for_selection(Some(&selection));
+        assert_eq!(inspector.name(), "ScenePlayerEntry");
     }
 
     #[test]
@@ -641,6 +925,12 @@ mod tests {
     fn scene_inspector_has_correct_name() {
         let inspector = SceneInspector::new("TestScene".to_string());
         assert_eq!(inspector.name(), "Scene");
+    }
+
+    #[test]
+    fn scene_player_entry_inspector_has_correct_name() {
+        let inspector = ScenePlayerEntryInspector::new("TestScene".to_string());
+        assert_eq!(inspector.name(), "ScenePlayerEntry");
     }
 
     #[test]

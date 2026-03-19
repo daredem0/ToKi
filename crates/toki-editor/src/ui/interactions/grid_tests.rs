@@ -126,12 +126,8 @@ fn scene_anchor_marker_world_position_uses_grid_cell_center_when_snap_enabled() 
         snap_to_grid: true,
     };
 
-    let marker = GridInteraction::placement_pose(
-        Vec2::new(32.0, 48.0),
-        None,
-        Some(&config),
-    )
-    .marker_world;
+    let marker =
+        GridInteraction::placement_pose(Vec2::new(32.0, 48.0), None, Some(&config)).marker_world;
 
     assert_eq!(marker, Vec2::new(40.0, 56.0));
 }
@@ -162,12 +158,9 @@ fn scene_anchor_marker_world_position_prefers_tilemap_cell_center() {
     };
     let tilemap = sample_tilemap(UVec2::new(16, 24));
 
-    let marker = GridInteraction::placement_pose(
-        Vec2::new(32.0, 48.0),
-        Some(&tilemap),
-        Some(&config),
-    )
-    .marker_world;
+    let marker =
+        GridInteraction::placement_pose(Vec2::new(32.0, 48.0), Some(&tilemap), Some(&config))
+            .marker_world;
 
     assert_eq!(marker, Vec2::new(40.0, 60.0));
 }
@@ -181,12 +174,8 @@ fn scene_anchor_marker_world_position_keeps_raw_position_when_snap_disabled() {
         snap_to_grid: false,
     };
 
-    let marker = GridInteraction::placement_pose(
-        Vec2::new(32.0, 48.0),
-        None,
-        Some(&config),
-    )
-    .marker_world;
+    let marker =
+        GridInteraction::placement_pose(Vec2::new(32.0, 48.0), None, Some(&config)).marker_world;
 
     assert_eq!(marker, Vec2::new(32.0, 48.0));
 }

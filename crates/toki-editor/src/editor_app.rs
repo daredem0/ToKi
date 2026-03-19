@@ -67,6 +67,11 @@ pub(crate) struct EditorResourceCache {
     pub busy_logo_texture: Option<egui::TextureHandle>,
     /// Caches which project's menu preview fonts have been registered with egui.
     pub menu_font_project_path: Option<PathBuf>,
+    /// Caches preview visuals by project and entity definition name.
+    pub preview_sprite_frames: std::collections::HashMap<
+        (PathBuf, String),
+        Option<crate::ui::editor_ui::PlacementPreviewVisual>,
+    >,
 }
 
 /// Platform layer: window, renderer, and egui integration.
@@ -135,6 +140,22 @@ enum EditorShortcutAction {
 }
 
 impl EditorApp {
+    fn cached_preview_sprite_frame(
+        preview_sprite_frames: &mut std::collections::HashMap<
+            (PathBuf, String),
+            Option<crate::ui::editor_ui::PlacementPreviewVisual>,
+        >,
+        entity_def_name: &str,
+        project_path: &std::path::Path,
+        project_assets: &ProjectAssets,
+    ) -> Option<crate::ui::editor_ui::PlacementPreviewVisual> {
+        let cache_key = (project_path.to_path_buf(), entity_def_name.to_string());
+        let cached = preview_sprite_frames.entry(cache_key).or_insert_with(|| {
+            Self::load_preview_sprite_frame_static(entity_def_name, project_path, project_assets)
+        });
+        cached.clone()
+    }
+
     fn new(log_capture: Option<LogCapture>) -> Self {
         // Load or create config
         let config = EditorConfig::load().unwrap_or_else(|e| {
@@ -691,6 +712,32 @@ impl EditorApp {
         }
         self.sync_project_menu_preview_fonts(&egui_ctx);
 
+        // Load sprite frame cache if needed (before render loop to avoid borrowing issues)
+        let project_path = self.core.config.current_project_path().cloned();
+        if self.core.ui.is_in_placement_mode()
+            && self.core.ui.placement.preview_cached_frame.is_none()
+        {
+            let placement_entity_definition = self
+                .core
+                .ui
+                .placement
+                .entity_definition()
+                .map(str::to_string);
+            if let (Some(entity_def), Some(project_path), Some(project_assets)) = (
+                placement_entity_definition.as_deref(),
+                &project_path,
+                self.core.project_manager.get_project_assets(),
+            ) {
+                let cached_frame = Self::cached_preview_sprite_frame(
+                    &mut self.resources.preview_sprite_frames,
+                    entity_def,
+                    project_path.as_path(),
+                    project_assets,
+                );
+                self.core.ui.placement.preview_cached_frame = cached_frame;
+            }
+        }
+
         let egui_winit = match &mut self.platform.egui_winit {
             Some(egui) => egui,
             None => return, // Not initialized yet
@@ -704,30 +751,17 @@ impl EditorApp {
             None => return, // Not initialized yet
         };
 
-        // Load sprite frame cache if needed (before render loop to avoid borrowing issues)
-        let project_path = self.core.config.current_project_path();
-        if self.core.ui.is_in_placement_mode()
-            && self.core.ui.placement.preview_cached_frame.is_none()
-        {
-            if let (Some(entity_def), Some(project_path), Some(project_assets)) = (
-                self.core.ui.placement.entity_definition(),
-                &project_path,
-                self.core.project_manager.get_project_assets(),
-            ) {
-                let cached_frame = EditorApp::load_preview_sprite_frame_static(
-                    entity_def,
-                    project_path.as_path(),
-                    project_assets,
-                );
-                self.core.ui.placement.preview_cached_frame = cached_frame;
-            }
-        }
-
         // Pre-render active center viewport to texture before egui UI.
         if let Some(project_path) = &project_path {
             if let Some(project_assets) = self.core.project_manager.get_project_assets() {
                 match self.core.ui.center_panel_tab {
                     CenterPanelTab::SceneViewport => {
+                        let scene_player_overlay_sprites = Self::build_scene_player_overlay_sprites(
+                            &self.core.ui,
+                            project_path.as_path(),
+                            project_assets,
+                            &mut self.resources.preview_sprite_frames,
+                        );
                         if let Some(scene_viewport) = &mut self.viewports.scene {
                             let placement_preview = if self.core.ui.is_in_placement_mode() {
                                 if self.core.ui.placement.entity_move_drag.is_none() {
@@ -781,7 +815,7 @@ impl EditorApp {
                             let overlay_data = ViewportOverlayData {
                                 placement_preview,
                                 drag_preview_sprites: drag_preview_sprites.unwrap_or_default(),
-                                overlay_sprites: Vec::new(),
+                                overlay_sprites: scene_player_overlay_sprites,
                                 overlay_rects: Vec::new(),
                                 overlay_lines: anchor_overlay_lines,
                             };

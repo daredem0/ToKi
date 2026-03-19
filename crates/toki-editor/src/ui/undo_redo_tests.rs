@@ -428,18 +428,27 @@ fn update_scene_command_round_trips_scene_metadata_and_anchors() {
     assert!(history.execute(command, &mut ui_state, None));
 
     let updated = main_scene(&ui_state);
-    assert_eq!(updated.background_music_track_id, Some("lavandia".to_string()));
+    assert_eq!(
+        updated.background_music_track_id,
+        Some("lavandia".to_string())
+    );
     assert_eq!(updated.anchors.len(), 1);
     assert_eq!(updated.anchors[0].id, "from_forest");
 
     assert!(history.undo(&mut ui_state, None));
     let restored = main_scene(&ui_state);
-    assert_eq!(restored.background_music_track_id, before.background_music_track_id);
+    assert_eq!(
+        restored.background_music_track_id,
+        before.background_music_track_id
+    );
     assert!(restored.anchors.is_empty());
 
     assert!(history.redo(&mut ui_state, None));
     let redone = main_scene(&ui_state);
-    assert_eq!(redone.background_music_track_id, Some("lavandia".to_string()));
+    assert_eq!(
+        redone.background_music_track_id,
+        Some("lavandia".to_string())
+    );
     assert_eq!(redone.anchors.len(), 1);
 }
 

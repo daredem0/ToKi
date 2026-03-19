@@ -1177,6 +1177,7 @@ fn game_state_primary_action_damages_scene_loaded_legacy_health_target() {
         camera_scale: None,
         background_music_track_id: None,
         anchors: Vec::new(),
+        player_entry: None,
     };
 
     game_state.add_scene(scene);
@@ -2035,6 +2036,7 @@ fn game_state_load_scene_uses_control_role_for_player_identity() {
         camera_scale: None,
         background_music_track_id: None,
         anchors: Vec::new(),
+        player_entry: None,
     };
 
     game_state.add_scene(scene);

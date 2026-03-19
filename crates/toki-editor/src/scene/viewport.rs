@@ -327,11 +327,7 @@ impl SceneViewport {
         tracing::trace!("Scene needs re-rendering, proceeding with render");
 
         // Prepare scene data
-        let scene_data = self.prepare_scene_data(
-            Some(project_path),
-            project_assets,
-            overlay_data,
-        );
+        let scene_data = self.prepare_scene_data(Some(project_path), project_assets, overlay_data);
 
         // Render to offscreen target
         let projection = self.calculate_editor_projection();

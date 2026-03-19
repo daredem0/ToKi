@@ -129,6 +129,41 @@ impl EditorUI {
             });
     }
 
+    fn render_scene_player_entry_group(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        player_entry: &toki_core::scene::ScenePlayerEntry,
+        current_selection: &Option<super::Selection>,
+        selection_changes: &mut Vec<super::Selection>,
+    ) {
+        egui::CollapsingHeader::new("Player")
+            .id_salt(format!("scene_player_{scene_name}"))
+            .default_open(false)
+            .show(ui, |ui| {
+                let is_selected = matches!(
+                    current_selection,
+                    Some(super::Selection::ScenePlayerEntry(selected_scene))
+                        if selected_scene == scene_name
+                );
+
+                ui.horizontal(|ui| {
+                    let response = ui.selectable_label(
+                        is_selected,
+                        format!("Player: {}", player_entry.entity_definition_name),
+                    );
+
+                    if response.clicked() {
+                        selection_changes
+                            .push(super::Selection::ScenePlayerEntry(scene_name.to_string()));
+                    }
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(format!("spawn: {}", player_entry.spawn_point_id));
+                    });
+                });
+            });
+    }
+
     pub(super) fn render_scene_hierarchy_section(
         &mut self,
         ui: &mut egui::Ui,
@@ -241,6 +276,16 @@ impl EditorUI {
                         &mut selection_changes,
                         &mut anchor_removals,
                     );
+
+                    if let Some(player_entry) = scene.player_entry.as_ref() {
+                        Self::render_scene_player_entry_group(
+                            ui,
+                            &scene.name,
+                            player_entry,
+                            &self.selection,
+                            &mut selection_changes,
+                        );
+                    }
 
                     if self.visibility.show_runtime_entities {
                         egui::CollapsingHeader::new("Runtime Entities:")
@@ -383,7 +428,11 @@ impl EditorUI {
                 before_scene,
                 after_scene,
             )) {
-                tracing::info!("Removed spawnpoint '{}' from scene {}", anchor_id, scene_name);
+                tracing::info!(
+                    "Removed spawnpoint '{}' from scene {}",
+                    anchor_id,
+                    scene_name
+                );
                 if matches!(
                     &self.selection,
                     Some(super::Selection::SceneAnchor { scene_name: selected_scene, anchor_id: selected_anchor })

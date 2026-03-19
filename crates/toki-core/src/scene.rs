@@ -24,6 +24,12 @@ pub struct SceneAnchor {
     pub facing: Option<SceneAnchorFacing>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScenePlayerEntry {
+    pub entity_definition_name: String,
+    pub spawn_point_id: String,
+}
+
 /// Represents a game scene - a complete game environment with entities, maps, and metadata.
 ///
 /// A scene is a self-contained game environment that can be loaded, saved, and edited.
@@ -56,6 +62,14 @@ pub struct Scene {
     /// Placeable authored scene anchors such as spawn points.
     #[serde(default)]
     pub anchors: Vec<SceneAnchor>,
+
+    /// Optional scene-authored player preview/entry configuration.
+    ///
+    /// Scenes are not required to author a player entry. This is used when a
+    /// scene wants to define which player entity definition should preview and
+    /// enter at which spawn point.
+    #[serde(default)]
+    pub player_entry: Option<ScenePlayerEntry>,
 }
 
 impl Scene {
@@ -71,6 +85,7 @@ impl Scene {
             camera_scale: None,
             background_music_track_id: None,
             anchors: Vec::new(),
+            player_entry: None,
         }
     }
 
@@ -86,6 +101,7 @@ impl Scene {
             camera_scale: None,
             background_music_track_id: None,
             anchors: Vec::new(),
+            player_entry: None,
         }
     }
 

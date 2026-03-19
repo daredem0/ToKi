@@ -73,7 +73,10 @@ impl SelectionInteraction {
         config: Option<&EditorConfig>,
     ) -> Option<(String, String)> {
         let active_scene_name = ui_state.active_scene.as_ref()?;
-        let scene = ui_state.scenes.iter().find(|scene| &scene.name == active_scene_name)?;
+        let scene = ui_state
+            .scenes
+            .iter()
+            .find(|scene| &scene.name == active_scene_name)?;
         const HIT_RADIUS_WORLD: f32 = 8.0;
 
         scene.anchors.iter().find_map(|anchor| {
@@ -120,7 +123,8 @@ impl SelectionInteraction {
                 return;
             };
 
-            let Some(entity) = Self::find_scene_entity(ui_state, &active_scene_name, entity_id) else {
+            let Some(entity) = Self::find_scene_entity(ui_state, &active_scene_name, entity_id)
+            else {
                 tracing::warn!(
                     "Cannot start entity move drag: entity {} not found in active scene '{}'",
                     entity_id,
@@ -129,7 +133,8 @@ impl SelectionInteraction {
                 return;
             };
 
-            let project_path = config.and_then(|cfg| cfg.current_project_path().map(|p| p.as_path()));
+            let project_path =
+                config.and_then(|cfg| cfg.current_project_path().map(|p| p.as_path()));
             let entity_def_name = Self::resolve_entity_definition_name(&entity, project_path)
                 .unwrap_or_else(|| Self::entity_kind_name(&entity.entity_kind).to_string());
 
@@ -512,9 +517,20 @@ impl SelectionInteraction {
         scene.entities.iter().find(|e| e.id == entity_id).cloned()
     }
 
-    fn find_scene_anchor(ui_state: &EditorUI, scene_name: &str, anchor_id: &str) -> Option<toki_core::scene::SceneAnchor> {
-        let scene = ui_state.scenes.iter().find(|scene| scene.name == scene_name)?;
-        scene.anchors.iter().find(|anchor| anchor.id == anchor_id).cloned()
+    fn find_scene_anchor(
+        ui_state: &EditorUI,
+        scene_name: &str,
+        anchor_id: &str,
+    ) -> Option<toki_core::scene::SceneAnchor> {
+        let scene = ui_state
+            .scenes
+            .iter()
+            .find(|scene| scene.name == scene_name)?;
+        scene
+            .anchors
+            .iter()
+            .find(|anchor| anchor.id == anchor_id)
+            .cloned()
     }
 
     fn drag_entities_for_start(

@@ -13,8 +13,15 @@
   "attributes": {
     "health": 100,
     "stats": {
-      "attack_power": 8
+      "attack_power": 8,
+      "health": 100
     },
+    "speed": 2.0,
+    "solid": true,
+    "active": true,
+    "can_move": true,
+    "ai_behavior": "none",
+    "movement_profile": "player_wasd",
     "primary_projectile": {
       "sheet": "fauna",
       "object_name": "rock",
@@ -30,12 +37,6 @@
         0
       ]
     },
-    "speed": 2,
-    "solid": true,
-    "active": true,
-    "can_move": true,
-    "ai_behavior": "wander",
-    "movement_profile": "player_wasd",
     "has_inventory": true
   },
   "collision": {
@@ -53,8 +54,8 @@
   "audio": {
     "footstep_trigger_distance": 16.0,
     "hearing_radius": 100,
-    "movement_sound_trigger": "distance",
-    "movement_sound": "sfx_player_step",
+    "movement_sound_trigger": "animation_loop",
+    "movement_sound": "sfx_step",
     "collision_sound": null
   },
   "animations": {

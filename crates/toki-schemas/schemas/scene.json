@@ -58,9 +58,31 @@
         "$ref": "#/definitions/sceneAnchor"
       },
       "description": "Authored scene anchors such as spawn points"
+    },
+    "player_entry": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/definitions/scenePlayerEntry" }
+      ],
+      "description": "Optional scene-authored player entry preview and spawn target"
     }
   },
   "definitions": {
+    "scenePlayerEntry": {
+      "type": "object",
+      "required": ["entity_definition_name", "spawn_point_id"],
+      "additionalProperties": false,
+      "properties": {
+        "entity_definition_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spawn_point_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "sceneAnchor": {
       "type": "object",
       "required": ["id", "kind", "position"],

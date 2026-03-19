@@ -108,6 +108,29 @@ fn scene_schema_accepts_scene_anchors_and_background_music() {
 }
 
 #[test]
+fn scene_schema_accepts_optional_scene_player_entry() {
+    let schema = compile_scene_schema();
+    let doc = json!({
+        "name": "PlayerEntryScene",
+        "maps": [],
+        "entities": [],
+        "anchors": [
+            {
+                "id": "spawn_1",
+                "kind": "SpawnPoint",
+                "position": [0, 0]
+            }
+        ],
+        "player_entry": {
+            "entity_definition_name": "player",
+            "spawn_point_id": "spawn_1"
+        }
+    });
+
+    assert_valid(&schema, &doc);
+}
+
+#[test]
 fn scene_schema_rejects_invalid_scene_anchor_payloads() {
     let schema = compile_scene_schema();
     let invalid_docs = vec![
@@ -128,6 +151,18 @@ fn scene_schema_rejects_invalid_scene_anchor_payloads() {
             "maps": [],
             "entities": [],
             "anchors": [{"id": "spawn", "kind": "Unknown", "position": [0, 0]}]
+        }),
+        json!({
+            "name": "InvalidScene",
+            "maps": [],
+            "entities": [],
+            "player_entry": {"entity_definition_name": "", "spawn_point_id": "spawn"}
+        }),
+        json!({
+            "name": "InvalidScene",
+            "maps": [],
+            "entities": [],
+            "player_entry": {"entity_definition_name": "player"}
         }),
     ];
 

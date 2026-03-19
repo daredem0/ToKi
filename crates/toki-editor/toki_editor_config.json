@@ -1,0 +1,35 @@
+{
+  "project_path": null,
+  "editor_settings": {
+    "window_size": [
+      1200,
+      800
+    ],
+    "panels": {
+      "hierarchy_visible": true,
+      "inspector_visible": true,
+      "console_visible": true
+    },
+    "grid": {
+      "show_grid": true,
+      "grid_size": [
+        16,
+        16
+      ],
+      "snap_to_grid": true
+    },
+    "camera": {
+      "pan_speed": 1.0,
+      "zoom_speed": 1.0
+    }
+  },
+  "recent_projects": [],
+  "rendering": {
+    "vsync": true,
+    "target_fps": 60,
+    "show_collision_boxes": true,
+    "show_debug_info": false
+  },
+  "log_to_terminal": true,
+  "log_level": "INFO"
+}

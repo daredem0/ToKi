@@ -96,5 +96,8 @@
     ]
   },
   "camera_position": null,
-  "camera_scale": null
+  "camera_scale": null,
+  "background_music_track_id": null,
+  "anchors": [],
+  "player_entry": null
 }

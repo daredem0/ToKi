@@ -216,6 +216,79 @@ impl EntityPropertyDraft {
             collision,
         }
     }
+
+    fn from_entity_definition(definition: &toki_core::entity::EntityDefinition) -> Self {
+        let collision = if definition.collision.enabled {
+            CollisionDraft {
+                enabled: true,
+                offset_x: definition.collision.offset[0],
+                offset_y: definition.collision.offset[1],
+                size_x: definition.collision.size[0] as i64,
+                size_y: definition.collision.size[1] as i64,
+                trigger: definition.collision.trigger,
+            }
+        } else {
+            CollisionDraft {
+                enabled: false,
+                offset_x: 0,
+                offset_y: 0,
+                size_x: definition.rendering.size[0] as i64,
+                size_y: definition.rendering.size[1] as i64,
+                trigger: false,
+            }
+        };
+
+        let (health_enabled, health_value) = match definition.attributes.health {
+            Some(value) => (true, value as i64),
+            None => (false, 0),
+        };
+        let (attack_power_enabled, attack_power_value) = match definition
+            .attributes
+            .stats
+            .get(ATTACK_POWER_STAT_ID)
+            .copied()
+        {
+            Some(value) => (true, value as i64),
+            None => (false, 0),
+        };
+
+        Self {
+            category: definition.category.clone(),
+            static_object_sheet: definition
+                .rendering
+                .static_object
+                .as_ref()
+                .map(|render| render.sheet.clone()),
+            static_object_name: definition
+                .rendering
+                .static_object
+                .as_ref()
+                .map(|render| render.object_name.clone()),
+            control_role: ControlRole::PlayerCharacter,
+            position_x: 0,
+            position_y: 0,
+            size_x: definition.rendering.size[0] as i64,
+            size_y: definition.rendering.size[1] as i64,
+            visible: definition.rendering.visible,
+            active: definition.attributes.active,
+            solid: definition.attributes.solid,
+            can_move: definition.attributes.can_move,
+            ai_behavior: definition.attributes.ai_behavior,
+            movement_profile: definition.attributes.movement_profile,
+            movement_sound_trigger: definition.audio.movement_sound_trigger,
+            footstep_trigger_distance: definition.audio.footstep_trigger_distance,
+            hearing_radius: definition.audio.hearing_radius,
+            movement_sound: definition.audio.movement_sound.clone(),
+            has_inventory: definition.attributes.has_inventory,
+            speed: definition.attributes.speed as f64,
+            render_layer: definition.rendering.render_layer,
+            health_enabled,
+            health_value,
+            attack_power_enabled,
+            attack_power_value,
+            collision,
+        }
+    }
 }
 
 impl ProjectSettingsDraft {
@@ -372,6 +445,30 @@ impl InspectorSystem {
                     "ogg" | "wav" | "mp3"
                 );
                 if !supported {
+                    continue;
+                }
+                if let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) {
+                    names.push(stem.to_string());
+                }
+            }
+        }
+
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    fn discover_entity_definition_names(dir: &std::path::Path) -> Vec<String> {
+        if !dir.exists() {
+            return Vec::new();
+        }
+
+        let mut names = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_file() || path.extension().and_then(|ext| ext.to_str()) != Some("json")
+                {
                     continue;
                 }
                 if let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) {

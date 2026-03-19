@@ -2,6 +2,7 @@ use super::*;
 use crate::config::EditorConfig;
 use crate::ui::editor_ui::PlacementPreviewVisual;
 use crate::ui::interactions::GridInteraction;
+use toki_core::entity::ControlRole;
 use toki_core::project_assets::normalize_asset_name;
 
 impl EditorApp {
@@ -102,6 +103,64 @@ impl EditorApp {
         }
 
         lines
+    }
+
+    pub(super) fn build_scene_player_overlay_sprites(
+        ui_state: &crate::ui::EditorUI,
+        project_path: &std::path::Path,
+        project_assets: &crate::project::ProjectAssets,
+        preview_cache: &mut std::collections::HashMap<
+            (std::path::PathBuf, String),
+            Option<crate::ui::editor_ui::PlacementPreviewVisual>,
+        >,
+    ) -> Vec<crate::scene::viewport::OverlaySpriteInstance> {
+        let Some(active_scene_name) = ui_state.active_scene.as_ref() else {
+            return Vec::new();
+        };
+        let Some(scene) = ui_state
+            .scenes
+            .iter()
+            .find(|scene| &scene.name == active_scene_name)
+        else {
+            return Vec::new();
+        };
+        let Some(player_entry) = scene.player_entry.as_ref() else {
+            return Vec::new();
+        };
+
+        if scene
+            .entities
+            .iter()
+            .any(|entity| entity.control_role == ControlRole::PlayerCharacter)
+        {
+            return Vec::new();
+        }
+
+        let Some(spawn_point) = scene.get_anchor(&player_entry.spawn_point_id) else {
+            return Vec::new();
+        };
+        let cache_key = (
+            project_path.to_path_buf(),
+            player_entry.entity_definition_name.clone(),
+        );
+        let Some(visual) = preview_cache
+            .entry(cache_key)
+            .or_insert_with(|| {
+                Self::load_preview_sprite_frame_static(
+                    &player_entry.entity_definition_name,
+                    project_path,
+                    project_assets,
+                )
+            })
+            .clone()
+        else {
+            return Vec::new();
+        };
+
+        vec![crate::scene::viewport::OverlaySpriteInstance {
+            world_position: spawn_point.position,
+            visual,
+        }]
     }
 
     pub(super) fn load_preview_sprite_frame_static(

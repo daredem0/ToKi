@@ -354,10 +354,7 @@ impl PlacementInteraction {
         entities.iter().map(|e| e.id).max().unwrap_or(0) + 1
     }
 
-    pub fn next_scene_anchor_id(
-        anchors: &[SceneAnchor],
-        kind: SceneAnchorKind,
-    ) -> String {
+    pub fn next_scene_anchor_id(anchors: &[SceneAnchor], kind: SceneAnchorKind) -> String {
         let base = match kind {
             SceneAnchorKind::SpawnPoint => "spawn_point",
         };

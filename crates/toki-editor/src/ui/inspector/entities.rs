@@ -1,26 +1,31 @@
 use super::*;
 
 impl InspectorSystem {
-    pub(super) fn render_scene_entity_editor(
+    fn render_entity_property_editor(
         ui: &mut egui::Ui,
         draft: &mut EntityPropertyDraft,
         config: Option<&EditorConfig>,
+        show_position: bool,
+        allow_control_role_edit: bool,
+        section_label: &str,
     ) -> bool {
         let mut changed = false;
         let is_static_item = draft.category == "item" && draft.static_object_sheet.is_some();
 
-        ui.label("Scene Entity Properties");
+        ui.label(section_label);
         ui.separator();
 
-        ui.horizontal(|ui| {
-            ui.label("Position:");
-            changed |= ui
-                .add(egui::DragValue::new(&mut draft.position_x).speed(1.0))
-                .changed();
-            changed |= ui
-                .add(egui::DragValue::new(&mut draft.position_y).speed(1.0))
-                .changed();
-        });
+        if show_position {
+            ui.horizontal(|ui| {
+                ui.label("Position:");
+                changed |= ui
+                    .add(egui::DragValue::new(&mut draft.position_x).speed(1.0))
+                    .changed();
+                changed |= ui
+                    .add(egui::DragValue::new(&mut draft.position_y).speed(1.0))
+                    .changed();
+            });
+        }
 
         ui.horizontal(|ui| {
             ui.label("Size:");
@@ -76,20 +81,28 @@ impl InspectorSystem {
             changed |= ui.checkbox(&mut draft.can_move, "Can Move").changed();
             ui.horizontal(|ui| {
                 ui.label("Control Role:");
-                egui::ComboBox::from_id_salt("entity_control_role")
-                    .selected_text(control_role_label(draft.control_role))
-                    .show_ui(ui, |ui| {
-                        changed |= ui
-                            .selectable_value(&mut draft.control_role, ControlRole::None, "None")
-                            .changed();
-                        changed |= ui
-                            .selectable_value(
-                                &mut draft.control_role,
-                                ControlRole::PlayerCharacter,
-                                "Player Character",
-                            )
-                            .changed();
-                    });
+                if allow_control_role_edit {
+                    egui::ComboBox::from_id_salt("entity_control_role")
+                        .selected_text(control_role_label(draft.control_role))
+                        .show_ui(ui, |ui| {
+                            changed |= ui
+                                .selectable_value(
+                                    &mut draft.control_role,
+                                    ControlRole::None,
+                                    "None",
+                                )
+                                .changed();
+                            changed |= ui
+                                .selectable_value(
+                                    &mut draft.control_role,
+                                    ControlRole::PlayerCharacter,
+                                    "Player Character",
+                                )
+                                .changed();
+                        });
+                } else {
+                    ui.label(control_role_label(ControlRole::PlayerCharacter));
+                }
             });
             ui.horizontal(|ui| {
                 ui.label("Movement:");
@@ -289,6 +302,150 @@ impl InspectorSystem {
             changed |= ui
                 .checkbox(&mut draft.collision.trigger, "Trigger")
                 .changed();
+        }
+
+        changed
+    }
+
+    pub(super) fn render_scene_entity_editor(
+        ui: &mut egui::Ui,
+        draft: &mut EntityPropertyDraft,
+        config: Option<&EditorConfig>,
+    ) -> bool {
+        Self::render_entity_property_editor(
+            ui,
+            draft,
+            config,
+            true,
+            true,
+            "Scene Entity Properties",
+        )
+    }
+
+    pub(super) fn render_entity_definition_property_editor(
+        ui: &mut egui::Ui,
+        draft: &mut EntityPropertyDraft,
+        config: Option<&EditorConfig>,
+    ) -> bool {
+        Self::render_entity_property_editor(ui, draft, config, false, false, "Entity Properties")
+    }
+
+    pub(super) fn apply_entity_property_draft_to_definition(
+        definition: &mut toki_core::entity::EntityDefinition,
+        draft: &EntityPropertyDraft,
+    ) -> bool {
+        let mut changed = false;
+
+        let new_width = draft.size_x.clamp(1, u32::MAX as i64) as u32;
+        let new_height = draft.size_y.clamp(1, u32::MAX as i64) as u32;
+        if definition.rendering.size != [new_width, new_height] {
+            definition.rendering.size = [new_width, new_height];
+            changed = true;
+        }
+
+        if definition.rendering.render_layer != draft.render_layer {
+            definition.rendering.render_layer = draft.render_layer;
+            changed = true;
+        }
+        if definition.rendering.visible != draft.visible {
+            definition.rendering.visible = draft.visible;
+            changed = true;
+        }
+        if definition.attributes.active != draft.active {
+            definition.attributes.active = draft.active;
+            changed = true;
+        }
+        if definition.attributes.solid != draft.solid {
+            definition.attributes.solid = draft.solid;
+            changed = true;
+        }
+        if definition.attributes.can_move != draft.can_move {
+            definition.attributes.can_move = draft.can_move;
+            changed = true;
+        }
+        if definition.attributes.ai_behavior != draft.ai_behavior {
+            definition.attributes.ai_behavior = draft.ai_behavior;
+            changed = true;
+        }
+        if definition.attributes.movement_profile != draft.movement_profile {
+            definition.attributes.movement_profile = draft.movement_profile;
+            changed = true;
+        }
+        let new_speed = draft.speed.max(0.0) as f32;
+        if (definition.attributes.speed - new_speed).abs() > f32::EPSILON {
+            definition.attributes.speed = new_speed;
+            changed = true;
+        }
+        if definition.attributes.has_inventory != draft.has_inventory {
+            definition.attributes.has_inventory = draft.has_inventory;
+            changed = true;
+        }
+
+        let new_health = if draft.health_enabled {
+            Some(draft.health_value.clamp(0, u32::MAX as i64) as u32)
+        } else {
+            None
+        };
+        if definition.attributes.health != new_health {
+            definition.attributes.health = new_health;
+            changed = true;
+        }
+        changed |= Self::set_optional_definition_stat(
+            &mut definition.attributes,
+            HEALTH_STAT_ID,
+            new_health.map(|value| value as i32),
+        );
+        changed |= Self::set_optional_definition_stat(
+            &mut definition.attributes,
+            ATTACK_POWER_STAT_ID,
+            if draft.attack_power_enabled {
+                Some(draft.attack_power_value.clamp(0, i32::MAX as i64) as i32)
+            } else {
+                None
+            },
+        );
+
+        let new_collision_enabled = draft.collision.enabled;
+        if definition.collision.enabled != new_collision_enabled {
+            definition.collision.enabled = new_collision_enabled;
+            changed = true;
+        }
+        let new_collision_offset = [draft.collision.offset_x, draft.collision.offset_y];
+        if definition.collision.offset != new_collision_offset {
+            definition.collision.offset = new_collision_offset;
+            changed = true;
+        }
+        let new_collision_size = [
+            draft.collision.size_x.clamp(1, u32::MAX as i64) as u32,
+            draft.collision.size_y.clamp(1, u32::MAX as i64) as u32,
+        ];
+        if definition.collision.size != new_collision_size {
+            definition.collision.size = new_collision_size;
+            changed = true;
+        }
+        if definition.collision.trigger != draft.collision.trigger {
+            definition.collision.trigger = draft.collision.trigger;
+            changed = true;
+        }
+
+        if definition.audio.movement_sound_trigger != draft.movement_sound_trigger {
+            definition.audio.movement_sound_trigger = draft.movement_sound_trigger;
+            changed = true;
+        }
+        let new_footstep_distance = draft.footstep_trigger_distance.max(0.0);
+        if (definition.audio.footstep_trigger_distance - new_footstep_distance).abs() > f32::EPSILON
+        {
+            definition.audio.footstep_trigger_distance = new_footstep_distance;
+            changed = true;
+        }
+        if definition.audio.hearing_radius != draft.hearing_radius {
+            definition.audio.hearing_radius = draft.hearing_radius;
+            changed = true;
+        }
+        let new_movement_sound = draft.movement_sound.trim().to_string();
+        if definition.audio.movement_sound != new_movement_sound {
+            definition.audio.movement_sound = new_movement_sound;
+            changed = true;
         }
 
         changed

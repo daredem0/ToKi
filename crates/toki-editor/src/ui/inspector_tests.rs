@@ -901,9 +901,9 @@ fn validate_rule_set_reports_duplicate_ids_and_invalid_action_payloads() {
     assert!(issues
         .iter()
         .any(|issue| issue.message.contains("SwitchScene requires a scene name")));
-    assert!(issues
-        .iter()
-        .any(|issue| issue.message.contains("SwitchScene requires a spawn point id")));
+    assert!(issues.iter().any(|issue| issue
+        .message
+        .contains("SwitchScene requires a spawn point id")));
 }
 
 #[test]
@@ -961,12 +961,12 @@ fn validate_rule_set_for_scene_reports_invalid_switch_scene_targets() {
     };
 
     let issues = InspectorSystem::validate_rule_set_for_scene(&rules, "Main Scene", &scenes);
-    assert!(issues
-        .iter()
-        .any(|issue| issue.message.contains("SwitchScene target scene 'Missing Scene' does not exist")));
-    assert!(issues
-        .iter()
-        .any(|issue| issue.message.contains("SwitchScene target spawn point 'missing_spawn' does not exist in scene 'Target Scene'")));
+    assert!(issues.iter().any(|issue| issue
+        .message
+        .contains("SwitchScene target scene 'Missing Scene' does not exist")));
+    assert!(issues.iter().any(|issue| issue.message.contains(
+        "SwitchScene target spawn point 'missing_spawn' does not exist in scene 'Target Scene'"
+    )));
 }
 
 #[test]
