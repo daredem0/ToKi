@@ -1,0 +1,14 @@
+{
+  "name": "Scene 4",
+  "description": null,
+  "maps": [],
+  "entities": [],
+  "rules": {
+    "rules": []
+  },
+  "camera_position": null,
+  "camera_scale": null,
+  "background_music_track_id": null,
+  "anchors": [],
+  "player_entry": null
+}

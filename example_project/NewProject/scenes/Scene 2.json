@@ -4,75 +4,7 @@
   "maps": [
     "my_new_map"
   ],
-  "entities": [
-    {
-      "id": 1,
-      "position": [
-        74,
-        541
-      ],
-      "size": [
-        16,
-        16
-      ],
-      "entity_kind": "Player",
-      "category": "",
-      "definition_name": "player",
-      "attributes": {
-        "health": 100,
-        "speed": 2.0,
-        "solid": true,
-        "visible": true,
-        "animation_controller": {
-          "clips": {
-            "Walk": {
-              "state": "Walk",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/walk_0",
-                "slime/walk_1",
-                "slime/walk_2",
-                "slime/walk_3"
-              ],
-              "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            }
-          },
-          "current_clip_state": "Idle",
-          "current_frame_index": 0,
-          "frame_timer": 0.0,
-          "is_finished": false
-        },
-        "render_layer": 1,
-        "active": true,
-        "can_move": true,
-        "ai_behavior": "wander",
-        "movement_profile": "legacy_default",
-        "has_inventory": true
-      },
-      "collision_box": {
-        "offset": [
-          0,
-          0
-        ],
-        "size": [
-          16,
-          16
-        ],
-        "trigger": false
-      }
-    }
-  ],
+  "entities": [],
   "rules": {
     "rules": [
       {
@@ -90,6 +22,12 @@
               "channel": "Movement",
               "sound_id": "sfx_coin"
             }
+          },
+          {
+            "SwitchScene": {
+              "scene_name": "Main Scene",
+              "spawn_point_id": "spawn_point_2"
+            }
           }
         ]
       }
@@ -98,6 +36,16 @@
   "camera_position": null,
   "camera_scale": null,
   "background_music_track_id": null,
-  "anchors": [],
+  "anchors": [
+    {
+      "id": "spawn_point_1",
+      "kind": "SpawnPoint",
+      "position": [
+        200,
+        536
+      ],
+      "facing": "Right"
+    }
+  ],
   "player_entry": null
 }

@@ -7,8 +7,8 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-"Main Scene" = "scenes/mainscene.json"
-"Scene 2" = "scenes/scene2.json"
+"Scene 2" = "scenes/Scene 2.json"
+"Main Scene" = "scenes/Main Scene.json"
 main = "scenes/main.json"
 
 [assets]
@@ -136,17 +136,50 @@ recent_files = []
 
 [editor.camera_settings]
 
+[editor.graph_layouts."Scene 2"]
+zoom = 0.8264462351799011
+pan = [
+    -74.87890625,
+    64.38671875,
+]
+
+[editor.graph_layouts."Scene 2".node_positions]
+"node:1" = [
+    60.0,
+    50.0,
+]
+"node:2" = [
+    800.0,
+    50.0,
+]
+"node:4" = [
+    656.8824462890625,
+    177.01071166992188,
+]
+"node:3" = [
+    430.0,
+    50.0,
+]
+
 [editor.graph_layouts."Main Scene"]
 zoom = 0.791378378868103
 pan = [
-    97.44644165039063,
-    119.90234375,
+    -112.65902709960938,
+    73.33984375,
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
+"node:2" = [
+    800.0,
+    50.0,
+]
+"node:4" = [
+    60.0,
+    106.0,
+]
 "node:1" = [
-    48.04502868652344,
-    -53.77464294433594,
+    60.0,
+    50.0,
 ]
 "node:3" = [
     430.0,
@@ -160,20 +193,16 @@ pan = [
     430.0,
     106.0,
 ]
-"node:2" = [
-    800.0,
-    50.0,
-]
-"node:4" = [
-    60.0,
-    106.0,
+"node:7" = [
+    1049.559326171875,
+    214.29232788085938,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 1
 position = [
-    48.04502868652344,
-    -53.77464294433594,
+    60.0,
+    50.0,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -230,6 +259,17 @@ position = [
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
 Condition = "Always"
 
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 7
+position = [
+    1049.559326171875,
+    214.29232788085938,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Action.SwitchScene]
+scene_name = "Scene 2"
+spawn_point_id = "spawn_point_1"
+
 [[editor.rule_graph_drafts."Main Scene".edges]]
 from = 3
 to = 2
@@ -246,6 +286,10 @@ to = 5
 from = 4
 to = 6
 
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 5
+to = 7
+
 [[editor.rule_graph_drafts."Main Scene".chains]]
 rule_id = "rule_1"
 enabled = true
@@ -259,3 +303,64 @@ enabled = true
 priority = 0
 once = false
 trigger_node_id = 4
+
+[[editor.rule_graph_drafts."Scene 2".nodes]]
+id = 1
+position = [
+    60.0,
+    50.0,
+]
+
+[editor.rule_graph_drafts."Scene 2".nodes.kind]
+Trigger = "OnCollision"
+
+[[editor.rule_graph_drafts."Scene 2".nodes]]
+id = 2
+position = [
+    800.0,
+    50.0,
+]
+
+[editor.rule_graph_drafts."Scene 2".nodes.kind.Action.PlaySound]
+channel = "Movement"
+sound_id = "sfx_coin"
+
+[[editor.rule_graph_drafts."Scene 2".nodes]]
+id = 3
+position = [
+    430.0,
+    50.0,
+]
+
+[editor.rule_graph_drafts."Scene 2".nodes.kind]
+Condition = "Always"
+
+[[editor.rule_graph_drafts."Scene 2".nodes]]
+id = 4
+position = [
+    656.8824462890625,
+    177.01071166992188,
+]
+
+[editor.rule_graph_drafts."Scene 2".nodes.kind.Action.SwitchScene]
+scene_name = "Main Scene"
+spawn_point_id = "spawn_point_2"
+
+[[editor.rule_graph_drafts."Scene 2".edges]]
+from = 3
+to = 2
+
+[[editor.rule_graph_drafts."Scene 2".edges]]
+from = 1
+to = 3
+
+[[editor.rule_graph_drafts."Scene 2".edges]]
+from = 2
+to = 4
+
+[[editor.rule_graph_drafts."Scene 2".chains]]
+rule_id = "rule_1"
+enabled = true
+priority = 0
+once = false
+trigger_node_id = 1
