@@ -36,7 +36,7 @@ pub mod camera;
 pub use camera::{Camera, CameraController, CameraMode};
 
 pub mod events;
-pub use events::{EventHandler, EventQueue, GameEvent, GameUpdateResult};
+pub use events::{EventHandler, EventQueue, GameEvent, GameUpdateResult, SceneSwitchRequest};
 
 pub mod game;
 pub use game::{GameState, InputAction, InputKey, DEFAULT_TIMESTEP_MS};

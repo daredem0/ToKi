@@ -61,6 +61,12 @@ pub trait EventHandler<T: GameEvent> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SceneSwitchRequest {
+    pub scene_name: String,
+    pub spawn_point_id: String,
+}
+
 /// Game update result that includes both state changes and events
 #[derive(Debug, Default)]
 pub struct GameUpdateResult<T: GameEvent> {
@@ -68,6 +74,8 @@ pub struct GameUpdateResult<T: GameEvent> {
     pub player_moved: bool,
     /// Events that were generated this frame
     pub events: Vec<T>,
+    /// Optional deferred scene-switch request to be applied by the runtime layer.
+    pub scene_switch_request: Option<SceneSwitchRequest>,
 }
 
 impl<T: GameEvent> GameUpdateResult<T> {
@@ -76,6 +84,7 @@ impl<T: GameEvent> GameUpdateResult<T> {
         Self {
             player_moved: false,
             events: Vec::new(),
+            scene_switch_request: None,
         }
     }
 
@@ -84,6 +93,7 @@ impl<T: GameEvent> GameUpdateResult<T> {
         Self {
             player_moved,
             events: Vec::new(),
+            scene_switch_request: None,
         }
     }
 
@@ -95,5 +105,16 @@ impl<T: GameEvent> GameUpdateResult<T> {
     /// Add multiple events to this result
     pub fn add_events(&mut self, events: impl IntoIterator<Item = T>) {
         self.events.extend(events);
+    }
+
+    pub fn request_scene_switch(
+        &mut self,
+        scene_name: impl Into<String>,
+        spawn_point_id: impl Into<String>,
+    ) {
+        self.scene_switch_request = Some(SceneSwitchRequest {
+            scene_name: scene_name.into(),
+            spawn_point_id: spawn_point_id.into(),
+        });
     }
 }

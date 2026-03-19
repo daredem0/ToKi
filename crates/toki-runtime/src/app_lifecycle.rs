@@ -205,7 +205,30 @@ impl ApplicationHandler for App {
         self.refresh_tilemap_vertices_for_current_camera();
 
         self.audio_system.list_available_sounds();
-        if self.launch_options.scene_name.is_none() {
+        if let Some(track_id) = self
+            .game_system
+            .active_scene()
+            .and_then(|scene| scene.background_music_track_id.as_deref())
+        {
+            if let Err(error) = self.scene_transition.ensure_scene_music(
+                &mut self.audio_system,
+                Some(track_id),
+                self.launch_options.audio_mix.music_percent,
+            ) {
+                tracing::warn!(
+                    "Failed to ensure startup scene background music '{}': {}",
+                    track_id,
+                    error
+                );
+            }
+        }
+        if self.launch_options.scene_name.is_none()
+            && self
+                .game_system
+                .active_scene()
+                .and_then(|scene| scene.background_music_track_id.as_deref())
+                .is_none()
+        {
             if let Err(e) = self.audio_system.play_background_music("lavandia", -10.0) {
                 tracing::warn!("Failed to start background music: {}", e);
             }

@@ -1,41 +1,54 @@
 use super::{
-    amplitude_to_decibels, classify_sfx_inventory, discover_ogg_assets, percent_to_decibels,
+    amplitude_to_decibels, classify_sfx_inventory, discover_supported_audio_assets,
+    percent_to_decibels,
     spatial_attenuation,
 };
 use std::fs;
 
 #[test]
-fn discover_ogg_assets_returns_sorted_stems_and_paths() {
+fn discover_supported_audio_assets_returns_sorted_stems_and_paths() {
     let temp = tempfile::tempdir().expect("temp dir");
     let audio_dir = temp.path().join("audio");
     fs::create_dir_all(&audio_dir).expect("audio dir");
     fs::write(audio_dir.join("z_sound.ogg"), "z").expect("z");
     fs::write(audio_dir.join("a_sound.ogg"), "a").expect("a");
+    fs::write(audio_dir.join("m_sound.mp3"), "m").expect("m");
+    fs::write(audio_dir.join("b_sound.wav"), "b").expect("b");
     fs::write(audio_dir.join("readme.txt"), "ignore").expect("txt");
 
-    let discovered = discover_ogg_assets(&audio_dir).expect("discover");
-    assert_eq!(discovered.len(), 2);
+    let discovered = discover_supported_audio_assets(&audio_dir).expect("discover");
+    assert_eq!(discovered.len(), 4);
     assert_eq!(discovered[0].0, "a_sound");
-    assert_eq!(discovered[1].0, "z_sound");
+    assert_eq!(discovered[1].0, "b_sound");
+    assert_eq!(discovered[2].0, "m_sound");
+    assert_eq!(discovered[3].0, "z_sound");
     assert_eq!(
         discovered[0].1.file_name().and_then(|name| name.to_str()),
         Some("a_sound.ogg")
     );
     assert_eq!(
         discovered[1].1.file_name().and_then(|name| name.to_str()),
+        Some("b_sound.wav")
+    );
+    assert_eq!(
+        discovered[2].1.file_name().and_then(|name| name.to_str()),
+        Some("m_sound.mp3")
+    );
+    assert_eq!(
+        discovered[3].1.file_name().and_then(|name| name.to_str()),
         Some("z_sound.ogg")
     );
 }
 
 #[test]
-fn discover_ogg_assets_ignores_non_audio_extensions() {
+fn discover_supported_audio_assets_ignores_non_audio_extensions() {
     let temp = tempfile::tempdir().expect("temp dir");
     let audio_dir = temp.path().join("audio");
     fs::create_dir_all(&audio_dir).expect("audio dir");
-    fs::write(audio_dir.join("sound.mp3"), "x").expect("mp3");
-    fs::write(audio_dir.join("sound.wav"), "x").expect("wav");
+    fs::write(audio_dir.join("sound.flac"), "x").expect("flac");
+    fs::write(audio_dir.join("sound.aac"), "x").expect("aac");
 
-    let discovered = discover_ogg_assets(&audio_dir).expect("discover");
+    let discovered = discover_supported_audio_assets(&audio_dir).expect("discover");
     assert!(discovered.is_empty());
 }
 

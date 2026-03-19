@@ -35,7 +35,7 @@
   },
   "camera_position": null,
   "camera_scale": null,
-  "background_music_track_id": null,
+  "background_music_track_id": "retroplatformer",
   "anchors": [
     {
       "id": "spawn_point_1",

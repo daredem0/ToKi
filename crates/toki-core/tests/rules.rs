@@ -1465,7 +1465,7 @@ fn rules_serialize_roundtrip() {
 }
 
 #[test]
-fn switch_scene_applies_at_tick_boundary_after_movement_processing() {
+fn switch_scene_requests_deferred_runtime_transition_after_movement_processing() {
     let mut state = GameState::new_empty();
     let mut scene_a = scene_with_player("Scene A", IVec2::new(0, 0));
     scene_a.rules = RuleSet {
@@ -1493,7 +1493,7 @@ fn switch_scene_applies_at_tick_boundary_after_movement_processing() {
         .expect("initial scene should load");
 
     state.handle_key_press(InputKey::Right);
-    state.update(
+    let result = state.update(
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1501,13 +1501,20 @@ fn switch_scene_applies_at_tick_boundary_after_movement_processing() {
 
     assert_eq!(
         state.scene_manager().active_scene_name(),
-        Some("Scene B"),
-        "switch should apply by end of tick"
+        Some("Scene A"),
+        "core should defer the scene switch for the runtime layer"
     );
     assert_eq!(
         state.player_position(),
-        IVec2::new(100, 0),
-        "destination scene should load after the tick, not be moved by this tick's input"
+        IVec2::new(2, 0),
+        "movement processing should still complete before the deferred switch is emitted"
+    );
+    assert_eq!(
+        result.scene_switch_request,
+        Some(toki_core::SceneSwitchRequest {
+            scene_name: "Scene B".to_string(),
+            spawn_point_id: "spawn_b".to_string(),
+        })
     );
 }
 
@@ -1549,14 +1556,20 @@ fn switch_scene_uses_highest_priority_rule_target() {
         .load_scene("Scene A")
         .expect("initial scene should load");
 
-    state.update(
+    let result = state.update(
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    assert_eq!(state.scene_manager().active_scene_name(), Some("Scene B"));
-    assert_eq!(state.player_position(), IVec2::new(10, 0));
+    assert_eq!(state.scene_manager().active_scene_name(), Some("Scene A"));
+    assert_eq!(
+        result.scene_switch_request,
+        Some(toki_core::SceneSwitchRequest {
+            scene_name: "Scene B".to_string(),
+            spawn_point_id: "spawn_b".to_string(),
+        })
+    );
 }
 
 #[test]
@@ -1580,7 +1593,7 @@ fn switch_scene_keeps_active_scene_when_target_scene_is_missing() {
         .load_scene("Scene A")
         .expect("initial scene should load");
 
-    state.update(
+    let result = state.update(
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1588,6 +1601,13 @@ fn switch_scene_keeps_active_scene_when_target_scene_is_missing() {
 
     assert_eq!(state.scene_manager().active_scene_name(), Some("Scene A"));
     assert_eq!(state.player_position(), IVec2::new(0, 0));
+    assert_eq!(
+        result.scene_switch_request,
+        Some(toki_core::SceneSwitchRequest {
+            scene_name: "Missing Scene".to_string(),
+            spawn_point_id: "missing_spawn".to_string(),
+        })
+    );
 }
 
 #[test]
@@ -1612,7 +1632,7 @@ fn switch_scene_keeps_active_scene_when_target_spawn_is_missing() {
         .load_scene("Scene A")
         .expect("initial scene should load");
 
-    state.update(
+    let result = state.update(
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1620,6 +1640,13 @@ fn switch_scene_keeps_active_scene_when_target_spawn_is_missing() {
 
     assert_eq!(state.scene_manager().active_scene_name(), Some("Scene A"));
     assert_eq!(state.player_position(), IVec2::new(0, 0));
+    assert_eq!(
+        result.scene_switch_request,
+        Some(toki_core::SceneSwitchRequest {
+            scene_name: "Scene B".to_string(),
+            spawn_point_id: "spawn_b".to_string(),
+        })
+    );
 }
 
 #[test]

@@ -75,6 +75,38 @@ impl SceneInspector {
         Self { scene_name }
     }
 
+    fn load_scene_music_choices(
+        ctx: &InspectorContext<'_>,
+        current_track_id: Option<&str>,
+    ) -> Vec<String> {
+        let project_path = ctx
+            .project
+            .as_ref()
+            .map(|project| project.path.clone())
+            .or_else(|| {
+                ctx.config
+                    .and_then(|config| config.current_project_path().cloned())
+            });
+
+        let mut choices = project_path
+            .map(|path| {
+                InspectorSystem::discover_audio_asset_names(path.join("assets/audio/music").as_path())
+            })
+            .unwrap_or_default();
+
+        if let Some(current_track_id) = current_track_id {
+            if !current_track_id.trim().is_empty()
+                && !choices.iter().any(|choice| choice == current_track_id)
+            {
+                choices.push(current_track_id.to_string());
+                choices.sort();
+                choices.dedup();
+            }
+        }
+
+        choices
+    }
+
     fn scene_has_authored_player_entity(scene: &toki_core::Scene) -> bool {
         scene
             .entities
@@ -287,21 +319,39 @@ impl Inspector for SceneInspector {
 
             ui.separator();
 
-            let mut background_music_track_id =
-                scene.background_music_track_id.clone().unwrap_or_default();
-            let mut background_music_changed = false;
+            let music_choices =
+                Self::load_scene_music_choices(ctx, scene.background_music_track_id.as_deref());
+            let mut selected_background_music_track_id = scene.background_music_track_id.clone();
             ui.horizontal(|ui| {
                 ui.label("Background Music:");
-                background_music_changed |= ui
-                    .text_edit_singleline(&mut background_music_track_id)
-                    .changed();
+                egui::ComboBox::from_id_salt(format!(
+                    "scene_background_music_{}",
+                    self.scene_name
+                ))
+                .selected_text(
+                    selected_background_music_track_id
+                        .as_deref()
+                        .unwrap_or("<none>"),
+                )
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(
+                        &mut selected_background_music_track_id,
+                        None,
+                        "<none>",
+                    );
+                    for track_id in &music_choices {
+                        ui.selectable_value(
+                            &mut selected_background_music_track_id,
+                            Some(track_id.clone()),
+                            track_id,
+                        );
+                    }
+                });
             });
-            if background_music_changed {
+            if selected_background_music_track_id != scene.background_music_track_id {
                 let before_scene = scene.clone();
                 let mut after_scene = before_scene.clone();
-                after_scene.background_music_track_id =
-                    (!background_music_track_id.trim().is_empty())
-                        .then(|| background_music_track_id.trim().to_string());
+                after_scene.background_music_track_id = selected_background_music_track_id;
                 if ctx
                     .ui_state
                     .execute_command(crate::ui::undo_redo::EditorCommand::update_scene(
@@ -1177,5 +1227,49 @@ mod tests {
 
         let command = build_delete_scene_command(&ui_state, &project, "Scene 3");
         assert!(command.is_ok());
+    }
+
+    #[test]
+    fn load_scene_music_choices_discovers_tracks_from_project_music_folder() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should exist");
+        let project_root = temp_dir.path().to_path_buf();
+        let music_dir = project_root.join("assets").join("audio").join("music");
+        std::fs::create_dir_all(&music_dir).expect("music dir should exist");
+        std::fs::write(music_dir.join("forest.ogg"), b"").expect("forest track should write");
+        std::fs::write(music_dir.join("town.wav"), b"").expect("town track should write");
+        std::fs::write(music_dir.join("ignore.txt"), b"").expect("ignore file should write");
+
+        let project = Project::new("Demo".to_string(), project_root);
+        let mut ui_state = EditorUI::new();
+        let context = egui::Context::default();
+        let inspector_ctx = InspectorContext {
+            ui_state: &mut ui_state,
+            ctx: &context,
+            game_state: None,
+            project: Some(&mut project.clone()),
+            config: None,
+        };
+
+        let choices = SceneInspector::load_scene_music_choices(&inspector_ctx, None);
+        assert_eq!(choices, vec!["forest".to_string(), "town".to_string()]);
+    }
+
+    #[test]
+    fn load_scene_music_choices_keeps_current_track_even_if_not_discovered() {
+        let mut ui_state = EditorUI::new();
+        let context = egui::Context::default();
+        let temp_dir = tempfile::tempdir().expect("temp dir should exist");
+        let project = Project::new("Demo".to_string(), temp_dir.path().to_path_buf());
+        let mut project = project;
+        let inspector_ctx = InspectorContext {
+            ui_state: &mut ui_state,
+            ctx: &context,
+            game_state: None,
+            project: Some(&mut project),
+            config: None,
+        };
+
+        let choices = SceneInspector::load_scene_music_choices(&inspector_ctx, Some("legacy_track"));
+        assert_eq!(choices, vec!["legacy_track".to_string()]);
     }
 }

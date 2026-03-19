@@ -265,7 +265,7 @@ impl GameState {
         }
 
         if let Some((scene_name, spawn_point_id)) = pending_scene_switch {
-            self.apply_rule_scene_switch(&scene_name, &spawn_point_id);
+            result.request_scene_switch(scene_name, spawn_point_id);
         }
 
         result
@@ -365,7 +365,7 @@ impl GameState {
         }
 
         if let Some((scene_name, spawn_point_id)) = pending_scene_switch {
-            self.apply_rule_scene_switch(&scene_name, &spawn_point_id);
+            result.request_scene_switch(scene_name, spawn_point_id);
         }
 
         result

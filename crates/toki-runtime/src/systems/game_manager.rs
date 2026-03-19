@@ -172,6 +172,18 @@ impl GameManager {
         self.game_state.active_scene()
     }
 
+    pub fn scene_named(&self, scene_name: &str) -> Option<&Scene> {
+        self.game_state.scene_manager().get_scene(scene_name)
+    }
+
+    pub fn transition_to_scene(
+        &mut self,
+        scene_name: &str,
+        spawn_point_id: &str,
+    ) -> Result<(), String> {
+        self.game_state.transition_to_scene(scene_name, spawn_point_id)
+    }
+
     /// Get entities for camera system integration
     pub fn entities_for_camera(&self) -> Vec<Entity> {
         self.game_state.entities_owned()

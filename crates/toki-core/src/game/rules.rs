@@ -396,17 +396,6 @@ impl GameState {
         }
     }
 
-    pub(super) fn apply_rule_scene_switch(&mut self, scene_name: &str, spawn_point_id: &str) {
-        if let Err(error) = self.transition_to_scene(scene_name, spawn_point_id) {
-            tracing::warn!(
-                "Rule requested scene switch to '{}' via '{}': {}",
-                scene_name,
-                spawn_point_id,
-                error
-            );
-        }
-    }
-
     pub(super) fn apply_rule_animations(
         &mut self,
         pending_animations: Vec<(EntityId, AnimationState)>,

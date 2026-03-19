@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use toki_core::{
     game::{AudioChannel as AudioEventChannel, AudioEvent},
-    project_assets::{discover_audio_files, ProjectAssetError, ProjectAudioFormat},
+    project_assets::{discover_audio_files, ProjectAssetError},
     EventHandler,
 };
 
@@ -26,10 +26,22 @@ pub enum PlaybackPolicy {
 }
 
 #[derive(Debug)]
+struct ActiveStaticSound {
+    handle: StaticSoundHandle,
+    base_gain: f32,
+}
+
+#[derive(Debug)]
+struct ActiveStreamingSound {
+    handle: StreamingSoundHandle<FromFileError>,
+    base_gain: f32,
+}
+
+#[derive(Debug)]
 struct AudioChannel {
     policy: PlaybackPolicy,
-    active_handles: Vec<StaticSoundHandle>,
-    active_streaming_handles: Vec<StreamingSoundHandle<FromFileError>>,
+    active_handles: Vec<ActiveStaticSound>,
+    active_streaming_handles: Vec<ActiveStreamingSound>,
     last_played: Option<Instant>,
     cooldown_duration: Option<Duration>,
 }
@@ -63,7 +75,7 @@ impl AudioAssetCache {
             return Ok(());
         }
 
-        let inventory = classify_sfx_inventory(&discover_ogg_assets(&sfx_dir)?, preload_names);
+        let inventory = classify_sfx_inventory(&discover_supported_audio_assets(&sfx_dir)?, preload_names);
         for (name, path) in inventory.all_paths {
             let path_str = path.to_string_lossy().to_string();
             self.sfx_paths.insert(name.clone(), path_str.clone());
@@ -95,7 +107,7 @@ impl AudioAssetCache {
             return Ok(());
         }
 
-        for (name, path) in discover_ogg_assets(&music_dir)? {
+        for (name, path) in discover_supported_audio_assets(&music_dir)? {
             let path_str = path.to_string_lossy().to_string();
             self.music_paths.insert(name, path_str);
         }
@@ -171,8 +183,24 @@ impl AudioPlaybackState {
     }
 
     fn set_channel_volume_percent(&mut self, channel: &str, percent: u8) {
+        let percent = percent.min(100);
         self.channel_volume_percents
-            .insert(channel.to_string(), percent.min(100));
+            .insert(channel.to_string(), percent);
+        let channel_gain = self.channel_volume_for(channel);
+        if let Some(channel_data) = self.channels.get_mut(channel) {
+            for active in &mut channel_data.active_handles {
+                active.handle.set_volume(
+                    amplitude_to_decibels(active.base_gain) + channel_gain,
+                    Tween::default(),
+                );
+            }
+            for active in &mut channel_data.active_streaming_handles {
+                active.handle.set_volume(
+                    amplitude_to_decibels(active.base_gain) + channel_gain,
+                    Tween::default(),
+                );
+            }
+        }
     }
 
     fn set_master_volume_percent(&mut self, percent: u8) {
@@ -213,12 +241,12 @@ impl AudioPlaybackState {
             tracing::debug!("Stopping {} sounds in channel '{}'", total_stopped, channel);
 
             for handle in &mut channel_data.active_handles {
-                handle.stop(Tween::default());
+                handle.handle.stop(Tween::default());
             }
             channel_data.active_handles.clear();
 
             for handle in &mut channel_data.active_streaming_handles {
-                handle.stop(Tween::default());
+                handle.handle.stop(Tween::default());
             }
             channel_data.active_streaming_handles.clear();
         } else {
@@ -239,19 +267,19 @@ impl AudioPlaybackState {
                     initial_streaming
                 );
                 for (i, handle) in channel.active_handles.iter().enumerate() {
-                    tracing::trace!("  Static handle {}: state={:?}", i, handle.state());
+                    tracing::trace!("  Static handle {}: state={:?}", i, handle.handle.state());
                 }
                 for (i, handle) in channel.active_streaming_handles.iter().enumerate() {
-                    tracing::trace!("  Streaming handle {}: state={:?}", i, handle.state());
+                    tracing::trace!("  Streaming handle {}: state={:?}", i, handle.handle.state());
                 }
             }
 
             channel
                 .active_handles
-                .retain(|handle| handle.state() != kira::sound::PlaybackState::Stopped);
+                .retain(|handle| handle.handle.state() != kira::sound::PlaybackState::Stopped);
             channel
                 .active_streaming_handles
-                .retain(|handle| handle.state() != kira::sound::PlaybackState::Stopped);
+                .retain(|handle| handle.handle.state() != kira::sound::PlaybackState::Stopped);
 
             let removed_static = initial_static - channel.active_handles.len();
             let removed_streaming = initial_streaming - channel.active_streaming_handles.len();
@@ -425,11 +453,11 @@ impl AudioManager {
                     name
                 );
                 for handle in &mut channel_data.active_handles {
-                    handle.stop(Tween::default());
+                    handle.handle.stop(Tween::default());
                 }
                 channel_data.active_handles.clear();
                 for handle in &mut channel_data.active_streaming_handles {
-                    handle.stop(Tween::default());
+                    handle.handle.stop(Tween::default());
                 }
                 channel_data.active_streaming_handles.clear();
             }
@@ -467,7 +495,10 @@ impl AudioManager {
                 .playback
                 .play_static_sound(sound_data.volume(channel_gain))?;
             let channel_data = self.playback.get_channel_mut(channel).unwrap();
-            channel_data.active_handles.push(handle);
+            channel_data.active_handles.push(ActiveStaticSound {
+                handle,
+                base_gain: gain,
+            });
             channel_data.last_played = Some(Instant::now());
             let new_total =
                 channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
@@ -489,7 +520,10 @@ impl AudioManager {
                 .playback
                 .play_static_sound(sound_data.volume(channel_gain))?;
             let channel_data = self.playback.get_channel_mut(channel).unwrap();
-            channel_data.active_handles.push(handle);
+            channel_data.active_handles.push(ActiveStaticSound {
+                handle,
+                base_gain: gain,
+            });
             channel_data.last_played = Some(Instant::now());
             let new_total =
                 channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
@@ -536,11 +570,11 @@ impl AudioManager {
                 tracing::debug!("Music channel '{}' policy=Exclusive: stopping {} active sounds before playing '{}'",
                     channel, active_count, name);
                 for handle in &mut channel_data.active_handles {
-                    handle.stop(Tween::default());
+                    handle.handle.stop(Tween::default());
                 }
                 channel_data.active_handles.clear();
                 for handle in &mut channel_data.active_streaming_handles {
-                    handle.stop(Tween::default());
+                    handle.handle.stop(Tween::default());
                 }
                 channel_data.active_streaming_handles.clear();
             }
@@ -585,7 +619,10 @@ impl AudioManager {
 
             let handle = self.playback.play_streaming_sound(sound_data)?;
             let channel_data = self.playback.get_channel_mut(channel).unwrap();
-            channel_data.active_streaming_handles.push(handle);
+            channel_data.active_streaming_handles.push(ActiveStreamingSound {
+                handle,
+                base_gain: volume,
+            });
 
             let duration = start.elapsed();
             let new_total =
@@ -656,7 +693,7 @@ fn spatial_attenuation(
     Some(1.0 - smoothstep)
 }
 
-fn discover_ogg_assets(dir: &Path) -> Result<Vec<(String, PathBuf)>, std::io::Error> {
+fn discover_supported_audio_assets(dir: &Path) -> Result<Vec<(String, PathBuf)>, std::io::Error> {
     let discovered = discover_audio_files(dir).map_err(|error| match error {
         ProjectAssetError::Io(io) => io,
         other => std::io::Error::other(other.to_string()),
@@ -664,7 +701,6 @@ fn discover_ogg_assets(dir: &Path) -> Result<Vec<(String, PathBuf)>, std::io::Er
 
     Ok(discovered
         .into_iter()
-        .filter(|asset| asset.format == ProjectAudioFormat::Ogg)
         .map(|asset| (asset.name, asset.path))
         .collect())
 }

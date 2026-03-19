@@ -6,8 +6,9 @@ use toki_core::sprite_render::{
     resolve_sprite_render_requests, sort_sprite_render_requests,
 };
 use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
-use toki_core::{EventHandler, GameUpdateResult};
+use toki_core::{EventHandler, GameUpdateResult, DEFAULT_TIMESTEP_MS};
 
+use super::app_transition::TransitionAdvance;
 use super::App;
 
 impl App {
@@ -23,12 +24,13 @@ impl App {
         let tick_start = Instant::now();
         tracing::trace!("TICK @ {:?}", tick_start);
 
-        let previous_scene_name = self.game_system.active_scene_name().map(str::to_string);
+        let transition_delta_ms = delta_ms.unwrap_or(DEFAULT_TIMESTEP_MS).max(0.0) as u32;
         let mut world_bounds = glam::UVec2::new(
             self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
             self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
         );
-        let game_result = if self.should_gate_gameplay_for_menu() {
+        let game_result = if self.should_gate_gameplay_for_menu() || self.scene_transition.is_active()
+        {
             GameUpdateResult::new()
         } else if let Some(delta) = delta_ms {
             self.game_system.update_with_delta(
@@ -55,12 +57,65 @@ impl App {
             self.audio_system.handle(event);
         }
 
-        if self.game_system.active_scene_name() != previous_scene_name.as_deref() {
-            self.handle_runtime_scene_change();
-            world_bounds = glam::UVec2::new(
-                self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
-                self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
-            );
+        if let Some(request) = game_result.scene_switch_request.clone() {
+            let target_track = self
+                .game_system
+                .scene_named(&request.scene_name)
+                .and_then(|scene| scene.background_music_track_id.clone());
+            self.scene_transition
+                .request_scene_switch(request, target_track);
+        }
+
+        match self.scene_transition.advance(
+            transition_delta_ms,
+            &mut self.audio_system,
+            self.launch_options.audio_mix.music_percent,
+        ) {
+            TransitionAdvance::ReadyToSwap(request) => {
+                let switch_result = self
+                    .game_system
+                    .transition_to_scene(&request.scene_name, &request.spawn_point_id);
+                match switch_result {
+                    Ok(()) => {
+                        self.handle_runtime_scene_change();
+                        let active_track = self
+                            .game_system
+                            .active_scene()
+                            .and_then(|scene| scene.background_music_track_id.as_deref());
+                        if let Err(error) = self.scene_transition.complete_scene_switch(
+                            &mut self.audio_system,
+                            true,
+                            active_track,
+                        ) {
+                            tracing::warn!("Failed to complete scene-transition audio handoff: {error}");
+                        }
+                        world_bounds = glam::UVec2::new(
+                            self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
+                            self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
+                        );
+                    }
+                    Err(error) => {
+                        tracing::warn!(
+                            "Failed to transition to scene '{}' via '{}': {}",
+                            request.scene_name,
+                            request.spawn_point_id,
+                            error
+                        );
+                        if let Err(audio_error) = self.scene_transition.complete_scene_switch(
+                            &mut self.audio_system,
+                            false,
+                            self.game_system
+                                .active_scene()
+                                .and_then(|scene| scene.background_music_track_id.as_deref()),
+                        ) {
+                            tracing::warn!(
+                                "Failed to restore audio after scene-transition failure: {audio_error}"
+                            );
+                        }
+                    }
+                }
+            }
+            TransitionAdvance::None | TransitionAdvance::Completed => {}
         }
 
         let player_moved = game_result.player_moved;
@@ -169,6 +224,7 @@ impl App {
             }
 
             self.render_runtime_menu_overlay();
+            self.render_scene_transition_overlay();
             self.rendering.finalize_ui_shapes();
         }
 
@@ -257,17 +313,6 @@ impl App {
             self.refresh_tilemap_vertices_for_current_camera();
         }
 
-        if let Some(scene) = active_scene.as_ref() {
-            if let Some(track_id) = scene.background_music_track_id.as_deref() {
-                if let Err(error) = self.audio_system.play_background_music(track_id, 0.3) {
-                    tracing::warn!(
-                        "Failed to start scene background music '{}' after scene switch: {}",
-                        track_id,
-                        error
-                    );
-                }
-            }
-        }
     }
 
     fn render_entity_health_bars(&mut self) {
@@ -348,5 +393,21 @@ impl App {
         for sprite in resolved {
             self.rendering.add_resolved_sprite(&sprite);
         }
+    }
+
+    fn render_scene_transition_overlay(&mut self) {
+        let alpha = self.scene_transition.fade_alpha();
+        if alpha <= f32::EPSILON {
+            return;
+        }
+
+        let projection = self.rendering.projection_params();
+        self.rendering.add_filled_ui_rect(
+            0.0,
+            0.0,
+            projection.width as f32,
+            projection.height as f32,
+            [0.0, 0.0, 0.0, alpha.clamp(0.0, 1.0)],
+        );
     }
 }

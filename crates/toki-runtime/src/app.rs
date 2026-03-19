@@ -37,9 +37,12 @@ mod app_lifecycle;
 mod app_splash;
 #[path = "app_tick.rs"]
 mod app_tick;
+#[path = "app_transition.rs"]
+mod app_transition;
 #[path = "runtime_menu.rs"]
 mod runtime_menu;
 
+use app_transition::SceneTransitionController;
 use app_splash::{ResolvedSplashConfig, SplashPolicy};
 use toki_core::project_assets::first_existing_path;
 
@@ -115,6 +118,19 @@ impl RuntimeDisplayOptions {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuntimeTransitionOptions {
+    pub fade_duration_ms: u32,
+}
+
+impl Default for RuntimeTransitionOptions {
+    fn default() -> Self {
+        Self {
+            fade_duration_ms: 250,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RuntimeLaunchOptions {
     pub project_path: Option<PathBuf>,
@@ -124,6 +140,7 @@ pub struct RuntimeLaunchOptions {
     pub splash: RuntimeSplashOptions,
     pub audio_mix: RuntimeAudioMixOptions,
     pub display: RuntimeDisplayOptions,
+    pub transition: RuntimeTransitionOptions,
     pub menu: MenuSettings,
 }
 
@@ -154,6 +171,7 @@ struct App {
     /// Last tick instant for delta time calculation in delta timing mode
     last_tick_instant: Option<Instant>,
     asset_load_plan: RuntimeAssetLoadPlan,
+    scene_transition: SceneTransitionController,
     #[allow(dead_code)]
     decoded_project_cache: DecodedProjectCache,
     #[allow(dead_code)]
@@ -209,11 +227,26 @@ impl App {
         .expect("Failed to initialize audio system");
         audio_system.set_master_volume_percent(launch_options.audio_mix.master_percent);
         audio_system.set_channel_volume_percent("music", launch_options.audio_mix.music_percent);
+        audio_system.set_channel_volume_percent("music_a", launch_options.audio_mix.music_percent);
+        audio_system.set_channel_volume_percent("music_b", launch_options.audio_mix.music_percent);
         audio_system
             .set_channel_volume_percent("movement", launch_options.audio_mix.movement_percent);
         audio_system
             .set_channel_volume_percent("collision", launch_options.audio_mix.collision_percent);
         let menu_system = MenuController::new(launch_options.menu.clone());
+        let mut scene_transition = SceneTransitionController::new(launch_options.transition.clone());
+        if let Some(track_id) = game_system
+            .active_scene()
+            .and_then(|scene| scene.background_music_track_id.as_deref())
+        {
+            if let Err(error) = scene_transition.prime_scene_music(
+                &mut audio_system,
+                Some(track_id),
+                launch_options.audio_mix.music_percent,
+            ) {
+                tracing::warn!("Failed to start initial scene background music '{track_id}': {error}");
+            }
+        }
 
         // Frame limiter: only active when vsync is disabled
         let frame_limiter = if launch_options.display.vsync {
@@ -250,6 +283,7 @@ impl App {
             pending_ui_events: Vec::new(),
             last_tick_instant: None,
             asset_load_plan,
+            scene_transition,
             decoded_project_cache,
             pack_mount,
         }

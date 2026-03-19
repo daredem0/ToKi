@@ -325,6 +325,7 @@ fn resolve_post_splash_sprite_texture_path_prefers_project_creatures_texture() {
         splash: RuntimeSplashOptions::default(),
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
+        transition: Default::default(),
         menu: MenuSettings::default(),
     };
 
@@ -359,6 +360,7 @@ fn resolve_post_splash_sprite_texture_path_prefers_content_root_over_project_pat
         splash: RuntimeSplashOptions::default(),
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
+        transition: Default::default(),
         menu: MenuSettings::default(),
     };
 
@@ -423,6 +425,7 @@ fn build_startup_state_loads_resources_and_scene_from_pack_mount() {
         splash: RuntimeSplashOptions::default(),
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
+        transition: Default::default(),
         menu: MenuSettings::default(),
     };
 
@@ -536,6 +539,7 @@ fn build_startup_state_uses_scene_player_entry_and_preloads_all_scenes() {
         splash: RuntimeSplashOptions::default(),
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
+        transition: Default::default(),
         menu: MenuSettings::default(),
     };
 
@@ -633,6 +637,7 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
         splash: RuntimeSplashOptions::default(),
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
+        transition: Default::default(),
         menu: MenuSettings::default(),
     };
 
@@ -645,6 +650,200 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
     );
     assert_eq!(game_state.player_position(), glam::IVec2::new(32, 48));
     assert_eq!(asset_load_plan.map_name.as_deref(), Some("demo_map"));
+}
+
+#[test]
+fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
+    #[derive(Default)]
+    struct FakeAudioSink;
+
+    impl super::app_transition::TransitionAudioSink for FakeAudioSink {
+        fn play_background_music_in_channel(
+            &mut self,
+            _channel: &str,
+            _track_id: &str,
+            _volume: f32,
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            Ok(())
+        }
+
+        fn set_channel_volume_percent(&mut self, _channel: &str, _percent: u8) {}
+
+        fn stop_channel(&mut self, _channel: &str) {}
+    }
+
+    let project_dir = make_unique_temp_dir();
+    fs::create_dir_all(project_dir.join("assets").join("sprites")).expect("sprites dir");
+    fs::create_dir_all(project_dir.join("assets").join("tilemaps")).expect("tilemaps dir");
+    fs::create_dir_all(project_dir.join("scenes")).expect("scenes dir");
+    write_player_definition(&project_dir, "player");
+
+    fs::write(
+        project_dir.join("project.toml"),
+        "[scenes]\nMain = 'scenes/Main.json'\nSecond = 'scenes/Second.json'\n",
+    )
+    .expect("project");
+
+    let main_scene = Scene {
+        name: "Main".to_string(),
+        description: None,
+        maps: vec!["demo_map".to_string()],
+        entities: vec![],
+        rules: RuleSet {
+            rules: vec![Rule {
+                id: "switch_to_second".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::SwitchScene {
+                    scene_name: "Second".to_string(),
+                    spawn_point_id: "entry_b".to_string(),
+                }],
+            }],
+        },
+        camera_position: None,
+        camera_scale: None,
+        background_music_track_id: None,
+        anchors: vec![SceneAnchor {
+            id: "entry_a".to_string(),
+            kind: SceneAnchorKind::SpawnPoint,
+            position: glam::IVec2::new(16, 16),
+            facing: Some(SceneAnchorFacing::Down),
+        }],
+        player_entry: Some(ScenePlayerEntry {
+            entity_definition_name: "player".to_string(),
+            spawn_point_id: "entry_a".to_string(),
+        }),
+    };
+    fs::write(
+        project_dir.join("scenes").join("Main.json"),
+        serde_json::to_string_pretty(&main_scene).expect("serialize main scene"),
+    )
+    .expect("write main scene");
+
+    let second_scene = Scene {
+        name: "Second".to_string(),
+        description: None,
+        maps: vec!["demo_map".to_string()],
+        entities: vec![],
+        rules: RuleSet::default(),
+        camera_position: None,
+        camera_scale: None,
+        background_music_track_id: None,
+        anchors: vec![SceneAnchor {
+            id: "entry_b".to_string(),
+            kind: SceneAnchorKind::SpawnPoint,
+            position: glam::IVec2::new(96, 48),
+            facing: Some(SceneAnchorFacing::Right),
+        }],
+        player_entry: Some(ScenePlayerEntry {
+            entity_definition_name: "player".to_string(),
+            spawn_point_id: "entry_b".to_string(),
+        }),
+    };
+    fs::write(
+        project_dir.join("scenes").join("Second.json"),
+        serde_json::to_string_pretty(&second_scene).expect("serialize second scene"),
+    )
+    .expect("write second scene");
+
+    fs::write(
+        project_dir.join("assets").join("sprites").join("creatures.json"),
+        r#"{
+  "image": "creatures.png",
+  "tile_size": [16, 16],
+  "tiles": { "idle": { "position": [0, 0], "properties": { "solid": false } } }
+}"#,
+    )
+    .expect("creatures atlas");
+    fs::write(
+        project_dir.join("assets").join("tilemaps").join("demo_map.json"),
+        r#"{
+  "size": [1, 1],
+  "tile_size": [16, 16],
+  "atlas": "terrain.json",
+  "tiles": ["floor"]
+}"#,
+    )
+    .expect("tilemap");
+    fs::write(
+        project_dir.join("assets").join("tilemaps").join("terrain.json"),
+        r#"{
+  "image": "terrain.png",
+  "tile_size": [16, 16],
+  "tiles": { "floor": { "position": [0, 0], "properties": { "solid": false } } }
+}"#,
+    )
+    .expect("terrain atlas");
+
+    let launch_options = RuntimeLaunchOptions {
+        project_path: Some(project_dir),
+        pack_path: None,
+        scene_name: Some("Main".to_string()),
+        map_name: None,
+        splash: RuntimeSplashOptions::default(),
+        audio_mix: RuntimeAudioMixOptions::default(),
+        display: RuntimeDisplayOptions::default(),
+        transition: super::RuntimeTransitionOptions {
+            fade_duration_ms: 100,
+        },
+        menu: MenuSettings::default(),
+    };
+    let (resources, mut game_state, _mount, _asset_load_plan, _) =
+        App::build_startup_state(&launch_options);
+    let mut transition =
+        super::app_transition::SceneTransitionController::new(launch_options.transition.clone());
+    let mut audio = FakeAudioSink;
+
+    assert_eq!(game_state.scene_manager().active_scene_name(), Some("Main"));
+
+    let result = game_state.update(
+        glam::UVec2::new(16, 16),
+        resources.get_tilemap(),
+        resources.get_terrain_atlas(),
+    );
+    let request = result
+        .scene_switch_request
+        .expect("rule should emit scene-switch request");
+    let target_track = game_state
+        .scene_manager()
+        .get_scene(&request.scene_name)
+        .and_then(|scene| scene.background_music_track_id.clone());
+    assert!(transition.request_scene_switch(request, target_track));
+
+    assert!(matches!(
+        transition.advance(50, &mut audio, launch_options.audio_mix.music_percent),
+        super::app_transition::TransitionAdvance::None
+    ));
+    assert_eq!(game_state.scene_manager().active_scene_name(), Some("Main"));
+    assert!(transition.fade_alpha() > 0.0);
+
+    let request = match transition.advance(60, &mut audio, launch_options.audio_mix.music_percent) {
+        super::app_transition::TransitionAdvance::ReadyToSwap(request) => request,
+        other => panic!("expected ready-to-swap transition action, got {other:?}"),
+    };
+    game_state
+        .transition_to_scene(&request.scene_name, &request.spawn_point_id)
+        .expect("scene transition should apply after fade-out");
+    transition
+        .complete_scene_switch(
+            &mut audio,
+            true,
+            game_state
+                .active_scene()
+                .and_then(|scene| scene.background_music_track_id.as_deref()),
+        )
+        .expect("fade-in should start");
+
+    assert_eq!(game_state.scene_manager().active_scene_name(), Some("Second"));
+    assert_eq!(game_state.player_position(), glam::IVec2::new(96, 48));
+    assert!(transition.is_active());
+
+    let _ = transition.advance(100, &mut audio, launch_options.audio_mix.music_percent);
+    assert!(!transition.is_active());
+    assert_eq!(transition.fade_alpha(), 0.0);
 }
 
 #[test]
@@ -672,6 +871,7 @@ fn build_startup_state_from_pack_returns_error_when_required_assets_are_missing(
         splash: RuntimeSplashOptions::default(),
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
+        transition: Default::default(),
         menu: MenuSettings::default(),
     };
 
