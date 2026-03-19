@@ -1,4 +1,5 @@
 use super::*;
+use crate::project::ProjectAssets;
 use toki_core::project_assets::tilemap_file_path;
 
 impl EditorApp {
@@ -73,8 +74,12 @@ impl EditorApp {
             .get(scene_name)
             .map(String::as_str);
         let map_to_load = Self::resolve_scene_map_to_load(&active_scene, preferred_map);
+        let preview_game_state = {
+            let project_assets = self.core.project_manager.get_project_assets_mut();
+            Self::build_scene_preview_game_state(&active_scene, project_assets)
+        };
 
-        Self::load_scene_into_gamestate(viewport, &active_scene, scene_name);
+        Self::load_scene_into_gamestate(viewport, scene_name, preview_game_state);
         Self::load_scene_tilemap(
             viewport,
             scene_name,
@@ -91,19 +96,54 @@ impl EditorApp {
         self.core.ui.scenes.iter().find(|s| s.name == scene_name)
     }
 
+    pub(super) fn build_scene_preview_game_state(
+        scene: &toki_core::Scene,
+        project_assets: Option<&mut ProjectAssets>,
+    ) -> Result<toki_core::GameState, String> {
+        let mut game_state = toki_core::GameState::new_empty();
+
+        if let Some(player_entry) = scene.player_entry.as_ref() {
+            let project_assets = project_assets.ok_or_else(|| {
+                format!(
+                    "Scene '{}' has a player entry but no project assets are available",
+                    scene.name
+                )
+            })?;
+            let definition = project_assets
+                .load_entity_definition(&player_entry.entity_definition_name)
+                .map_err(|error| {
+                    format!(
+                        "Failed to load player entity definition '{}' for scene '{}': {}",
+                        player_entry.entity_definition_name, scene.name, error
+                    )
+                })?
+                .ok_or_else(|| {
+                    format!(
+                        "Scene '{}' references missing player entity definition '{}'",
+                        scene.name, player_entry.entity_definition_name
+                    )
+                })?;
+            game_state.add_entity_definition(definition);
+        }
+
+        game_state.add_scene(scene.clone());
+        game_state.load_scene(&scene.name)?;
+        Ok(game_state)
+    }
+
     pub(super) fn load_scene_into_gamestate(
         viewport: &mut crate::scene::SceneViewport,
-        scene: &toki_core::Scene,
         scene_name: &str,
+        preview_game_state: Result<toki_core::GameState, String>,
     ) {
-        viewport.game_state_mut().add_scene(scene.clone());
-
-        match viewport.game_state_mut().load_scene(scene_name) {
-            Ok(()) => {
+        match preview_game_state {
+            Ok(game_state) => {
+                *viewport.game_state_mut() = game_state;
+                viewport.mark_dirty();
                 tracing::info!(
                     "Loaded active scene '{}' with {} entities into GameState",
                     scene_name,
-                    scene.entities.len()
+                    viewport.game_state().entities().len()
                 );
             }
             Err(e) => {

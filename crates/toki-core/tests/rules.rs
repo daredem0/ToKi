@@ -11,7 +11,11 @@ use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
     RuleTarget, RuleTrigger,
 };
-use toki_core::{entity::EntityKind, GameState, InputKey, Scene};
+use toki_core::{
+    entity::EntityKind,
+    scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind},
+    GameState, InputKey, Scene,
+};
 
 fn create_test_tilemap() -> TileMap {
     TileMap {
@@ -109,6 +113,15 @@ fn scene_with_player(name: &str, position: IVec2) -> Scene {
         .clone();
     scene.add_entity(player);
     scene
+}
+
+fn spawn_anchor(id: &str, position: IVec2, facing: Option<SceneAnchorFacing>) -> SceneAnchor {
+    SceneAnchor {
+        id: id.to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position,
+        facing,
+    }
 }
 
 #[test]
@@ -1466,7 +1479,12 @@ fn switch_scene_applies_at_tick_boundary_after_movement_processing() {
             }],
         )],
     };
-    let scene_b = scene_with_player("Scene B", IVec2::new(100, 0));
+    let mut scene_b = Scene::new("Scene B".to_string());
+    scene_b.add_anchor(spawn_anchor(
+        "spawn_b",
+        IVec2::new(100, 0),
+        Some(SceneAnchorFacing::Right),
+    ));
 
     state.add_scene(scene_a);
     state.add_scene(scene_b);
@@ -1521,8 +1539,12 @@ fn switch_scene_uses_highest_priority_rule_target() {
     };
 
     state.add_scene(scene_a);
-    state.add_scene(scene_with_player("Scene B", IVec2::new(10, 0)));
-    state.add_scene(scene_with_player("Scene C", IVec2::new(20, 0)));
+    let mut scene_b = Scene::new("Scene B".to_string());
+    scene_b.add_anchor(spawn_anchor("spawn_b", IVec2::new(10, 0), None));
+    let mut scene_c = Scene::new("Scene C".to_string());
+    scene_c.add_anchor(spawn_anchor("spawn_c", IVec2::new(20, 0), None));
+    state.add_scene(scene_b);
+    state.add_scene(scene_c);
     state
         .load_scene("Scene A")
         .expect("initial scene should load");
@@ -1538,7 +1560,7 @@ fn switch_scene_uses_highest_priority_rule_target() {
 }
 
 #[test]
-fn switch_scene_keeps_active_scene_when_target_is_missing() {
+fn switch_scene_keeps_active_scene_when_target_scene_is_missing() {
     let mut state = GameState::new_empty();
     let mut scene_a = scene_with_player("Scene A", IVec2::new(0, 0));
     scene_a.rules = RuleSet {
@@ -1569,29 +1591,23 @@ fn switch_scene_keeps_active_scene_when_target_is_missing() {
 }
 
 #[test]
-fn switch_scene_syncs_outgoing_scene_entities_before_loading_target() {
+fn switch_scene_keeps_active_scene_when_target_spawn_is_missing() {
     let mut state = GameState::new_empty();
     let mut scene_a = scene_with_player("Scene A", IVec2::new(0, 0));
     scene_a.rules = RuleSet {
         rules: vec![base_rule(
-            "move-and-switch",
+            "missing-spawn",
             RuleTrigger::OnUpdate,
             0,
-            vec![
-                RuleAction::SetVelocity {
-                    target: RuleTarget::Player,
-                    velocity: [1, 0],
-                },
-                RuleAction::SwitchScene {
-                    scene_name: "Scene B".to_string(),
-                    spawn_point_id: "spawn_b".to_string(),
-                },
-            ],
+            vec![RuleAction::SwitchScene {
+                scene_name: "Scene B".to_string(),
+                spawn_point_id: "spawn_b".to_string(),
+            }],
         )],
     };
 
     state.add_scene(scene_a);
-    state.add_scene(scene_with_player("Scene B", IVec2::new(50, 0)));
+    state.add_scene(Scene::new("Scene B".to_string()));
     state
         .load_scene("Scene A")
         .expect("initial scene should load");
@@ -1602,17 +1618,8 @@ fn switch_scene_syncs_outgoing_scene_entities_before_loading_target() {
         &create_test_atlas(),
     );
 
-    assert_eq!(state.scene_manager().active_scene_name(), Some("Scene B"));
-    let scene_a_after = state
-        .scene_manager()
-        .get_scene("Scene A")
-        .expect("scene A should still exist");
-    let persisted_player = scene_a_after
-        .entities
-        .iter()
-        .find(|entity| matches!(entity.entity_kind, EntityKind::Player))
-        .expect("scene A should still contain its player entity");
-    assert_eq!(persisted_player.position, IVec2::new(1, 0));
+    assert_eq!(state.scene_manager().active_scene_name(), Some("Scene A"));
+    assert_eq!(state.player_position(), IVec2::new(0, 0));
 }
 
 #[test]

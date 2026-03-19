@@ -23,7 +23,8 @@ impl App {
         let tick_start = Instant::now();
         tracing::trace!("TICK @ {:?}", tick_start);
 
-        let world_bounds = glam::UVec2::new(
+        let previous_scene_name = self.game_system.active_scene_name().map(str::to_string);
+        let mut world_bounds = glam::UVec2::new(
             self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
             self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
         );
@@ -52,6 +53,14 @@ impl App {
 
         for event in &game_result.events {
             self.audio_system.handle(event);
+        }
+
+        if self.game_system.active_scene_name() != previous_scene_name.as_deref() {
+            self.handle_runtime_scene_change();
+            world_bounds = glam::UVec2::new(
+                self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
+                self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
+            );
         }
 
         let player_moved = game_result.player_moved;
@@ -164,6 +173,101 @@ impl App {
         }
 
         self.platform.request_redraw();
+    }
+
+    fn handle_runtime_scene_change(&mut self) {
+        let active_scene_name = self.game_system.active_scene_name().map(str::to_string);
+        let active_scene = self.game_system.active_scene().cloned();
+
+        if let (Some(content_root), Some(scene_name), Some(scene)) = (
+            self.content_root_path().map(std::path::Path::to_path_buf),
+            active_scene_name.as_deref(),
+            active_scene.as_ref(),
+        ) {
+            let map_name = scene.maps.first().map(String::as_str);
+            match Self::load_project_resources_with_cache(
+                &content_root,
+                Some(scene_name),
+                map_name,
+                &mut self.decoded_project_cache,
+            ) {
+                Ok((resources, asset_load_plan)) => {
+                    self.resources = resources;
+                    self.asset_load_plan = asset_load_plan;
+                    if self.rendering.has_gpu() {
+                        if let Some(tilemap_texture_path) =
+                            self.asset_load_plan.tilemap_texture_path.clone()
+                        {
+                            if let Err(error) =
+                                self.rendering.load_tilemap_texture(tilemap_texture_path)
+                            {
+                                tracing::warn!(
+                                    "Failed to reload tilemap texture for scene '{}': {}",
+                                    scene_name,
+                                    error
+                                );
+                            }
+                        }
+                        if let Some(sprite_texture_path) =
+                            self.asset_load_plan.sprite_texture_path.clone()
+                        {
+                            if let Err(error) =
+                                self.rendering.load_sprite_texture(sprite_texture_path)
+                            {
+                                tracing::warn!(
+                                    "Failed to reload sprite texture for scene '{}': {}",
+                                    scene_name,
+                                    error
+                                );
+                            }
+                        }
+                    }
+                }
+                Err(error) => {
+                    tracing::error!(
+                        "Failed to reload resources for scene '{}': {}",
+                        scene_name,
+                        error
+                    );
+                }
+            }
+        }
+
+        let world_bounds = glam::UVec2::new(
+            self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
+            self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
+        );
+
+        let new_mode = if let Some(player_id) = self.game_system.player_id() {
+            self.camera_system
+                .camera_mut()
+                .center_on(self.game_system.player_position());
+            toki_core::camera::CameraMode::FollowEntity(player_id)
+        } else {
+            toki_core::camera::CameraMode::FreeScroll
+        };
+        self.camera_system.controller_mut().mode = new_mode;
+        self.camera_system
+            .camera_mut()
+            .clamp_to_world_bounds(world_bounds);
+
+        if self.rendering.has_gpu() {
+            let view = self.camera_system.view_matrix();
+            self.rendering.update_projection(view);
+            self.refresh_tilemap_vertices_for_current_camera();
+        }
+
+        if let Some(scene) = active_scene.as_ref() {
+            if let Some(track_id) = scene.background_music_track_id.as_deref() {
+                if let Err(error) = self.audio_system.play_background_music(track_id, 0.3) {
+                    tracing::warn!(
+                        "Failed to start scene background music '{}' after scene switch: {}",
+                        track_id,
+                        error
+                    );
+                }
+            }
+        }
     }
 
     fn render_entity_health_bars(&mut self) {

@@ -7,6 +7,7 @@ use toki_core::{
     assets::tilemap::TileMap,
     entity::Entity,
     game::{EntityHealthBar, InputAction},
+    scene::Scene,
     sprite::SpriteFrame,
     GameState, GameUpdateResult, InputKey,
 };
@@ -161,6 +162,14 @@ impl GameManager {
 
     pub fn player_inventory_entries(&self) -> Vec<InventoryEntry> {
         self.game_state.player_inventory_entries()
+    }
+
+    pub fn active_scene_name(&self) -> Option<&str> {
+        self.game_state.scene_manager().active_scene_name()
+    }
+
+    pub fn active_scene(&self) -> Option<&Scene> {
+        self.game_state.active_scene()
     }
 
     /// Get entities for camera system integration

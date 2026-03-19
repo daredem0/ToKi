@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
+use toki_core::entity::EntityDefinition;
 use toki_core::AssetCache;
 use toki_core::Scene;
 use toki_render::RenderError;
@@ -83,6 +84,7 @@ pub struct DecodedProjectCache {
     tilemaps: AssetCache<PathBuf, TileMap>,
     atlases: AssetCache<PathBuf, AtlasMeta>,
     object_sheets: AssetCache<PathBuf, ObjectSheetMeta>,
+    entity_definitions: AssetCache<PathBuf, EntityDefinition>,
 }
 
 impl DecodedProjectCache {
@@ -123,6 +125,17 @@ impl DecodedProjectCache {
         self.object_sheets
             .get_or_load(object_sheet_path.to_path_buf(), |path| {
                 ObjectSheetMeta::load_from_file(path)
+            })
+    }
+
+    pub fn load_entity_definition_from_path(
+        &mut self,
+        entity_definition_path: &Path,
+    ) -> Result<EntityDefinition, toki_core::CoreError> {
+        self.entity_definitions
+            .get_or_load(entity_definition_path.to_path_buf(), |path| {
+                let json = fs::read_to_string(path)?;
+                Ok(serde_json::from_str::<EntityDefinition>(&json)?)
             })
     }
 }

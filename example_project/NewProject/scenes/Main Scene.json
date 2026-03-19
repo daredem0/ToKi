@@ -33,16 +33,6 @@
         "visible": true,
         "animation_controller": {
           "clips": {
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -53,6 +43,16 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -171,7 +171,7 @@
       "audio": {
         "footstep_trigger_distance": 16.0,
         "hearing_radius": 192,
-        "movement_sound_trigger": "distance",
+        "movement_sound_trigger": "animation_loop",
         "movement_sound": "sfx_slime_bounce",
         "collision_sound": null
       },
@@ -253,7 +253,7 @@
       "audio": {
         "footstep_trigger_distance": 16.0,
         "hearing_radius": 192,
-        "movement_sound_trigger": "distance",
+        "movement_sound_trigger": "animation_loop",
         "movement_sound": "sfx_slime_bounce",
         "collision_sound": null
       },
@@ -272,6 +272,16 @@
         "visible": true,
         "animation_controller": {
           "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -282,16 +292,6 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -335,7 +335,7 @@
       "audio": {
         "footstep_trigger_distance": 16.0,
         "hearing_radius": 192,
-        "movement_sound_trigger": "distance",
+        "movement_sound_trigger": "animation_loop",
         "movement_sound": "sfx_slime_bounce",
         "collision_sound": null
       },
@@ -405,7 +405,7 @@
       "id": 9,
       "position": [
         104,
-        168
+        160
       ],
       "size": [
         16,
@@ -417,7 +417,7 @@
       "audio": {
         "footstep_trigger_distance": 16.0,
         "hearing_radius": 192,
-        "movement_sound_trigger": "distance",
+        "movement_sound_trigger": "animation_loop",
         "movement_sound": "sfx_slime_bounce",
         "collision_sound": null
       },

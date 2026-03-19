@@ -563,6 +563,116 @@ fn build_scene_player_overlay_sprites_uses_scene_player_entry_spawn_point() {
 }
 
 #[test]
+fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_entry() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should exist");
+    let project_path = temp_dir.path().to_path_buf();
+    fs::create_dir_all(project_path.join("entities")).expect("entities dir should exist");
+
+    fs::write(
+        project_path.join("entities/player.json"),
+        serde_json::to_string_pretty(&EntityDefinition {
+            name: "player".to_string(),
+            display_name: "Player".to_string(),
+            description: "Scene player preview".to_string(),
+            rendering: RenderingDef {
+                size: [16, 16],
+                render_layer: 0,
+                visible: true,
+                static_object: None,
+            },
+            attributes: AttributesDef {
+                health: Some(100),
+                stats: HashMap::new(),
+                speed: 0.0,
+                solid: true,
+                active: true,
+                can_move: false,
+                ai_behavior: AiBehavior::None,
+                movement_profile: MovementProfile::None,
+                primary_projectile: None,
+                pickup: None,
+                has_inventory: true,
+            },
+            collision: CollisionDef {
+                enabled: true,
+                offset: [0, 0],
+                size: [16, 16],
+                trigger: false,
+            },
+            audio: AudioDef {
+                footstep_trigger_distance: 16.0,
+                hearing_radius: 192,
+                movement_sound_trigger: MovementSoundTrigger::Distance,
+                movement_sound: "step".to_string(),
+                collision_sound: None,
+            },
+            animations: AnimationsDef {
+                atlas_name: "".to_string(),
+                clips: vec![],
+                default_state: "".to_string(),
+            },
+            category: "character".to_string(),
+            tags: vec!["player".to_string()],
+        })
+        .expect("entity json should serialize"),
+    )
+    .expect("entity definition should be written");
+
+    let mut project_assets = ProjectAssets::new(project_path);
+    project_assets
+        .scan_assets()
+        .expect("project assets should scan");
+
+    let mut scene = Scene::new("Main Scene".to_string());
+    scene.anchors.push(SceneAnchor {
+        id: "spawn_a".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(64, 80),
+        facing: None,
+    });
+    scene.player_entry = Some(ScenePlayerEntry {
+        entity_definition_name: "player".to_string(),
+        spawn_point_id: "spawn_a".to_string(),
+    });
+    scene.entities.push(solid_entity(77, IVec2::new(16, 32)));
+
+    let game_state =
+        EditorApp::build_scene_preview_game_state(&scene, Some(&mut project_assets))
+            .expect("scene preview game state should build");
+
+    assert_eq!(game_state.active_scene().map(|scene| scene.name.as_str()), Some("Main Scene"));
+    assert!(game_state.player_entity().is_some());
+    assert!(
+        game_state
+            .entities_owned()
+            .iter()
+            .any(|entity| entity.id == 77),
+        "authored scene entity should still be present in preview GameState"
+    );
+    assert_eq!(game_state.entities().len(), 2);
+}
+
+#[test]
+fn build_scene_preview_game_state_errors_when_player_entry_definition_is_unavailable() {
+    let mut scene = Scene::new("Main Scene".to_string());
+    scene.anchors.push(SceneAnchor {
+        id: "spawn_a".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(64, 80),
+        facing: None,
+    });
+    scene.player_entry = Some(ScenePlayerEntry {
+        entity_definition_name: "player".to_string(),
+        spawn_point_id: "spawn_a".to_string(),
+    });
+
+    let error = EditorApp::build_scene_preview_game_state(&scene, None)
+        .expect_err("scene preview build should fail without required project assets");
+
+    assert!(error.contains("no project assets are available"));
+}
+
+#[test]
 fn build_scene_player_overlay_sprites_skips_when_scene_already_contains_authored_player_entity() {
     let temp_dir = tempfile::tempdir().expect("temp dir should exist");
     let project_path = temp_dir.path().to_path_buf();

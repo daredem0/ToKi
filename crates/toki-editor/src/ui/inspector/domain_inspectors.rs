@@ -614,10 +614,9 @@ impl Inspector for ScenePlayerEntryInspector {
                                 if InspectorSystem::render_entity_definition_property_editor(
                                     ui, &mut draft, ctx.config,
                                 ) && InspectorSystem::apply_entity_property_draft_to_definition(
-                                        &mut definition,
-                                        &draft,
-                                    )
-                                {
+                                    &mut definition,
+                                    &draft,
+                                ) {
                                     if let Err(err) = InspectorSystem::save_entity_definition(
                                         &definition,
                                         &entity_file,

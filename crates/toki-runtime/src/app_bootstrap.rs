@@ -1,6 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use toki_core::project_assets::{first_existing_path, scene_file_path};
+use toki_core::entity::EntityDefinition;
+use toki_core::project_assets::{
+    discover_project_entity_definition_paths, discover_project_scene_paths, first_existing_path,
+    resolve_project_scene_path,
+};
 use toki_core::{GameState, Scene};
 use toki_render::RenderError;
 
@@ -32,13 +36,33 @@ impl App {
 
         let mut decoded_project_cache = DecodedProjectCache::default();
         if let Some(project_path) = &launch_options.project_path {
+            let scenes =
+                Self::load_all_project_scenes_with_cache(project_path, &mut decoded_project_cache)
+                    .unwrap_or_else(|error| {
+                        tracing::error!(
+                            "Failed to preload project scenes from '{}': {}",
+                            project_path.display(),
+                            error
+                        );
+                        Vec::new()
+                    });
+            let entity_definitions = Self::load_project_entity_definitions_with_cache(
+                project_path,
+                &mut decoded_project_cache,
+            )
+            .unwrap_or_else(|error| {
+                tracing::error!(
+                    "Failed to preload entity definitions from '{}': {}",
+                    project_path.display(),
+                    error
+                );
+                Vec::new()
+            });
             let scene = launch_options.scene_name.as_deref().and_then(|scene_name| {
-                Self::load_project_scene_with_cache(
-                    project_path,
-                    scene_name,
-                    &mut decoded_project_cache,
-                )
-                .ok()
+                scenes
+                    .iter()
+                    .find(|scene| scene.name == scene_name)
+                    .cloned()
             });
 
             let map_name = launch_options.map_name.clone().or_else(|| {
@@ -54,8 +78,13 @@ impl App {
                 &mut decoded_project_cache,
             ) {
                 Ok((resources, asset_load_plan)) => {
-                    let game_state = if let Some(scene) = scene {
-                        Self::game_state_from_scene(scene)
+                    let game_state = if let Some(scene_name) = launch_options.scene_name.as_deref()
+                    {
+                        Self::game_state_from_project_content(
+                            scenes.clone(),
+                            entity_definitions.clone(),
+                            scene_name,
+                        )
                     } else {
                         Self::fallback_game_state()
                     };
@@ -112,18 +141,20 @@ impl App {
         let mount = crate::pack::extract_pak_to_tempdir(pack_path)?;
         let mount_path = mount.path().to_path_buf();
         let mut decoded_project_cache = DecodedProjectCache::default();
-        let scene = launch_options
-            .scene_name
-            .as_deref()
-            .map(|scene_name| {
-                Self::load_project_scene_with_cache(
-                    &mount_path,
-                    scene_name,
-                    &mut decoded_project_cache,
-                )
-            })
-            .transpose()
-            .map_err(anyhow::Error::msg)?;
+        let scenes =
+            Self::load_all_project_scenes_with_cache(&mount_path, &mut decoded_project_cache)
+                .map_err(anyhow::Error::msg)?;
+        let entity_definitions = Self::load_project_entity_definitions_with_cache(
+            &mount_path,
+            &mut decoded_project_cache,
+        )
+        .map_err(anyhow::Error::msg)?;
+        let scene = launch_options.scene_name.as_deref().and_then(|scene_name| {
+            scenes
+                .iter()
+                .find(|scene| scene.name == scene_name)
+                .cloned()
+        });
         let map_name = launch_options.map_name.clone().or_else(|| {
             scene
                 .as_ref()
@@ -135,8 +166,8 @@ impl App {
             map_name.as_deref(),
             &mut decoded_project_cache,
         )?;
-        let game_state = if let Some(scene) = scene {
-            Self::game_state_from_scene(scene)
+        let game_state = if let Some(scene_name) = launch_options.scene_name.as_deref() {
+            Self::game_state_from_project_content(scenes, entity_definitions, scene_name)
         } else {
             Self::fallback_game_state()
         };
@@ -168,15 +199,50 @@ impl App {
         Ok((resources, asset_load_plan))
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn load_project_scene_with_cache(
         project_path: &Path,
         scene_name: &str,
         decoded_project_cache: &mut DecodedProjectCache,
     ) -> Result<Scene, String> {
-        let scene_path = scene_file_path(project_path, scene_name);
+        let scene_path = resolve_project_scene_path(project_path, scene_name)
+            .ok_or_else(|| format!("Could not resolve scene file for '{}'", scene_name))?;
         decoded_project_cache.load_scene_from_path(&scene_path)
     }
 
+    pub(super) fn load_all_project_scenes_with_cache(
+        project_path: &Path,
+        decoded_project_cache: &mut DecodedProjectCache,
+    ) -> Result<Vec<Scene>, String> {
+        let scene_paths =
+            discover_project_scene_paths(project_path).map_err(|error| error.to_string())?;
+        let mut scenes = Vec::new();
+        for (_, path) in scene_paths {
+            scenes.push(decoded_project_cache.load_scene_from_path(&path)?);
+        }
+        scenes.sort_by(|left, right| left.name.cmp(&right.name));
+        Ok(scenes)
+    }
+
+    pub(super) fn load_project_entity_definitions_with_cache(
+        project_path: &Path,
+        decoded_project_cache: &mut DecodedProjectCache,
+    ) -> Result<Vec<EntityDefinition>, String> {
+        let definition_paths = discover_project_entity_definition_paths(project_path)
+            .map_err(|error| error.to_string())?;
+        let mut definitions = Vec::new();
+        for path in definition_paths {
+            definitions.push(
+                decoded_project_cache
+                    .load_entity_definition_from_path(&path)
+                    .map_err(|error| error.to_string())?,
+            );
+        }
+        definitions.sort_by(|left, right| left.name.cmp(&right.name));
+        Ok(definitions)
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn game_state_from_scene(scene: Scene) -> GameState {
         let scene_name = scene.name.clone();
         let mut game_state = GameState::new_empty();
@@ -185,6 +251,29 @@ impl App {
             tracing::error!(
                 "Failed to load startup scene '{}' into game state: {}",
                 scene_name,
+                error
+            );
+            return Self::fallback_game_state();
+        }
+        game_state
+    }
+
+    pub(super) fn game_state_from_project_content(
+        scenes: Vec<Scene>,
+        entity_definitions: Vec<EntityDefinition>,
+        startup_scene_name: &str,
+    ) -> GameState {
+        let mut game_state = GameState::new_empty();
+        for definition in entity_definitions {
+            game_state.add_entity_definition(definition);
+        }
+        for scene in scenes {
+            game_state.add_scene(scene);
+        }
+        if let Err(error) = game_state.load_scene(startup_scene_name) {
+            tracing::error!(
+                "Failed to load startup scene '{}' into game state: {}",
+                startup_scene_name,
                 error
             );
             return Self::fallback_game_state();

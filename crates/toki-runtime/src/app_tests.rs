@@ -12,7 +12,14 @@ use toki_core::math::projection::ProjectionParameter;
 use toki_core::menu::MenuSettings;
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::text::{TextStyle, TextWeight};
-use toki_core::Scene;
+use toki_core::{
+    entity::{
+        AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
+        MovementProfile, MovementSoundTrigger, RenderingDef,
+    },
+    scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind, ScenePlayerEntry},
+    Scene,
+};
 
 fn make_unique_temp_dir() -> std::path::PathBuf {
     let nanos = std::time::SystemTime::now()
@@ -27,6 +34,76 @@ fn make_unique_temp_dir() -> std::path::PathBuf {
 fn load_project_scene(project_path: &std::path::Path, scene_name: &str) -> Result<Scene, String> {
     let mut decoded_project_cache = super::DecodedProjectCache::default();
     App::load_project_scene_with_cache(project_path, scene_name, &mut decoded_project_cache)
+}
+
+fn write_player_definition(project_path: &std::path::Path, name: &str) {
+    let definition = EntityDefinition {
+        name: name.to_string(),
+        display_name: "Player".to_string(),
+        description: "Player definition".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 1,
+            visible: true,
+            static_object: None,
+        },
+        attributes: AttributesDef {
+            health: Some(100),
+            stats: std::collections::HashMap::from([
+                ("health".to_string(), 100),
+                ("attack_power".to_string(), 8),
+            ]),
+            speed: 2.0,
+            solid: true,
+            active: true,
+            can_move: true,
+            ai_behavior: toki_core::entity::AiBehavior::None,
+            movement_profile: MovementProfile::PlayerWasd,
+            primary_projectile: None,
+            pickup: None,
+            has_inventory: true,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 100,
+            movement_sound_trigger: MovementSoundTrigger::AnimationLoop,
+            movement_sound: "sfx_step".to_string(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "creatures".to_string(),
+            clips: vec![
+                AnimationClipDef {
+                    state: "idle_down".to_string(),
+                    frame_tiles: vec!["idle".to_string()],
+                    frame_duration_ms: 300.0,
+                    loop_mode: "loop".to_string(),
+                },
+                AnimationClipDef {
+                    state: "idle_right".to_string(),
+                    frame_tiles: vec!["idle".to_string()],
+                    frame_duration_ms: 300.0,
+                    loop_mode: "loop".to_string(),
+                },
+            ],
+            default_state: "idle_down".to_string(),
+        },
+        category: "human".to_string(),
+        tags: vec!["player".to_string()],
+    };
+    let entities_dir = project_path.join("entities");
+    fs::create_dir_all(&entities_dir).expect("entities dir");
+    fs::write(
+        entities_dir.join(format!("{name}.json")),
+        serde_json::to_string_pretty(&definition).expect("serialize definition"),
+    )
+    .expect("write definition");
 }
 fn write_test_pak(pak_path: &std::path::Path, entries: &[(String, Vec<u8>)]) {
     let mut file = fs::File::create(pak_path).expect("create pak");
@@ -148,6 +225,30 @@ fn load_project_scene_reads_valid_scene_file() {
 }
 
 #[test]
+fn load_project_scene_uses_project_scene_mapping_from_project_toml() {
+    let project_dir = make_unique_temp_dir();
+    let mapped_dir = project_dir.join("scenes").join("nested");
+    fs::create_dir_all(&mapped_dir).expect("mapped scene dir");
+    fs::write(
+        project_dir.join("project.toml"),
+        "[scenes]\nTown = 'scenes/nested/town_entry.json'\n",
+    )
+    .expect("project file");
+
+    let mut scene = Scene::new("Town".to_string());
+    scene.maps.push("demo_map".to_string());
+    fs::write(
+        mapped_dir.join("town_entry.json"),
+        serde_json::to_string_pretty(&scene).expect("serialize scene"),
+    )
+    .expect("write scene");
+
+    let loaded = load_project_scene(&project_dir, "Town").expect("mapped scene should load");
+    assert_eq!(loaded.name, "Town");
+    assert_eq!(loaded.maps, vec!["demo_map".to_string()]);
+}
+
+#[test]
 fn load_project_scene_returns_error_for_invalid_json() {
     let project_dir = make_unique_temp_dir();
     let scenes_dir = project_dir.join("scenes");
@@ -166,7 +267,7 @@ fn load_project_scene_returns_error_for_missing_scene_file() {
 
     let error = load_project_scene(&project_dir, "DoesNotExist")
         .expect_err("missing scene file should fail");
-    assert!(error.contains("Could not read scene file"));
+    assert!(error.contains("Could not resolve scene file"));
 }
 
 #[test]
@@ -336,6 +437,213 @@ fn build_startup_state_loads_resources_and_scene_from_pack_mount() {
     assert_eq!(game_state.entity_manager().active_entities().len(), 0);
     assert_eq!(resources.get_tilemap().size, glam::UVec2::new(1, 1));
     assert_eq!(resources.get_tilemap().atlas, terrain_atlas_path);
+    assert_eq!(asset_load_plan.map_name.as_deref(), Some("demo_map"));
+}
+
+#[test]
+fn build_startup_state_uses_scene_player_entry_and_preloads_all_scenes() {
+    let project_dir = make_unique_temp_dir();
+    fs::create_dir_all(project_dir.join("assets").join("sprites")).expect("sprites dir");
+    fs::create_dir_all(project_dir.join("assets").join("tilemaps")).expect("tilemaps dir");
+    fs::create_dir_all(project_dir.join("scenes").join("custom")).expect("custom scenes dir");
+    write_player_definition(&project_dir, "player");
+
+    fs::write(
+        project_dir.join("project.toml"),
+        "[scenes]\nMain = 'scenes/custom/main_scene.json'\nSecond = 'scenes/Second.json'\n",
+    )
+    .expect("project");
+
+    let main_scene = Scene {
+        name: "Main".to_string(),
+        description: None,
+        maps: vec!["demo_map".to_string()],
+        entities: vec![],
+        rules: RuleSet::default(),
+        camera_position: None,
+        camera_scale: None,
+        background_music_track_id: None,
+        anchors: vec![SceneAnchor {
+            id: "entry".to_string(),
+            kind: SceneAnchorKind::SpawnPoint,
+            position: glam::IVec2::new(48, 64),
+            facing: Some(SceneAnchorFacing::Right),
+        }],
+        player_entry: Some(ScenePlayerEntry {
+            entity_definition_name: "player".to_string(),
+            spawn_point_id: "entry".to_string(),
+        }),
+    };
+    fs::write(
+        project_dir
+            .join("scenes")
+            .join("custom")
+            .join("main_scene.json"),
+        serde_json::to_string_pretty(&main_scene).expect("serialize main scene"),
+    )
+    .expect("write main scene");
+
+    let second_scene = Scene::new("Second".to_string());
+    fs::write(
+        project_dir.join("scenes").join("Second.json"),
+        serde_json::to_string_pretty(&second_scene).expect("serialize second scene"),
+    )
+    .expect("write second scene");
+
+    fs::write(
+        project_dir
+            .join("assets")
+            .join("sprites")
+            .join("creatures.json"),
+        r#"{
+  "image": "creatures.png",
+  "tile_size": [16, 16],
+  "tiles": { "idle": { "position": [0, 0], "properties": { "solid": false } } }
+}"#,
+    )
+    .expect("creatures atlas");
+    fs::write(
+        project_dir
+            .join("assets")
+            .join("tilemaps")
+            .join("demo_map.json"),
+        r#"{
+  "size": [1, 1],
+  "tile_size": [16, 16],
+  "atlas": "terrain.json",
+  "tiles": ["floor"]
+}"#,
+    )
+    .expect("tilemap");
+    fs::write(
+        project_dir
+            .join("assets")
+            .join("tilemaps")
+            .join("terrain.json"),
+        r#"{
+  "image": "terrain.png",
+  "tile_size": [16, 16],
+  "tiles": { "floor": { "position": [0, 0], "properties": { "solid": false } } }
+}"#,
+    )
+    .expect("terrain atlas");
+
+    let launch_options = RuntimeLaunchOptions {
+        project_path: Some(project_dir.clone()),
+        pack_path: None,
+        scene_name: Some("Main".to_string()),
+        map_name: None,
+        splash: RuntimeSplashOptions::default(),
+        audio_mix: RuntimeAudioMixOptions::default(),
+        display: RuntimeDisplayOptions::default(),
+        menu: MenuSettings::default(),
+    };
+
+    let (_resources, game_state, _pack_mount, asset_load_plan, _) =
+        App::build_startup_state(&launch_options);
+
+    assert_eq!(game_state.scene_manager().active_scene_name(), Some("Main"));
+    assert!(game_state.scene_manager().has_scene("Second"));
+    assert_eq!(game_state.player_position(), glam::IVec2::new(48, 64));
+    assert_eq!(
+        game_state
+            .player_entity()
+            .expect("scene player should exist")
+            .definition_name
+            .as_deref(),
+        Some("player")
+    );
+    assert_eq!(asset_load_plan.map_name.as_deref(), Some("demo_map"));
+}
+
+#[test]
+fn build_startup_state_tolerates_stale_scene_manifest_paths() {
+    let project_dir = make_unique_temp_dir();
+    fs::create_dir_all(project_dir.join("assets").join("sprites")).expect("sprites dir");
+    fs::create_dir_all(project_dir.join("assets").join("tilemaps")).expect("tilemaps dir");
+    fs::create_dir_all(project_dir.join("scenes")).expect("scenes dir");
+    write_player_definition(&project_dir, "player");
+
+    fs::write(
+        project_dir.join("project.toml"),
+        "[scenes]\n\"Main Scene\" = 'scenes/mainscene.json'\n",
+    )
+    .expect("project");
+
+    let startup_scene = Scene {
+        name: "Main Scene".to_string(),
+        description: None,
+        maps: vec!["demo_map".to_string()],
+        entities: vec![],
+        rules: RuleSet::default(),
+        camera_position: None,
+        camera_scale: None,
+        background_music_track_id: None,
+        anchors: vec![SceneAnchor {
+            id: "entry".to_string(),
+            kind: SceneAnchorKind::SpawnPoint,
+            position: glam::IVec2::new(32, 48),
+            facing: Some(SceneAnchorFacing::Down),
+        }],
+        player_entry: Some(ScenePlayerEntry {
+            entity_definition_name: "player".to_string(),
+            spawn_point_id: "entry".to_string(),
+        }),
+    };
+    fs::write(
+        project_dir.join("scenes").join("Main Scene.json"),
+        serde_json::to_string_pretty(&startup_scene).expect("serialize scene"),
+    )
+    .expect("scene");
+
+    fs::write(
+        project_dir.join("assets").join("sprites").join("creatures.json"),
+        r#"{
+  "image": "creatures.png",
+  "tile_size": [16, 16],
+  "tiles": { "idle": { "position": [0, 0], "properties": { "solid": false } } }
+}"#,
+    )
+    .expect("creatures atlas");
+    fs::write(
+        project_dir.join("assets").join("tilemaps").join("demo_map.json"),
+        r#"{
+  "size": [1, 1],
+  "tile_size": [16, 16],
+  "atlas": "terrain.json",
+  "tiles": ["floor"]
+}"#,
+    )
+    .expect("tilemap");
+    fs::write(
+        project_dir.join("assets").join("tilemaps").join("terrain.json"),
+        r#"{
+  "image": "terrain.png",
+  "tile_size": [16, 16],
+  "tiles": { "floor": { "position": [0, 0], "properties": { "solid": false } } }
+}"#,
+    )
+    .expect("terrain atlas");
+
+    let launch_options = RuntimeLaunchOptions {
+        project_path: Some(project_dir),
+        pack_path: None,
+        scene_name: Some("Main Scene".to_string()),
+        map_name: None,
+        splash: RuntimeSplashOptions::default(),
+        audio_mix: RuntimeAudioMixOptions::default(),
+        display: RuntimeDisplayOptions::default(),
+        menu: MenuSettings::default(),
+    };
+
+    let (_resources, game_state, _mount, asset_load_plan, _) =
+        App::build_startup_state(&launch_options);
+
+    assert_eq!(
+        game_state.scene_manager().active_scene_name(),
+        Some("Main Scene")
+    );
+    assert_eq!(game_state.player_position(), glam::IVec2::new(32, 48));
     assert_eq!(asset_load_plan.map_name.as_deref(), Some("demo_map"));
 }
 

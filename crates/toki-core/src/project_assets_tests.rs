@@ -1,7 +1,7 @@
 use crate::project_assets::{
-    classify_sprite_metadata_file, discover_audio_files, discover_sprite_metadata,
-    normalize_asset_name, resolve_project_resource_paths, scene_file_path, tilemap_file_path,
-    ProjectAudioFormat, SpriteMetadataFileKind,
+    classify_sprite_metadata_file, discover_audio_files, discover_project_scene_paths,
+    discover_sprite_metadata, normalize_asset_name, resolve_project_resource_paths,
+    scene_file_path, tilemap_file_path, ProjectAudioFormat, SpriteMetadataFileKind,
 };
 use std::fs;
 
@@ -216,4 +216,43 @@ fn tilemap_file_path_returns_canonical_path() {
         path,
         project.join("assets").join("tilemaps").join("Level 1.json")
     );
+}
+
+#[test]
+fn discover_project_scene_paths_falls_back_when_manifest_paths_are_stale() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let project = tmp.path();
+    fs::create_dir_all(project.join("scenes")).expect("scenes dir");
+    fs::write(
+        project.join("project.toml"),
+        "[scenes]\n\"Main Scene\" = \"scenes/mainscene.json\"\n",
+    )
+    .expect("project");
+    fs::write(project.join("scenes").join("Main Scene.json"), "{}").expect("scene");
+
+    let discovered = discover_project_scene_paths(project).expect("discover scenes");
+
+    assert_eq!(discovered.len(), 1);
+    assert_eq!(discovered[0].0, "Main Scene");
+    assert_eq!(discovered[0].1, project.join("scenes").join("Main Scene.json"));
+}
+
+#[test]
+fn discover_project_scene_paths_includes_unlisted_scene_files_alongside_manifest_entries() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let project = tmp.path();
+    fs::create_dir_all(project.join("scenes")).expect("scenes dir");
+    fs::write(
+        project.join("project.toml"),
+        "[scenes]\nMain = \"scenes/Main.json\"\n",
+    )
+    .expect("project");
+    fs::write(project.join("scenes").join("Main.json"), "{}").expect("main scene");
+    fs::write(project.join("scenes").join("Extra.json"), "{}").expect("extra scene");
+
+    let discovered = discover_project_scene_paths(project).expect("discover scenes");
+
+    assert_eq!(discovered.len(), 2);
+    assert_eq!(discovered[0], ("Extra".to_string(), project.join("scenes").join("Extra.json")));
+    assert_eq!(discovered[1], ("Main".to_string(), project.join("scenes").join("Main.json")));
 }

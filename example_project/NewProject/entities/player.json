@@ -16,7 +16,7 @@
       "attack_power": 8,
       "health": 100
     },
-    "speed": 2.0,
+    "speed": 1.0,
     "solid": true,
     "active": true,
     "can_move": true,

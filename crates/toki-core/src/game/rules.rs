@@ -52,6 +52,8 @@ pub(super) enum RuleCommand {
     },
 }
 
+pub(super) type PendingSceneSwitch = (String, String);
+
 impl GameState {
     pub fn rules(&self) -> &RuleSet {
         &self.rules
@@ -273,7 +275,7 @@ impl GameState {
         &mut self,
         commands: Vec<RuleCommand>,
         result: &mut GameUpdateResult<AudioEvent>,
-    ) -> (Vec<(EntityId, AnimationState)>, Option<String>) {
+    ) -> (Vec<(EntityId, AnimationState)>, Option<PendingSceneSwitch>) {
         let mut buffered_velocities = HashMap::new();
         let mut buffered_animations = HashMap::new();
         let mut pending_scene_switch = None;
@@ -317,11 +319,12 @@ impl GameState {
                 }
                 RuleCommand::SwitchScene {
                     scene_name,
-                    spawn_point_id: _,
+                    spawn_point_id,
                 } => {
                     let target = scene_name.trim();
-                    if !target.is_empty() && pending_scene_switch.is_none() {
-                        pending_scene_switch = Some(target.to_string());
+                    let spawn = spawn_point_id.trim();
+                    if !target.is_empty() && !spawn.is_empty() && pending_scene_switch.is_none() {
+                        pending_scene_switch = Some((target.to_string(), spawn.to_string()));
                     }
                 }
             }
@@ -393,10 +396,14 @@ impl GameState {
         }
     }
 
-    pub(super) fn apply_rule_scene_switch(&mut self, scene_name: &str) {
-        self.sync_entities_to_active_scene();
-        if let Err(error) = self.load_scene(scene_name) {
-            tracing::warn!("Rule requested scene switch to '{}': {}", scene_name, error);
+    pub(super) fn apply_rule_scene_switch(&mut self, scene_name: &str, spawn_point_id: &str) {
+        if let Err(error) = self.transition_to_scene(scene_name, spawn_point_id) {
+            tracing::warn!(
+                "Rule requested scene switch to '{}' via '{}': {}",
+                scene_name,
+                spawn_point_id,
+                error
+            );
         }
     }
 

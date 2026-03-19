@@ -1,5 +1,7 @@
 use crate::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
+use crate::entity::EntityDefinition;
 use crate::CoreError;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -79,6 +81,78 @@ pub fn scene_file_path(project_path: &Path, scene_name: &str) -> PathBuf {
         .join(format!("{scene_name}.json"))
 }
 
+#[derive(Debug, serde::Deserialize, Default)]
+struct ProjectSceneManifest {
+    #[serde(default)]
+    scenes: HashMap<String, String>,
+}
+
+fn load_project_scene_manifest(
+    project_path: &Path,
+) -> Result<ProjectSceneManifest, ProjectAssetError> {
+    let project_file = project_path.join("project.toml");
+    if !project_file.exists() {
+        return Ok(ProjectSceneManifest::default());
+    }
+
+    let content = fs::read_to_string(&project_file)?;
+    Ok(toml::from_str(&content).unwrap_or_default())
+}
+
+pub fn resolve_project_scene_path(project_path: &Path, scene_name: &str) -> Option<PathBuf> {
+    let manifest = load_project_scene_manifest(project_path).ok()?;
+    if let Some(relative_path) = manifest.scenes.get(scene_name) {
+        let mapped = project_path.join(relative_path);
+        if mapped.exists() {
+            return Some(mapped);
+        }
+    }
+
+    let canonical = scene_file_path(project_path, scene_name);
+    canonical.exists().then_some(canonical)
+}
+
+pub fn discover_project_scene_paths(
+    project_path: &Path,
+) -> Result<Vec<(String, PathBuf)>, ProjectAssetError> {
+    let manifest = load_project_scene_manifest(project_path)?;
+    let mut scene_paths = Vec::new();
+    let mut seen_names = std::collections::HashSet::new();
+    let mut seen_paths = std::collections::HashSet::new();
+
+    for (scene_name, relative_path) in manifest.scenes {
+        let mapped = project_path.join(relative_path);
+        let resolved = if mapped.exists() {
+            Some(mapped)
+        } else {
+            let canonical = scene_file_path(project_path, &scene_name);
+            canonical.exists().then_some(canonical)
+        };
+
+        if let Some(path) = resolved {
+            seen_names.insert(scene_name.clone());
+            seen_paths.insert(path.clone());
+            scene_paths.push((scene_name, path));
+        }
+    }
+
+    let scenes_dir = project_path.join("scenes");
+    let mut discovered = find_json_files(&scenes_dir)?
+        .into_iter()
+        .filter_map(|path| {
+            let name = path.file_stem()?.to_str()?.to_string();
+            if seen_names.contains(&name) || seen_paths.contains(&path) {
+                None
+            } else {
+                Some((name, path))
+            }
+        })
+        .collect::<Vec<_>>();
+    scene_paths.append(&mut discovered);
+    scene_paths.sort_by(|left, right| left.0.cmp(&right.0));
+    Ok(scene_paths)
+}
+
 /// Returns the canonical path for a tilemap file in a project.
 ///
 /// Tilemap files are stored as `{project_path}/assets/tilemaps/{map_name}.json`.
@@ -87,6 +161,19 @@ pub fn tilemap_file_path(project_path: &Path, map_name: &str) -> PathBuf {
         .join("assets")
         .join("tilemaps")
         .join(format!("{map_name}.json"))
+}
+
+pub fn discover_project_entity_definition_paths(
+    project_path: &Path,
+) -> Result<Vec<PathBuf>, ProjectAssetError> {
+    find_json_files(&project_path.join("entities"))
+}
+
+pub fn load_entity_definition_from_path(
+    path: &Path,
+) -> Result<EntityDefinition, ProjectAssetError> {
+    let json = fs::read_to_string(path)?;
+    Ok(serde_json::from_str::<EntityDefinition>(&json).map_err(CoreError::from)?)
 }
 
 pub fn find_json_files(dir: &Path) -> Result<Vec<PathBuf>, ProjectAssetError> {

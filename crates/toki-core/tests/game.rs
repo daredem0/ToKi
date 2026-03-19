@@ -14,7 +14,11 @@ use toki_core::entity::{
 use toki_core::rules::{Rule, RuleAction, RuleSet, RuleTarget, RuleTrigger};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{
-    game::AudioChannel, game::AudioEvent, game::InputAction, scene::Scene, GameState, InputKey,
+    game::AudioChannel,
+    game::AudioEvent,
+    game::InputAction,
+    scene::{Scene, SceneAnchor, SceneAnchorFacing, SceneAnchorKind, ScenePlayerEntry},
+    GameState, InputKey,
 };
 
 fn create_test_sprite() -> SpriteInstance {
@@ -147,6 +151,105 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
         },
         category: category.to_string(),
         tags: vec!["test".to_string()],
+    }
+}
+
+fn player_definition(name: &str) -> EntityDefinition {
+    EntityDefinition {
+        name: name.to_string(),
+        display_name: format!("Display {name}"),
+        description: format!("Definition for {name}"),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+            static_object: None,
+        },
+        attributes: AttributesDef {
+            health: Some(100),
+            stats: HashMap::from([("health".to_string(), 100), ("attack_power".to_string(), 8)]),
+            speed: 2.0,
+            solid: true,
+            active: true,
+            can_move: true,
+            ai_behavior: toki_core::entity::AiBehavior::None,
+            movement_profile: MovementProfile::PlayerWasd,
+            primary_projectile: None,
+            pickup: None,
+            has_inventory: true,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 100,
+            movement_sound_trigger: MovementSoundTrigger::AnimationLoop,
+            movement_sound: "sfx_step".to_string(),
+            collision_sound: Some("sfx_hit2".to_string()),
+        },
+        animations: AnimationsDef {
+            atlas_name: "players.json".to_string(),
+            clips: vec![
+                AnimationClipDef {
+                    state: "idle_down".to_string(),
+                    frame_tiles: vec!["player/walk_down_a".to_string()],
+                    frame_duration_ms: 300.0,
+                    loop_mode: "loop".to_string(),
+                },
+                AnimationClipDef {
+                    state: "idle_up".to_string(),
+                    frame_tiles: vec!["player/walk_up_a".to_string()],
+                    frame_duration_ms: 300.0,
+                    loop_mode: "loop".to_string(),
+                },
+                AnimationClipDef {
+                    state: "idle_left".to_string(),
+                    frame_tiles: vec!["player/walk_left_a".to_string()],
+                    frame_duration_ms: 300.0,
+                    loop_mode: "loop".to_string(),
+                },
+                AnimationClipDef {
+                    state: "idle_right".to_string(),
+                    frame_tiles: vec!["player/walk_right_a".to_string()],
+                    frame_duration_ms: 300.0,
+                    loop_mode: "loop".to_string(),
+                },
+                AnimationClipDef {
+                    state: "walk_right".to_string(),
+                    frame_tiles: vec![
+                        "player/walk_right_a".to_string(),
+                        "player/walk_right_b".to_string(),
+                    ],
+                    frame_duration_ms: 180.0,
+                    loop_mode: "loop".to_string(),
+                },
+                AnimationClipDef {
+                    state: "attack_right".to_string(),
+                    frame_tiles: vec![
+                        "player/attack_right_a".to_string(),
+                        "player/attack_right_b".to_string(),
+                    ],
+                    frame_duration_ms: 180.0,
+                    loop_mode: "once".to_string(),
+                },
+            ],
+            default_state: "idle_down".to_string(),
+        },
+        category: "human".to_string(),
+        tags: vec!["player".to_string()],
+    }
+}
+
+fn scene_anchor(id: &str, position: IVec2, facing: Option<SceneAnchorFacing>) -> SceneAnchor {
+    SceneAnchor {
+        id: id.to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position,
+        facing,
     }
 }
 
@@ -2052,6 +2155,216 @@ fn game_state_load_scene_uses_control_role_for_player_identity() {
             .category,
         "creature"
     );
+}
+
+#[test]
+fn game_state_load_scene_spawns_player_from_scene_player_entry() {
+    let mut game_state = GameState::new_empty();
+    game_state.add_entity_definition(player_definition("player"));
+
+    let mut scene = Scene::new("Entry Scene".to_string());
+    scene.add_anchor(scene_anchor(
+        "main_spawn",
+        IVec2::new(96, 48),
+        Some(SceneAnchorFacing::Left),
+    ));
+    scene.player_entry = Some(ScenePlayerEntry {
+        entity_definition_name: "player".to_string(),
+        spawn_point_id: "main_spawn".to_string(),
+    });
+
+    game_state.add_scene(scene);
+    game_state
+        .load_scene("Entry Scene")
+        .expect("scene should load successfully");
+
+    let player = game_state
+        .player_entity()
+        .expect("scene player should spawn");
+    assert_eq!(player.position, IVec2::new(96, 48));
+    assert_eq!(player.definition_name.as_deref(), Some("player"));
+    assert_eq!(player.control_role, ControlRole::PlayerCharacter);
+    assert_eq!(player.entity_kind, EntityKind::Player);
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_ref()
+        .expect("player animation controller should exist");
+    assert_eq!(controller.current_clip_state, AnimationState::IdleLeft);
+}
+
+#[test]
+fn game_state_transition_to_scene_preserves_durable_player_state_and_resets_transient_state() {
+    let mut game_state = GameState::new_empty();
+    game_state.add_entity_definition(player_definition("player"));
+    game_state.add_entity_definition(player_definition("player_knight"));
+
+    let mut scene_a = Scene::new("Scene A".to_string());
+    let mut hero = player_definition("player")
+        .create_entity(IVec2::new(8, 8), 7)
+        .expect("hero should instantiate");
+    hero.control_role = ControlRole::PlayerCharacter;
+    hero.entity_kind = EntityKind::Player;
+    scene_a.add_entity(hero);
+
+    let mut scene_b = Scene::new("Scene B".to_string());
+    scene_b.add_anchor(scene_anchor(
+        "from_gate",
+        IVec2::new(128, 64),
+        Some(SceneAnchorFacing::Left),
+    ));
+    scene_b.player_entry = Some(ScenePlayerEntry {
+        entity_definition_name: "player_knight".to_string(),
+        spawn_point_id: "default_spawn".to_string(),
+    });
+
+    game_state.add_scene(scene_a);
+    game_state.add_scene(scene_b);
+    game_state
+        .load_scene("Scene A")
+        .expect("initial scene should load");
+
+    let player_id = game_state.player_id().expect("player should exist");
+    {
+        let player = game_state
+            .entity_manager_mut()
+            .get_entity_mut(player_id)
+            .expect("player should exist");
+        player.attributes.apply_stat_delta("health", -35);
+        player.attributes.inventory.add_item("coin", 3);
+        player.movement_accumulator = glam::Vec2::new(0.5, 0.25);
+        let controller = player
+            .attributes
+            .animation_controller
+            .as_mut()
+            .expect("player controller should exist");
+        controller.play(AnimationState::AttackRight);
+        controller.current_frame_index = 1;
+        controller.frame_timer = 99.0;
+        controller.is_finished = true;
+    }
+    let audio = game_state
+        .entity_manager_mut()
+        .audio_component_mut(player_id)
+        .expect("player audio should exist");
+    audio.footstep_distance_accumulator = 42.0;
+    audio.last_collision_state = true;
+
+    game_state
+        .transition_to_scene("Scene B", "from_gate")
+        .expect("scene transition should succeed");
+
+    assert_eq!(
+        game_state.scene_manager().active_scene_name(),
+        Some("Scene B")
+    );
+    assert_eq!(game_state.player_id(), Some(player_id));
+
+    let player = game_state
+        .player_entity()
+        .expect("player should still exist");
+    assert_eq!(player.position, IVec2::new(128, 64));
+    assert_eq!(player.definition_name.as_deref(), Some("player_knight"));
+    assert_eq!(player.attributes.current_stat("health"), Some(65));
+    assert_eq!(player.attributes.inventory.item_count("coin"), 3);
+    assert_eq!(player.movement_accumulator, glam::Vec2::ZERO);
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_ref()
+        .expect("player controller should exist");
+    assert_eq!(controller.current_clip_state, AnimationState::IdleLeft);
+    assert_eq!(controller.current_frame_index, 0);
+    assert_eq!(controller.frame_timer, 0.0);
+    assert!(!controller.is_finished);
+
+    let audio = game_state
+        .entity_manager()
+        .audio_component(player_id)
+        .expect("player audio should exist after transition");
+    assert_eq!(audio.footstep_distance_accumulator, 0.0);
+    assert!(!audio.last_collision_state);
+}
+
+#[test]
+fn game_state_transition_to_scene_resets_non_player_entities_on_return() {
+    let mut game_state = GameState::new_empty();
+    game_state.add_entity_definition(player_definition("player"));
+
+    let mut scene_a = Scene::new("Scene A".to_string());
+    scene_a.add_anchor(scene_anchor("return_spawn", IVec2::new(16, 16), None));
+    let mut hero = player_definition("player")
+        .create_entity(IVec2::new(0, 0), 1)
+        .expect("hero should instantiate");
+    hero.control_role = ControlRole::PlayerCharacter;
+    hero.entity_kind = EntityKind::Player;
+    scene_a.add_entity(hero);
+    let npc_id = scene_a.add_entity(
+        test_definition("villager", "creature")
+            .create_entity(IVec2::new(40, 40), 9)
+            .expect("npc should instantiate"),
+    );
+
+    let mut scene_b = Scene::new("Scene B".to_string());
+    scene_b.add_anchor(scene_anchor("entry_b", IVec2::new(96, 32), None));
+
+    game_state.add_scene(scene_a);
+    game_state.add_scene(scene_b);
+    game_state
+        .load_scene("Scene A")
+        .expect("initial scene should load");
+
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(npc_id)
+        .expect("npc should exist")
+        .position = IVec2::new(80, 80);
+
+    game_state
+        .transition_to_scene("Scene B", "entry_b")
+        .expect("transition to scene B should succeed");
+    game_state
+        .transition_to_scene("Scene A", "return_spawn")
+        .expect("transition back should succeed");
+
+    let npc = game_state
+        .entity_manager()
+        .get_entity(npc_id)
+        .expect("authored npc should be restored on return");
+    assert_eq!(npc.position, IVec2::new(40, 40));
+}
+
+#[test]
+fn game_state_transition_to_scene_missing_spawn_fails_without_corrupting_state() {
+    let mut game_state = GameState::new_empty();
+    game_state.add_entity_definition(player_definition("player"));
+
+    let mut scene_a = Scene::new("Scene A".to_string());
+    let mut hero = player_definition("player")
+        .create_entity(IVec2::new(12, 24), 3)
+        .expect("hero should instantiate");
+    hero.control_role = ControlRole::PlayerCharacter;
+    hero.entity_kind = EntityKind::Player;
+    scene_a.add_entity(hero);
+
+    let scene_b = Scene::new("Scene B".to_string());
+
+    game_state.add_scene(scene_a);
+    game_state.add_scene(scene_b);
+    game_state
+        .load_scene("Scene A")
+        .expect("initial scene should load");
+
+    let before_position = game_state.player_position();
+    let error = game_state
+        .transition_to_scene("Scene B", "missing_spawn")
+        .expect_err("missing spawn point should fail");
+    assert!(error.contains("missing_spawn"));
+    assert_eq!(
+        game_state.scene_manager().active_scene_name(),
+        Some("Scene A")
+    );
+    assert_eq!(game_state.player_position(), before_position);
 }
 
 #[test]

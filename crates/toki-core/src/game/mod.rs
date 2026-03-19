@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use crate::animation::AnimationState;
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
-use crate::entity::{AiBehavior, Entity, EntityId, EntityManager, MovementProfile};
+use crate::entity::{
+    AiBehavior, Entity, EntityDefinition, EntityId, EntityManager, MovementProfile,
+};
 use crate::events::{GameEvent, GameUpdateResult};
 use crate::rules::{RuleSet, RuleTrigger};
 use crate::scene_manager::SceneManager;
@@ -82,6 +84,10 @@ pub struct GameState {
 
     /// Entity manager for all game objects in the current scene
     entity_manager: EntityManager,
+
+    /// Authored entity definitions available to scene player-entry instantiation.
+    #[serde(default)]
+    entity_definitions: HashMap<String, EntityDefinition>,
 
     /// Player entity ID for quick access
     player_id: Option<EntityId>,
@@ -258,8 +264,8 @@ impl GameState {
             self.emit_animation_loop_movement_audio(entity_id, completed_loops, &mut result);
         }
 
-        if let Some(scene_name) = pending_scene_switch {
-            self.apply_rule_scene_switch(&scene_name);
+        if let Some((scene_name, spawn_point_id)) = pending_scene_switch {
+            self.apply_rule_scene_switch(&scene_name, &spawn_point_id);
         }
 
         result
@@ -358,8 +364,8 @@ impl GameState {
             self.emit_animation_loop_movement_audio(entity_id, completed_loops, &mut result);
         }
 
-        if let Some(scene_name) = pending_scene_switch {
-            self.apply_rule_scene_switch(&scene_name);
+        if let Some((scene_name, spawn_point_id)) = pending_scene_switch {
+            self.apply_rule_scene_switch(&scene_name, &spawn_point_id);
         }
 
         result
