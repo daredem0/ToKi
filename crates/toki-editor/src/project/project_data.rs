@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use toki_core::project_runtime::RuntimeSettings;
 use toki_template_lowering::ProjectFileChange;
+use toki_template_runner::ProjectTemplateSettings;
 
 /// Main project data structure
 #[allow(dead_code)]
@@ -35,6 +36,9 @@ pub struct ProjectMetadata {
     /// Runtime-specific settings
     #[serde(default)]
     pub runtime: RuntimeSettings,
+    /// Project-local template runner configuration
+    #[serde(default)]
+    pub templates: ProjectTemplateSettings,
     /// Editor-specific settings
     #[serde(default)]
     pub editor: EditorSettings,
@@ -179,6 +183,7 @@ impl Project {
             },
             assets: AssetConfig::default(),
             runtime: RuntimeSettings::default(),
+            templates: ProjectTemplateSettings::default(),
             editor: EditorSettings::default(),
         };
 

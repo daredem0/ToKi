@@ -12,6 +12,10 @@ pub enum TemplateProviderErrorCode {
     SemanticValidation,
     UnsupportedProtocolVersion,
     UnsupportedSemanticVersion,
+    BuildFailed,
+    InvocationFailed,
+    TimedOut,
+    ProtocolViolation,
     Internal,
 }
 
@@ -37,7 +41,7 @@ pub struct TemplateInstantiation {
 }
 
 pub trait TemplateProvider {
-    fn list_templates(&self) -> Vec<TemplateDescriptor>;
+    fn list_templates(&self) -> Result<Vec<TemplateDescriptor>, TemplateProviderError>;
 
     fn describe_template(
         &self,

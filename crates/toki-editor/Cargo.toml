@@ -20,6 +20,7 @@ toki-render = { path = "../toki-render", version = "0.1.1", features = ["editor"
 toki-schemas = { path = "../toki-schemas", version = "0.1.1" }
 toki-templates = { path = "../toki-templates", version = "0.1.1" }
 toki-template-builtins = { path = "../toki-template-builtins", version = "0.1.1" }
+toki-template-runner = { path = "../toki-template-runner", version = "0.1.1" }
 toki-template-lowering = { path = "../toki-template-lowering", version = "0.1.1" }
 glam = "0.30.5"
 pollster = "0.4.0"

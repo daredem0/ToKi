@@ -1,7 +1,7 @@
 use crate::project::Project;
 use crate::ui::editor_ui::EditorUI;
 use crate::ui::template_workflow::{
-    built_in_template_descriptors, filtered_descriptors, preview_selected_template,
+    available_template_catalog, filtered_descriptors, preview_selected_template,
     summary_line_for_parameter_value, sync_template_editor_state, template_categories,
     TemplateAssetChoices,
 };
@@ -19,7 +19,8 @@ pub(super) fn render_template_editor(
         return;
     };
 
-    let descriptors = built_in_template_descriptors();
+    let catalog = available_template_catalog(Some(project));
+    let descriptors = catalog.descriptors;
     sync_template_editor_state(&mut ui_state.template, &descriptors);
     let categories = template_categories(&descriptors);
 
@@ -45,6 +46,12 @@ pub(super) fn render_template_editor(
             });
     });
     ui.separator();
+    for diagnostic in &catalog.diagnostics {
+        ui.colored_label(egui::Color32::from_rgb(215, 180, 110), diagnostic);
+    }
+    if !catalog.diagnostics.is_empty() {
+        ui.separator();
+    }
 
     let filtered = filtered_descriptors(&descriptors, ui_state.template.category_filter.as_deref());
     sync_template_editor_state(&mut ui_state.template, &filtered);

@@ -8,7 +8,9 @@ use toki_templates::{
 #[test]
 fn built_in_registry_lists_expected_templates() {
     let registry = BuiltInTemplateRegistry::new();
-    let mut templates = registry.list_templates();
+    let mut templates = registry
+        .list_templates()
+        .expect("built-in listing should succeed");
     templates.sort_by(|a, b| a.id.cmp(&b.id));
 
     let ids: Vec<_> = templates.into_iter().map(|d| d.id).collect();

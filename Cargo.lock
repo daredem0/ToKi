@@ -4492,6 +4492,7 @@ dependencies = [
  "toki-schemas",
  "toki-template-builtins",
  "toki-template-lowering",
+ "toki-template-runner",
  "toki-templates",
  "toml",
  "tracing",
@@ -4563,6 +4564,18 @@ dependencies = [
  "toki-core",
  "toki-template-builtins",
  "toki-templates",
+]
+
+[[package]]
+name = "toki-template-runner"
+version = "0.1.1"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toki-templates",
+ "toml",
 ]
 
 [[package]]

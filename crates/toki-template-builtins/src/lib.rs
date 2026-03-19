@@ -59,11 +59,12 @@ impl Default for BuiltInTemplateRegistry {
 }
 
 impl TemplateProvider for BuiltInTemplateRegistry {
-    fn list_templates(&self) -> Vec<TemplateDescriptor> {
-        self.templates
+    fn list_templates(&self) -> Result<Vec<TemplateDescriptor>, TemplateProviderError> {
+        Ok(self
+            .templates
             .keys()
             .filter_map(|template_id| self.validated_descriptor(template_id).ok())
-            .collect()
+            .collect())
     }
 
     fn describe_template(

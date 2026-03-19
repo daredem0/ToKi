@@ -7,6 +7,7 @@ use toki_template_builtins::BuiltInTemplateRegistry;
 use toki_template_lowering::{
     build_project_file_changes, lower_plan_for_project, ProjectFileChange,
 };
+use toki_template_runner::ProjectTemplateProvider;
 use toki_templates::{
     AssetReferenceKind, TemplateDescriptor, TemplateInstantiation, TemplateParameter,
     TemplateParameterKind, TemplateProvider, TemplateSemanticItem, TemplateValue,
@@ -46,6 +47,12 @@ pub struct TemplatePreview {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateWorkflowError {
     pub message: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TemplateCatalog {
+    pub descriptors: Vec<TemplateDescriptor>,
+    pub diagnostics: Vec<String>,
 }
 
 impl TemplateWorkflowError {
@@ -121,10 +128,47 @@ impl TemplateAssetChoices {
     }
 }
 
+#[cfg(test)]
 pub fn built_in_template_descriptors() -> Vec<TemplateDescriptor> {
-    let mut descriptors = BuiltInTemplateRegistry::new().list_templates();
+    let mut descriptors = BuiltInTemplateRegistry::new()
+        .list_templates()
+        .unwrap_or_default();
     descriptors.sort_by(|a, b| a.display_name.cmp(&b.display_name).then(a.id.cmp(&b.id)));
     descriptors
+}
+
+pub fn available_template_catalog(project: Option<&Project>) -> TemplateCatalog {
+    let mut diagnostics = Vec::new();
+    let mut descriptors = match BuiltInTemplateRegistry::new().list_templates() {
+        Ok(descriptors) => descriptors,
+        Err(error) => {
+            diagnostics.push(format!("Built-in templates unavailable: {}", error.message));
+            Vec::new()
+        }
+    };
+
+    if let Some(project) = project {
+        match ProjectTemplateProvider::detect(&project.path, &project.metadata.templates) {
+            Ok(Some(provider)) => match provider.list_templates() {
+                Ok(mut project_descriptors) => descriptors.append(&mut project_descriptors),
+                Err(error) => diagnostics.push(format!(
+                    "Project templates unavailable: {}",
+                    error.message
+                )),
+            },
+            Ok(None) => {}
+            Err(error) => diagnostics.push(format!(
+                "Project template discovery failed: {}",
+                error.message
+            )),
+        }
+    }
+
+    descriptors.sort_by(|a, b| a.display_name.cmp(&b.display_name).then(a.id.cmp(&b.id)));
+    TemplateCatalog {
+        descriptors,
+        diagnostics,
+    }
 }
 
 pub fn template_categories(descriptors: &[TemplateDescriptor]) -> Vec<String> {
@@ -202,19 +246,17 @@ pub fn preview_selected_template(
     state: &TemplateEditorState,
     project: &Project,
 ) -> Result<TemplatePreview, TemplateWorkflowError> {
-    let descriptors = built_in_template_descriptors();
+    let catalog = available_template_catalog(Some(project));
+    let descriptors = catalog.descriptors;
     let descriptor = selected_descriptor(state, &descriptors)
         .cloned()
         .ok_or_else(|| TemplateWorkflowError::new("no template selected"))?;
-    let registry = BuiltInTemplateRegistry::new();
     let parameters = state
         .parameters_by_template
         .get(&descriptor.id)
         .cloned()
         .unwrap_or_default();
-    let instantiation = registry
-        .instantiate_template(&descriptor.id, parameters.clone())
-        .map_err(|error| TemplateWorkflowError::new(error.message))?;
+    let instantiation = instantiate_template_for_project(project, &descriptor.id, parameters.clone())?;
     let lowered = lower_plan_for_project(&project.path, &instantiation.plan)
         .map_err(|error| TemplateWorkflowError::new(error.message))?;
     let mut file_changes = build_project_file_changes(&project.path, &lowered)
@@ -319,6 +361,31 @@ fn tracked_template_file_changes(file_changes: &[ProjectFileChange]) -> Vec<Proj
         .filter(|change| change.relative_path != std::path::Path::new("project.toml"))
         .cloned()
         .collect()
+}
+
+fn instantiate_template_for_project(
+    project: &Project,
+    template_id: &str,
+    parameters: BTreeMap<String, TemplateValue>,
+) -> Result<TemplateInstantiation, TemplateWorkflowError> {
+    if template_id.starts_with("toki/") {
+        return BuiltInTemplateRegistry::new()
+            .instantiate_template(template_id, parameters)
+            .map_err(|error| TemplateWorkflowError::new(error.message));
+    }
+    if template_id.starts_with("project/") {
+        let provider = ProjectTemplateProvider::detect(&project.path, &project.metadata.templates)
+            .map_err(|error| TemplateWorkflowError::new(error.message))?
+            .ok_or_else(|| TemplateWorkflowError::new("project template runner is not available"))?;
+        return provider
+            .instantiate_template(template_id, parameters)
+            .map_err(|error| TemplateWorkflowError::new(error.message));
+    }
+
+    Err(TemplateWorkflowError::new(format!(
+        "unsupported template namespace for '{}'",
+        template_id
+    )))
 }
 
 fn reverse_project_file_change(change: &ProjectFileChange) -> ProjectFileChange {

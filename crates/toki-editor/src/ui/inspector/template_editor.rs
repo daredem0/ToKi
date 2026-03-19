@@ -1,8 +1,9 @@
 use crate::project::Project;
 use crate::ui::editor_ui::EditorUI;
 use crate::ui::template_workflow::{
+    available_template_catalog,
     animation_state_choices_for_parameter, build_apply_template_command,
-    build_remove_template_application_command, built_in_template_descriptors,
+    build_remove_template_application_command,
     default_value_for_kind, preview_selected_template, selected_descriptor,
     sync_template_editor_state, TemplateAssetChoices,
 };
@@ -25,11 +26,18 @@ impl InspectorSystem {
             return;
         };
 
-        let descriptors = built_in_template_descriptors();
+        let catalog = available_template_catalog(Some(project));
+        let descriptors = catalog.descriptors;
         sync_template_editor_state(&mut ui_state.template, &descriptors);
 
         ui.heading("Template Editor");
         ui.separator();
+        for diagnostic in &catalog.diagnostics {
+            ui.colored_label(egui::Color32::from_rgb(215, 180, 110), diagnostic);
+        }
+        if !catalog.diagnostics.is_empty() {
+            ui.separator();
+        }
 
         render_active_templates(ui_state, ui, project);
         ui.separator();
