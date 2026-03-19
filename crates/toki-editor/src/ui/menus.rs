@@ -1,4 +1,6 @@
 use crate::config::EditorConfig;
+use crate::ui::editor_ui::EditorConfirmation;
+use crate::ui::inspector::build_delete_scene_command;
 
 /// Handles all menu bar rendering for the editor
 pub struct MenuSystem;
@@ -176,6 +178,67 @@ impl MenuSystem {
 
         if ui_state.project.show_new_project_dialog {
             Self::render_new_project_dialog(ui_state, ctx);
+        }
+        Self::render_pending_confirmations(ui_state, ctx, project);
+    }
+
+    fn render_pending_confirmations(
+        ui_state: &mut super::EditorUI,
+        ctx: &egui::Context,
+        project: Option<&mut crate::project::Project>,
+    ) {
+        let Some(pending_confirmation) = ui_state.project.pending_confirmation.clone() else {
+            return;
+        };
+
+        match pending_confirmation {
+            EditorConfirmation::DeleteScene { scene_name } => {
+                let mut open = true;
+                let mut confirm_delete = false;
+                let mut cancel = false;
+                egui::Window::new("Delete Scene")
+                    .collapsible(false)
+                    .resizable(false)
+                    .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+                    .open(&mut open)
+                    .show(ctx, |ui| {
+                        ui.label("The selected Scene is not empty. Do you really want to delete it? This cannot be undone.");
+                        ui.add_space(8.0);
+                        ui.horizontal(|ui| {
+                            if ui.button("Yes, delete anyway").clicked() {
+                                confirm_delete = true;
+                            }
+                            if ui.button("No").clicked() {
+                                cancel = true;
+                            }
+                        });
+                    });
+
+                if !open || cancel {
+                    ui_state.project.pending_confirmation = None;
+                    return;
+                }
+
+                if confirm_delete {
+                    let Some(project) = project else {
+                        ui_state.project.pending_confirmation = None;
+                        return;
+                    };
+                    match build_delete_scene_command(ui_state, project, &scene_name) {
+                        Ok(command) => {
+                            let _ = ui_state.execute_command_with_project(project, command);
+                        }
+                        Err(error) => {
+                            tracing::error!(
+                                "Failed to build delete scene command for '{}': {}",
+                                scene_name,
+                                error
+                            );
+                        }
+                    }
+                    ui_state.project.pending_confirmation = None;
+                }
+            }
         }
     }
 

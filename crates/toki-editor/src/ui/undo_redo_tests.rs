@@ -1,8 +1,10 @@
 use super::{EditorCommand, EntityPosition, IndexedEntity, UndoRedoHistory};
-use crate::project::SceneGraphLayout;
+use crate::project::{Project, SceneGraphLayout};
+use crate::ui::inspector::build_delete_scene_command;
 use crate::ui::rule_graph::RuleGraph;
 use crate::ui::EditorUI;
 use glam::{IVec2, UVec2};
+use tempfile::tempdir;
 use toki_core::entity::{Entity, EntityAttributes, EntityKind};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind};
@@ -128,7 +130,117 @@ fn main_scene(ui_state: &EditorUI) -> toki_core::Scene {
         .iter()
         .find(|scene| scene.name == "Main Scene")
         .expect("main scene should exist")
-        .clone()
+    .clone()
+}
+
+#[test]
+fn delete_scene_command_round_trips_ui_and_project_metadata_with_backing_file() {
+    let temp = tempdir().expect("temp dir should exist");
+    let project_root = temp.path().to_path_buf();
+    std::fs::create_dir_all(project_root.join("scenes")).expect("scenes dir should exist");
+    let main_scene_file = project_root.join("scenes").join("Main Scene.json");
+    std::fs::write(&main_scene_file, "{\n  \"name\": \"Main Scene\"\n}\n")
+        .expect("scene file should exist");
+
+    let mut project = Project::new("TestProject".to_string(), project_root.clone());
+    project
+        .metadata
+        .scenes
+        .insert("Main Scene".to_string(), "scenes/Main Scene.json".to_string());
+    std::fs::write(
+        project.project_file_path(),
+        toml::to_string_pretty(&project.metadata).expect("project metadata should serialize"),
+    )
+    .expect("project metadata should write");
+
+    let mut ui_state = EditorUI::new();
+    ui_state.scenes = vec![
+        toki_core::Scene::new("Main Scene".to_string()),
+        toki_core::Scene::new("Backup Scene".to_string()),
+    ];
+    ui_state.active_scene = Some("Main Scene".to_string());
+    ui_state.set_selection(crate::ui::editor_ui::Selection::Scene(
+        "Main Scene".to_string(),
+    ));
+
+    let command =
+        build_delete_scene_command(&ui_state, &project, "Main Scene").expect("command should build");
+
+    let mut history = UndoRedoHistory::default();
+    assert!(history.execute(command, &mut ui_state, Some(&mut project)));
+    assert_eq!(
+        ui_state
+            .scenes
+            .iter()
+            .map(|scene| scene.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Backup Scene"]
+    );
+    assert_eq!(ui_state.active_scene.as_deref(), Some("Backup Scene"));
+    assert!(!main_scene_file.exists());
+    assert!(!project.metadata.scenes.contains_key("Main Scene"));
+
+    assert!(history.undo(&mut ui_state, Some(&mut project)));
+    assert_eq!(
+        ui_state
+            .scenes
+            .iter()
+            .map(|scene| scene.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Main Scene", "Backup Scene"]
+    );
+    assert_eq!(ui_state.active_scene.as_deref(), Some("Main Scene"));
+    assert!(main_scene_file.exists());
+    assert!(project.metadata.scenes.contains_key("Main Scene"));
+}
+
+#[test]
+fn delete_scene_command_round_trips_ui_and_project_metadata_without_scene_file() {
+    let temp = tempdir().expect("temp dir should exist");
+    let project_root = temp.path().to_path_buf();
+    let mut project = Project::new("TestProject".to_string(), project_root.clone());
+    std::fs::write(
+        project.project_file_path(),
+        toml::to_string_pretty(&project.metadata).expect("project metadata should serialize"),
+    )
+    .expect("project metadata should write");
+
+    let mut ui_state = EditorUI::new();
+    ui_state.scenes = vec![
+        toki_core::Scene::new("Scene 3".to_string()),
+        toki_core::Scene::new("Backup Scene".to_string()),
+    ];
+    ui_state.active_scene = Some("Scene 3".to_string());
+    ui_state.set_selection(crate::ui::editor_ui::Selection::Scene(
+        "Scene 3".to_string(),
+    ));
+
+    let command =
+        build_delete_scene_command(&ui_state, &project, "Scene 3").expect("command should build");
+
+    let mut history = UndoRedoHistory::default();
+    assert!(history.execute(command, &mut ui_state, Some(&mut project)));
+    assert_eq!(
+        ui_state
+            .scenes
+            .iter()
+            .map(|scene| scene.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Backup Scene"]
+    );
+    assert_eq!(ui_state.active_scene.as_deref(), Some("Backup Scene"));
+    assert!(!project.metadata.scenes.contains_key("Scene 3"));
+
+    assert!(history.undo(&mut ui_state, Some(&mut project)));
+    assert_eq!(
+        ui_state
+            .scenes
+            .iter()
+            .map(|scene| scene.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Scene 3", "Backup Scene"]
+    );
+    assert_eq!(ui_state.active_scene.as_deref(), Some("Scene 3"));
 }
 
 #[test]

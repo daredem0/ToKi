@@ -1,12 +1,13 @@
 use super::editor_ui::EditorUI;
 use super::rule_graph::RuleGraph;
-use crate::project::Project;
-use crate::project::SceneGraphLayout;
+use crate::project::{Project, ProjectMetadata, SceneGraphLayout};
 use glam::IVec2;
 use toki_core::entity::{Entity, EntityId};
 use toki_core::menu::MenuSettings;
 use toki_core::rules::RuleSet;
 use toki_core::Scene;
+use std::fs;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default)]
 pub struct UndoRedoHistory {
@@ -91,6 +92,7 @@ pub enum EditorCommand {
     MoveEntities(Box<MoveEntitiesCommand>),
     UpdateEntities(Box<UpdateEntitiesCommand>),
     UpdateScene(Box<UpdateSceneCommand>),
+    DeleteScene(Box<DeleteSceneCommand>),
     UpdateSceneRulesGraph(Box<UpdateSceneRulesGraphCommand>),
     UpdateMenuSettings(Box<UpdateMenuSettingsCommand>),
 }
@@ -145,6 +147,10 @@ impl EditorCommand {
         }))
     }
 
+    pub fn delete_scene(data: DeleteSceneCommandData) -> Self {
+        Self::DeleteScene(Box::new(DeleteSceneCommand::new(data)))
+    }
+
     pub fn update_scene_rules_graph(
         scene_name: impl Into<String>,
         before_rule_set: RuleSet,
@@ -176,6 +182,7 @@ impl EditorCommand {
             Self::MoveEntities(command) => command.apply(ui_state),
             Self::UpdateEntities(command) => command.apply(ui_state),
             Self::UpdateScene(command) => command.apply(ui_state),
+            Self::DeleteScene(command) => command.apply(ui_state, project),
             Self::UpdateSceneRulesGraph(command) => command.apply(ui_state),
             Self::UpdateMenuSettings(command) => command.apply(project),
         }
@@ -188,6 +195,7 @@ impl EditorCommand {
             Self::MoveEntities(command) => command.undo(ui_state),
             Self::UpdateEntities(command) => command.undo(ui_state),
             Self::UpdateScene(command) => command.undo(ui_state),
+            Self::DeleteScene(command) => command.undo(ui_state, project),
             Self::UpdateSceneRulesGraph(command) => command.undo(ui_state),
             Self::UpdateMenuSettings(command) => command.undo(project),
         }
@@ -201,11 +209,37 @@ impl EditorCommand {
                 | Self::MoveEntities(_)
                 | Self::UpdateEntities(_)
                 | Self::UpdateScene(_)
+                | Self::DeleteScene(_)
                 | Self::UpdateSceneRulesGraph(_)
         ) {
             ui_state.scene_content_changed = true;
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct SceneSnapshot {
+    pub index: usize,
+    pub scene: Scene,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectFileChange {
+    pub relative_path: PathBuf,
+    pub before_contents: Option<String>,
+    pub after_contents: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeleteSceneCommandData {
+    pub removed_scene: SceneSnapshot,
+    pub active_scene_before: Option<String>,
+    pub active_scene_after: Option<String>,
+    pub selection_before: Option<crate::ui::editor_ui::Selection>,
+    pub selection_after: Option<crate::ui::editor_ui::Selection>,
+    pub changes: Vec<ProjectFileChange>,
+    pub project_metadata_before: Option<ProjectMetadata>,
+    pub project_metadata_after: Option<ProjectMetadata>,
 }
 
 #[derive(Debug, Clone)]
@@ -398,6 +432,53 @@ impl UpdateSceneCommand {
 }
 
 #[derive(Debug, Clone)]
+pub struct DeleteSceneCommand {
+    data: DeleteSceneCommandData,
+}
+
+impl DeleteSceneCommand {
+    fn new(data: DeleteSceneCommandData) -> Self {
+        Self { data }
+    }
+
+    fn apply(&self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
+        let Some(project) = project else {
+            return false;
+        };
+        apply_delete_scene_snapshot(
+            ui_state,
+            project,
+            &self.data.removed_scene,
+            DeleteSceneApplyContext {
+                next_active_scene: self.data.active_scene_after.clone(),
+                next_selection: self.data.selection_after.clone(),
+                changes: &self.data.changes,
+                direction: ProjectFileChangeDirection::Forward,
+                next_metadata: self.data.project_metadata_after.as_ref(),
+            },
+        )
+    }
+
+    fn undo(&self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
+        let Some(project) = project else {
+            return false;
+        };
+        restore_deleted_scene_snapshot(
+            ui_state,
+            project,
+            &self.data.removed_scene,
+            DeleteSceneApplyContext {
+                next_active_scene: self.data.active_scene_before.clone(),
+                next_selection: self.data.selection_before.clone(),
+                changes: &self.data.changes,
+                direction: ProjectFileChangeDirection::Reverse,
+                next_metadata: self.data.project_metadata_before.as_ref(),
+            },
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct UpdateSceneRulesGraphCommand {
     scene_name: String,
     before_rule_set: RuleSet,
@@ -530,6 +611,125 @@ fn apply_scene_snapshot(ui_state: &mut EditorUI, scene_name: &str, snapshot: &Sc
     };
     *scene = snapshot.clone();
     true
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProjectFileChangeDirection {
+    Forward,
+    Reverse,
+}
+
+struct DeleteSceneApplyContext<'a> {
+    next_active_scene: Option<String>,
+    next_selection: Option<crate::ui::editor_ui::Selection>,
+    changes: &'a [ProjectFileChange],
+    direction: ProjectFileChangeDirection,
+    next_metadata: Option<&'a ProjectMetadata>,
+}
+
+fn apply_delete_scene_snapshot(
+    ui_state: &mut EditorUI,
+    project: &mut Project,
+    removed_scene: &SceneSnapshot,
+    context: DeleteSceneApplyContext<'_>,
+) -> bool {
+    if removed_scene.index >= ui_state.scenes.len() {
+        return false;
+    }
+    if ui_state.scenes[removed_scene.index].name != removed_scene.scene.name {
+        return false;
+    }
+    ui_state.scenes.remove(removed_scene.index);
+    ui_state.active_scene = context.next_active_scene;
+    ui_state.selection = context.next_selection;
+    ui_state.project.pending_confirmation = None;
+
+    if !apply_project_file_changes(project, context.changes, context.direction) {
+        return false;
+    }
+
+    if let Some(metadata) = context.next_metadata {
+        project.metadata = metadata.clone();
+        mark_project_dirty(project);
+    }
+    true
+}
+
+fn restore_deleted_scene_snapshot(
+    ui_state: &mut EditorUI,
+    project: &mut Project,
+    restored_scene: &SceneSnapshot,
+    context: DeleteSceneApplyContext<'_>,
+) -> bool {
+    let insert_index = restored_scene.index.min(ui_state.scenes.len());
+    ui_state
+        .scenes
+        .insert(insert_index, restored_scene.scene.clone());
+    ui_state.active_scene = context.next_active_scene;
+    ui_state.selection = context.next_selection;
+    ui_state.project.pending_confirmation = None;
+
+    if !apply_project_file_changes(project, context.changes, context.direction) {
+        return false;
+    }
+
+    if let Some(metadata) = context.next_metadata {
+        project.metadata = metadata.clone();
+        mark_project_dirty(project);
+    }
+    true
+}
+
+fn apply_project_file_changes(
+    project: &mut Project,
+    changes: &[ProjectFileChange],
+    direction: ProjectFileChangeDirection,
+) -> bool {
+    for change in changes {
+        if let Err(error) = write_project_file_change(project, change, direction) {
+            tracing::error!("Failed to apply project file change: {}", error);
+            return false;
+        }
+    }
+    true
+}
+
+fn write_project_file_change(
+    project: &Project,
+    change: &ProjectFileChange,
+    direction: ProjectFileChangeDirection,
+) -> Result<(), String> {
+    let absolute_path = project.path.join(&change.relative_path);
+    let target_contents = match direction {
+        ProjectFileChangeDirection::Forward => &change.after_contents,
+        ProjectFileChangeDirection::Reverse => &change.before_contents,
+    };
+
+    match target_contents {
+        Some(contents) => {
+            if let Some(parent) = absolute_path.parent() {
+                fs::create_dir_all(parent).map_err(|error| {
+                    format!(
+                        "failed to create parent directories for '{}': {}",
+                        absolute_path.display(),
+                        error
+                    )
+                })?;
+            }
+            fs::write(&absolute_path, contents).map_err(|error| {
+                format!("failed to write '{}': {}", absolute_path.display(), error)
+            })?;
+        }
+        None => {
+            if absolute_path.exists() {
+                fs::remove_file(&absolute_path).map_err(|error| {
+                    format!("failed to remove '{}': {}", absolute_path.display(), error)
+                })?;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
