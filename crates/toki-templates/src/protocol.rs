@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{TemplateDescriptor, TemplateSemanticPlan, TemplateValue};
+use crate::{TemplateDescriptor, TemplateProviderError, TemplateSemanticPlan, TemplateValue};
 
 pub const TEMPLATE_PROTOCOL_VERSION: u32 = 1;
 
@@ -47,12 +47,6 @@ pub enum TemplateProviderRequest {
         #[serde(default)]
         parameters: BTreeMap<String, TemplateValue>,
     },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TemplateProviderError {
-    pub code: String,
-    pub message: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

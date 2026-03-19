@@ -1,0 +1,19 @@
+[package]
+name = "toki-template-builtins"
+version.workspace = true
+edition.workspace = true
+license = "MPL-2.0"
+description = "Built-in template registry for ToKi."
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+
+[lib]
+name = "toki_template_builtins"
+path = "src/lib.rs"
+
+[dependencies]
+toki-templates = { path = "../toki-templates", version = "0.1.1" }
+
+[dev-dependencies]
+serde_json = "1.0"

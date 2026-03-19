@@ -25,4 +25,14 @@ pub enum TemplateContractError {
         expected: String,
         actual: String,
     },
+    #[error("missing required parameter '{parameter_id}'")]
+    MissingRequiredParameter { parameter_id: String },
+    #[error("unexpected parameter '{parameter_id}'")]
+    UnexpectedParameter { parameter_id: String },
+    #[error("parameter '{parameter_id}' has an incompatible value type: expected {expected}, got {actual}")]
+    ParameterValueTypeMismatch {
+        parameter_id: String,
+        expected: String,
+        actual: String,
+    },
 }

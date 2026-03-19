@@ -4542,6 +4542,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "toki-template-builtins"
+version = "0.1.1"
+dependencies = [
+ "serde_json",
+ "toki-templates",
+]
+
+[[package]]
+name = "toki-templates"
+version = "0.1.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.14",
+]
+
+[[package]]
 name = "tokio"
 version = "1.47.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -5,6 +5,8 @@ members = [
   "crates/toki-render",
   "crates/toki-runtime",
   "crates/toki-editor",
+  "crates/toki-templates",
+  "crates/toki-template-builtins",
 ]
 resolver = "2"
 
