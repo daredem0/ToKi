@@ -1,0 +1,20 @@
+[package]
+name = "toki-templates"
+version.workspace = true
+edition.workspace = true
+license = "MPL-2.0"
+description = "Shared template contract and protocol types for ToKi."
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+
+[lib]
+name = "toki_templates"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0"
+
+[dev-dependencies]
+serde_json = "1.0"
