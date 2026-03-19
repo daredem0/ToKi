@@ -498,3 +498,39 @@ fn preview_and_apply_project_template_updates_entity_definition_via_runner() {
         "project/player_attack_clone"
     );
 }
+
+#[test]
+fn build_delete_project_template_command_removes_starter_source_and_registry() {
+    let temp = tempdir().expect("temp dir should exist");
+    let starter = crate::project::build_template_starter_plan(temp.path(), "ProjectTest")
+        .expect("starter plan should build");
+    toki_template_lowering::apply_project_file_changes(temp.path(), &starter.changes)
+        .expect("starter plan should apply");
+
+    let mut project = Project::new("TestProject".to_string(), temp.path().to_path_buf());
+    std::fs::write(
+        project.project_file_path(),
+        toml::to_string_pretty(&project.metadata).expect("project metadata should serialize"),
+    )
+    .expect("project metadata should write");
+
+    let command = build_delete_project_template_command(
+        &project,
+        "project/projecttest",
+        "ProjectTest",
+        None,
+    )
+    .expect("delete command should build");
+
+    let mut ui_state = crate::ui::EditorUI::new();
+    assert!(ui_state.execute_command_with_project(&mut project, command));
+
+    assert!(!temp
+        .path()
+        .join("templates/src/templates/projecttest.rs")
+        .exists());
+    let mod_rs = std::fs::read_to_string(temp.path().join("templates/src/templates/mod.rs"))
+        .expect("mod.rs should read");
+    assert!(!mod_rs.contains("pub mod projecttest;"));
+    assert!(!mod_rs.contains("\"project/projecttest\""));
+}

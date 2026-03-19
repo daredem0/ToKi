@@ -152,6 +152,12 @@ pub struct ProjectEditorState {
     pub new_project_name: String,
     pub new_project_submit_requested: Option<NewProjectRequest>,
 
+    // New template dialog state
+    pub new_template_requested: bool,
+    pub show_new_template_dialog: bool,
+    pub new_template_name: String,
+    pub new_template_submit_requested: Option<String>,
+
     // Background task state
     pub background_task_running: bool,
     pub background_task_status: Option<String>,
@@ -180,6 +186,10 @@ impl Default for ProjectEditorState {
             new_project_parent_directory: None,
             new_project_name: "NewProject".to_string(),
             new_project_submit_requested: None,
+            new_template_requested: false,
+            show_new_template_dialog: false,
+            new_template_name: "NewTemplate".to_string(),
+            new_template_submit_requested: None,
             background_task_running: false,
             background_task_status: None,
             cancel_background_task_requested: false,
@@ -192,6 +202,10 @@ impl Default for ProjectEditorState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EditorConfirmation {
     DeleteScene { scene_name: String },
+    DeleteProjectTemplate {
+        template_id: String,
+        template_display_name: String,
+    },
 }
 
 impl ProjectEditorState {
@@ -224,6 +238,22 @@ impl ProjectEditorState {
             name,
         });
         self.show_new_project_dialog = false;
+    }
+
+    pub fn begin_new_template_dialog(&mut self, suggested_name: String) {
+        self.show_new_template_dialog = true;
+        if !suggested_name.trim().is_empty() {
+            self.new_template_name = suggested_name;
+        }
+    }
+
+    pub fn submit_new_template_request(&mut self) {
+        let name = self.new_template_name.trim().to_string();
+        if name.is_empty() {
+            return;
+        }
+        self.new_template_submit_requested = Some(name);
+        self.show_new_template_dialog = false;
     }
 
     /// Sets the window title

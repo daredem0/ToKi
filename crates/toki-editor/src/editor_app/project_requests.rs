@@ -200,8 +200,24 @@ impl EditorApp {
             );
         }
 
+        if self.core.ui.project.new_template_requested {
+            self.core.ui.project.new_template_requested = false;
+            let suggested_name = self
+                .core
+                .project_manager
+                .current_project
+                .as_ref()
+                .map(next_available_template_starter_name)
+                .unwrap_or_else(|| "NewTemplate".to_string());
+            self.core.ui.project.begin_new_template_dialog(suggested_name);
+        }
+
         if let Some(request) = self.core.ui.project.new_project_submit_requested.take() {
             self.handle_new_project_requested(request.template, request.parent_path, request.name);
+        }
+
+        if let Some(template_name) = self.core.ui.project.new_template_submit_requested.take() {
+            self.handle_new_template_requested(template_name);
         }
 
         if self.core.ui.project.open_project_requested {
@@ -250,6 +266,63 @@ impl EditorApp {
             tracing::error!("Failed to start asset validation task: {}", error);
         } else {
             self.poll_background_task_updates();
+        }
+    }
+}
+
+fn next_available_template_starter_name(project: &crate::project::Project) -> String {
+    let templates_dir = project.path.join("templates").join("src").join("templates");
+    let mut candidate = "NewTemplate".to_string();
+    let mut counter = 1;
+    while templates_dir
+        .join(format!(
+            "{}.rs",
+            crate::project::template_starter::template_slug(&candidate)
+        ))
+        .exists()
+    {
+        candidate = format!("NewTemplate{counter}");
+        counter += 1;
+    }
+    candidate
+}
+
+impl EditorApp {
+    fn handle_new_template_requested(&mut self, template_name: String) {
+        let Some(project) = self.core.project_manager.current_project.as_mut() else {
+            tracing::warn!("No project loaded - cannot create template starter");
+            return;
+        };
+
+        match crate::project::build_template_starter_plan(&project.path, &template_name) {
+            Ok(plan) => {
+                let command = crate::ui::undo_redo::EditorCommand::apply_project_file_changes(
+                    format!("Create template starter '{}'", plan.display_name),
+                    plan.changes,
+                    self.core.ui.selection.clone(),
+                    self.core.ui.selection.clone(),
+                    Some(project.metadata.clone()),
+                    Some(project.metadata.clone()),
+                );
+                if self.core.ui.execute_command_with_project(project, command) {
+                    self.core.ui.template.selected_template_id = Some(plan.template_id.clone());
+                    self.core.ui.template.last_error = None;
+                    self.core.ui.template.last_success = Some(format!(
+                        "Created template starter '{}' successfully.",
+                        plan.display_name
+                    ));
+                    self.core.ui.center_panel_tab = crate::ui::editor_ui::CenterPanelTab::TemplateEditor;
+                } else {
+                    self.core.ui.template.last_error =
+                        Some("template starter command failed to execute".to_string());
+                    self.core.ui.template.last_success = None;
+                }
+            }
+            Err(error) => {
+                tracing::error!("Failed to create template starter '{}': {}", template_name, error);
+                self.core.ui.template.last_error = Some(error.to_string());
+                self.core.ui.template.last_success = None;
+            }
         }
     }
 }

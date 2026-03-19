@@ -25,6 +25,13 @@ impl MenuSystem {
                         tracing::info!("New Top-Down Starter clicked");
                         ui_state.project.new_top_down_project_requested = true;
                     }
+                    if ui
+                        .add_enabled(project.is_some(), egui::Button::new("New Template Starter..."))
+                        .clicked()
+                    {
+                        tracing::info!("New Template Starter clicked");
+                        ui_state.project.new_template_requested = true;
+                    }
 
                     // Auto-open the project from config
                     if let Some(config) = config {
@@ -178,6 +185,9 @@ impl MenuSystem {
         if ui_state.project.show_new_project_dialog {
             Self::render_new_project_dialog(ui_state, ctx);
         }
+        if ui_state.project.show_new_template_dialog {
+            Self::render_new_template_dialog(ui_state, ctx, project.as_deref());
+        }
         if ui_state.project.pending_confirmation.is_some() {
             Self::render_confirmation_dialog(ui_state, ctx, project);
         }
@@ -310,7 +320,134 @@ impl MenuSystem {
                     ui_state.project.pending_confirmation = None;
                 }
             }
+            EditorConfirmation::DeleteProjectTemplate {
+                template_id,
+                template_display_name,
+            } => {
+                egui::Window::new("Confirm Template Deletion")
+                    .collapsible(false)
+                    .resizable(false)
+                    .open(&mut open)
+                    .show(ctx, |ui| {
+                        ui.label("Delete this project template source from the project template crate?");
+                        ui.add_space(8.0);
+                        ui.small(format!("Template: {template_display_name}"));
+                        ui.small(format!("Id: {template_id}"));
+                        ui.separator();
+                        ui.horizontal(|ui| {
+                            if ui.button("Yes, delete template").clicked() {
+                                accept_clicked = true;
+                            }
+                            if ui.button("No").clicked() {
+                                cancel_clicked = true;
+                            }
+                        });
+                    });
+
+                if accept_clicked {
+                    if let Some(project) = project {
+                        match crate::ui::template_workflow::build_delete_project_template_command(
+                            project,
+                            &template_id,
+                            &template_display_name,
+                            ui_state.selection.clone(),
+                        ) {
+                            Ok(command) => {
+                                if ui_state.execute_command_with_project(project, command) {
+                                    ui_state.template.last_error = None;
+                                    ui_state.template.last_success = Some(format!(
+                                        "Deleted project template '{}'.",
+                                        template_display_name
+                                    ));
+                                    if ui_state
+                                        .template
+                                        .selected_template_id
+                                        .as_deref()
+                                        == Some(template_id.as_str())
+                                    {
+                                        ui_state.template.selected_template_id = None;
+                                    }
+                                } else {
+                                    ui_state.template.last_error =
+                                        Some("project template delete command failed to execute".to_string());
+                                    ui_state.template.last_success = None;
+                                }
+                            }
+                            Err(error) => {
+                                let message = error.message;
+                                ui_state.template.last_error = Some(message.clone());
+                                ui_state.template.last_success = None;
+                                tracing::error!(
+                                    "Failed to build delete project template command for '{}': {}",
+                                    template_id,
+                                    message
+                                );
+                            }
+                        }
+                    }
+                    ui_state.project.pending_confirmation = None;
+                } else if cancel_clicked || !open {
+                    ui_state.project.pending_confirmation = None;
+                }
+            }
         }
+    }
+
+    fn render_new_template_dialog(
+        ui_state: &mut super::EditorUI,
+        ctx: &egui::Context,
+        project: Option<&crate::project::Project>,
+    ) {
+        let mut open = ui_state.project.show_new_template_dialog;
+        let mut create_clicked = false;
+        let mut cancel_clicked = false;
+        egui::Window::new("New Template Starter")
+            .collapsible(false)
+            .resizable(false)
+            .open(&mut open)
+            .show(ctx, |ui| {
+                let project_root_label = project
+                    .map(|project| project.path.join("templates").display().to_string())
+                    .unwrap_or_else(|| "No project open".to_string());
+                ui.label("Project Template Crate");
+                ui.monospace(project_root_label);
+                ui.separator();
+
+                ui.label("Template Name");
+                ui.text_edit_singleline(&mut ui_state.project.new_template_name);
+                ui.small("This becomes a starter file in the project's template crate and a 'project/...' template id.");
+
+                let can_create = project.is_some() && !ui_state.project.new_template_name.trim().is_empty();
+                if !can_create {
+                    ui.add_space(6.0);
+                    ui.colored_label(
+                        egui::Color32::from_rgb(215, 120, 120),
+                        "Open a project and enter a template name.",
+                    );
+                }
+
+                ui.separator();
+                ui.horizontal(|ui| {
+                    if ui
+                        .add_enabled(can_create, egui::Button::new("Create"))
+                        .clicked()
+                    {
+                        create_clicked = true;
+                    }
+                    if ui.button("Cancel").clicked() {
+                        cancel_clicked = true;
+                    }
+                });
+            });
+
+        if create_clicked {
+            ui_state.project.submit_new_template_request();
+            open = false;
+        }
+        if cancel_clicked {
+            open = false;
+        }
+        ui_state.project.show_new_template_dialog = open;
     }
 
     fn render_busy_logo(

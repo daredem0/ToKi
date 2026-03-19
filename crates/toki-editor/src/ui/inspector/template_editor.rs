@@ -53,6 +53,23 @@ impl InspectorSystem {
         ui.small(&descriptor.description);
         ui.separator();
 
+        if descriptor.id.starts_with("project/") {
+            egui::CollapsingHeader::new("Template Source")
+                .default_open(false)
+                .show(ui, |ui| {
+                    ui.small("This template lives in the project's starter-managed template crate.");
+                    if ui.button("Delete Project Template").clicked() {
+                        ui_state.project.pending_confirmation = Some(
+                            crate::ui::editor_ui::EditorConfirmation::DeleteProjectTemplate {
+                                template_id: descriptor.id.clone(),
+                                template_display_name: descriptor.display_name.clone(),
+                            },
+                        );
+                    }
+                });
+            ui.separator();
+        }
+
         egui::CollapsingHeader::new("Parameters")
             .default_open(true)
             .show(ui, |ui| {

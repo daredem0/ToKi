@@ -355,6 +355,29 @@ pub fn build_remove_template_application_command(
     ))
 }
 
+pub fn build_delete_project_template_command(
+    project: &Project,
+    template_id: &str,
+    template_display_name: &str,
+    current_selection: Option<Selection>,
+) -> Result<EditorCommand, TemplateWorkflowError> {
+    let plan = crate::project::build_remove_template_starter_plan(
+        &project.path,
+        template_id,
+        template_display_name,
+    )
+    .map_err(|error| TemplateWorkflowError::new(error.to_string()))?;
+
+    Ok(EditorCommand::apply_project_file_changes(
+        format!("Delete project template '{}'", template_display_name),
+        plan.changes,
+        current_selection.clone(),
+        current_selection,
+        Some(project.metadata.clone()),
+        Some(project.metadata.clone()),
+    ))
+}
+
 fn tracked_template_file_changes(file_changes: &[ProjectFileChange]) -> Vec<ProjectFileChange> {
     file_changes
         .iter()

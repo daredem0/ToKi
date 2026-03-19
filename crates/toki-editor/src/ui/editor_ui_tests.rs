@@ -749,7 +749,9 @@ fn project_editor_state_defaults() {
     // All project request flags should be false by default
     assert!(!ui.project.new_project_requested);
     assert!(!ui.project.new_top_down_project_requested);
+    assert!(!ui.project.new_template_requested);
     assert!(!ui.project.show_new_project_dialog);
+    assert!(!ui.project.show_new_template_dialog);
     assert!(!ui.project.open_project_requested);
     assert!(!ui.project.browse_for_project_requested);
     assert!(!ui.project.save_project_requested);
@@ -762,8 +764,10 @@ fn project_editor_state_defaults() {
 
     // Other project state defaults
     assert_eq!(ui.project.new_project_name, "NewProject");
+    assert_eq!(ui.project.new_template_name, "NewTemplate");
     assert!(ui.project.new_project_parent_directory.is_none());
     assert!(ui.project.new_project_submit_requested.is_none());
+    assert!(ui.project.new_template_submit_requested.is_none());
     assert!(ui.project.background_task_status.is_none());
     assert!(ui.project.window_title.is_some());
 }
@@ -847,6 +851,31 @@ fn submit_new_project_request_requires_non_empty_name() {
     assert!(
         ui.project.new_project_submit_requested.is_none(),
         "should not create request with empty name"
+    );
+}
+
+#[test]
+fn begin_new_template_dialog_sets_up_dialog_state() {
+    let mut ui = EditorUI::new();
+
+    ui.project.begin_new_template_dialog("My Template".to_string());
+
+    assert!(ui.project.show_new_template_dialog);
+    assert_eq!(ui.project.new_template_name, "My Template");
+}
+
+#[test]
+fn submit_new_template_request_creates_request_and_closes_dialog() {
+    let mut ui = EditorUI::new();
+    ui.project.show_new_template_dialog = true;
+    ui.project.new_template_name = "Boss Attack".to_string();
+
+    ui.project.submit_new_template_request();
+
+    assert!(!ui.project.show_new_template_dialog);
+    assert_eq!(
+        ui.project.new_template_submit_requested.as_deref(),
+        Some("Boss Attack")
     );
 }
 
