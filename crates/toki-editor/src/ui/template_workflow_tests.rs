@@ -500,6 +500,124 @@ fn preview_and_apply_project_template_updates_entity_definition_via_runner() {
 }
 
 #[test]
+fn merge_template_registries_rejects_invalid_project_namespace() {
+    let merged = merge_template_registries(
+        vec![TemplateDescriptor {
+            id: "toki/player_attack".to_string(),
+            display_name: "Player Attack".to_string(),
+            category: "combat".to_string(),
+            description: String::new(),
+            parameters: vec![],
+        }],
+        vec![TemplateDescriptor {
+            id: "toki/custom_attack".to_string(),
+            display_name: "Custom Attack".to_string(),
+            category: "combat".to_string(),
+            description: String::new(),
+            parameters: vec![],
+        }],
+    );
+
+    assert_eq!(merged.descriptors.len(), 1);
+    assert_eq!(merged.descriptors[0].id, "toki/player_attack");
+    assert!(merged
+        .diagnostics
+        .iter()
+        .any(|message| message.contains("Project template 'toki/custom_attack' must use the 'project/' namespace.")));
+}
+
+#[test]
+fn merge_template_registries_rejects_duplicate_ids_without_override() {
+    let merged = merge_template_registries(
+        vec![TemplateDescriptor {
+            id: "toki/player_attack".to_string(),
+            display_name: "Player Attack".to_string(),
+            category: "combat".to_string(),
+            description: String::new(),
+            parameters: vec![],
+        }],
+        vec![
+            TemplateDescriptor {
+                id: "project/alpha".to_string(),
+                display_name: "Alpha".to_string(),
+                category: "custom".to_string(),
+                description: String::new(),
+                parameters: vec![],
+            },
+            TemplateDescriptor {
+                id: "project/alpha".to_string(),
+                display_name: "Alpha Duplicate".to_string(),
+                category: "custom".to_string(),
+                description: String::new(),
+                parameters: vec![],
+            },
+        ],
+    );
+
+    assert_eq!(merged.descriptors.len(), 2);
+    assert!(merged
+        .descriptors
+        .iter()
+        .any(|descriptor| descriptor.display_name == "Alpha"));
+    assert!(!merged
+        .descriptors
+        .iter()
+        .any(|descriptor| descriptor.display_name == "Alpha Duplicate"));
+    assert!(merged
+        .diagnostics
+        .iter()
+        .any(|message| message.contains("Duplicate template id 'project/alpha'")));
+}
+
+#[test]
+fn merge_template_registries_orders_built_ins_before_project_templates() {
+    let merged = merge_template_registries(
+        vec![
+            TemplateDescriptor {
+                id: "toki/zeta".to_string(),
+                display_name: "Zeta Builtin".to_string(),
+                category: "builtin".to_string(),
+                description: String::new(),
+                parameters: vec![],
+            },
+            TemplateDescriptor {
+                id: "toki/alpha".to_string(),
+                display_name: "Alpha Builtin".to_string(),
+                category: "builtin".to_string(),
+                description: String::new(),
+                parameters: vec![],
+            },
+        ],
+        vec![
+            TemplateDescriptor {
+                id: "project/beta".to_string(),
+                display_name: "Beta Project".to_string(),
+                category: "project".to_string(),
+                description: String::new(),
+                parameters: vec![],
+            },
+            TemplateDescriptor {
+                id: "project/alpha".to_string(),
+                display_name: "Alpha Project".to_string(),
+                category: "project".to_string(),
+                description: String::new(),
+                parameters: vec![],
+            },
+        ],
+    );
+
+    let ordered_ids = merged
+        .descriptors
+        .iter()
+        .map(|descriptor| descriptor.id.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        ordered_ids,
+        vec!["toki/alpha", "toki/zeta", "project/alpha", "project/beta"]
+    );
+}
+
+#[test]
 fn build_delete_project_template_command_removes_starter_source_and_registry() {
     let temp = tempdir().expect("temp dir should exist");
     let starter = crate::project::build_template_starter_plan(temp.path(), "ProjectTest")

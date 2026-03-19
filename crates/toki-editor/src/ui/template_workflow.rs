@@ -55,6 +55,12 @@ pub struct TemplateCatalog {
     pub diagnostics: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum TemplateRegistrySource {
+    BuiltIn,
+    Project,
+}
+
 impl TemplateWorkflowError {
     fn new(message: impl Into<String>) -> Self {
         Self {
@@ -139,7 +145,7 @@ pub fn built_in_template_descriptors() -> Vec<TemplateDescriptor> {
 
 pub fn available_template_catalog(project: Option<&Project>) -> TemplateCatalog {
     let mut diagnostics = Vec::new();
-    let mut descriptors = match BuiltInTemplateRegistry::new().list_templates() {
+    let built_in_descriptors = match BuiltInTemplateRegistry::new().list_templates() {
         Ok(descriptors) => descriptors,
         Err(error) => {
             diagnostics.push(format!("Built-in templates unavailable: {}", error.message));
@@ -147,10 +153,11 @@ pub fn available_template_catalog(project: Option<&Project>) -> TemplateCatalog 
         }
     };
 
+    let mut project_descriptors = Vec::new();
     if let Some(project) = project {
         match ProjectTemplateProvider::detect(&project.path, &project.metadata.templates) {
             Ok(Some(provider)) => match provider.list_templates() {
-                Ok(mut project_descriptors) => descriptors.append(&mut project_descriptors),
+                Ok(descriptors) => project_descriptors = descriptors,
                 Err(error) => diagnostics.push(format!(
                     "Project templates unavailable: {}",
                     error.message
@@ -164,10 +171,89 @@ pub fn available_template_catalog(project: Option<&Project>) -> TemplateCatalog 
         }
     }
 
-    descriptors.sort_by(|a, b| a.display_name.cmp(&b.display_name).then(a.id.cmp(&b.id)));
+    let merged = merge_template_registries(built_in_descriptors, project_descriptors);
+    diagnostics.extend(merged.diagnostics);
     TemplateCatalog {
-        descriptors,
+        descriptors: merged.descriptors,
         diagnostics,
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+struct MergedTemplateRegistry {
+    descriptors: Vec<TemplateDescriptor>,
+    diagnostics: Vec<String>,
+}
+
+fn merge_template_registries(
+    built_in_descriptors: Vec<TemplateDescriptor>,
+    project_descriptors: Vec<TemplateDescriptor>,
+) -> MergedTemplateRegistry {
+    let mut diagnostics = Vec::new();
+    let mut accepted = Vec::<(TemplateRegistrySource, TemplateDescriptor)>::new();
+    let mut seen_ids = BTreeMap::<String, TemplateRegistrySource>::new();
+
+    for (source, descriptors) in [
+        (TemplateRegistrySource::BuiltIn, built_in_descriptors),
+        (TemplateRegistrySource::Project, project_descriptors),
+    ] {
+        for descriptor in descriptors {
+            if let Some(message) = validate_template_namespace(&descriptor.id, source) {
+                diagnostics.push(message);
+                continue;
+            }
+
+            if let Some(existing_source) = seen_ids.get(&descriptor.id).copied() {
+                diagnostics.push(format!(
+                    "Duplicate template id '{}' from {} templates; keeping the {} definition and ignoring the later one.",
+                    descriptor.id,
+                    template_source_label(source),
+                    template_source_label(existing_source)
+                ));
+                continue;
+            }
+
+            seen_ids.insert(descriptor.id.clone(), source);
+            accepted.push((source, descriptor));
+        }
+    }
+
+    accepted.sort_by(|(left_source, left), (right_source, right)| {
+        left_source
+            .cmp(right_source)
+            .then(left.display_name.cmp(&right.display_name))
+            .then(left.id.cmp(&right.id))
+    });
+
+    MergedTemplateRegistry {
+        descriptors: accepted.into_iter().map(|(_, descriptor)| descriptor).collect(),
+        diagnostics,
+    }
+}
+
+fn validate_template_namespace(
+    template_id: &str,
+    source: TemplateRegistrySource,
+) -> Option<String> {
+    let expected_prefix = match source {
+        TemplateRegistrySource::BuiltIn => "toki/",
+        TemplateRegistrySource::Project => "project/",
+    };
+    match template_id.strip_prefix(expected_prefix) {
+        Some(remainder) if !remainder.trim().is_empty() => None,
+        _ => Some(format!(
+            "{} template '{}' must use the '{}' namespace.",
+            template_source_label(source),
+            template_id,
+            expected_prefix
+        )),
+    }
+}
+
+fn template_source_label(source: TemplateRegistrySource) -> &'static str {
+    match source {
+        TemplateRegistrySource::BuiltIn => "Built-in",
+        TemplateRegistrySource::Project => "Project",
     }
 }
 
