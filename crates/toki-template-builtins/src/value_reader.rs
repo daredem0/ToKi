@@ -50,7 +50,9 @@ impl<'a> ParameterReader<'a> {
             None => Ok(None),
             Some(TemplateValue::Optional(None)) => Ok(None),
             Some(TemplateValue::Optional(Some(value))) => match value.as_ref() {
-                TemplateValue::String(value) => Ok(Some(value.clone())),
+                TemplateValue::String(value) | TemplateValue::AnimationStateReference(value) => {
+                    Ok(Some(value.clone()))
+                }
                 other => Err(type_error(id, "optional<string>", Some(other))),
             },
             other => Err(type_error(id, "optional<string>", other)),

@@ -114,7 +114,9 @@ fn lowering_melee_player_attack_writes_primary_action_to_actor_definition() {
     parameters.insert("cooldown_ticks".into(), TemplateValue::Integer(24));
     parameters.insert(
         "animation_state".into(),
-        TemplateValue::Optional(Some(Box::new(TemplateValue::String("attack_right".into())))),
+        TemplateValue::Optional(Some(Box::new(TemplateValue::AnimationStateReference(
+            "attack_right".into(),
+        )))),
     );
     parameters.insert(
         "sound_id".into(),

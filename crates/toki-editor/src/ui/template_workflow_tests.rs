@@ -90,6 +90,12 @@ fn sync_template_editor_state_selects_first_filtered_template_and_seeds_defaults
 fn preview_selected_template_returns_lowered_entity_definition_change() {
     let temp = tempdir().expect("temp dir should exist");
     write_player_entity(temp.path());
+    let project = Project::new("TestProject".to_string(), temp.path().to_path_buf());
+    std::fs::write(
+        project.project_file_path(),
+        toml::to_string_pretty(&project.metadata).expect("project metadata should serialize"),
+    )
+    .expect("project metadata should write");
 
     let descriptors = built_in_template_descriptors();
     let mut state = TemplateEditorState {
@@ -107,17 +113,21 @@ fn preview_selected_template_returns_lowered_entity_definition_change() {
     );
     params.insert(
         "animation_state".to_string(),
-        TemplateValue::Optional(Some(Box::new(TemplateValue::String(
+        TemplateValue::Optional(Some(Box::new(TemplateValue::AnimationStateReference(
             "attack_right".to_string(),
         )))),
     );
 
-    let preview = preview_selected_template(&state, temp.path()).expect("preview should succeed");
-    assert_eq!(preview.file_changes.len(), 1);
+    let preview = preview_selected_template(&state, &project).expect("preview should succeed");
+    assert_eq!(preview.file_changes.len(), 2);
     assert!(preview
         .lowered_summary_lines
         .iter()
         .any(|line| line.contains("entities/player.json")));
+    assert!(preview
+        .lowered_summary_lines
+        .iter()
+        .any(|line| line.contains("project.toml")));
     assert_eq!(
         preview.selection_after_apply,
         Some(crate::ui::editor_ui::Selection::EntityDefinition(
@@ -130,6 +140,12 @@ fn preview_selected_template_returns_lowered_entity_definition_change() {
 fn build_apply_template_command_creates_history_safe_project_file_change_command() {
     let temp = tempdir().expect("temp dir should exist");
     write_player_entity(temp.path());
+    let mut project = Project::new("TestProject".to_string(), temp.path().to_path_buf());
+    std::fs::write(
+        project.project_file_path(),
+        toml::to_string_pretty(&project.metadata).expect("project metadata should serialize"),
+    )
+    .expect("project metadata should write");
 
     let descriptors = built_in_template_descriptors();
     let mut state = TemplateEditorState {
@@ -147,28 +163,117 @@ fn build_apply_template_command_creates_history_safe_project_file_change_command
     );
     params.insert(
         "animation_state".to_string(),
-        TemplateValue::Optional(Some(Box::new(TemplateValue::String(
+        TemplateValue::Optional(Some(Box::new(TemplateValue::AnimationStateReference(
             "attack_right".to_string(),
         )))),
     );
 
     let command = build_apply_template_command(
         &state,
-        temp.path(),
+        &project,
         Some(crate::ui::editor_ui::Selection::Scene(
             "Main Scene".to_string(),
         )),
     )
     .expect("apply command should build");
 
-    let mut project = Project::new("TestProject".to_string(), temp.path().to_path_buf());
     let mut ui_state = crate::ui::EditorUI::new();
     assert!(ui_state.execute_command_with_project(&mut project, command));
     let updated = std::fs::read_to_string(temp.path().join("entities/player.json"))
         .expect("entity file should read after apply");
     assert!(updated.contains("primary_action"));
+    assert_eq!(project.metadata.editor.template_applications.len(), 1);
     assert!(matches!(
         ui_state.selection,
         Some(crate::ui::editor_ui::Selection::EntityDefinition(ref id)) if id == "player"
     ));
+}
+
+#[test]
+fn build_remove_template_application_command_reverts_entity_changes_and_removes_record() {
+    let temp = tempdir().expect("temp dir should exist");
+    write_player_entity(temp.path());
+    let mut project = Project::new("TestProject".to_string(), temp.path().to_path_buf());
+    std::fs::write(
+        project.project_file_path(),
+        toml::to_string_pretty(&project.metadata).expect("project metadata should serialize"),
+    )
+    .expect("project metadata should write");
+
+    let descriptors = built_in_template_descriptors();
+    let mut state = TemplateEditorState {
+        selected_template_id: Some("toki/player_attack".to_string()),
+        ..TemplateEditorState::default()
+    };
+    sync_template_editor_state(&mut state, &descriptors);
+    let params = state
+        .parameters_by_template
+        .get_mut("toki/player_attack")
+        .expect("player attack params should exist");
+    params.insert(
+        "actor_entity_definition_id".to_string(),
+        TemplateValue::EntityDefinitionReference("player".to_string()),
+    );
+    params.insert(
+        "animation_state".to_string(),
+        TemplateValue::Optional(Some(Box::new(TemplateValue::AnimationStateReference(
+            "attack_right".to_string(),
+        )))),
+    );
+
+    let apply_command = build_apply_template_command(&state, &project, None)
+        .expect("apply command should build");
+    let mut ui_state = crate::ui::EditorUI::new();
+    assert!(ui_state.execute_command_with_project(&mut project, apply_command));
+    assert_eq!(project.metadata.editor.template_applications.len(), 1);
+
+    let application_id = project.metadata.editor.template_applications[0]
+        .application_id
+        .clone();
+    let remove_command =
+        build_remove_template_application_command(&project, &application_id, None)
+            .expect("remove command should build");
+    assert!(ui_state.execute_command_with_project(&mut project, remove_command));
+
+    let reverted = std::fs::read_to_string(temp.path().join("entities/player.json"))
+        .expect("entity file should read after remove");
+    assert!(!reverted.contains("primary_action"));
+    assert!(project.metadata.editor.template_applications.is_empty());
+}
+
+#[test]
+fn animation_state_choices_follow_selected_actor_definition() {
+    let parameter = toki_templates::TemplateParameter {
+        id: "animation_state".to_string(),
+        label: "Animation State".to_string(),
+        description: None,
+        kind: toki_templates::TemplateParameterKind::Optional {
+            inner: Box::new(toki_templates::TemplateParameterKind::AnimationStateReference {
+                entity_parameter_id: "actor_entity_definition_id".to_string(),
+            }),
+        },
+        default: Some(TemplateValue::Optional(None)),
+        required: false,
+    };
+    let mut values = std::collections::BTreeMap::new();
+    values.insert(
+        "actor_entity_definition_id".to_string(),
+        TemplateValue::EntityDefinitionReference("player".to_string()),
+    );
+    let choices = TemplateAssetChoices {
+        entity_definition_ids: vec!["player".to_string()],
+        entity_animation_states: std::collections::BTreeMap::from([(
+            "player".to_string(),
+            vec!["attack_right".to_string(), "attack_up".to_string()],
+        )]),
+        ..TemplateAssetChoices::default()
+    };
+
+    let animation_choices =
+        animation_state_choices_for_parameter(&parameter, &values, Some(&choices))
+            .expect("animation choices should be available");
+    assert_eq!(
+        animation_choices,
+        vec!["attack_right".to_string(), "attack_up".to_string()]
+    );
 }

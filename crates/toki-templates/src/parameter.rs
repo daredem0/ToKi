@@ -58,6 +58,9 @@ pub enum TemplateParameterKind {
         asset_kind: AssetReferenceKind,
     },
     EntityDefinitionReference,
+    AnimationStateReference {
+        entity_parameter_id: String,
+    },
     SceneReference,
     Optional {
         inner: Box<TemplateParameterKind>,
@@ -81,6 +84,7 @@ pub enum TemplateValue {
     Enum(String),
     AssetReference(String),
     EntityDefinitionReference(String),
+    AnimationStateReference(String),
     SceneReference(String),
     Optional(Option<Box<TemplateValue>>),
     List(Vec<TemplateValue>),
@@ -96,6 +100,7 @@ impl TemplateValue {
             TemplateValue::Enum(_) => "enum",
             TemplateValue::AssetReference(_) => "asset_reference",
             TemplateValue::EntityDefinitionReference(_) => "entity_definition_reference",
+            TemplateValue::AnimationStateReference(_) => "animation_state_reference",
             TemplateValue::SceneReference(_) => "scene_reference",
             TemplateValue::Optional(_) => "optional",
             TemplateValue::List(_) => "list",
@@ -114,6 +119,9 @@ impl TemplateParameterKind {
             TemplateParameterKind::AssetReference { .. } => "asset_reference".into(),
             TemplateParameterKind::EntityDefinitionReference => {
                 "entity_definition_reference".into()
+            }
+            TemplateParameterKind::AnimationStateReference { .. } => {
+                "animation_state_reference".into()
             }
             TemplateParameterKind::SceneReference => "scene_reference".into(),
             TemplateParameterKind::Optional { inner } => {
@@ -140,6 +148,10 @@ impl TemplateParameterKind {
             (
                 TemplateParameterKind::EntityDefinitionReference,
                 TemplateValue::EntityDefinitionReference(_),
+            ) => true,
+            (
+                TemplateParameterKind::AnimationStateReference { .. },
+                TemplateValue::AnimationStateReference(_),
             ) => true,
             (TemplateParameterKind::SceneReference, TemplateValue::SceneReference(_)) => true,
             (TemplateParameterKind::Optional { inner }, TemplateValue::Optional(value)) => {

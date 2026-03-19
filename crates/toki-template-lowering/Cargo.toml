@@ -16,6 +16,7 @@ path = "src/lib.rs"
 thiserror = "2.0"
 toki-core = { path = "../toki-core", version = "0.1.1" }
 toki-templates = { path = "../toki-templates", version = "0.1.1" }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 [dev-dependencies]

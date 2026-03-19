@@ -1,6 +1,6 @@
 use super::editor_ui::{EditorUI, Selection};
 use super::rule_graph::RuleGraph;
-use crate::project::Project;
+use crate::project::{Project, ProjectMetadata};
 use crate::project::SceneGraphLayout;
 use glam::IVec2;
 use toki_core::entity::{Entity, EntityId};
@@ -95,6 +95,7 @@ pub enum EditorCommand {
     UpdateSceneRulesGraph(Box<UpdateSceneRulesGraphCommand>),
     UpdateMenuSettings(Box<UpdateMenuSettingsCommand>),
     ApplyProjectFileChanges(Box<ApplyProjectFileChangesCommand>),
+    DeleteScene(Box<DeleteSceneCommand>),
 }
 
 impl EditorCommand {
@@ -168,12 +169,29 @@ impl EditorCommand {
         changes: Vec<ProjectFileChange>,
         selection_before: Option<Selection>,
         selection_after: Option<Selection>,
+        project_metadata_before: Option<ProjectMetadata>,
+        project_metadata_after: Option<ProjectMetadata>,
     ) -> Self {
         Self::ApplyProjectFileChanges(Box::new(ApplyProjectFileChangesCommand {
             description: description.into(),
             changes,
             selection_before,
             selection_after,
+            project_metadata_before,
+            project_metadata_after,
+        }))
+    }
+
+    pub fn delete_scene(data: DeleteSceneCommandData) -> Self {
+        Self::DeleteScene(Box::new(DeleteSceneCommand {
+            removed_scene: data.removed_scene,
+            active_scene_before: data.active_scene_before,
+            active_scene_after: data.active_scene_after,
+            selection_before: data.selection_before,
+            selection_after: data.selection_after,
+            changes: data.changes,
+            project_metadata_before: data.project_metadata_before,
+            project_metadata_after: data.project_metadata_after,
         }))
     }
 
@@ -186,6 +204,7 @@ impl EditorCommand {
             Self::UpdateSceneRulesGraph(command) => command.apply(ui_state),
             Self::UpdateMenuSettings(command) => command.apply(project),
             Self::ApplyProjectFileChanges(command) => command.apply(ui_state, project),
+            Self::DeleteScene(command) => command.apply(ui_state, project),
         }
     }
 
@@ -198,6 +217,7 @@ impl EditorCommand {
             Self::UpdateSceneRulesGraph(command) => command.undo(ui_state),
             Self::UpdateMenuSettings(command) => command.undo(project),
             Self::ApplyProjectFileChanges(command) => command.undo(ui_state, project),
+            Self::DeleteScene(command) => command.undo(ui_state, project),
         }
     }
 
@@ -210,6 +230,7 @@ impl EditorCommand {
                 | Self::UpdateEntities(_)
                 | Self::UpdateSceneRulesGraph(_)
                 | Self::ApplyProjectFileChanges(_)
+                | Self::DeleteScene(_)
         ) {
             ui_state.scene_content_changed = true;
             ui_state.project.rescan_assets_requested = true;
@@ -253,6 +274,38 @@ pub struct ApplyProjectFileChangesCommand {
     changes: Vec<ProjectFileChange>,
     selection_before: Option<Selection>,
     selection_after: Option<Selection>,
+    project_metadata_before: Option<ProjectMetadata>,
+    project_metadata_after: Option<ProjectMetadata>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SceneSnapshot {
+    pub index: usize,
+    pub scene: toki_core::Scene,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeleteSceneCommand {
+    removed_scene: SceneSnapshot,
+    active_scene_before: Option<String>,
+    active_scene_after: Option<String>,
+    selection_before: Option<Selection>,
+    selection_after: Option<Selection>,
+    changes: Vec<ProjectFileChange>,
+    project_metadata_before: Option<ProjectMetadata>,
+    project_metadata_after: Option<ProjectMetadata>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeleteSceneCommandData {
+    pub removed_scene: SceneSnapshot,
+    pub active_scene_before: Option<String>,
+    pub active_scene_after: Option<String>,
+    pub selection_before: Option<Selection>,
+    pub selection_after: Option<Selection>,
+    pub changes: Vec<ProjectFileChange>,
+    pub project_metadata_before: Option<ProjectMetadata>,
+    pub project_metadata_after: Option<ProjectMetadata>,
 }
 
 impl UpdateMenuSettingsCommand {
@@ -290,6 +343,9 @@ impl ApplyProjectFileChangesCommand {
             return false;
         }
 
+        if let Some(metadata) = &self.project_metadata_after {
+            project.metadata = metadata.clone();
+        }
         apply_selection(ui_state, self.selection_after.clone());
         mark_project_dirty(project);
         true
@@ -309,6 +365,67 @@ impl ApplyProjectFileChangesCommand {
             return false;
         }
 
+        if let Some(metadata) = &self.project_metadata_before {
+            project.metadata = metadata.clone();
+        }
+        apply_selection(ui_state, self.selection_before.clone());
+        mark_project_dirty(project);
+        true
+    }
+}
+
+impl DeleteSceneCommand {
+    fn apply(&self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
+        let Some(project) = project else {
+            return false;
+        };
+        if !ui_state
+            .scenes
+            .iter()
+            .any(|scene| scene.name == self.removed_scene.scene.name)
+        {
+            return false;
+        }
+        if let Err(error) = apply_project_file_changes(&project.path, &self.changes) {
+            tracing::error!("Failed to delete scene '{}': {}", self.removed_scene.scene.name, error);
+            return false;
+        }
+        let Some(_) = remove_scene_snapshot(ui_state, &self.removed_scene.scene.name) else {
+            return false;
+        };
+        if let Some(metadata) = &self.project_metadata_after {
+            project.metadata = metadata.clone();
+        }
+        ui_state.active_scene = self.active_scene_after.clone();
+        apply_selection(ui_state, self.selection_after.clone());
+        mark_project_dirty(project);
+        true
+    }
+
+    fn undo(&self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
+        let Some(project) = project else {
+            return false;
+        };
+        if ui_state
+            .scenes
+            .iter()
+            .any(|scene| scene.name == self.removed_scene.scene.name)
+        {
+            return false;
+        }
+        if let Err(error) = revert_project_file_changes(&project.path, &self.changes) {
+            tracing::error!(
+                "Failed to restore deleted scene '{}': {}",
+                self.removed_scene.scene.name,
+                error
+            );
+            return false;
+        }
+        restore_scene_snapshot(ui_state, &self.removed_scene);
+        if let Some(metadata) = &self.project_metadata_before {
+            project.metadata = metadata.clone();
+        }
+        ui_state.active_scene = self.active_scene_before.clone();
         apply_selection(ui_state, self.selection_before.clone());
         mark_project_dirty(project);
         true
@@ -569,6 +686,24 @@ fn apply_scene_rules_graph_snapshot(
     }
     ui_state.graph.layout_dirty = true;
     true
+}
+
+fn remove_scene_snapshot(ui_state: &mut EditorUI, scene_name: &str) -> Option<SceneSnapshot> {
+    let scene_index = ui_state.scenes.iter().position(|scene| scene.name == scene_name)?;
+    let scene = ui_state.scenes.remove(scene_index);
+    ui_state.graph.rule_graphs_by_scene.remove(scene_name);
+    ui_state.graph.layouts_by_scene.remove(scene_name);
+    Some(SceneSnapshot {
+        index: scene_index,
+        scene,
+    })
+}
+
+fn restore_scene_snapshot(ui_state: &mut EditorUI, snapshot: &SceneSnapshot) {
+    let insert_index = snapshot.index.min(ui_state.scenes.len());
+    ui_state
+        .scenes
+        .insert(insert_index, snapshot.scene.clone());
 }
 
 #[cfg(test)]

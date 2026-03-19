@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
 
-use crate::project::ProjectAssets;
+use crate::project::{Project, ProjectAssets, TemplateApplicationRecord};
 use crate::ui::editor_ui::Selection;
 use crate::ui::undo_redo::EditorCommand;
 use toki_template_builtins::BuiltInTemplateRegistry;
@@ -19,11 +18,14 @@ pub struct TemplateEditorState {
     pub category_filter: Option<String>,
     pub parameters_by_template: BTreeMap<String, BTreeMap<String, TemplateValue>>,
     pub last_error: Option<String>,
+    pub last_success: Option<String>,
+    pub selected_application_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TemplateAssetChoices {
     pub entity_definition_ids: Vec<String>,
+    pub entity_animation_states: BTreeMap<String, Vec<String>>,
     pub scene_ids: Vec<String>,
     pub tilemap_ids: Vec<String>,
     pub sprite_atlas_ids: Vec<String>,
@@ -55,9 +57,23 @@ impl TemplateWorkflowError {
 }
 
 impl TemplateAssetChoices {
-    pub fn from_project_assets(assets: &ProjectAssets) -> Self {
+    pub fn from_project_assets(assets: &mut ProjectAssets) -> Self {
         let mut entity_definition_ids = assets.get_entity_names();
         entity_definition_ids.sort();
+        let mut entity_animation_states = BTreeMap::new();
+        for entity_definition_id in &entity_definition_ids {
+            if let Ok(Some(definition)) = assets.load_entity_definition(entity_definition_id) {
+                let mut states = definition
+                    .animations
+                    .clips
+                    .iter()
+                    .map(|clip| clip.state.clone())
+                    .collect::<Vec<_>>();
+                states.sort();
+                states.dedup();
+                entity_animation_states.insert(entity_definition_id.clone(), states);
+            }
+        }
         let mut scene_ids = assets.get_scene_names();
         scene_ids.sort();
         let mut tilemap_ids = assets.get_tilemap_names();
@@ -77,6 +93,7 @@ impl TemplateAssetChoices {
 
         Self {
             entity_definition_ids,
+            entity_animation_states,
             scene_ids,
             tilemap_ids,
             sprite_atlas_ids,
@@ -183,7 +200,7 @@ pub fn selected_descriptor<'a>(
 
 pub fn preview_selected_template(
     state: &TemplateEditorState,
-    project_root: &Path,
+    project: &Project,
 ) -> Result<TemplatePreview, TemplateWorkflowError> {
     let descriptors = built_in_template_descriptors();
     let descriptor = selected_descriptor(state, &descriptors)
@@ -196,12 +213,23 @@ pub fn preview_selected_template(
         .cloned()
         .unwrap_or_default();
     let instantiation = registry
-        .instantiate_template(&descriptor.id, parameters)
+        .instantiate_template(&descriptor.id, parameters.clone())
         .map_err(|error| TemplateWorkflowError::new(error.message))?;
-    let lowered = lower_plan_for_project(project_root, &instantiation.plan)
+    let lowered = lower_plan_for_project(&project.path, &instantiation.plan)
         .map_err(|error| TemplateWorkflowError::new(error.message))?;
-    let file_changes = build_project_file_changes(project_root, &lowered)
+    let mut file_changes = build_project_file_changes(&project.path, &lowered)
         .map_err(|error| TemplateWorkflowError::new(error.message))?;
+    let application =
+        template_application_record(
+            &descriptor,
+            &parameters,
+            &instantiation,
+            &tracked_template_file_changes(&file_changes),
+        );
+    file_changes.push(project_metadata_change_for_template_application(
+        project,
+        &application,
+    )?);
 
     Ok(TemplatePreview {
         descriptor,
@@ -215,16 +243,90 @@ pub fn preview_selected_template(
 
 pub fn build_apply_template_command(
     state: &TemplateEditorState,
-    project_root: &Path,
+    project: &Project,
     current_selection: Option<Selection>,
 ) -> Result<EditorCommand, TemplateWorkflowError> {
-    let preview = preview_selected_template(state, project_root)?;
+    let preview = preview_selected_template(state, project)?;
+    let parameter_values = state
+        .parameters_by_template
+        .get(&preview.descriptor.id)
+        .cloned()
+        .unwrap_or_default();
+    let mut metadata_after = project.metadata.clone();
+    upsert_template_application(
+        &mut metadata_after.editor.template_applications,
+        template_application_record(
+            &preview.descriptor,
+            &parameter_values,
+            &preview.instantiation,
+            &tracked_template_file_changes(&preview.file_changes),
+        ),
+    );
     Ok(EditorCommand::apply_project_file_changes(
         format!("Apply template '{}'", preview.descriptor.display_name),
         preview.file_changes,
         current_selection,
         preview.selection_after_apply,
+        Some(project.metadata.clone()),
+        Some(metadata_after),
     ))
+}
+
+pub fn build_remove_template_application_command(
+    project: &Project,
+    application_id: &str,
+    current_selection: Option<Selection>,
+) -> Result<EditorCommand, TemplateWorkflowError> {
+    let Some(application) = project
+        .metadata
+        .editor
+        .template_applications
+        .iter()
+        .find(|application| application.application_id == application_id)
+        .cloned()
+    else {
+        return Err(TemplateWorkflowError::new("active template application not found"));
+    };
+
+    let mut metadata_after = project.metadata.clone();
+    metadata_after
+        .editor
+        .template_applications
+        .retain(|candidate| candidate.application_id != application.application_id);
+    let mut changes = application
+        .file_changes
+        .iter()
+        .map(reverse_project_file_change)
+        .collect::<Vec<_>>();
+    changes.push(project_metadata_change_after_metadata_update(
+        project,
+        &metadata_after,
+    )?);
+
+    Ok(EditorCommand::apply_project_file_changes(
+        format!("Remove template '{}'", application.template_display_name),
+        changes,
+        current_selection.clone(),
+        current_selection,
+        Some(project.metadata.clone()),
+        Some(metadata_after),
+    ))
+}
+
+fn tracked_template_file_changes(file_changes: &[ProjectFileChange]) -> Vec<ProjectFileChange> {
+    file_changes
+        .iter()
+        .filter(|change| change.relative_path != std::path::Path::new("project.toml"))
+        .cloned()
+        .collect()
+}
+
+fn reverse_project_file_change(change: &ProjectFileChange) -> ProjectFileChange {
+    ProjectFileChange {
+        relative_path: change.relative_path.clone(),
+        before_contents: change.after_contents.clone(),
+        after_contents: change.before_contents.clone(),
+    }
 }
 
 pub fn summary_line_for_parameter_value(
@@ -243,6 +345,7 @@ pub fn template_value_label(value: &TemplateValue) -> String {
         | TemplateValue::Enum(value)
         | TemplateValue::AssetReference(value)
         | TemplateValue::EntityDefinitionReference(value)
+        | TemplateValue::AnimationStateReference(value)
         | TemplateValue::SceneReference(value) => value.clone(),
         TemplateValue::Integer(value) => value.to_string(),
         TemplateValue::Float(value) => value.to_string(),
@@ -271,10 +374,133 @@ pub fn default_value_for_kind(kind: &TemplateParameterKind) -> TemplateValue {
         TemplateParameterKind::EntityDefinitionReference => {
             TemplateValue::EntityDefinitionReference(String::new())
         }
+        TemplateParameterKind::AnimationStateReference { .. } => {
+            TemplateValue::AnimationStateReference(String::new())
+        }
         TemplateParameterKind::SceneReference => TemplateValue::SceneReference(String::new()),
         TemplateParameterKind::Optional { .. } => TemplateValue::Optional(None),
         TemplateParameterKind::List { .. } => TemplateValue::List(Vec::new()),
     }
+}
+
+pub fn animation_state_choices_for_parameter(
+    parameter: &TemplateParameter,
+    values: &BTreeMap<String, TemplateValue>,
+    template_asset_choices: Option<&TemplateAssetChoices>,
+) -> Option<Vec<String>> {
+    let TemplateParameterKind::Optional { inner } = &parameter.kind else {
+        return None;
+    };
+    let TemplateParameterKind::AnimationStateReference { entity_parameter_id } = inner.as_ref() else {
+        return None;
+    };
+    let entity_id = match values.get(entity_parameter_id) {
+        Some(TemplateValue::EntityDefinitionReference(entity_id)) if !entity_id.is_empty() => {
+            entity_id
+        }
+        _ => return None,
+    };
+    template_asset_choices
+        .and_then(|choices| choices.entity_animation_states.get(entity_id))
+        .cloned()
+}
+
+fn template_application_record(
+    descriptor: &TemplateDescriptor,
+    parameters: &BTreeMap<String, TemplateValue>,
+    instantiation: &TemplateInstantiation,
+    file_changes: &[ProjectFileChange],
+) -> TemplateApplicationRecord {
+    TemplateApplicationRecord {
+        application_id: template_application_id(descriptor, instantiation),
+        template_id: descriptor.id.clone(),
+        template_display_name: descriptor.display_name.clone(),
+        parameter_summary_lines: descriptor
+            .parameters
+            .iter()
+            .map(|parameter| {
+                let value = parameters.get(&parameter.id);
+                summary_line_for_parameter_value(parameter, value)
+            })
+            .collect(),
+        semantic_summary_lines: semantic_summary_lines(&instantiation.plan.items),
+        affected_paths: file_changes
+            .iter()
+            .map(|change| change.relative_path.display().to_string())
+            .collect(),
+        file_changes: file_changes.to_vec(),
+    }
+}
+
+fn template_application_id(
+    descriptor: &TemplateDescriptor,
+    instantiation: &TemplateInstantiation,
+) -> String {
+    let mut item_ids = instantiation
+        .plan
+        .items
+        .iter()
+        .map(template_semantic_item_id)
+        .collect::<Vec<_>>();
+    item_ids.sort();
+    format!("{}::{}", descriptor.id, item_ids.join("+"))
+}
+
+fn template_semantic_item_id(item: &TemplateSemanticItem) -> String {
+    match item {
+        TemplateSemanticItem::CreateAttackBehavior { id, .. }
+        | TemplateSemanticItem::CreatePickupBehavior { id, .. }
+        | TemplateSemanticItem::CreateProjectileBehavior { id, .. }
+        | TemplateSemanticItem::CreateConfirmationDialog { id, .. }
+        | TemplateSemanticItem::CreatePauseMenuFlow { id, .. }
+        | TemplateSemanticItem::ConfigureEntityCapability { id, .. } => id.clone(),
+    }
+}
+
+fn upsert_template_application(
+    applications: &mut Vec<TemplateApplicationRecord>,
+    application: TemplateApplicationRecord,
+) {
+    if let Some(existing_index) = applications
+        .iter()
+        .position(|existing| existing.application_id == application.application_id)
+    {
+        applications[existing_index] = application;
+    } else {
+        applications.push(application);
+    }
+    applications.sort_by(|left, right| {
+        left.template_display_name
+            .cmp(&right.template_display_name)
+            .then(left.application_id.cmp(&right.application_id))
+    });
+}
+
+fn project_metadata_change_for_template_application(
+    project: &Project,
+    application: &TemplateApplicationRecord,
+) -> Result<ProjectFileChange, TemplateWorkflowError> {
+    let mut metadata_after = project.metadata.clone();
+    upsert_template_application(
+        &mut metadata_after.editor.template_applications,
+        application.clone(),
+    );
+    project_metadata_change_after_metadata_update(project, &metadata_after)
+}
+
+fn project_metadata_change_after_metadata_update(
+    project: &Project,
+    metadata_after: &crate::project::ProjectMetadata,
+) -> Result<ProjectFileChange, TemplateWorkflowError> {
+    let before_contents = std::fs::read_to_string(project.project_file_path())
+        .map_err(|error| TemplateWorkflowError::new(format!("failed to read project.toml: {error}")))?;
+    let after_contents = toml::to_string_pretty(metadata_after)
+        .map_err(|error| TemplateWorkflowError::new(format!("failed to serialize project metadata: {error}")))?;
+    Ok(ProjectFileChange {
+        relative_path: std::path::PathBuf::from("project.toml"),
+        before_contents: Some(before_contents),
+        after_contents: Some(after_contents),
+    })
 }
 
 fn semantic_summary_lines(items: &[TemplateSemanticItem]) -> Vec<String> {
@@ -339,11 +565,14 @@ fn lowered_summary_lines(file_changes: &[ProjectFileChange]) -> Vec<String> {
 }
 
 fn selection_after_apply(file_changes: &[ProjectFileChange]) -> Option<Selection> {
-    if file_changes.len() != 1 {
+    let mut entity_changes = file_changes
+        .iter()
+        .filter(|change| change.relative_path.parent().is_some())
+        .filter(|change| change.relative_path.parent().unwrap().to_string_lossy() == "entities");
+    let relative = &entity_changes.next()?.relative_path;
+    if entity_changes.next().is_some() {
         return None;
     }
-
-    let relative = &file_changes[0].relative_path;
     let parent = relative.parent()?.to_string_lossy();
     if parent != "entities" {
         return None;

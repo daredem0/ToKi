@@ -81,10 +81,8 @@ impl BuiltInTemplate for PlayerAttackTemplate {
                     label: "Animation State".into(),
                     description: Some("Optional attack animation state.".into()),
                     kind: TemplateParameterKind::Optional {
-                        inner: Box::new(TemplateParameterKind::String {
-                            multiline: false,
-                            min_length: None,
-                            max_length: None,
+                        inner: Box::new(TemplateParameterKind::AnimationStateReference {
+                            entity_parameter_id: "actor_entity_definition_id".into(),
                         }),
                     },
                     default: Some(TemplateValue::Optional(None)),

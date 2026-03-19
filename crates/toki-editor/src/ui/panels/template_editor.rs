@@ -95,7 +95,7 @@ pub(super) fn render_template_editor(
         }
 
         columns[1].add_space(10.0);
-        match preview_selected_template(&ui_state.template, &project.path) {
+        match preview_selected_template(&ui_state.template, project) {
             Ok(preview) => {
                 if !preview.semantic_summary_lines.is_empty() {
                     columns[1].label("Semantic Output");
@@ -113,6 +113,19 @@ pub(super) fn render_template_editor(
             }
             Err(error) => {
                 columns[1].colored_label(egui::Color32::from_rgb(215, 120, 120), &error.message);
+            }
+        }
+
+        columns[1].add_space(10.0);
+        columns[1].label("Active Templates");
+        if project.metadata.editor.template_applications.is_empty() {
+            columns[1].small("No active templates recorded yet.");
+        } else {
+            for application in &project.metadata.editor.template_applications {
+                columns[1].small(format!(
+                    "- {} ({})",
+                    application.template_display_name, application.application_id
+                ));
             }
         }
     });

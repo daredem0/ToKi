@@ -23,7 +23,7 @@
     "movement_profile": "player_wasd",
     "primary_action": {
       "mode": "melee",
-      "cooldown_ticks": 20,
+      "cooldown_ticks": 10,
       "damage": 8,
       "sound_id": "sfx_hit2"
     },

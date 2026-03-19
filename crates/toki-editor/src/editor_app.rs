@@ -827,7 +827,7 @@ impl EditorApp {
         let template_asset_choices = self
             .core
             .project_manager
-            .get_project_assets()
+            .get_project_assets_mut()
             .map(TemplateAssetChoices::from_project_assets);
         let full_output = egui_ctx.run(raw_input, |ctx| {
             // Render UI - viewport will use the pre-rendered texture

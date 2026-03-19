@@ -1,4 +1,5 @@
 use crate::config::EditorConfig;
+use crate::ui::editor_ui::EditorConfirmation;
 
 /// Handles all menu bar rendering for the editor
 pub struct MenuSystem;
@@ -177,6 +178,9 @@ impl MenuSystem {
         if ui_state.project.show_new_project_dialog {
             Self::render_new_project_dialog(ui_state, ctx);
         }
+        if ui_state.project.pending_confirmation.is_some() {
+            Self::render_confirmation_dialog(ui_state, ctx, project);
+        }
     }
 
     fn render_new_project_dialog(ui_state: &mut super::EditorUI, ctx: &egui::Context) {
@@ -248,6 +252,65 @@ impl MenuSystem {
             open = false;
         }
         ui_state.project.show_new_project_dialog = open;
+    }
+
+    fn render_confirmation_dialog(
+        ui_state: &mut super::EditorUI,
+        ctx: &egui::Context,
+        project: Option<&mut crate::project::Project>,
+    ) {
+        let Some(pending_confirmation) = ui_state.project.pending_confirmation.clone() else {
+            return;
+        };
+        let mut open = true;
+        let mut accept_clicked = false;
+        let mut cancel_clicked = false;
+        match pending_confirmation {
+            EditorConfirmation::DeleteScene { scene_name } => {
+                egui::Window::new("Confirm Scene Deletion")
+                    .collapsible(false)
+                    .resizable(false)
+                    .open(&mut open)
+                    .show(ctx, |ui| {
+                        ui.label("The selected Scene is not empty. Do you really want to delete it? This cannot be undone.");
+                        ui.add_space(8.0);
+                        ui.small(format!("Scene: {scene_name}"));
+                        ui.separator();
+                        ui.horizontal(|ui| {
+                            if ui.button("Yes, delete anyway").clicked() {
+                                accept_clicked = true;
+                            }
+                            if ui.button("No").clicked() {
+                                cancel_clicked = true;
+                            }
+                        });
+                    });
+
+                if accept_clicked {
+                    if let Some(project) = project {
+                        match crate::ui::inspector::build_delete_scene_command(
+                            ui_state,
+                            project,
+                            &scene_name,
+                        ) {
+                            Ok(command) => {
+                                let _ = ui_state.execute_command_with_project(project, command);
+                            }
+                            Err(error) => {
+                                tracing::error!(
+                                    "Failed to build delete scene command for '{}': {}",
+                                    scene_name,
+                                    error
+                                );
+                            }
+                        }
+                    }
+                    ui_state.project.pending_confirmation = None;
+                } else if cancel_clicked || !open {
+                    ui_state.project.pending_confirmation = None;
+                }
+            }
+        }
     }
 
     fn render_busy_logo(

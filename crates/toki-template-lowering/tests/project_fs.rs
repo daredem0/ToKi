@@ -86,7 +86,9 @@ fn instantiate_melee_attack_plan() -> toki_templates::TemplateSemanticPlan {
     parameters.insert("cooldown_ticks".into(), TemplateValue::Integer(18));
     parameters.insert(
         "animation_state".into(),
-        TemplateValue::Optional(Some(Box::new(TemplateValue::String("attack_right".into())))),
+        TemplateValue::Optional(Some(Box::new(TemplateValue::AnimationStateReference(
+            "attack_right".into(),
+        )))),
     );
     parameters.insert(
         "sound_id".into(),

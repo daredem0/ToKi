@@ -54,7 +54,9 @@ fn player_attack_instantiation_returns_semantic_attack_behavior() {
     parameters.insert("cooldown_ticks".into(), TemplateValue::Integer(20));
     parameters.insert(
         "animation_state".into(),
-        TemplateValue::Optional(Some(Box::new(TemplateValue::String("attack".into())))),
+        TemplateValue::Optional(Some(Box::new(TemplateValue::AnimationStateReference(
+            "attack".into(),
+        )))),
     );
     parameters.insert(
         "projectile_entity_definition_id".into(),

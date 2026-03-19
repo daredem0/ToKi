@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use toki_core::project_runtime::RuntimeSettings;
+use toki_template_lowering::ProjectFileChange;
 
 /// Main project data structure
 #[allow(dead_code)]
@@ -85,6 +86,24 @@ pub struct EditorSettings {
     /// Persisted scene rule graph drafts for each scene
     #[serde(default)]
     pub rule_graph_drafts: HashMap<String, RuleGraph>,
+    /// Persisted template applications so the editor can show and remove active templates safely.
+    #[serde(default)]
+    pub template_applications: Vec<TemplateApplicationRecord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TemplateApplicationRecord {
+    pub application_id: String,
+    pub template_id: String,
+    pub template_display_name: String,
+    #[serde(default)]
+    pub parameter_summary_lines: Vec<String>,
+    #[serde(default)]
+    pub semantic_summary_lines: Vec<String>,
+    #[serde(default)]
+    pub affected_paths: Vec<String>,
+    #[serde(default)]
+    pub file_changes: Vec<ProjectFileChange>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

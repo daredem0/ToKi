@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
 use toki_core::entity::EntityDefinition;
 use toki_templates::TemplateSemanticPlan;
 
@@ -13,7 +14,7 @@ pub struct ProjectFilesystemResolver<'a> {
     project_root: &'a Path,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProjectFileChange {
     pub relative_path: PathBuf,
     pub before_contents: Option<String>,
@@ -196,10 +197,42 @@ fn write_project_file_change(
     direction: ProjectFileChangeDirection,
 ) -> Result<(), TemplateLoweringError> {
     let absolute_path = project_root.join(&change.relative_path);
+    let expected_current_contents = match direction {
+        ProjectFileChangeDirection::Forward => &change.before_contents,
+        ProjectFileChangeDirection::Reverse => &change.after_contents,
+    };
     let target_contents = match direction {
         ProjectFileChangeDirection::Forward => &change.after_contents,
         ProjectFileChangeDirection::Reverse => &change.before_contents,
     };
+    let current_contents = if absolute_path.exists() {
+        Some(fs::read_to_string(&absolute_path).map_err(|error| {
+            TemplateLoweringError::new(
+                TemplateLoweringErrorCode::ApplyFailed,
+                format!(
+                    "failed to read current contents of '{}' during template apply: {}",
+                    absolute_path.display(),
+                    error
+                ),
+            )
+        })?)
+    } else {
+        None
+    };
+
+    if &current_contents != expected_current_contents {
+        return Err(TemplateLoweringError::new(
+            TemplateLoweringErrorCode::ApplyFailed,
+            format!(
+                "refusing to overwrite '{}' because its current contents do not match the expected {} state",
+                absolute_path.display(),
+                match direction {
+                    ProjectFileChangeDirection::Forward => "pre-apply",
+                    ProjectFileChangeDirection::Reverse => "post-apply",
+                }
+            ),
+        ));
+    }
 
     if let Some(parent) = absolute_path.parent() {
         fs::create_dir_all(parent).map_err(|error| {

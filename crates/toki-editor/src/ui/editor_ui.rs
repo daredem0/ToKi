@@ -159,6 +159,7 @@ pub struct ProjectEditorState {
 
     // Window state
     pub window_title: Option<String>,
+    pub pending_confirmation: Option<EditorConfirmation>,
 }
 
 impl Default for ProjectEditorState {
@@ -183,8 +184,14 @@ impl Default for ProjectEditorState {
             background_task_status: None,
             cancel_background_task_requested: false,
             window_title: Some("No project open".to_string()),
+            pending_confirmation: None,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EditorConfirmation {
+    DeleteScene { scene_name: String },
 }
 
 impl ProjectEditorState {
