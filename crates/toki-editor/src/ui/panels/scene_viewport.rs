@@ -40,7 +40,7 @@ impl PanelSystem {
             egui::Sense::click_and_drag().union(egui::Sense::hover()),
         );
 
-        if !ui_state.is_entity_move_drag_active() {
+        if !ui_state.is_entity_move_drag_active() && !ui_state.is_scene_anchor_move_drag_active() {
             viewport.clear_suppressed_entity_rendering();
         }
 
@@ -90,7 +90,10 @@ impl PanelSystem {
             }
         }
 
-        if !ui_state.is_entity_move_drag_active() && !ui_state.is_marquee_selection_active() {
+        if !ui_state.is_entity_move_drag_active()
+            && !ui_state.is_scene_anchor_move_drag_active()
+            && !ui_state.is_marquee_selection_active()
+        {
             CameraInteraction::handle_drag(viewport, &response, config.as_deref());
         } else {
             viewport.stop_camera_drag();

@@ -54,14 +54,35 @@ impl EditorApp {
             return Vec::new();
         };
         let mut lines = Vec::new();
+        let dragged_anchor_id = ui_state
+            .placement
+            .scene_anchor_move_drag
+            .as_ref()
+            .filter(|drag| drag.scene_name == scene.name)
+            .map(|drag| drag.anchor.id.as_str());
 
         for anchor in &scene.anchors {
+            if dragged_anchor_id == Some(anchor.id.as_str()) {
+                continue;
+            }
             lines.extend(Self::scene_anchor_cross_lines(
                 anchor.position.as_vec2(),
                 tilemap,
                 config,
                 [0.1882, 0.5176, 1.0, 1.0],
             ));
+        }
+
+        if ui_state.placement.scene_anchor_move_drag.is_some() {
+            if let Some(preview_position) = ui_state.placement.preview_position {
+                lines.extend(Self::scene_anchor_cross_lines(
+                    preview_position,
+                    tilemap,
+                    config,
+                    [0.1882, 0.5176, 1.0, 1.0],
+                ));
+            }
+            return lines;
         }
 
         if ui_state.placement.scene_anchor_draft().is_some() {

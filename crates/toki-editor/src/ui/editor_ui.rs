@@ -81,6 +81,13 @@ pub struct EntityMoveDragState {
     pub grab_offset: glam::Vec2, // Cursor world position offset from entity top-left at drag start
 }
 
+#[derive(Debug, Clone)]
+pub struct SceneAnchorMoveDragState {
+    pub scene_name: String,
+    pub anchor: toki_core::scene::SceneAnchor,
+    pub grab_offset: glam::Vec2,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct MarqueeSelectionState {
     pub start_screen: egui::Pos2,
@@ -246,6 +253,7 @@ pub struct PlacementState {
     pub preview_cached_frame: Option<PlacementPreviewVisual>,
     pub preview_valid: Option<bool>,
     pub entity_move_drag: Option<EntityMoveDragState>,
+    pub scene_anchor_move_drag: Option<SceneAnchorMoveDragState>,
     pub marquee_selection: Option<MarqueeSelectionState>,
 }
 
@@ -276,6 +284,7 @@ impl PlacementState {
         self.preview_cached_frame = None;
         self.preview_valid = None;
         self.entity_move_drag = None;
+        self.scene_anchor_move_drag = None;
         self.marquee_selection = None;
     }
 
@@ -303,6 +312,14 @@ impl PlacementState {
 
     pub fn is_entity_move_drag_active(&self) -> bool {
         self.entity_move_drag.is_some()
+    }
+
+    pub fn begin_scene_anchor_move_drag(&mut self, drag_state: SceneAnchorMoveDragState) {
+        self.scene_anchor_move_drag = Some(drag_state);
+    }
+
+    pub fn is_scene_anchor_move_drag_active(&self) -> bool {
+        self.scene_anchor_move_drag.is_some()
     }
 
     pub fn start_marquee_selection(&mut self, start: egui::Pos2) {
@@ -636,6 +653,14 @@ impl EditorUI {
 
     pub fn is_entity_move_drag_active(&self) -> bool {
         self.placement.is_entity_move_drag_active()
+    }
+
+    pub fn begin_scene_anchor_move_drag(&mut self, drag_state: SceneAnchorMoveDragState) {
+        self.placement.begin_scene_anchor_move_drag(drag_state);
+    }
+
+    pub fn is_scene_anchor_move_drag_active(&self) -> bool {
+        self.placement.is_scene_anchor_move_drag_active()
     }
 
     pub fn start_marquee_selection(&mut self, start: egui::Pos2) {

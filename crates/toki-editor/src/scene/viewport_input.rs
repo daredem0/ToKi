@@ -124,20 +124,6 @@ impl SceneViewport {
         )
     }
 
-    pub fn world_to_screen_pos(
-        &self,
-        world_pos: glam::Vec2,
-        display_rect: egui::Rect,
-    ) -> egui::Pos2 {
-        world_to_screen_from_camera(
-            world_pos,
-            display_rect,
-            self.viewport_size,
-            self.camera.position,
-            self.effective_camera_scale(),
-        )
-    }
-
     pub fn start_camera_drag(&mut self, mouse_pos: glam::Vec2) {
         self.is_dragging_camera = true;
         self.last_mouse_pos = Some(mouse_pos);

@@ -8,6 +8,7 @@ use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityAttributes,
     EntityDefinition, EntityKind, EntityManager, RenderingDef,
 };
+use toki_core::scene::{SceneAnchor, SceneAnchorKind};
 
 fn unique_temp_project_dir() -> PathBuf {
     let nanos = SystemTime::now()
@@ -424,6 +425,67 @@ fn apply_click_selection_selects_scene_anchor_when_present() {
         }) if scene_name == "Main Scene" && anchor_id == "spawn_point_1"
     ));
     assert!(ui_state.selected_entity_ids().is_empty());
+}
+
+#[test]
+fn find_scene_anchor_at_world_pos_hits_snapped_spawnpoint_cell() {
+    let mut ui_state = EditorUI::new();
+    let scene = ui_state
+        .scenes
+        .iter_mut()
+        .find(|scene| scene.name == "Main Scene")
+        .expect("missing default scene");
+    scene.anchors.push(SceneAnchor {
+        id: "spawn_point_1".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(32, 48),
+        facing: None,
+    });
+
+    let mut config = crate::config::EditorConfig::default();
+    config.editor_settings.grid.snap_to_grid = true;
+    config.editor_settings.grid.grid_size = [16, 16];
+
+    let clicked = SelectionInteraction::find_scene_anchor_at_world_pos(
+        &ui_state,
+        glam::Vec2::new(40.0, 56.0),
+        None,
+        Some(&config),
+    );
+
+    assert_eq!(
+        clicked,
+        Some(("Main Scene".to_string(), "spawn_point_1".to_string()))
+    );
+}
+
+#[test]
+fn find_scene_anchor_at_world_pos_misses_outside_spawnpoint_cell() {
+    let mut ui_state = EditorUI::new();
+    let scene = ui_state
+        .scenes
+        .iter_mut()
+        .find(|scene| scene.name == "Main Scene")
+        .expect("missing default scene");
+    scene.anchors.push(SceneAnchor {
+        id: "spawn_point_1".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(32, 48),
+        facing: None,
+    });
+
+    let mut config = crate::config::EditorConfig::default();
+    config.editor_settings.grid.snap_to_grid = true;
+    config.editor_settings.grid.grid_size = [16, 16];
+
+    let clicked = SelectionInteraction::find_scene_anchor_at_world_pos(
+        &ui_state,
+        glam::Vec2::new(20.0, 20.0),
+        None,
+        Some(&config),
+    );
+
+    assert_eq!(clicked, None);
 }
 
 #[test]

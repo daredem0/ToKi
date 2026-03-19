@@ -21,6 +21,27 @@ impl PlacementInteraction {
         rect: egui::Rect,
         config: Option<&EditorConfig>,
     ) {
+        if let Some(drag_state) = ui_state.placement.scene_anchor_move_drag.as_ref() {
+            if let Some(hover_pos) = response.hover_pos() {
+                let display_rect = viewport.display_rect_in(rect);
+                let cursor_world = viewport.screen_to_world_pos_raw(hover_pos, display_rect);
+                let world_pos = GridInteraction::drag_target_world_position(
+                    cursor_world,
+                    drag_state.grab_offset,
+                    viewport.tilemap(),
+                    config,
+                );
+                ui_state.placement.preview_position = Some(world_pos);
+                ui_state.placement.preview_valid = Some(true);
+                viewport.mark_dirty();
+            } else {
+                ui_state.placement.preview_position = None;
+                ui_state.placement.preview_valid = None;
+                viewport.mark_dirty();
+            }
+            return;
+        }
+
         if ui_state.is_in_placement_mode() {
             if let Some(hover_pos) = response.hover_pos() {
                 let display_rect = viewport.display_rect_in(rect);

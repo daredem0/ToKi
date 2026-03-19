@@ -78,6 +78,57 @@ impl EditorUI {
             });
     }
 
+    fn render_scene_spawnpoint_group(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        anchors: &[&toki_core::scene::SceneAnchor],
+        current_selection: &Option<super::Selection>,
+        selection_changes: &mut Vec<super::Selection>,
+        anchor_removals: &mut Vec<(String, String)>,
+    ) {
+        if anchors.is_empty() {
+            return;
+        }
+
+        egui::CollapsingHeader::new("Spawnpoints")
+            .id_salt(format!("spawnpoints_{scene_name}"))
+            .default_open(false)
+            .show(ui, |ui| {
+                for anchor in anchors {
+                    let is_selected = matches!(
+                        current_selection,
+                        Some(super::Selection::SceneAnchor { scene_name: selected_scene, anchor_id })
+                            if selected_scene == scene_name && anchor_id == &anchor.id
+                    );
+
+                    ui.horizontal(|ui| {
+                        let response = ui.selectable_label(
+                            is_selected,
+                            format!("Spawnpoint: {}", anchor.id),
+                        );
+
+                        if response.clicked() {
+                            selection_changes.push(super::Selection::SceneAnchor {
+                                scene_name: scene_name.to_string(),
+                                anchor_id: anchor.id.clone(),
+                            });
+                        }
+
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui
+                                .small_button("🗑")
+                                .on_hover_text("Remove spawnpoint from scene")
+                                .clicked()
+                            {
+                                anchor_removals.push((scene_name.to_string(), anchor.id.clone()));
+                            }
+                            ui.label(format!("({}, {})", anchor.position.x, anchor.position.y));
+                        });
+                    });
+                }
+            });
+    }
+
     pub(super) fn render_scene_hierarchy_section(
         &mut self,
         ui: &mut egui::Ui,
@@ -87,6 +138,7 @@ impl EditorUI {
         let mut active_scene_change = None;
         let mut map_removals: Vec<(usize, usize)> = Vec::new();
         let mut entity_removals: Vec<(String, u32)> = Vec::new();
+        let mut anchor_removals: Vec<(String, String)> = Vec::new();
 
         for (scene_index, scene) in self.scenes.iter().enumerate() {
             let is_active_scene = self.active_scene.as_ref() == Some(&scene.name);
@@ -173,6 +225,22 @@ impl EditorUI {
                             &mut entity_removals,
                         );
                     }
+
+                    let spawnpoints = scene
+                        .anchors
+                        .iter()
+                        .filter(|anchor| {
+                            matches!(anchor.kind, toki_core::scene::SceneAnchorKind::SpawnPoint)
+                        })
+                        .collect::<Vec<_>>();
+                    Self::render_scene_spawnpoint_group(
+                        ui,
+                        &scene.name,
+                        &spawnpoints,
+                        &self.selection,
+                        &mut selection_changes,
+                        &mut anchor_removals,
+                    );
 
                     if self.visibility.show_runtime_entities {
                         egui::CollapsingHeader::new("Runtime Entities:")
@@ -288,6 +356,39 @@ impl EditorUI {
 
                 if matches!(&self.selection, Some(super::Selection::Entity(id)) if id == &entity_id)
                 {
+                    self.clear_selection();
+                }
+            }
+        }
+
+        for (scene_name, anchor_id) in anchor_removals {
+            let Some(scene_index) = self
+                .scenes
+                .iter()
+                .position(|scene| scene.name == scene_name)
+            else {
+                continue;
+            };
+
+            let before_scene = self.scenes[scene_index].clone();
+            let mut after_scene = before_scene.clone();
+            let before_len = after_scene.anchors.len();
+            after_scene.anchors.retain(|anchor| anchor.id != anchor_id);
+            if after_scene.anchors.len() == before_len {
+                continue;
+            }
+
+            if self.execute_command(EditorCommand::update_scene(
+                scene_name.clone(),
+                before_scene,
+                after_scene,
+            )) {
+                tracing::info!("Removed spawnpoint '{}' from scene {}", anchor_id, scene_name);
+                if matches!(
+                    &self.selection,
+                    Some(super::Selection::SceneAnchor { scene_name: selected_scene, anchor_id: selected_anchor })
+                        if selected_scene == &scene_name && selected_anchor == &anchor_id
+                ) {
                     self.clear_selection();
                 }
             }

@@ -38,24 +38,6 @@ pub(super) fn screen_to_world_from_camera(
     viewport_to_world(viewport_pos, camera_position, camera_scale)
 }
 
-pub(super) fn world_to_screen_from_camera(
-    world_pos: glam::Vec2,
-    display_rect: egui::Rect,
-    _viewport_size: (u32, u32),
-    camera_position: glam::IVec2,
-    camera_scale: f32,
-) -> egui::Pos2 {
-    let screen_x =
-        display_rect.min.x + ((world_pos.x - camera_position.x as f32) / camera_scale);
-    let screen_y =
-        display_rect.min.y + ((world_pos.y - camera_position.y as f32) / camera_scale);
-
-    egui::pos2(
-        screen_x.clamp(display_rect.min.x, display_rect.max.x),
-        screen_y.clamp(display_rect.min.y, display_rect.max.y),
-    )
-}
-
 /// Converts screen coordinates to viewport-local coordinates.
 ///
 /// Handles letterboxing (horizontal bars) when display is wider than viewport,

@@ -515,6 +515,40 @@ fn build_scene_anchor_overlay_lines_prefer_tilemap_tile_size() {
     assert_eq!(lines[1].start, glam::Vec2::new(120.0, 96.0));
 }
 
+#[test]
+fn build_scene_anchor_overlay_lines_use_drag_preview_instead_of_original_anchor() {
+    let mut ui_state = crate::ui::EditorUI::new();
+    let mut scene = Scene::new("Main Scene".to_string());
+    scene.anchors.push(SceneAnchor {
+        id: "spawn_point_1".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(16, 16),
+        facing: None,
+    });
+    ui_state.scenes = vec![scene];
+    ui_state.active_scene = Some("Main Scene".to_string());
+    ui_state.begin_scene_anchor_move_drag(crate::ui::editor_ui::SceneAnchorMoveDragState {
+        scene_name: "Main Scene".to_string(),
+        anchor: SceneAnchor {
+            id: "spawn_point_1".to_string(),
+            kind: SceneAnchorKind::SpawnPoint,
+            position: IVec2::new(16, 16),
+            facing: None,
+        },
+        grab_offset: glam::Vec2::ZERO,
+    });
+    ui_state.placement.preview_position = Some(glam::Vec2::new(48.0, 64.0));
+    let config = crate::config::EditorConfig::default();
+
+    let lines = EditorApp::build_scene_anchor_overlay_lines(&ui_state, None, Some(&config));
+
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[0].start, glam::Vec2::new(48.0, 64.0));
+    assert_eq!(lines[0].end, glam::Vec2::new(64.0, 80.0));
+    assert_eq!(lines[1].start, glam::Vec2::new(64.0, 64.0));
+    assert_eq!(lines[1].end, glam::Vec2::new(48.0, 80.0));
+}
+
 // =============================================================================
 // EditorSessionState tests
 // =============================================================================

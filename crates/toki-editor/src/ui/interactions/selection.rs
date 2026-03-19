@@ -1,7 +1,7 @@
 use super::GridInteraction;
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
-use crate::ui::editor_ui::EntityMoveDragState;
+use crate::ui::editor_ui::{EntityMoveDragState, SceneAnchorMoveDragState};
 use crate::ui::undo_redo::{EditorCommand, EntityPosition};
 use crate::ui::EditorUI;
 use std::path::Path;
@@ -21,7 +21,7 @@ impl SelectionInteraction {
         ctrl_pressed: bool,
     ) {
         // Ignore plain click-selection while an explicit move drag operation is active.
-        if ui_state.is_entity_move_drag_active() {
+        if ui_state.is_entity_move_drag_active() || ui_state.is_scene_anchor_move_drag_active() {
             return;
         }
 
@@ -29,7 +29,7 @@ impl SelectionInteraction {
         let world_pos = viewport.screen_to_world_pos(click_pos, display_rect);
         let clicked_entity = viewport.get_entity_at_world_pos(world_pos);
         let clicked_anchor =
-            Self::find_scene_anchor_at_screen_pos(ui_state, viewport, click_pos, display_rect, config);
+            Self::find_scene_anchor_at_world_pos(ui_state, world_pos, viewport.tilemap(), config);
         Self::apply_click_selection(ui_state, clicked_entity, clicked_anchor, ctrl_pressed);
     }
 
@@ -66,34 +66,32 @@ impl SelectionInteraction {
         ui_state.clear_entity_selection();
     }
 
-    fn find_scene_anchor_at_screen_pos(
+    fn find_scene_anchor_at_world_pos(
         ui_state: &EditorUI,
-        viewport: &SceneViewport,
-        click_pos: egui::Pos2,
-        rect: egui::Rect,
+        world_pos: glam::Vec2,
+        tilemap: Option<&toki_core::assets::tilemap::TileMap>,
         config: Option<&EditorConfig>,
     ) -> Option<(String, String)> {
         let active_scene_name = ui_state.active_scene.as_ref()?;
         let scene = ui_state.scenes.iter().find(|scene| &scene.name == active_scene_name)?;
-        const HIT_RADIUS_PX: f32 = 10.0;
+        const HIT_RADIUS_WORLD: f32 = 8.0;
 
         scene.anchors.iter().find_map(|anchor| {
-            let pose = GridInteraction::placement_pose(
-                anchor.position.as_vec2(),
-                viewport.tilemap(),
-                config,
-            );
+            let pose = GridInteraction::placement_pose(anchor.position.as_vec2(), tilemap, config);
             if let Some(cell_size) = pose.snapped_cell_size {
-                let rect_min = viewport.world_to_screen_pos(pose.world_origin, rect);
-                let rect_max =
-                    viewport.world_to_screen_pos(pose.world_origin + cell_size.as_vec2(), rect);
-                if egui::Rect::from_min_max(rect_min, rect_max).contains(click_pos) {
+                let rect_min = pose.world_origin;
+                let rect_max = pose.world_origin + cell_size.as_vec2();
+                if world_pos.x >= rect_min.x
+                    && world_pos.x < rect_max.x
+                    && world_pos.y >= rect_min.y
+                    && world_pos.y < rect_max.y
+                {
                     return Some((scene.name.clone(), anchor.id.clone()));
                 }
             }
 
-            let screen_pos = viewport.world_to_screen_pos(pose.marker_world, rect);
-            (screen_pos.distance(click_pos) <= HIT_RADIUS_PX).then(|| (scene.name.clone(), anchor.id.clone()))
+            (pose.marker_world.distance(world_pos) <= HIT_RADIUS_WORLD)
+                .then(|| (scene.name.clone(), anchor.id.clone()))
         })
     }
 
@@ -106,64 +104,96 @@ impl SelectionInteraction {
         config: Option<&EditorConfig>,
         ctrl_pressed: bool,
     ) {
-        if ui_state.is_in_placement_mode() || ui_state.is_entity_move_drag_active() || ctrl_pressed
+        if ui_state.is_in_placement_mode()
+            || ui_state.is_entity_move_drag_active()
+            || ui_state.is_scene_anchor_move_drag_active()
+            || ctrl_pressed
         {
             return;
         }
 
         let display_rect = viewport.display_rect_in(rect);
         let world_pos = viewport.screen_to_world_pos(drag_start_pos, display_rect);
-        let Some(entity_id) = viewport.get_entity_at_world_pos(world_pos) else {
-            return;
-        };
+        if let Some(entity_id) = viewport.get_entity_at_world_pos(world_pos) {
+            let Some(active_scene_name) = ui_state.active_scene.clone() else {
+                tracing::warn!("Cannot start entity move drag: no active scene");
+                return;
+            };
 
-        let Some(active_scene_name) = ui_state.active_scene.clone() else {
-            tracing::warn!("Cannot start entity move drag: no active scene");
-            return;
-        };
+            let Some(entity) = Self::find_scene_entity(ui_state, &active_scene_name, entity_id) else {
+                tracing::warn!(
+                    "Cannot start entity move drag: entity {} not found in active scene '{}'",
+                    entity_id,
+                    active_scene_name
+                );
+                return;
+            };
 
-        let Some(entity) = Self::find_scene_entity(ui_state, &active_scene_name, entity_id) else {
-            tracing::warn!(
-                "Cannot start entity move drag: entity {} not found in active scene '{}'",
+            let project_path = config.and_then(|cfg| cfg.current_project_path().map(|p| p.as_path()));
+            let entity_def_name = Self::resolve_entity_definition_name(&entity, project_path)
+                .unwrap_or_else(|| Self::entity_kind_name(&entity.entity_kind).to_string());
+
+            tracing::info!(
+                "Starting move drag for entity {} using definition '{}'",
                 entity_id,
-                active_scene_name
+                entity_def_name
+            );
+
+            let dragged_entities =
+                Self::drag_entities_for_start(ui_state, &active_scene_name, &entity, entity_id);
+            if dragged_entities.len() == 1 {
+                ui_state.set_single_entity_selection(entity_id);
+            } else {
+                ui_state.selection = Some(crate::ui::editor_ui::Selection::Entity(entity_id));
+            }
+            ui_state.enter_placement_mode(entity_def_name.clone());
+            let grab_offset = world_pos - entity.position.as_vec2();
+            ui_state.begin_entity_move_drag(EntityMoveDragState {
+                scene_name: active_scene_name,
+                entity,
+                dragged_entities,
+                grab_offset,
+            });
+            viewport.suppress_entity_rendering_many(
+                ui_state
+                    .placement
+                    .entity_move_drag
+                    .as_ref()
+                    .into_iter()
+                    .flat_map(|drag| drag.dragged_entities.iter().map(|entity| entity.id)),
+            );
+            return;
+        }
+
+        let Some((scene_name, anchor_id)) =
+            Self::find_scene_anchor_at_world_pos(ui_state, world_pos, viewport.tilemap(), config)
+        else {
+            return;
+        };
+        let Some(anchor) = Self::find_scene_anchor(ui_state, &scene_name, &anchor_id) else {
+            tracing::warn!(
+                "Cannot start scene anchor move drag: anchor '{}' not found in scene '{}'",
+                anchor_id,
+                scene_name
             );
             return;
         };
 
-        let project_path = config.and_then(|cfg| cfg.current_project_path().map(|p| p.as_path()));
-        let entity_def_name = Self::resolve_entity_definition_name(&entity, project_path)
-            .unwrap_or_else(|| Self::entity_kind_name(&entity.entity_kind).to_string());
-
         tracing::info!(
-            "Starting move drag for entity {} using definition '{}'",
-            entity_id,
-            entity_def_name
+            "Starting move drag for scene anchor '{}' in scene '{}'",
+            anchor_id,
+            scene_name
         );
-
-        let dragged_entities =
-            Self::drag_entities_for_start(ui_state, &active_scene_name, &entity, entity_id);
-        if dragged_entities.len() == 1 {
-            ui_state.set_single_entity_selection(entity_id);
-        } else {
-            ui_state.selection = Some(crate::ui::editor_ui::Selection::Entity(entity_id));
-        }
-        ui_state.enter_placement_mode(entity_def_name.clone());
-        let grab_offset = world_pos - entity.position.as_vec2();
-        ui_state.begin_entity_move_drag(EntityMoveDragState {
-            scene_name: active_scene_name,
-            entity,
-            dragged_entities,
+        let grab_offset = world_pos - anchor.position.as_vec2();
+        ui_state.set_selection(crate::ui::editor_ui::Selection::SceneAnchor {
+            scene_name: scene_name.clone(),
+            anchor_id: anchor_id.clone(),
+        });
+        ui_state.begin_scene_anchor_move_drag(SceneAnchorMoveDragState {
+            scene_name,
+            anchor,
             grab_offset,
         });
-        viewport.suppress_entity_rendering_many(
-            ui_state
-                .placement
-                .entity_move_drag
-                .as_ref()
-                .into_iter()
-                .flat_map(|drag| drag.dragged_entities.iter().map(|entity| entity.id)),
-        );
     }
 
     pub fn handle_marquee_drag_start(ui_state: &mut EditorUI, drag_start_pos: egui::Pos2) {
@@ -202,6 +232,16 @@ impl SelectionInteraction {
         config: Option<&EditorConfig>,
     ) {
         let Some(drag_state) = ui_state.placement.entity_move_drag.clone() else {
+            if let Some(anchor_drag_state) = ui_state.placement.scene_anchor_move_drag.clone() {
+                Self::handle_scene_anchor_drag_release(
+                    ui_state,
+                    viewport,
+                    anchor_drag_state,
+                    drop_pos,
+                    rect,
+                    config,
+                );
+            }
             return;
         };
 
@@ -281,6 +321,89 @@ impl SelectionInteraction {
 
         ui_state.exit_placement_mode();
         viewport.clear_suppressed_entity_rendering();
+        viewport.mark_dirty();
+    }
+
+    fn handle_scene_anchor_drag_release(
+        ui_state: &mut EditorUI,
+        viewport: &mut SceneViewport,
+        drag_state: SceneAnchorMoveDragState,
+        drop_pos: Option<egui::Pos2>,
+        rect: egui::Rect,
+        config: Option<&EditorConfig>,
+    ) {
+        let Some(drop_pos) = drop_pos else {
+            tracing::warn!(
+                "Scene anchor drag ended without pointer position - cancelling move for '{}'",
+                drag_state.anchor.id
+            );
+            ui_state.exit_placement_mode();
+            viewport.mark_dirty();
+            return;
+        };
+
+        let display_rect = viewport.display_rect_in(rect);
+        let drop_world_pos = GridInteraction::drag_target_world_position(
+            viewport.screen_to_world_pos_raw(drop_pos, display_rect),
+            drag_state.grab_offset,
+            viewport.tilemap(),
+            config,
+        );
+        let drop_world_pos_i32 = glam::IVec2::new(
+            drop_world_pos.x.floor() as i32,
+            drop_world_pos.y.floor() as i32,
+        );
+
+        let Some(scene_index) = ui_state
+            .scenes
+            .iter()
+            .position(|scene| scene.name == drag_state.scene_name)
+        else {
+            tracing::warn!(
+                "Scene anchor move drag drop failed - scene '{}' no longer present",
+                drag_state.scene_name
+            );
+            ui_state.exit_placement_mode();
+            viewport.mark_dirty();
+            return;
+        };
+
+        let before_scene = ui_state.scenes[scene_index].clone();
+        let Some(anchor_index) = before_scene
+            .anchors
+            .iter()
+            .position(|anchor| anchor.id == drag_state.anchor.id)
+        else {
+            tracing::warn!(
+                "Scene anchor move drag drop failed - anchor '{}' no longer present",
+                drag_state.anchor.id
+            );
+            ui_state.exit_placement_mode();
+            viewport.mark_dirty();
+            return;
+        };
+
+        let mut after_scene = before_scene.clone();
+        after_scene.anchors[anchor_index].position = drop_world_pos_i32;
+
+        if ui_state.execute_command(EditorCommand::update_scene(
+            drag_state.scene_name.clone(),
+            before_scene,
+            after_scene,
+        )) {
+            ui_state.set_selection(crate::ui::editor_ui::Selection::SceneAnchor {
+                scene_name: drag_state.scene_name.clone(),
+                anchor_id: drag_state.anchor.id.clone(),
+            });
+            tracing::info!(
+                "Dropped scene anchor '{}' at ({}, {})",
+                drag_state.anchor.id,
+                drop_world_pos_i32.x,
+                drop_world_pos_i32.y
+            );
+        }
+
+        ui_state.exit_placement_mode();
         viewport.mark_dirty();
     }
 
@@ -387,6 +510,11 @@ impl SelectionInteraction {
     ) -> Option<Entity> {
         let scene = ui_state.scenes.iter().find(|s| s.name == scene_name)?;
         scene.entities.iter().find(|e| e.id == entity_id).cloned()
+    }
+
+    fn find_scene_anchor(ui_state: &EditorUI, scene_name: &str, anchor_id: &str) -> Option<toki_core::scene::SceneAnchor> {
+        let scene = ui_state.scenes.iter().find(|scene| scene.name == scene_name)?;
+        scene.anchors.iter().find(|anchor| anchor.id == anchor_id).cloned()
     }
 
     fn drag_entities_for_start(
