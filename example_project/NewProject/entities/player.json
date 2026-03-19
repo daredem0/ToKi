@@ -15,27 +15,18 @@
     "stats": {
       "attack_power": 8
     },
-    "primary_projectile": {
-      "sheet": "fauna",
-      "object_name": "rock",
-      "size": [
-        16,
-        16
-      ],
-      "speed": 4,
-      "damage": 8,
-      "lifetime_ticks": 20,
-      "spawn_offset": [
-        0,
-        0
-      ]
-    },
-    "speed": 2,
+    "speed": 2.0,
     "solid": true,
     "active": true,
     "can_move": true,
     "ai_behavior": "wander",
     "movement_profile": "player_wasd",
+    "primary_action": {
+      "mode": "melee",
+      "cooldown_ticks": 20,
+      "damage": 8,
+      "sound_id": "sfx_hit2"
+    },
     "has_inventory": true
   },
   "collision": {

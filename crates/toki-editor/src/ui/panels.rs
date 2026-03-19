@@ -28,6 +28,7 @@ mod scene_graph_editors;
 mod scene_graph_layout;
 mod scene_graph_validation;
 mod scene_viewport;
+mod template_editor;
 
 /// Handles panel rendering for the editor (viewport and log panels)
 pub struct PanelSystem;
@@ -85,6 +86,7 @@ impl PanelSystem {
         map_editor_viewport: Option<&mut SceneViewport>,
         project: Option<&mut crate::project::Project>,
         available_map_names: Option<Vec<String>>,
+        template_asset_choices: Option<&crate::ui::template_workflow::TemplateAssetChoices>,
         config: Option<&mut EditorConfig>,
         renderer: Option<&mut egui_wgpu::Renderer>,
     ) {
@@ -115,6 +117,11 @@ impl PanelSystem {
                     CenterPanelTab::MenuEditor,
                     "Menu Editor",
                 );
+                ui.selectable_value(
+                    &mut ui_state.center_panel_tab,
+                    CenterPanelTab::TemplateEditor,
+                    "Templates",
+                );
             });
             ui.separator();
 
@@ -142,6 +149,16 @@ impl PanelSystem {
 
             if ui_state.center_panel_tab == CenterPanelTab::MenuEditor {
                 menu_editor::render_menu_editor(ui, ui_state, project);
+                return;
+            }
+
+            if ui_state.center_panel_tab == CenterPanelTab::TemplateEditor {
+                template_editor::render_template_editor(
+                    ui,
+                    ui_state,
+                    project.as_deref(),
+                    template_asset_choices,
+                );
                 return;
             }
 

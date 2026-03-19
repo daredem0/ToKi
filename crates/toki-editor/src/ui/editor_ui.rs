@@ -2,6 +2,7 @@ use super::inspector::InspectorSystem;
 use super::menus::MenuSystem;
 use super::panels::PanelSystem;
 use super::rule_graph::RuleGraph;
+use super::template_workflow::{TemplateAssetChoices, TemplateEditorState};
 use super::undo_redo::UndoRedoHistory;
 use crate::project::ProjectTemplateKind;
 use crate::project::SceneGraphLayout;
@@ -60,6 +61,7 @@ pub(crate) enum CenterPanelTab {
     SceneRules,
     MapEditor,
     MenuEditor,
+    TemplateEditor,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -141,6 +143,7 @@ pub struct ProjectEditorState {
     pub play_scene_requested: bool,
     pub init_config_requested: bool,
     pub validate_assets_requested: bool,
+    pub rescan_assets_requested: bool,
 
     // New project dialog state
     pub show_new_project_dialog: bool,
@@ -170,6 +173,7 @@ impl Default for ProjectEditorState {
             play_scene_requested: false,
             init_config_requested: false,
             validate_assets_requested: false,
+            rescan_assets_requested: false,
             show_new_project_dialog: false,
             new_project_template: ProjectTemplateKind::Empty,
             new_project_parent_directory: None,
@@ -420,6 +424,8 @@ pub struct EditorUI {
 
     pub command_history: UndoRedoHistory, // Undo/redo command history for scene mutations
 
+    pub template: TemplateEditorState,
+
     // Multi-entity inspector draft state
     pub multi_entity_render_layer_input: i64,
     pub multi_entity_delta_x_input: i32,
@@ -460,6 +466,7 @@ impl EditorUI {
             graph: GraphEditorState::default(),
 
             command_history: UndoRedoHistory::default(),
+            template: TemplateEditorState::default(),
             multi_entity_render_layer_input: 0,
             multi_entity_delta_x_input: 0,
             multi_entity_delta_y_input: 0,
@@ -640,6 +647,7 @@ impl EditorUI {
         map_editor_viewport: Option<&mut SceneViewport>,
         mut project: Option<&mut crate::project::Project>,
         available_map_names: Option<Vec<String>>,
+        template_asset_choices: Option<TemplateAssetChoices>,
         config: Option<&mut crate::config::EditorConfig>,
         log_capture: Option<&crate::logging::LogCapture>,
         renderer: Option<&mut egui_wgpu::Renderer>,
@@ -672,6 +680,7 @@ impl EditorUI {
                 ctx,
                 game_state,
                 project.as_deref_mut(),
+                template_asset_choices.as_ref(),
                 config_readonly,
             );
         }
@@ -688,6 +697,7 @@ impl EditorUI {
             map_editor_viewport,
             project,
             available_map_names,
+            template_asset_choices.as_ref(),
             config,
             renderer,
         );

@@ -1,10 +1,13 @@
 use super::{EditorCommand, EntityPosition, IndexedEntity, UndoRedoHistory};
+use crate::project::Project;
 use crate::project::SceneGraphLayout;
 use crate::ui::rule_graph::RuleGraph;
 use crate::ui::EditorUI;
 use glam::{IVec2, UVec2};
+use tempfile::tempdir;
 use toki_core::entity::{Entity, EntityAttributes, EntityKind};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
+use toki_template_lowering::ProjectFileChange;
 
 fn sample_entity(id: u32, position: IVec2) -> Entity {
     Entity {
@@ -312,6 +315,61 @@ fn remove_entities_command_restores_original_order_on_undo() {
         .map(|entity| entity.id)
         .collect::<Vec<_>>();
     assert_eq!(ids, vec![1, 2, 3]);
+}
+
+#[test]
+fn apply_project_file_changes_command_round_trips_file_contents_and_selection() {
+    let temp = tempdir().expect("temp dir should exist");
+    let project_root = temp.path().to_path_buf();
+    std::fs::create_dir_all(project_root.join("entities")).expect("entities dir should exist");
+    let entity_path = project_root.join("entities/player.json");
+    std::fs::write(&entity_path, "{\n  \"name\": \"before\"\n}\n")
+        .expect("before file should write");
+
+    let mut project = Project::new("TestProject".to_string(), project_root.clone());
+    let mut ui_state = EditorUI::new();
+    ui_state.set_selection(crate::ui::editor_ui::Selection::Scene(
+        "Main Scene".to_string(),
+    ));
+    let mut history = UndoRedoHistory::default();
+
+    let command = EditorCommand::apply_project_file_changes(
+        "apply template entity update",
+        vec![ProjectFileChange {
+            relative_path: std::path::PathBuf::from("entities/player.json"),
+            before_contents: Some("{\n  \"name\": \"before\"\n}\n".to_string()),
+            after_contents: Some("{\n  \"name\": \"after\"\n}\n".to_string()),
+        }],
+        Some(crate::ui::editor_ui::Selection::Scene(
+            "Main Scene".to_string(),
+        )),
+        Some(crate::ui::editor_ui::Selection::EntityDefinition(
+            "player".to_string(),
+        )),
+    );
+
+    assert!(history.execute(command, &mut ui_state, Some(&mut project)));
+    assert_eq!(
+        std::fs::read_to_string(&entity_path).expect("after file should read"),
+        "{\n  \"name\": \"after\"\n}\n"
+    );
+    assert!(matches!(
+        ui_state.selection,
+        Some(crate::ui::editor_ui::Selection::EntityDefinition(ref id)) if id == "player"
+    ));
+    assert!(ui_state.project.rescan_assets_requested);
+
+    ui_state.project.rescan_assets_requested = false;
+    assert!(history.undo(&mut ui_state, Some(&mut project)));
+    assert_eq!(
+        std::fs::read_to_string(&entity_path).expect("before file should read"),
+        "{\n  \"name\": \"before\"\n}\n"
+    );
+    assert!(matches!(
+        ui_state.selection,
+        Some(crate::ui::editor_ui::Selection::Scene(ref id)) if id == "Main Scene"
+    ));
+    assert!(ui_state.project.rescan_assets_requested);
 }
 
 #[test]

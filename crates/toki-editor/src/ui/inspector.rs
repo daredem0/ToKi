@@ -27,6 +27,7 @@ mod map_editor;
 mod menu_editor;
 mod project;
 mod rules;
+mod template_editor;
 
 pub use domain_inspectors::*;
 
@@ -279,6 +280,7 @@ impl InspectorSystem {
         ctx: &egui::Context,
         game_state: Option<&toki_core::GameState>,
         project: Option<&mut Project>,
+        template_asset_choices: Option<&crate::ui::template_workflow::TemplateAssetChoices>,
         config: Option<&EditorConfig>,
     ) {
         egui::SidePanel::right("inspector_panel")
@@ -306,7 +308,13 @@ impl InspectorSystem {
                     .show(ui, |ui| match ui_state.right_panel_tab {
                         super::editor_ui::RightPanelTab::Inspector => {
                             Self::render_selection_inspector_contents(
-                                ui_state, ui, ctx, game_state, project, config,
+                                ui_state,
+                                ui,
+                                ctx,
+                                game_state,
+                                project,
+                                template_asset_choices,
+                                config,
                             );
                         }
                         super::editor_ui::RightPanelTab::Project => {
@@ -322,6 +330,7 @@ impl InspectorSystem {
         ctx: &egui::Context,
         game_state: Option<&toki_core::GameState>,
         project: Option<&mut Project>,
+        template_asset_choices: Option<&crate::ui::template_workflow::TemplateAssetChoices>,
         config: Option<&EditorConfig>,
     ) {
         // Handle special editor modes first
@@ -332,6 +341,11 @@ impl InspectorSystem {
 
         if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::MenuEditor {
             Self::render_menu_editor_inspector(ui_state, ui, project);
+            return;
+        }
+
+        if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::TemplateEditor {
+            Self::render_template_editor_inspector(ui_state, ui, project, template_asset_choices);
             return;
         }
 
@@ -346,6 +360,7 @@ impl InspectorSystem {
             ctx,
             game_state,
             project,
+            template_asset_choices,
             config,
         };
 

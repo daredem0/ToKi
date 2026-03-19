@@ -25,6 +25,7 @@ use crate::rendering::WindowRenderer;
 use crate::scene::viewport::DragPreviewSprite;
 use crate::scene::SceneViewport;
 use crate::ui::editor_ui::{CenterPanelTab, MapEditorDraft};
+use crate::ui::template_workflow::TemplateAssetChoices;
 use crate::ui::EditorUI;
 
 #[path = "editor_app/background_tasks.rs"]
@@ -554,7 +555,8 @@ impl ApplicationHandler for EditorApp {
                         CenterPanelTab::MapEditor => self.viewports.map_editor.as_mut(),
                         CenterPanelTab::SceneGraph
                         | CenterPanelTab::SceneRules
-                        | CenterPanelTab::MenuEditor => None,
+                        | CenterPanelTab::MenuEditor
+                        | CenterPanelTab::TemplateEditor => None,
                     };
                     if let Some(viewport) = active_viewport {
                         tracing::debug!("Passing logical key {:?} to viewport", event.logical_key);
@@ -801,7 +803,8 @@ impl EditorApp {
                     }
                     CenterPanelTab::SceneGraph
                     | CenterPanelTab::SceneRules
-                    | CenterPanelTab::MenuEditor => {}
+                    | CenterPanelTab::MenuEditor
+                    | CenterPanelTab::TemplateEditor => {}
                 }
             } else if self.core.project_manager.current_project.is_some() {
                 tracing::warn!(
@@ -821,6 +824,11 @@ impl EditorApp {
                 names.sort();
                 names
             });
+        let template_asset_choices = self
+            .core
+            .project_manager
+            .get_project_assets()
+            .map(TemplateAssetChoices::from_project_assets);
         let full_output = egui_ctx.run(raw_input, |ctx| {
             // Render UI - viewport will use the pre-rendered texture
             self.core.ui.render(
@@ -829,12 +837,24 @@ impl EditorApp {
                 self.viewports.map_editor.as_mut(),
                 self.core.project_manager.current_project.as_mut(),
                 available_map_names.clone(),
+                template_asset_choices.clone(),
                 Some(&mut self.core.config),
                 self.log_capture.as_ref(),
                 None, // Can't pass renderer due to borrow issues
                 self.resources.busy_logo_texture.as_ref(),
             );
         });
+
+        if self.core.ui.project.rescan_assets_requested {
+            if let Some(project_assets) = self.core.project_manager.project_assets.as_mut() {
+                if let Err(error) = project_assets.scan_assets() {
+                    tracing::error!(
+                        "Failed to rescan project assets after template apply: {error}"
+                    );
+                }
+            }
+            self.core.ui.project.rescan_assets_requested = false;
+        }
 
         // Handle UI requests
         if self.core.ui.visibility.should_exit {

@@ -1,4 +1,4 @@
-use super::editor_ui::EditorUI;
+use super::editor_ui::{EditorUI, Selection};
 use super::rule_graph::RuleGraph;
 use crate::project::Project;
 use crate::project::SceneGraphLayout;
@@ -6,6 +6,9 @@ use glam::IVec2;
 use toki_core::entity::{Entity, EntityId};
 use toki_core::menu::MenuSettings;
 use toki_core::rules::RuleSet;
+use toki_template_lowering::{
+    apply_project_file_changes, revert_project_file_changes, ProjectFileChange,
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct UndoRedoHistory {
@@ -91,6 +94,7 @@ pub enum EditorCommand {
     UpdateEntities(Box<UpdateEntitiesCommand>),
     UpdateSceneRulesGraph(Box<UpdateSceneRulesGraphCommand>),
     UpdateMenuSettings(Box<UpdateMenuSettingsCommand>),
+    ApplyProjectFileChanges(Box<ApplyProjectFileChangesCommand>),
 }
 
 impl EditorCommand {
@@ -159,6 +163,20 @@ impl EditorCommand {
         Self::UpdateMenuSettings(Box::new(UpdateMenuSettingsCommand { before, after }))
     }
 
+    pub fn apply_project_file_changes(
+        description: impl Into<String>,
+        changes: Vec<ProjectFileChange>,
+        selection_before: Option<Selection>,
+        selection_after: Option<Selection>,
+    ) -> Self {
+        Self::ApplyProjectFileChanges(Box::new(ApplyProjectFileChangesCommand {
+            description: description.into(),
+            changes,
+            selection_before,
+            selection_after,
+        }))
+    }
+
     pub fn apply(&self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
         match self {
             Self::AddEntity(command) => command.apply(ui_state),
@@ -167,6 +185,7 @@ impl EditorCommand {
             Self::UpdateEntities(command) => command.apply(ui_state),
             Self::UpdateSceneRulesGraph(command) => command.apply(ui_state),
             Self::UpdateMenuSettings(command) => command.apply(project),
+            Self::ApplyProjectFileChanges(command) => command.apply(ui_state, project),
         }
     }
 
@@ -178,6 +197,7 @@ impl EditorCommand {
             Self::UpdateEntities(command) => command.undo(ui_state),
             Self::UpdateSceneRulesGraph(command) => command.undo(ui_state),
             Self::UpdateMenuSettings(command) => command.undo(project),
+            Self::ApplyProjectFileChanges(command) => command.undo(ui_state, project),
         }
     }
 
@@ -189,8 +209,10 @@ impl EditorCommand {
                 | Self::MoveEntities(_)
                 | Self::UpdateEntities(_)
                 | Self::UpdateSceneRulesGraph(_)
+                | Self::ApplyProjectFileChanges(_)
         ) {
             ui_state.scene_content_changed = true;
+            ui_state.project.rescan_assets_requested = true;
         }
     }
 }
@@ -225,6 +247,14 @@ pub struct UpdateMenuSettingsCommand {
     after: MenuSettings,
 }
 
+#[derive(Debug, Clone)]
+pub struct ApplyProjectFileChangesCommand {
+    description: String,
+    changes: Vec<ProjectFileChange>,
+    selection_before: Option<Selection>,
+    selection_after: Option<Selection>,
+}
+
 impl UpdateMenuSettingsCommand {
     fn apply(&self, project: Option<&mut Project>) -> bool {
         let Some(project) = project else {
@@ -242,6 +272,53 @@ impl UpdateMenuSettingsCommand {
         project.metadata.runtime.menu = self.before.clone();
         mark_project_dirty(project);
         true
+    }
+}
+
+impl ApplyProjectFileChangesCommand {
+    fn apply(&self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
+        let Some(project) = project else {
+            return false;
+        };
+
+        if let Err(error) = apply_project_file_changes(&project.path, &self.changes) {
+            tracing::error!(
+                "Failed to apply project file change command '{}': {}",
+                self.description,
+                error
+            );
+            return false;
+        }
+
+        apply_selection(ui_state, self.selection_after.clone());
+        mark_project_dirty(project);
+        true
+    }
+
+    fn undo(&self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
+        let Some(project) = project else {
+            return false;
+        };
+
+        if let Err(error) = revert_project_file_changes(&project.path, &self.changes) {
+            tracing::error!(
+                "Failed to undo project file change command '{}': {}",
+                self.description,
+                error
+            );
+            return false;
+        }
+
+        apply_selection(ui_state, self.selection_before.clone());
+        mark_project_dirty(project);
+        true
+    }
+}
+
+fn apply_selection(ui_state: &mut EditorUI, selection: Option<Selection>) {
+    match selection {
+        Some(selection) => ui_state.set_selection(selection),
+        None => ui_state.clear_selection(),
     }
 }
 

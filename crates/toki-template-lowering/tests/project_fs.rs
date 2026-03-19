@@ -7,7 +7,10 @@ use toki_core::entity::{
     MovementProfile, MovementSoundTrigger, RenderingDef,
 };
 use toki_template_builtins::BuiltInTemplateRegistry;
-use toki_template_lowering::lower_and_apply_plan_to_project;
+use toki_template_lowering::{
+    apply_project_file_changes, build_project_file_changes, lower_and_apply_plan_to_project,
+    lower_plan_for_project, revert_project_file_changes,
+};
 use toki_templates::{TemplateProvider, TemplateValue};
 
 fn sample_actor_definition() -> EntityDefinition {
@@ -185,4 +188,45 @@ fn lower_and_apply_plan_to_project_surfaces_projectile_lowering_error_without_mu
         reloaded.attributes.primary_projectile,
         actor_definition.attributes.primary_projectile
     );
+}
+
+#[test]
+fn build_project_file_changes_captures_before_and_after_contents_and_reverts_cleanly() {
+    let temp = tempdir().expect("temp dir should exist");
+    let project_root = temp.path();
+    fs::create_dir_all(project_root.join("entities")).expect("entities dir should exist");
+    let actor_definition = sample_actor_definition();
+    let actor_path = project_root.join("entities/player.json");
+    let before_contents =
+        serde_json::to_string_pretty(&actor_definition).expect("actor definition should serialize");
+    fs::write(&actor_path, &before_contents).expect("actor definition should write");
+
+    let lowered = lower_plan_for_project(project_root, &instantiate_melee_attack_plan())
+        .expect("lowering should succeed");
+    let changes = build_project_file_changes(project_root, &lowered)
+        .expect("building file changes should succeed");
+
+    assert_eq!(changes.len(), 1);
+    let change = &changes[0];
+    assert_eq!(
+        change.relative_path,
+        std::path::Path::new("entities/player.json")
+    );
+    assert_eq!(
+        change.before_contents.as_deref(),
+        Some(before_contents.as_str())
+    );
+    let after_contents = change
+        .after_contents
+        .as_deref()
+        .expect("after contents should exist for upsert");
+    assert!(after_contents.contains("\"primary_action\""));
+
+    apply_project_file_changes(project_root, &changes).expect("forward apply should succeed");
+    let applied = fs::read_to_string(&actor_path).expect("applied entity should read");
+    assert_eq!(applied, after_contents);
+
+    revert_project_file_changes(project_root, &changes).expect("revert should succeed");
+    let reverted = fs::read_to_string(&actor_path).expect("reverted entity should read");
+    assert_eq!(reverted, before_contents);
 }

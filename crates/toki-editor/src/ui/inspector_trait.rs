@@ -13,6 +13,8 @@ pub struct InspectorContext<'a> {
     /// The project for inspectors that need to modify project settings.
     #[allow(dead_code)] // Reserved for project settings inspector
     pub project: Option<&'a mut Project>,
+    #[allow(dead_code)] // Reserved for template editor and future schema-driven inspectors
+    pub template_asset_choices: Option<&'a crate::ui::template_workflow::TemplateAssetChoices>,
     pub config: Option<&'a EditorConfig>,
 }
 
