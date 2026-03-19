@@ -48,6 +48,7 @@ pub(super) enum RuleCommand {
     },
     SwitchScene {
         scene_name: String,
+        spawn_point_id: String,
     },
 }
 
@@ -256,9 +257,13 @@ impl GameState {
                     command_buffer.push(RuleCommand::DestroySelf { entity_id });
                 }
             }
-            RuleAction::SwitchScene { scene_name } => {
+            RuleAction::SwitchScene {
+                scene_name,
+                spawn_point_id,
+            } => {
                 command_buffer.push(RuleCommand::SwitchScene {
                     scene_name: scene_name.clone(),
+                    spawn_point_id: spawn_point_id.clone(),
                 });
             }
         }
@@ -310,7 +315,10 @@ impl GameState {
                         self.rule_runtime.velocities.remove(&entity_id);
                     }
                 }
-                RuleCommand::SwitchScene { scene_name } => {
+                RuleCommand::SwitchScene {
+                    scene_name,
+                    spawn_point_id: _,
+                } => {
                     let target = scene_name.trim();
                     if !target.is_empty() && pending_scene_switch.is_none() {
                         pending_scene_switch = Some(target.to_string());

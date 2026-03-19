@@ -15,6 +15,7 @@ pub struct SceneData {
     pub visible_chunks: Vec<(u32, u32)>,
     pub sprites: Vec<SpriteInstance>,
     pub debug_shapes: Vec<DebugShape>,
+    pub overlay_shapes: Vec<OverlayShape>,
 }
 
 /// Sprite instance for rendering
@@ -40,7 +41,23 @@ pub struct DebugShape {
 pub enum DebugShapeType {
     Rectangle,
     Circle,
-    Line { end: glam::Vec2 },
+    Line { end: glam::Vec2, thickness: f32 },
+}
+
+/// Non-debug overlay shape for editor/runtime annotations rendered in the scene pass.
+#[derive(Debug, Clone)]
+pub struct OverlayShape {
+    pub shape_type: OverlayShapeType,
+    pub position: glam::Vec2,
+    pub size: glam::Vec2,
+    pub color: [f32; 4],
+}
+
+#[derive(Debug, Clone)]
+pub enum OverlayShapeType {
+    Rectangle,
+    Circle,
+    Line { end: glam::Vec2, thickness: f32 },
 }
 
 impl Default for SceneData {
@@ -52,6 +69,7 @@ impl Default for SceneData {
             visible_chunks: Vec::new(),
             sprites: Vec::new(),
             debug_shapes: Vec::new(),
+            overlay_shapes: Vec::new(),
         }
     }
 }
@@ -213,6 +231,48 @@ impl SceneRenderer {
         }
     }
 
+    fn add_debug_shape_batch(&mut self, shapes: &[DebugShape]) {
+        for shape in shapes {
+            match shape.shape_type {
+                DebugShapeType::Rectangle => {
+                    self.debug_pipeline.add_rect(
+                        shape.position.x,
+                        shape.position.y,
+                        shape.size.x,
+                        shape.size.y,
+                        shape.color,
+                    );
+                }
+                DebugShapeType::Circle => {}
+                DebugShapeType::Line { end, thickness } => {
+                    self.debug_pipeline
+                        .add_line(shape.position, end, thickness, shape.color);
+                }
+            }
+        }
+    }
+
+    fn add_overlay_shape_batch(&mut self, shapes: &[OverlayShape]) {
+        for shape in shapes {
+            match shape.shape_type {
+                OverlayShapeType::Rectangle => {
+                    self.debug_pipeline.add_rect(
+                        shape.position.x,
+                        shape.position.y,
+                        shape.size.x,
+                        shape.size.y,
+                        shape.color,
+                    );
+                }
+                OverlayShapeType::Circle => {}
+                OverlayShapeType::Line { end, thickness } => {
+                    self.debug_pipeline
+                        .add_line(shape.position, end, thickness, shape.color);
+                }
+            }
+        }
+    }
+
     /// Render scene to any render target with custom projection matrix
     pub fn render_scene_with_projection<T: RenderTarget>(
         &mut self,
@@ -222,10 +282,11 @@ impl SceneRenderer {
     ) -> Result<(), RenderError> {
         tracing::trace!("Starting scene render with custom projection");
         tracing::trace!(
-            "Scene data - tilemap: {}, sprites: {}, debug_shapes: {}",
+            "Scene data - tilemap: {}, sprites: {}, debug_shapes: {}, overlay_shapes: {}",
             scene_data.tilemap.is_some(),
             scene_data.sprites.len(),
-            scene_data.debug_shapes.len()
+            scene_data.debug_shapes.len(),
+            scene_data.overlay_shapes.len()
         );
 
         target.begin_frame()?;
@@ -274,29 +335,14 @@ impl SceneRenderer {
 
         // Add debug shapes
         tracing::trace!(
-            "Adding {} debug shapes to pipeline",
+            "Adding {} debug shapes and {} overlay shapes to pipeline",
             scene_data.debug_shapes.len()
+            ,
+            scene_data.overlay_shapes.len()
         );
         self.debug_pipeline.clear();
-        for debug_shape in &scene_data.debug_shapes {
-            match debug_shape.shape_type {
-                DebugShapeType::Rectangle => {
-                    self.debug_pipeline.add_rect(
-                        debug_shape.position.x,
-                        debug_shape.position.y,
-                        debug_shape.size.x,
-                        debug_shape.size.y,
-                        debug_shape.color,
-                    );
-                }
-                DebugShapeType::Circle => {
-                    // TODO: Add circle support to debug pipeline
-                }
-                DebugShapeType::Line { end: _ } => {
-                    // TODO: Add line support to debug pipeline
-                }
-            }
-        }
+        self.add_debug_shape_batch(&scene_data.debug_shapes);
+        self.add_overlay_shape_batch(&scene_data.overlay_shapes);
 
         // Finalize debug shapes
         tracing::trace!("Finalizing debug shapes");
@@ -358,10 +404,11 @@ impl SceneRenderer {
     ) -> Result<(), RenderError> {
         tracing::trace!("Starting scene render");
         tracing::trace!(
-            "Scene data - tilemap: {}, sprites: {}, debug_shapes: {}",
+            "Scene data - tilemap: {}, sprites: {}, debug_shapes: {}, overlay_shapes: {}",
             scene_data.tilemap.is_some(),
             scene_data.sprites.len(),
-            scene_data.debug_shapes.len()
+            scene_data.debug_shapes.len(),
+            scene_data.overlay_shapes.len()
         );
 
         target.begin_frame()?;
@@ -413,29 +460,14 @@ impl SceneRenderer {
 
         // Add debug shapes
         tracing::trace!(
-            "Adding {} debug shapes to pipeline",
+            "Adding {} debug shapes and {} overlay shapes to pipeline",
             scene_data.debug_shapes.len()
+            ,
+            scene_data.overlay_shapes.len()
         );
         self.debug_pipeline.clear();
-        for debug_shape in &scene_data.debug_shapes {
-            match debug_shape.shape_type {
-                DebugShapeType::Rectangle => {
-                    self.debug_pipeline.add_rect(
-                        debug_shape.position.x,
-                        debug_shape.position.y,
-                        debug_shape.size.x,
-                        debug_shape.size.y,
-                        debug_shape.color,
-                    );
-                }
-                DebugShapeType::Circle => {
-                    // TODO: Add circle support to debug pipeline
-                }
-                DebugShapeType::Line { end: _ } => {
-                    // TODO: Add line support to debug pipeline
-                }
-            }
-        }
+        self.add_debug_shape_batch(&scene_data.debug_shapes);
+        self.add_overlay_shape_batch(&scene_data.overlay_shapes);
 
         // Finalize debug shapes
         tracing::trace!("Finalizing debug shapes");

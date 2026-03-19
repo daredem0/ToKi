@@ -673,9 +673,9 @@ fn apply_config_preserves_non_config_visibility_flags() {
 fn placement_mode_default_is_inactive() {
     let ui = EditorUI::new();
 
-    assert!(!ui.placement.mode);
+    assert!(ui.placement.kind.is_none());
     assert!(!ui.is_in_placement_mode());
-    assert!(ui.placement.entity_definition.is_none());
+    assert!(ui.placement.entity_definition().is_none());
     assert!(ui.placement.preview_position.is_none());
     assert!(ui.placement.preview_cached_frame.is_none());
     assert!(ui.placement.preview_valid.is_none());
@@ -689,9 +689,9 @@ fn enter_placement_mode_sets_mode_and_definition() {
 
     ui.enter_placement_mode("player".to_string());
 
-    assert!(ui.placement.mode);
+    assert!(ui.placement.kind.is_some());
     assert!(ui.is_in_placement_mode());
-    assert_eq!(ui.placement.entity_definition.as_deref(), Some("player"));
+    assert_eq!(ui.placement.entity_definition(), Some("player"));
 }
 
 #[test]
@@ -705,9 +705,9 @@ fn exit_placement_mode_clears_all_placement_state() {
 
     ui.exit_placement_mode();
 
-    assert!(!ui.placement.mode);
+    assert!(ui.placement.kind.is_none());
     assert!(!ui.is_in_placement_mode());
-    assert!(ui.placement.entity_definition.is_none());
+    assert!(ui.placement.entity_definition().is_none());
     assert!(ui.placement.preview_position.is_none());
     assert!(ui.placement.preview_cached_frame.is_none());
     assert!(ui.placement.preview_valid.is_none());

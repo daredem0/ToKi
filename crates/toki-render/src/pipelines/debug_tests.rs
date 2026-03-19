@@ -29,3 +29,18 @@ fn quad_vertices_for_fill_emits_two_triangles() {
     assert_eq!(vertices[0].position, [10.0, 12.0]);
     assert_eq!(vertices[2].position, [30.0, 20.0]);
 }
+
+#[test]
+fn line_vertices_emit_two_triangles_for_thick_segment() {
+    let vertices = DebugPipeline::line_vertices(
+        glam::Vec2::new(0.0, 0.0),
+        glam::Vec2::new(10.0, 0.0),
+        2.0,
+        [0.0, 0.0, 1.0, 1.0],
+    );
+    assert_eq!(vertices.len(), 6);
+    assert!(vertices.iter().any(|v| v.position == [0.0, 1.0]));
+    assert!(vertices.iter().any(|v| v.position == [10.0, 1.0]));
+    assert!(vertices.iter().any(|v| v.position == [10.0, -1.0]));
+    assert!(vertices.iter().any(|v| v.position == [0.0, -1.0]));
+}

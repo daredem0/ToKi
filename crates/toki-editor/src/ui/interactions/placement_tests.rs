@@ -11,6 +11,7 @@ use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
     RenderingDef,
 };
+use toki_core::scene::SceneAnchorKind;
 
 fn sample_entity_definition(name: &str) -> EntityDefinition {
     EntityDefinition {
@@ -167,6 +168,27 @@ fn next_entity_id_uses_max_id_plus_one() {
 }
 
 #[test]
+fn next_scene_anchor_id_uses_kind_prefix_and_skips_existing_ids() {
+    let anchors = vec![
+        toki_core::scene::SceneAnchor {
+            id: "spawn_point_1".to_string(),
+            kind: SceneAnchorKind::SpawnPoint,
+            position: IVec2::new(0, 0),
+            facing: None,
+        },
+        toki_core::scene::SceneAnchor {
+            id: "spawn_point_2".to_string(),
+            kind: SceneAnchorKind::SpawnPoint,
+            position: IVec2::new(16, 0),
+            facing: None,
+        },
+    ];
+
+    let next = PlacementInteraction::next_scene_anchor_id(&anchors, SceneAnchorKind::SpawnPoint);
+    assert_eq!(next, "spawn_point_3");
+}
+
+#[test]
 fn load_entity_definition_succeeds_for_valid_file() {
     let project_dir = unique_temp_project_dir();
     let entity_def = sample_entity_definition("valid_entity");
@@ -304,6 +326,41 @@ fn create_entity_in_scene_blocks_on_solid_terrain_and_keeps_placement_mode() {
     assert_eq!(scene.entities.len(), 0);
     assert!(!ui_state.scene_content_changed);
     assert!(ui_state.is_in_placement_mode());
+}
+
+#[test]
+fn scene_anchor_placement_adds_anchor_and_selects_it() {
+    let mut ui_state = EditorUI::new();
+    ui_state.enter_scene_anchor_placement_mode(crate::ui::editor_ui::SceneAnchorPlacementDraft {
+        kind: SceneAnchorKind::SpawnPoint,
+        suggested_id: "spawn_point_1".to_string(),
+    });
+
+    let placed = PlacementInteraction::try_place_scene_anchor(
+        &mut ui_state,
+        crate::ui::editor_ui::SceneAnchorPlacementDraft {
+            kind: SceneAnchorKind::SpawnPoint,
+            suggested_id: "spawn_point_1".to_string(),
+        },
+        Vec2::new(32.0, 48.0),
+    );
+
+    assert!(placed);
+    let scene = ui_state
+        .scenes
+        .iter()
+        .find(|s| s.name == "Main Scene")
+        .expect("missing default scene");
+    assert_eq!(scene.anchors.len(), 1);
+    assert_eq!(scene.anchors[0].id, "spawn_point_1");
+    assert_eq!(scene.anchors[0].position, IVec2::new(32, 48));
+    assert!(matches!(
+        ui_state.selection,
+        Some(crate::ui::editor_ui::Selection::SceneAnchor {
+            ref scene_name,
+            ref anchor_id
+        }) if scene_name == "Main Scene" && anchor_id == "spawn_point_1"
+    ));
 }
 
 #[test]

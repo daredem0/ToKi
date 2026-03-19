@@ -6,6 +6,7 @@ use glam::IVec2;
 use toki_core::entity::{Entity, EntityId};
 use toki_core::menu::MenuSettings;
 use toki_core::rules::RuleSet;
+use toki_core::Scene;
 
 #[derive(Debug, Clone, Default)]
 pub struct UndoRedoHistory {
@@ -89,6 +90,7 @@ pub enum EditorCommand {
     RemoveEntity(Box<RemoveEntityCommand>),
     MoveEntities(Box<MoveEntitiesCommand>),
     UpdateEntities(Box<UpdateEntitiesCommand>),
+    UpdateScene(Box<UpdateSceneCommand>),
     UpdateSceneRulesGraph(Box<UpdateSceneRulesGraphCommand>),
     UpdateMenuSettings(Box<UpdateMenuSettingsCommand>),
 }
@@ -135,6 +137,14 @@ impl EditorCommand {
         }))
     }
 
+    pub fn update_scene(scene_name: impl Into<String>, before: Scene, after: Scene) -> Self {
+        Self::UpdateScene(Box::new(UpdateSceneCommand {
+            scene_name: scene_name.into(),
+            before,
+            after,
+        }))
+    }
+
     pub fn update_scene_rules_graph(
         scene_name: impl Into<String>,
         before_rule_set: RuleSet,
@@ -165,6 +175,7 @@ impl EditorCommand {
             Self::RemoveEntity(command) => command.apply(ui_state),
             Self::MoveEntities(command) => command.apply(ui_state),
             Self::UpdateEntities(command) => command.apply(ui_state),
+            Self::UpdateScene(command) => command.apply(ui_state),
             Self::UpdateSceneRulesGraph(command) => command.apply(ui_state),
             Self::UpdateMenuSettings(command) => command.apply(project),
         }
@@ -176,6 +187,7 @@ impl EditorCommand {
             Self::RemoveEntity(command) => command.undo(ui_state),
             Self::MoveEntities(command) => command.undo(ui_state),
             Self::UpdateEntities(command) => command.undo(ui_state),
+            Self::UpdateScene(command) => command.undo(ui_state),
             Self::UpdateSceneRulesGraph(command) => command.undo(ui_state),
             Self::UpdateMenuSettings(command) => command.undo(project),
         }
@@ -188,6 +200,7 @@ impl EditorCommand {
                 | Self::RemoveEntity(_)
                 | Self::MoveEntities(_)
                 | Self::UpdateEntities(_)
+                | Self::UpdateScene(_)
                 | Self::UpdateSceneRulesGraph(_)
         ) {
             ui_state.scene_content_changed = true;
@@ -368,6 +381,23 @@ impl UpdateEntitiesCommand {
 }
 
 #[derive(Debug, Clone)]
+pub struct UpdateSceneCommand {
+    scene_name: String,
+    before: Scene,
+    after: Scene,
+}
+
+impl UpdateSceneCommand {
+    fn apply(&self, ui_state: &mut EditorUI) -> bool {
+        apply_scene_snapshot(ui_state, &self.scene_name, &self.after)
+    }
+
+    fn undo(&self, ui_state: &mut EditorUI) -> bool {
+        apply_scene_snapshot(ui_state, &self.scene_name, &self.before)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct UpdateSceneRulesGraphCommand {
     scene_name: String,
     before_rule_set: RuleSet,
@@ -491,6 +521,14 @@ fn apply_scene_rules_graph_snapshot(
         }
     }
     ui_state.graph.layout_dirty = true;
+    true
+}
+
+fn apply_scene_snapshot(ui_state: &mut EditorUI, scene_name: &str, snapshot: &Scene) -> bool {
+    let Some(scene) = scene_mut(ui_state, scene_name) else {
+        return false;
+    };
+    *scene = snapshot.clone();
     true
 }
 

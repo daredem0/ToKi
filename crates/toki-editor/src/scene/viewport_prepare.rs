@@ -9,8 +9,7 @@ impl SceneViewport {
         &mut self,
         project_path: Option<&std::path::Path>,
         project_assets: &ProjectAssets,
-        preview_data: Option<(glam::Vec2, PlacementPreviewVisual, bool)>,
-        drag_preview_data: Option<&[DragPreviewSprite]>,
+        overlay_data: &ViewportOverlayData,
     ) -> SceneData {
         tracing::trace!("Preparing scene data for rendering...");
 
@@ -19,21 +18,34 @@ impl SceneViewport {
         self.prepare_tilemap_data(&mut scene_data, project_path);
         self.prepare_sprite_data(&mut scene_data, project_path, project_assets);
         self.prepare_tilemap_object_data(&mut scene_data, project_path, project_assets);
-        self.prepare_preview_sprite_data(&mut scene_data, preview_data);
+        self.prepare_preview_sprite_data(&mut scene_data, overlay_data.placement_preview.clone());
         self.prepare_drag_preview_sprite_data(
             &mut scene_data,
             project_path,
             project_assets,
-            drag_preview_data,
+            Some(overlay_data.drag_preview_sprites.as_slice()),
+        );
+        self.prepare_overlay_sprite_data(
+            &mut scene_data,
+            Some(overlay_data.overlay_sprites.as_slice()),
+        );
+        self.prepare_overlay_rect_data(
+            &mut scene_data,
+            Some(overlay_data.overlay_rects.as_slice()),
+        );
+        self.prepare_overlay_line_data(
+            &mut scene_data,
+            Some(overlay_data.overlay_lines.as_slice()),
         );
         self.prepare_debug_shapes(&mut scene_data);
 
         tracing::trace!(
-            "Scene data prepared: tilemap={}, atlas={}, sprites={}, debug_shapes={}",
+            "Scene data prepared: tilemap={}, atlas={}, sprites={}, debug_shapes={}, overlay_shapes={}",
             scene_data.tilemap.is_some(),
             scene_data.atlas.is_some(),
             scene_data.sprites.len(),
-            scene_data.debug_shapes.len()
+            scene_data.debug_shapes.len(),
+            scene_data.overlay_shapes.len()
         );
 
         scene_data
@@ -190,13 +202,13 @@ impl SceneViewport {
             [1.0, 0.0, 0.0, 1.0]
         };
 
-        let outline_shape = toki_render::DebugShape {
-            shape_type: toki_render::DebugShapeType::Rectangle,
+        let outline_shape = toki_render::OverlayShape {
+            shape_type: toki_render::OverlayShapeType::Rectangle,
             position: glam::Vec2::new(render_position_i32.x as f32, render_position_i32.y as f32),
             size: glam::Vec2::new(cached_visual.size.x as f32, cached_visual.size.y as f32),
             color: outline_color,
         };
-        scene_data.debug_shapes.push(outline_shape);
+        scene_data.overlay_shapes.push(outline_shape);
     }
 
     pub(super) fn prepare_drag_preview_sprite_data(
@@ -247,14 +259,75 @@ impl SceneViewport {
             } else {
                 [1.0, 0.0, 0.0, 1.0]
             };
-            scene_data.debug_shapes.push(toki_render::DebugShape {
-                shape_type: toki_render::DebugShapeType::Rectangle,
+            scene_data.overlay_shapes.push(toki_render::OverlayShape {
+                shape_type: toki_render::OverlayShapeType::Rectangle,
                 position: glam::Vec2::new(
                     preview.world_position.x as f32,
                     preview.world_position.y as f32,
                 ),
                 size: glam::Vec2::new(entity_size.x as f32, entity_size.y as f32),
                 color: outline_color,
+            });
+        }
+    }
+
+    pub(super) fn prepare_overlay_sprite_data(
+        &mut self,
+        scene_data: &mut SceneData,
+        overlay_sprites: Option<&[OverlaySpriteInstance]>,
+    ) {
+        let Some(overlay_sprites) = overlay_sprites else {
+            return;
+        };
+
+        for sprite in overlay_sprites {
+            scene_data.sprites.push(toki_render::SpriteInstance {
+                frame: sprite.visual.frame,
+                position: sprite.world_position,
+                size: sprite.visual.size,
+                texture_path: sprite.visual.texture_path.clone(),
+                flip_x: false,
+            });
+        }
+    }
+
+    pub(super) fn prepare_overlay_rect_data(
+        &mut self,
+        scene_data: &mut SceneData,
+        overlay_rects: Option<&[OverlayRectInstance]>,
+    ) {
+        let Some(overlay_rects) = overlay_rects else {
+            return;
+        };
+
+        for rect in overlay_rects {
+            scene_data.overlay_shapes.push(toki_render::OverlayShape {
+                shape_type: toki_render::OverlayShapeType::Rectangle,
+                position: rect.position,
+                size: rect.size,
+                color: rect.color,
+            });
+        }
+    }
+
+    pub(super) fn prepare_overlay_line_data(
+        &mut self,
+        scene_data: &mut SceneData,
+        overlay_lines: Option<&[OverlayLineInstance]>,
+    ) {
+        let Some(overlay_lines) = overlay_lines else {
+            return;
+        };
+
+        for line in overlay_lines {
+            scene_data.overlay_shapes.push(toki_render::OverlayShape {
+                shape_type: toki_render::OverlayShapeType::Line {
+                    end: line.end,
+                    thickness: line.thickness,
+                },
+                position: line.start,
+                size: glam::Vec2::ZERO,
+                color: line.color,
             });
         }
     }

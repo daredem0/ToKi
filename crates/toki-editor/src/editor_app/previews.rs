@@ -1,8 +1,88 @@
 use super::*;
+use crate::config::EditorConfig;
 use crate::ui::editor_ui::PlacementPreviewVisual;
+use crate::ui::interactions::GridInteraction;
 use toki_core::project_assets::normalize_asset_name;
 
 impl EditorApp {
+    fn scene_anchor_cross_lines(
+        world_position: glam::Vec2,
+        tilemap: Option<&toki_core::assets::tilemap::TileMap>,
+        config: Option<&EditorConfig>,
+        color: [f32; 4],
+    ) -> Vec<crate::scene::viewport::OverlayLineInstance> {
+        let pose = GridInteraction::placement_pose(world_position, tilemap, config);
+        let Some(size) = GridInteraction::effective_grid_size(tilemap, config) else {
+            return Vec::new();
+        };
+        let origin = pose.world_origin;
+        let size = size.as_vec2();
+        let top_left = origin;
+        let top_right = origin + glam::Vec2::new(size.x, 0.0);
+        let bottom_left = origin + glam::Vec2::new(0.0, size.y);
+        let bottom_right = origin + size;
+
+        vec![
+            crate::scene::viewport::OverlayLineInstance {
+                start: top_left,
+                end: bottom_right,
+                thickness: 1.0,
+                color,
+            },
+            crate::scene::viewport::OverlayLineInstance {
+                start: top_right,
+                end: bottom_left,
+                thickness: 1.0,
+                color,
+            },
+        ]
+    }
+
+    pub(super) fn build_scene_anchor_overlay_lines(
+        ui_state: &crate::ui::EditorUI,
+        tilemap: Option<&toki_core::assets::tilemap::TileMap>,
+        config: Option<&EditorConfig>,
+    ) -> Vec<crate::scene::viewport::OverlayLineInstance> {
+        let Some(active_scene_name) = ui_state.active_scene.as_ref() else {
+            return Vec::new();
+        };
+        let Some(scene) = ui_state
+            .scenes
+            .iter()
+            .find(|scene| &scene.name == active_scene_name)
+        else {
+            return Vec::new();
+        };
+        let mut lines = Vec::new();
+
+        for anchor in &scene.anchors {
+            lines.extend(Self::scene_anchor_cross_lines(
+                anchor.position.as_vec2(),
+                tilemap,
+                config,
+                [0.1882, 0.5176, 1.0, 1.0],
+            ));
+        }
+
+        if ui_state.placement.scene_anchor_draft().is_some() {
+            if let Some(preview_position) = ui_state.placement.preview_position {
+                let color = if ui_state.placement.preview_valid.unwrap_or(true) {
+                    [0.1882, 0.5176, 1.0, 1.0]
+                } else {
+                    [1.0, 0.0, 0.0, 1.0]
+                };
+                lines.extend(Self::scene_anchor_cross_lines(
+                    preview_position,
+                    tilemap,
+                    config,
+                    color,
+                ));
+            }
+        }
+
+        lines
+    }
+
     pub(super) fn load_preview_sprite_frame_static(
         entity_def_name: &str,
         project_path: &std::path::Path,

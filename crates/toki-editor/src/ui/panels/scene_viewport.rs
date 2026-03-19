@@ -114,6 +114,7 @@ impl PanelSystem {
                         viewport,
                         click_pos,
                         rect,
+                        config.as_deref(),
                         ctrl_pressed,
                     );
                 }

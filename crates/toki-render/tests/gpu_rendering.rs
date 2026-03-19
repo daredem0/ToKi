@@ -132,12 +132,14 @@ fn build_scene_data(visible_chunks: Vec<(u32, u32)>) -> SceneData {
             DebugShape {
                 shape_type: DebugShapeType::Line {
                     end: Vec2::new(8.0, 8.0),
+                    thickness: 1.0,
                 },
                 position: Vec2::new(1.0, 1.0),
                 size: Vec2::new(0.0, 0.0),
                 color: [0.0, 0.0, 1.0, 1.0],
             },
         ],
+        overlay_shapes: vec![],
     }
 }
 

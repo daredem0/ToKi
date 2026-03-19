@@ -17,6 +17,7 @@ use toki_core::rules::{
     Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
     RuleTarget, RuleTrigger,
 };
+use toki_core::scene::{SceneAnchor, SceneAnchorKind};
 use toki_core::Scene;
 
 fn sample_entity_with_id(id: u32) -> toki_core::entity::Entity {
@@ -764,7 +765,10 @@ fn add_remove_and_switch_action_types() {
     ));
     assert!(matches!(
         rule.actions[6],
-        RuleAction::SwitchScene { ref scene_name } if scene_name.is_empty()
+        RuleAction::SwitchScene {
+            ref scene_name,
+            ref spawn_point_id
+        } if scene_name.is_empty() && spawn_point_id.is_empty()
     ));
 
     InspectorSystem::switch_action_kind(&mut rule.actions[0], RuleActionKind::SetVelocity);
@@ -870,6 +874,7 @@ fn validate_rule_set_reports_duplicate_ids_and_invalid_action_payloads() {
         conditions: vec![RuleCondition::Always],
         actions: vec![RuleAction::SwitchScene {
             scene_name: "   ".to_string(),
+            spawn_point_id: "   ".to_string(),
         }],
     };
 
@@ -896,6 +901,9 @@ fn validate_rule_set_reports_duplicate_ids_and_invalid_action_payloads() {
     assert!(issues
         .iter()
         .any(|issue| issue.message.contains("SwitchScene requires a scene name")));
+    assert!(issues
+        .iter()
+        .any(|issue| issue.message.contains("SwitchScene requires a spawn point id")));
 }
 
 #[test]
@@ -918,6 +926,47 @@ fn validate_rule_set_reports_empty_play_music_track() {
     assert!(issues.iter().any(|issue| issue
         .message
         .contains("PlayMusic requires a non-empty track id")));
+}
+
+#[test]
+fn validate_rule_set_for_scene_reports_invalid_switch_scene_targets() {
+    let mut target_scene = Scene::new("Target Scene".to_string());
+    target_scene.add_anchor(SceneAnchor {
+        id: "valid_spawn".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(64, 32),
+        facing: None,
+    });
+
+    let scenes = vec![Scene::new("Main Scene".to_string()), target_scene];
+    let rules = RuleSet {
+        rules: vec![Rule {
+            id: "switch_rule".to_string(),
+            enabled: true,
+            priority: 0,
+            once: false,
+            trigger: RuleTrigger::OnTrigger,
+            conditions: vec![RuleCondition::Always],
+            actions: vec![
+                RuleAction::SwitchScene {
+                    scene_name: "Missing Scene".to_string(),
+                    spawn_point_id: "spawn_a".to_string(),
+                },
+                RuleAction::SwitchScene {
+                    scene_name: "Target Scene".to_string(),
+                    spawn_point_id: "missing_spawn".to_string(),
+                },
+            ],
+        }],
+    };
+
+    let issues = InspectorSystem::validate_rule_set_for_scene(&rules, "Main Scene", &scenes);
+    assert!(issues
+        .iter()
+        .any(|issue| issue.message.contains("SwitchScene target scene 'Missing Scene' does not exist")));
+    assert!(issues
+        .iter()
+        .any(|issue| issue.message.contains("SwitchScene target spawn point 'missing_spawn' does not exist in scene 'Target Scene'")));
 }
 
 #[test]

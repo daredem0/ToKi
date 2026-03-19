@@ -80,6 +80,7 @@ pub enum RuleAction {
     /// Runtime placeholder until scene-switch plumbing is integrated end-to-end.
     SwitchScene {
         scene_name: String,
+        spawn_point_id: String,
     },
 }
 

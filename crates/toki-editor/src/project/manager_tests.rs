@@ -162,6 +162,8 @@ fn scene_json_roundtrip_through_editor_persists_rules_and_executes_in_runtime() 
         },
         camera_position: None,
         camera_scale: None,
+        background_music_track_id: None,
+        anchors: Vec::new(),
     };
 
     let scene_path = project_path.join("scenes").join("main.json");

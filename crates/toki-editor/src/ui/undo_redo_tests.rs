@@ -5,6 +5,7 @@ use crate::ui::EditorUI;
 use glam::{IVec2, UVec2};
 use toki_core::entity::{Entity, EntityAttributes, EntityKind};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
+use toki_core::scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind};
 
 fn sample_entity(id: u32, position: IVec2) -> Entity {
     Entity {
@@ -118,6 +119,15 @@ fn main_scene_entities(ui_state: &EditorUI) -> Vec<Entity> {
         .find(|scene| scene.name == "Main Scene")
         .expect("main scene should exist")
         .entities
+        .clone()
+}
+
+fn main_scene(ui_state: &EditorUI) -> toki_core::Scene {
+    ui_state
+        .scenes
+        .iter()
+        .find(|scene| scene.name == "Main Scene")
+        .expect("main scene should exist")
         .clone()
 }
 
@@ -397,6 +407,40 @@ fn update_scene_rules_graph_command_round_trips_rules_graph_and_layout() {
     assert_eq!(scene.rules, before_rule_set);
     assert!(ui_state.rule_graph_for_scene("Main Scene").is_none());
     assert!(!ui_state.graph.layouts_by_scene.contains_key("Main Scene"));
+}
+
+#[test]
+fn update_scene_command_round_trips_scene_metadata_and_anchors() {
+    let mut ui_state = EditorUI::new();
+    let mut history = UndoRedoHistory::default();
+
+    let before = main_scene(&ui_state);
+    let mut after = before.clone();
+    after.background_music_track_id = Some("lavandia".to_string());
+    after.anchors.push(SceneAnchor {
+        id: "from_forest".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(64, 96),
+        facing: Some(SceneAnchorFacing::Left),
+    });
+
+    let command = EditorCommand::update_scene("Main Scene", before.clone(), after.clone());
+    assert!(history.execute(command, &mut ui_state, None));
+
+    let updated = main_scene(&ui_state);
+    assert_eq!(updated.background_music_track_id, Some("lavandia".to_string()));
+    assert_eq!(updated.anchors.len(), 1);
+    assert_eq!(updated.anchors[0].id, "from_forest");
+
+    assert!(history.undo(&mut ui_state, None));
+    let restored = main_scene(&ui_state);
+    assert_eq!(restored.background_music_track_id, before.background_music_track_id);
+    assert!(restored.anchors.is_empty());
+
+    assert!(history.redo(&mut ui_state, None));
+    let redone = main_scene(&ui_state);
+    assert_eq!(redone.background_music_track_id, Some("lavandia".to_string()));
+    assert_eq!(redone.anchors.len(), 1);
 }
 
 #[test]

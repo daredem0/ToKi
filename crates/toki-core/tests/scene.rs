@@ -4,7 +4,7 @@ use toki_core::entity::{
     AiBehavior, ControlRole, Entity, EntityAttributes, EntityKind, MovementProfile,
 };
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
-use toki_core::scene::Scene;
+use toki_core::scene::{Scene, SceneAnchor, SceneAnchorFacing, SceneAnchorKind};
 
 fn create_test_entity(id: u32, position: IVec2) -> Entity {
     let mut controller = AnimationController::new();
@@ -62,6 +62,8 @@ fn test_scene_new() {
     assert!(scene.rules.rules.is_empty());
     assert!(scene.camera_position.is_none());
     assert!(scene.camera_scale.is_none());
+    assert!(scene.background_music_track_id.is_none());
+    assert!(scene.anchors.is_empty());
 }
 
 #[test]
@@ -76,6 +78,8 @@ fn test_scene_with_maps() {
     assert!(scene.rules.rules.is_empty());
     assert!(scene.camera_position.is_none());
     assert!(scene.camera_scale.is_none());
+    assert!(scene.background_music_track_id.is_none());
+    assert!(scene.anchors.is_empty());
 }
 
 #[test]
@@ -225,6 +229,13 @@ fn test_scene_serialization() {
     scene.add_map("test_map".to_string());
     scene.camera_position = Some(IVec2::new(100, 200));
     scene.camera_scale = Some(2);
+    scene.background_music_track_id = Some("lavandia".to_string());
+    scene.add_anchor(SceneAnchor {
+        id: "from_forest".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(128, 96),
+        facing: Some(SceneAnchorFacing::Right),
+    });
 
     let entity = create_test_entity(1, IVec2::new(50, 75));
     scene.add_entity(entity);
@@ -239,6 +250,11 @@ fn test_scene_serialization() {
     assert_eq!(scene.maps, deserialized.maps);
     assert_eq!(scene.camera_position, deserialized.camera_position);
     assert_eq!(scene.camera_scale, deserialized.camera_scale);
+    assert_eq!(
+        scene.background_music_track_id,
+        deserialized.background_music_track_id
+    );
+    assert_eq!(scene.anchors, deserialized.anchors);
     assert_eq!(scene.entities.len(), deserialized.entities.len());
     assert_eq!(scene.entities[0].id, deserialized.entities[0].id);
     assert_eq!(
@@ -298,6 +314,38 @@ fn test_scene_with_camera_settings() {
 
     assert_eq!(scene.camera_position, deserialized.camera_position);
     assert_eq!(scene.camera_scale, deserialized.camera_scale);
+}
+
+#[test]
+fn test_scene_anchor_management() {
+    let mut scene = Scene::new("anchor_scene".to_string());
+    let anchor = SceneAnchor {
+        id: "from_cave".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(64, 48),
+        facing: Some(SceneAnchorFacing::Up),
+    };
+
+    scene.add_anchor(anchor.clone());
+
+    assert_eq!(scene.anchors.len(), 1);
+    assert_eq!(scene.get_anchor("from_cave"), Some(&anchor));
+
+    let anchor_mut = scene
+        .get_anchor_mut("from_cave")
+        .expect("anchor should be editable");
+    anchor_mut.position = IVec2::new(80, 64);
+
+    assert_eq!(
+        scene
+            .get_anchor("from_cave")
+            .expect("anchor should still exist")
+            .position,
+        IVec2::new(80, 64)
+    );
+
+    assert!(scene.remove_anchor("from_cave"));
+    assert!(scene.anchors.is_empty());
 }
 
 #[test]

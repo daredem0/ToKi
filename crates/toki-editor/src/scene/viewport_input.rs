@@ -1,4 +1,5 @@
 use super::*;
+use crate::scene::viewport::viewport_math::compute_display_rect;
 
 impl SceneViewport {
     #[allow(dead_code)]
@@ -113,6 +114,28 @@ impl SceneViewport {
         display_rect: egui::Rect,
     ) -> glam::Vec2 {
         self.screen_to_world_pos_raw(screen_pos, display_rect)
+    }
+
+    pub fn display_rect_in(&self, outer_rect: egui::Rect) -> egui::Rect {
+        compute_display_rect(
+            outer_rect,
+            self.viewport_size,
+            self.sizing_mode == ViewportSizingMode::Responsive,
+        )
+    }
+
+    pub fn world_to_screen_pos(
+        &self,
+        world_pos: glam::Vec2,
+        display_rect: egui::Rect,
+    ) -> egui::Pos2 {
+        world_to_screen_from_camera(
+            world_pos,
+            display_rect,
+            self.viewport_size,
+            self.camera.position,
+            self.effective_camera_scale(),
+        )
     }
 
     pub fn start_camera_drag(&mut self, mouse_pos: glam::Vec2) {

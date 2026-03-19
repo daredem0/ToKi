@@ -3,6 +3,27 @@ use serde::{Deserialize, Serialize};
 use crate::entity::{Entity, EntityId};
 use crate::rules::RuleSet;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SceneAnchorKind {
+    SpawnPoint,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SceneAnchorFacing {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SceneAnchor {
+    pub id: String,
+    pub kind: SceneAnchorKind,
+    pub position: glam::IVec2,
+    pub facing: Option<SceneAnchorFacing>,
+}
+
 /// Represents a game scene - a complete game environment with entities, maps, and metadata.
 ///
 /// A scene is a self-contained game environment that can be loaded, saved, and edited.
@@ -27,6 +48,14 @@ pub struct Scene {
     /// Scene-specific camera settings (optional override)
     pub camera_position: Option<glam::IVec2>,
     pub camera_scale: Option<u32>,
+
+    /// Optional background music track id for this scene.
+    #[serde(default)]
+    pub background_music_track_id: Option<String>,
+
+    /// Placeable authored scene anchors such as spawn points.
+    #[serde(default)]
+    pub anchors: Vec<SceneAnchor>,
 }
 
 impl Scene {
@@ -40,6 +69,8 @@ impl Scene {
             rules: RuleSet::default(),
             camera_position: None,
             camera_scale: None,
+            background_music_track_id: None,
+            anchors: Vec::new(),
         }
     }
 
@@ -53,6 +84,8 @@ impl Scene {
             rules: RuleSet::default(),
             camera_position: None,
             camera_scale: None,
+            background_music_track_id: None,
+            anchors: Vec::new(),
         }
     }
 
@@ -97,5 +130,29 @@ impl Scene {
     /// Check if this scene has a specific map
     pub fn has_map(&self, map_name: &str) -> bool {
         self.maps.contains(&map_name.to_string())
+    }
+
+    /// Add a scene anchor.
+    pub fn add_anchor(&mut self, anchor: SceneAnchor) {
+        self.anchors.push(anchor);
+    }
+
+    /// Remove an anchor by id.
+    pub fn remove_anchor(&mut self, anchor_id: &str) -> bool {
+        let initial_len = self.anchors.len();
+        self.anchors.retain(|anchor| anchor.id != anchor_id);
+        self.anchors.len() != initial_len
+    }
+
+    /// Get an anchor by id.
+    pub fn get_anchor(&self, anchor_id: &str) -> Option<&SceneAnchor> {
+        self.anchors.iter().find(|anchor| anchor.id == anchor_id)
+    }
+
+    /// Get a mutable anchor by id.
+    pub fn get_anchor_mut(&mut self, anchor_id: &str) -> Option<&mut SceneAnchor> {
+        self.anchors
+            .iter_mut()
+            .find(|anchor| anchor.id == anchor_id)
     }
 }

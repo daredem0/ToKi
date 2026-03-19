@@ -133,6 +133,14 @@ impl InspectorSystem {
     }
 
     pub(in super::super) fn validate_rule_set(rule_set: &RuleSet) -> Vec<RuleValidationIssue> {
+        Self::validate_rule_set_for_scene(rule_set, "", &[])
+    }
+
+    pub(in super::super) fn validate_rule_set_for_scene(
+        rule_set: &RuleSet,
+        _current_scene_name: &str,
+        scenes: &[toki_core::Scene],
+    ) -> Vec<RuleValidationIssue> {
         let mut issues = Vec::new();
 
         let mut id_to_indices: HashMap<&str, Vec<usize>> = HashMap::new();
@@ -232,7 +240,10 @@ impl InspectorSystem {
                             }
                         }
                     }
-                    RuleAction::SwitchScene { scene_name } => {
+                    RuleAction::SwitchScene {
+                        scene_name,
+                        spawn_point_id,
+                    } => {
                         if scene_name.trim().is_empty() {
                             issues.push(RuleValidationIssue {
                                 rule_index,
@@ -240,12 +251,137 @@ impl InspectorSystem {
                                 message: "SwitchScene requires a scene name".to_string(),
                             });
                         }
+                        if spawn_point_id.trim().is_empty() {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "SwitchScene requires a spawn point id".to_string(),
+                            });
+                        }
+                        if !scenes.is_empty() && !scene_name.trim().is_empty() {
+                            let Some(target_scene) =
+                                scenes.iter().find(|scene| scene.name == scene_name.trim())
+                            else {
+                                issues.push(RuleValidationIssue {
+                                    rule_index,
+                                    action_index: Some(action_index),
+                                    message: format!(
+                                        "SwitchScene target scene '{}' does not exist",
+                                        scene_name.trim()
+                                    ),
+                                });
+                                continue;
+                            };
+
+                            if !spawn_point_id.trim().is_empty()
+                                && target_scene
+                                    .anchors
+                                    .iter()
+                                    .filter(|anchor| {
+                                        matches!(
+                                            anchor.kind,
+                                            toki_core::scene::SceneAnchorKind::SpawnPoint
+                                        )
+                                    })
+                                    .all(|anchor| anchor.id != spawn_point_id.trim())
+                            {
+                                issues.push(RuleValidationIssue {
+                                    rule_index,
+                                    action_index: Some(action_index),
+                                    message: format!(
+                                        "SwitchScene target spawn point '{}' does not exist in scene '{}'",
+                                        spawn_point_id.trim(),
+                                        target_scene.name
+                                    ),
+                                });
+                            }
+                        }
                     }
                 }
             }
         }
 
         issues
+    }
+
+    pub(in super::super) fn scene_switch_target_scene_names(
+        scenes: &[toki_core::Scene],
+    ) -> Vec<String> {
+        let mut names = scenes.iter().map(|scene| scene.name.clone()).collect::<Vec<_>>();
+        names.sort();
+        names
+    }
+
+    pub(in super::super) fn scene_switch_spawn_point_ids(
+        scenes: &[toki_core::Scene],
+        target_scene_name: &str,
+    ) -> Vec<String> {
+        let Some(scene) = scenes.iter().find(|scene| scene.name == target_scene_name) else {
+            return Vec::new();
+        };
+        let mut ids = scene
+            .anchors
+            .iter()
+            .filter(|anchor| {
+                matches!(anchor.kind, toki_core::scene::SceneAnchorKind::SpawnPoint)
+            })
+            .map(|anchor| anchor.id.clone())
+            .collect::<Vec<_>>();
+        ids.sort();
+        ids
+    }
+
+    pub(in super::super) fn render_switch_scene_editor(
+        ui: &mut egui::Ui,
+        id_salt: impl std::hash::Hash,
+        scene_name: &mut String,
+        spawn_point_id: &mut String,
+        scenes: &[toki_core::Scene],
+    ) -> bool {
+        let mut changed = false;
+        let scene_names = Self::scene_switch_target_scene_names(scenes);
+        ui.horizontal(|ui| {
+            ui.label("Scene:");
+            egui::ComboBox::from_id_salt((&id_salt, "scene"))
+                .selected_text(if scene_name.is_empty() {
+                    "<select scene>"
+                } else {
+                    scene_name.as_str()
+                })
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(scene_name, String::new(), "<select scene>")
+                        .changed();
+                    for candidate in &scene_names {
+                        changed |= ui
+                            .selectable_value(scene_name, candidate.clone(), candidate)
+                            .changed();
+                    }
+                });
+        });
+
+        let spawn_ids = Self::scene_switch_spawn_point_ids(scenes, scene_name);
+        ui.horizontal(|ui| {
+            ui.label("Spawn Point:");
+            egui::ComboBox::from_id_salt((&id_salt, "spawn"))
+                .selected_text(if spawn_point_id.is_empty() {
+                    "<select spawn>"
+                } else {
+                    spawn_point_id.as_str()
+                })
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(spawn_point_id, String::new(), "<select spawn>")
+                        .changed();
+                    for candidate in &spawn_ids {
+                        changed |= ui
+                            .selectable_value(spawn_point_id, candidate.clone(), candidate)
+                            .changed();
+                    }
+                });
+        });
+
+        changed
     }
 
     pub(in super::super) fn default_action(action_kind: RuleActionKind) -> RuleAction {
@@ -274,6 +410,7 @@ impl InspectorSystem {
             },
             RuleActionKind::SwitchScene => RuleAction::SwitchScene {
                 scene_name: String::new(),
+                spawn_point_id: String::new(),
             },
         }
     }

@@ -47,9 +47,45 @@
     "camera_scale": {
       "type": ["number", "null"],
       "description": "Optional camera scale factor"
+    },
+    "background_music_track_id": {
+      "type": ["string", "null"],
+      "description": "Optional background music track id for this scene"
+    },
+    "anchors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/sceneAnchor"
+      },
+      "description": "Authored scene anchors such as spawn points"
     }
   },
   "definitions": {
+    "sceneAnchor": {
+      "type": "object",
+      "required": ["id", "kind", "position"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["SpawnPoint"]
+        },
+        "position": {
+          "type": "array",
+          "items": {"type": "integer"},
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "facing": {
+          "type": ["string", "null"],
+          "enum": ["Up", "Down", "Left", "Right", null]
+        }
+      }
+    },
     "ruleSet": {
       "type": "object",
       "required": ["rules"],
@@ -375,10 +411,14 @@
           "properties": {
             "SwitchScene": {
               "type": "object",
-              "required": ["scene_name"],
+              "required": ["scene_name", "spawn_point_id"],
               "additionalProperties": false,
               "properties": {
                 "scene_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "spawn_point_id": {
                   "type": "string",
                   "minLength": 1
                 }

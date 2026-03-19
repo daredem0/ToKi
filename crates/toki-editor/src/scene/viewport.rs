@@ -22,7 +22,7 @@ mod viewport_ui;
 
 use viewport_math::{
     next_zoom_in_scale, next_zoom_out_scale, point_in_entity_bounds, request_viewport_size_state,
-    screen_to_world_from_camera, world_to_i32_floor,
+    screen_to_world_from_camera, world_to_i32_floor, world_to_screen_from_camera,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -30,6 +30,36 @@ pub struct DragPreviewSprite {
     pub entity_id: toki_core::entity::EntityId,
     pub world_position: glam::IVec2,
     pub is_valid: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct OverlaySpriteInstance {
+    pub world_position: glam::IVec2,
+    pub visual: PlacementPreviewVisual,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct OverlayRectInstance {
+    pub position: glam::Vec2,
+    pub size: glam::Vec2,
+    pub color: [f32; 4],
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct OverlayLineInstance {
+    pub start: glam::Vec2,
+    pub end: glam::Vec2,
+    pub thickness: f32,
+    pub color: [f32; 4],
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ViewportOverlayData {
+    pub placement_preview: Option<(glam::Vec2, PlacementPreviewVisual, bool)>,
+    pub drag_preview_sprites: Vec<DragPreviewSprite>,
+    pub overlay_sprites: Vec<OverlaySpriteInstance>,
+    pub overlay_rects: Vec<OverlayRectInstance>,
+    pub overlay_lines: Vec<OverlayLineInstance>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -281,8 +311,7 @@ impl SceneViewport {
         project_path: &std::path::Path,
         project_assets: &ProjectAssets,
         renderer: &mut egui_wgpu::Renderer,
-        preview_data: Option<(glam::Vec2, PlacementPreviewVisual, bool)>,
-        drag_preview_data: Option<&[DragPreviewSprite]>,
+        overlay_data: &ViewportOverlayData,
     ) -> Result<()> {
         if !self.is_initialized {
             return Ok(()); // Skip if not initialized
@@ -301,8 +330,7 @@ impl SceneViewport {
         let scene_data = self.prepare_scene_data(
             Some(project_path),
             project_assets,
-            preview_data,
-            drag_preview_data,
+            overlay_data,
         );
 
         // Render to offscreen target

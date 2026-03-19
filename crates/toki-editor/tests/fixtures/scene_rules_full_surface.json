@@ -132,7 +132,8 @@
         "actions": [
           {
             "SwitchScene": {
-              "scene_name": "BossRoom"
+              "scene_name": "BossRoom",
+              "spawn_point_id": "boss_entry"
             }
           }
         ]

@@ -116,3 +116,77 @@ fn drag_target_world_position_keeps_unsnapped_anchored_world_when_snap_disabled(
     );
     assert_eq!(target, Vec2::new(32.3, 16.6));
 }
+
+#[test]
+fn scene_anchor_marker_world_position_uses_grid_cell_center_when_snap_enabled() {
+    let mut config = EditorConfig::default();
+    config.editor_settings.grid = GridSettings {
+        show_grid: true,
+        grid_size: [16, 16],
+        snap_to_grid: true,
+    };
+
+    let marker = GridInteraction::placement_pose(
+        Vec2::new(32.0, 48.0),
+        None,
+        Some(&config),
+    )
+    .marker_world;
+
+    assert_eq!(marker, Vec2::new(40.0, 56.0));
+}
+
+#[test]
+fn placement_pose_uses_shared_origin_and_marker_for_snapped_placement() {
+    let mut config = EditorConfig::default();
+    config.editor_settings.grid = GridSettings {
+        show_grid: true,
+        grid_size: [16, 16],
+        snap_to_grid: true,
+    };
+
+    let pose = GridInteraction::placement_pose(Vec2::new(39.5, 55.9), None, Some(&config));
+
+    assert_eq!(pose.world_origin, Vec2::new(32.0, 48.0));
+    assert_eq!(pose.marker_world, Vec2::new(40.0, 56.0));
+    assert_eq!(pose.snapped_cell_size, Some(UVec2::new(16, 16)));
+}
+
+#[test]
+fn scene_anchor_marker_world_position_prefers_tilemap_cell_center() {
+    let mut config = EditorConfig::default();
+    config.editor_settings.grid = GridSettings {
+        show_grid: true,
+        grid_size: [32, 32],
+        snap_to_grid: true,
+    };
+    let tilemap = sample_tilemap(UVec2::new(16, 24));
+
+    let marker = GridInteraction::placement_pose(
+        Vec2::new(32.0, 48.0),
+        Some(&tilemap),
+        Some(&config),
+    )
+    .marker_world;
+
+    assert_eq!(marker, Vec2::new(40.0, 60.0));
+}
+
+#[test]
+fn scene_anchor_marker_world_position_keeps_raw_position_when_snap_disabled() {
+    let mut config = EditorConfig::default();
+    config.editor_settings.grid = GridSettings {
+        show_grid: true,
+        grid_size: [16, 16],
+        snap_to_grid: false,
+    };
+
+    let marker = GridInteraction::placement_pose(
+        Vec2::new(32.0, 48.0),
+        None,
+        Some(&config),
+    )
+    .marker_world;
+
+    assert_eq!(marker, Vec2::new(32.0, 48.0));
+}

@@ -13,6 +13,8 @@ use toki_core::entity::{
     EntityDefinition, EntityKind, MovementProfile, MovementSoundTrigger, PickupDef, RenderingDef,
     StaticObjectRenderDef,
 };
+use toki_core::scene::{SceneAnchor, SceneAnchorKind};
+use toki_core::Scene;
 use winit::keyboard::ModifiersState;
 
 #[test]
@@ -451,6 +453,66 @@ fn load_preview_sprite_frame_static_supports_object_sheet_backed_entities() {
 
     assert_eq!(preview.size, UVec2::new(16, 16));
     assert!(preview.texture_path.is_some());
+}
+
+#[test]
+fn build_scene_anchor_overlay_lines_use_grid_sized_crossmark() {
+    let mut config = crate::config::EditorConfig::default();
+    config.editor_settings.grid.grid_size = [24, 32];
+    config.editor_settings.grid.snap_to_grid = true;
+
+    let mut ui_state = crate::ui::EditorUI::new();
+    let mut scene = Scene::new("Main Scene".to_string());
+    scene.anchors.push(SceneAnchor {
+        id: "spawn_point_1".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(48, 64),
+        facing: None,
+    });
+    ui_state.scenes = vec![scene];
+    ui_state.active_scene = Some("Main Scene".to_string());
+
+    let lines = EditorApp::build_scene_anchor_overlay_lines(&ui_state, None, Some(&config));
+
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[0].start, glam::Vec2::new(48.0, 64.0));
+    assert_eq!(lines[0].end, glam::Vec2::new(72.0, 96.0));
+    assert_eq!(lines[1].start, glam::Vec2::new(72.0, 64.0));
+    assert_eq!(lines[1].end, glam::Vec2::new(48.0, 96.0));
+    assert_eq!(lines[0].thickness, 1.0);
+    assert_eq!(lines[0].color, [0.1882, 0.5176, 1.0, 1.0]);
+}
+
+#[test]
+fn build_scene_anchor_overlay_lines_prefer_tilemap_tile_size() {
+    let mut config = crate::config::EditorConfig::default();
+    config.editor_settings.grid.grid_size = [24, 32];
+    config.editor_settings.grid.snap_to_grid = true;
+
+    let tilemap = toki_core::assets::tilemap::TileMap {
+        size: UVec2::new(8, 8),
+        tile_size: UVec2::new(40, 48),
+        atlas: std::path::PathBuf::from("dummy.json"),
+        tiles: vec![],
+        objects: vec![],
+    };
+
+    let mut ui_state = crate::ui::EditorUI::new();
+    let mut scene = Scene::new("Main Scene".to_string());
+    scene.anchors.push(SceneAnchor {
+        id: "spawn_point_1".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(80, 96),
+        facing: None,
+    });
+    ui_state.scenes = vec![scene];
+    ui_state.active_scene = Some("Main Scene".to_string());
+
+    let lines = EditorApp::build_scene_anchor_overlay_lines(&ui_state, Some(&tilemap), Some(&config));
+
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[0].end - lines[0].start, glam::Vec2::new(40.0, 48.0));
+    assert_eq!(lines[1].start, glam::Vec2::new(120.0, 96.0));
 }
 
 // =============================================================================

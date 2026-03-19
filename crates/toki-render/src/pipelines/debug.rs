@@ -127,6 +127,55 @@ impl DebugPipeline {
         vertices
     }
 
+    fn line_vertices(
+        start: glam::Vec2,
+        end: glam::Vec2,
+        thickness: f32,
+        color: [f32; 4],
+    ) -> Vec<DebugVertex> {
+        let delta = end - start;
+        let length = delta.length();
+        if length <= f32::EPSILON {
+            return Vec::new();
+        }
+
+        let thickness = thickness.max(0.1);
+        let direction = delta / length;
+        let normal = glam::Vec2::new(-direction.y, direction.x) * (thickness * 0.5);
+
+        let p0 = start + normal;
+        let p1 = end + normal;
+        let p2 = end - normal;
+        let p3 = start - normal;
+
+        vec![
+            DebugVertex {
+                position: p0.to_array(),
+                color,
+            },
+            DebugVertex {
+                position: p1.to_array(),
+                color,
+            },
+            DebugVertex {
+                position: p2.to_array(),
+                color,
+            },
+            DebugVertex {
+                position: p0.to_array(),
+                color,
+            },
+            DebugVertex {
+                position: p2.to_array(),
+                color,
+            },
+            DebugVertex {
+                position: p3.to_array(),
+                color,
+            },
+        ]
+    }
+
     pub fn new(device: &Device, surface_format: wgpu::TextureFormat) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Debug Shader"),
@@ -236,6 +285,17 @@ impl DebugPipeline {
             return;
         }
         let vertices = Self::quad_vertices(x, y, x + width, y + height, color);
+        self.vertices.extend_from_slice(&vertices);
+    }
+
+    pub fn add_line(
+        &mut self,
+        start: glam::Vec2,
+        end: glam::Vec2,
+        thickness: f32,
+        color: [f32; 4],
+    ) {
+        let vertices = Self::line_vertices(start, end, thickness, color);
         self.vertices.extend_from_slice(&vertices);
     }
 

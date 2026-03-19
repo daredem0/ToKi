@@ -1,5 +1,20 @@
 use super::*;
 
+struct RuleActionEditorContext<'a> {
+    scene_name: &'a str,
+    rule_index: usize,
+    action_index: usize,
+}
+
+impl RuleActionEditorContext<'_> {
+    fn id_salt(&self) -> String {
+        format!(
+            "{}_{}_{}",
+            self.scene_name, self.rule_index, self.action_index
+        )
+    }
+}
+
 impl InspectorSystem {
     pub(in super::super) fn render_rule_editor(
         ui: &mut egui::Ui,
@@ -8,6 +23,7 @@ impl InspectorSystem {
         rule: &mut Rule,
         validation_issues: &[RuleValidationIssue],
         audio_choices: &RuleAudioChoices,
+        scenes: &[toki_core::Scene],
     ) -> RuleEditorOutcome {
         let mut outcome = RuleEditorOutcome::default();
         let has_rule_issues = validation_issues
@@ -223,12 +239,15 @@ impl InspectorSystem {
                         });
                         outcome.changed |= Self::render_rule_action_editor(
                             ui,
-                            scene_name,
-                            rule_index,
-                            action_index,
+                            RuleActionEditorContext {
+                                scene_name,
+                                rule_index,
+                                action_index,
+                            },
                             action,
                             validation_issues,
                             audio_choices,
+                            scenes,
                         );
                     });
                 }
@@ -272,25 +291,22 @@ impl InspectorSystem {
         outcome
     }
 
-    pub(in super::super) fn render_rule_action_editor(
+    fn render_rule_action_editor(
         ui: &mut egui::Ui,
-        scene_name: &str,
-        rule_index: usize,
-        action_index: usize,
+        ctx: RuleActionEditorContext<'_>,
         action: &mut RuleAction,
         validation_issues: &[RuleValidationIssue],
         audio_choices: &RuleAudioChoices,
+        scenes: &[toki_core::Scene],
     ) -> bool {
         let mut changed = false;
+        let id_salt = ctx.id_salt();
 
         let current_kind = Self::action_kind(action);
         let mut selected_kind = current_kind;
         ui.horizontal(|ui| {
             ui.label("Type:");
-            egui::ComboBox::from_id_salt(format!(
-                "rule_action_kind_{}_{}_{}",
-                scene_name, rule_index, action_index
-            ))
+            egui::ComboBox::from_id_salt(format!("rule_action_kind_{id_salt}"))
             .selected_text(Self::action_kind_label(current_kind))
             .show_ui(ui, |ui| {
                 changed |= ui
@@ -352,10 +368,7 @@ impl InspectorSystem {
             RuleAction::PlaySound { channel, sound_id } => {
                 ui.horizontal(|ui| {
                     ui.label("Channel:");
-                    egui::ComboBox::from_id_salt(format!(
-                        "rule_sound_channel_{}_{}_{}",
-                        scene_name, rule_index, action_index
-                    ))
+                    egui::ComboBox::from_id_salt(format!("rule_sound_channel_{id_salt}"))
                     .selected_text(match channel {
                         RuleSoundChannel::Movement => "Movement",
                         RuleSoundChannel::Collision => "Collision",
@@ -377,10 +390,7 @@ impl InspectorSystem {
 
                 changed |= Self::render_audio_choice_picker(
                     ui,
-                    format!(
-                        "rule_sfx_picker_{}_{}_{}",
-                        scene_name, rule_index, action_index
-                    ),
+                    format!("rule_sfx_picker_{id_salt}"),
                     "SFX",
                     sound_id,
                     &audio_choices.sfx,
@@ -394,10 +404,7 @@ impl InspectorSystem {
 
                 changed |= Self::render_audio_choice_picker(
                     ui,
-                    format!(
-                        "rule_music_picker_{}_{}_{}",
-                        scene_name, rule_index, action_index
-                    ),
+                    format!("rule_music_picker_{id_salt}"),
                     "Music",
                     track_id,
                     &audio_choices.music,
@@ -406,18 +413,15 @@ impl InspectorSystem {
             RuleAction::PlayAnimation { target, state } => {
                 changed |= Self::render_rule_target_editor(
                     ui,
-                    scene_name,
-                    rule_index,
-                    action_index,
+                    ctx.scene_name,
+                    ctx.rule_index,
+                    ctx.action_index,
                     target,
                 );
 
                 ui.horizontal(|ui| {
                     ui.label("State:");
-                    egui::ComboBox::from_id_salt(format!(
-                        "rule_animation_state_{}_{}_{}",
-                        scene_name, rule_index, action_index
-                    ))
+                    egui::ComboBox::from_id_salt(format!("rule_animation_state_{id_salt}"))
                     .selected_text(animation_state_label(*state))
                     .show_ui(ui, |ui| {
                         for candidate in animation_state_options() {
@@ -435,9 +439,9 @@ impl InspectorSystem {
             RuleAction::SetVelocity { target, velocity } => {
                 changed |= Self::render_rule_target_editor(
                     ui,
-                    scene_name,
-                    rule_index,
-                    action_index,
+                    ctx.scene_name,
+                    ctx.rule_index,
+                    ctx.action_index,
                     target,
                 );
 
@@ -457,10 +461,7 @@ impl InspectorSystem {
             } => {
                 ui.horizontal(|ui| {
                     ui.label("Entity Type:");
-                    egui::ComboBox::from_id_salt(format!(
-                        "rule_spawn_type_{}_{}_{}",
-                        scene_name, rule_index, action_index
-                    ))
+                    egui::ComboBox::from_id_salt(format!("rule_spawn_type_{id_salt}"))
                     .selected_text(Self::spawn_entity_type_label(*entity_type))
                     .show_ui(ui, |ui| {
                         for candidate in [
@@ -494,22 +495,31 @@ impl InspectorSystem {
             RuleAction::DestroySelf { target } => {
                 changed |= Self::render_rule_target_editor(
                     ui,
-                    scene_name,
-                    rule_index,
-                    action_index,
+                    ctx.scene_name,
+                    ctx.rule_index,
+                    ctx.action_index,
                     target,
                 );
             }
-            RuleAction::SwitchScene { scene_name } => {
-                ui.horizontal(|ui| {
-                    ui.label("Scene:");
-                    changed |= ui.text_edit_singleline(scene_name).changed();
-                });
+            RuleAction::SwitchScene {
+                scene_name,
+                spawn_point_id,
+            } => {
+                changed |= Self::render_switch_scene_editor(
+                    ui,
+                    format!(
+                        "switch_scene_{}_{}_{}",
+                        ctx.scene_name, ctx.rule_index, ctx.action_index
+                    ),
+                    scene_name,
+                    spawn_point_id,
+                    scenes,
+                );
             }
         }
 
         for issue in validation_issues.iter().filter(|issue| {
-            issue.rule_index == rule_index && issue.action_index == Some(action_index)
+            issue.rule_index == ctx.rule_index && issue.action_index == Some(ctx.action_index)
         }) {
             ui.colored_label(egui::Color32::from_rgb(255, 210, 80), &issue.message);
         }

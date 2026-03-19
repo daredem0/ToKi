@@ -366,7 +366,7 @@ fn apply_click_selection_plain_click_replaces_with_single_entity() {
     ui_state.toggle_entity_selection(2);
     assert_eq!(ui_state.selected_entity_ids(), &[1, 2]);
 
-    SelectionInteraction::apply_click_selection(&mut ui_state, Some(7), false);
+    SelectionInteraction::apply_click_selection(&mut ui_state, Some(7), None, false);
 
     assert_eq!(ui_state.selected_entity_id(), Some(7));
     assert_eq!(ui_state.selected_entity_ids(), &[7]);
@@ -377,10 +377,10 @@ fn apply_click_selection_ctrl_click_toggles_entity_membership() {
     let mut ui_state = EditorUI::new();
     ui_state.set_single_entity_selection(3);
 
-    SelectionInteraction::apply_click_selection(&mut ui_state, Some(5), true);
+    SelectionInteraction::apply_click_selection(&mut ui_state, Some(5), None, true);
     assert_eq!(ui_state.selected_entity_ids(), &[3, 5]);
 
-    SelectionInteraction::apply_click_selection(&mut ui_state, Some(3), true);
+    SelectionInteraction::apply_click_selection(&mut ui_state, Some(3), None, true);
     assert_eq!(ui_state.selected_entity_ids(), &[5]);
     assert_eq!(ui_state.selected_entity_id(), Some(5));
 }
@@ -389,7 +389,7 @@ fn apply_click_selection_ctrl_click_toggles_entity_membership() {
 fn apply_click_selection_plain_click_on_empty_clears_selection() {
     let mut ui_state = EditorUI::new();
     ui_state.set_single_entity_selection(3);
-    SelectionInteraction::apply_click_selection(&mut ui_state, None, false);
+    SelectionInteraction::apply_click_selection(&mut ui_state, None, None, false);
     assert!(ui_state.selection.is_none());
     assert!(ui_state.selected_entity_ids().is_empty());
 }
@@ -400,9 +400,30 @@ fn apply_click_selection_ctrl_click_on_empty_keeps_selection() {
     ui_state.set_single_entity_selection(9);
     ui_state.toggle_entity_selection(10);
 
-    SelectionInteraction::apply_click_selection(&mut ui_state, None, true);
+    SelectionInteraction::apply_click_selection(&mut ui_state, None, None, true);
 
     assert_eq!(ui_state.selected_entity_ids(), &[9, 10]);
+}
+
+#[test]
+fn apply_click_selection_selects_scene_anchor_when_present() {
+    let mut ui_state = EditorUI::new();
+
+    SelectionInteraction::apply_click_selection(
+        &mut ui_state,
+        None,
+        Some(("Main Scene".to_string(), "spawn_point_1".to_string())),
+        false,
+    );
+
+    assert!(matches!(
+        ui_state.selection,
+        Some(crate::ui::editor_ui::Selection::SceneAnchor {
+            ref scene_name,
+            ref anchor_id
+        }) if scene_name == "Main Scene" && anchor_id == "spawn_point_1"
+    ));
+    assert!(ui_state.selected_entity_ids().is_empty());
 }
 
 #[test]

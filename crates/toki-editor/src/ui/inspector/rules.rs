@@ -12,10 +12,11 @@ impl InspectorSystem {
         ui: &mut egui::Ui,
         scene_name: &str,
         rule_set: &mut RuleSet,
+        scenes: &[toki_core::Scene],
         config: Option<&EditorConfig>,
     ) -> bool {
         let mut changed = false;
-        let validation_issues = Self::validate_rule_set(rule_set);
+        let validation_issues = Self::validate_rule_set_for_scene(rule_set, scene_name, scenes);
         let audio_choices = Self::load_rule_audio_choices(config);
 
         ui.label("Visual Rules");
@@ -51,6 +52,7 @@ impl InspectorSystem {
                 rule,
                 &validation_issues,
                 &audio_choices,
+                scenes,
             );
             changed |= outcome.changed;
             if pending_command.is_none() {

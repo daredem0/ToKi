@@ -1,6 +1,28 @@
 use super::ViewportSizingMode;
 use toki_core::camera::viewport_to_world;
 
+pub(super) fn compute_display_rect(
+    outer_rect: egui::Rect,
+    viewport_size: (u32, u32),
+    responsive: bool,
+) -> egui::Rect {
+    if responsive {
+        return outer_rect;
+    }
+
+    let viewport_aspect = viewport_size.0 as f32 / viewport_size.1 as f32;
+    let available_size = outer_rect.size();
+    let available_aspect = available_size.x / available_size.y;
+
+    let display_size = if available_aspect > viewport_aspect {
+        egui::Vec2::new(available_size.y * viewport_aspect, available_size.y)
+    } else {
+        egui::Vec2::new(available_size.x, available_size.x / viewport_aspect)
+    };
+    let offset = (available_size - display_size) * 0.5;
+    egui::Rect::from_min_size(outer_rect.min + offset, display_size)
+}
+
 pub(super) fn screen_to_world_from_camera(
     screen_pos: egui::Pos2,
     display_rect: egui::Rect,
@@ -14,6 +36,24 @@ pub(super) fn screen_to_world_from_camera(
 
     // Use shared utility for viewport-to-world conversion
     viewport_to_world(viewport_pos, camera_position, camera_scale)
+}
+
+pub(super) fn world_to_screen_from_camera(
+    world_pos: glam::Vec2,
+    display_rect: egui::Rect,
+    _viewport_size: (u32, u32),
+    camera_position: glam::IVec2,
+    camera_scale: f32,
+) -> egui::Pos2 {
+    let screen_x =
+        display_rect.min.x + ((world_pos.x - camera_position.x as f32) / camera_scale);
+    let screen_y =
+        display_rect.min.y + ((world_pos.y - camera_position.y as f32) / camera_scale);
+
+    egui::pos2(
+        screen_x.clamp(display_rect.min.x, display_rect.max.x),
+        screen_y.clamp(display_rect.min.y, display_rect.max.y),
+    )
 }
 
 /// Converts screen coordinates to viewport-local coordinates.

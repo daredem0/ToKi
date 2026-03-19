@@ -17,6 +17,7 @@ impl SelectionInteraction {
         viewport: &SceneViewport,
         click_pos: egui::Pos2,
         rect: egui::Rect,
+        config: Option<&EditorConfig>,
         ctrl_pressed: bool,
     ) {
         // Ignore plain click-selection while an explicit move drag operation is active.
@@ -24,14 +25,18 @@ impl SelectionInteraction {
             return;
         }
 
-        let world_pos = viewport.screen_to_world_pos(click_pos, rect);
+        let display_rect = viewport.display_rect_in(rect);
+        let world_pos = viewport.screen_to_world_pos(click_pos, display_rect);
         let clicked_entity = viewport.get_entity_at_world_pos(world_pos);
-        Self::apply_click_selection(ui_state, clicked_entity, ctrl_pressed);
+        let clicked_anchor =
+            Self::find_scene_anchor_at_screen_pos(ui_state, viewport, click_pos, display_rect, config);
+        Self::apply_click_selection(ui_state, clicked_entity, clicked_anchor, ctrl_pressed);
     }
 
     fn apply_click_selection(
         ui_state: &mut EditorUI,
         clicked_entity: Option<toki_core::entity::EntityId>,
+        clicked_anchor: Option<(String, String)>,
         ctrl_pressed: bool,
     ) {
         if let Some(entity_id) = clicked_entity {
@@ -44,12 +49,52 @@ impl SelectionInteraction {
             return;
         }
 
+        if let Some((scene_name, anchor_id)) = clicked_anchor {
+            tracing::info!("Selected scene anchor '{}' via viewport click", anchor_id);
+            ui_state.set_selection(crate::ui::editor_ui::Selection::SceneAnchor {
+                scene_name,
+                anchor_id,
+            });
+            return;
+        }
+
         if ctrl_pressed {
             return;
         }
 
         tracing::info!("Clearing selection - no entity under viewport click");
         ui_state.clear_entity_selection();
+    }
+
+    fn find_scene_anchor_at_screen_pos(
+        ui_state: &EditorUI,
+        viewport: &SceneViewport,
+        click_pos: egui::Pos2,
+        rect: egui::Rect,
+        config: Option<&EditorConfig>,
+    ) -> Option<(String, String)> {
+        let active_scene_name = ui_state.active_scene.as_ref()?;
+        let scene = ui_state.scenes.iter().find(|scene| &scene.name == active_scene_name)?;
+        const HIT_RADIUS_PX: f32 = 10.0;
+
+        scene.anchors.iter().find_map(|anchor| {
+            let pose = GridInteraction::placement_pose(
+                anchor.position.as_vec2(),
+                viewport.tilemap(),
+                config,
+            );
+            if let Some(cell_size) = pose.snapped_cell_size {
+                let rect_min = viewport.world_to_screen_pos(pose.world_origin, rect);
+                let rect_max =
+                    viewport.world_to_screen_pos(pose.world_origin + cell_size.as_vec2(), rect);
+                if egui::Rect::from_min_max(rect_min, rect_max).contains(click_pos) {
+                    return Some((scene.name.clone(), anchor.id.clone()));
+                }
+            }
+
+            let screen_pos = viewport.world_to_screen_pos(pose.marker_world, rect);
+            (screen_pos.distance(click_pos) <= HIT_RADIUS_PX).then(|| (scene.name.clone(), anchor.id.clone()))
+        })
     }
 
     /// Handle drag start (click+hold+drag): begin move operation if drag started over an entity.
@@ -66,7 +111,8 @@ impl SelectionInteraction {
             return;
         }
 
-        let world_pos = viewport.screen_to_world_pos(drag_start_pos, rect);
+        let display_rect = viewport.display_rect_in(rect);
+        let world_pos = viewport.screen_to_world_pos(drag_start_pos, display_rect);
         let Some(entity_id) = viewport.get_entity_at_world_pos(world_pos) else {
             return;
         };
@@ -138,8 +184,9 @@ impl SelectionInteraction {
             return;
         };
 
-        let world_start = viewport.screen_to_world_pos(marquee.start_screen, rect);
-        let world_end = viewport.screen_to_world_pos(marquee.current_screen, rect);
+        let display_rect = viewport.display_rect_in(rect);
+        let world_start = viewport.screen_to_world_pos(marquee.start_screen, display_rect);
+        let world_end = viewport.screen_to_world_pos(marquee.current_screen, display_rect);
         let selected_entity_ids =
             Self::collect_scene_entities_in_world_rect(ui_state, world_start, world_end);
         Self::apply_marquee_selection(ui_state, selected_entity_ids, ctrl_pressed);
@@ -169,8 +216,9 @@ impl SelectionInteraction {
             return;
         };
 
+        let display_rect = viewport.display_rect_in(rect);
         let drop_world_pos = GridInteraction::drag_target_world_position(
-            viewport.screen_to_world_pos_raw(drop_pos, rect),
+            viewport.screen_to_world_pos_raw(drop_pos, display_rect),
             drag_state.grab_offset,
             viewport.tilemap(),
             config,

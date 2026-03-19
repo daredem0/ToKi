@@ -61,7 +61,10 @@ impl PanelSystem {
             RuleAction::DestroySelf { target } => {
                 format!("DestroySelf({})", Self::target_label(*target))
             }
-            RuleAction::SwitchScene { scene_name } => format!("SwitchScene({})", scene_name),
+            RuleAction::SwitchScene {
+                scene_name,
+                spawn_point_id,
+            } => format!("SwitchScene({} -> {})", scene_name, spawn_point_id),
         }
     }
 
@@ -210,6 +213,7 @@ impl PanelSystem {
             },
             GraphActionKind::SwitchScene => RuleAction::SwitchScene {
                 scene_name: String::new(),
+                spawn_point_id: String::new(),
             },
         }
     }
@@ -337,7 +341,16 @@ impl PanelSystem {
             RuleAction::DestroySelf { target } => {
                 Self::edit_rule_target(ui, target, &format!("{id_prefix}::destroy_target"))
             }
-            RuleAction::SwitchScene { scene_name } => ui.text_edit_singleline(scene_name).changed(),
+            RuleAction::SwitchScene {
+                scene_name,
+                spawn_point_id,
+            } => {
+                let mut changed = ui.text_edit_singleline(scene_name).changed();
+                ui.end_row();
+                ui.label("Spawn Point");
+                changed |= ui.text_edit_singleline(spawn_point_id).changed();
+                changed
+            }
         }
     }
 

@@ -30,12 +30,17 @@ use std::path::PathBuf;
 use toki_core::{
     assets::tilemap::TileMap,
     entity::{Entity, EntityId},
+    scene::SceneAnchorKind,
     Scene,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Selection {
     Scene(String),
+    SceneAnchor {
+        scene_name: String,
+        anchor_id: String,
+    },
     Map(String, String), // (scene_name, map_name)
     Entity(EntityId),
     StandaloneMap(String), // Map selected from Maps panel (not in scene context)
@@ -222,10 +227,21 @@ impl ProjectEditorState {
 }
 
 /// Entity placement and drag interaction state
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SceneAnchorPlacementDraft {
+    pub kind: SceneAnchorKind,
+    pub suggested_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PlacementKind {
+    EntityDefinition(String),
+    SceneAnchor(SceneAnchorPlacementDraft),
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct PlacementState {
-    pub mode: bool,
-    pub entity_definition: Option<String>,
+    pub kind: Option<PlacementKind>,
     pub preview_position: Option<glam::Vec2>,
     pub preview_cached_frame: Option<PlacementPreviewVisual>,
     pub preview_valid: Option<bool>,
@@ -235,20 +251,27 @@ pub struct PlacementState {
 
 impl PlacementState {
     pub fn enter_placement_mode(&mut self, entity_definition: String) {
-        self.mode = true;
-        self.entity_definition = Some(entity_definition);
+        self.kind = Some(PlacementKind::EntityDefinition(entity_definition));
         tracing::info!(
             "Entered placement mode for entity: {:?}",
-            self.entity_definition.as_ref().unwrap()
+            self.entity_definition()
         );
     }
 
+    pub fn enter_scene_anchor_placement_mode(&mut self, draft: SceneAnchorPlacementDraft) {
+        tracing::info!(
+            "Entered placement mode for scene anchor '{}' ({:?})",
+            draft.suggested_id,
+            draft.kind
+        );
+        self.kind = Some(PlacementKind::SceneAnchor(draft));
+    }
+
     pub fn exit_placement_mode(&mut self) {
-        if self.mode {
+        if self.kind.is_some() {
             tracing::info!("Exiting placement mode");
         }
-        self.mode = false;
-        self.entity_definition = None;
+        self.kind = None;
         self.preview_position = None;
         self.preview_cached_frame = None;
         self.preview_valid = None;
@@ -257,7 +280,21 @@ impl PlacementState {
     }
 
     pub fn is_in_placement_mode(&self) -> bool {
-        self.mode
+        self.kind.is_some()
+    }
+
+    pub fn entity_definition(&self) -> Option<&str> {
+        match &self.kind {
+            Some(PlacementKind::EntityDefinition(name)) => Some(name.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn scene_anchor_draft(&self) -> Option<&SceneAnchorPlacementDraft> {
+        match &self.kind {
+            Some(PlacementKind::SceneAnchor(draft)) => Some(draft),
+            _ => None,
+        }
     }
 
     pub fn begin_entity_move_drag(&mut self, drag_state: EntityMoveDragState) {
@@ -576,6 +613,13 @@ impl EditorUI {
 
     pub fn enter_placement_mode(&mut self, entity_definition: String) {
         self.placement.enter_placement_mode(entity_definition);
+    }
+
+    pub fn enter_scene_anchor_placement_mode(
+        &mut self,
+        draft: SceneAnchorPlacementDraft,
+    ) {
+        self.placement.enter_scene_anchor_placement_mode(draft);
     }
 
     pub fn exit_placement_mode(&mut self) {

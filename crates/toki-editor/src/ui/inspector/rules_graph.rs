@@ -102,6 +102,7 @@ impl InspectorSystem {
                     &mut edited_action,
                     &validation_issues,
                     &audio_choices,
+                    &ui_state.scenes,
                 );
                 if changed && edited_action != action {
                     if let Err(error) = graph.set_action_for_node(node_id, edited_action) {
@@ -460,14 +461,22 @@ impl InspectorSystem {
             RuleAction::DestroySelf { target } => {
                 format!("DestroySelf({})", Self::rule_graph_target_summary(*target))
             }
-            RuleAction::SwitchScene { scene_name } => format!(
-                "SwitchScene({})",
-                if scene_name.is_empty() {
+            RuleAction::SwitchScene {
+                scene_name,
+                spawn_point_id,
+            } => {
+                let scene = if scene_name.is_empty() {
                     "<empty>"
                 } else {
                     scene_name
-                }
-            ),
+                };
+                let spawn = if spawn_point_id.is_empty() {
+                    "<empty>"
+                } else {
+                    spawn_point_id
+                };
+                format!("SwitchScene({scene} -> {spawn})")
+            }
         }
     }
 
@@ -619,6 +628,7 @@ impl InspectorSystem {
         action: &mut RuleAction,
         _validation_issues: &[RuleValidationIssue],
         audio_choices: &RuleAudioChoices,
+        scenes: &[toki_core::Scene],
     ) -> bool {
         let mut changed = false;
         let current_kind = Self::action_kind(action);
@@ -789,11 +799,17 @@ impl InspectorSystem {
                     target,
                 );
             }
-            RuleAction::SwitchScene { scene_name } => {
-                ui.horizontal(|ui| {
-                    ui.label("Scene:");
-                    changed |= ui.text_edit_singleline(scene_name).changed();
-                });
+            RuleAction::SwitchScene {
+                scene_name,
+                spawn_point_id,
+            } => {
+                changed |= Self::render_switch_scene_editor(
+                    ui,
+                    format!("graph_switch_scene_{}_{}", scene_name, node_key),
+                    scene_name,
+                    spawn_point_id,
+                    scenes,
+                );
             }
         }
 

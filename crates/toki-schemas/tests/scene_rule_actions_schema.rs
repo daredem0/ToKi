@@ -12,6 +12,7 @@ fn scene_with_actions(actions: Vec<Value>) -> Value {
         "name": "SchemaActionTest",
         "maps": [],
         "entities": [],
+        "anchors": [],
         "rules": {
             "rules": [
                 {
@@ -55,7 +56,7 @@ fn scene_schema_accepts_all_rule_action_payload_variants() {
         json!({"SetVelocity": {"target": {"Entity": 3}, "velocity": [2, -1]}}),
         json!({"Spawn": {"entity_type": "Npc", "position": [64, 32]}}),
         json!({"DestroySelf": {"target": {"Entity": 3}}}),
-        json!({"SwitchScene": {"scene_name": "Main Scene"}}),
+        json!({"SwitchScene": {"scene_name": "Main Scene", "spawn_point_id": "from_forest"}}),
     ]);
     assert_valid(&schema, &doc);
 }
@@ -73,12 +74,64 @@ fn scene_schema_rejects_invalid_rule_action_payload_combinations() {
         json!({"Spawn": {"entity_type": "Enemy", "position": [1, 2]}}),
         json!({"DestroySelf": {}}),
         json!({"SwitchScene": {"scene_name": ""}}),
+        json!({"SwitchScene": {"scene_name": "Main Scene"}}),
+        json!({"SwitchScene": {"scene_name": "Main Scene", "spawn_point_id": ""}}),
         json!({"UnknownAction": {"foo": "bar"}}),
         json!({"PlayMusic": {"track_id": "a"}, "PlaySound": {"channel": "Movement", "sound_id": "b"}}),
     ];
 
     for action in invalid_actions {
         let doc = scene_with_actions(vec![action]);
+        assert_invalid(&schema, &doc);
+    }
+}
+
+#[test]
+fn scene_schema_accepts_scene_anchors_and_background_music() {
+    let schema = compile_scene_schema();
+    let doc = json!({
+        "name": "AnchorScene",
+        "maps": [],
+        "entities": [],
+        "background_music_track_id": "lavandia",
+        "anchors": [
+            {
+                "id": "from_forest",
+                "kind": "SpawnPoint",
+                "position": [128, 96],
+                "facing": "Right"
+            }
+        ]
+    });
+
+    assert_valid(&schema, &doc);
+}
+
+#[test]
+fn scene_schema_rejects_invalid_scene_anchor_payloads() {
+    let schema = compile_scene_schema();
+    let invalid_docs = vec![
+        json!({
+            "name": "InvalidScene",
+            "maps": [],
+            "entities": [],
+            "anchors": [{"id": "", "kind": "SpawnPoint", "position": [0, 0]}]
+        }),
+        json!({
+            "name": "InvalidScene",
+            "maps": [],
+            "entities": [],
+            "anchors": [{"id": "spawn", "kind": "SpawnPoint"}]
+        }),
+        json!({
+            "name": "InvalidScene",
+            "maps": [],
+            "entities": [],
+            "anchors": [{"id": "spawn", "kind": "Unknown", "position": [0, 0]}]
+        }),
+    ];
+
+    for doc in invalid_docs {
         assert_invalid(&schema, &doc);
     }
 }

@@ -1,6 +1,7 @@
 use super::super::inspector_trait::{Inspector, InspectorContext};
 use super::InspectorSystem;
 use toki_core::entity::EntityId;
+use toki_core::scene::{SceneAnchorFacing, SceneAnchorKind};
 
 /// Inspector for single or multi-entity selection.
 pub struct EntityInspector {
@@ -78,7 +79,7 @@ impl Inspector for SceneInspector {
         ui.heading(format!("🎬 {}", self.scene_name));
         ui.separator();
 
-        if let Some(scene) = ctx.ui_state.get_scene(&self.scene_name) {
+        if let Some(scene) = ctx.ui_state.get_scene(&self.scene_name).cloned() {
             ui.horizontal(|ui| {
                 ui.label("Maps:");
                 ui.label(format!("{}", scene.maps.len()));
@@ -90,6 +91,34 @@ impl Inspector for SceneInspector {
             });
 
             ui.separator();
+
+            let mut background_music_track_id =
+                scene.background_music_track_id.clone().unwrap_or_default();
+            let mut background_music_changed = false;
+            ui.horizontal(|ui| {
+                ui.label("Background Music:");
+                background_music_changed |= ui
+                    .text_edit_singleline(&mut background_music_track_id)
+                    .changed();
+            });
+            if background_music_changed {
+                let before_scene = scene.clone();
+                let mut after_scene = before_scene.clone();
+                after_scene.background_music_track_id = (!background_music_track_id.trim().is_empty())
+                    .then(|| background_music_track_id.trim().to_string());
+                if ctx
+                    .ui_state
+                    .execute_command(crate::ui::undo_redo::EditorCommand::update_scene(
+                        self.scene_name.clone(),
+                        before_scene,
+                        after_scene,
+                    ))
+                {
+                    return true;
+                }
+            }
+
+            ui.separator();
             ui.label("Scene Actions:");
 
             if ui.button("🗺 Add Map").clicked() {
@@ -98,6 +127,47 @@ impl Inspector for SceneInspector {
 
             if ui.button("👤 Add Entity").clicked() {
                 tracing::info!("Add Entity to scene: {}", self.scene_name);
+            }
+
+            ui.separator();
+            ui.label("Scene Anchors:");
+
+            for anchor in &scene.anchors {
+                let selected = matches!(
+                    ctx.ui_state.selection,
+                    Some(crate::ui::editor_ui::Selection::SceneAnchor {
+                        ref scene_name,
+                        ref anchor_id
+                    }) if scene_name == &self.scene_name && anchor_id == &anchor.id
+                );
+                if ui
+                    .selectable_label(
+                        selected,
+                        format!(
+                            "{} ({:?}) @ {}, {}",
+                            anchor.id, anchor.kind, anchor.position.x, anchor.position.y
+                        ),
+                    )
+                    .clicked()
+                {
+                    ctx.ui_state.set_selection(crate::ui::editor_ui::Selection::SceneAnchor {
+                        scene_name: self.scene_name.clone(),
+                        anchor_id: anchor.id.clone(),
+                    });
+                }
+            }
+
+            if ui.button("➕ Place Spawn Point").clicked() {
+                let next_id = crate::ui::interactions::PlacementInteraction::next_scene_anchor_id(
+                    &scene.anchors,
+                    SceneAnchorKind::SpawnPoint,
+                );
+                ctx.ui_state.enter_scene_anchor_placement_mode(
+                    crate::ui::editor_ui::SceneAnchorPlacementDraft {
+                        kind: SceneAnchorKind::SpawnPoint,
+                        suggested_id: next_id,
+                    },
+                );
             }
         }
 
@@ -115,6 +185,7 @@ impl Inspector for SceneInspector {
                 ui,
                 &self.scene_name,
                 &mut edited_rules,
+                &ctx.ui_state.scenes,
                 ctx.config,
             );
             if rules_changed && edited_rules != before_rules {
@@ -151,6 +222,162 @@ impl Inspector for SceneInspector {
 
     fn name(&self) -> &'static str {
         "Scene"
+    }
+}
+
+pub struct SceneAnchorInspector {
+    scene_name: String,
+    anchor_id: String,
+}
+
+impl SceneAnchorInspector {
+    pub fn new(scene_name: String, anchor_id: String) -> Self {
+        Self {
+            scene_name,
+            anchor_id,
+        }
+    }
+}
+
+impl Inspector for SceneAnchorInspector {
+    fn render(&mut self, ui: &mut egui::Ui, ctx: &mut InspectorContext<'_>) -> bool {
+        ui.heading(format!("📍 {}", self.anchor_id));
+        ui.label(format!("Scene: {}", self.scene_name));
+        ui.separator();
+
+        let Some(before_scene) = ctx.ui_state.get_scene(&self.scene_name).cloned() else {
+            ui.label("Scene not found.");
+            return false;
+        };
+        let Some(anchor_index) = before_scene
+            .anchors
+            .iter()
+            .position(|anchor| anchor.id == self.anchor_id)
+        else {
+            ui.label("Selected anchor no longer exists.");
+            return false;
+        };
+
+        let mut edited_anchor = before_scene.anchors[anchor_index].clone();
+        let mut changed = false;
+        let mut delete_requested = false;
+
+        ui.horizontal(|ui| {
+            ui.label("Id:");
+            changed |= ui.text_edit_singleline(&mut edited_anchor.id).changed();
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Kind:");
+            egui::ComboBox::from_id_salt(("scene_anchor_kind", &self.scene_name, &self.anchor_id))
+                .selected_text(match edited_anchor.kind {
+                    SceneAnchorKind::SpawnPoint => "SpawnPoint",
+                })
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(
+                            &mut edited_anchor.kind,
+                            SceneAnchorKind::SpawnPoint,
+                            "SpawnPoint",
+                        )
+                        .changed();
+                });
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Position:");
+            changed |= ui
+                .add(egui::DragValue::new(&mut edited_anchor.position.x).speed(1.0))
+                .changed();
+            changed |= ui
+                .add(egui::DragValue::new(&mut edited_anchor.position.y).speed(1.0))
+                .changed();
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Facing:");
+            let mut facing = edited_anchor.facing;
+            egui::ComboBox::from_id_salt(("scene_anchor_facing", &self.scene_name, &self.anchor_id))
+                .selected_text(match facing {
+                    None => "<none>",
+                    Some(SceneAnchorFacing::Up) => "Up",
+                    Some(SceneAnchorFacing::Down) => "Down",
+                    Some(SceneAnchorFacing::Left) => "Left",
+                    Some(SceneAnchorFacing::Right) => "Right",
+                })
+                .show_ui(ui, |ui| {
+                    changed |= ui.selectable_value(&mut facing, None, "<none>").changed();
+                    changed |= ui
+                        .selectable_value(&mut facing, Some(SceneAnchorFacing::Up), "Up")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(&mut facing, Some(SceneAnchorFacing::Down), "Down")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(&mut facing, Some(SceneAnchorFacing::Left), "Left")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(&mut facing, Some(SceneAnchorFacing::Right), "Right")
+                        .changed();
+                });
+            edited_anchor.facing = facing;
+        });
+
+        if before_scene
+            .anchors
+            .iter()
+            .enumerate()
+            .any(|(index, anchor)| index != anchor_index && anchor.id == edited_anchor.id)
+        {
+            ui.colored_label(
+                egui::Color32::from_rgb(255, 210, 80),
+                "Anchor id must be unique within the scene.",
+            );
+            changed = false;
+        }
+
+        if ui.button("🗑 Delete Anchor").clicked() {
+            delete_requested = true;
+        }
+
+        if delete_requested {
+            let mut after_scene = before_scene.clone();
+            after_scene.anchors.remove(anchor_index);
+            if ctx.ui_state.execute_command(crate::ui::undo_redo::EditorCommand::update_scene(
+                self.scene_name.clone(),
+                before_scene,
+                after_scene,
+            )) {
+                ctx.ui_state.set_selection(crate::ui::editor_ui::Selection::Scene(
+                    self.scene_name.clone(),
+                ));
+                return true;
+            }
+            return false;
+        }
+
+        if changed {
+            let mut after_scene = before_scene.clone();
+            after_scene.anchors[anchor_index] = edited_anchor.clone();
+            if ctx.ui_state.execute_command(crate::ui::undo_redo::EditorCommand::update_scene(
+                self.scene_name.clone(),
+                before_scene,
+                after_scene,
+            )) {
+                self.anchor_id = edited_anchor.id.clone();
+                ctx.ui_state.set_selection(crate::ui::editor_ui::Selection::SceneAnchor {
+                    scene_name: self.scene_name.clone(),
+                    anchor_id: edited_anchor.id,
+                });
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn name(&self) -> &'static str {
+        "SceneAnchor"
     }
 }
 
@@ -311,6 +538,13 @@ use super::super::inspector_trait::NoSelectionInspector;
 pub fn create_inspector_for_selection(selection: Option<&Selection>) -> Box<dyn Inspector> {
     match selection {
         Some(Selection::Scene(scene_name)) => Box::new(SceneInspector::new(scene_name.clone())),
+        Some(Selection::SceneAnchor {
+            scene_name,
+            anchor_id,
+        }) => Box::new(SceneAnchorInspector::new(
+            scene_name.clone(),
+            anchor_id.clone(),
+        )),
         Some(Selection::RuleGraphNode {
             scene_name,
             node_key,

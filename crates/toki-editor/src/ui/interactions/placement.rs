@@ -1,11 +1,13 @@
 use super::GridInteraction;
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
+use crate::ui::editor_ui::SceneAnchorPlacementDraft;
 use crate::ui::undo_redo::EditorCommand;
 use crate::ui::EditorUI;
 use std::path::{Path, PathBuf};
 use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
 use toki_core::entity::{Entity, EntityDefinition};
+use toki_core::scene::{SceneAnchor, SceneAnchorKind};
 
 /// Handles entity placement interactions
 pub struct PlacementInteraction;
@@ -21,7 +23,8 @@ impl PlacementInteraction {
     ) {
         if ui_state.is_in_placement_mode() {
             if let Some(hover_pos) = response.hover_pos() {
-                let cursor_world = viewport.screen_to_world_pos_raw(hover_pos, rect);
+                let display_rect = viewport.display_rect_in(rect);
+                let cursor_world = viewport.screen_to_world_pos_raw(hover_pos, display_rect);
                 let grab_offset = ui_state
                     .placement
                     .entity_move_drag
@@ -58,28 +61,97 @@ impl PlacementInteraction {
     ) {
         tracing::info!("Placement click detected at screen pos: {:?}", click_pos);
 
-        let Some(entity_def_name) = &ui_state.placement.entity_definition.clone() else {
-            tracing::warn!("No entity definition for placement");
-            return;
-        };
-
-        let world_pos = GridInteraction::maybe_snap_world_position(
-            viewport.screen_to_world_pos_raw(click_pos, rect),
+        let display_rect = viewport.display_rect_in(rect);
+        let world_pos = GridInteraction::placement_pose(
+            viewport.screen_to_world_pos_raw(click_pos, display_rect),
             viewport.tilemap(),
             config,
-        );
-        tracing::info!(
-            "Placing entity '{}' at world coordinates ({}, {}) [converted from screen ({}, {})]",
-            entity_def_name,
-            world_pos.x,
-            world_pos.y,
-            click_pos.x,
-            click_pos.y
-        );
+        )
+        .world_origin;
+        if let Some(entity_def_name) = ui_state.placement.entity_definition().map(str::to_string) {
+            tracing::info!(
+                "Placing entity '{}' at world coordinates ({}, {}) [converted from screen ({}, {})]",
+                entity_def_name,
+                world_pos.x,
+                world_pos.y,
+                click_pos.x,
+                click_pos.y
+            );
 
-        if Self::try_place_entity(ui_state, entity_def_name, world_pos, config, viewport) {
-            ui_state.exit_placement_mode();
+            if Self::try_place_entity(ui_state, &entity_def_name, world_pos, config, viewport) {
+                ui_state.exit_placement_mode();
+            }
+            return;
         }
+
+        if let Some(anchor_draft) = ui_state.placement.scene_anchor_draft().cloned() {
+            tracing::info!(
+                "Placing scene anchor '{}' ({:?}) at world coordinates ({}, {})",
+                anchor_draft.suggested_id,
+                anchor_draft.kind,
+                world_pos.x,
+                world_pos.y
+            );
+            if Self::try_place_scene_anchor(ui_state, anchor_draft, world_pos) {
+                ui_state.exit_placement_mode();
+            }
+        }
+    }
+
+    fn try_place_scene_anchor(
+        ui_state: &mut EditorUI,
+        anchor_draft: SceneAnchorPlacementDraft,
+        world_pos: glam::Vec2,
+    ) -> bool {
+        let Some(active_scene_name) = ui_state.active_scene.clone() else {
+            tracing::error!("No active scene for scene anchor placement");
+            ui_state.exit_placement_mode();
+            return false;
+        };
+        let Some(scene_index) = ui_state
+            .scenes
+            .iter()
+            .position(|scene| scene.name == active_scene_name)
+        else {
+            tracing::error!("Active scene '{}' not found", active_scene_name);
+            ui_state.exit_placement_mode();
+            return false;
+        };
+
+        let before_scene = ui_state.scenes[scene_index].clone();
+        if before_scene
+            .anchors
+            .iter()
+            .any(|anchor| anchor.id == anchor_draft.suggested_id)
+        {
+            tracing::warn!(
+                "Cannot place scene anchor '{}' in scene '{}': id already exists",
+                anchor_draft.suggested_id,
+                active_scene_name
+            );
+            return false;
+        }
+
+        let mut after_scene = before_scene.clone();
+        after_scene.anchors.push(SceneAnchor {
+            id: anchor_draft.suggested_id.clone(),
+            kind: anchor_draft.kind,
+            position: Self::placement_world_position_to_entity_position(world_pos),
+            facing: None,
+        });
+
+        let changed = ui_state.execute_command(EditorCommand::update_scene(
+            active_scene_name.clone(),
+            before_scene,
+            after_scene,
+        ));
+        if changed {
+            ui_state.set_selection(crate::ui::editor_ui::Selection::SceneAnchor {
+                scene_name: active_scene_name,
+                anchor_id: anchor_draft.suggested_id,
+            });
+        }
+        changed
     }
 
     /// Try to place entity at given world position, returns true if successful
@@ -217,7 +289,10 @@ impl PlacementInteraction {
         world_pos: glam::Vec2,
         config: Option<&EditorConfig>,
     ) -> bool {
-        let Some(entity_def_name) = &ui_state.placement.entity_definition else {
+        if ui_state.placement.scene_anchor_draft().is_some() {
+            return true;
+        }
+        let Some(entity_def_name) = ui_state.placement.entity_definition() else {
             return false;
         };
 
@@ -256,6 +331,23 @@ impl PlacementInteraction {
 
     fn next_entity_id(entities: &[Entity]) -> toki_core::entity::EntityId {
         entities.iter().map(|e| e.id).max().unwrap_or(0) + 1
+    }
+
+    pub fn next_scene_anchor_id(
+        anchors: &[SceneAnchor],
+        kind: SceneAnchorKind,
+    ) -> String {
+        let base = match kind {
+            SceneAnchorKind::SpawnPoint => "spawn_point",
+        };
+        let mut index = 1usize;
+        loop {
+            let candidate = format!("{base}_{index}");
+            if anchors.iter().all(|anchor| anchor.id != candidate) {
+                return candidate;
+            }
+            index += 1;
+        }
     }
 
     fn can_place_entity(

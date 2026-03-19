@@ -1433,6 +1433,7 @@ fn rules_serialize_roundtrip() {
                 },
                 RuleAction::SwitchScene {
                     scene_name: "Town".to_string(),
+                    spawn_point_id: "from_gate".to_string(),
                 },
                 RuleAction::Spawn {
                     entity_type: RuleSpawnEntityType::Npc,
@@ -1461,6 +1462,7 @@ fn switch_scene_applies_at_tick_boundary_after_movement_processing() {
             0,
             vec![RuleAction::SwitchScene {
                 scene_name: "Scene B".to_string(),
+                spawn_point_id: "spawn_b".to_string(),
             }],
         )],
     };
@@ -1503,6 +1505,7 @@ fn switch_scene_uses_highest_priority_rule_target() {
                 1,
                 vec![RuleAction::SwitchScene {
                     scene_name: "Scene C".to_string(),
+                    spawn_point_id: "spawn_c".to_string(),
                 }],
             ),
             base_rule(
@@ -1511,6 +1514,7 @@ fn switch_scene_uses_highest_priority_rule_target() {
                 10,
                 vec![RuleAction::SwitchScene {
                     scene_name: "Scene B".to_string(),
+                    spawn_point_id: "spawn_b".to_string(),
                 }],
             ),
         ],
@@ -1544,6 +1548,7 @@ fn switch_scene_keeps_active_scene_when_target_is_missing() {
             0,
             vec![RuleAction::SwitchScene {
                 scene_name: "Missing Scene".to_string(),
+                spawn_point_id: "missing_spawn".to_string(),
             }],
         )],
     };
@@ -1579,6 +1584,7 @@ fn switch_scene_syncs_outgoing_scene_entities_before_loading_target() {
                 },
                 RuleAction::SwitchScene {
                     scene_name: "Scene B".to_string(),
+                    spawn_point_id: "spawn_b".to_string(),
                 },
             ],
         )],

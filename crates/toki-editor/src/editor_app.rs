@@ -22,7 +22,7 @@ use crate::logging::LogCapture;
 use crate::project::ProjectAssets;
 use crate::project::{ProjectManager, ProjectTemplateKind};
 use crate::rendering::WindowRenderer;
-use crate::scene::viewport::DragPreviewSprite;
+use crate::scene::viewport::{DragPreviewSprite, ViewportOverlayData};
 use crate::scene::SceneViewport;
 use crate::ui::editor_ui::{CenterPanelTab, MapEditorDraft};
 use crate::ui::EditorUI;
@@ -710,7 +710,7 @@ impl EditorApp {
             && self.core.ui.placement.preview_cached_frame.is_none()
         {
             if let (Some(entity_def), Some(project_path), Some(project_assets)) = (
-                &self.core.ui.placement.entity_definition,
+                self.core.ui.placement.entity_definition(),
                 &project_path,
                 self.core.project_manager.get_project_assets(),
             ) {
@@ -729,18 +729,19 @@ impl EditorApp {
                 match self.core.ui.center_panel_tab {
                     CenterPanelTab::SceneViewport => {
                         if let Some(scene_viewport) = &mut self.viewports.scene {
-                            let preview_data = if self.core.ui.is_in_placement_mode() {
+                            let placement_preview = if self.core.ui.is_in_placement_mode() {
                                 if self.core.ui.placement.entity_move_drag.is_none() {
-                                    if let (Some(_entity_def), Some(position), Some(cached_frame)) = (
-                                        &self.core.ui.placement.entity_definition,
+                                    let is_valid =
+                                        self.core.ui.placement.preview_valid.unwrap_or(true);
+                                    match (
+                                        self.core.ui.placement.entity_definition(),
                                         &self.core.ui.placement.preview_position,
                                         &self.core.ui.placement.preview_cached_frame,
                                     ) {
-                                        let is_valid =
-                                            self.core.ui.placement.preview_valid.unwrap_or(true);
-                                        Some((*position, cached_frame.clone(), is_valid))
-                                    } else {
-                                        None
+                                        (Some(_entity_def), Some(position), Some(cached_frame)) => {
+                                            Some((*position, cached_frame.clone(), is_valid))
+                                        }
+                                        _ => None,
                                     }
                                 } else {
                                     None
@@ -749,7 +750,12 @@ impl EditorApp {
                                 None
                             };
 
-                            let drag_preview_data = self
+                            let anchor_overlay_lines = Self::build_scene_anchor_overlay_lines(
+                                &self.core.ui,
+                                scene_viewport.tilemap(),
+                                Some(&self.core.config),
+                            );
+                            let drag_preview_sprites = self
                                 .core
                                 .ui
                                 .placement
@@ -772,12 +778,19 @@ impl EditorApp {
                                     )
                                 });
 
+                            let overlay_data = ViewportOverlayData {
+                                placement_preview,
+                                drag_preview_sprites: drag_preview_sprites.unwrap_or_default(),
+                                overlay_sprites: Vec::new(),
+                                overlay_rects: Vec::new(),
+                                overlay_lines: anchor_overlay_lines,
+                            };
+
                             if let Err(e) = scene_viewport.render_to_texture(
                                 project_path.as_path(),
                                 project_assets,
                                 renderer.egui_renderer_mut(),
-                                preview_data,
-                                drag_preview_data.as_deref(),
+                                &overlay_data,
                             ) {
                                 tracing::error!("Failed to render scene to texture: {}", e);
                             }
@@ -789,8 +802,7 @@ impl EditorApp {
                                 project_path.as_path(),
                                 project_assets,
                                 renderer.egui_renderer_mut(),
-                                None,
-                                None,
+                                &ViewportOverlayData::default(),
                             ) {
                                 tracing::error!(
                                     "Failed to render map editor viewport to texture: {}",
