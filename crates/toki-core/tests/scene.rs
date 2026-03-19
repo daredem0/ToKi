@@ -2,6 +2,7 @@ use glam::{IVec2, UVec2};
 use toki_core::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use toki_core::entity::{
     AiBehavior, ControlRole, Entity, EntityAttributes, EntityKind, MovementProfile,
+    PrimaryActionRuntimeState,
 };
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::scene::Scene;
@@ -41,10 +42,12 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: None,
+            primary_action: None,
             projectile: None,
             pickup: None,
             inventory: toki_core::entity::Inventory::default(),
             has_inventory: false,
+            primary_action_runtime: PrimaryActionRuntimeState::default(),
         },
         collision_box: None,
         movement_accumulator: glam::Vec2::ZERO,

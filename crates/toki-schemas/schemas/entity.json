@@ -140,6 +140,69 @@
             }
           }
         },
+        "primary_action": {
+          "type": ["object", "null"],
+          "description": "Optional authored primary action configuration for melee or projectile attacks",
+          "required": ["mode", "cooldown_ticks", "damage"],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["melee", "projectile"]
+            },
+            "cooldown_ticks": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "damage": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "animation_state": {
+              "type": ["string", "null"]
+            },
+            "sound_id": {
+              "type": ["string", "null"]
+            },
+            "projectile": {
+              "type": ["object", "null"],
+              "required": ["sheet", "object_name", "size", "speed", "damage", "lifetime_ticks"],
+              "properties": {
+                "sheet": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "object_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "size": {
+                  "type": "array",
+                  "items": {"type": "integer", "minimum": 1},
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "speed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "damage": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "lifetime_ticks": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "spawn_offset": {
+                  "type": "array",
+                  "items": {"type": "integer"},
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              }
+            }
+          }
+        },
         "pickup": {
           "type": ["object", "null"],
           "description": "Optional item stack granted when another entity collects this entity by overlap",

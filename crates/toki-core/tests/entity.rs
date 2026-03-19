@@ -31,6 +31,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
                 MovementProfile::None
             },
             primary_projectile: None,
+            primary_action: None,
             pickup: None,
             has_inventory: false,
         },

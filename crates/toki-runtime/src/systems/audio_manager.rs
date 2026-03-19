@@ -737,6 +737,7 @@ impl EventHandler<AudioEvent> for AudioManager {
                 let (channel_name, policy) = match channel {
                     AudioEventChannel::Movement => ("movement", PlaybackPolicy::Overlap),
                     AudioEventChannel::Collision => ("collision", PlaybackPolicy::Exclusive),
+                    AudioEventChannel::Action => ("action", PlaybackPolicy::Overlap),
                 };
 
                 if !self.playback.has_channel(channel_name) {

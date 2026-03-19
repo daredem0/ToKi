@@ -8,6 +8,33 @@ pub type EntityId = u32;
 pub const HEALTH_STAT_ID: &str = "health";
 pub const ATTACK_POWER_STAT_ID: &str = "attack_power";
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PrimaryActionMode {
+    Melee,
+    Projectile,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrimaryActionDef {
+    pub mode: PrimaryActionMode,
+    #[serde(default)]
+    pub cooldown_ticks: u32,
+    pub damage: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub animation_state: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sound_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projectile: Option<PrimaryProjectileDef>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct PrimaryActionRuntimeState {
+    #[serde(default)]
+    pub cooldown_ticks_remaining: u32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PickupDef {
     pub item_id: String,
@@ -266,6 +293,8 @@ pub struct EntityAttributes {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub primary_projectile: Option<PrimaryProjectileDef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_action: Option<PrimaryActionDef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub projectile: Option<ProjectileState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub static_object_render: Option<StaticObjectRenderDef>,
@@ -277,6 +306,10 @@ pub struct EntityAttributes {
     // Extended attributes for entity definitions
     #[serde(default)]
     pub has_inventory: bool, // Can this entity carry items
+
+    // Runtime-only state
+    #[serde(skip, default)]
+    pub primary_action_runtime: PrimaryActionRuntimeState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
@@ -340,11 +373,13 @@ impl Default for EntityAttributes {
             ai_behavior: AiBehavior::default(),
             movement_profile: MovementProfile::default(),
             primary_projectile: None,
+            primary_action: None,
             projectile: None,
             static_object_render: None,
             pickup: None,
             inventory: Inventory::default(),
             has_inventory: false,
+            primary_action_runtime: PrimaryActionRuntimeState::default(),
         }
     }
 }
@@ -769,6 +804,8 @@ pub struct AttributesDef {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub primary_projectile: Option<PrimaryProjectileDef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_action: Option<PrimaryActionDef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pickup: Option<PickupDef>,
     pub has_inventory: bool,
 }
@@ -913,11 +950,13 @@ impl EntityDefinition {
             ai_behavior: self.attributes.ai_behavior,
             movement_profile: self.attributes.movement_profile,
             primary_projectile: self.attributes.primary_projectile.clone(),
+            primary_action: self.attributes.primary_action.clone(),
             projectile: None,
             static_object_render: self.rendering.static_object.clone(),
             pickup: self.attributes.pickup.clone(),
             inventory: Inventory::default(),
             has_inventory: self.attributes.has_inventory,
+            primary_action_runtime: PrimaryActionRuntimeState::default(),
         };
         attributes.ensure_legacy_health_stat();
 

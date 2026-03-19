@@ -35,6 +35,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
                 MovementProfile::None
             },
             primary_projectile: None,
+            primary_action: None,
             pickup: None,
             has_inventory: false,
         },
@@ -91,10 +92,12 @@ fn create_test_entity() -> Entity {
         ai_behavior: AiBehavior::None,
         movement_profile: MovementProfile::PlayerWasd,
         primary_projectile: None,
+        primary_action: None,
         projectile: None,
         pickup: None,
         inventory: toki_core::entity::Inventory::default(),
         has_inventory: true,
+        primary_action_runtime: PrimaryActionRuntimeState::default(),
     };
 
     Entity {

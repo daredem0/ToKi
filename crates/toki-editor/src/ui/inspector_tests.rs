@@ -10,7 +10,7 @@ use toki_core::animation::AnimationState;
 use toki_core::collision::CollisionBox;
 use toki_core::entity::{
     ControlRole, EntityAttributes, EntityKind, EntityManager, MovementSoundTrigger,
-    ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
+    PrimaryActionRuntimeState, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
 };
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
 use toki_core::rules::{
@@ -39,10 +39,12 @@ fn sample_entity_with_id(id: u32) -> toki_core::entity::Entity {
             ai_behavior: AiBehavior::Wander,
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
+            primary_action: None,
             projectile: None,
             pickup: None,
             inventory: toki_core::entity::Inventory::default(),
             has_inventory: false,
+            primary_action_runtime: PrimaryActionRuntimeState::default(),
         },
     );
     let mut entity = manager
@@ -1002,6 +1004,7 @@ fn save_entity_definition_persists_audio_updates() {
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: None,
+            primary_action: None,
             pickup: None,
             has_inventory: false,
         },

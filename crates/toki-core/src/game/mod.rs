@@ -67,6 +67,7 @@ pub enum AudioEvent {
 pub enum AudioChannel {
     Movement,
     Collision,
+    Action,
 }
 
 impl GameEvent for AudioEvent {}
@@ -204,7 +205,8 @@ impl GameState {
             }
         }
 
-        self.process_profile_actions();
+        self.process_profile_actions(&mut result);
+        self.tick_primary_action_cooldowns();
         self.update_projectiles(tilemap, atlas);
         self.collect_overlapping_pickups();
         self.resolve_pending_stat_changes();
@@ -333,7 +335,8 @@ impl GameState {
             .unwrap_or(glam::IVec2::ZERO);
 
         self.update_player_animation(initial_player_position, intended_player_delta);
-        self.process_profile_actions();
+        self.process_profile_actions(&mut result);
+        self.tick_primary_action_cooldowns();
         self.update_projectiles(tilemap, atlas);
         self.collect_overlapping_pickups();
         self.resolve_pending_stat_changes();

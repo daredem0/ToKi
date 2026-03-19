@@ -191,6 +191,62 @@ fn entity_schema_accepts_primary_projectile_authoring() {
 }
 
 #[test]
+fn entity_schema_accepts_primary_action_authoring() {
+    let schema = compile_entity_schema();
+    let doc = json!({
+        "name": "swordsman",
+        "display_name": "Swordsman",
+        "description": "Melee fighter",
+        "rendering": {
+            "size": [16, 16],
+            "render_layer": 0,
+            "visible": true
+        },
+        "attributes": {
+            "health": 30,
+            "primary_action": {
+                "mode": "melee",
+                "cooldown_ticks": 18,
+                "damage": 9,
+                "animation_state": "attack_right",
+                "sound_id": "sfx_attack"
+            },
+            "speed": 2,
+            "solid": true,
+            "active": true,
+            "can_move": true,
+            "has_inventory": false
+        },
+        "collision": {
+            "enabled": true,
+            "offset": [0, 0],
+            "size": [16, 16],
+            "trigger": false
+        },
+        "audio": {
+            "footstep_trigger_distance": 16.0,
+            "movement_sound": "step"
+        },
+        "animations": {
+            "atlas_name": "players",
+            "clips": [
+                {
+                    "state": "attack_right",
+                    "frame_tiles": ["fighter/attack_right_a"],
+                    "frame_duration_ms": 150.0,
+                    "loop_mode": "once"
+                }
+            ],
+            "default_state": "attack_right"
+        },
+        "category": "human",
+        "tags": []
+    });
+
+    assert_valid(&schema, &doc);
+}
+
+#[test]
 fn entity_schema_rejects_invalid_primary_projectile_lifetime() {
     let schema = compile_entity_schema();
     let doc = json!({

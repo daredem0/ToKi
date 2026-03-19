@@ -1,10 +1,12 @@
 use crate::animation::AnimationState;
 use crate::collision;
 use crate::collision::CollisionBox;
-use crate::entity::{Entity, EntityId, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID};
+use crate::entity::{
+    Entity, EntityId, PrimaryActionDef, PrimaryActionMode, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
+};
 
 use super::animation::FacingDirection;
-use super::{GameState, InputAction};
+use super::{AudioChannel, AudioEvent, GameState, InputAction};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct StatChangeRequest {
@@ -25,6 +27,9 @@ impl GameState {
     }
 
     fn primary_action_damage_for_entity(entity: &Entity) -> i32 {
+        if let Some(primary_action) = &entity.attributes.primary_action {
+            return i32::try_from(primary_action.damage).unwrap_or(i32::MAX);
+        }
         entity
             .attributes
             .current_stat(ATTACK_POWER_STAT_ID)
@@ -115,11 +120,22 @@ impl GameState {
         changes
     }
 
+    fn authored_primary_projectile(entity: &Entity) -> Option<crate::entity::PrimaryProjectileDef> {
+        if let Some(primary_action) = &entity.attributes.primary_action {
+            return match primary_action.mode {
+                PrimaryActionMode::Melee => None,
+                PrimaryActionMode::Projectile => primary_action.projectile.clone(),
+            };
+        }
+
+        entity.attributes.primary_projectile.clone()
+    }
+
     fn spawn_primary_projectile(&mut self, attacker_id: EntityId, facing: FacingDirection) {
         let Some(attacker) = self.entity_manager.get_entity(attacker_id) else {
             return;
         };
-        let Some(spec) = attacker.attributes.primary_projectile.clone() else {
+        let Some(spec) = Self::authored_primary_projectile(attacker) else {
             return;
         };
         if spec.size[0] == 0 || spec.size[1] == 0 || spec.lifetime_ticks == 0 {
@@ -185,6 +201,47 @@ impl GameState {
             debug_damage,
             debug_lifetime_ticks
         );
+    }
+
+    fn parse_primary_action_animation_state(state: &str) -> Option<AnimationState> {
+        match state.to_ascii_lowercase().as_str() {
+            "idle" => Some(AnimationState::Idle),
+            "walk" => Some(AnimationState::Walk),
+            "attack" => Some(AnimationState::Attack),
+            "idle_down" => Some(AnimationState::IdleDown),
+            "idle_up" => Some(AnimationState::IdleUp),
+            "idle_left" => Some(AnimationState::IdleLeft),
+            "idle_right" => Some(AnimationState::IdleRight),
+            "walk_down" => Some(AnimationState::WalkDown),
+            "walk_up" => Some(AnimationState::WalkUp),
+            "walk_left" => Some(AnimationState::WalkLeft),
+            "walk_right" => Some(AnimationState::WalkRight),
+            "attack_down" => Some(AnimationState::AttackDown),
+            "attack_up" => Some(AnimationState::AttackUp),
+            "attack_left" => Some(AnimationState::AttackLeft),
+            "attack_right" => Some(AnimationState::AttackRight),
+            _ => None,
+        }
+    }
+
+    fn authored_primary_action(entity: &Entity) -> Option<PrimaryActionDef> {
+        entity.attributes.primary_action.clone()
+    }
+
+    fn authored_primary_action_sound_event(&self, entity_id: EntityId) -> Option<AudioEvent> {
+        let entity = self.entity_manager.get_entity(entity_id)?;
+        let sound_id = entity
+            .attributes
+            .primary_action
+            .as_ref()?
+            .sound_id
+            .clone()?;
+        Some(AudioEvent::PlaySound {
+            channel: AudioChannel::Action,
+            sound_id,
+            source_position: Some(entity.position),
+            hearing_radius: Some(entity.audio.hearing_radius),
+        })
     }
 
     fn projectile_hit_target(&self, projectile_id: EntityId) -> Option<EntityId> {
@@ -384,25 +441,46 @@ impl GameState {
         }
     }
 
-    fn trigger_entity_primary_action(&mut self, entity_id: EntityId) -> bool {
+    fn trigger_entity_primary_action(&mut self, entity_id: EntityId) -> Option<AudioEvent> {
+        let authored_primary_action = self
+            .entity_manager
+            .get_entity(entity_id)
+            .and_then(Self::authored_primary_action);
+
+        if let Some(entity) = self.entity_manager.get_entity(entity_id) {
+            if entity
+                .attributes
+                .primary_action_runtime
+                .cooldown_ticks_remaining
+                > 0
+            {
+                return None;
+            }
+        }
+
         let triggered_facing = {
-            let Some(animation_controller) = self
+            let animation_controller = self
                 .entity_manager
                 .get_entity_mut(entity_id)
-                .and_then(|entity| entity.attributes.animation_controller.as_mut())
-            else {
-                return false;
-            };
+                .and_then(|entity| entity.attributes.animation_controller.as_mut())?;
 
             let facing = Self::facing_from_animation_state(animation_controller.current_clip_state);
-            let directional_attack = Self::directional_attack_state(facing);
-            let next_state = if animation_controller.has_clip(directional_attack) {
-                directional_attack
-            } else if animation_controller.has_clip(AnimationState::Attack) {
-                AnimationState::Attack
-            } else {
-                return false;
-            };
+            let next_state = authored_primary_action
+                .as_ref()
+                .and_then(|primary_action| primary_action.animation_state.as_deref())
+                .and_then(Self::parse_primary_action_animation_state)
+                .filter(|state| animation_controller.has_clip(*state))
+                .or_else(|| {
+                    let directional_attack = Self::directional_attack_state(facing);
+                    animation_controller
+                        .has_clip(directional_attack)
+                        .then_some(directional_attack)
+                })
+                .or_else(|| {
+                    animation_controller
+                        .has_clip(AnimationState::Attack)
+                        .then_some(AnimationState::Attack)
+                })?;
 
             if animation_controller.play(next_state) {
                 Some(facing)
@@ -411,9 +489,7 @@ impl GameState {
             }
         };
 
-        let Some(facing) = triggered_facing else {
-            return false;
-        };
+        let facing = triggered_facing?;
 
         tracing::debug!(
             "Entity {} triggered primary action facing {:?}",
@@ -421,13 +497,37 @@ impl GameState {
             facing
         );
 
-        self.spawn_primary_projectile(entity_id, facing);
-        self.pending_stat_changes
-            .extend(self.collect_primary_action_stat_changes(entity_id, facing));
-        true
+        if let Some(entity) = self.entity_manager.get_entity_mut(entity_id) {
+            if let Some(primary_action) = &authored_primary_action {
+                entity
+                    .attributes
+                    .primary_action_runtime
+                    .cooldown_ticks_remaining = primary_action.cooldown_ticks;
+            }
+        }
+
+        match authored_primary_action.as_ref().map(|action| action.mode) {
+            Some(PrimaryActionMode::Melee) => {
+                self.pending_stat_changes
+                    .extend(self.collect_primary_action_stat_changes(entity_id, facing));
+            }
+            Some(PrimaryActionMode::Projectile) => {
+                self.spawn_primary_projectile(entity_id, facing);
+            }
+            None => {
+                self.spawn_primary_projectile(entity_id, facing);
+                self.pending_stat_changes
+                    .extend(self.collect_primary_action_stat_changes(entity_id, facing));
+            }
+        }
+
+        self.authored_primary_action_sound_event(entity_id)
     }
 
-    pub(super) fn process_profile_actions(&mut self) {
+    pub(super) fn process_profile_actions(
+        &mut self,
+        result: &mut crate::events::GameUpdateResult<AudioEvent>,
+    ) {
         let pending_actions = std::mem::take(&mut self.pending_profile_actions);
         if pending_actions.is_empty() {
             return;
@@ -449,7 +549,24 @@ impl GameState {
                 if Self::effective_movement_profile(entity) != profile {
                     continue;
                 }
-                self.trigger_entity_primary_action(entity_id);
+                if let Some(audio_event) = self.trigger_entity_primary_action(entity_id) {
+                    result.add_event(audio_event);
+                }
+            }
+        }
+    }
+
+    pub(super) fn tick_primary_action_cooldowns(&mut self) {
+        for entity_id in self.entity_manager.active_entities() {
+            let Some(entity) = self.entity_manager.get_entity_mut(entity_id) else {
+                continue;
+            };
+            let cooldown = &mut entity
+                .attributes
+                .primary_action_runtime
+                .cooldown_ticks_remaining;
+            if *cooldown > 0 {
+                *cooldown -= 1;
             }
         }
     }

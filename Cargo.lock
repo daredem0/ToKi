@@ -4550,6 +4550,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "toki-template-lowering"
+version = "0.1.1"
+dependencies = [
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.14",
+ "toki-core",
+ "toki-template-builtins",
+ "toki-templates",
+]
+
+[[package]]
 name = "toki-templates"
 version = "0.1.1"
 dependencies = [

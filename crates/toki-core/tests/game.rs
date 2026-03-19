@@ -9,7 +9,7 @@ use toki_core::assets::{
 use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, ControlRole,
     EntityDefinition, EntityKind, MovementProfile, MovementSoundTrigger, PickupDef,
-    PrimaryProjectileDef, RenderingDef, ATTACK_POWER_STAT_ID,
+    PrimaryActionDef, PrimaryActionMode, PrimaryProjectileDef, RenderingDef, ATTACK_POWER_STAT_ID,
 };
 use toki_core::rules::{Rule, RuleAction, RuleSet, RuleTarget, RuleTrigger};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
@@ -119,6 +119,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
                 MovementProfile::None
             },
             primary_projectile: None,
+            primary_action: None,
             pickup: None,
             has_inventory: false,
         },
@@ -1198,6 +1199,194 @@ fn game_state_primary_action_damages_scene_loaded_legacy_health_target() {
 }
 
 #[test]
+fn game_state_authored_primary_action_melee_applies_damage_emits_audio_and_respects_cooldown() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    player.attributes.primary_action = Some(PrimaryActionDef {
+        mode: PrimaryActionMode::Melee,
+        cooldown_ticks: 3,
+        damage: 6,
+        animation_state: Some("attack_right".to_string()),
+        sound_id: Some("sfx_attack".to_string()),
+        projectile: None,
+    });
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 120.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    let mut target_definition = test_definition("melee_target", "creature");
+    target_definition.attributes.health = Some(25);
+    let target_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&target_definition, IVec2::new(66, 60))
+        .expect("target should spawn");
+
+    let world_bounds = UVec2::new(128, 128);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    let first_result = game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.handle_profile_action_release(MovementProfile::PlayerWasd, InputAction::Primary);
+
+    assert!(first_result.events.iter().any(|event| {
+        matches!(
+            event,
+            AudioEvent::PlaySound {
+                channel: AudioChannel::Action,
+                sound_id,
+                source_position: Some(_),
+                hearing_radius: Some(_),
+            } if sound_id == "sfx_attack"
+        )
+    }));
+    assert_eq!(
+        game_state
+            .entity_manager()
+            .get_entity(target_id)
+            .expect("target should still exist")
+            .attributes
+            .current_stat("health"),
+        Some(19)
+    );
+
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    let blocked_result = game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.handle_profile_action_release(MovementProfile::PlayerWasd, InputAction::Primary);
+    assert!(
+        !blocked_result.events.iter().any(|event| matches!(
+            event,
+            AudioEvent::PlaySound {
+                channel: AudioChannel::Action,
+                ..
+            }
+        )),
+        "cooldown-blocked attack should not emit action audio"
+    );
+    assert_eq!(
+        game_state
+            .entity_manager()
+            .get_entity(target_id)
+            .expect("target should still exist")
+            .attributes
+            .current_stat("health"),
+        Some(19)
+    );
+
+    game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    let second_result = game_state.update(world_bounds, &tilemap, &atlas);
+    game_state.handle_profile_action_release(MovementProfile::PlayerWasd, InputAction::Primary);
+
+    assert!(second_result.events.iter().any(|event| {
+        matches!(
+            event,
+            AudioEvent::PlaySound {
+                channel: AudioChannel::Action,
+                sound_id,
+                ..
+            } if sound_id == "sfx_attack"
+        )
+    }));
+    assert_eq!(
+        game_state
+            .entity_manager()
+            .get_entity(target_id)
+            .expect("target should still exist after second hit")
+            .attributes
+            .current_stat("health"),
+        Some(13)
+    );
+}
+
+#[test]
+fn game_state_authored_primary_action_projectile_mode_spawns_projectile_from_authored_config() {
+    let sprite = create_test_sprite();
+    let mut game_state = GameState::new(sprite);
+    let player = game_state
+        .entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
+    player.attributes.primary_action = Some(PrimaryActionDef {
+        mode: PrimaryActionMode::Projectile,
+        cooldown_ticks: 0,
+        damage: 8,
+        animation_state: Some("attack_right".to_string()),
+        sound_id: None,
+        projectile: Some(PrimaryProjectileDef {
+            sheet: "fauna".to_string(),
+            object_name: "rock".to_string(),
+            size: [16, 16],
+            speed: 4,
+            damage: 8,
+            lifetime_ticks: 5,
+            spawn_offset: [0, 0],
+        }),
+    });
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 120.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    game_state.handle_profile_action_press(MovementProfile::PlayerWasd, InputAction::Primary);
+    game_state.update(
+        UVec2::new(128, 128),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    let projectile_ids = game_state
+        .entity_manager()
+        .active_entities()
+        .into_iter()
+        .filter(|&entity_id| {
+            game_state
+                .entity_manager()
+                .get_entity(entity_id)
+                .is_some_and(|entity| entity.entity_kind == EntityKind::Projectile)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(projectile_ids.len(), 1);
+}
+
+#[test]
 fn game_state_primary_action_spawns_projectile_when_authored() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
@@ -1536,6 +1725,7 @@ fn game_state_static_entity_renderables_include_object_sheet_backed_entities() {
             ai_behavior: toki_core::entity::AiBehavior::None,
             movement_profile: MovementProfile::None,
             primary_projectile: None,
+            primary_action: None,
             pickup: Some(PickupDef {
                 item_id: "coin".to_string(),
                 count: 1,

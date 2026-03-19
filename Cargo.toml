@@ -7,6 +7,7 @@ members = [
   "crates/toki-editor",
   "crates/toki-templates",
   "crates/toki-template-builtins",
+  "crates/toki-template-lowering",
 ]
 resolver = "2"
 

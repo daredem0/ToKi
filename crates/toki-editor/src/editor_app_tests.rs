@@ -407,6 +407,7 @@ fn load_preview_sprite_frame_static_supports_object_sheet_backed_entities() {
             ai_behavior: AiBehavior::None,
             movement_profile: MovementProfile::None,
             primary_projectile: None,
+            primary_action: None,
             pickup: Some(PickupDef {
                 item_id: "coin".to_string(),
                 count: 1,

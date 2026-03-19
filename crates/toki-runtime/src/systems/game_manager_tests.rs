@@ -144,6 +144,7 @@ fn sprite_render_request_wrapper_exposes_object_sheet_backed_entities() {
             ai_behavior: toki_core::entity::AiBehavior::None,
             movement_profile: toki_core::entity::MovementProfile::None,
             primary_projectile: None,
+            primary_action: None,
             pickup: Some(toki_core::entity::PickupDef {
                 item_id: "coin".to_string(),
                 count: 1,
