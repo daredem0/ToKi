@@ -496,6 +496,7 @@ impl InspectorSystem {
             RuleTrigger::OnDamaged => RuleTriggerKind::Damaged,
             RuleTrigger::OnDeath => RuleTriggerKind::Death,
             RuleTrigger::OnTrigger => RuleTriggerKind::Trigger,
+            RuleTrigger::OnInteract { .. } => RuleTriggerKind::Interact,
         }
     }
 
@@ -509,6 +510,7 @@ impl InspectorSystem {
             RuleTriggerKind::Damaged => "OnDamaged",
             RuleTriggerKind::Death => "OnDeath",
             RuleTriggerKind::Trigger => "OnTrigger",
+            RuleTriggerKind::Interact => "OnInteract",
         }
     }
 
@@ -522,6 +524,9 @@ impl InspectorSystem {
             RuleTriggerKind::Damaged => RuleTrigger::OnDamaged,
             RuleTriggerKind::Death => RuleTrigger::OnDeath,
             RuleTriggerKind::Trigger => RuleTrigger::OnTrigger,
+            RuleTriggerKind::Interact => RuleTrigger::OnInteract {
+                mode: toki_core::rules::InteractionMode::default(),
+            },
         };
     }
 
@@ -532,6 +537,11 @@ impl InspectorSystem {
             RuleKey::Left => "Left",
             RuleKey::Right => "Right",
             RuleKey::DebugToggle => "DebugToggle",
+            RuleKey::Interact => "Interact",
+            RuleKey::AttackPrimary => "AttackPrimary",
+            RuleKey::AttackSecondary => "AttackSecondary",
+            RuleKey::Inventory => "Inventory",
+            RuleKey::Pause => "Pause",
         }
     }
 

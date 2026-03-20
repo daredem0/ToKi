@@ -401,6 +401,7 @@ impl InspectorSystem {
             RuleTrigger::OnDamaged => "OnDamaged".to_string(),
             RuleTrigger::OnDeath => "OnDeath".to_string(),
             RuleTrigger::OnTrigger => "OnTrigger".to_string(),
+            RuleTrigger::OnInteract { .. } => "OnInteract".to_string(),
         }
     }
 
@@ -515,6 +516,7 @@ impl InspectorSystem {
                     RuleTriggerKind::Damaged,
                     RuleTriggerKind::Death,
                     RuleTriggerKind::Trigger,
+                    RuleTriggerKind::Interact,
                 ] {
                     changed |= ui
                         .selectable_value(
@@ -537,6 +539,9 @@ impl InspectorSystem {
                 RuleTriggerKind::Damaged => RuleTrigger::OnDamaged,
                 RuleTriggerKind::Death => RuleTrigger::OnDeath,
                 RuleTriggerKind::Trigger => RuleTrigger::OnTrigger,
+                RuleTriggerKind::Interact => RuleTrigger::OnInteract {
+                    mode: toki_core::rules::InteractionMode::default(),
+                },
             };
             changed = true;
         }
@@ -546,6 +551,14 @@ impl InspectorSystem {
                 ui,
                 &format!("graph_node_trigger_key_{}_{}", scene_name, node_key),
                 key,
+            );
+        }
+
+        if let RuleTrigger::OnInteract { mode } = trigger {
+            changed |= Self::render_rule_interaction_mode_editor_with_salt(
+                ui,
+                &format!("graph_node_trigger_interact_mode_{}_{}", scene_name, node_key),
+                mode,
             );
         }
 
@@ -917,9 +930,54 @@ impl InspectorSystem {
                         RuleKey::Left,
                         RuleKey::Right,
                         RuleKey::DebugToggle,
+                        RuleKey::Interact,
+                        RuleKey::AttackPrimary,
+                        RuleKey::AttackSecondary,
+                        RuleKey::Inventory,
+                        RuleKey::Pause,
                     ] {
                         changed |= ui
                             .selectable_value(key, candidate, Self::rule_key_label(candidate))
+                            .changed();
+                    }
+                });
+        });
+        changed
+    }
+
+    fn interaction_mode_label(mode: toki_core::rules::InteractionMode) -> &'static str {
+        use toki_core::rules::InteractionMode;
+        match mode {
+            InteractionMode::Overlap => "Overlap (Same Tile)",
+            InteractionMode::Adjacent => "Adjacent (Within Reach)",
+            InteractionMode::InFront => "In Front",
+        }
+    }
+
+    pub(in super::super) fn render_rule_interaction_mode_editor_with_salt(
+        ui: &mut egui::Ui,
+        id_salt: &str,
+        mode: &mut toki_core::rules::InteractionMode,
+    ) -> bool {
+        use toki_core::rules::InteractionMode;
+
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Mode:");
+            egui::ComboBox::from_id_salt(id_salt)
+                .selected_text(Self::interaction_mode_label(*mode))
+                .show_ui(ui, |ui| {
+                    for candidate in [
+                        InteractionMode::Overlap,
+                        InteractionMode::Adjacent,
+                        InteractionMode::InFront,
+                    ] {
+                        changed |= ui
+                            .selectable_value(
+                                mode,
+                                candidate,
+                                Self::interaction_mode_label(candidate),
+                            )
                             .changed();
                     }
                 });

@@ -24,7 +24,12 @@ impl GameState {
                 InputKey::Down => delta.y += 1,
                 InputKey::Left => delta.x -= 1,
                 InputKey::Right => delta.x += 1,
-                InputKey::DebugToggle => {}
+                InputKey::DebugToggle
+                | InputKey::Interact
+                | InputKey::AttackPrimary
+                | InputKey::AttackSecondary
+                | InputKey::Inventory
+                | InputKey::Pause => {}
             }
         }
         delta

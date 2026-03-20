@@ -20,6 +20,8 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             solid: true,
             active: true,
             can_move: true,
+            interactable: false,
+            interaction_reach: 0,
             ai_behavior: if category == "creature" {
                 AiBehavior::Wander
             } else {

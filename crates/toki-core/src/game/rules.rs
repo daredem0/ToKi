@@ -40,6 +40,28 @@ pub struct DeathEvent {
     pub attacker: Option<EntityId>,
 }
 
+/// The spatial relationship between player and interactable when interaction occurred.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InteractionSpatial {
+    /// Player was overlapping the interactable (strict AABB intersection).
+    Overlap,
+    /// Player was adjacent to the interactable (within reach but not overlapping).
+    Adjacent,
+    /// Player was facing the interactable and within reach.
+    InFront,
+}
+
+/// An interaction event recording when the player interacts with an entity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InteractionEvent {
+    /// The entity that initiated the interaction (player).
+    pub interactor: EntityId,
+    /// The entity being interacted with.
+    pub interactable: EntityId,
+    /// The spatial relationship when interaction occurred.
+    pub spatial: InteractionSpatial,
+}
+
 #[derive(Debug, Default)]
 pub(super) struct RuleRuntimeState {
     pub(super) started: bool,
@@ -51,6 +73,8 @@ pub(super) struct RuleRuntimeState {
     pub(super) frame_damage_events: Vec<DamageEvent>,
     /// Death events that occurred this frame.
     pub(super) frame_death_events: Vec<DeathEvent>,
+    /// Interaction events that occurred this frame.
+    pub(super) frame_interactions: Vec<InteractionEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -163,6 +187,70 @@ impl GameState {
             if rule.once {
                 self.rule_runtime.fired_once_rules.insert(rule.id);
             }
+        }
+    }
+
+    /// Collects rule commands for OnInteract triggers, filtering by interaction mode.
+    ///
+    /// The `event` contains the spatial relationship between player and interactable.
+    /// Only rules whose interaction mode matches the spatial relationship will fire.
+    pub(super) fn collect_rule_commands_for_interaction(
+        &mut self,
+        event: &InteractionEvent,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        let context = TriggerContext::with_pair(event.interactor, event.interactable);
+
+        let mut matching_rules = self
+            .rules
+            .rules
+            .iter()
+            .filter(|rule| rule.enabled)
+            .filter(|rule| matches!(rule.trigger, RuleTrigger::OnInteract { .. }))
+            .filter(|rule| {
+                !(rule.once
+                    && self
+                        .rule_runtime
+                        .fired_once_rules
+                        .contains(rule.id.as_str()))
+            })
+            .filter(|rule| {
+                // Check if the rule's interaction mode matches the event's spatial
+                let mode = rule.trigger.interaction_mode().unwrap_or_default();
+                Self::interaction_mode_matches(mode, event.spatial)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+
+        matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+
+        for rule in matching_rules {
+            if !self.rule_conditions_match(&rule.conditions, &context) {
+                continue;
+            }
+
+            for action in &rule.actions {
+                self.buffer_rule_action(action, &context, command_buffer);
+            }
+
+            if rule.once {
+                self.rule_runtime.fired_once_rules.insert(rule.id);
+            }
+        }
+    }
+
+    /// Checks if an interaction mode matches a spatial relationship.
+    ///
+    /// - `Overlap`: Only matches `Overlap` spatial
+    /// - `Adjacent`: Matches `Overlap`, `Adjacent`, or `InFront` (anything within reach)
+    /// - `InFront`: Only matches `InFront` or `Overlap` (overlap implies you're "on" the entity)
+    fn interaction_mode_matches(mode: crate::rules::InteractionMode, spatial: InteractionSpatial) -> bool {
+        use crate::rules::InteractionMode;
+
+        match mode {
+            InteractionMode::Overlap => matches!(spatial, InteractionSpatial::Overlap),
+            InteractionMode::Adjacent => true, // Adjacent mode accepts any proximity
+            InteractionMode::InFront => matches!(spatial, InteractionSpatial::InFront | InteractionSpatial::Overlap),
         }
     }
 

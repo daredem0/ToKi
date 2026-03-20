@@ -260,6 +260,10 @@ pub struct EntityAttributes {
     pub active: bool,
     pub can_move: bool, // Can we be moved by the player
     #[serde(default)]
+    pub interactable: bool, // Can player interact with this entity
+    #[serde(default)]
+    pub interaction_reach: u32, // Extra pixels of reach for interaction (0 = must overlap)
+    #[serde(default)]
     pub ai_behavior: AiBehavior,
     #[serde(default)]
     pub movement_profile: MovementProfile,
@@ -337,6 +341,8 @@ impl Default for EntityAttributes {
             render_layer: 0,
             active: true,
             can_move: true,
+            interactable: false,
+            interaction_reach: 0,
             ai_behavior: AiBehavior::default(),
             movement_profile: MovementProfile::default(),
             primary_projectile: None,
@@ -772,6 +778,10 @@ pub struct AttributesDef {
     pub active: bool,
     pub can_move: bool,
     #[serde(default)]
+    pub interactable: bool,
+    #[serde(default)]
+    pub interaction_reach: u32,
+    #[serde(default)]
     pub ai_behavior: AiBehavior,
     #[serde(default)]
     pub movement_profile: MovementProfile,
@@ -919,6 +929,8 @@ impl EntityDefinition {
             render_layer: self.rendering.render_layer,
             active: self.attributes.active,
             can_move: self.attributes.can_move,
+            interactable: self.attributes.interactable,
+            interaction_reach: self.attributes.interaction_reach,
             ai_behavior: self.attributes.ai_behavior,
             movement_profile: self.attributes.movement_profile,
             primary_projectile: self.attributes.primary_projectile.clone(),

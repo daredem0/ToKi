@@ -141,6 +141,8 @@ fn sprite_render_request_wrapper_exposes_object_sheet_backed_entities() {
             solid: false,
             active: true,
             can_move: false,
+            interactable: false,
+            interaction_reach: 0,
             ai_behavior: toki_core::entity::AiBehavior::None,
             movement_profile: toki_core::entity::MovementProfile::None,
             primary_projectile: None,

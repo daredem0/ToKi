@@ -69,4 +69,5 @@ pub enum RuleTriggerEditorKind {
     Damaged,
     Death,
     Trigger,
+    Interact,
 }

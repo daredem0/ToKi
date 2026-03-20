@@ -123,6 +123,11 @@ impl GameState {
             InputKey::Left => 2,
             InputKey::Right => 3,
             InputKey::DebugToggle => 4,
+            InputKey::Interact => 5,
+            InputKey::AttackPrimary => 6,
+            InputKey::AttackSecondary => 7,
+            InputKey::Inventory => 8,
+            InputKey::Pause => 9,
         }
     }
 
@@ -133,6 +138,11 @@ impl GameState {
             InputKey::Left => RuleKey::Left,
             InputKey::Right => RuleKey::Right,
             InputKey::DebugToggle => RuleKey::DebugToggle,
+            InputKey::Interact => RuleKey::Interact,
+            InputKey::AttackPrimary => RuleKey::AttackPrimary,
+            InputKey::AttackSecondary => RuleKey::AttackSecondary,
+            InputKey::Inventory => RuleKey::Inventory,
+            InputKey::Pause => RuleKey::Pause,
         }
     }
 
@@ -143,6 +153,11 @@ impl GameState {
             RuleKey::Left => InputKey::Left,
             RuleKey::Right => InputKey::Right,
             RuleKey::DebugToggle => InputKey::DebugToggle,
+            RuleKey::Interact => InputKey::Interact,
+            RuleKey::AttackPrimary => InputKey::AttackPrimary,
+            RuleKey::AttackSecondary => InputKey::AttackSecondary,
+            RuleKey::Inventory => InputKey::Inventory,
+            RuleKey::Pause => InputKey::Pause,
         }
     }
 }

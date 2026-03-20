@@ -77,6 +77,25 @@ impl InspectorSystem {
         changed |= ui.checkbox(&mut draft.visible, "Visible").changed();
         changed |= ui.checkbox(&mut draft.active, "Active").changed();
         changed |= ui.checkbox(&mut draft.solid, "Solid").changed();
+        changed |= ui.checkbox(&mut draft.interactable, "Interactable").changed();
+        if draft.interactable {
+            ui.horizontal(|ui| {
+                ui.label("Interaction Reach:");
+                let mut value = draft.interaction_reach as i64;
+                if ui
+                    .add(
+                        egui::DragValue::new(&mut value)
+                            .speed(1.0)
+                            .range(0..=256),
+                    )
+                    .changed()
+                {
+                    draft.interaction_reach = value as u32;
+                    changed = true;
+                }
+                ui.label("px");
+            });
+        }
         if !is_static_item {
             changed |= ui.checkbox(&mut draft.can_move, "Can Move").changed();
             ui.horizontal(|ui| {
@@ -357,6 +376,14 @@ impl InspectorSystem {
         }
         if definition.attributes.solid != draft.solid {
             definition.attributes.solid = draft.solid;
+            changed = true;
+        }
+        if definition.attributes.interactable != draft.interactable {
+            definition.attributes.interactable = draft.interactable;
+            changed = true;
+        }
+        if definition.attributes.interaction_reach != draft.interaction_reach {
+            definition.attributes.interaction_reach = draft.interaction_reach;
             changed = true;
         }
         if definition.attributes.can_move != draft.can_move {
@@ -966,6 +993,11 @@ impl InspectorSystem {
         changed |= set_if_changed(&mut entity.attributes.visible, draft.visible);
         changed |= set_if_changed(&mut entity.attributes.active, draft.active);
         changed |= set_if_changed(&mut entity.attributes.solid, draft.solid);
+        changed |= set_if_changed(&mut entity.attributes.interactable, draft.interactable);
+        changed |= set_if_changed(
+            &mut entity.attributes.interaction_reach,
+            draft.interaction_reach,
+        );
         changed |= set_if_changed(&mut entity.attributes.can_move, draft.can_move);
         changed |= set_if_changed(&mut entity.control_role, draft.control_role);
         changed |= set_if_changed(&mut entity.attributes.ai_behavior, draft.ai_behavior);

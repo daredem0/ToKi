@@ -11,6 +11,7 @@ impl PanelSystem {
             RuleTrigger::OnDamaged => "OnDamaged".to_string(),
             RuleTrigger::OnDeath => "OnDeath".to_string(),
             RuleTrigger::OnTrigger => "OnTrigger".to_string(),
+            RuleTrigger::OnInteract { .. } => "OnInteract".to_string(),
         }
     }
 
@@ -75,6 +76,11 @@ impl PanelSystem {
             RuleKey::Left => "Left",
             RuleKey::Right => "Right",
             RuleKey::DebugToggle => "DebugToggle",
+            RuleKey::Interact => "Interact",
+            RuleKey::AttackPrimary => "AttackPrimary",
+            RuleKey::AttackSecondary => "AttackSecondary",
+            RuleKey::Inventory => "Inventory",
+            RuleKey::Pause => "Pause",
         }
     }
 
@@ -105,6 +111,7 @@ impl PanelSystem {
             RuleTrigger::OnDamaged => GraphTriggerKind::Damaged,
             RuleTrigger::OnDeath => GraphTriggerKind::Death,
             RuleTrigger::OnTrigger => GraphTriggerKind::Trigger,
+            RuleTrigger::OnInteract { .. } => GraphTriggerKind::Interact,
         }
     }
 
@@ -118,6 +125,7 @@ impl PanelSystem {
             GraphTriggerKind::Damaged => "OnDamaged",
             GraphTriggerKind::Death => "OnDeath",
             GraphTriggerKind::Trigger => "OnTrigger",
+            GraphTriggerKind::Interact => "OnInteract",
         }
     }
 
@@ -131,6 +139,9 @@ impl PanelSystem {
             GraphTriggerKind::Damaged => RuleTrigger::OnDamaged,
             GraphTriggerKind::Death => RuleTrigger::OnDeath,
             GraphTriggerKind::Trigger => RuleTrigger::OnTrigger,
+            GraphTriggerKind::Interact => RuleTrigger::OnInteract {
+                mode: toki_core::rules::InteractionMode::default(),
+            },
         }
     }
 
@@ -421,13 +432,7 @@ impl PanelSystem {
     pub(super) fn edit_rule_key(ui: &mut egui::Ui, key: &mut RuleKey, id_salt: &str) -> bool {
         let mut changed = false;
         egui::ComboBox::from_id_salt(id_salt)
-            .selected_text(match key {
-                RuleKey::Up => "Up",
-                RuleKey::Down => "Down",
-                RuleKey::Left => "Left",
-                RuleKey::Right => "Right",
-                RuleKey::DebugToggle => "DebugToggle",
-            })
+            .selected_text(Self::key_label(*key))
             .show_ui(ui, |ui| {
                 for candidate in [
                     RuleKey::Up,
@@ -435,19 +440,14 @@ impl PanelSystem {
                     RuleKey::Left,
                     RuleKey::Right,
                     RuleKey::DebugToggle,
+                    RuleKey::Interact,
+                    RuleKey::AttackPrimary,
+                    RuleKey::AttackSecondary,
+                    RuleKey::Inventory,
+                    RuleKey::Pause,
                 ] {
                     changed |= ui
-                        .selectable_value(
-                            key,
-                            candidate,
-                            match candidate {
-                                RuleKey::Up => "Up",
-                                RuleKey::Down => "Down",
-                                RuleKey::Left => "Left",
-                                RuleKey::Right => "Right",
-                                RuleKey::DebugToggle => "DebugToggle",
-                            },
-                        )
+                        .selectable_value(key, candidate, Self::key_label(candidate))
                         .changed();
                 }
             });

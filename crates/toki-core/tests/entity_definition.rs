@@ -26,6 +26,8 @@ fn test_entity_definition_create_entity_basic() {
             primary_projectile: None,
             pickup: None,
             has_inventory: true,
+            interactable: false,
+            interaction_reach: 0,
         },
         collision: CollisionDef {
             enabled: true,
@@ -155,6 +157,8 @@ fn test_entity_definition_create_npc_entity() {
             primary_projectile: None,
             pickup: None,
             has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
         },
         collision: CollisionDef {
             enabled: false,
@@ -302,6 +306,8 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
             primary_projectile: None,
             pickup: None,
             has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
         },
         collision: CollisionDef {
             enabled: true,
@@ -426,6 +432,8 @@ fn test_entity_definition_accepts_directional_animation_states() {
             primary_projectile: None,
             pickup: None,
             has_inventory: true,
+            interactable: false,
+            interaction_reach: 0,
         },
         collision: CollisionDef {
             enabled: true,
@@ -512,6 +520,8 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
             primary_projectile: None,
             pickup: None,
             has_inventory: true,
+            interactable: false,
+            interaction_reach: 0,
         },
         collision: CollisionDef {
             enabled: true,
@@ -607,6 +617,8 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
             primary_projectile: None,
             pickup: None,
             has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
         },
         collision: CollisionDef {
             enabled: true,
@@ -671,6 +683,8 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
             primary_projectile: None,
             pickup: None,
             has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
         },
         collision: CollisionDef {
             enabled: true,
@@ -744,6 +758,8 @@ fn test_entity_definition_copies_authored_primary_projectile() {
             }),
             pickup: None,
             has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
         },
         collision: CollisionDef {
             enabled: true,
@@ -819,6 +835,8 @@ fn test_entity_definition_copies_authored_pickup() {
                 count: 3,
             }),
             has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
         },
         collision: CollisionDef {
             enabled: true,
@@ -886,6 +904,8 @@ fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type()
             primary_projectile: None,
             pickup: None,
             has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
         },
         collision: CollisionDef {
             enabled: false,
@@ -940,6 +960,8 @@ fn test_entity_definition_invalid_animation_state() {
             primary_projectile: None,
             pickup: None,
             has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
         },
         collision: CollisionDef {
             enabled: false,
@@ -997,6 +1019,8 @@ fn test_entity_definition_invalid_loop_mode() {
             primary_projectile: None,
             pickup: None,
             has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
         },
         collision: CollisionDef {
             enabled: false,
@@ -1054,6 +1078,8 @@ fn test_entity_definition_serialization() {
             primary_projectile: None,
             pickup: None,
             has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
         },
         collision: CollisionDef {
             enabled: true,
@@ -1123,6 +1149,8 @@ fn test_entity_definition_create_audio_component() {
             primary_projectile: None,
             pickup: None,
             has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
         },
         collision: CollisionDef {
             enabled: true,

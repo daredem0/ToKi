@@ -375,6 +375,7 @@ fn trigger_kind_label(trigger: &RuleTrigger) -> &'static str {
         RuleTrigger::OnDamaged => "OnDamaged",
         RuleTrigger::OnDeath => "OnDeath",
         RuleTrigger::OnTrigger => "OnTrigger",
+        RuleTrigger::OnInteract { .. } => "OnInteract",
     }
 }
 

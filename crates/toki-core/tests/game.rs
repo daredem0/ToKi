@@ -112,6 +112,8 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             solid: true,
             active: true,
             can_move: true,
+            interactable: false,
+            interaction_reach: 0,
             ai_behavior: if category == "creature" {
                 toki_core::entity::AiBehavior::Wander
             } else {
@@ -172,6 +174,8 @@ fn player_definition(name: &str) -> EntityDefinition {
             solid: true,
             active: true,
             can_move: true,
+            interactable: false,
+            interaction_reach: 0,
             ai_behavior: toki_core::entity::AiBehavior::None,
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: None,
@@ -1639,6 +1643,8 @@ fn game_state_static_entity_renderables_include_object_sheet_backed_entities() {
             solid: false,
             active: true,
             can_move: false,
+            interactable: false,
+            interaction_reach: 0,
             ai_behavior: toki_core::entity::AiBehavior::None,
             movement_profile: MovementProfile::None,
             primary_projectile: None,

@@ -24,6 +24,8 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             solid: true,
             active: true,
             can_move: true,
+            interactable: false,
+            interaction_reach: 0,
             ai_behavior: if category == "creature" {
                 AiBehavior::Wander
             } else {
@@ -88,6 +90,8 @@ fn create_test_entity() -> Entity {
         render_layer: 2,
         active: true,
         can_move: true,
+        interactable: false,
+        interaction_reach: 0,
         ai_behavior: AiBehavior::None,
         movement_profile: MovementProfile::PlayerWasd,
         primary_projectile: None,

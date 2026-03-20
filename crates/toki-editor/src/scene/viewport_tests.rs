@@ -234,6 +234,8 @@ fn viewport_resolves_shared_sprite_render_requests_for_static_entities() {
             solid: false,
             active: true,
             can_move: false,
+            interactable: false,
+            interaction_reach: 0,
             ai_behavior: toki_core::entity::AiBehavior::None,
             movement_profile: toki_core::entity::MovementProfile::None,
             primary_projectile: None,

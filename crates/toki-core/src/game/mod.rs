@@ -15,6 +15,7 @@ use crate::scene_manager::SceneManager;
 mod animation;
 mod combat;
 mod input;
+mod interaction;
 mod inventory;
 mod movement;
 mod render_queries;
@@ -33,7 +34,11 @@ pub enum InputKey {
     Left,
     Right,
     DebugToggle, // F4 key for toggling debug rendering
-                 // Can extend with more keys as needed
+    Interact,
+    AttackPrimary,
+    AttackSecondary,
+    Inventory,
+    Pause,
 }
 
 /// Profile-scoped action buttons that can be mapped independently from movement.
@@ -149,6 +154,7 @@ impl GameState {
         self.rule_runtime.frame_collisions.clear();
         self.rule_runtime.frame_damage_events.clear();
         self.rule_runtime.frame_death_events.clear();
+        self.rule_runtime.frame_interactions.clear();
 
         if !self.rule_runtime.started {
             self.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut rule_commands);
@@ -213,6 +219,7 @@ impl GameState {
         self.process_profile_actions();
         self.update_projectiles(tilemap, atlas);
         self.collect_overlapping_pickups();
+        self.collect_interaction_events();
         self.resolve_pending_stat_changes();
 
         // Update NPC AI
@@ -271,6 +278,12 @@ impl GameState {
                     context,
                     &mut reactive_rule_commands,
                 );
+            }
+
+            // Fire interact triggers with context for each interaction event
+            let interaction_events = std::mem::take(&mut self.rule_runtime.frame_interactions);
+            for event in &interaction_events {
+                self.collect_rule_commands_for_interaction(event, &mut reactive_rule_commands);
             }
         }
 
@@ -338,6 +351,7 @@ impl GameState {
         self.rule_runtime.frame_collisions.clear();
         self.rule_runtime.frame_damage_events.clear();
         self.rule_runtime.frame_death_events.clear();
+        self.rule_runtime.frame_interactions.clear();
 
         if !self.rule_runtime.started {
             self.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut rule_commands);
@@ -373,6 +387,7 @@ impl GameState {
         self.process_profile_actions();
         self.update_projectiles(tilemap, atlas);
         self.collect_overlapping_pickups();
+        self.collect_interaction_events();
         self.resolve_pending_stat_changes();
 
         // Update NPC AI
@@ -497,6 +512,12 @@ impl GameState {
                 context,
                 reactive_rule_commands,
             );
+        }
+
+        // Fire interact triggers with context for each interaction event
+        let interaction_events = std::mem::take(&mut self.rule_runtime.frame_interactions);
+        for event in &interaction_events {
+            self.collect_rule_commands_for_interaction(event, reactive_rule_commands);
         }
 
         if self.any_entity_overlaps_trigger_tile(tilemap, atlas) {

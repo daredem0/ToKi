@@ -58,6 +58,10 @@ pub enum RuleTrigger {
     OnDamaged,
     OnDeath,
     OnTrigger,
+    OnInteract {
+        #[serde(default)]
+        mode: InteractionMode,
+    },
 }
 
 impl RuleTrigger {
@@ -68,8 +72,19 @@ impl RuleTrigger {
     pub const fn provides_context(&self) -> bool {
         matches!(
             self,
-            RuleTrigger::OnCollision | RuleTrigger::OnDamaged | RuleTrigger::OnDeath
+            RuleTrigger::OnCollision
+                | RuleTrigger::OnDamaged
+                | RuleTrigger::OnDeath
+                | RuleTrigger::OnInteract { .. }
         )
+    }
+
+    /// Returns the interaction mode if this is an OnInteract trigger.
+    pub const fn interaction_mode(&self) -> Option<InteractionMode> {
+        match self {
+            RuleTrigger::OnInteract { mode } => Some(*mode),
+            _ => None,
+        }
     }
 }
 
@@ -80,6 +95,11 @@ pub enum RuleKey {
     Left,
     Right,
     DebugToggle,
+    Interact,
+    AttackPrimary,
+    AttackSecondary,
+    Inventory,
+    Pause,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -94,6 +114,19 @@ pub enum RuleCondition {
 pub enum RuleSoundChannel {
     Movement,
     Collision,
+}
+
+/// Spatial relationship required for OnInteract trigger to fire.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum InteractionMode {
+    /// Player must be overlapping the interactable entity (strict AABB intersection).
+    Overlap,
+    /// Player can be adjacent to the interactable (touching at edges, 1px reach).
+    #[default]
+    Adjacent,
+    /// Player must be facing the interactable and within reach.
+    /// Uses the player's facing direction to determine valid interaction targets.
+    InFront,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

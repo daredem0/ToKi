@@ -8,8 +8,8 @@ use toki_core::assets::{
 };
 use toki_core::game::{AudioChannel, AudioEvent};
 use toki_core::rules::{
-    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
-    RuleTarget, RuleTrigger,
+    InteractionMode, Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel,
+    RuleSpawnEntityType, RuleTarget, RuleTrigger,
 };
 use toki_core::{
     entity::EntityKind,
@@ -1969,5 +1969,261 @@ fn on_damaged_with_trigger_other_refers_to_attacker() {
     assert!(update.events.iter().any(|event| matches!(
         event,
         AudioEvent::PlaySound { sound_id, .. } if sound_id == "attacker_exists"
+    )));
+}
+
+// Phase 1.5B: Extended Keys And Interaction Tests
+
+#[test]
+fn on_key_interact_fires_when_interact_key_is_held() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "interact-key-sfx",
+            RuleTrigger::OnKey {
+                key: RuleKey::Interact,
+            },
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "interact_sfx".to_string(),
+            }],
+        )],
+    });
+
+    state.handle_key_press(InputKey::Interact);
+    let pressed = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert!(pressed.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "interact_sfx"
+    )));
+
+    state.handle_key_release(InputKey::Interact);
+    let released = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert!(!released.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "interact_sfx"
+    )));
+}
+
+#[test]
+fn on_key_attack_primary_fires_when_attack_primary_key_is_held() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "attack-primary-key-sfx",
+            RuleTrigger::OnKey {
+                key: RuleKey::AttackPrimary,
+            },
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "attack_primary_sfx".to_string(),
+            }],
+        )],
+    });
+
+    state.handle_key_press(InputKey::AttackPrimary);
+    let pressed = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert!(pressed.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "attack_primary_sfx"
+    )));
+}
+
+#[test]
+fn on_interact_fires_when_player_overlaps_interactable_and_presses_interact() {
+    let mut state = GameState::new_empty();
+    let _player_id = state.spawn_player_at(IVec2::new(50, 50));
+
+    // Spawn NPC at overlapping position
+    let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    // Mark NPC as interactable
+    state
+        .entity_manager_mut()
+        .get_entity_mut(npc_id)
+        .expect("npc should exist")
+        .attributes
+        .interactable = true;
+
+    // Rule fires on interact with NPC
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "npc-interact",
+            RuleTrigger::OnInteract { mode: InteractionMode::default() },
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "npc_talk".to_string(),
+            }],
+        )],
+    });
+
+    // Press interact key
+    state.handle_key_press(InputKey::Interact);
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(result.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "npc_talk"
+    )));
+
+    // Release interact - should not fire again
+    state.handle_key_release(InputKey::Interact);
+    let no_interact = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert!(!no_interact.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "npc_talk"
+    )));
+}
+
+#[test]
+fn on_interact_does_not_fire_when_not_overlapping() {
+    let mut state = GameState::new_empty();
+    state.spawn_player_at(IVec2::new(50, 50));
+
+    // Spawn NPC far away
+    let npc_id = state.spawn_player_like_npc(IVec2::new(150, 150));
+    state
+        .entity_manager_mut()
+        .get_entity_mut(npc_id)
+        .expect("npc should exist")
+        .attributes
+        .interactable = true;
+
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "npc-interact",
+            RuleTrigger::OnInteract { mode: InteractionMode::default() },
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "npc_talk".to_string(),
+            }],
+        )],
+    });
+
+    state.handle_key_press(InputKey::Interact);
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    // Should not fire because player is not overlapping
+    assert!(!result.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "npc_talk"
+    )));
+}
+
+#[test]
+fn on_interact_does_not_fire_when_entity_is_not_interactable() {
+    let mut state = GameState::new_empty();
+    state.spawn_player_at(IVec2::new(50, 50));
+
+    // Spawn NPC at overlapping position but NOT marked as interactable
+    let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    state
+        .entity_manager_mut()
+        .get_entity_mut(npc_id)
+        .expect("npc should exist")
+        .attributes
+        .interactable = false;
+
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "npc-interact",
+            RuleTrigger::OnInteract { mode: InteractionMode::default() },
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "npc_talk".to_string(),
+            }],
+        )],
+    });
+
+    state.handle_key_press(InputKey::Interact);
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    // Should not fire because NPC is not interactable
+    assert!(!result.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "npc_talk"
+    )));
+}
+
+#[test]
+fn on_interact_provides_trigger_context() {
+    let mut state = GameState::new_empty();
+    let _player_id = state.spawn_player_at(IVec2::new(50, 50));
+
+    // Spawn interactable NPC
+    let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    state
+        .entity_manager_mut()
+        .get_entity_mut(npc_id)
+        .expect("npc should exist")
+        .attributes
+        .interactable = true;
+
+    // Rule uses TriggerSelf (player) and TriggerOther (NPC)
+    state.set_rules(RuleSet {
+        rules: vec![Rule {
+            id: "interact-context".to_string(),
+            enabled: true,
+            priority: 0,
+            once: false,
+            trigger: RuleTrigger::OnInteract { mode: InteractionMode::default() },
+            conditions: vec![
+                RuleCondition::TargetExists {
+                    target: RuleTarget::TriggerSelf,
+                },
+                RuleCondition::TargetExists {
+                    target: RuleTarget::TriggerOther,
+                },
+            ],
+            actions: vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "context_valid".to_string(),
+            }],
+        }],
+    });
+
+    state.handle_key_press(InputKey::Interact);
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    // Should fire because both TriggerSelf and TriggerOther exist
+    assert!(result.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "context_valid"
     )));
 }

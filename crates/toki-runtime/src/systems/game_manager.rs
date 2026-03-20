@@ -124,6 +124,7 @@ impl GameManager {
                 action: InputAction::Primary,
             }),
             KeyCode::F4 => Some(KeyboardBinding::Direct(InputKey::DebugToggle)),
+            KeyCode::KeyE => Some(KeyboardBinding::Direct(InputKey::Interact)),
             _ => None,
         }
     }

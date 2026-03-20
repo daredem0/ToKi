@@ -42,6 +42,8 @@ fn sample_entity_definition(name: &str, category: &str, size: [u32; 2]) -> Entit
             solid: true,
             active: true,
             can_move: false,
+            interactable: false,
+            interaction_reach: 0,
             ai_behavior: toki_core::entity::AiBehavior::Wander,
             movement_profile: toki_core::entity::MovementProfile::None,
             primary_projectile: None,

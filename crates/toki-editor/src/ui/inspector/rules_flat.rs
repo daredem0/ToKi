@@ -135,6 +135,13 @@ impl InspectorSystem {
                                 Self::trigger_kind_label(RuleTriggerKind::Trigger),
                             )
                             .changed();
+                        outcome.changed |= ui
+                            .selectable_value(
+                                &mut trigger_kind,
+                                RuleTriggerKind::Interact,
+                                Self::trigger_kind_label(RuleTriggerKind::Interact),
+                            )
+                            .changed();
                     });
                     if trigger_kind != Self::trigger_kind(&rule.trigger) {
                         Self::set_rule_trigger_kind(rule, trigger_kind);
@@ -156,6 +163,11 @@ impl InspectorSystem {
                                 RuleKey::Left,
                                 RuleKey::Right,
                                 RuleKey::DebugToggle,
+                                RuleKey::Interact,
+                                RuleKey::AttackPrimary,
+                                RuleKey::AttackSecondary,
+                                RuleKey::Inventory,
+                                RuleKey::Pause,
                             ] {
                                 outcome.changed |= ui
                                     .selectable_value(
@@ -606,6 +618,11 @@ impl InspectorSystem {
                             RuleKey::Left,
                             RuleKey::Right,
                             RuleKey::DebugToggle,
+                            RuleKey::Interact,
+                            RuleKey::AttackPrimary,
+                            RuleKey::AttackSecondary,
+                            RuleKey::Inventory,
+                            RuleKey::Pause,
                         ] {
                             changed |= ui
                                 .selectable_value(key, candidate, Self::rule_key_label(candidate))

@@ -7,9 +7,9 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-"Scene 2" = "scenes/Scene 2.json"
 "Main Scene" = "scenes/Main Scene.json"
 main = "scenes/main.json"
+"Scene 2" = "scenes/Scene 2.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -124,6 +124,39 @@ recent_files = []
 
 [editor.camera_settings]
 
+[editor.graph_layouts."Main Scene"]
+zoom = 0.791378378868103
+pan = [
+    -85.2137451171875,
+    98.4921875,
+]
+
+[editor.graph_layouts."Main Scene".node_positions]
+"node:2" = [
+    800.0,
+    50.0,
+]
+"node:3" = [
+    430.0,
+    50.0,
+]
+"node:4" = [
+    60.0,
+    106.0,
+]
+"node:5" = [
+    800.0,
+    106.0,
+]
+"node:6" = [
+    430.0,
+    106.0,
+]
+"node:1" = [
+    60.0,
+    50.0,
+]
+
 [editor.graph_layouts."Scene 2"]
 zoom = 0.8264462351799011
 pan = [
@@ -132,10 +165,6 @@ pan = [
 ]
 
 [editor.graph_layouts."Scene 2".node_positions]
-"node:1" = [
-    60.0,
-    50.0,
-]
 "node:3" = [
     430.0,
     50.0,
@@ -148,31 +177,102 @@ pan = [
     656.8824462890625,
     177.01071166992188,
 ]
-
-[editor.graph_layouts."Main Scene"]
-zoom = 0.791378378868103
-pan = [
-    -15.233245849609375,
-    62.5703125,
-]
-
-[editor.graph_layouts."Main Scene".node_positions]
-"node:2" = [
-    1170.0,
-    50.0,
-]
-"node:4" = [
-    430.0,
-    50.0,
-]
 "node:1" = [
     60.0,
     50.0,
 ]
-"node:3" = [
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 1
+position = [
+    60.0,
+    50.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind]
+Trigger = "OnCollision"
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 2
+position = [
     800.0,
     50.0,
 ]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlaySound]
+channel = "Collision"
+sound_id = "sfx_hit"
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 3
+position = [
+    430.0,
+    50.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind]
+Condition = "Always"
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 4
+position = [
+    60.0,
+    106.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnInteract]
+mode = "InFront"
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 5
+position = [
+    800.0,
+    106.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlaySound]
+channel = "Movement"
+sound_id = "sfx_powerup"
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 6
+position = [
+    430.0,
+    106.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind]
+Condition = "Always"
+
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 3
+to = 2
+
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 1
+to = 3
+
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 6
+to = 5
+
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 4
+to = 6
+
+[[editor.rule_graph_drafts."Main Scene".chains]]
+rule_id = "rule_2"
+enabled = true
+priority = 0
+once = false
+trigger_node_id = 1
+
+[[editor.rule_graph_drafts."Main Scene".chains]]
+rule_id = "rule_1"
+enabled = true
+priority = 0
+once = false
+trigger_node_id = 4
 
 [[editor.rule_graph_drafts."Scene 2".nodes]]
 id = 1
@@ -230,67 +330,6 @@ to = 4
 
 [[editor.rule_graph_drafts."Scene 2".chains]]
 rule_id = "rule_1"
-enabled = true
-priority = 0
-once = false
-trigger_node_id = 1
-
-[[editor.rule_graph_drafts."Main Scene".nodes]]
-id = 1
-position = [
-    60.0,
-    50.0,
-]
-
-[editor.rule_graph_drafts."Main Scene".nodes.kind]
-Trigger = "OnCollision"
-
-[[editor.rule_graph_drafts."Main Scene".nodes]]
-id = 2
-position = [
-    1170.0,
-    50.0,
-]
-
-[editor.rule_graph_drafts."Main Scene".nodes.kind.Action.SwitchScene]
-scene_name = "Scene 2"
-spawn_point_id = "spawn_point_1"
-
-[[editor.rule_graph_drafts."Main Scene".nodes]]
-id = 3
-position = [
-    800.0,
-    50.0,
-]
-
-[editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlaySound]
-channel = "Collision"
-sound_id = "sfx_hit"
-
-[[editor.rule_graph_drafts."Main Scene".nodes]]
-id = 4
-position = [
-    430.0,
-    50.0,
-]
-
-[editor.rule_graph_drafts."Main Scene".nodes.kind]
-Condition = "Always"
-
-[[editor.rule_graph_drafts."Main Scene".edges]]
-from = 3
-to = 2
-
-[[editor.rule_graph_drafts."Main Scene".edges]]
-from = 4
-to = 3
-
-[[editor.rule_graph_drafts."Main Scene".edges]]
-from = 1
-to = 4
-
-[[editor.rule_graph_drafts."Main Scene".chains]]
-rule_id = "rule_2"
 enabled = true
 priority = 0
 once = false
