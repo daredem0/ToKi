@@ -29,6 +29,7 @@ mod scene_graph_editors;
 mod scene_graph_layout;
 mod scene_graph_validation;
 mod scene_viewport;
+mod sprite_editor;
 
 /// Handles panel rendering for the editor (viewport and log panels)
 pub struct PanelSystem;
@@ -132,6 +133,11 @@ impl PanelSystem {
                     CenterPanelTab::MenuEditor,
                     "Menu Editor",
                 );
+                ui.selectable_value(
+                    &mut ui_state.center_panel_tab,
+                    CenterPanelTab::SpriteEditor,
+                    "Sprite Editor",
+                );
             });
             ui.separator();
 
@@ -159,6 +165,11 @@ impl PanelSystem {
 
             if ui_state.center_panel_tab == CenterPanelTab::MenuEditor {
                 menu_editor::render_menu_editor(ui, ui_state, project);
+                return;
+            }
+
+            if ui_state.center_panel_tab == CenterPanelTab::SpriteEditor {
+                sprite_editor::render_sprite_editor(ui, ui_state, ctx);
                 return;
             }
 

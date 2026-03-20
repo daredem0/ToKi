@@ -575,7 +575,8 @@ impl ApplicationHandler for EditorApp {
                         CenterPanelTab::MapEditor => self.viewports.map_editor.as_mut(),
                         CenterPanelTab::SceneGraph
                         | CenterPanelTab::SceneRules
-                        | CenterPanelTab::MenuEditor => None,
+                        | CenterPanelTab::MenuEditor
+                        | CenterPanelTab::SpriteEditor => None,
                     };
                     if let Some(viewport) = active_viewport {
                         tracing::debug!("Passing logical key {:?} to viewport", event.logical_key);
@@ -847,7 +848,8 @@ impl EditorApp {
                     }
                     CenterPanelTab::SceneGraph
                     | CenterPanelTab::SceneRules
-                    | CenterPanelTab::MenuEditor => {}
+                    | CenterPanelTab::MenuEditor
+                    | CenterPanelTab::SpriteEditor => {}
                 }
             } else if self.core.project_manager.current_project.is_some() {
                 tracing::warn!(

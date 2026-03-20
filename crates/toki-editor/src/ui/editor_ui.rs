@@ -19,11 +19,16 @@ mod editor_ui_map_editor;
 mod editor_ui_menu_editor;
 #[path = "editor_ui_scene_tree.rs"]
 mod editor_ui_scene_tree;
+#[path = "editor_ui_sprite_editor.rs"]
+mod editor_ui_sprite_editor;
 
 pub(crate) use editor_ui_graph::SceneRulesGraphCommandData;
 pub(crate) use editor_ui_map_editor::{
     MapEditorDraft, MapEditorHistory, MapEditorObjectInfo, MapEditorObjectPropertyEditRequest,
     MapEditorTileInfo, MapEditorTool, MapObjectMoveDragState, NewMapRequest,
+};
+pub(crate) use editor_ui_sprite_editor::{
+    SpriteCanvas, SpriteCanvasViewport, SpriteEditorState, SpriteEditorTool,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -66,6 +71,7 @@ pub(crate) enum CenterPanelTab {
     SceneRules,
     MapEditor,
     MenuEditor,
+    SpriteEditor,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -472,6 +478,9 @@ pub struct EditorUI {
     // Map editor state
     pub map: MapEditorState,
 
+    // Sprite editor state
+    pub sprite: SpriteEditorState,
+
     // Entity placement system
     pub placement: PlacementState,
 
@@ -514,6 +523,9 @@ impl EditorUI {
 
             // Map editor state
             map: MapEditorState::default(),
+
+            // Sprite editor state
+            sprite: SpriteEditorState::default(),
 
             // Entity placement system
             placement: PlacementState::default(),

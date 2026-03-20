@@ -30,6 +30,7 @@ mod map_editor;
 mod menu_editor;
 mod project;
 mod rules;
+mod sprite_editor;
 
 pub use domain_inspectors::*;
 
@@ -424,6 +425,11 @@ impl InspectorSystem {
 
         if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::MenuEditor {
             Self::render_menu_editor_inspector(ui_state, ui, project);
+            return;
+        }
+
+        if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::SpriteEditor {
+            Self::render_sprite_editor_inspector(ui_state, ui, ctx);
             return;
         }
 
