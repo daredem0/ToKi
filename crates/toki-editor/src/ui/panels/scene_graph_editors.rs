@@ -143,11 +143,15 @@ impl PanelSystem {
             RuleAction::SetEntityActive { target, active } => {
                 format!("SetActive({}, {})", Self::target_label(*target), active)
             }
-            RuleAction::TeleportEntity { target, position } => format!(
-                "Teleport({}, {}, {})",
+            RuleAction::TeleportEntity {
+                target,
+                tile_x,
+                tile_y,
+            } => format!(
+                "Teleport({}, tile[{}, {}])",
                 Self::target_label(*target),
-                position[0],
-                position[1]
+                tile_x,
+                tile_y
             ),
         }
     }
@@ -399,7 +403,8 @@ impl PanelSystem {
             },
             GraphActionKind::TeleportEntity => RuleAction::TeleportEntity {
                 target: RuleTarget::Player,
-                position: [0, 0],
+                tile_x: 0,
+                tile_y: 0,
             },
         }
     }
@@ -637,15 +642,35 @@ impl PanelSystem {
                 changed |= ui.checkbox(active, "Active").changed();
                 changed
             }
-            RuleAction::TeleportEntity { target, position } => {
+            RuleAction::TeleportEntity {
+                target,
+                tile_x,
+                tile_y,
+            } => {
                 let mut changed =
                     Self::edit_rule_target(ui, target, &format!("{id_prefix}::teleport_target"));
-                changed |= ui
-                    .add(egui::DragValue::new(&mut position[0]).speed(1.0))
-                    .changed();
-                changed |= ui
-                    .add(egui::DragValue::new(&mut position[1]).speed(1.0))
-                    .changed();
+                ui.horizontal(|ui| {
+                    ui.label("Tile X:");
+                    let mut x_val = *tile_x as i32;
+                    if ui
+                        .add(egui::DragValue::new(&mut x_val).speed(1.0).range(0..=9999))
+                        .changed()
+                    {
+                        *tile_x = x_val.max(0) as u32;
+                        changed = true;
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Tile Y:");
+                    let mut y_val = *tile_y as i32;
+                    if ui
+                        .add(egui::DragValue::new(&mut y_val).speed(1.0).range(0..=9999))
+                        .changed()
+                    {
+                        *tile_y = y_val.max(0) as u32;
+                        changed = true;
+                    }
+                });
                 changed
             }
         }

@@ -149,7 +149,8 @@ pub(super) enum RuleCommand {
     },
     TeleportEntity {
         entity_id: EntityId,
-        position: glam::IVec2,
+        tile_x: u32,
+        tile_y: u32,
     },
 }
 
@@ -832,11 +833,16 @@ impl GameState {
                     });
                 }
             }
-            RuleAction::TeleportEntity { target, position } => {
+            RuleAction::TeleportEntity {
+                target,
+                tile_x,
+                tile_y,
+            } => {
                 if let Some(entity_id) = self.resolve_rule_target(*target, context) {
                     command_buffer.push(RuleCommand::TeleportEntity {
                         entity_id,
-                        position: glam::IVec2::new(position[0], position[1]),
+                        tile_x: *tile_x,
+                        tile_y: *tile_y,
                     });
                 }
             }
@@ -847,6 +853,7 @@ impl GameState {
         &mut self,
         commands: Vec<RuleCommand>,
         result: &mut GameUpdateResult<AudioEvent>,
+        tilemap: &TileMap,
     ) -> (Vec<(EntityId, AnimationState)>, Option<PendingSceneSwitch>) {
         let mut buffered_velocities = HashMap::new();
         let mut buffered_animations = HashMap::new();
@@ -956,10 +963,14 @@ impl GameState {
                 }
                 RuleCommand::TeleportEntity {
                     entity_id,
-                    position,
+                    tile_x,
+                    tile_y,
                 } => {
                     if let Some(entity) = self.entity_manager.get_entity_mut(entity_id) {
-                        entity.position = position;
+                        // Convert tile coordinates to pixel coordinates (top-left of tile)
+                        let pixel_x = (tile_x * tilemap.tile_size.x) as i32;
+                        let pixel_y = (tile_y * tilemap.tile_size.y) as i32;
+                        entity.position = glam::IVec2::new(pixel_x, pixel_y);
                     }
                 }
             }

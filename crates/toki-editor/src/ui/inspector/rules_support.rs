@@ -497,7 +497,8 @@ impl InspectorSystem {
             },
             RuleActionKind::TeleportEntity => RuleAction::TeleportEntity {
                 target: RuleTarget::Player,
-                position: [0, 0],
+                tile_x: 0,
+                tile_y: 0,
             },
         }
     }

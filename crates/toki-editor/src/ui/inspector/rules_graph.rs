@@ -584,12 +584,16 @@ impl InspectorSystem {
                     active
                 )
             }
-            RuleAction::TeleportEntity { target, position } => {
+            RuleAction::TeleportEntity {
+                target,
+                tile_x,
+                tile_y,
+            } => {
                 format!(
-                    "Teleport({}, [{}, {}])",
+                    "Teleport({}, tile[{}, {}])",
                     Self::rule_graph_target_summary(*target),
-                    position[0],
-                    position[1]
+                    tile_x,
+                    tile_y
                 )
             }
         }
@@ -622,19 +626,7 @@ impl InspectorSystem {
             ))
             .selected_text(Self::trigger_kind_label(trigger_kind))
             .show_ui(ui, |ui| {
-                for candidate in [
-                    RuleTriggerKind::Start,
-                    RuleTriggerKind::Update,
-                    RuleTriggerKind::PlayerMove,
-                    RuleTriggerKind::Key,
-                    RuleTriggerKind::Collision,
-                    RuleTriggerKind::Damaged,
-                    RuleTriggerKind::Death,
-                    RuleTriggerKind::Trigger,
-                    RuleTriggerKind::Interact,
-                    RuleTriggerKind::TileEnter,
-                    RuleTriggerKind::TileExit,
-                ] {
+                for candidate in RuleTriggerKind::iter() {
                     changed |= ui
                         .selectable_value(
                             &mut trigger_kind,
@@ -778,20 +770,7 @@ impl InspectorSystem {
             ))
             .selected_text(Self::condition_kind_label(current_kind))
             .show_ui(ui, |ui| {
-                for candidate in [
-                    RuleConditionKind::Always,
-                    RuleConditionKind::TargetExists,
-                    RuleConditionKind::KeyHeld,
-                    RuleConditionKind::EntityActive,
-                    RuleConditionKind::HealthBelow,
-                    RuleConditionKind::HealthAbove,
-                    RuleConditionKind::TriggerOtherIsPlayer,
-                    RuleConditionKind::EntityIsKind,
-                    RuleConditionKind::TriggerOtherIsKind,
-                    RuleConditionKind::EntityHasTag,
-                    RuleConditionKind::TriggerOtherHasTag,
-                    RuleConditionKind::HasInventoryItem,
-                ] {
+                for candidate in RuleConditionKind::iter() {
                     changed |= ui
                         .selectable_value(
                             &mut selected_kind,
@@ -931,21 +910,7 @@ impl InspectorSystem {
             ))
             .selected_text(Self::action_kind_label(current_kind))
             .show_ui(ui, |ui| {
-                for candidate in [
-                    RuleActionKind::PlaySound,
-                    RuleActionKind::PlayMusic,
-                    RuleActionKind::PlayAnimation,
-                    RuleActionKind::SetVelocity,
-                    RuleActionKind::Spawn,
-                    RuleActionKind::DestroySelf,
-                    RuleActionKind::SwitchScene,
-                    RuleActionKind::DamageEntity,
-                    RuleActionKind::HealEntity,
-                    RuleActionKind::AddInventoryItem,
-                    RuleActionKind::RemoveInventoryItem,
-                    RuleActionKind::SetEntityActive,
-                    RuleActionKind::TeleportEntity,
-                ] {
+                for candidate in RuleActionKind::iter() {
                     changed |= ui
                         .selectable_value(
                             &mut selected_kind,
@@ -1185,20 +1150,37 @@ impl InspectorSystem {
                     changed |= ui.checkbox(active, "Active").changed();
                 });
             }
-            RuleAction::TeleportEntity { target, position } => {
+            RuleAction::TeleportEntity {
+                target,
+                tile_x,
+                tile_y,
+            } => {
                 changed |= Self::render_rule_target_editor_with_salt(
                     ui,
                     &format!("graph_node_teleport_target_{}_{}", scene_name, node_key),
                     target,
                 );
                 ui.horizontal(|ui| {
-                    ui.label("Position:");
-                    changed |= ui
-                        .add(egui::DragValue::new(&mut position[0]).speed(1.0))
-                        .changed();
-                    changed |= ui
-                        .add(egui::DragValue::new(&mut position[1]).speed(1.0))
-                        .changed();
+                    ui.label("Tile X:");
+                    let mut x_val = *tile_x as i32;
+                    if ui
+                        .add(egui::DragValue::new(&mut x_val).speed(1.0).range(0..=9999))
+                        .changed()
+                    {
+                        *tile_x = x_val.max(0) as u32;
+                        changed = true;
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Tile Y:");
+                    let mut y_val = *tile_y as i32;
+                    if ui
+                        .add(egui::DragValue::new(&mut y_val).speed(1.0).range(0..=9999))
+                        .changed()
+                    {
+                        *tile_y = y_val.max(0) as u32;
+                        changed = true;
+                    }
                 });
             }
         }

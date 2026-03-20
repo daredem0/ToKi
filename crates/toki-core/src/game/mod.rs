@@ -168,7 +168,7 @@ impl GameState {
         self.collect_rule_commands_for_trigger(RuleTrigger::OnUpdate, &mut rule_commands);
         self.collect_rule_commands_for_key_triggers(&mut rule_commands);
         let (mut pending_rule_animations, mut pending_scene_switch) =
-            self.apply_rule_commands(rule_commands, &mut result);
+            self.apply_rule_commands(rule_commands, &mut result, tilemap);
 
         let initial_player_position = self
             .player_id
@@ -277,7 +277,7 @@ impl GameState {
             );
         }
         let (mut reactive_animations, reactive_scene_switch) =
-            self.apply_rule_commands(reactive_rule_commands, &mut result);
+            self.apply_rule_commands(reactive_rule_commands, &mut result, tilemap);
         if pending_scene_switch.is_none() {
             pending_scene_switch = reactive_scene_switch;
         }
@@ -350,7 +350,7 @@ impl GameState {
         self.collect_rule_commands_for_trigger(RuleTrigger::OnUpdate, &mut rule_commands);
         self.collect_rule_commands_for_key_triggers(&mut rule_commands);
         let (mut pending_rule_animations, mut pending_scene_switch) =
-            self.apply_rule_commands(rule_commands, &mut result);
+            self.apply_rule_commands(rule_commands, &mut result, tilemap);
 
         let initial_player_position = self
             .player_id
@@ -389,7 +389,7 @@ impl GameState {
         let mut reactive_rule_commands: Vec<rules::RuleCommand> = Vec::new();
         self.collect_reactive_rule_commands(&result, tilemap, atlas, &mut reactive_rule_commands);
         let (mut reactive_animations, reactive_scene_switch) =
-            self.apply_rule_commands(reactive_rule_commands, &mut result);
+            self.apply_rule_commands(reactive_rule_commands, &mut result, tilemap);
         if pending_scene_switch.is_none() {
             pending_scene_switch = reactive_scene_switch;
         }

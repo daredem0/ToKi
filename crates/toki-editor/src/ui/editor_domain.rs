@@ -1,3 +1,4 @@
+use strum::EnumIter;
 use toki_core::animation::AnimationState;
 
 pub fn animation_state_label(state: AnimationState) -> &'static str {
@@ -40,7 +41,7 @@ pub fn animation_state_options() -> [AnimationState; 15] {
     ]
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 pub enum RuleActionEditorKind {
     PlaySound,
     PlayMusic,
@@ -57,7 +58,7 @@ pub enum RuleActionEditorKind {
     TeleportEntity,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 pub enum RuleConditionEditorKind {
     Always,
     TargetExists,
@@ -73,7 +74,7 @@ pub enum RuleConditionEditorKind {
     HasInventoryItem,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 pub enum RuleTriggerEditorKind {
     Start,
     Update,

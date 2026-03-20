@@ -8,8 +8,8 @@ description = ""
 
 [scenes]
 "Scene 2" = "scenes/Scene 2.json"
-main = "scenes/main.json"
 "Main Scene" = "scenes/Main Scene.json"
+main = "scenes/main.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -124,6 +124,87 @@ recent_files = []
 
 [editor.camera_settings]
 
+[editor.graph_layouts."Main Scene"]
+zoom = 0.791378378868103
+pan = [
+    -0.326995849609375,
+    -27.34375,
+]
+
+[editor.graph_layouts."Main Scene".node_positions]
+"node:2" = [
+    800.0,
+    50.0,
+]
+"node:11" = [
+    800.0,
+    218.0,
+]
+"node:5" = [
+    800.0,
+    106.0,
+]
+"node:10" = [
+    60.0,
+    218.0,
+]
+"node:18" = [
+    430.0,
+    330.0,
+]
+"node:14" = [
+    800.0,
+    274.0,
+]
+"node:1" = [
+    60.0,
+    50.0,
+]
+"node:3" = [
+    430.0,
+    50.0,
+]
+"node:4" = [
+    60.0,
+    106.0,
+]
+"node:15" = [
+    430.0,
+    274.0,
+]
+"node:12" = [
+    430.0,
+    218.0,
+]
+"node:6" = [
+    430.0,
+    106.0,
+]
+"node:8" = [
+    800.0,
+    162.0,
+]
+"node:13" = [
+    60.0,
+    274.0,
+]
+"node:9" = [
+    430.0,
+    162.0,
+]
+"node:17" = [
+    800.0,
+    330.0,
+]
+"node:16" = [
+    60.0,
+    330.0,
+]
+"node:7" = [
+    60.0,
+    162.0,
+]
+
 [editor.graph_layouts."Scene 2"]
 zoom = 0.8264462351799011
 pan = [
@@ -132,14 +213,6 @@ pan = [
 ]
 
 [editor.graph_layouts."Scene 2".node_positions]
-"node:2" = [
-    800.0,
-    50.0,
-]
-"node:1" = [
-    60.0,
-    50.0,
-]
 "node:4" = [
     656.8824462890625,
     177.01071166992188,
@@ -148,74 +221,13 @@ pan = [
     430.0,
     50.0,
 ]
-
-[editor.graph_layouts."Main Scene"]
-zoom = 0.791378378868103
-pan = [
-    35.512847900390625,
-    -24.64453125,
-]
-
-[editor.graph_layouts."Main Scene".node_positions]
-"node:9" = [
-    430.0,
-    162.0,
-]
 "node:2" = [
     800.0,
     50.0,
 ]
-"node:5" = [
-    800.0,
-    106.0,
-]
-"node:3" = [
-    430.0,
-    50.0,
-]
-"node:10" = [
-    60.0,
-    218.0,
-]
 "node:1" = [
     60.0,
     50.0,
-]
-"node:15" = [
-    430.0,
-    274.0,
-]
-"node:13" = [
-    60.0,
-    274.0,
-]
-"node:12" = [
-    430.0,
-    218.0,
-]
-"node:11" = [
-    800.0,
-    218.0,
-]
-"node:8" = [
-    800.0,
-    162.0,
-]
-"node:7" = [
-    60.0,
-    162.0,
-]
-"node:6" = [
-    430.0,
-    106.0,
-]
-"node:4" = [
-    60.0,
-    106.0,
-]
-"node:14" = [
-    800.0,
-    274.0,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]
@@ -376,6 +388,39 @@ position = [
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
 Condition = "Always"
 
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 16
+position = [
+    60.0,
+    330.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnTileEnter]
+x = 1
+y = 1
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 17
+position = [
+    800.0,
+    330.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Action.TeleportEntity]
+target = "Player"
+tile_x = 11
+tile_y = 11
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 18
+position = [
+    430.0,
+    330.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind]
+Condition = "Always"
+
 [[editor.rule_graph_drafts."Main Scene".edges]]
 from = 3
 to = 2
@@ -416,6 +461,14 @@ to = 14
 from = 13
 to = 15
 
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 18
+to = 17
+
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 16
+to = 18
+
 [[editor.rule_graph_drafts."Main Scene".chains]]
 rule_id = "rule_2"
 enabled = true
@@ -450,3 +503,10 @@ enabled = true
 priority = 0
 once = false
 trigger_node_id = 13
+
+[[editor.rule_graph_drafts."Main Scene".chains]]
+rule_id = "rule_6"
+enabled = true
+priority = 0
+once = false
+trigger_node_id = 16

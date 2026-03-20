@@ -1,3 +1,5 @@
+use strum::IntoEnumIterator;
+
 use super::editor_domain::{
     animation_state_label, animation_state_options, RuleActionEditorKind as RuleActionKind,
     RuleConditionEditorKind as RuleConditionKind, RuleTriggerEditorKind as RuleTriggerKind,

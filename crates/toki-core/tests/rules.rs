@@ -4500,29 +4500,31 @@ fn teleport_entity_moves_to_specified_position() {
             0,
             vec![RuleAction::TeleportEntity {
                 target: RuleTarget::Entity(npc_id),
-                position: [200, 300],
+                tile_x: 5,
+                tile_y: 6,
             }],
         )],
     });
-    
+
     state.update(
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    
+
     let new_pos = state
         .entity_manager()
         .get_entity(npc_id)
         .unwrap()
         .position;
-    assert_eq!(new_pos, IVec2::new(200, 300));
+    // tile_x=5, tile_y=6 with 16x16 tiles -> pixel position (80, 96)
+    assert_eq!(new_pos, IVec2::new(80, 96));
 }
 
 #[test]
 fn teleport_entity_works_with_trigger_self() {
     let mut state = GameState::new_empty();
-    let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    let _npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
     let player_id = state.spawn_player_at(IVec2::new(48, 48));
     
     state.set_rules(RuleSet {
@@ -4532,11 +4534,12 @@ fn teleport_entity_works_with_trigger_self() {
             0,
             vec![RuleAction::TeleportEntity {
                 target: RuleTarget::TriggerSelf,
-                position: [100, 100],
+                tile_x: 6,
+                tile_y: 6,
             }],
         )],
     });
-    
+
     // Move player to collide with NPC, then check if teleport happened
     state.handle_key_press(InputKey::Right);
     state.update(
@@ -4554,5 +4557,6 @@ fn teleport_entity_works_with_trigger_self() {
 
     let player_pos = state.entity_manager().get_entity(player_id).unwrap().position;
     // Player (TriggerSelf in collision) should have been teleported when collision occurred
-    assert_eq!(player_pos, IVec2::new(100, 100));
+    // tile_x=6, tile_y=6 with 16x16 tiles -> pixel position (96, 96)
+    assert_eq!(player_pos, IVec2::new(96, 96));
 }

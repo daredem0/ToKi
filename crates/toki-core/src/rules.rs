@@ -324,11 +324,14 @@ pub enum RuleAction {
         target: RuleTarget,
         active: bool,
     },
-    /// Teleports the target entity to the specified world position instantly.
-    /// Uses world coordinates (pixels), not tile coordinates.
+    /// Teleports the target entity to the specified tile position instantly.
+    /// Uses tile coordinates (like OnTileEnter/OnTileExit), converted to pixels at runtime.
     TeleportEntity {
         target: RuleTarget,
-        position: [i32; 2],
+        /// The tile x-coordinate (in tile units, not pixels).
+        tile_x: u32,
+        /// The tile y-coordinate (in tile units, not pixels).
+        tile_y: u32,
     },
 }
 

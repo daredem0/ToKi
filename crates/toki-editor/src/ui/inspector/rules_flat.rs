@@ -81,83 +81,15 @@ impl InspectorSystem {
                     ))
                     .selected_text(Self::trigger_kind_label(trigger_kind))
                     .show_ui(ui, |ui| {
-                        outcome.changed |= ui
-                            .selectable_value(
-                                &mut trigger_kind,
-                                RuleTriggerKind::Start,
-                                Self::trigger_kind_label(RuleTriggerKind::Start),
-                            )
-                            .changed();
-                        outcome.changed |= ui
-                            .selectable_value(
-                                &mut trigger_kind,
-                                RuleTriggerKind::Update,
-                                Self::trigger_kind_label(RuleTriggerKind::Update),
-                            )
-                            .changed();
-                        outcome.changed |= ui
-                            .selectable_value(
-                                &mut trigger_kind,
-                                RuleTriggerKind::PlayerMove,
-                                Self::trigger_kind_label(RuleTriggerKind::PlayerMove),
-                            )
-                            .changed();
-                        outcome.changed |= ui
-                            .selectable_value(
-                                &mut trigger_kind,
-                                RuleTriggerKind::Key,
-                                Self::trigger_kind_label(RuleTriggerKind::Key),
-                            )
-                            .changed();
-                        outcome.changed |= ui
-                            .selectable_value(
-                                &mut trigger_kind,
-                                RuleTriggerKind::Collision,
-                                Self::trigger_kind_label(RuleTriggerKind::Collision),
-                            )
-                            .changed();
-                        outcome.changed |= ui
-                            .selectable_value(
-                                &mut trigger_kind,
-                                RuleTriggerKind::Damaged,
-                                Self::trigger_kind_label(RuleTriggerKind::Damaged),
-                            )
-                            .changed();
-                        outcome.changed |= ui
-                            .selectable_value(
-                                &mut trigger_kind,
-                                RuleTriggerKind::Death,
-                                Self::trigger_kind_label(RuleTriggerKind::Death),
-                            )
-                            .changed();
-                        outcome.changed |= ui
-                            .selectable_value(
-                                &mut trigger_kind,
-                                RuleTriggerKind::Trigger,
-                                Self::trigger_kind_label(RuleTriggerKind::Trigger),
-                            )
-                            .changed();
-                        outcome.changed |= ui
-                            .selectable_value(
-                                &mut trigger_kind,
-                                RuleTriggerKind::Interact,
-                                Self::trigger_kind_label(RuleTriggerKind::Interact),
-                            )
-                            .changed();
-                        outcome.changed |= ui
-                            .selectable_value(
-                                &mut trigger_kind,
-                                RuleTriggerKind::TileEnter,
-                                Self::trigger_kind_label(RuleTriggerKind::TileEnter),
-                            )
-                            .changed();
-                        outcome.changed |= ui
-                            .selectable_value(
-                                &mut trigger_kind,
-                                RuleTriggerKind::TileExit,
-                                Self::trigger_kind_label(RuleTriggerKind::TileExit),
-                            )
-                            .changed();
+                        for candidate in RuleTriggerKind::iter() {
+                            outcome.changed |= ui
+                                .selectable_value(
+                                    &mut trigger_kind,
+                                    candidate,
+                                    Self::trigger_kind_label(candidate),
+                                )
+                                .changed();
+                        }
                     });
                     if trigger_kind != Self::trigger_kind(&rule.trigger) {
                         Self::set_rule_trigger_kind(rule, trigger_kind);
@@ -265,22 +197,13 @@ impl InspectorSystem {
                     outcome.changed |= Self::remove_condition(rule, index);
                 }
 
-                ui.horizontal(|ui| {
-                    if ui.small_button("+ Always").clicked() {
-                        Self::add_condition(rule, RuleConditionKind::Always);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ TargetExists").clicked() {
-                        Self::add_condition(rule, RuleConditionKind::TargetExists);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ KeyHeld").clicked() {
-                        Self::add_condition(rule, RuleConditionKind::KeyHeld);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ EntityActive").clicked() {
-                        Self::add_condition(rule, RuleConditionKind::EntityActive);
-                        outcome.changed = true;
+                ui.horizontal_wrapped(|ui| {
+                    for kind in RuleConditionKind::iter() {
+                        let label = format!("+ {}", Self::condition_kind_label(kind));
+                        if ui.small_button(label).clicked() {
+                            Self::add_condition(rule, kind);
+                            outcome.changed = true;
+                        }
                     }
                 });
 
@@ -323,57 +246,12 @@ impl InspectorSystem {
                 }
 
                 ui.horizontal_wrapped(|ui| {
-                    if ui.small_button("+ PlaySound").clicked() {
-                        Self::add_action(rule, RuleActionKind::PlaySound);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ PlayMusic").clicked() {
-                        Self::add_action(rule, RuleActionKind::PlayMusic);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ PlayAnimation").clicked() {
-                        Self::add_action(rule, RuleActionKind::PlayAnimation);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ SetVelocity").clicked() {
-                        Self::add_action(rule, RuleActionKind::SetVelocity);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ Spawn").clicked() {
-                        Self::add_action(rule, RuleActionKind::Spawn);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ DestroySelf").clicked() {
-                        Self::add_action(rule, RuleActionKind::DestroySelf);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ SwitchScene").clicked() {
-                        Self::add_action(rule, RuleActionKind::SwitchScene);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ DamageEntity").clicked() {
-                        Self::add_action(rule, RuleActionKind::DamageEntity);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ HealEntity").clicked() {
-                        Self::add_action(rule, RuleActionKind::HealEntity);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ AddInventoryItem").clicked() {
-                        Self::add_action(rule, RuleActionKind::AddInventoryItem);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ RemoveInventoryItem").clicked() {
-                        Self::add_action(rule, RuleActionKind::RemoveInventoryItem);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ SetEntityActive").clicked() {
-                        Self::add_action(rule, RuleActionKind::SetEntityActive);
-                        outcome.changed = true;
-                    }
-                    if ui.small_button("+ TeleportEntity").clicked() {
-                        Self::add_action(rule, RuleActionKind::TeleportEntity);
-                        outcome.changed = true;
+                    for kind in RuleActionKind::iter() {
+                        let label = format!("+ {}", Self::action_kind_label(kind));
+                        if ui.small_button(label).clicked() {
+                            Self::add_action(rule, kind);
+                            outcome.changed = true;
+                        }
                     }
                 });
             });
@@ -399,97 +277,15 @@ impl InspectorSystem {
             egui::ComboBox::from_id_salt(format!("rule_action_kind_{id_salt}"))
                 .selected_text(Self::action_kind_label(current_kind))
                 .show_ui(ui, |ui| {
-                    changed |= ui
-                        .selectable_value(
-                            &mut selected_kind,
-                            RuleActionKind::PlaySound,
-                            Self::action_kind_label(RuleActionKind::PlaySound),
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut selected_kind,
-                            RuleActionKind::PlayMusic,
-                            Self::action_kind_label(RuleActionKind::PlayMusic),
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut selected_kind,
-                            RuleActionKind::PlayAnimation,
-                            Self::action_kind_label(RuleActionKind::PlayAnimation),
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut selected_kind,
-                            RuleActionKind::SetVelocity,
-                            Self::action_kind_label(RuleActionKind::SetVelocity),
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut selected_kind,
-                            RuleActionKind::Spawn,
-                            Self::action_kind_label(RuleActionKind::Spawn),
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut selected_kind,
-                            RuleActionKind::DestroySelf,
-                            Self::action_kind_label(RuleActionKind::DestroySelf),
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut selected_kind,
-                            RuleActionKind::SwitchScene,
-                            Self::action_kind_label(RuleActionKind::SwitchScene),
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut selected_kind,
-                            RuleActionKind::DamageEntity,
-                            Self::action_kind_label(RuleActionKind::DamageEntity),
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut selected_kind,
-                            RuleActionKind::HealEntity,
-                            Self::action_kind_label(RuleActionKind::HealEntity),
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut selected_kind,
-                            RuleActionKind::AddInventoryItem,
-                            Self::action_kind_label(RuleActionKind::AddInventoryItem),
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut selected_kind,
-                            RuleActionKind::RemoveInventoryItem,
-                            Self::action_kind_label(RuleActionKind::RemoveInventoryItem),
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut selected_kind,
-                            RuleActionKind::SetEntityActive,
-                            Self::action_kind_label(RuleActionKind::SetEntityActive),
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut selected_kind,
-                            RuleActionKind::TeleportEntity,
-                            Self::action_kind_label(RuleActionKind::TeleportEntity),
-                        )
-                        .changed();
+                    for candidate in RuleActionKind::iter() {
+                        changed |= ui
+                            .selectable_value(
+                                &mut selected_kind,
+                                candidate,
+                                Self::action_kind_label(candidate),
+                            )
+                            .changed();
+                    }
                 });
         });
         if selected_kind != current_kind {
@@ -743,7 +539,11 @@ impl InspectorSystem {
                     changed |= ui.checkbox(active, "Active").changed();
                 });
             }
-            RuleAction::TeleportEntity { target, position } => {
+            RuleAction::TeleportEntity {
+                target,
+                tile_x,
+                tile_y,
+            } => {
                 changed |= Self::render_rule_target_editor(
                     ui,
                     ctx.scene_name,
@@ -753,13 +553,26 @@ impl InspectorSystem {
                 );
 
                 ui.horizontal(|ui| {
-                    ui.label("Position:");
-                    changed |= ui
-                        .add(egui::DragValue::new(&mut position[0]).speed(1.0))
-                        .changed();
-                    changed |= ui
-                        .add(egui::DragValue::new(&mut position[1]).speed(1.0))
-                        .changed();
+                    ui.label("Tile X:");
+                    let mut x_val = *tile_x as i32;
+                    if ui
+                        .add(egui::DragValue::new(&mut x_val).speed(1.0).range(0..=9999))
+                        .changed()
+                    {
+                        *tile_x = x_val.max(0) as u32;
+                        changed = true;
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Tile Y:");
+                    let mut y_val = *tile_y as i32;
+                    if ui
+                        .add(egui::DragValue::new(&mut y_val).speed(1.0).range(0..=9999))
+                        .changed()
+                    {
+                        *tile_y = y_val.max(0) as u32;
+                        changed = true;
+                    }
                 });
             }
         }
@@ -792,34 +605,15 @@ impl InspectorSystem {
             ))
             .selected_text(Self::condition_kind_label(current_kind))
             .show_ui(ui, |ui| {
-                changed |= ui
-                    .selectable_value(
-                        &mut selected_kind,
-                        RuleConditionKind::Always,
-                        Self::condition_kind_label(RuleConditionKind::Always),
-                    )
-                    .changed();
-                changed |= ui
-                    .selectable_value(
-                        &mut selected_kind,
-                        RuleConditionKind::TargetExists,
-                        Self::condition_kind_label(RuleConditionKind::TargetExists),
-                    )
-                    .changed();
-                changed |= ui
-                    .selectable_value(
-                        &mut selected_kind,
-                        RuleConditionKind::KeyHeld,
-                        Self::condition_kind_label(RuleConditionKind::KeyHeld),
-                    )
-                    .changed();
-                changed |= ui
-                    .selectable_value(
-                        &mut selected_kind,
-                        RuleConditionKind::EntityActive,
-                        Self::condition_kind_label(RuleConditionKind::EntityActive),
-                    )
-                    .changed();
+                for candidate in RuleConditionKind::iter() {
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            candidate,
+                            Self::condition_kind_label(candidate),
+                        )
+                        .changed();
+                }
             });
         });
         if selected_kind != current_kind {
