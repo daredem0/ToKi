@@ -151,6 +151,14 @@ impl RuleTrigger {
             _ => None,
         }
     }
+
+    /// Returns the tile coordinates for OnTileEnter or OnTileExit triggers, if any.
+    pub const fn tile_coordinates(&self) -> Option<(u32, u32)> {
+        match self {
+            RuleTrigger::OnTileEnter { x, y } | RuleTrigger::OnTileExit { x, y } => Some((*x, *y)),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

@@ -24,6 +24,7 @@ impl InspectorSystem {
         validation_issues: &[RuleValidationIssue],
         audio_choices: &RuleAudioChoices,
         scenes: &[toki_core::Scene],
+        map_size: Option<(u32, u32)>,
     ) -> RuleEditorOutcome {
         let mut outcome = RuleEditorOutcome::default();
         let has_rule_issues = validation_issues
@@ -204,6 +205,16 @@ impl InspectorSystem {
                             outcome.changed = true;
                         }
                     });
+                    // Validation warning for X coordinate
+                    if let Some((map_width, _)) = map_size {
+                        if *x >= map_width {
+                            ui.colored_label(
+                                egui::Color32::from_rgb(255, 150, 80),
+                                format!("⚠ X coordinate {} is out of bounds (map width: {})", *x, map_width),
+                            );
+                        }
+                    }
+
                     ui.horizontal(|ui| {
                         ui.label("Tile Y:");
                         let mut y_val = *y as i32;
@@ -212,6 +223,15 @@ impl InspectorSystem {
                             outcome.changed = true;
                         }
                     });
+                    // Validation warning for Y coordinate
+                    if let Some((_, map_height)) = map_size {
+                        if *y >= map_height {
+                            ui.colored_label(
+                                egui::Color32::from_rgb(255, 150, 80),
+                                format!("⚠ Y coordinate {} is out of bounds (map height: {})", *y, map_height),
+                            );
+                        }
+                    }
                 }
 
                 if rule.conditions.is_empty() {

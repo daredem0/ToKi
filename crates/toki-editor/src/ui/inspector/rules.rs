@@ -14,6 +14,7 @@ impl InspectorSystem {
         rule_set: &mut RuleSet,
         scenes: &[toki_core::Scene],
         config: Option<&EditorConfig>,
+        map_size: Option<(u32, u32)>,
     ) -> bool {
         let mut changed = false;
         let validation_issues = Self::validate_rule_set_for_scene(rule_set, scene_name, scenes);
@@ -53,6 +54,7 @@ impl InspectorSystem {
                 &validation_issues,
                 &audio_choices,
                 scenes,
+                map_size,
             );
             changed |= outcome.changed;
             if pending_command.is_none() {

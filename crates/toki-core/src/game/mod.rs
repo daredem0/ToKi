@@ -267,7 +267,7 @@ impl GameState {
             }
 
             // Fire tile transition triggers
-            self.collect_rule_commands_for_tile_transitions(&mut reactive_rule_commands);
+            self.collect_rule_commands_for_tile_transitions(tilemap, &mut reactive_rule_commands);
         }
 
         if self.any_entity_overlaps_trigger_tile(tilemap, atlas) {
@@ -491,7 +491,7 @@ impl GameState {
         }
 
         // Fire tile transition triggers
-        self.collect_rule_commands_for_tile_transitions(reactive_rule_commands);
+        self.collect_rule_commands_for_tile_transitions(tilemap, reactive_rule_commands);
 
         if self.any_entity_overlaps_trigger_tile(tilemap, atlas) {
             self.collect_rule_commands_for_trigger(RuleTrigger::OnTrigger, reactive_rule_commands);

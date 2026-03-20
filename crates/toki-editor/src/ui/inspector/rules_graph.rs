@@ -55,11 +55,26 @@ impl InspectorSystem {
             RuleGraphNodeKind::Trigger(trigger) => {
                 ui.label("Trigger");
                 let mut edited_trigger = trigger;
+                // Extract map size for validation if available
+                let map_size = ui_state.scenes.get(scene_index)
+                    .and_then(|scene| scene.maps.first())
+                    .and_then(|map_name| {
+                        // Try to get map size from loaded map draft or pending sync
+                        if ui_state.map.active_map.as_ref() == Some(map_name) {
+                            ui_state.map.draft.as_ref()
+                                .map(|draft| (draft.tilemap.size.x, draft.tilemap.size.y))
+                                .or_else(|| ui_state.map.pending_tilemap_sync.as_ref()
+                                    .map(|tm| (tm.size.x, tm.size.y)))
+                        } else {
+                            None
+                        }
+                    });
                 let changed = Self::render_rule_graph_trigger_editor(
                     ui,
                     scene_name,
                     node_key,
                     &mut edited_trigger,
+                    map_size,
                 );
                 if changed && edited_trigger != trigger {
                     if let Err(error) = graph.set_trigger_for_chain(node_id, edited_trigger) {
@@ -540,6 +555,7 @@ impl InspectorSystem {
         scene_name: &str,
         node_key: &str,
         trigger: &mut RuleTrigger,
+        map_size: Option<(u32, u32)>,
     ) -> bool {
         let mut changed = false;
         let mut trigger_kind = Self::trigger_kind(trigger);
@@ -654,6 +670,16 @@ impl InspectorSystem {
                     changed = true;
                 }
             });
+            // Validation warning for X coordinate
+            if let Some((map_width, _)) = map_size {
+                if *x >= map_width {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(255, 150, 80),
+                        format!("⚠ X coordinate {} is out of bounds (map width: {})", *x, map_width),
+                    );
+                }
+            }
+
             ui.horizontal(|ui| {
                 ui.label("Tile Y:");
                 let mut y_val = *y as i32;
@@ -665,6 +691,15 @@ impl InspectorSystem {
                     changed = true;
                 }
             });
+            // Validation warning for Y coordinate
+            if let Some((_, map_height)) = map_size {
+                if *y >= map_height {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(255, 150, 80),
+                        format!("⚠ Y coordinate {} is out of bounds (map height: {})", *y, map_height),
+                    );
+                }
+            }
         }
 
         changed

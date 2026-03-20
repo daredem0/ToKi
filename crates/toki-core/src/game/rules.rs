@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::animation::AnimationState;
 use crate::assets::atlas::AtlasMeta;
@@ -1047,11 +1047,17 @@ impl GameState {
     }
 
     /// Collects rule commands for tile transition events (OnTileEnter/OnTileExit).
+    ///
+    /// Validates tile coordinates against the active tilemap bounds.
+    /// Rules with out-of-bounds coordinates are skipped with a warning.
     pub(super) fn collect_rule_commands_for_tile_transitions(
         &mut self,
+        tilemap: &TileMap,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
         let tile_events = std::mem::take(&mut self.rule_runtime.frame_tile_transitions);
+        let map_width = tilemap.size.x;
+        let map_height = tilemap.size.y;
 
         for event in tile_events {
             let trigger = if event.is_enter {
@@ -1087,6 +1093,21 @@ impl GameState {
                 .sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
 
             for rule in matching_rules {
+                // Validate tile coordinates are within map bounds
+                if let Some((tile_x, tile_y)) = rule.trigger.tile_coordinates() {
+                    if tile_x >= map_width || tile_y >= map_height {
+                        warn!(
+                            rule_id = %rule.id,
+                            tile_x = tile_x,
+                            tile_y = tile_y,
+                            map_width = map_width,
+                            map_height = map_height,
+                            "Skipping tile trigger rule with out-of-bounds coordinates"
+                        );
+                        continue;
+                    }
+                }
+
                 let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
                 debug!(
                     rule_id = %rule.id,

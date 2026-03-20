@@ -433,12 +433,27 @@ impl Inspector for SceneInspector {
             ui.separator();
             let before_rules = ctx.ui_state.scenes[scene_index].rules.clone();
             let mut edited_rules = before_rules.clone();
+            // Extract map size for validation if available
+            let map_size = ctx.ui_state.scenes.get(scene_index)
+                .and_then(|scene| scene.maps.first())
+                .and_then(|map_name| {
+                    // Try to get map size from loaded map draft or pending sync
+                    if ctx.ui_state.map.active_map.as_ref() == Some(map_name) {
+                        ctx.ui_state.map.draft.as_ref()
+                            .map(|draft| (draft.tilemap.size.x, draft.tilemap.size.y))
+                            .or_else(|| ctx.ui_state.map.pending_tilemap_sync.as_ref()
+                                .map(|tm| (tm.size.x, tm.size.y)))
+                    } else {
+                        None
+                    }
+                });
             let rules_changed = InspectorSystem::render_scene_rules_editor(
                 ui,
                 &self.scene_name,
                 &mut edited_rules,
                 &ctx.ui_state.scenes,
                 ctx.config,
+                map_size,
             );
             if rules_changed && edited_rules != before_rules {
                 use super::super::editor_ui::SceneRulesGraphCommandData;
