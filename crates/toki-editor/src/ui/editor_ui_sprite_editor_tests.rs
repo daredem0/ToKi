@@ -183,7 +183,7 @@ fn sprite_canvas_viewport_zoom_in() {
     let initial_zoom = viewport.zoom;
     viewport.zoom_in();
     assert!(viewport.zoom > initial_zoom);
-    assert_eq!(viewport.zoom, initial_zoom * 2.0);
+    assert_eq!(viewport.zoom, initial_zoom * 1.2);
 }
 
 #[test]
@@ -192,7 +192,7 @@ fn sprite_canvas_viewport_zoom_out() {
     let initial_zoom = viewport.zoom;
     viewport.zoom_out();
     assert!(viewport.zoom < initial_zoom);
-    assert_eq!(viewport.zoom, initial_zoom / 2.0);
+    assert_eq!(viewport.zoom, initial_zoom / 1.2);
 }
 
 #[test]

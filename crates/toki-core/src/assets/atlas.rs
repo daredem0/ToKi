@@ -1,29 +1,41 @@
 use crate::CoreError;
 use glam::UVec2;
-use serde::Deserialize;
-use serde_with::{serde_as, DisplayFromStr};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Default)]
+mod pathbuf_as_string {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::path::{Path, PathBuf};
+
+    pub fn serialize<S: Serializer>(path: &Path, s: S) -> Result<S::Ok, S::Error> {
+        path.to_string_lossy().serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<PathBuf, D::Error> {
+        let s = String::deserialize(d)?;
+        Ok(PathBuf::from(s))
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default)]
 pub struct TileProperties {
     pub solid: bool,
     #[serde(default)]
     pub trigger: bool,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TileInfo {
     pub position: UVec2,
     #[serde(default)]
     pub properties: TileProperties,
 }
 
-#[serde_as]
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AtlasMeta {
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(with = "pathbuf_as_string")]
     pub image: PathBuf,
 
     pub tile_size: UVec2,
@@ -85,5 +97,56 @@ impl AtlasMeta {
 
     pub fn get_tile_properties(&self, name: &str) -> Option<&TileProperties> {
         self.tiles.get(name).map(|tile_info| &tile_info.properties)
+    }
+
+    /// Create a new atlas with a single tile covering the entire image.
+    pub fn new_single_tile(image_filename: impl Into<PathBuf>, tile_size: UVec2) -> Self {
+        let mut tiles = HashMap::new();
+        tiles.insert(
+            "default".to_string(),
+            TileInfo {
+                position: UVec2::ZERO,
+                properties: TileProperties::default(),
+            },
+        );
+        Self {
+            image: image_filename.into(),
+            tile_size,
+            tiles,
+        }
+    }
+
+    /// Create a new atlas from a grid of tiles.
+    pub fn new_grid(
+        image_filename: impl Into<PathBuf>,
+        tile_size: UVec2,
+        cols: u32,
+        rows: u32,
+    ) -> Self {
+        let mut tiles = HashMap::new();
+        for row in 0..rows {
+            for col in 0..cols {
+                let index = row * cols + col;
+                tiles.insert(
+                    format!("tile_{index}"),
+                    TileInfo {
+                        position: UVec2::new(col, row),
+                        properties: TileProperties::default(),
+                    },
+                );
+            }
+        }
+        Self {
+            image: image_filename.into(),
+            tile_size,
+            tiles,
+        }
+    }
+
+    /// Save the atlas metadata to a JSON file.
+    pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), CoreError> {
+        let content = serde_json::to_string_pretty(self)?;
+        fs::write(&path, content)?;
+        Ok(())
     }
 }

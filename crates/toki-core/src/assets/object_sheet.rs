@@ -1,28 +1,40 @@
 use crate::CoreError;
 use glam::UVec2;
-use serde::Deserialize;
-use serde_with::{serde_as, DisplayFromStr};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+mod pathbuf_as_string {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::path::{Path, PathBuf};
+
+    pub fn serialize<S: Serializer>(path: &Path, s: S) -> Result<S::Ok, S::Error> {
+        path.to_string_lossy().serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<PathBuf, D::Error> {
+        let s = String::deserialize(d)?;
+        Ok(PathBuf::from(s))
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ObjectSheetType {
     Objects,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ObjectSpriteInfo {
     pub position: UVec2,
     pub size_tiles: UVec2,
 }
 
-#[serde_as]
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ObjectSheetMeta {
     pub sheet_type: ObjectSheetType,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(with = "pathbuf_as_string")]
     pub image: PathBuf,
     pub tile_size: UVec2,
     pub objects: HashMap<String, ObjectSpriteInfo>,
@@ -62,6 +74,63 @@ impl ObjectSheetMeta {
         let v1 = (rect[1] + rect[3]) as f32 / texture_size.y as f32;
 
         Some([u0, v0, u1, v1])
+    }
+
+    /// Create a new object sheet with a single object covering the entire image.
+    pub fn new_single_object(
+        image_filename: impl Into<PathBuf>,
+        object_name: &str,
+        size: UVec2,
+    ) -> Self {
+        let mut objects = HashMap::new();
+        objects.insert(
+            object_name.to_string(),
+            ObjectSpriteInfo {
+                position: UVec2::ZERO,
+                size_tiles: UVec2::ONE,
+            },
+        );
+        Self {
+            sheet_type: ObjectSheetType::Objects,
+            image: image_filename.into(),
+            tile_size: size,
+            objects,
+        }
+    }
+
+    /// Create a new object sheet from a grid of equal-sized objects.
+    pub fn new_grid(
+        image_filename: impl Into<PathBuf>,
+        cell_size: UVec2,
+        cols: u32,
+        rows: u32,
+    ) -> Self {
+        let mut objects = HashMap::new();
+        for row in 0..rows {
+            for col in 0..cols {
+                let index = row * cols + col;
+                objects.insert(
+                    format!("object_{index}"),
+                    ObjectSpriteInfo {
+                        position: UVec2::new(col, row),
+                        size_tiles: UVec2::ONE,
+                    },
+                );
+            }
+        }
+        Self {
+            sheet_type: ObjectSheetType::Objects,
+            image: image_filename.into(),
+            tile_size: cell_size,
+            objects,
+        }
+    }
+
+    /// Save the object sheet metadata to a JSON file.
+    pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), CoreError> {
+        let content = serde_json::to_string_pretty(self)?;
+        fs::write(&path, content)?;
+        Ok(())
     }
 }
 

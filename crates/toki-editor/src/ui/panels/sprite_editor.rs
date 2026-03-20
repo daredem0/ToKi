@@ -1,11 +1,27 @@
+use crate::project::Project;
 use crate::ui::editor_ui::{SpriteCanvas, SpriteCanvasViewport, SpriteEditorTool};
 use crate::ui::EditorUI;
 
 /// Renders the sprite editor panel
-pub fn render_sprite_editor(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::Context) {
+pub fn render_sprite_editor(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    ctx: &egui::Context,
+    project: Option<&mut Project>,
+) {
     // Handle new canvas dialog
     if ui_state.sprite.show_new_canvas_dialog {
         render_new_canvas_dialog(ui_state, ctx);
+    }
+
+    // Handle save dialog
+    if ui_state.sprite.show_save_dialog {
+        render_save_dialog(ui_state, ctx, project);
+    }
+
+    // Handle warning dialog
+    if ui_state.sprite.show_warning_dialog {
+        render_warning_dialog(ui_state, ctx);
     }
 
     // Toolbar (simplified - tools are in inspector panel)
@@ -80,12 +96,166 @@ fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
 
             ui.separator();
 
+            ui.checkbox(&mut ui_state.sprite.new_canvas_is_sheet, "Create as sprite sheet");
+
+            if ui_state.sprite.new_canvas_is_sheet {
+                ui.horizontal(|ui| {
+                    ui.label("Cell Width:");
+                    ui.add(
+                        egui::DragValue::new(&mut ui_state.sprite.new_canvas_cell_width)
+                            .range(1..=512)
+                            .speed(1),
+                    );
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Cell Height:");
+                    ui.add(
+                        egui::DragValue::new(&mut ui_state.sprite.new_canvas_cell_height)
+                            .range(1..=512)
+                            .speed(1),
+                    );
+                });
+
+                // Show calculated cell count
+                let cols = ui_state.sprite.new_canvas_width / ui_state.sprite.new_canvas_cell_width.max(1);
+                let rows = ui_state.sprite.new_canvas_height / ui_state.sprite.new_canvas_cell_height.max(1);
+                ui.label(format!("Grid: {}x{} = {} cells", cols, rows, cols * rows));
+            }
+
+            ui.separator();
+
             ui.horizontal(|ui| {
                 if ui.button("Create").clicked() {
-                    ui_state.submit_new_sprite_canvas();
+                    submit_new_canvas(ui_state);
                 }
                 if ui.button("Cancel").clicked() {
                     ui_state.cancel_new_sprite_canvas_dialog();
+                }
+            });
+        });
+}
+
+fn submit_new_canvas(ui_state: &mut EditorUI) {
+    if ui_state.sprite.new_canvas_is_sheet {
+        ui_state.sprite.new_sheet(
+            ui_state.sprite.new_canvas_width,
+            ui_state.sprite.new_canvas_height,
+            ui_state.sprite.new_canvas_cell_width,
+            ui_state.sprite.new_canvas_cell_height,
+        );
+    } else {
+        ui_state.sprite.new_canvas(
+            ui_state.sprite.new_canvas_width,
+            ui_state.sprite.new_canvas_height,
+        );
+        ui_state.sprite.show_cell_grid = false;
+    }
+    ui_state.sprite.show_new_canvas_dialog = false;
+}
+
+fn render_save_dialog(
+    ui_state: &mut EditorUI,
+    ctx: &egui::Context,
+    project: Option<&mut Project>,
+) {
+    use crate::ui::editor_ui::SpriteAssetKind;
+
+    egui::Window::new("Save Sprite Asset")
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .show(ctx, |ui| {
+            // Check if we have a project to save to
+            let Some(project) = project else {
+                ui.label("No project open. Cannot save sprite.");
+                if ui.button("Cancel").clicked() {
+                    ui_state.sprite.show_save_dialog = false;
+                }
+                return;
+            };
+
+            ui.horizontal(|ui| {
+                ui.label("Asset Name:");
+                ui.text_edit_singleline(&mut ui_state.sprite.save_asset_name);
+            });
+
+            ui.separator();
+
+            ui.horizontal(|ui| {
+                ui.label("Save as:");
+                ui.selectable_value(
+                    &mut ui_state.sprite.save_asset_kind,
+                    SpriteAssetKind::ObjectSheet,
+                    "Object Sheet",
+                );
+                ui.selectable_value(
+                    &mut ui_state.sprite.save_asset_kind,
+                    SpriteAssetKind::TileAtlas,
+                    "Tile Atlas",
+                );
+            });
+
+            // Show info about what will be created
+            ui.add_space(4.0);
+            if ui_state.sprite.is_sheet() {
+                if let Some((cols, rows)) = ui_state.sprite.sheet_cell_count() {
+                    ui.label(format!("Will create {}x{} grid ({} items)", cols, rows, cols * rows));
+                }
+            } else {
+                ui.label("Will create single sprite asset");
+            }
+
+            // Show target path
+            let sprites_dir = project.path.join("assets").join("sprites");
+            ui.label(format!("Target: {}", sprites_dir.display()));
+
+            ui.separator();
+
+            ui.horizontal(|ui| {
+                if ui.button("Save").clicked() {
+                    if let Err(e) = ui_state.sprite.save_as_asset(&sprites_dir) {
+                        tracing::error!("Failed to save sprite: {}", e);
+                    }
+                }
+                if ui.button("Cancel").clicked() {
+                    ui_state.sprite.show_save_dialog = false;
+                }
+            });
+        });
+}
+
+fn render_warning_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
+    use crate::ui::editor_ui::WarningAction;
+
+    egui::Window::new("Warning")
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .show(ctx, |ui| {
+            ui.label(&ui_state.sprite.warning_message);
+            ui.add_space(8.0);
+
+            ui.horizontal(|ui| {
+                if ui.button("Confirm").clicked() {
+                    // Execute the pending action
+                    if let Some(action) = ui_state.sprite.pending_warning_action.take() {
+                        match action {
+                            WarningAction::ClearCell(cell_idx) => {
+                                ui_state.sprite.selected_cell = Some(cell_idx);
+                                ui_state.sprite.clear_selected_cell();
+                            }
+                            WarningAction::ChangeCellSize { new_width, new_height } => {
+                                ui_state.sprite.cell_size.x = new_width;
+                                ui_state.sprite.cell_size.y = new_height;
+                                ui_state.sprite.selected_cell = None;
+                            }
+                        }
+                    }
+                    ui_state.sprite.show_warning_dialog = false;
+                }
+                if ui.button("Cancel").clicked() {
+                    ui_state.sprite.pending_warning_action = None;
+                    ui_state.sprite.show_warning_dialog = false;
                 }
             });
         });
@@ -185,6 +355,20 @@ fn render_canvas_viewport(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui
     if ui_state.sprite.show_grid && ui_state.sprite.viewport.zoom >= 4.0 {
         if let Some(canvas) = &ui_state.sprite.canvas {
             draw_pixel_grid(&painter, rect, &ui_state.sprite.viewport, canvas);
+        }
+    }
+
+    // Draw cell grid overlay for sprite sheets
+    if ui_state.sprite.is_sheet() {
+        if let Some(canvas) = &ui_state.sprite.canvas {
+            draw_cell_grid(
+                &painter,
+                rect,
+                &ui_state.sprite.viewport,
+                canvas,
+                ui_state.sprite.cell_size,
+                ui_state.sprite.selected_cell,
+            );
         }
     }
 
@@ -308,7 +492,8 @@ fn draw_pixel_grid(
 
     let canvas_screen_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
 
-    let stroke = egui::Stroke::new(1.0, egui::Color32::from_white_alpha(40));
+    // Use a cyan tint that contrasts with both light and dark checkerboard squares
+    let stroke = egui::Stroke::new(1.0, egui::Color32::from_rgba_unmultiplied(0, 180, 200, 100));
 
     // Vertical lines
     for x in 0..=canvas.width {
@@ -343,6 +528,86 @@ fn draw_pixel_grid(
                 ],
                 stroke,
             );
+        }
+    }
+}
+
+fn draw_cell_grid(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    viewport: &SpriteCanvasViewport,
+    canvas: &SpriteCanvas,
+    cell_size: glam::UVec2,
+    selected_cell: Option<usize>,
+) {
+    let zoom = viewport.zoom;
+    let pan = viewport.pan;
+
+    let canvas_screen_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
+
+    let stroke = egui::Stroke::new(2.0, egui::Color32::from_rgba_unmultiplied(255, 200, 50, 180));
+
+    let cols = canvas.width / cell_size.x.max(1);
+    let rows = canvas.height / cell_size.y.max(1);
+
+    // Vertical cell lines
+    for x in 0..=cols {
+        let pixel_x = x * cell_size.x;
+        let screen_x = canvas_screen_min.x + pixel_x as f32 * zoom;
+        if screen_x >= rect.left() && screen_x <= rect.right() {
+            painter.line_segment(
+                [
+                    egui::pos2(screen_x, rect.top().max(canvas_screen_min.y)),
+                    egui::pos2(
+                        screen_x,
+                        rect.bottom()
+                            .min(canvas_screen_min.y + canvas.height as f32 * zoom),
+                    ),
+                ],
+                stroke,
+            );
+        }
+    }
+
+    // Horizontal cell lines
+    for y in 0..=rows {
+        let pixel_y = y * cell_size.y;
+        let screen_y = canvas_screen_min.y + pixel_y as f32 * zoom;
+        if screen_y >= rect.top() && screen_y <= rect.bottom() {
+            painter.line_segment(
+                [
+                    egui::pos2(rect.left().max(canvas_screen_min.x), screen_y),
+                    egui::pos2(
+                        rect.right()
+                            .min(canvas_screen_min.x + canvas.width as f32 * zoom),
+                        screen_y,
+                    ),
+                ],
+                stroke,
+            );
+        }
+    }
+
+    // Highlight selected cell
+    if let Some(cell_idx) = selected_cell {
+        let col = cell_idx as u32 % cols;
+        let row = cell_idx as u32 / cols;
+        if row < rows {
+            let cell_min = egui::pos2(
+                canvas_screen_min.x + (col * cell_size.x) as f32 * zoom,
+                canvas_screen_min.y + (row * cell_size.y) as f32 * zoom,
+            );
+            let cell_max = egui::pos2(
+                cell_min.x + cell_size.x as f32 * zoom,
+                cell_min.y + cell_size.y as f32 * zoom,
+            );
+            let cell_rect = egui::Rect::from_min_max(cell_min, cell_max);
+
+            let fill = egui::Color32::from_rgba_unmultiplied(255, 200, 50, 40);
+            let highlight_stroke = egui::Stroke::new(3.0, egui::Color32::from_rgb(255, 200, 50));
+
+            painter.rect_filled(cell_rect, 0.0, fill);
+            painter.rect_stroke(cell_rect, 0.0, highlight_stroke, egui::StrokeKind::Inside);
         }
     }
 }
@@ -420,7 +685,7 @@ fn handle_tool_interaction(
     };
 
     match ui_state.sprite.tool {
-        SpriteEditorTool::Drag => handle_drag_tool(ui_state, response),
+        SpriteEditorTool::Drag => handle_drag_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Brush => handle_brush_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Eraser => handle_eraser_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Fill => handle_fill_tool(ui_state, response, canvas_pos),
@@ -430,7 +695,23 @@ fn handle_tool_interaction(
     }
 }
 
-fn handle_drag_tool(ui_state: &mut EditorUI, response: &egui::Response) {
+fn handle_drag_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    canvas_pos: glam::IVec2,
+) {
+    // Click to select cell in sheet mode
+    if response.clicked()
+        && ui_state.sprite.is_sheet()
+        && canvas_pos.x >= 0
+        && canvas_pos.y >= 0
+    {
+        let cell = ui_state
+            .sprite
+            .cell_at_position(canvas_pos.x as u32, canvas_pos.y as u32);
+        ui_state.sprite.selected_cell = cell;
+    }
+
     // Primary drag for panning (same as secondary/middle)
     if response.dragged_by(egui::PointerButton::Primary) {
         let delta = response.drag_delta();

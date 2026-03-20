@@ -169,7 +169,7 @@ impl PanelSystem {
             }
 
             if ui_state.center_panel_tab == CenterPanelTab::SpriteEditor {
-                sprite_editor::render_sprite_editor(ui, ui_state, ctx);
+                sprite_editor::render_sprite_editor(ui, ui_state, ctx, project);
                 return;
             }
 
