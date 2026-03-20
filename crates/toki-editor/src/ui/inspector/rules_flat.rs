@@ -105,18 +105,7 @@ impl InspectorSystem {
                         ))
                         .selected_text(Self::rule_key_label(*key))
                         .show_ui(ui, |ui| {
-                            for candidate in [
-                                RuleKey::Up,
-                                RuleKey::Down,
-                                RuleKey::Left,
-                                RuleKey::Right,
-                                RuleKey::DebugToggle,
-                                RuleKey::Interact,
-                                RuleKey::AttackPrimary,
-                                RuleKey::AttackSecondary,
-                                RuleKey::Inventory,
-                                RuleKey::Pause,
-                            ] {
+                            for candidate in RuleKey::iter() {
                                 outcome.changed |= ui
                                     .selectable_value(
                                         key,
@@ -392,13 +381,7 @@ impl InspectorSystem {
                     egui::ComboBox::from_id_salt(format!("rule_spawn_type_{id_salt}"))
                         .selected_text(Self::spawn_entity_type_label(*entity_type))
                         .show_ui(ui, |ui| {
-                            for candidate in [
-                                RuleSpawnEntityType::PlayerLikeNpc,
-                                RuleSpawnEntityType::Npc,
-                                RuleSpawnEntityType::Item,
-                                RuleSpawnEntityType::Decoration,
-                                RuleSpawnEntityType::Trigger,
-                            ] {
+                            for candidate in RuleSpawnEntityType::iter() {
                                 changed |= ui
                                     .selectable_value(
                                         entity_type,
@@ -640,18 +623,7 @@ impl InspectorSystem {
                     ))
                     .selected_text(Self::rule_key_label(*key))
                     .show_ui(ui, |ui| {
-                        for candidate in [
-                            RuleKey::Up,
-                            RuleKey::Down,
-                            RuleKey::Left,
-                            RuleKey::Right,
-                            RuleKey::DebugToggle,
-                            RuleKey::Interact,
-                            RuleKey::AttackPrimary,
-                            RuleKey::AttackSecondary,
-                            RuleKey::Inventory,
-                            RuleKey::Pause,
-                        ] {
+                        for candidate in RuleKey::iter() {
                             changed |= ui
                                 .selectable_value(key, candidate, Self::rule_key_label(candidate))
                                 .changed();

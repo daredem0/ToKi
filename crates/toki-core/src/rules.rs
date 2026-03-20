@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use strum::EnumIter;
 
 use crate::animation::AnimationState;
 use crate::entity::{EntityId, EntityKind};
@@ -161,7 +162,7 @@ impl RuleTrigger {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, EnumIter)]
 pub enum RuleKey {
     Up,
     Down,
@@ -206,14 +207,14 @@ pub enum RuleCondition {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter)]
 pub enum RuleSoundChannel {
     Movement,
     Collision,
 }
 
 /// Spatial relationship required for OnInteract trigger to fire.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, EnumIter)]
 pub enum InteractionMode {
     /// Player must be overlapping the interactable entity (strict AABB intersection).
     Overlap,
@@ -254,7 +255,7 @@ impl RuleTarget {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter)]
 pub enum RuleSpawnEntityType {
     PlayerLikeNpc,
     Npc,

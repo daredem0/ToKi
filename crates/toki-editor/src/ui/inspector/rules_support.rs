@@ -629,6 +629,13 @@ impl InspectorSystem {
         }
     }
 
+    pub(in super::super) fn sound_channel_label(channel: RuleSoundChannel) -> &'static str {
+        match channel {
+            RuleSoundChannel::Movement => "Movement",
+            RuleSoundChannel::Collision => "Collision",
+        }
+    }
+
     pub(in super::super) fn trigger_kind(trigger: &RuleTrigger) -> RuleTriggerKind {
         match trigger {
             RuleTrigger::OnStart => RuleTriggerKind::Start,

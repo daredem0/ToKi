@@ -3,6 +3,7 @@ use crate::collision::CollisionBox;
 use glam::{IVec2, UVec2};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use strum::EnumIter;
 
 pub type EntityId = u32;
 pub const HEALTH_STAT_ID: &str = "health";
@@ -184,7 +185,7 @@ fn default_hearing_radius() -> u32 {
     192
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize, EnumIter)]
 pub enum EntityKind {
     Player,
     Npc,

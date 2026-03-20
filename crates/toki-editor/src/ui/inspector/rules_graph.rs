@@ -934,17 +934,17 @@ impl InspectorSystem {
                         "graph_node_sound_channel_{}_{}",
                         scene_name, node_key
                     ))
-                    .selected_text(match channel {
-                        RuleSoundChannel::Movement => "Movement",
-                        RuleSoundChannel::Collision => "Collision",
-                    })
+                    .selected_text(Self::sound_channel_label(*channel))
                     .show_ui(ui, |ui| {
-                        changed |= ui
-                            .selectable_value(channel, RuleSoundChannel::Movement, "Movement")
-                            .changed();
-                        changed |= ui
-                            .selectable_value(channel, RuleSoundChannel::Collision, "Collision")
-                            .changed();
+                        for candidate in RuleSoundChannel::iter() {
+                            changed |= ui
+                                .selectable_value(
+                                    channel,
+                                    candidate,
+                                    Self::sound_channel_label(candidate),
+                                )
+                                .changed();
+                        }
                     });
                 });
                 ui.horizontal(|ui| {
@@ -1026,13 +1026,7 @@ impl InspectorSystem {
                     ))
                     .selected_text(Self::spawn_entity_type_label(*entity_type))
                     .show_ui(ui, |ui| {
-                        for candidate in [
-                            RuleSpawnEntityType::PlayerLikeNpc,
-                            RuleSpawnEntityType::Npc,
-                            RuleSpawnEntityType::Item,
-                            RuleSpawnEntityType::Decoration,
-                            RuleSpawnEntityType::Trigger,
-                        ] {
+                        for candidate in RuleSpawnEntityType::iter() {
                             changed |= ui
                                 .selectable_value(
                                     entity_type,
@@ -1280,18 +1274,7 @@ impl InspectorSystem {
             egui::ComboBox::from_id_salt(id_salt)
                 .selected_text(Self::rule_key_label(*key))
                 .show_ui(ui, |ui| {
-                    for candidate in [
-                        RuleKey::Up,
-                        RuleKey::Down,
-                        RuleKey::Left,
-                        RuleKey::Right,
-                        RuleKey::DebugToggle,
-                        RuleKey::Interact,
-                        RuleKey::AttackPrimary,
-                        RuleKey::AttackSecondary,
-                        RuleKey::Inventory,
-                        RuleKey::Pause,
-                    ] {
+                    for candidate in RuleKey::iter() {
                         changed |= ui
                             .selectable_value(key, candidate, Self::rule_key_label(candidate))
                             .changed();
@@ -1315,19 +1298,13 @@ impl InspectorSystem {
         id_salt: &str,
         mode: &mut toki_core::rules::InteractionMode,
     ) -> bool {
-        use toki_core::rules::InteractionMode;
-
         let mut changed = false;
         ui.horizontal(|ui| {
             ui.label("Mode:");
             egui::ComboBox::from_id_salt(id_salt)
                 .selected_text(Self::interaction_mode_label(*mode))
                 .show_ui(ui, |ui| {
-                    for candidate in [
-                        InteractionMode::Overlap,
-                        InteractionMode::Adjacent,
-                        InteractionMode::InFront,
-                    ] {
+                    for candidate in InteractionMode::iter() {
                         changed |= ui
                             .selectable_value(
                                 mode,
@@ -1358,22 +1335,13 @@ impl InspectorSystem {
         id_salt: &str,
         kind: &mut toki_core::entity::EntityKind,
     ) -> bool {
-        use toki_core::entity::EntityKind;
-
         let mut changed = false;
         ui.horizontal(|ui| {
             ui.label("Entity Kind:");
             egui::ComboBox::from_id_salt(id_salt)
                 .selected_text(Self::entity_kind_label(*kind))
                 .show_ui(ui, |ui| {
-                    for candidate in [
-                        EntityKind::Player,
-                        EntityKind::Npc,
-                        EntityKind::Item,
-                        EntityKind::Decoration,
-                        EntityKind::Trigger,
-                        EntityKind::Projectile,
-                    ] {
+                    for candidate in EntityKind::iter() {
                         changed |= ui
                             .selectable_value(kind, candidate, Self::entity_kind_label(candidate))
                             .changed();

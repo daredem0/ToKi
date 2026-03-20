@@ -17,9 +17,10 @@ use toki_core::entity::{
     AiBehavior, ControlRole, MovementProfile, MovementSoundTrigger, ATTACK_POWER_STAT_ID,
     HEALTH_STAT_ID,
 };
+use toki_core::entity::EntityKind;
 use toki_core::rules::{
-    Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel, RuleSpawnEntityType,
-    RuleTarget, RuleTrigger,
+    InteractionMode, Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel,
+    RuleSpawnEntityType, RuleTarget, RuleTrigger,
 };
 
 mod assets;

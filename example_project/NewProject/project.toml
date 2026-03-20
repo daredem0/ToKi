@@ -8,8 +8,8 @@ description = ""
 
 [scenes]
 "Scene 2" = "scenes/Scene 2.json"
-"Main Scene" = "scenes/Main Scene.json"
 main = "scenes/main.json"
+"Main Scene" = "scenes/Main Scene.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -124,87 +124,6 @@ recent_files = []
 
 [editor.camera_settings]
 
-[editor.graph_layouts."Main Scene"]
-zoom = 0.791378378868103
-pan = [
-    -0.326995849609375,
-    -27.34375,
-]
-
-[editor.graph_layouts."Main Scene".node_positions]
-"node:2" = [
-    800.0,
-    50.0,
-]
-"node:11" = [
-    800.0,
-    218.0,
-]
-"node:5" = [
-    800.0,
-    106.0,
-]
-"node:10" = [
-    60.0,
-    218.0,
-]
-"node:18" = [
-    430.0,
-    330.0,
-]
-"node:14" = [
-    800.0,
-    274.0,
-]
-"node:1" = [
-    60.0,
-    50.0,
-]
-"node:3" = [
-    430.0,
-    50.0,
-]
-"node:4" = [
-    60.0,
-    106.0,
-]
-"node:15" = [
-    430.0,
-    274.0,
-]
-"node:12" = [
-    430.0,
-    218.0,
-]
-"node:6" = [
-    430.0,
-    106.0,
-]
-"node:8" = [
-    800.0,
-    162.0,
-]
-"node:13" = [
-    60.0,
-    274.0,
-]
-"node:9" = [
-    430.0,
-    162.0,
-]
-"node:17" = [
-    800.0,
-    330.0,
-]
-"node:16" = [
-    60.0,
-    330.0,
-]
-"node:7" = [
-    60.0,
-    162.0,
-]
-
 [editor.graph_layouts."Scene 2"]
 zoom = 0.8264462351799011
 pan = [
@@ -213,28 +132,109 @@ pan = [
 ]
 
 [editor.graph_layouts."Scene 2".node_positions]
-"node:4" = [
-    656.8824462890625,
-    177.01071166992188,
+"node:1" = [
+    60.0,
+    50.0,
 ]
 "node:3" = [
     430.0,
     50.0,
 ]
+"node:4" = [
+    656.8824462890625,
+    177.01071166992188,
+]
 "node:2" = [
     800.0,
     50.0,
 ]
+
+[editor.graph_layouts."Main Scene"]
+zoom = 0.791378378868103
+pan = [
+    67.3097152709961,
+    -16.50390625,
+]
+
+[editor.graph_layouts."Main Scene".node_positions]
+"node:18" = [
+    259.625,
+    307.609375,
+]
+"node:3" = [
+    246.0,
+    64.328125,
+]
+"node:11" = [
+    584.375,
+    210.296875,
+]
+"node:14" = [
+    522.25,
+    258.953125,
+]
+"node:4" = [
+    60.0,
+    112.984375,
+]
+"node:10" = [
+    60.0,
+    210.296875,
+]
+"node:16" = [
+    60.0,
+    307.609375,
+]
+"node:7" = [
+    60.0,
+    161.640625,
+]
+"node:6" = [
+    244.359375,
+    112.984375,
+]
+"node:9" = [
+    318.65625,
+    161.640625,
+]
+"node:17" = [
+    483.578125,
+    307.609375,
+]
+"node:8" = [
+    615.984375,
+    161.640625,
+]
 "node:1" = [
     60.0,
-    50.0,
+    64.328125,
+]
+"node:13" = [
+    60.0,
+    258.953125,
+]
+"node:15" = [
+    262.625,
+    258.953125,
+]
+"node:2" = [
+    469.625,
+    64.328125,
+]
+"node:5" = [
+    488.640625,
+    112.984375,
+]
+"node:12" = [
+    293.71875,
+    210.296875,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 1
 position = [
     60.0,
-    50.0,
+    64.328125,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnCollision]
@@ -242,8 +242,8 @@ position = [
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 2
 position = [
-    800.0,
-    50.0,
+    469.625,
+    64.328125,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlaySound]
@@ -253,8 +253,8 @@ sound_id = "sfx_hit"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 3
 position = [
-    430.0,
-    50.0,
+    246.0,
+    64.328125,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -264,7 +264,7 @@ Condition = "Always"
 id = 4
 position = [
     60.0,
-    106.0,
+    112.984375,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnInteract]
@@ -273,8 +273,8 @@ mode = "InFront"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 5
 position = [
-    800.0,
-    106.0,
+    488.640625,
+    112.984375,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlaySound]
@@ -284,8 +284,8 @@ sound_id = "sfx_powerup"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 6
 position = [
-    430.0,
-    106.0,
+    244.359375,
+    112.984375,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -295,7 +295,7 @@ Condition = "Always"
 id = 7
 position = [
     60.0,
-    162.0,
+    161.640625,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnDamaged.entity]
@@ -304,8 +304,8 @@ Entity = 9
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 8
 position = [
-    800.0,
-    162.0,
+    615.984375,
+    161.640625,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.SwitchScene]
@@ -315,8 +315,8 @@ spawn_point_id = "spawn_point_1"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 9
 position = [
-    430.0,
-    162.0,
+    318.65625,
+    161.640625,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Condition.HealthBelow]
@@ -329,7 +329,7 @@ Entity = 9
 id = 10
 position = [
     60.0,
-    218.0,
+    210.296875,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnDeath]
@@ -337,8 +337,8 @@ position = [
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 11
 position = [
-    800.0,
-    218.0,
+    584.375,
+    210.296875,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlaySound]
@@ -348,8 +348,8 @@ sound_id = "sfx_select"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 12
 position = [
-    430.0,
-    218.0,
+    293.71875,
+    210.296875,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Condition.EntityIsKind]
@@ -360,7 +360,7 @@ kind = "Npc"
 id = 13
 position = [
     60.0,
-    274.0,
+    258.953125,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnTileEnter]
@@ -370,8 +370,8 @@ y = 23
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 14
 position = [
-    800.0,
-    274.0,
+    522.25,
+    258.953125,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.SwitchScene]
@@ -381,8 +381,8 @@ spawn_point_id = "spawn_point_2"
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 15
 position = [
-    430.0,
-    274.0,
+    262.625,
+    258.953125,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
@@ -392,7 +392,7 @@ Condition = "Always"
 id = 16
 position = [
     60.0,
-    330.0,
+    307.609375,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnTileEnter]
@@ -402,8 +402,8 @@ y = 1
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 17
 position = [
-    800.0,
-    330.0,
+    483.578125,
+    307.609375,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind.Action.TeleportEntity]
@@ -414,8 +414,8 @@ tile_y = 11
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 18
 position = [
-    430.0,
-    330.0,
+    259.625,
+    307.609375,
 ]
 
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
