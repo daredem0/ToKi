@@ -29,10 +29,8 @@ fn render_toolbar(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             ui_state.begin_new_sprite_canvas_dialog();
         }
 
-        if ui_state.sprite.has_canvas() {
-            if ui_state.sprite.dirty {
-                ui.label("Unsaved changes");
-            }
+        if ui_state.sprite.has_canvas() && ui_state.sprite.dirty {
+            ui.label("Unsaved changes");
         }
     });
 
@@ -163,6 +161,9 @@ fn render_canvas_viewport(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui
         ui_state.sprite.cursor_canvas_pos = None;
     }
 
+    // Handle tool interactions
+    handle_tool_interaction(ui_state, &response, rect, ctx);
+
     // Draw canvas background
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 0.0, egui::Color32::from_gray(40));
@@ -185,6 +186,11 @@ fn render_canvas_viewport(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui
         if let Some(canvas) = &ui_state.sprite.canvas {
             draw_pixel_grid(&painter, rect, &ui_state.sprite.viewport, canvas);
         }
+    }
+
+    // Draw selection rectangle
+    if let Some(selection) = &ui_state.sprite.selection {
+        draw_selection_rect(&painter, rect, &ui_state.sprite.viewport, selection);
     }
 
     // Status bar
@@ -341,6 +347,36 @@ fn draw_pixel_grid(
     }
 }
 
+fn draw_selection_rect(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    viewport: &SpriteCanvasViewport,
+    selection: &crate::ui::editor_ui::SpriteSelection,
+) {
+    let zoom = viewport.zoom;
+    let pan = viewport.pan;
+
+    let canvas_screen_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
+
+    // Calculate selection screen rect
+    let sel_min = egui::pos2(
+        canvas_screen_min.x + selection.x as f32 * zoom,
+        canvas_screen_min.y + selection.y as f32 * zoom,
+    );
+    let sel_max = egui::pos2(
+        sel_min.x + selection.width as f32 * zoom,
+        sel_min.y + selection.height as f32 * zoom,
+    );
+    let sel_rect = egui::Rect::from_min_max(sel_min, sel_max);
+
+    // Draw selection with dashed border and semi-transparent fill
+    let fill = egui::Color32::from_rgba_unmultiplied(100, 150, 255, 50);
+    let stroke = egui::Stroke::new(1.0, egui::Color32::from_rgb(100, 150, 255));
+
+    painter.rect_filled(sel_rect, 0.0, fill);
+    painter.rect_stroke(sel_rect, 0.0, stroke, egui::StrokeKind::Outside);
+}
+
 fn render_status_bar(ui: &mut egui::Ui, ui_state: &EditorUI) {
     ui.horizontal(|ui| {
         // Cursor position
@@ -369,4 +405,220 @@ fn render_status_bar(ui: &mut egui::Ui, ui_state: &EditorUI) {
             ui.label("*Modified");
         }
     });
+}
+
+fn handle_tool_interaction(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    _rect: egui::Rect,
+    _ctx: &egui::Context,
+) {
+    use crate::ui::editor_ui::SpriteEditorTool;
+
+    let Some(canvas_pos) = ui_state.sprite.cursor_canvas_pos else {
+        return;
+    };
+
+    match ui_state.sprite.tool {
+        SpriteEditorTool::Drag => handle_drag_tool(ui_state, response),
+        SpriteEditorTool::Brush => handle_brush_tool(ui_state, response, canvas_pos),
+        SpriteEditorTool::Eraser => handle_eraser_tool(ui_state, response, canvas_pos),
+        SpriteEditorTool::Fill => handle_fill_tool(ui_state, response, canvas_pos),
+        SpriteEditorTool::Eyedropper => handle_eyedropper_tool(ui_state, response, canvas_pos),
+        SpriteEditorTool::Line => handle_line_tool(ui_state, response, canvas_pos),
+        SpriteEditorTool::Select => handle_select_tool(ui_state, response, canvas_pos),
+    }
+}
+
+fn handle_drag_tool(ui_state: &mut EditorUI, response: &egui::Response) {
+    // Primary drag for panning (same as secondary/middle)
+    if response.dragged_by(egui::PointerButton::Primary) {
+        let delta = response.drag_delta();
+        ui_state
+            .sprite
+            .viewport
+            .pan_by(glam::Vec2::new(delta.x, delta.y));
+    }
+}
+
+fn handle_brush_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    canvas_pos: glam::IVec2,
+) {
+    use crate::ui::interactions::SpritePaintInteraction;
+
+    if response.drag_started_by(egui::PointerButton::Primary) {
+        start_paint_stroke(ui_state);
+    }
+
+    if response.dragged_by(egui::PointerButton::Primary) || response.clicked() {
+        if let Some(canvas) = &mut ui_state.sprite.canvas {
+            let color = ui_state.sprite.foreground_color;
+            let brush_size = ui_state.sprite.brush_size;
+            if SpritePaintInteraction::paint_brush(canvas, canvas_pos, color, brush_size) {
+                ui_state.sprite.dirty = true;
+                invalidate_canvas_texture(ui_state);
+            }
+        }
+    }
+
+    if response.drag_stopped_by(egui::PointerButton::Primary) {
+        finish_paint_stroke(ui_state);
+    }
+}
+
+fn handle_eraser_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    canvas_pos: glam::IVec2,
+) {
+    use crate::ui::interactions::SpritePaintInteraction;
+
+    if response.drag_started_by(egui::PointerButton::Primary) {
+        start_paint_stroke(ui_state);
+    }
+
+    if response.dragged_by(egui::PointerButton::Primary) || response.clicked() {
+        if let Some(canvas) = &mut ui_state.sprite.canvas {
+            let brush_size = ui_state.sprite.brush_size;
+            if SpritePaintInteraction::erase_brush(canvas, canvas_pos, brush_size) {
+                ui_state.sprite.dirty = true;
+                invalidate_canvas_texture(ui_state);
+            }
+        }
+    }
+
+    if response.drag_stopped_by(egui::PointerButton::Primary) {
+        finish_paint_stroke(ui_state);
+    }
+}
+
+fn handle_fill_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    canvas_pos: glam::IVec2,
+) {
+    use crate::ui::interactions::SpritePaintInteraction;
+
+    if response.clicked() {
+        start_paint_stroke(ui_state);
+        if let Some(canvas) = &mut ui_state.sprite.canvas {
+            let color = ui_state.sprite.foreground_color;
+            if SpritePaintInteraction::flood_fill(canvas, canvas_pos, color) {
+                ui_state.sprite.dirty = true;
+                invalidate_canvas_texture(ui_state);
+            }
+        }
+        finish_paint_stroke(ui_state);
+    }
+}
+
+fn handle_eyedropper_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    canvas_pos: glam::IVec2,
+) {
+    use crate::ui::interactions::SpritePaintInteraction;
+
+    if response.clicked() {
+        if let Some(canvas) = &ui_state.sprite.canvas {
+            if let Some(color) = SpritePaintInteraction::pick_color(canvas, canvas_pos) {
+                ui_state.sprite.foreground_color = color;
+                ui_state.sprite.add_recent_color(color);
+            }
+        }
+    }
+}
+
+fn handle_line_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    canvas_pos: glam::IVec2,
+) {
+    use crate::ui::interactions::SpritePaintInteraction;
+
+    if response.drag_started_by(egui::PointerButton::Primary) {
+        ui_state.sprite.line_start_pos = Some(canvas_pos);
+        start_paint_stroke(ui_state);
+    }
+
+    if response.drag_stopped_by(egui::PointerButton::Primary) {
+        if let Some(start) = ui_state.sprite.line_start_pos.take() {
+            if let Some(canvas) = &mut ui_state.sprite.canvas {
+                let color = ui_state.sprite.foreground_color;
+                let brush_size = ui_state.sprite.brush_size;
+                if SpritePaintInteraction::draw_line(canvas, start, canvas_pos, color, brush_size) {
+                    ui_state.sprite.dirty = true;
+                    invalidate_canvas_texture(ui_state);
+                }
+            }
+        }
+        finish_paint_stroke(ui_state);
+    }
+}
+
+fn handle_select_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    canvas_pos: glam::IVec2,
+) {
+
+    if response.drag_started_by(egui::PointerButton::Primary) {
+        ui_state.sprite.selection_start_pos = Some(canvas_pos);
+        ui_state.sprite.selection = None;
+    }
+
+    if response.dragged_by(egui::PointerButton::Primary) {
+        if let Some(start) = ui_state.sprite.selection_start_pos {
+            ui_state.sprite.selection = Some(create_selection(start, canvas_pos));
+        }
+    }
+
+    if response.drag_stopped_by(egui::PointerButton::Primary) {
+        if let Some(start) = ui_state.sprite.selection_start_pos.take() {
+            let selection = create_selection(start, canvas_pos);
+            // Only keep selection if it has non-zero size
+            if selection.width > 0 && selection.height > 0 {
+                ui_state.sprite.selection = Some(selection);
+            } else {
+                ui_state.sprite.selection = None;
+            }
+        }
+    }
+
+    // Clear selection with right-click
+    if response.clicked_by(egui::PointerButton::Secondary) {
+        ui_state.sprite.selection = None;
+    }
+}
+
+fn create_selection(start: glam::IVec2, end: glam::IVec2) -> crate::ui::editor_ui::SpriteSelection {
+    let x = start.x.min(end.x).max(0) as u32;
+    let y = start.y.min(end.y).max(0) as u32;
+    let w = (start.x - end.x).unsigned_abs();
+    let h = (start.y - end.y).unsigned_abs();
+    crate::ui::editor_ui::SpriteSelection::new(x, y, w, h)
+}
+
+fn start_paint_stroke(ui_state: &mut EditorUI) {
+    if !ui_state.sprite.is_painting {
+        ui_state.sprite.is_painting = true;
+        ui_state.sprite.canvas_before_stroke = ui_state.sprite.canvas.clone();
+    }
+}
+
+fn finish_paint_stroke(ui_state: &mut EditorUI) {
+    if ui_state.sprite.is_painting {
+        ui_state.sprite.is_painting = false;
+        if let Some(before) = ui_state.sprite.canvas_before_stroke.take() {
+            ui_state.sprite.push_undo_state(before);
+        }
+        // Add the used color to recent colors
+        ui_state.sprite.add_recent_color(ui_state.sprite.foreground_color);
+    }
+}
+
+fn invalidate_canvas_texture(ui_state: &mut EditorUI) {
+    ui_state.sprite.canvas_texture = None;
 }

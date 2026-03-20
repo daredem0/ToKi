@@ -15,6 +15,7 @@ pub(crate) enum SpriteEditorTool {
 
 /// Type of sprite asset being edited
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum SpriteAssetKind {
     /// Atlas-style tiles metadata (tiles with positions)
     TileAtlas,
@@ -31,6 +32,7 @@ pub struct PixelColor {
     pub a: u8,
 }
 
+#[allow(dead_code)]
 impl PixelColor {
     pub const fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self { r, g, b, a }
@@ -69,6 +71,21 @@ impl PixelColor {
             a: rgba[3],
         }
     }
+
+    /// Convert to egui Color32
+    pub fn to_color32(self) -> egui::Color32 {
+        egui::Color32::from_rgba_unmultiplied(self.r, self.g, self.b, self.a)
+    }
+
+    /// Convert from egui Color32
+    pub fn from_color32(color: egui::Color32) -> Self {
+        Self {
+            r: color.r(),
+            g: color.g(),
+            b: color.b(),
+            a: color.a(),
+        }
+    }
 }
 
 /// In-memory canvas for pixel editing
@@ -82,6 +99,7 @@ pub struct SpriteCanvas {
     pixels: Vec<u8>,
 }
 
+#[allow(dead_code)]
 impl SpriteCanvas {
     /// Create a new canvas filled with transparent pixels
     pub fn new(width: u32, height: u32) -> Self {
@@ -205,6 +223,7 @@ impl Default for SpriteCanvasViewport {
     }
 }
 
+#[allow(dead_code)]
 impl SpriteCanvasViewport {
     /// Create a new viewport with default settings
     pub fn new() -> Self {
@@ -263,6 +282,7 @@ pub struct SpriteSelection {
     pub height: u32,
 }
 
+#[allow(dead_code)]
 impl SpriteSelection {
     pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
         Self {
@@ -280,6 +300,7 @@ impl SpriteSelection {
 
 /// Undo/redo command for sprite editing
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct SpriteEditCommand {
     /// Canvas state before the edit
     pub before: SpriteCanvas,
@@ -296,6 +317,7 @@ pub struct SpriteEditorHistory {
     max_size: usize,
 }
 
+#[allow(dead_code)]
 impl SpriteEditorHistory {
     pub fn new(max_size: usize) -> Self {
         Self {
@@ -343,6 +365,7 @@ impl SpriteEditorHistory {
 }
 
 /// Sprite editor state
+#[allow(dead_code)]
 pub struct SpriteEditorState {
     /// Currently active sprite asset path (JSON metadata file)
     pub active_sprite: Option<String>,
@@ -386,6 +409,14 @@ pub struct SpriteEditorState {
     pub new_canvas_width: u32,
     /// New canvas dialog: height
     pub new_canvas_height: u32,
+    /// Line tool: start position when dragging
+    pub line_start_pos: Option<glam::IVec2>,
+    /// Selection tool: start position when dragging
+    pub selection_start_pos: Option<glam::IVec2>,
+    /// Canvas state before current stroke (for undo)
+    pub canvas_before_stroke: Option<SpriteCanvas>,
+    /// Whether currently in a paint stroke
+    pub is_painting: bool,
 }
 
 impl Default for SpriteEditorState {
@@ -412,10 +443,15 @@ impl Default for SpriteEditorState {
             show_new_canvas_dialog: false,
             new_canvas_width: 16,
             new_canvas_height: 16,
+            line_start_pos: None,
+            selection_start_pos: None,
+            canvas_before_stroke: None,
+            is_painting: false,
         }
     }
 }
 
+#[allow(dead_code)]
 impl SpriteEditorState {
     pub fn new() -> Self {
         Self::default()

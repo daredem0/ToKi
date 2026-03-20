@@ -64,6 +64,9 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     }
 
     ui.separator();
+    render_color_picker(ui, ui_state);
+
+    ui.separator();
     render_viewport_controls(ui, ui_state);
 
     if ui_state.sprite.dirty {
@@ -81,6 +84,71 @@ fn render_brush_size(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 .speed(0.1),
         );
         ui.label("px");
+    });
+}
+
+fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    use super::super::editor_ui::PixelColor;
+
+    ui.label("Color:");
+
+    // Convert to Color32 for egui color picker
+    let mut color = ui_state.sprite.foreground_color.to_color32();
+
+    ui.horizontal(|ui| {
+        if ui.color_edit_button_srgba(&mut color).changed() {
+            ui_state.sprite.foreground_color = PixelColor::from_color32(color);
+        }
+
+        // Show hex value
+        let hex = format!(
+            "#{:02X}{:02X}{:02X}",
+            color.r(),
+            color.g(),
+            color.b()
+        );
+        ui.label(hex);
+    });
+
+    // Recent colors palette
+    if !ui_state.sprite.recent_colors.is_empty() {
+        ui.add_space(4.0);
+        ui.label("Recent:");
+        render_recent_colors(ui, ui_state);
+    }
+}
+
+fn render_recent_colors(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let size = egui::vec2(16.0, 16.0);
+    let colors_per_row = 8;
+
+    ui.horizontal_wrapped(|ui| {
+        for (i, &color) in ui_state.sprite.recent_colors.iter().enumerate() {
+            if i > 0 && i % colors_per_row == 0 {
+                ui.end_row();
+            }
+
+            let color32 = color.to_color32();
+            let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
+
+            // Draw color swatch
+            ui.painter().rect_filled(rect, 2.0, color32);
+            ui.painter().rect_stroke(
+                rect,
+                2.0,
+                egui::Stroke::new(1.0, egui::Color32::GRAY),
+                egui::StrokeKind::Outside,
+            );
+
+            if response.clicked() {
+                ui_state.sprite.foreground_color = color;
+            }
+
+            if response.hovered() {
+                let hex = format!("#{:02X}{:02X}{:02X}", color.r, color.g, color.b);
+                response.on_hover_text(hex);
+            }
+        }
     });
 }
 
