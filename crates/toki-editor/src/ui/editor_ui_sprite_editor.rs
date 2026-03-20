@@ -453,6 +453,12 @@ pub struct SpriteEditorState {
     pub discovered_assets: Vec<DiscoveredSpriteAsset>,
     /// Selected asset index in the load dialog
     pub selected_asset_index: Option<usize>,
+    /// Show the merge sprites dialog
+    pub show_merge_dialog: bool,
+    /// Selected asset indices for merging (multi-select)
+    pub merge_selected_indices: Vec<usize>,
+    /// Merge dialog: target columns for the resulting sheet
+    pub merge_target_cols: u32,
 }
 
 /// Actions that require warning confirmation
@@ -520,6 +526,9 @@ impl Default for SpriteEditorState {
             show_load_dialog: false,
             discovered_assets: Vec::new(),
             selected_asset_index: None,
+            show_merge_dialog: false,
+            merge_selected_indices: Vec::new(),
+            merge_target_cols: 4,
         }
     }
 }
@@ -749,6 +758,164 @@ impl SpriteEditorState {
         true
     }
 
+    /// Append a new row of empty cells to the bottom of the sheet
+    pub fn append_row(&mut self) -> bool {
+        if !self.is_sheet() {
+            return false;
+        }
+
+        let Some(canvas) = &self.canvas else {
+            return false;
+        };
+
+        let old_width = canvas.width;
+        let old_height = canvas.height;
+        let new_height = old_height + self.cell_size.y;
+
+        // Save state for undo
+        let before = canvas.clone();
+
+        // Create new larger canvas
+        let mut new_canvas = SpriteCanvas::new(old_width, new_height);
+
+        // Copy old pixels to new canvas
+        for y in 0..old_height {
+            for x in 0..old_width {
+                if let Some(color) = before.get_pixel(x, y) {
+                    new_canvas.set_pixel(x, y, color);
+                }
+            }
+        }
+
+        self.canvas = Some(new_canvas.clone());
+        self.history.push(SpriteEditCommand {
+            before,
+            after: new_canvas,
+        });
+        self.dirty = true;
+        self.canvas_texture = None;
+        true
+    }
+
+    /// Append a new column of empty cells to the right of the sheet
+    pub fn append_column(&mut self) -> bool {
+        if !self.is_sheet() {
+            return false;
+        }
+
+        let Some(canvas) = &self.canvas else {
+            return false;
+        };
+
+        let old_width = canvas.width;
+        let old_height = canvas.height;
+        let new_width = old_width + self.cell_size.x;
+
+        // Save state for undo
+        let before = canvas.clone();
+
+        // Create new larger canvas
+        let mut new_canvas = SpriteCanvas::new(new_width, old_height);
+
+        // Copy old pixels to new canvas
+        for y in 0..old_height {
+            for x in 0..old_width {
+                if let Some(color) = before.get_pixel(x, y) {
+                    new_canvas.set_pixel(x, y, color);
+                }
+            }
+        }
+
+        self.canvas = Some(new_canvas.clone());
+        self.history.push(SpriteEditCommand {
+            before,
+            after: new_canvas,
+        });
+        self.dirty = true;
+        self.canvas_texture = None;
+        true
+    }
+
+    /// Delete the selected cell and collapse remaining cells to fill the gap
+    pub fn delete_cell_with_collapse(&mut self) -> bool {
+        let cell_idx = match self.selected_cell {
+            Some(idx) => idx,
+            None => return false,
+        };
+
+        let Some((cols, rows)) = self.sheet_cell_count() else {
+            return false;
+        };
+
+        let total_cells = (cols * rows) as usize;
+        if cell_idx >= total_cells {
+            return false;
+        }
+
+        let Some(canvas) = &mut self.canvas else {
+            return false;
+        };
+
+        // Save state for undo
+        let before = canvas.clone();
+
+        let cell_w = self.cell_size.x;
+        let cell_h = self.cell_size.y;
+
+        // Shift all cells after the deleted one to the left
+        for i in cell_idx..(total_cells - 1) {
+            let src_col = ((i + 1) as u32) % cols;
+            let src_row = ((i + 1) as u32) / cols;
+            let dst_col = (i as u32) % cols;
+            let dst_row = (i as u32) / cols;
+
+            // Copy pixels from source cell to destination cell
+            for py in 0..cell_h {
+                for px in 0..cell_w {
+                    let src_x = src_col * cell_w + px;
+                    let src_y = src_row * cell_h + py;
+                    let dst_x = dst_col * cell_w + px;
+                    let dst_y = dst_row * cell_h + py;
+
+                    let color = canvas
+                        .get_pixel(src_x, src_y)
+                        .unwrap_or(PixelColor::transparent());
+                    canvas.set_pixel(dst_x, dst_y, color);
+                }
+            }
+        }
+
+        // Clear the last cell (now empty after collapse)
+        let last_idx = total_cells - 1;
+        let last_col = (last_idx as u32) % cols;
+        let last_row = (last_idx as u32) / cols;
+        canvas.fill_rect(
+            last_col * cell_w,
+            last_row * cell_h,
+            cell_w,
+            cell_h,
+            PixelColor::transparent(),
+        );
+
+        self.history.push(SpriteEditCommand {
+            before,
+            after: canvas.clone(),
+        });
+
+        // Deselect or select the same index (now contains next cell's content)
+        if cell_idx >= total_cells - 1 {
+            self.selected_cell = if total_cells > 1 {
+                Some(total_cells - 2)
+            } else {
+                None
+            };
+        }
+
+        self.dirty = true;
+        self.canvas_texture = None;
+        true
+    }
+
     /// Mark the current state as dirty (has unsaved changes)
     pub fn mark_dirty(&mut self) {
         self.dirty = true;
@@ -827,6 +994,103 @@ impl SpriteEditorState {
         self.discovered_assets = Self::scan_sprite_assets(sprites_dir);
         self.selected_asset_index = None;
         self.show_load_dialog = true;
+    }
+
+    /// Open the merge dialog and scan for assets
+    pub fn begin_merge_dialog(&mut self, sprites_dir: &std::path::Path) {
+        self.discovered_assets = Self::scan_sprite_assets(sprites_dir);
+        self.merge_selected_indices.clear();
+        self.merge_target_cols = 4;
+        self.show_merge_dialog = true;
+    }
+
+    /// Toggle selection of an asset for merging
+    pub fn toggle_merge_selection(&mut self, index: usize) {
+        if let Some(pos) = self.merge_selected_indices.iter().position(|&i| i == index) {
+            self.merge_selected_indices.remove(pos);
+        } else {
+            self.merge_selected_indices.push(index);
+        }
+    }
+
+    /// Merge selected sprites into a new sheet canvas
+    pub fn merge_sprites_into_sheet(&mut self) -> Result<(), String> {
+        use toki_core::graphics::image::load_image_rgba8;
+
+        if self.merge_selected_indices.is_empty() {
+            return Err("No sprites selected for merge".to_string());
+        }
+
+        // Load all selected sprites
+        let mut images: Vec<(u32, u32, Vec<u8>)> = Vec::new();
+        let mut max_width = 0u32;
+        let mut max_height = 0u32;
+
+        for &idx in &self.merge_selected_indices {
+            let asset = self
+                .discovered_assets
+                .get(idx)
+                .ok_or_else(|| "Invalid asset index".to_string())?;
+
+            let decoded = load_image_rgba8(&asset.png_path)
+                .map_err(|e| format!("Failed to load {}: {e}", asset.name))?;
+
+            max_width = max_width.max(decoded.width);
+            max_height = max_height.max(decoded.height);
+            images.push((decoded.width, decoded.height, decoded.data));
+        }
+
+        // Calculate sheet dimensions
+        let cols = self.merge_target_cols.max(1);
+        let rows = (images.len() as u32).div_ceil(cols);
+        let cell_w = max_width;
+        let cell_h = max_height;
+        let sheet_w = cols * cell_w;
+        let sheet_h = rows * cell_h;
+
+        // Create the merged canvas
+        let mut canvas = SpriteCanvas::new(sheet_w, sheet_h);
+
+        // Copy each image into its cell
+        for (i, (img_w, img_h, data)) in images.iter().enumerate() {
+            let col = (i as u32) % cols;
+            let row = (i as u32) / cols;
+            let start_x = col * cell_w;
+            let start_y = row * cell_h;
+
+            // Copy pixels (centered if smaller than cell)
+            let offset_x = (cell_w - img_w) / 2;
+            let offset_y = (cell_h - img_h) / 2;
+
+            for py in 0..*img_h {
+                for px in 0..*img_w {
+                    let src_idx = ((py * img_w + px) * 4) as usize;
+                    let color = PixelColor::from_rgba_array([
+                        data[src_idx],
+                        data[src_idx + 1],
+                        data[src_idx + 2],
+                        data[src_idx + 3],
+                    ]);
+                    canvas.set_pixel(start_x + offset_x + px, start_y + offset_y + py, color);
+                }
+            }
+        }
+
+        // Update state
+        self.canvas = Some(canvas);
+        self.active_sprite = None;
+        self.asset_kind = None;
+        self.cell_size = glam::UVec2::new(cell_w, cell_h);
+        self.show_cell_grid = true;
+        self.dirty = true;
+        self.history.clear();
+        self.selection = None;
+        self.canvas_texture = None;
+        self.viewport = SpriteCanvasViewport::default();
+        self.selected_cell = None;
+        self.show_merge_dialog = false;
+
+        Ok(())
     }
 
     /// Scan a sprites directory for available sprite assets

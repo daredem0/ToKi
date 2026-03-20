@@ -245,6 +245,17 @@ fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             ui.label(format!("Grid: {}x{} ({} cells)", cols, rows, cols * rows));
         }
 
+        // Sheet expansion controls
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            if ui.button("+ Row").clicked() {
+                ui_state.sprite.append_row();
+            }
+            if ui.button("+ Column").clicked() {
+                ui_state.sprite.append_column();
+            }
+        });
+
         // Show selected cell info and operations
         if let Some(cell_idx) = ui_state.sprite.selected_cell {
             if let Some((cols, rows)) = ui_state.sprite.sheet_cell_count() {
@@ -261,6 +272,13 @@ fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 ui.horizontal(|ui| {
                     if ui.button("Clear Cell").clicked() {
                         ui_state.sprite.clear_selected_cell();
+                    }
+                    if ui
+                        .button("Delete & Collapse")
+                        .on_hover_text("Delete cell and shift remaining cells to fill the gap")
+                        .clicked()
+                    {
+                        ui_state.sprite.delete_cell_with_collapse();
                     }
                 });
 

@@ -704,3 +704,118 @@ fn sprite_editor_state_load_sprite_asset() {
     assert_eq!(state.cell_size.y, 8);
     assert_eq!(state.save_asset_name, "sprite");
 }
+
+// ============================================================================
+// Sheet Append/Delete Tests
+// ============================================================================
+
+#[test]
+fn sprite_editor_state_append_row_expands_canvas() {
+    let mut state = SpriteEditorState::default();
+    // Create 2x2 sheet with 8x8 cells (16x16 canvas)
+    state.new_sheet(16, 16, 8, 8);
+
+    assert_eq!(state.canvas_dimensions(), Some((16, 16)));
+    assert_eq!(state.sheet_cell_count(), Some((2, 2)));
+
+    // Append a row - should expand to 16x24 (2x3 grid)
+    assert!(state.append_row());
+
+    assert_eq!(state.canvas_dimensions(), Some((16, 24)));
+    assert_eq!(state.sheet_cell_count(), Some((2, 3)));
+    assert!(state.dirty);
+    assert!(state.history.can_undo());
+}
+
+#[test]
+fn sprite_editor_state_append_column_expands_canvas() {
+    let mut state = SpriteEditorState::default();
+    // Create 2x2 sheet with 8x8 cells (16x16 canvas)
+    state.new_sheet(16, 16, 8, 8);
+
+    assert_eq!(state.canvas_dimensions(), Some((16, 16)));
+    assert_eq!(state.sheet_cell_count(), Some((2, 2)));
+
+    // Append a column - should expand to 24x16 (3x2 grid)
+    assert!(state.append_column());
+
+    assert_eq!(state.canvas_dimensions(), Some((24, 16)));
+    assert_eq!(state.sheet_cell_count(), Some((3, 2)));
+    assert!(state.dirty);
+    assert!(state.history.can_undo());
+}
+
+#[test]
+fn sprite_editor_state_append_row_preserves_existing_pixels() {
+    let mut state = SpriteEditorState::default();
+    state.new_sheet(8, 8, 8, 8); // 1x1 cell
+
+    // Draw a red pixel in the original cell
+    if let Some(canvas) = &mut state.canvas {
+        canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
+    }
+
+    state.append_row();
+
+    // Check the red pixel is still there
+    if let Some(canvas) = &state.canvas {
+        assert_eq!(canvas.get_pixel(0, 0), Some(PixelColor::rgb(255, 0, 0)));
+        // New row should be transparent
+        assert_eq!(canvas.get_pixel(0, 8), Some(PixelColor::transparent()));
+    }
+}
+
+#[test]
+fn sprite_editor_state_delete_cell_with_collapse_shifts_cells() {
+    let mut state = SpriteEditorState::default();
+    // Create 2x2 sheet with 4x4 cells
+    state.new_sheet(8, 8, 4, 4);
+
+    // Draw distinct colors in each cell
+    if let Some(canvas) = &mut state.canvas {
+        // Cell 0 (top-left): Red
+        canvas.fill_rect(0, 0, 4, 4, PixelColor::rgb(255, 0, 0));
+        // Cell 1 (top-right): Green
+        canvas.fill_rect(4, 0, 4, 4, PixelColor::rgb(0, 255, 0));
+        // Cell 2 (bottom-left): Blue
+        canvas.fill_rect(0, 4, 4, 4, PixelColor::rgb(0, 0, 255));
+        // Cell 3 (bottom-right): Yellow
+        canvas.fill_rect(4, 4, 4, 4, PixelColor::rgb(255, 255, 0));
+    }
+
+    // Select and delete cell 0 (red)
+    state.selected_cell = Some(0);
+    assert!(state.delete_cell_with_collapse());
+
+    // After collapse: cell 0 should now have green (was cell 1)
+    if let Some(canvas) = &state.canvas {
+        assert_eq!(canvas.get_pixel(0, 0), Some(PixelColor::rgb(0, 255, 0)));
+        // Cell 1 should have blue (was cell 2)
+        assert_eq!(canvas.get_pixel(4, 0), Some(PixelColor::rgb(0, 0, 255)));
+        // Cell 2 should have yellow (was cell 3)
+        assert_eq!(canvas.get_pixel(0, 4), Some(PixelColor::rgb(255, 255, 0)));
+        // Cell 3 (last) should be transparent
+        assert_eq!(canvas.get_pixel(4, 4), Some(PixelColor::transparent()));
+    }
+
+    assert!(state.dirty);
+    assert!(state.history.can_undo());
+}
+
+#[test]
+fn sprite_editor_state_delete_cell_without_selection_fails() {
+    let mut state = SpriteEditorState::default();
+    state.new_sheet(8, 8, 4, 4);
+    state.selected_cell = None;
+
+    assert!(!state.delete_cell_with_collapse());
+}
+
+#[test]
+fn sprite_editor_state_append_on_non_sheet_fails() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(16, 16); // Not a sheet
+
+    assert!(!state.append_row());
+    assert!(!state.append_column());
+}

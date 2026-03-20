@@ -29,6 +29,11 @@ pub fn render_sprite_editor(
         render_load_dialog(ui_state, ctx);
     }
 
+    // Handle merge dialog
+    if ui_state.sprite.show_merge_dialog {
+        render_merge_dialog(ui_state, ctx);
+    }
+
     // Handle warning dialog
     if ui_state.sprite.show_warning_dialog {
         render_warning_dialog(ui_state, ctx);
@@ -67,6 +72,17 @@ fn render_toolbar(
         {
             if let Some(dir) = sprites_dir {
                 ui_state.sprite.begin_load_dialog(dir);
+            }
+        }
+
+        // Merge sprites into sheet
+        if ui
+            .add_enabled(load_enabled, egui::Button::new("Merge..."))
+            .on_hover_text("Merge multiple sprites into a single sheet")
+            .clicked()
+        {
+            if let Some(dir) = sprites_dir {
+                ui_state.sprite.begin_merge_dialog(dir);
             }
         }
 
@@ -407,6 +423,107 @@ fn render_load_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                     ui_state.sprite.show_load_dialog = false;
                 }
             });
+        });
+}
+
+fn render_merge_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
+    use crate::ui::editor_ui::SpriteAssetKind;
+
+    egui::Window::new("Merge Sprites into Sheet")
+        .collapsible(false)
+        .resizable(true)
+        .default_size([450.0, 350.0])
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .show(ctx, |ui| {
+            if ui_state.sprite.discovered_assets.is_empty() {
+                ui.label("No sprite assets found in project.");
+                ui.add_space(8.0);
+                if ui.button("Cancel").clicked() {
+                    ui_state.sprite.show_merge_dialog = false;
+                }
+                return;
+            }
+
+            ui.label("Select sprites to merge (click to toggle):");
+            ui.separator();
+
+            // Build asset display info first to avoid borrow conflicts
+            let asset_info: Vec<_> = ui_state
+                .sprite
+                .discovered_assets
+                .iter()
+                .enumerate()
+                .map(|(i, asset)| {
+                    let is_selected = ui_state.sprite.merge_selected_indices.contains(&i);
+                    let kind_label = match asset.kind {
+                        SpriteAssetKind::TileAtlas => "Atlas",
+                        SpriteAssetKind::ObjectSheet => "Object",
+                    };
+                    (i, format!("{} [{}]", asset.name, kind_label), is_selected)
+                })
+                .collect();
+
+            // Scrollable list of assets with checkboxes
+            let mut toggle_index = None;
+            egui::ScrollArea::vertical()
+                .max_height(180.0)
+                .show(ui, |ui| {
+                    for (i, label, is_selected) in &asset_info {
+                        let mut selected = *is_selected;
+                        if ui.checkbox(&mut selected, label.as_str()).changed() {
+                            toggle_index = Some(*i);
+                        }
+                    }
+                });
+
+            // Apply toggle after the loop
+            if let Some(idx) = toggle_index {
+                ui_state.sprite.toggle_merge_selection(idx);
+            }
+
+            ui.separator();
+
+            // Show selected count
+            let count = ui_state.sprite.merge_selected_indices.len();
+            ui.label(format!("Selected: {} sprites", count));
+
+            // Target columns setting
+            ui.horizontal(|ui| {
+                ui.label("Columns:");
+                ui.add(
+                    egui::DragValue::new(&mut ui_state.sprite.merge_target_cols)
+                        .range(1..=16)
+                        .speed(1),
+                );
+            });
+
+            // Show calculated grid
+            if count > 0 {
+                let cols = ui_state.sprite.merge_target_cols.max(1);
+                let rows = (count as u32).div_ceil(cols);
+                ui.label(format!("Result: {}x{} grid ({} cells)", cols, rows, count));
+            }
+
+            ui.add_space(8.0);
+
+            ui.horizontal(|ui| {
+                let can_merge = count >= 2;
+                if ui
+                    .add_enabled(can_merge, egui::Button::new("Merge"))
+                    .clicked()
+                {
+                    if let Err(e) = ui_state.sprite.merge_sprites_into_sheet() {
+                        tracing::error!("Failed to merge sprites: {}", e);
+                    }
+                }
+                if ui.button("Cancel").clicked() {
+                    ui_state.sprite.show_merge_dialog = false;
+                }
+            });
+
+            if count < 2 {
+                ui.label("Select at least 2 sprites to merge.");
+            }
         });
 }
 
