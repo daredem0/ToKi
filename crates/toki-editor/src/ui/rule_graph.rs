@@ -123,7 +123,7 @@ impl RuleGraph {
                     &mut nodes,
                     &mut next_node_id,
                     &mut suffix_cache,
-                    RuleGraphNodeKind::Condition(*condition),
+                    RuleGraphNodeKind::Condition(condition.clone()),
                     next_in_chain,
                 );
                 if let Some(next_node) = next_in_chain {
@@ -316,7 +316,7 @@ impl RuleGraph {
                 match &next_node.kind {
                     RuleGraphNodeKind::Trigger(_) => {}
                     RuleGraphNodeKind::Condition(condition) => {
-                        conditions.push(*condition);
+                        conditions.push(condition.clone());
                     }
                     RuleGraphNodeKind::Action(action) => {
                         actions.push(action.clone());

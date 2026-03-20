@@ -12,11 +12,11 @@ fn trigger_summary_is_semantic() {
         "OnStart"
     );
     assert_eq!(
-        PanelSystem::trigger_summary(RuleTrigger::OnDamaged),
+        PanelSystem::trigger_summary(RuleTrigger::OnDamaged { entity: None }),
         "OnDamaged"
     );
     assert_eq!(
-        PanelSystem::trigger_summary(RuleTrigger::OnDeath),
+        PanelSystem::trigger_summary(RuleTrigger::OnDeath { entity: None }),
         "OnDeath"
     );
     assert_eq!(
@@ -28,11 +28,11 @@ fn trigger_summary_is_semantic() {
 #[test]
 fn condition_summary_is_semantic() {
     assert_eq!(
-        PanelSystem::condition_summary(RuleCondition::Always),
+        PanelSystem::condition_summary(&RuleCondition::Always),
         "Always"
     );
     assert_eq!(
-        PanelSystem::condition_summary(RuleCondition::TargetExists {
+        PanelSystem::condition_summary(&RuleCondition::TargetExists {
             target: RuleTarget::Player
         }),
         "TargetExists(Player)"

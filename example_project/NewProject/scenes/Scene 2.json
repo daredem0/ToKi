@@ -12,7 +12,11 @@
         "enabled": true,
         "priority": 0,
         "once": false,
-        "trigger": "OnCollision",
+        "trigger": {
+          "OnCollision": {
+            "entity": null
+          }
+        },
         "conditions": [
           "Always"
         ],

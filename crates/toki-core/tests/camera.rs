@@ -17,6 +17,7 @@ fn create_test_entity(id: EntityId, position: IVec2) -> Entity {
         attributes: EntityAttributes::default(),
         collision_box: None,
         movement_accumulator: glam::Vec2::ZERO,
+        tags: Vec::new(),
     }
 }
 

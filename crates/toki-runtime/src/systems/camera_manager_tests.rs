@@ -51,6 +51,7 @@ fn update_with_follow_mode_moves_camera_and_view_matrix_matches() {
         collision_box: None,
         definition_name: None,
         movement_accumulator: glam::Vec2::ZERO,
+        tags: Vec::new(),
     };
     let runtime = RuntimeState {
         entities: &[entity],

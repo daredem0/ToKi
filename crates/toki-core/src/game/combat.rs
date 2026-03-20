@@ -284,7 +284,7 @@ impl GameState {
                 projectile_entity.position = new_position;
                 if let Some(projectile) = projectile_entity.attributes.projectile.as_mut() {
                     projectile.remaining_ticks = projectile.remaining_ticks.saturating_sub(1);
-                    tracing::debug!(
+                    tracing::trace!(
                         "Projectile {} moved from {:?} to {:?} remaining_ticks={}",
                         projectile_id,
                         current_position,
@@ -378,7 +378,7 @@ impl GameState {
                     attacker: change.source_entity_id,
                 });
                 tracing::info!(
-                    "Entity {} reached zero {} and will be despawned",
+                    "Entity {} reached zero {} and will be deferred for despawn",
                     change.target_entity_id,
                     change.stat_id
                 );
@@ -386,11 +386,10 @@ impl GameState {
             }
         }
 
+        // Defer despawning until after death events are processed
         despawn_ids.sort_unstable();
         despawn_ids.dedup();
-        for entity_id in despawn_ids {
-            self.entity_manager.despawn_entity(entity_id);
-        }
+        self.pending_despawns.extend(despawn_ids);
     }
 
     fn trigger_entity_primary_action(&mut self, entity_id: EntityId) -> bool {
@@ -461,5 +460,21 @@ impl GameState {
                 self.trigger_entity_primary_action(entity_id);
             }
         }
+    }
+
+    /// Apply damage to an entity directly (for testing).
+    /// This queues a stat change request that will be applied during the next update.
+    pub fn deal_damage_to_entity(
+        &mut self,
+        target_id: EntityId,
+        damage: i32,
+        attacker_id: Option<EntityId>,
+    ) {
+        self.pending_stat_changes.push(StatChangeRequest {
+            target_entity_id: target_id,
+            stat_id: HEALTH_STAT_ID.to_string(),
+            delta: -damage,
+            source_entity_id: attacker_id,
+        });
     }
 }

@@ -50,6 +50,7 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
         },
         collision_box: None,
         movement_accumulator: glam::Vec2::ZERO,
+        tags: Vec::new(),
     }
 }
 

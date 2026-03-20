@@ -74,7 +74,7 @@ impl InspectorSystem {
             }
             RuleGraphNodeKind::Condition(condition) => {
                 ui.label("Condition");
-                let mut edited_condition = condition;
+                let mut edited_condition = condition.clone();
                 let changed = Self::render_rule_graph_condition_editor(
                     ui,
                     scene_name,
@@ -381,7 +381,7 @@ impl InspectorSystem {
             RuleGraphNodeKind::Condition(condition) => {
                 format!(
                     "Condition {}",
-                    Self::rule_graph_condition_summary(*condition)
+                    Self::rule_graph_condition_summary(condition)
                 )
             }
             RuleGraphNodeKind::Action(action) => {
@@ -397,25 +397,67 @@ impl InspectorSystem {
             RuleTrigger::OnUpdate => "OnUpdate".to_string(),
             RuleTrigger::OnPlayerMove => "OnPlayerMove".to_string(),
             RuleTrigger::OnKey { key } => format!("OnKey({})", Self::rule_key_label(key)),
-            RuleTrigger::OnCollision => "OnCollision".to_string(),
-            RuleTrigger::OnDamaged => "OnDamaged".to_string(),
-            RuleTrigger::OnDeath => "OnDeath".to_string(),
+            RuleTrigger::OnCollision { entity: None } => "OnCollision".to_string(),
+            RuleTrigger::OnCollision { entity: Some(target) } => {
+                format!("OnCollision({})", Self::rule_graph_target_summary(target))
+            }
+            RuleTrigger::OnDamaged { entity: None } => "OnDamaged".to_string(),
+            RuleTrigger::OnDamaged { entity: Some(target) } => {
+                format!("OnDamaged({})", Self::rule_graph_target_summary(target))
+            }
+            RuleTrigger::OnDeath { entity: None } => "OnDeath".to_string(),
+            RuleTrigger::OnDeath { entity: Some(target) } => {
+                format!("OnDeath({})", Self::rule_graph_target_summary(target))
+            }
             RuleTrigger::OnTrigger => "OnTrigger".to_string(),
             RuleTrigger::OnInteract { .. } => "OnInteract".to_string(),
         }
     }
 
-    pub(in super::super) fn rule_graph_condition_summary(condition: RuleCondition) -> String {
+    pub(in super::super) fn rule_graph_condition_summary(condition: &RuleCondition) -> String {
         match condition {
             RuleCondition::Always => "Always".to_string(),
             RuleCondition::TargetExists { target } => {
-                format!("TargetExists({})", Self::rule_graph_target_summary(target))
+                format!("TargetExists({})", Self::rule_graph_target_summary(*target))
             }
-            RuleCondition::KeyHeld { key } => format!("KeyHeld({})", Self::rule_key_label(key)),
+            RuleCondition::KeyHeld { key } => format!("KeyHeld({})", Self::rule_key_label(*key)),
             RuleCondition::EntityActive { target, is_active } => format!(
                 "EntityActive({}, {})",
-                Self::rule_graph_target_summary(target),
-                if is_active { "true" } else { "false" }
+                Self::rule_graph_target_summary(*target),
+                if *is_active { "true" } else { "false" }
+            ),
+            RuleCondition::HealthBelow { target, threshold } => format!(
+                "HealthBelow({}, {})",
+                Self::rule_graph_target_summary(*target),
+                threshold
+            ),
+            RuleCondition::HealthAbove { target, threshold } => format!(
+                "HealthAbove({}, {})",
+                Self::rule_graph_target_summary(*target),
+                threshold
+            ),
+            RuleCondition::TriggerOtherIsPlayer => "TriggerOtherIsPlayer".to_string(),
+            RuleCondition::EntityIsKind { target, kind } => format!(
+                "EntityIsKind({}, {:?})",
+                Self::rule_graph_target_summary(*target),
+                kind
+            ),
+            RuleCondition::TriggerOtherIsKind { kind } => format!("TriggerOtherIsKind({:?})", kind),
+            RuleCondition::EntityHasTag { target, tag } => format!(
+                "EntityHasTag({}, {})",
+                Self::rule_graph_target_summary(*target),
+                tag
+            ),
+            RuleCondition::TriggerOtherHasTag { tag } => format!("TriggerOtherHasTag({})", tag),
+            RuleCondition::HasInventoryItem {
+                target,
+                item_id,
+                min_count,
+            } => format!(
+                "HasInventoryItem({}, {}, {})",
+                Self::rule_graph_target_summary(*target),
+                item_id,
+                min_count
             ),
         }
     }
@@ -535,12 +577,13 @@ impl InspectorSystem {
                 RuleTriggerKind::Update => RuleTrigger::OnUpdate,
                 RuleTriggerKind::PlayerMove => RuleTrigger::OnPlayerMove,
                 RuleTriggerKind::Key => RuleTrigger::OnKey { key: RuleKey::Up },
-                RuleTriggerKind::Collision => RuleTrigger::OnCollision,
-                RuleTriggerKind::Damaged => RuleTrigger::OnDamaged,
-                RuleTriggerKind::Death => RuleTrigger::OnDeath,
+                RuleTriggerKind::Collision => RuleTrigger::OnCollision { entity: None },
+                RuleTriggerKind::Damaged => RuleTrigger::OnDamaged { entity: None },
+                RuleTriggerKind::Death => RuleTrigger::OnDeath { entity: None },
                 RuleTriggerKind::Trigger => RuleTrigger::OnTrigger,
                 RuleTriggerKind::Interact => RuleTrigger::OnInteract {
                     mode: toki_core::rules::InteractionMode::default(),
+                    entity: None,
                 },
             };
             changed = true;
@@ -554,11 +597,41 @@ impl InspectorSystem {
             );
         }
 
-        if let RuleTrigger::OnInteract { mode } = trigger {
+        if let RuleTrigger::OnInteract { mode, .. } = trigger {
             changed |= Self::render_rule_interaction_mode_editor_with_salt(
                 ui,
                 &format!("graph_node_trigger_interact_mode_{}_{}", scene_name, node_key),
                 mode,
+            );
+        }
+
+        // Entity filter editors for triggers that support them
+        if let RuleTrigger::OnCollision { entity } = trigger {
+            changed |= Self::render_optional_entity_filter_editor(
+                ui,
+                &format!("graph_node_trigger_collision_entity_{}_{}", scene_name, node_key),
+                entity,
+            );
+        }
+        if let RuleTrigger::OnDamaged { entity } = trigger {
+            changed |= Self::render_optional_entity_filter_editor(
+                ui,
+                &format!("graph_node_trigger_damaged_entity_{}_{}", scene_name, node_key),
+                entity,
+            );
+        }
+        if let RuleTrigger::OnDeath { entity } = trigger {
+            changed |= Self::render_optional_entity_filter_editor(
+                ui,
+                &format!("graph_node_trigger_death_entity_{}_{}", scene_name, node_key),
+                entity,
+            );
+        }
+        if let RuleTrigger::OnInteract { entity, .. } = trigger {
+            changed |= Self::render_optional_entity_filter_editor(
+                ui,
+                &format!("graph_node_trigger_interact_entity_{}_{}", scene_name, node_key),
+                entity,
             );
         }
 
@@ -588,6 +661,14 @@ impl InspectorSystem {
                     RuleConditionKind::TargetExists,
                     RuleConditionKind::KeyHeld,
                     RuleConditionKind::EntityActive,
+                    RuleConditionKind::HealthBelow,
+                    RuleConditionKind::HealthAbove,
+                    RuleConditionKind::TriggerOtherIsPlayer,
+                    RuleConditionKind::EntityIsKind,
+                    RuleConditionKind::TriggerOtherIsKind,
+                    RuleConditionKind::EntityHasTag,
+                    RuleConditionKind::TriggerOtherHasTag,
+                    RuleConditionKind::HasInventoryItem,
                 ] {
                     changed |= ui
                         .selectable_value(
@@ -606,7 +687,7 @@ impl InspectorSystem {
         }
 
         match condition {
-            RuleCondition::Always => {}
+            RuleCondition::Always | RuleCondition::TriggerOtherIsPlayer => {}
             RuleCondition::TargetExists { target } => {
                 changed |= Self::render_rule_target_editor_with_salt(
                     ui,
@@ -631,6 +712,77 @@ impl InspectorSystem {
                     target,
                 );
                 changed |= ui.checkbox(is_active, "Target Is Active").changed();
+            }
+            RuleCondition::HealthBelow { target, threshold }
+            | RuleCondition::HealthAbove { target, threshold } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!("graph_node_condition_health_target_{}_{}", scene_name, node_key),
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    ui.label("Threshold:");
+                    changed |= ui
+                        .add(egui::DragValue::new(threshold).range(0..=1000))
+                        .changed();
+                });
+            }
+            RuleCondition::EntityIsKind { target, kind } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!("graph_node_condition_entity_kind_target_{}_{}", scene_name, node_key),
+                    target,
+                );
+                changed |= Self::render_entity_kind_editor(
+                    ui,
+                    &format!("graph_node_condition_entity_kind_{}_{}", scene_name, node_key),
+                    kind,
+                );
+            }
+            RuleCondition::TriggerOtherIsKind { kind } => {
+                changed |= Self::render_entity_kind_editor(
+                    ui,
+                    &format!("graph_node_condition_other_kind_{}_{}", scene_name, node_key),
+                    kind,
+                );
+            }
+            RuleCondition::EntityHasTag { target, tag } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!("graph_node_condition_tag_target_{}_{}", scene_name, node_key),
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    ui.label("Tag:");
+                    changed |= ui.text_edit_singleline(tag).changed();
+                });
+            }
+            RuleCondition::TriggerOtherHasTag { tag } => {
+                ui.horizontal(|ui| {
+                    ui.label("Tag:");
+                    changed |= ui.text_edit_singleline(tag).changed();
+                });
+            }
+            RuleCondition::HasInventoryItem {
+                target,
+                item_id,
+                min_count,
+            } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!("graph_node_condition_inv_target_{}_{}", scene_name, node_key),
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    ui.label("Item ID:");
+                    changed |= ui.text_edit_singleline(item_id).changed();
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Min Count:");
+                    changed |= ui
+                        .add(egui::DragValue::new(min_count).range(1..=999))
+                        .changed();
+                });
             }
         }
 
@@ -982,6 +1134,92 @@ impl InspectorSystem {
                     }
                 });
         });
+        changed
+    }
+
+    fn entity_kind_label(kind: toki_core::entity::EntityKind) -> &'static str {
+        use toki_core::entity::EntityKind;
+        match kind {
+            EntityKind::Player => "Player",
+            EntityKind::Npc => "NPC",
+            EntityKind::Item => "Item",
+            EntityKind::Decoration => "Decoration",
+            EntityKind::Trigger => "Trigger",
+            EntityKind::Projectile => "Projectile",
+        }
+    }
+
+    pub(in super::super) fn render_entity_kind_editor(
+        ui: &mut egui::Ui,
+        id_salt: &str,
+        kind: &mut toki_core::entity::EntityKind,
+    ) -> bool {
+        use toki_core::entity::EntityKind;
+
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Entity Kind:");
+            egui::ComboBox::from_id_salt(id_salt)
+                .selected_text(Self::entity_kind_label(*kind))
+                .show_ui(ui, |ui| {
+                    for candidate in [
+                        EntityKind::Player,
+                        EntityKind::Npc,
+                        EntityKind::Item,
+                        EntityKind::Decoration,
+                        EntityKind::Trigger,
+                        EntityKind::Projectile,
+                    ] {
+                        changed |= ui
+                            .selectable_value(kind, candidate, Self::entity_kind_label(candidate))
+                            .changed();
+                    }
+                });
+        });
+        changed
+    }
+
+    /// Renders an optional entity filter editor for triggers like OnDamaged, OnDeath, OnCollision.
+    ///
+    /// When `None`, the trigger fires for all events. When `Some(target)`, it only fires
+    /// when the resolved target matches the event entity.
+    pub(in super::super) fn render_optional_entity_filter_editor(
+        ui: &mut egui::Ui,
+        id_salt: &str,
+        entity: &mut Option<RuleTarget>,
+    ) -> bool {
+        let mut changed = false;
+        let is_filtered = entity.is_some();
+
+        ui.horizontal(|ui| {
+            ui.label("Entity Filter:");
+            let filter_label = if is_filtered { "Specific Entity" } else { "All Entities" };
+            egui::ComboBox::from_id_salt((id_salt, "filter_toggle"))
+                .selected_text(filter_label)
+                .show_ui(ui, |ui| {
+                    if ui
+                        .selectable_label(!is_filtered, "All Entities")
+                        .clicked()
+                        && is_filtered
+                    {
+                        *entity = None;
+                        changed = true;
+                    }
+                    if ui
+                        .selectable_label(is_filtered, "Specific Entity")
+                        .clicked()
+                        && !is_filtered
+                    {
+                        *entity = Some(RuleTarget::Player);
+                        changed = true;
+                    }
+                });
+        });
+
+        if let Some(target) = entity {
+            changed |= Self::render_rule_target_editor_with_salt(ui, &format!("{}_target", id_salt), target);
+        }
+
         changed
     }
 }

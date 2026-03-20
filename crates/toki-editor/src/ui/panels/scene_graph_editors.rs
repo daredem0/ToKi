@@ -7,26 +7,72 @@ impl PanelSystem {
             RuleTrigger::OnUpdate => "OnUpdate".to_string(),
             RuleTrigger::OnPlayerMove => "OnPlayerMove".to_string(),
             RuleTrigger::OnKey { key } => format!("OnKey({})", Self::key_label(key)),
-            RuleTrigger::OnCollision => "OnCollision".to_string(),
-            RuleTrigger::OnDamaged => "OnDamaged".to_string(),
-            RuleTrigger::OnDeath => "OnDeath".to_string(),
+            RuleTrigger::OnCollision { entity: None } => "OnCollision".to_string(),
+            RuleTrigger::OnCollision { entity: Some(target) } => {
+                format!("OnCollision({})", Self::target_label(target))
+            }
+            RuleTrigger::OnDamaged { entity: None } => "OnDamaged".to_string(),
+            RuleTrigger::OnDamaged { entity: Some(target) } => {
+                format!("OnDamaged({})", Self::target_label(target))
+            }
+            RuleTrigger::OnDeath { entity: None } => "OnDeath".to_string(),
+            RuleTrigger::OnDeath { entity: Some(target) } => {
+                format!("OnDeath({})", Self::target_label(target))
+            }
             RuleTrigger::OnTrigger => "OnTrigger".to_string(),
-            RuleTrigger::OnInteract { .. } => "OnInteract".to_string(),
+            RuleTrigger::OnInteract { entity: None, .. } => "OnInteract".to_string(),
+            RuleTrigger::OnInteract {
+                entity: Some(target),
+                ..
+            } => {
+                format!("OnInteract({})", Self::target_label(target))
+            }
         }
     }
 
-    pub(super) fn condition_summary(condition: RuleCondition) -> String {
+    pub(super) fn condition_summary(condition: &RuleCondition) -> String {
         match condition {
             RuleCondition::Always => "Always".to_string(),
             RuleCondition::TargetExists { target } => {
-                format!("TargetExists({})", Self::target_label(target))
+                format!("TargetExists({})", Self::target_label(*target))
             }
-            RuleCondition::KeyHeld { key } => format!("KeyHeld({})", Self::key_label(key)),
+            RuleCondition::KeyHeld { key } => format!("KeyHeld({})", Self::key_label(*key)),
             RuleCondition::EntityActive { target, is_active } => {
                 format!(
                     "EntityActive({}, active={})",
-                    Self::target_label(target),
+                    Self::target_label(*target),
                     is_active
+                )
+            }
+            RuleCondition::HealthBelow { target, threshold } => {
+                format!("HealthBelow({}, {})", Self::target_label(*target), threshold)
+            }
+            RuleCondition::HealthAbove { target, threshold } => {
+                format!("HealthAbove({}, {})", Self::target_label(*target), threshold)
+            }
+            RuleCondition::TriggerOtherIsPlayer => "TriggerOtherIsPlayer".to_string(),
+            RuleCondition::EntityIsKind { target, kind } => {
+                format!("EntityIsKind({}, {:?})", Self::target_label(*target), kind)
+            }
+            RuleCondition::TriggerOtherIsKind { kind } => {
+                format!("TriggerOtherIsKind({:?})", kind)
+            }
+            RuleCondition::EntityHasTag { target, tag } => {
+                format!("EntityHasTag({}, {})", Self::target_label(*target), tag)
+            }
+            RuleCondition::TriggerOtherHasTag { tag } => {
+                format!("TriggerOtherHasTag({})", tag)
+            }
+            RuleCondition::HasInventoryItem {
+                target,
+                item_id,
+                min_count,
+            } => {
+                format!(
+                    "HasInventoryItem({}, {}, {})",
+                    Self::target_label(*target),
+                    item_id,
+                    min_count
                 )
             }
         }
@@ -107,9 +153,9 @@ impl PanelSystem {
             RuleTrigger::OnUpdate => GraphTriggerKind::Update,
             RuleTrigger::OnPlayerMove => GraphTriggerKind::PlayerMove,
             RuleTrigger::OnKey { .. } => GraphTriggerKind::Key,
-            RuleTrigger::OnCollision => GraphTriggerKind::Collision,
-            RuleTrigger::OnDamaged => GraphTriggerKind::Damaged,
-            RuleTrigger::OnDeath => GraphTriggerKind::Death,
+            RuleTrigger::OnCollision { .. } => GraphTriggerKind::Collision,
+            RuleTrigger::OnDamaged { .. } => GraphTriggerKind::Damaged,
+            RuleTrigger::OnDeath { .. } => GraphTriggerKind::Death,
             RuleTrigger::OnTrigger => GraphTriggerKind::Trigger,
             RuleTrigger::OnInteract { .. } => GraphTriggerKind::Interact,
         }
@@ -135,22 +181,31 @@ impl PanelSystem {
             GraphTriggerKind::Update => RuleTrigger::OnUpdate,
             GraphTriggerKind::PlayerMove => RuleTrigger::OnPlayerMove,
             GraphTriggerKind::Key => RuleTrigger::OnKey { key: RuleKey::Up },
-            GraphTriggerKind::Collision => RuleTrigger::OnCollision,
-            GraphTriggerKind::Damaged => RuleTrigger::OnDamaged,
-            GraphTriggerKind::Death => RuleTrigger::OnDeath,
+            GraphTriggerKind::Collision => RuleTrigger::OnCollision { entity: None },
+            GraphTriggerKind::Damaged => RuleTrigger::OnDamaged { entity: None },
+            GraphTriggerKind::Death => RuleTrigger::OnDeath { entity: None },
             GraphTriggerKind::Trigger => RuleTrigger::OnTrigger,
             GraphTriggerKind::Interact => RuleTrigger::OnInteract {
                 mode: toki_core::rules::InteractionMode::default(),
+                entity: None,
             },
         }
     }
 
-    pub(super) fn graph_condition_kind(condition: RuleCondition) -> GraphConditionKind {
+    pub(super) fn graph_condition_kind(condition: &RuleCondition) -> GraphConditionKind {
         match condition {
             RuleCondition::Always => GraphConditionKind::Always,
             RuleCondition::TargetExists { .. } => GraphConditionKind::TargetExists,
             RuleCondition::KeyHeld { .. } => GraphConditionKind::KeyHeld,
             RuleCondition::EntityActive { .. } => GraphConditionKind::EntityActive,
+            RuleCondition::HealthBelow { .. } => GraphConditionKind::HealthBelow,
+            RuleCondition::HealthAbove { .. } => GraphConditionKind::HealthAbove,
+            RuleCondition::TriggerOtherIsPlayer => GraphConditionKind::TriggerOtherIsPlayer,
+            RuleCondition::EntityIsKind { .. } => GraphConditionKind::EntityIsKind,
+            RuleCondition::TriggerOtherIsKind { .. } => GraphConditionKind::TriggerOtherIsKind,
+            RuleCondition::EntityHasTag { .. } => GraphConditionKind::EntityHasTag,
+            RuleCondition::TriggerOtherHasTag { .. } => GraphConditionKind::TriggerOtherHasTag,
+            RuleCondition::HasInventoryItem { .. } => GraphConditionKind::HasInventoryItem,
         }
     }
 
@@ -160,6 +215,14 @@ impl PanelSystem {
             GraphConditionKind::TargetExists => "TargetExists",
             GraphConditionKind::KeyHeld => "KeyHeld",
             GraphConditionKind::EntityActive => "EntityActive",
+            GraphConditionKind::HealthBelow => "HealthBelow",
+            GraphConditionKind::HealthAbove => "HealthAbove",
+            GraphConditionKind::TriggerOtherIsPlayer => "TriggerOtherIsPlayer",
+            GraphConditionKind::EntityIsKind => "EntityIsKind",
+            GraphConditionKind::TriggerOtherIsKind => "TriggerOtherIsKind",
+            GraphConditionKind::EntityHasTag => "EntityHasTag",
+            GraphConditionKind::TriggerOtherHasTag => "TriggerOtherHasTag",
+            GraphConditionKind::HasInventoryItem => "HasInventoryItem",
         }
     }
 
@@ -173,6 +236,34 @@ impl PanelSystem {
             GraphConditionKind::EntityActive => RuleCondition::EntityActive {
                 target: RuleTarget::Player,
                 is_active: true,
+            },
+            GraphConditionKind::HealthBelow => RuleCondition::HealthBelow {
+                target: RuleTarget::Player,
+                threshold: 50,
+            },
+            GraphConditionKind::HealthAbove => RuleCondition::HealthAbove {
+                target: RuleTarget::Player,
+                threshold: 50,
+            },
+            GraphConditionKind::TriggerOtherIsPlayer => RuleCondition::TriggerOtherIsPlayer,
+            GraphConditionKind::EntityIsKind => RuleCondition::EntityIsKind {
+                target: RuleTarget::Player,
+                kind: toki_core::entity::EntityKind::Player,
+            },
+            GraphConditionKind::TriggerOtherIsKind => RuleCondition::TriggerOtherIsKind {
+                kind: toki_core::entity::EntityKind::Npc,
+            },
+            GraphConditionKind::EntityHasTag => RuleCondition::EntityHasTag {
+                target: RuleTarget::Player,
+                tag: String::new(),
+            },
+            GraphConditionKind::TriggerOtherHasTag => RuleCondition::TriggerOtherHasTag {
+                tag: String::new(),
+            },
+            GraphConditionKind::HasInventoryItem => RuleCondition::HasInventoryItem {
+                target: RuleTarget::Player,
+                item_id: String::new(),
+                min_count: 1,
             },
         }
     }
@@ -238,7 +329,7 @@ impl PanelSystem {
         id_prefix: &str,
     ) -> bool {
         match condition {
-            RuleCondition::Always => false,
+            RuleCondition::Always | RuleCondition::TriggerOtherIsPlayer => false,
             RuleCondition::TargetExists { target } => {
                 Self::edit_rule_target(ui, target, &format!("{id_prefix}::target"))
             }
@@ -249,6 +340,66 @@ impl PanelSystem {
                 let mut changed =
                     Self::edit_rule_target(ui, target, &format!("{id_prefix}::entity_target"));
                 changed |= ui.checkbox(is_active, "Active").changed();
+                changed
+            }
+            RuleCondition::HealthBelow { target, threshold }
+            | RuleCondition::HealthAbove { target, threshold } => {
+                let mut changed =
+                    Self::edit_rule_target(ui, target, &format!("{id_prefix}::target"));
+                ui.horizontal(|ui| {
+                    ui.label("Threshold:");
+                    changed |= ui.add(egui::DragValue::new(threshold)).changed();
+                });
+                changed
+            }
+            RuleCondition::EntityIsKind { target, kind } => {
+                let mut changed =
+                    Self::edit_rule_target(ui, target, &format!("{id_prefix}::target"));
+                changed |= Self::edit_entity_kind(ui, kind, &format!("{id_prefix}::kind"));
+                changed
+            }
+            RuleCondition::TriggerOtherIsKind { kind } => {
+                Self::edit_entity_kind(ui, kind, &format!("{id_prefix}::kind"))
+            }
+            RuleCondition::EntityHasTag { target, tag } => {
+                let mut changed =
+                    Self::edit_rule_target(ui, target, &format!("{id_prefix}::target"));
+                ui.horizontal(|ui| {
+                    ui.label("Tag:");
+                    changed |= ui.text_edit_singleline(tag).changed();
+                });
+                changed
+            }
+            RuleCondition::TriggerOtherHasTag { tag } => {
+                let mut changed = false;
+                ui.horizontal(|ui| {
+                    ui.label("Tag:");
+                    changed |= ui.text_edit_singleline(tag).changed();
+                });
+                changed
+            }
+            RuleCondition::HasInventoryItem {
+                target,
+                item_id,
+                min_count,
+            } => {
+                let mut changed =
+                    Self::edit_rule_target(ui, target, &format!("{id_prefix}::target"));
+                ui.horizontal(|ui| {
+                    ui.label("Item ID:");
+                    changed |= ui.text_edit_singleline(item_id).changed();
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Min Count:");
+                    let mut count_i32 = *min_count as i32;
+                    if ui
+                        .add(egui::DragValue::new(&mut count_i32).range(0..=i32::MAX))
+                        .changed()
+                    {
+                        *min_count = count_i32.max(0) as u32;
+                        changed = true;
+                    }
+                });
                 changed
             }
         }
@@ -454,6 +605,31 @@ impl PanelSystem {
         changed
     }
 
+    pub(super) fn edit_entity_kind(
+        ui: &mut egui::Ui,
+        kind: &mut EntityKind,
+        id_salt: &str,
+    ) -> bool {
+        let mut changed = false;
+        egui::ComboBox::from_id_salt(id_salt)
+            .selected_text(format!("{:?}", kind))
+            .show_ui(ui, |ui| {
+                for candidate in [
+                    EntityKind::Player,
+                    EntityKind::Npc,
+                    EntityKind::Item,
+                    EntityKind::Decoration,
+                    EntityKind::Trigger,
+                    EntityKind::Projectile,
+                ] {
+                    changed |= ui
+                        .selectable_value(kind, candidate, format!("{:?}", candidate))
+                        .changed();
+                }
+            });
+        changed
+    }
+
     pub(super) fn render_graph_selected_node_editor(
         ui: &mut egui::Ui,
         graph: &RuleGraph,
@@ -526,8 +702,8 @@ impl PanelSystem {
                 }
             }
             RuleGraphNodeKind::Condition(condition) => {
-                let mut edited_condition = condition;
-                let mut kind = Self::graph_condition_kind(condition);
+                let mut edited_condition = condition.clone();
+                let mut kind = Self::graph_condition_kind(&condition);
                 let kind_salt = format!("graph_canvas_condition_kind::{scene_name}::{node_id}");
                 egui::ComboBox::from_id_salt(kind_salt)
                     .selected_text(Self::graph_condition_kind_label(kind))
@@ -537,6 +713,14 @@ impl PanelSystem {
                             GraphConditionKind::TargetExists,
                             GraphConditionKind::KeyHeld,
                             GraphConditionKind::EntityActive,
+                            GraphConditionKind::HealthBelow,
+                            GraphConditionKind::HealthAbove,
+                            GraphConditionKind::TriggerOtherIsPlayer,
+                            GraphConditionKind::EntityIsKind,
+                            GraphConditionKind::TriggerOtherIsKind,
+                            GraphConditionKind::EntityHasTag,
+                            GraphConditionKind::TriggerOtherHasTag,
+                            GraphConditionKind::HasInventoryItem,
                         ] {
                             ui.selectable_value(
                                 &mut kind,
@@ -545,7 +729,7 @@ impl PanelSystem {
                             );
                         }
                     });
-                if kind != Self::graph_condition_kind(condition) {
+                if kind != Self::graph_condition_kind(&condition) {
                     edited_condition = Self::graph_default_condition(kind);
                 }
                 let _ = Self::edit_graph_condition_payload(

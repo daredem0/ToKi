@@ -374,7 +374,7 @@ impl PanelSystem {
                 format!("Trigger {}", Self::trigger_summary(*trigger))
             }
             RuleGraphNodeKind::Condition(condition) => {
-                format!("Condition {}", Self::condition_summary(*condition))
+                format!("Condition {}", Self::condition_summary(condition))
             }
             RuleGraphNodeKind::Action(action) => {
                 format!("Action {}", Self::action_summary(action))

@@ -119,6 +119,7 @@ fn create_test_entity() -> Entity {
         attributes,
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
         movement_accumulator: glam::Vec2::ZERO,
+        tags: Vec::new(),
     }
 }
 
@@ -182,6 +183,7 @@ fn test_entity_minimal_fields() {
         attributes: EntityAttributes::default(),
         collision_box: None,
         movement_accumulator: glam::Vec2::ZERO,
+        tags: Vec::new(),
     };
 
     let json = serde_json::to_string_pretty(&entity).unwrap();

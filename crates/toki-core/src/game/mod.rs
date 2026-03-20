@@ -132,6 +132,10 @@ pub struct GameState {
     /// Pending generic stat changes gathered during update and resolved centrally.
     #[serde(skip, default)]
     pending_stat_changes: Vec<StatChangeRequest>,
+
+    /// Entities that died and need to be despawned after death events are processed.
+    #[serde(skip, default)]
+    pending_despawns: Vec<EntityId>,
 }
 
 use combat::StatChangeRequest;
@@ -235,49 +239,21 @@ impl GameState {
 
         // Fire collision triggers with context for each collision event
         {
-            use crate::rules::TriggerContext;
             let collision_events = std::mem::take(&mut self.rule_runtime.frame_collisions);
             for event in collision_events {
-                let context = if let Some(entity_b) = event.entity_b {
-                    TriggerContext::with_pair(event.entity_a, entity_b)
-                } else {
-                    TriggerContext::with_self_only(event.entity_a)
-                };
-                self.collect_rule_commands_for_trigger_with_context(
-                    RuleTrigger::OnCollision,
-                    context,
-                    &mut reactive_rule_commands,
-                );
+                self.collect_rule_commands_for_collision(&event, &mut reactive_rule_commands);
             }
 
             // Fire damage triggers with context for each damage event
             let damage_events = std::mem::take(&mut self.rule_runtime.frame_damage_events);
             for event in damage_events {
-                let context = if let Some(attacker) = event.attacker {
-                    TriggerContext::with_pair(event.victim, attacker)
-                } else {
-                    TriggerContext::with_self_only(event.victim)
-                };
-                self.collect_rule_commands_for_trigger_with_context(
-                    RuleTrigger::OnDamaged,
-                    context,
-                    &mut reactive_rule_commands,
-                );
+                self.collect_rule_commands_for_damage(&event, &mut reactive_rule_commands);
             }
 
             // Fire death triggers with context for each death event
             let death_events = std::mem::take(&mut self.rule_runtime.frame_death_events);
             for event in death_events {
-                let context = if let Some(attacker) = event.attacker {
-                    TriggerContext::with_pair(event.victim, attacker)
-                } else {
-                    TriggerContext::with_self_only(event.victim)
-                };
-                self.collect_rule_commands_for_trigger_with_context(
-                    RuleTrigger::OnDeath,
-                    context,
-                    &mut reactive_rule_commands,
-                );
+                self.collect_rule_commands_for_death(&event, &mut reactive_rule_commands);
             }
 
             // Fire interact triggers with context for each interaction event
@@ -301,6 +277,12 @@ impl GameState {
         pending_rule_animations.append(&mut reactive_animations);
 
         self.apply_rule_animations(pending_rule_animations);
+
+        // Despawn entities that died after death events have been processed
+        let pending_despawns = std::mem::take(&mut self.pending_despawns);
+        for entity_id in pending_despawns {
+            self.entity_manager.despawn_entity(entity_id);
+        }
 
         // Update entity animation timing and emit animation-loop-based movement sounds.
         let completed_animation_loops = self.entity_manager.update_animations(17.0);
@@ -404,6 +386,12 @@ impl GameState {
 
         self.apply_rule_animations(pending_rule_animations);
 
+        // Despawn entities that died after death events have been processed
+        let pending_despawns = std::mem::take(&mut self.pending_despawns);
+        for entity_id in pending_despawns {
+            self.entity_manager.despawn_entity(entity_id);
+        }
+
         // Update entity animation timing with actual delta
         let completed_animation_loops = self.entity_manager.update_animations(animation_delta_ms);
         for (entity_id, completed_loops) in completed_animation_loops {
@@ -460,8 +448,6 @@ impl GameState {
         atlas: &AtlasMeta,
         reactive_rule_commands: &mut Vec<rules::RuleCommand>,
     ) {
-        use crate::rules::TriggerContext;
-
         if result.player_moved {
             self.collect_rule_commands_for_trigger(
                 RuleTrigger::OnPlayerMove,
@@ -472,46 +458,19 @@ impl GameState {
         // Fire collision triggers with context for each collision event
         let collision_events = std::mem::take(&mut self.rule_runtime.frame_collisions);
         for event in collision_events {
-            let context = if let Some(entity_b) = event.entity_b {
-                TriggerContext::with_pair(event.entity_a, entity_b)
-            } else {
-                TriggerContext::with_self_only(event.entity_a)
-            };
-            self.collect_rule_commands_for_trigger_with_context(
-                RuleTrigger::OnCollision,
-                context,
-                reactive_rule_commands,
-            );
+            self.collect_rule_commands_for_collision(&event, reactive_rule_commands);
         }
 
         // Fire damage triggers with context for each damage event
         let damage_events = std::mem::take(&mut self.rule_runtime.frame_damage_events);
         for event in damage_events {
-            let context = if let Some(attacker) = event.attacker {
-                TriggerContext::with_pair(event.victim, attacker)
-            } else {
-                TriggerContext::with_self_only(event.victim)
-            };
-            self.collect_rule_commands_for_trigger_with_context(
-                RuleTrigger::OnDamaged,
-                context,
-                reactive_rule_commands,
-            );
+            self.collect_rule_commands_for_damage(&event, reactive_rule_commands);
         }
 
         // Fire death triggers with context for each death event
         let death_events = std::mem::take(&mut self.rule_runtime.frame_death_events);
         for event in death_events {
-            let context = if let Some(attacker) = event.attacker {
-                TriggerContext::with_pair(event.victim, attacker)
-            } else {
-                TriggerContext::with_self_only(event.victim)
-            };
-            self.collect_rule_commands_for_trigger_with_context(
-                RuleTrigger::OnDeath,
-                context,
-                reactive_rule_commands,
-            );
+            self.collect_rule_commands_for_death(&event, reactive_rule_commands);
         }
 
         // Fire interact triggers with context for each interaction event

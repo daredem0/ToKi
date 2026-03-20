@@ -174,9 +174,18 @@ impl InspectorSystem {
 
             for (condition_index, condition) in rule.conditions.iter().enumerate() {
                 match condition {
-                    RuleCondition::Always => {}
+                    RuleCondition::Always
+                    | RuleCondition::KeyHeld { .. }
+                    | RuleCondition::TriggerOtherIsPlayer
+                    | RuleCondition::TriggerOtherIsKind { .. }
+                    | RuleCondition::TriggerOtherHasTag { .. } => {}
                     RuleCondition::TargetExists { target }
-                    | RuleCondition::EntityActive { target, .. } => {
+                    | RuleCondition::EntityActive { target, .. }
+                    | RuleCondition::HealthBelow { target, .. }
+                    | RuleCondition::HealthAbove { target, .. }
+                    | RuleCondition::EntityIsKind { target, .. }
+                    | RuleCondition::EntityHasTag { target, .. }
+                    | RuleCondition::HasInventoryItem { target, .. } => {
                         if let RuleTarget::Entity(entity_id) = target {
                             if *entity_id == 0 {
                                 issues.push(RuleValidationIssue {
@@ -190,7 +199,6 @@ impl InspectorSystem {
                             }
                         }
                     }
-                    RuleCondition::KeyHeld { .. } => {}
                 }
             }
 
@@ -427,6 +435,34 @@ impl InspectorSystem {
                 target: RuleTarget::Player,
                 is_active: true,
             },
+            RuleConditionKind::HealthBelow => RuleCondition::HealthBelow {
+                target: RuleTarget::Player,
+                threshold: 50,
+            },
+            RuleConditionKind::HealthAbove => RuleCondition::HealthAbove {
+                target: RuleTarget::Player,
+                threshold: 50,
+            },
+            RuleConditionKind::TriggerOtherIsPlayer => RuleCondition::TriggerOtherIsPlayer,
+            RuleConditionKind::EntityIsKind => RuleCondition::EntityIsKind {
+                target: RuleTarget::Player,
+                kind: toki_core::entity::EntityKind::Player,
+            },
+            RuleConditionKind::TriggerOtherIsKind => RuleCondition::TriggerOtherIsKind {
+                kind: toki_core::entity::EntityKind::Npc,
+            },
+            RuleConditionKind::EntityHasTag => RuleCondition::EntityHasTag {
+                target: RuleTarget::Player,
+                tag: String::new(),
+            },
+            RuleConditionKind::TriggerOtherHasTag => RuleCondition::TriggerOtherHasTag {
+                tag: String::new(),
+            },
+            RuleConditionKind::HasInventoryItem => RuleCondition::HasInventoryItem {
+                target: RuleTarget::Player,
+                item_id: String::new(),
+                min_count: 1,
+            },
         }
     }
 
@@ -436,6 +472,14 @@ impl InspectorSystem {
             RuleCondition::TargetExists { .. } => RuleConditionKind::TargetExists,
             RuleCondition::KeyHeld { .. } => RuleConditionKind::KeyHeld,
             RuleCondition::EntityActive { .. } => RuleConditionKind::EntityActive,
+            RuleCondition::HealthBelow { .. } => RuleConditionKind::HealthBelow,
+            RuleCondition::HealthAbove { .. } => RuleConditionKind::HealthAbove,
+            RuleCondition::TriggerOtherIsPlayer => RuleConditionKind::TriggerOtherIsPlayer,
+            RuleCondition::EntityIsKind { .. } => RuleConditionKind::EntityIsKind,
+            RuleCondition::TriggerOtherIsKind { .. } => RuleConditionKind::TriggerOtherIsKind,
+            RuleCondition::EntityHasTag { .. } => RuleConditionKind::EntityHasTag,
+            RuleCondition::TriggerOtherHasTag { .. } => RuleConditionKind::TriggerOtherHasTag,
+            RuleCondition::HasInventoryItem { .. } => RuleConditionKind::HasInventoryItem,
         }
     }
 
@@ -447,6 +491,14 @@ impl InspectorSystem {
             RuleConditionKind::TargetExists => "TargetExists",
             RuleConditionKind::KeyHeld => "KeyHeld",
             RuleConditionKind::EntityActive => "EntityActive",
+            RuleConditionKind::HealthBelow => "HealthBelow",
+            RuleConditionKind::HealthAbove => "HealthAbove",
+            RuleConditionKind::TriggerOtherIsPlayer => "TriggerOtherIsPlayer",
+            RuleConditionKind::EntityIsKind => "EntityIsKind",
+            RuleConditionKind::TriggerOtherIsKind => "TriggerOtherIsKind",
+            RuleConditionKind::EntityHasTag => "EntityHasTag",
+            RuleConditionKind::TriggerOtherHasTag => "TriggerOtherHasTag",
+            RuleConditionKind::HasInventoryItem => "HasInventoryItem",
         }
     }
 
@@ -492,9 +544,9 @@ impl InspectorSystem {
             RuleTrigger::OnUpdate => RuleTriggerKind::Update,
             RuleTrigger::OnPlayerMove => RuleTriggerKind::PlayerMove,
             RuleTrigger::OnKey { .. } => RuleTriggerKind::Key,
-            RuleTrigger::OnCollision => RuleTriggerKind::Collision,
-            RuleTrigger::OnDamaged => RuleTriggerKind::Damaged,
-            RuleTrigger::OnDeath => RuleTriggerKind::Death,
+            RuleTrigger::OnCollision { .. } => RuleTriggerKind::Collision,
+            RuleTrigger::OnDamaged { .. } => RuleTriggerKind::Damaged,
+            RuleTrigger::OnDeath { .. } => RuleTriggerKind::Death,
             RuleTrigger::OnTrigger => RuleTriggerKind::Trigger,
             RuleTrigger::OnInteract { .. } => RuleTriggerKind::Interact,
         }
@@ -520,12 +572,13 @@ impl InspectorSystem {
             RuleTriggerKind::Update => RuleTrigger::OnUpdate,
             RuleTriggerKind::PlayerMove => RuleTrigger::OnPlayerMove,
             RuleTriggerKind::Key => RuleTrigger::OnKey { key: RuleKey::Up },
-            RuleTriggerKind::Collision => RuleTrigger::OnCollision,
-            RuleTriggerKind::Damaged => RuleTrigger::OnDamaged,
-            RuleTriggerKind::Death => RuleTrigger::OnDeath,
+            RuleTriggerKind::Collision => RuleTrigger::OnCollision { entity: None },
+            RuleTriggerKind::Damaged => RuleTrigger::OnDamaged { entity: None },
+            RuleTriggerKind::Death => RuleTrigger::OnDeath { entity: None },
             RuleTriggerKind::Trigger => RuleTrigger::OnTrigger,
             RuleTriggerKind::Interact => RuleTrigger::OnInteract {
                 mode: toki_core::rules::InteractionMode::default(),
+                entity: None,
             },
         };
     }

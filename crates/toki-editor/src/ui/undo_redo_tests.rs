@@ -22,6 +22,7 @@ fn sample_entity(id: u32, position: IVec2) -> Entity {
         attributes: EntityAttributes::default(),
         collision_box: None,
         movement_accumulator: glam::Vec2::ZERO,
+        tags: Vec::new(),
     }
 }
 

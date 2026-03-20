@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::animation::AnimationState;
-use crate::entity::EntityId;
+use crate::entity::{EntityId, EntityKind};
 
 /// Context provided by triggers that involve entity interactions.
 ///
@@ -54,13 +54,32 @@ pub enum RuleTrigger {
     OnUpdate,
     OnPlayerMove,
     OnKey { key: RuleKey },
-    OnCollision,
-    OnDamaged,
-    OnDeath,
+    OnCollision {
+        /// Optional entity filter. If set, trigger only fires when this entity collides.
+        /// If None, fires for all collision events.
+        #[serde(default)]
+        entity: Option<RuleTarget>,
+    },
+    OnDamaged {
+        /// Optional entity filter. If set, trigger only fires when this entity is damaged.
+        /// If None, fires for all damage events.
+        #[serde(default)]
+        entity: Option<RuleTarget>,
+    },
+    OnDeath {
+        /// Optional entity filter. If set, trigger only fires when this entity dies.
+        /// If None, fires for all death events.
+        #[serde(default)]
+        entity: Option<RuleTarget>,
+    },
     OnTrigger,
     OnInteract {
         #[serde(default)]
         mode: InteractionMode,
+        /// Optional entity filter. If set, trigger only fires when this entity interacts.
+        /// If None, fires for all interaction events.
+        #[serde(default)]
+        entity: Option<RuleTarget>,
     },
 }
 
@@ -72,17 +91,49 @@ impl RuleTrigger {
     pub const fn provides_context(&self) -> bool {
         matches!(
             self,
-            RuleTrigger::OnCollision
-                | RuleTrigger::OnDamaged
-                | RuleTrigger::OnDeath
+            RuleTrigger::OnCollision { .. }
+                | RuleTrigger::OnDamaged { .. }
+                | RuleTrigger::OnDeath { .. }
                 | RuleTrigger::OnInteract { .. }
         )
+    }
+
+    /// Returns the entity filter for OnCollision trigger, if any.
+    pub const fn collision_entity_filter(&self) -> Option<RuleTarget> {
+        match self {
+            RuleTrigger::OnCollision { entity } => *entity,
+            _ => None,
+        }
+    }
+
+    /// Returns the entity filter for OnDamaged trigger, if any.
+    pub const fn damaged_entity_filter(&self) -> Option<RuleTarget> {
+        match self {
+            RuleTrigger::OnDamaged { entity } => *entity,
+            _ => None,
+        }
+    }
+
+    /// Returns the entity filter for OnDeath trigger, if any.
+    pub const fn death_entity_filter(&self) -> Option<RuleTarget> {
+        match self {
+            RuleTrigger::OnDeath { entity } => *entity,
+            _ => None,
+        }
     }
 
     /// Returns the interaction mode if this is an OnInteract trigger.
     pub const fn interaction_mode(&self) -> Option<InteractionMode> {
         match self {
-            RuleTrigger::OnInteract { mode } => Some(*mode),
+            RuleTrigger::OnInteract { mode, .. } => Some(*mode),
+            _ => None,
+        }
+    }
+
+    /// Returns the entity filter for OnInteract trigger, if any.
+    pub const fn interact_entity_filter(&self) -> Option<RuleTarget> {
+        match self {
+            RuleTrigger::OnInteract { entity, .. } => *entity,
             _ => None,
         }
     }
@@ -102,12 +153,35 @@ pub enum RuleKey {
     Pause,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RuleCondition {
     Always,
     TargetExists { target: RuleTarget },
     KeyHeld { key: RuleKey },
     EntityActive { target: RuleTarget, is_active: bool },
+    /// True when the target entity's health is strictly below the threshold.
+    HealthBelow { target: RuleTarget, threshold: i32 },
+    /// True when the target entity's health is strictly above the threshold.
+    HealthAbove { target: RuleTarget, threshold: i32 },
+    /// True when the trigger_other entity from trigger context is the player.
+    /// Fails safely (returns false) when no trigger context is available.
+    TriggerOtherIsPlayer,
+    /// True when the target entity's kind matches the specified kind.
+    EntityIsKind { target: RuleTarget, kind: EntityKind },
+    /// True when the trigger_other entity from trigger context has the specified kind.
+    /// Fails safely (returns false) when no trigger context is available.
+    TriggerOtherIsKind { kind: EntityKind },
+    /// True when the target entity has the specified tag.
+    EntityHasTag { target: RuleTarget, tag: String },
+    /// True when the trigger_other entity from trigger context has the specified tag.
+    /// Fails safely (returns false) when no trigger context is available.
+    TriggerOtherHasTag { tag: String },
+    /// True when the target entity's inventory contains at least `min_count` of the specified item.
+    HasInventoryItem {
+        target: RuleTarget,
+        item_id: String,
+        min_count: u32,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

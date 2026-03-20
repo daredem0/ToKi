@@ -41,6 +41,7 @@ impl GameState {
             rules: RuleSet::default(),
             rule_runtime: RuleRuntimeState::default(),
             pending_stat_changes: Vec::new(),
+            pending_despawns: Vec::new(),
         }
     }
 
@@ -60,6 +61,7 @@ impl GameState {
             rules: RuleSet::default(),
             rule_runtime: RuleRuntimeState::default(),
             pending_stat_changes: Vec::new(),
+            pending_despawns: Vec::new(),
         }
     }
 

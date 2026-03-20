@@ -243,6 +243,7 @@ fn test_add_existing_entity_tracks_explicit_player_character_role() {
         },
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
         movement_accumulator: glam::Vec2::ZERO,
+        tags: Vec::new(),
     };
 
     let entity_id = manager.add_existing_entity(entity);
@@ -279,6 +280,7 @@ fn test_add_existing_entity_seeds_generic_health_stat_from_legacy_health() {
         },
         collision_box: Some(CollisionBox::solid_box(UVec2::new(16, 16))),
         movement_accumulator: glam::Vec2::ZERO,
+        tags: Vec::new(),
     };
 
     let entity_id = manager.add_existing_entity(entity);

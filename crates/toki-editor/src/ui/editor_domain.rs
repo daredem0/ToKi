@@ -57,6 +57,14 @@ pub enum RuleConditionEditorKind {
     TargetExists,
     KeyHeld,
     EntityActive,
+    HealthBelow,
+    HealthAbove,
+    TriggerOtherIsPlayer,
+    EntityIsKind,
+    TriggerOtherIsKind,
+    EntityHasTag,
+    TriggerOtherHasTag,
+    HasInventoryItem,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

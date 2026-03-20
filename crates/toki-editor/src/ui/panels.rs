@@ -13,6 +13,7 @@ use crate::scene::SceneViewport;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use toki_core::animation::AnimationState;
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
+use toki_core::entity::EntityKind;
 use toki_core::rules::{
     RuleAction, RuleCondition, RuleKey, RuleSoundChannel, RuleSpawnEntityType, RuleTarget,
     RuleTrigger,

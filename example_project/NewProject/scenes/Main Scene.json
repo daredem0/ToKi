@@ -33,6 +33,16 @@
         "visible": true,
         "animation_controller": {
           "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -43,16 +53,6 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -194,6 +194,16 @@
         "visible": true,
         "animation_controller": {
           "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -204,16 +214,6 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -278,6 +278,16 @@
         "visible": true,
         "animation_controller": {
           "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -288,16 +298,6 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -446,16 +446,6 @@
         "visible": true,
         "animation_controller": {
           "clips": {
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -466,6 +456,16 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -707,57 +707,27 @@
               "frame_duration_ms": 180.0,
               "loop_mode": "Once"
             },
-            "IdleDown": {
-              "state": "IdleDown",
+            "IdleUp": {
+              "state": "IdleUp",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_down_a"
+                "player/walk_up_a"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "AttackDown": {
-              "state": "AttackDown",
+            "WalkDown": {
+              "state": "WalkDown",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/attack_down_a",
-                "player/attack_down_b"
+                "player/walk_down_a",
+                "player/walk_down_b"
               ],
               "frame_duration_ms": 180.0,
-              "loop_mode": "Once"
+              "loop_mode": "Loop"
             },
             "AttackRight": {
               "state": "AttackRight",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/attack_right_a",
-                "player/attack_right_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Once"
-            },
-            "WalkLeft": {
-              "state": "WalkLeft",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_right_a",
-                "player/walk_right_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Loop"
-            },
-            "WalkRight": {
-              "state": "WalkRight",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_right_a",
-                "player/walk_right_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Loop"
-            },
-            "AttackLeft": {
-              "state": "AttackLeft",
               "atlas_name": "players.json",
               "frame_tile_names": [
                 "player/attack_right_a",
@@ -776,11 +746,20 @@
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
-            "IdleUp": {
-              "state": "IdleUp",
+            "IdleDown": {
+              "state": "IdleDown",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_up_a"
+                "player/walk_down_a"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "IdleLeft": {
+              "state": "IdleLeft",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_right_a"
               ],
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
@@ -794,24 +773,45 @@
               "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             },
-            "WalkDown": {
-              "state": "WalkDown",
+            "WalkLeft": {
+              "state": "WalkLeft",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_down_a",
-                "player/walk_down_b"
+                "player/walk_right_a",
+                "player/walk_right_b"
               ],
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
-            "IdleLeft": {
-              "state": "IdleLeft",
+            "AttackLeft": {
+              "state": "AttackLeft",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_right_a"
+                "player/attack_right_a",
+                "player/attack_right_b"
               ],
-              "frame_duration_ms": 300.0,
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Once"
+            },
+            "WalkRight": {
+              "state": "WalkRight",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_right_a",
+                "player/walk_right_b"
+              ],
+              "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
+            },
+            "AttackDown": {
+              "state": "AttackDown",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/attack_down_a",
+                "player/attack_down_b"
+              ],
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Once"
             }
           },
           "current_clip_state": "IdleDown",
@@ -863,7 +863,11 @@
         "enabled": true,
         "priority": 0,
         "once": false,
-        "trigger": "OnCollision",
+        "trigger": {
+          "OnCollision": {
+            "entity": null
+          }
+        },
         "conditions": [
           "Always"
         ],
@@ -883,7 +887,8 @@
         "once": false,
         "trigger": {
           "OnInteract": {
-            "mode": "InFront"
+            "mode": "InFront",
+            "entity": null
           }
         },
         "conditions": [
@@ -894,6 +899,64 @@
             "PlaySound": {
               "channel": "Movement",
               "sound_id": "sfx_powerup"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rule_3",
+        "enabled": true,
+        "priority": 0,
+        "once": false,
+        "trigger": {
+          "OnDamaged": {
+            "entity": {
+              "Entity": 9
+            }
+          }
+        },
+        "conditions": [
+          {
+            "HealthBelow": {
+              "target": {
+                "Entity": 9
+              },
+              "threshold": 50
+            }
+          }
+        ],
+        "actions": [
+          {
+            "SwitchScene": {
+              "scene_name": "Scene 2",
+              "spawn_point_id": "spawn_point_1"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rule_4",
+        "enabled": true,
+        "priority": 0,
+        "once": false,
+        "trigger": {
+          "OnDeath": {
+            "entity": null
+          }
+        },
+        "conditions": [
+          {
+            "EntityIsKind": {
+              "target": "TriggerSelf",
+              "kind": "Npc"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "PlaySound": {
+              "channel": "Movement",
+              "sound_id": "sfx_select"
             }
           }
         ]

@@ -593,7 +593,7 @@ impl InspectorSystem {
         }
 
         match condition {
-            RuleCondition::Always => {}
+            RuleCondition::Always | RuleCondition::TriggerOtherIsPlayer => {}
             RuleCondition::TargetExists { target } => {
                 changed |= Self::render_rule_condition_target_editor(
                     ui,
@@ -641,6 +641,85 @@ impl InspectorSystem {
                 );
                 ui.horizontal(|ui| {
                     changed |= ui.checkbox(is_active, "Target Is Active").changed();
+                });
+            }
+            RuleCondition::HealthBelow { target, threshold }
+            | RuleCondition::HealthAbove { target, threshold } => {
+                changed |= Self::render_rule_condition_target_editor(
+                    ui,
+                    scene_name,
+                    rule_index,
+                    condition_index,
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    ui.label("Threshold:");
+                    changed |= ui
+                        .add(egui::DragValue::new(threshold).range(0..=1000))
+                        .changed();
+                });
+            }
+            RuleCondition::EntityIsKind { target, kind } => {
+                changed |= Self::render_rule_condition_target_editor(
+                    ui,
+                    scene_name,
+                    rule_index,
+                    condition_index,
+                    target,
+                );
+                changed |= Self::render_entity_kind_editor(
+                    ui,
+                    &format!("rule_condition_kind_{}_{}", rule_index, condition_index),
+                    kind,
+                );
+            }
+            RuleCondition::TriggerOtherIsKind { kind } => {
+                changed |= Self::render_entity_kind_editor(
+                    ui,
+                    &format!("rule_condition_other_kind_{}_{}", rule_index, condition_index),
+                    kind,
+                );
+            }
+            RuleCondition::EntityHasTag { target, tag } => {
+                changed |= Self::render_rule_condition_target_editor(
+                    ui,
+                    scene_name,
+                    rule_index,
+                    condition_index,
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    ui.label("Tag:");
+                    changed |= ui.text_edit_singleline(tag).changed();
+                });
+            }
+            RuleCondition::TriggerOtherHasTag { tag } => {
+                ui.horizontal(|ui| {
+                    ui.label("Tag:");
+                    changed |= ui.text_edit_singleline(tag).changed();
+                });
+            }
+            RuleCondition::HasInventoryItem {
+                target,
+                item_id,
+                min_count,
+            } => {
+                changed |= Self::render_rule_condition_target_editor(
+                    ui,
+                    scene_name,
+                    rule_index,
+                    condition_index,
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    ui.label("Item ID:");
+                    changed |= ui.text_edit_singleline(item_id).changed();
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Min Count:");
+                    changed |= ui
+                        .add(egui::DragValue::new(min_count).range(1..=999))
+                        .changed();
                 });
             }
         }

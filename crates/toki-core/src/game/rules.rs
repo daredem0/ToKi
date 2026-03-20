@@ -1,9 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
+use tracing::debug;
+
 use crate::animation::AnimationState;
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
-use crate::entity::{AiBehavior, Entity, EntityAttributes, EntityId, EntityKind};
+use crate::entity::{AiBehavior, Entity, EntityAttributes, EntityId, EntityKind, HEALTH_STAT_ID};
 use crate::events::GameUpdateResult;
 use crate::rules::{
     Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleSpawnEntityType, RuleTarget,
@@ -176,11 +178,20 @@ impl GameState {
         matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
 
         for rule in matching_rules {
-            if !self.rule_conditions_match(&rule.conditions, &context) {
+            let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
+            debug!(
+                rule_id = %rule.id,
+                trigger = ?trigger,
+                conditions_passed = conditions_result,
+                "Rule evaluated"
+            );
+
+            if !conditions_result {
                 continue;
             }
 
             for action in &rule.actions {
+                debug!(rule_id = %rule.id, action = ?action, "Executing action");
                 self.buffer_rule_action(action, &context, command_buffer);
             }
 
@@ -190,10 +201,11 @@ impl GameState {
         }
     }
 
-    /// Collects rule commands for OnInteract triggers, filtering by interaction mode.
+    /// Collects rule commands for OnInteract triggers, filtering by interaction mode and entity.
     ///
     /// The `event` contains the spatial relationship between player and interactable.
     /// Only rules whose interaction mode matches the spatial relationship will fire.
+    /// If a rule specifies an entity filter, it only fires when that entity is the interactable.
     pub(super) fn collect_rule_commands_for_interaction(
         &mut self,
         event: &InteractionEvent,
@@ -219,17 +231,34 @@ impl GameState {
                 let mode = rule.trigger.interaction_mode().unwrap_or_default();
                 Self::interaction_mode_matches(mode, event.spatial)
             })
+            .filter(|rule| {
+                // Check if entity filter matches the interactable
+                let entity_filter = rule.trigger.interact_entity_filter();
+                self.entity_filter_matches(entity_filter, event.interactable, &context)
+            })
             .cloned()
             .collect::<Vec<_>>();
 
         matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
 
         for rule in matching_rules {
-            if !self.rule_conditions_match(&rule.conditions, &context) {
+            let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
+            debug!(
+                rule_id = %rule.id,
+                trigger = ?rule.trigger,
+                interactor = ?event.interactor,
+                interactable = ?event.interactable,
+                spatial = ?event.spatial,
+                conditions_passed = conditions_result,
+                "Interaction rule evaluated"
+            );
+
+            if !conditions_result {
                 continue;
             }
 
             for action in &rule.actions {
+                debug!(rule_id = %rule.id, action = ?action, "Executing action");
                 self.buffer_rule_action(action, &context, command_buffer);
             }
 
@@ -251,6 +280,235 @@ impl GameState {
             InteractionMode::Overlap => matches!(spatial, InteractionSpatial::Overlap),
             InteractionMode::Adjacent => true, // Adjacent mode accepts any proximity
             InteractionMode::InFront => matches!(spatial, InteractionSpatial::InFront | InteractionSpatial::Overlap),
+        }
+    }
+
+    /// Collects rule commands for OnCollision triggers, filtering by entity if specified.
+    ///
+    /// If a rule has `OnCollision { entity: Some(target) }`, it only fires when the
+    /// resolved target matches the collision event's entity_a. If `entity: None`, it fires
+    /// for all collision events.
+    pub(super) fn collect_rule_commands_for_collision(
+        &mut self,
+        event: &CollisionEvent,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        let context = if let Some(entity_b) = event.entity_b {
+            TriggerContext::with_pair(event.entity_a, entity_b)
+        } else {
+            TriggerContext::with_self_only(event.entity_a)
+        };
+
+        let mut matching_rules = self
+            .rules
+            .rules
+            .iter()
+            .filter(|rule| rule.enabled)
+            .filter(|rule| matches!(rule.trigger, RuleTrigger::OnCollision { .. }))
+            .filter(|rule| {
+                !(rule.once
+                    && self
+                        .rule_runtime
+                        .fired_once_rules
+                        .contains(rule.id.as_str()))
+            })
+            .filter(|rule| {
+                // Check if entity filter matches entity_a (the colliding entity)
+                let entity_filter = rule.trigger.collision_entity_filter();
+                self.entity_filter_matches(entity_filter, event.entity_a, &context)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+
+        matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+
+        for rule in matching_rules {
+            let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
+
+            // Wall collisions (entity_b=None) are high-frequency, use trace level
+            if event.entity_b.is_some() {
+                debug!(
+                    rule_id = %rule.id,
+                    trigger = ?rule.trigger,
+                    entity_a = ?event.entity_a,
+                    entity_b = ?event.entity_b,
+                    conditions_passed = conditions_result,
+                    "Collision rule evaluated"
+                );
+            } else {
+                tracing::trace!(
+                    rule_id = %rule.id,
+                    trigger = ?rule.trigger,
+                    entity_a = ?event.entity_a,
+                    conditions_passed = conditions_result,
+                    "Wall collision rule evaluated"
+                );
+            }
+
+            if !conditions_result {
+                continue;
+            }
+
+            for action in &rule.actions {
+                if event.entity_b.is_some() {
+                    debug!(rule_id = %rule.id, action = ?action, "Executing action");
+                } else {
+                    tracing::trace!(rule_id = %rule.id, action = ?action, "Executing wall collision action");
+                }
+                self.buffer_rule_action(action, &context, command_buffer);
+            }
+
+            if rule.once {
+                self.rule_runtime.fired_once_rules.insert(rule.id);
+            }
+        }
+    }
+
+    /// Collects rule commands for OnDamaged triggers, filtering by entity if specified.
+    ///
+    /// If a rule has `OnDamaged { entity: Some(target) }`, it only fires when the
+    /// resolved target matches the damage event's victim. If `entity: None`, it fires
+    /// for all damage events.
+    pub(super) fn collect_rule_commands_for_damage(
+        &mut self,
+        event: &DamageEvent,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        let context = if let Some(attacker) = event.attacker {
+            TriggerContext::with_pair(event.victim, attacker)
+        } else {
+            TriggerContext::with_self_only(event.victim)
+        };
+
+        let mut matching_rules = self
+            .rules
+            .rules
+            .iter()
+            .filter(|rule| rule.enabled)
+            .filter(|rule| matches!(rule.trigger, RuleTrigger::OnDamaged { .. }))
+            .filter(|rule| {
+                !(rule.once
+                    && self
+                        .rule_runtime
+                        .fired_once_rules
+                        .contains(rule.id.as_str()))
+            })
+            .filter(|rule| {
+                // Check if entity filter matches the victim
+                let entity_filter = rule.trigger.damaged_entity_filter();
+                self.entity_filter_matches(entity_filter, event.victim, &context)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+
+        matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+
+        for rule in matching_rules {
+            let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
+            debug!(
+                rule_id = %rule.id,
+                trigger = ?rule.trigger,
+                victim = ?event.victim,
+                attacker = ?event.attacker,
+                conditions_passed = conditions_result,
+                "Damage rule evaluated"
+            );
+
+            if !conditions_result {
+                continue;
+            }
+
+            for action in &rule.actions {
+                debug!(rule_id = %rule.id, action = ?action, "Executing action");
+                self.buffer_rule_action(action, &context, command_buffer);
+            }
+
+            if rule.once {
+                self.rule_runtime.fired_once_rules.insert(rule.id);
+            }
+        }
+    }
+
+    /// Checks if an entity filter matches a target entity.
+    ///
+    /// - `None`: No filter, matches any entity
+    /// - `Some(target)`: Resolves target and checks if it equals the event entity
+    fn entity_filter_matches(
+        &self,
+        filter: Option<RuleTarget>,
+        event_entity: EntityId,
+        context: &TriggerContext,
+    ) -> bool {
+        match filter {
+            None => true, // No filter, match all
+            Some(target) => self
+                .resolve_rule_target(target, context)
+                .is_some_and(|id| id == event_entity),
+        }
+    }
+
+    /// Collects rule commands for OnDeath triggers, filtering by entity if specified.
+    ///
+    /// If a rule has `OnDeath { entity: Some(target) }`, it only fires when the
+    /// resolved target matches the death event's victim. If `entity: None`, it fires
+    /// for all death events.
+    pub(super) fn collect_rule_commands_for_death(
+        &mut self,
+        event: &DeathEvent,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        let context = if let Some(attacker) = event.attacker {
+            TriggerContext::with_pair(event.victim, attacker)
+        } else {
+            TriggerContext::with_self_only(event.victim)
+        };
+
+        let mut matching_rules = self
+            .rules
+            .rules
+            .iter()
+            .filter(|rule| rule.enabled)
+            .filter(|rule| matches!(rule.trigger, RuleTrigger::OnDeath { .. }))
+            .filter(|rule| {
+                !(rule.once
+                    && self
+                        .rule_runtime
+                        .fired_once_rules
+                        .contains(rule.id.as_str()))
+            })
+            .filter(|rule| {
+                // Check if entity filter matches the victim
+                let entity_filter = rule.trigger.death_entity_filter();
+                self.entity_filter_matches(entity_filter, event.victim, &context)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+
+        matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+
+        for rule in matching_rules {
+            let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
+            tracing::info!(
+                rule_id = %rule.id,
+                trigger = ?rule.trigger,
+                victim = ?event.victim,
+                attacker = ?event.attacker,
+                conditions_passed = conditions_result,
+                "Death rule evaluated"
+            );
+
+            if !conditions_result {
+                continue;
+            }
+
+            for action in &rule.actions {
+                tracing::info!(rule_id = %rule.id, action = ?action, "Executing death action");
+                self.buffer_rule_action(action, &context, command_buffer);
+            }
+
+            if rule.once {
+                self.rule_runtime.fired_once_rules.insert(rule.id);
+            }
         }
     }
 
@@ -335,7 +593,15 @@ impl GameState {
         conditions: &[RuleCondition],
         context: &TriggerContext,
     ) -> bool {
-        conditions.iter().all(|condition| match condition {
+        conditions.iter().all(|condition| {
+            let result = self.evaluate_condition(condition, context);
+            tracing::trace!(condition = ?condition, result, "Condition evaluated");
+            result
+        })
+    }
+
+    fn evaluate_condition(&self, condition: &RuleCondition, context: &TriggerContext) -> bool {
+        match condition {
             RuleCondition::Always => true,
             RuleCondition::TargetExists { target } => self
                 .resolve_rule_target(*target, context)
@@ -348,7 +614,46 @@ impl GameState {
                 .resolve_rule_target(*target, context)
                 .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
                 .is_some_and(|entity| entity.attributes.active == *is_active),
-        })
+            RuleCondition::HealthBelow { target, threshold } => self
+                .resolve_rule_target(*target, context)
+                .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
+                .and_then(|entity| entity.attributes.stats.current(HEALTH_STAT_ID))
+                .is_some_and(|health| health < *threshold),
+            RuleCondition::HealthAbove { target, threshold } => self
+                .resolve_rule_target(*target, context)
+                .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
+                .and_then(|entity| entity.attributes.stats.current(HEALTH_STAT_ID))
+                .is_some_and(|health| health > *threshold),
+            RuleCondition::TriggerOtherIsPlayer => context
+                .trigger_other
+                .is_some_and(|other_id| self.player_id == Some(other_id)),
+            RuleCondition::EntityIsKind { target, kind } => self
+                .resolve_rule_target(*target, context)
+                .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
+                .is_some_and(|entity| entity.entity_kind == *kind),
+            RuleCondition::TriggerOtherIsKind { kind } => context
+                .trigger_other
+                .and_then(|other_id| self.entity_manager.get_entity(other_id))
+                .is_some_and(|entity| entity.entity_kind == *kind),
+            RuleCondition::EntityHasTag { target, tag } => self
+                .resolve_rule_target(*target, context)
+                .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
+                .is_some_and(|entity| entity.tags.contains(tag)),
+            RuleCondition::TriggerOtherHasTag { tag } => context
+                .trigger_other
+                .and_then(|other_id| self.entity_manager.get_entity(other_id))
+                .is_some_and(|entity| entity.tags.contains(tag)),
+            RuleCondition::HasInventoryItem {
+                target,
+                item_id,
+                min_count,
+            } => self
+                .resolve_rule_target(*target, context)
+                .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
+                .is_some_and(|entity| {
+                    entity.attributes.inventory.item_count(item_id) >= *min_count
+                }),
+        }
     }
 
     fn buffer_rule_action(
@@ -417,6 +722,11 @@ impl GameState {
                 scene_name,
                 spawn_point_id,
             } => {
+                tracing::info!(
+                    scene_name = %scene_name,
+                    spawn_point_id = %spawn_point_id,
+                    "Scene switch triggered"
+                );
                 command_buffer.push(RuleCommand::SwitchScene {
                     scene_name: scene_name.clone(),
                     spawn_point_id: spawn_point_id.clone(),

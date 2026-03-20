@@ -7,8 +7,8 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-"Main Scene" = "scenes/Main Scene.json"
 main = "scenes/main.json"
+"Main Scene" = "scenes/Main Scene.json"
 "Scene 2" = "scenes/Scene 2.json"
 
 [assets]
@@ -127,8 +127,8 @@ recent_files = []
 [editor.graph_layouts."Main Scene"]
 zoom = 0.791378378868103
 pan = [
-    -85.2137451171875,
-    98.4921875,
+    -12.873878479003906,
+    -16.6015625,
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
@@ -136,24 +136,48 @@ pan = [
     800.0,
     50.0,
 ]
-"node:3" = [
-    430.0,
-    50.0,
-]
-"node:4" = [
-    60.0,
-    106.0,
+"node:11" = [
+    800.0,
+    218.0,
 ]
 "node:5" = [
     800.0,
     106.0,
 ]
+"node:10" = [
+    60.0,
+    218.0,
+]
+"node:12" = [
+    430.0,
+    218.0,
+]
 "node:6" = [
     430.0,
     106.0,
 ]
+"node:8" = [
+    800.0,
+    162.0,
+]
+"node:9" = [
+    430.0,
+    162.0,
+]
+"node:4" = [
+    60.0,
+    106.0,
+]
 "node:1" = [
     60.0,
+    50.0,
+]
+"node:7" = [
+    60.0,
+    162.0,
+]
+"node:3" = [
+    430.0,
     50.0,
 ]
 
@@ -165,21 +189,21 @@ pan = [
 ]
 
 [editor.graph_layouts."Scene 2".node_positions]
-"node:3" = [
-    430.0,
+"node:1" = [
+    60.0,
     50.0,
 ]
 "node:2" = [
     800.0,
     50.0,
 ]
+"node:3" = [
+    430.0,
+    50.0,
+]
 "node:4" = [
     656.8824462890625,
     177.01071166992188,
-]
-"node:1" = [
-    60.0,
-    50.0,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]
@@ -189,8 +213,7 @@ position = [
     50.0,
 ]
 
-[editor.rule_graph_drafts."Main Scene".nodes.kind]
-Trigger = "OnCollision"
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnCollision]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]
 id = 2
@@ -244,6 +267,71 @@ position = [
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
 Condition = "Always"
 
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 7
+position = [
+    60.0,
+    162.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnDamaged.entity]
+Entity = 9
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 8
+position = [
+    800.0,
+    162.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Action.SwitchScene]
+scene_name = "Scene 2"
+spawn_point_id = "spawn_point_1"
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 9
+position = [
+    430.0,
+    162.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Condition.HealthBelow]
+threshold = 50
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Condition.HealthBelow.target]
+Entity = 9
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 10
+position = [
+    60.0,
+    218.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnDeath]
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 11
+position = [
+    800.0,
+    218.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Action.PlaySound]
+channel = "Movement"
+sound_id = "sfx_select"
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 12
+position = [
+    430.0,
+    218.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Condition.EntityIsKind]
+target = "TriggerSelf"
+kind = "Npc"
+
 [[editor.rule_graph_drafts."Main Scene".edges]]
 from = 3
 to = 2
@@ -260,6 +348,22 @@ to = 5
 from = 4
 to = 6
 
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 9
+to = 8
+
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 7
+to = 9
+
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 12
+to = 11
+
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 10
+to = 12
+
 [[editor.rule_graph_drafts."Main Scene".chains]]
 rule_id = "rule_2"
 enabled = true
@@ -274,63 +378,16 @@ priority = 0
 once = false
 trigger_node_id = 4
 
-[[editor.rule_graph_drafts."Scene 2".nodes]]
-id = 1
-position = [
-    60.0,
-    50.0,
-]
-
-[editor.rule_graph_drafts."Scene 2".nodes.kind]
-Trigger = "OnCollision"
-
-[[editor.rule_graph_drafts."Scene 2".nodes]]
-id = 2
-position = [
-    800.0,
-    50.0,
-]
-
-[editor.rule_graph_drafts."Scene 2".nodes.kind.Action.PlaySound]
-channel = "Movement"
-sound_id = "sfx_coin"
-
-[[editor.rule_graph_drafts."Scene 2".nodes]]
-id = 3
-position = [
-    430.0,
-    50.0,
-]
-
-[editor.rule_graph_drafts."Scene 2".nodes.kind]
-Condition = "Always"
-
-[[editor.rule_graph_drafts."Scene 2".nodes]]
-id = 4
-position = [
-    656.8824462890625,
-    177.01071166992188,
-]
-
-[editor.rule_graph_drafts."Scene 2".nodes.kind.Action.SwitchScene]
-scene_name = "Main Scene"
-spawn_point_id = "spawn_point_2"
-
-[[editor.rule_graph_drafts."Scene 2".edges]]
-from = 3
-to = 2
-
-[[editor.rule_graph_drafts."Scene 2".edges]]
-from = 1
-to = 3
-
-[[editor.rule_graph_drafts."Scene 2".edges]]
-from = 2
-to = 4
-
-[[editor.rule_graph_drafts."Scene 2".chains]]
-rule_id = "rule_1"
+[[editor.rule_graph_drafts."Main Scene".chains]]
+rule_id = "rule_3"
 enabled = true
 priority = 0
 once = false
-trigger_node_id = 1
+trigger_node_id = 7
+
+[[editor.rule_graph_drafts."Main Scene".chains]]
+rule_id = "rule_4"
+enabled = true
+priority = 0
+once = false
+trigger_node_id = 10

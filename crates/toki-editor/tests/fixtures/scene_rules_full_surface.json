@@ -80,7 +80,7 @@
         "enabled": true,
         "priority": 60,
         "once": false,
-        "trigger": "OnCollision",
+        "trigger": { "OnCollision": {} },
         "conditions": ["Always"],
         "actions": [
           {
@@ -95,7 +95,7 @@
         "enabled": true,
         "priority": 55,
         "once": false,
-        "trigger": "OnDamaged",
+        "trigger": { "OnDamaged": {} },
         "conditions": ["Always"],
         "actions": [
           {
@@ -111,7 +111,7 @@
         "enabled": true,
         "priority": 52,
         "once": false,
-        "trigger": "OnDeath",
+        "trigger": { "OnDeath": {} },
         "conditions": ["Always"],
         "actions": [
           {

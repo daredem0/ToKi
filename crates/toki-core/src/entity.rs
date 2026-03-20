@@ -88,6 +88,9 @@ pub struct Entity {
     pub audio: EntityAudioSettings,
     pub attributes: EntityAttributes,
     pub collision_box: Option<CollisionBox>,
+    /// Tags for categorizing and filtering entities in rules.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     /// Runtime-only accumulator for sub-pixel movement.
     /// Allows speeds < 1.0 to accumulate over frames until a full pixel is reached.
     #[serde(skip, default)]
@@ -181,7 +184,7 @@ fn default_hearing_radius() -> u32 {
     192
 }
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum EntityKind {
     Player,
     Npc,
@@ -473,13 +476,14 @@ impl EntityManager {
             id,
             position,
             size,
-            entity_kind: entity_kind.clone(),
+            entity_kind,
             category: Self::legacy_category_for_kind(&entity_kind).to_string(),
             definition_name: None,
             control_role: ControlRole::LegacyDefault,
             audio: EntityAudioSettings::default(),
             attributes,
             collision_box,
+            tags: Vec::new(),
             movement_accumulator: glam::Vec2::ZERO,
         };
         self.audio_components
@@ -515,7 +519,7 @@ impl EntityManager {
         self.next_id += 1;
 
         let entity = definition.create_entity(position, id)?;
-        let entity_kind = entity.entity_kind.clone();
+        let entity_kind = entity.entity_kind;
         let audio_component = definition.create_audio_component();
 
         if Self::tracks_player_role(&entity) {
@@ -541,7 +545,7 @@ impl EntityManager {
         entity.attributes.ensure_legacy_health_stat();
 
         let id = entity.id;
-        let entity_kind = entity.entity_kind.clone();
+        let entity_kind = entity.entity_kind;
 
         // Update next_id if needed to avoid conflicts
         if id >= self.next_id {
@@ -987,6 +991,7 @@ impl EntityDefinition {
             },
             attributes,
             collision_box,
+            tags: self.tags.clone(),
             movement_accumulator: glam::Vec2::ZERO,
         })
     }

@@ -371,9 +371,9 @@ fn trigger_kind_label(trigger: &RuleTrigger) -> &'static str {
         RuleTrigger::OnUpdate => "OnUpdate",
         RuleTrigger::OnPlayerMove => "OnPlayerMove",
         RuleTrigger::OnKey { .. } => "OnKey",
-        RuleTrigger::OnCollision => "OnCollision",
-        RuleTrigger::OnDamaged => "OnDamaged",
-        RuleTrigger::OnDeath => "OnDeath",
+        RuleTrigger::OnCollision { .. } => "OnCollision",
+        RuleTrigger::OnDamaged { .. } => "OnDamaged",
+        RuleTrigger::OnDeath { .. } => "OnDeath",
         RuleTrigger::OnTrigger => "OnTrigger",
         RuleTrigger::OnInteract { .. } => "OnInteract",
     }

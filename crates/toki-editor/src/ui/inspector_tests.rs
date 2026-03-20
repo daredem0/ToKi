@@ -604,13 +604,13 @@ fn set_rule_trigger_kind_sets_expected_trigger_payload() {
     assert_eq!(rule.trigger, RuleTrigger::OnPlayerMove);
 
     InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Collision);
-    assert_eq!(rule.trigger, RuleTrigger::OnCollision);
+    assert_eq!(rule.trigger, RuleTrigger::OnCollision { entity: None });
 
     InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Damaged);
-    assert_eq!(rule.trigger, RuleTrigger::OnDamaged);
+    assert_eq!(rule.trigger, RuleTrigger::OnDamaged { entity: None });
 
     InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Death);
-    assert_eq!(rule.trigger, RuleTrigger::OnDeath);
+    assert_eq!(rule.trigger, RuleTrigger::OnDeath { entity: None });
 
     InspectorSystem::set_rule_trigger_kind(&mut rule, RuleTriggerKind::Trigger);
     assert_eq!(rule.trigger, RuleTrigger::OnTrigger);

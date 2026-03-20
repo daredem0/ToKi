@@ -145,7 +145,7 @@
           "oneOf": [
             {
               "type": "string",
-              "enum": ["OnStart", "OnUpdate", "OnPlayerMove", "OnCollision", "OnDamaged", "OnDeath", "OnTrigger"]
+              "enum": ["OnStart", "OnUpdate", "OnPlayerMove", "OnTrigger"]
             },
             {
               "type": "object",
@@ -160,6 +160,86 @@
                     "key": {
                       "type": "string",
                       "enum": ["Up", "Down", "Left", "Right", "DebugToggle"]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["OnCollision"],
+              "additionalProperties": false,
+              "properties": {
+                "OnCollision": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "entity": {
+                      "anyOf": [
+                        { "type": "null" },
+                        { "$ref": "#/definitions/ruleTarget" }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["OnDamaged"],
+              "additionalProperties": false,
+              "properties": {
+                "OnDamaged": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "entity": {
+                      "anyOf": [
+                        { "type": "null" },
+                        { "$ref": "#/definitions/ruleTarget" }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["OnDeath"],
+              "additionalProperties": false,
+              "properties": {
+                "OnDeath": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "entity": {
+                      "anyOf": [
+                        { "type": "null" },
+                        { "$ref": "#/definitions/ruleTarget" }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["OnInteract"],
+              "additionalProperties": false,
+              "properties": {
+                "OnInteract": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": ["Overlap", "Adjacent", "InFront"]
+                    },
+                    "entity": {
+                      "anyOf": [
+                        { "type": "null" },
+                        { "$ref": "#/definitions/ruleTarget" }
+                      ]
                     }
                   }
                 }
@@ -186,25 +266,7 @@
                     "required": ["target"],
                     "additionalProperties": false,
                     "properties": {
-                      "target": {
-                        "oneOf": [
-                          {
-                            "type": "string",
-                            "enum": ["Player"]
-                          },
-                          {
-                            "type": "object",
-                            "required": ["Entity"],
-                            "additionalProperties": false,
-                            "properties": {
-                              "Entity": {
-                                "type": "integer",
-                                "minimum": 1
-                              }
-                            }
-                          }
-                        ]
-                      }
+                      "target": { "$ref": "#/definitions/ruleTarget" }
                     }
                   }
                 }
@@ -237,27 +299,140 @@
                     "required": ["target", "is_active"],
                     "additionalProperties": false,
                     "properties": {
-                      "target": {
-                        "oneOf": [
-                          {
-                            "type": "string",
-                            "enum": ["Player"]
-                          },
-                          {
-                            "type": "object",
-                            "required": ["Entity"],
-                            "additionalProperties": false,
-                            "properties": {
-                              "Entity": {
-                                "type": "integer",
-                                "minimum": 1
-                              }
-                            }
-                          }
-                        ]
-                      },
+                      "target": { "$ref": "#/definitions/ruleTarget" },
                       "is_active": {
                         "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["HealthBelow"],
+                "additionalProperties": false,
+                "properties": {
+                  "HealthBelow": {
+                    "type": "object",
+                    "required": ["target", "threshold"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "target": { "$ref": "#/definitions/ruleTarget" },
+                      "threshold": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["HealthAbove"],
+                "additionalProperties": false,
+                "properties": {
+                  "HealthAbove": {
+                    "type": "object",
+                    "required": ["target", "threshold"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "target": { "$ref": "#/definitions/ruleTarget" },
+                      "threshold": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "string",
+                "enum": ["TriggerOtherIsPlayer"]
+              },
+              {
+                "type": "object",
+                "required": ["EntityIsKind"],
+                "additionalProperties": false,
+                "properties": {
+                  "EntityIsKind": {
+                    "type": "object",
+                    "required": ["target", "kind"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "target": { "$ref": "#/definitions/ruleTarget" },
+                      "kind": { "$ref": "#/definitions/entityKind" }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["TriggerOtherIsKind"],
+                "additionalProperties": false,
+                "properties": {
+                  "TriggerOtherIsKind": {
+                    "type": "object",
+                    "required": ["kind"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": { "$ref": "#/definitions/entityKind" }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["EntityHasTag"],
+                "additionalProperties": false,
+                "properties": {
+                  "EntityHasTag": {
+                    "type": "object",
+                    "required": ["target", "tag"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "target": { "$ref": "#/definitions/ruleTarget" },
+                      "tag": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["TriggerOtherHasTag"],
+                "additionalProperties": false,
+                "properties": {
+                  "TriggerOtherHasTag": {
+                    "type": "object",
+                    "required": ["tag"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "tag": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["HasInventoryItem"],
+                "additionalProperties": false,
+                "properties": {
+                  "HasInventoryItem": {
+                    "type": "object",
+                    "required": ["target", "item_id", "min_count"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "target": { "$ref": "#/definitions/ruleTarget" },
+                      "item_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "min_count": {
+                        "type": "integer",
+                        "minimum": 0
                       }
                     }
                   }
@@ -280,7 +455,7 @@
       "oneOf": [
         {
           "type": "string",
-          "enum": ["Player"]
+          "enum": ["Player", "RuleOwner", "TriggerSelf", "TriggerOther"]
         },
         {
           "type": "object",
@@ -294,6 +469,10 @@
           }
         }
       ]
+    },
+    "entityKind": {
+      "type": "string",
+      "enum": ["Player", "Npc", "Item", "Decoration", "Trigger", "Projectile"]
     },
     "ruleAction": {
       "oneOf": [

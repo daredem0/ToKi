@@ -353,13 +353,13 @@ impl PanelSystem {
                                                 let node_label = format!(
                                                     "{} Condition: {}",
                                                     badge,
-                                                    Self::condition_summary(*condition)
+                                                    Self::condition_summary(condition)
                                                 );
                                                 let is_selected = selected_graph_node == Some(node_id);
                                                 if ui.selectable_label(is_selected, node_label).clicked() {
                                                     selected_graph_node = Some(node_id);
                                                 }
-                                                let mut kind = Self::graph_condition_kind(*condition);
+                                                let mut kind = Self::graph_condition_kind(condition);
                                                 egui::ComboBox::from_id_salt((
                                                     "graph_condition_kind",
                                                     &active_scene_name,
@@ -372,6 +372,14 @@ impl PanelSystem {
                                                             GraphConditionKind::TargetExists,
                                                             GraphConditionKind::KeyHeld,
                                                             GraphConditionKind::EntityActive,
+                                                            GraphConditionKind::HealthBelow,
+                                                            GraphConditionKind::HealthAbove,
+                                                            GraphConditionKind::TriggerOtherIsPlayer,
+                                                            GraphConditionKind::EntityIsKind,
+                                                            GraphConditionKind::TriggerOtherIsKind,
+                                                            GraphConditionKind::EntityHasTag,
+                                                            GraphConditionKind::TriggerOtherHasTag,
+                                                            GraphConditionKind::HasInventoryItem,
                                                         ] {
                                                             ui.selectable_value(
                                                                 &mut kind,
@@ -380,8 +388,8 @@ impl PanelSystem {
                                                             );
                                                         }
                                                     });
-                                                let mut edited_condition = *condition;
-                                                if kind != Self::graph_condition_kind(*condition) {
+                                                let mut edited_condition = condition.clone();
+                                                if kind != Self::graph_condition_kind(condition) {
                                                     edited_condition =
                                                         Self::graph_default_condition(kind);
                                                 }
