@@ -107,6 +107,13 @@ pub struct CameraSettings {
     pub pan_speed: f32,
     /// Camera zoom speed multiplier (1.0 = normal speed)
     pub zoom_speed: f32,
+    /// Scroll wheel zoom sensitivity (lower = less sensitive, default 0.02)
+    #[serde(default = "default_scroll_zoom_sensitivity")]
+    pub scroll_zoom_sensitivity: f32,
+}
+
+fn default_scroll_zoom_sensitivity() -> f32 {
+    0.02
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -166,6 +173,7 @@ impl Default for CameraSettings {
         Self {
             pan_speed: 1.0,
             zoom_speed: 1.0,
+            scroll_zoom_sensitivity: default_scroll_zoom_sensitivity(),
         }
     }
 }

@@ -232,6 +232,25 @@ impl PanelSystem {
             }
         }
 
+        if response.hovered() {
+            let scroll_delta = ui.input(|input| input.smooth_scroll_delta.y);
+            if scroll_delta != 0.0 {
+                let sensitivity = config
+                    .as_deref()
+                    .map(|c| c.editor_settings.camera.scroll_zoom_sensitivity)
+                    .unwrap_or(0.02);
+                // Scale the scroll delta by sensitivity; require threshold to trigger discrete zoom
+                let scaled = scroll_delta.abs() * sensitivity;
+                if scaled > 0.3 {
+                    if scroll_delta > 0.0 {
+                        viewport.zoom_in();
+                    } else {
+                        viewport.zoom_out();
+                    }
+                }
+            }
+        }
+
         viewport.render(ui, rect, project_path.as_deref(), renderer);
         if let Some(cfg) = config.as_deref() {
             Self::paint_viewport_grid_overlay(ui, rect, viewport, cfg);

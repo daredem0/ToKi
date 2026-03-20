@@ -20,7 +20,8 @@
     },
     "camera": {
       "pan_speed": 0.5,
-      "zoom_speed": 1.0
+      "zoom_speed": 1.0,
+      "scroll_zoom_sensitivity": 0.03
     }
   },
   "recent_projects": [],

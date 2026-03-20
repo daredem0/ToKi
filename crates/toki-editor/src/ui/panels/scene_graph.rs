@@ -6,6 +6,7 @@ impl PanelSystem {
         ui: &mut egui::Ui,
         ui_state: &mut EditorUI,
         show_scene_rules: bool,
+        config: Option<&EditorConfig>,
     ) {
         if show_scene_rules {
             ui.heading("Active Scene Rules");
@@ -91,6 +92,16 @@ impl PanelSystem {
                         if ui.input(|input| input.key_pressed(egui::Key::Minus)) {
                             graph_zoom = (graph_zoom / 1.1).clamp(0.4, 4.0);
                         }
+                    }
+                    let scroll_delta = ui.input(|input| input.smooth_scroll_delta.y);
+                    if scroll_delta != 0.0 {
+                        let sensitivity = config
+                            .map(|c| c.editor_settings.camera.scroll_zoom_sensitivity)
+                            .unwrap_or(0.02);
+                        // Zoom is more aggressive here, hence we factor it down.
+                        // TODO: This should be cleaned up
+                        let zoom_factor = 1.0 + scroll_delta * sensitivity * 0.1;
+                        graph_zoom = (graph_zoom * zoom_factor).clamp(0.4, 4.0);
                     }
                     ui.label(format!("Zoom: {:.0}%", graph_zoom * 100.0));
                     ui.label("Tip: Drag Empty Space To Pan");

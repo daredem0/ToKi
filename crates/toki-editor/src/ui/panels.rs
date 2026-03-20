@@ -136,12 +136,12 @@ impl PanelSystem {
             ui.separator();
 
             if ui_state.center_panel_tab == CenterPanelTab::SceneGraph {
-                Self::render_scene_graph(ui, ui_state, false);
+                Self::render_scene_graph(ui, ui_state, false, config.as_deref());
                 return;
             }
 
             if ui_state.center_panel_tab == CenterPanelTab::SceneRules {
-                Self::render_scene_graph(ui, ui_state, true);
+                Self::render_scene_graph(ui, ui_state, true, config.as_deref());
                 return;
             }
 
