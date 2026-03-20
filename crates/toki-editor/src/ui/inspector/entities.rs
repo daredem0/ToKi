@@ -150,16 +150,54 @@ impl InspectorSystem {
             ui.horizontal(|ui| {
                 ui.label("AI:");
                 egui::ComboBox::from_id_salt("entity_ai_behavior")
-                    .selected_text(ai_behavior_label(draft.ai_behavior))
+                    .selected_text(ai_behavior_label(draft.ai_config.behavior))
                     .show_ui(ui, |ui| {
                         changed |= ui
-                            .selectable_value(&mut draft.ai_behavior, AiBehavior::None, "None")
+                            .selectable_value(
+                                &mut draft.ai_config.behavior,
+                                AiBehavior::None,
+                                "None",
+                            )
                             .changed();
                         changed |= ui
-                            .selectable_value(&mut draft.ai_behavior, AiBehavior::Wander, "Wander")
+                            .selectable_value(
+                                &mut draft.ai_config.behavior,
+                                AiBehavior::Wander,
+                                "Wander",
+                            )
+                            .changed();
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.ai_config.behavior,
+                                AiBehavior::Chase,
+                                "Chase",
+                            )
+                            .changed();
+                        changed |= ui
+                            .selectable_value(&mut draft.ai_config.behavior, AiBehavior::Run, "Run")
+                            .changed();
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.ai_config.behavior,
+                                AiBehavior::RunAndMultiply,
+                                "Run And Multiply",
+                            )
                             .changed();
                     });
             });
+            if ai_behavior_needs_detection_radius(draft.ai_config.behavior) {
+                ui.horizontal(|ui| {
+                    ui.label("Detection Radius:");
+                    let mut radius = draft.ai_config.detection_radius as i32;
+                    if ui
+                        .add(egui::DragValue::new(&mut radius).range(0..=1000).speed(1))
+                        .changed()
+                    {
+                        draft.ai_config.detection_radius = radius.max(0) as u32;
+                        changed = true;
+                    }
+                });
+            }
         }
         changed |= ui
             .checkbox(&mut draft.has_inventory, "Has Inventory")
@@ -390,8 +428,8 @@ impl InspectorSystem {
             definition.attributes.can_move = draft.can_move;
             changed = true;
         }
-        if definition.attributes.ai_behavior != draft.ai_behavior {
-            definition.attributes.ai_behavior = draft.ai_behavior;
+        if definition.attributes.ai_config != draft.ai_config {
+            definition.attributes.ai_config = draft.ai_config;
             changed = true;
         }
         if definition.attributes.movement_profile != draft.movement_profile {
@@ -828,7 +866,14 @@ impl InspectorSystem {
                 if !is_static_item {
                     ui.horizontal(|ui| {
                         ui.label("AI:");
-                        ui.label(ai_behavior_label(entity.attributes.ai_behavior));
+                        ui.label(ai_behavior_label(entity.attributes.ai_config.behavior));
+                        if ai_behavior_needs_detection_radius(entity.attributes.ai_config.behavior)
+                        {
+                            ui.label(format!(
+                                "(radius: {})",
+                                entity.attributes.ai_config.detection_radius
+                            ));
+                        }
                     });
                     ui.horizontal(|ui| {
                         ui.label("Movement:");
@@ -1000,7 +1045,7 @@ impl InspectorSystem {
         );
         changed |= set_if_changed(&mut entity.attributes.can_move, draft.can_move);
         changed |= set_if_changed(&mut entity.control_role, draft.control_role);
-        changed |= set_if_changed(&mut entity.attributes.ai_behavior, draft.ai_behavior);
+        changed |= set_if_changed(&mut entity.attributes.ai_config, draft.ai_config);
         changed |= set_if_changed(
             &mut entity.attributes.movement_profile,
             draft.movement_profile,

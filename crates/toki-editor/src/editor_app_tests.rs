@@ -9,7 +9,7 @@ use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::TileMap;
 use toki_core::collision::CollisionBox;
 use toki_core::entity::{
-    AiBehavior, AnimationsDef, AttributesDef, AudioDef, CollisionDef, Entity, EntityAttributes,
+    AiConfig, AnimationsDef, AttributesDef, AudioDef, CollisionDef, Entity, EntityAttributes,
     EntityDefinition, EntityKind, MovementProfile, MovementSoundTrigger, PickupDef, RenderingDef,
     StaticObjectRenderDef,
 };
@@ -409,7 +409,7 @@ fn load_preview_sprite_frame_static_supports_object_sheet_backed_entities() {
             can_move: false,
             interactable: false,
             interaction_reach: 0,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::None,
             primary_projectile: None,
             pickup: Some(PickupDef {
@@ -502,7 +502,7 @@ fn build_scene_player_overlay_sprites_uses_scene_player_entry_spawn_point() {
             can_move: false,
             interactable: false,
             interaction_reach: 0,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::None,
             primary_projectile: None,
             pickup: None,
@@ -594,7 +594,7 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
                 can_move: false,
                 interactable: false,
                 interaction_reach: 0,
-                ai_behavior: AiBehavior::None,
+                ai_config: AiConfig::default(),
                 movement_profile: MovementProfile::None,
                 primary_projectile: None,
                 pickup: None,
@@ -724,7 +724,7 @@ fn build_scene_player_overlay_sprites_skips_when_scene_already_contains_authored
                 can_move: false,
                 interactable: false,
                 interaction_reach: 0,
-                ai_behavior: AiBehavior::None,
+                ai_config: AiConfig::default(),
                 movement_profile: MovementProfile::None,
                 primary_projectile: None,
                 pickup: None,
@@ -833,7 +833,7 @@ fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk(
                 can_move: false,
                 interactable: false,
                 interaction_reach: 0,
-                ai_behavior: AiBehavior::None,
+                ai_config: AiConfig::default(),
                 movement_profile: MovementProfile::None,
                 primary_projectile: None,
                 pickup: None,

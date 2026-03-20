@@ -2,12 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::animation::AnimationState;
+use crate::ai::AiSystem;
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
-use crate::entity::{
-    AiBehavior, Entity, EntityDefinition, EntityId, EntityManager, MovementProfile,
-};
+use crate::entity::{Entity, EntityDefinition, EntityId, EntityManager, MovementProfile};
 use crate::events::{GameEvent, GameUpdateResult};
 use crate::rules::{RuleSet, RuleTrigger};
 use crate::scene_manager::SceneManager;
@@ -117,9 +115,9 @@ pub struct GameState {
     #[serde(default)]
     debug_collision_rendering: bool,
 
-    /// Frame counter for NPC AI decisions
-    #[serde(default)]
-    npc_ai_frame_counter: u32,
+    /// AI system for NPC behavior
+    #[serde(skip, default)]
+    ai_system: AiSystem,
 
     /// Data-driven gameplay rules evaluated each frame.
     #[serde(default)]
@@ -498,7 +496,7 @@ impl GameState {
         }
     }
 
-    /// Update NPC AI - makes NPCs move randomly every few frames
+    /// Update NPC AI using the AI system
     fn update_npc_ai(
         &mut self,
         world_bounds: glam::UVec2,
@@ -506,96 +504,42 @@ impl GameState {
         atlas: &AtlasMeta,
         result: &mut GameUpdateResult<AudioEvent>,
     ) {
-        self.npc_ai_frame_counter += 1;
+        let ai_updates = self.ai_system.update(
+            &self.entity_manager,
+            self.player_id,
+            world_bounds,
+            tilemap,
+            atlas,
+        );
 
-        // Only update NPC AI every 60 frames (roughly once per second at 60fps)
-        if !self.npc_ai_frame_counter.is_multiple_of(60) {
-            return;
+        for ai_result in ai_updates {
+            self.apply_ai_result(ai_result, result);
+        }
+    }
+
+    fn apply_ai_result(
+        &mut self,
+        ai_result: crate::ai::AiUpdateResult,
+        result: &mut GameUpdateResult<AudioEvent>,
+    ) {
+        if let Some(new_position) = ai_result.new_position {
+            if let Some(entity) = self.entity_manager.get_entity_mut(ai_result.entity_id) {
+                entity.position = new_position;
+            }
+            if ai_result.movement_distance > 0.0 {
+                self.emit_entity_movement_audio(
+                    ai_result.entity_id,
+                    ai_result.movement_distance,
+                    result,
+                );
+            }
         }
 
-        let npc_entity_ids: Vec<_> = self
-            .entity_manager
-            .active_entities()
-            .iter()
-            .filter_map(|&entity_id| {
-                if let Some(entity) = self.entity_manager.get_entity(entity_id) {
-                    // Skip the player entity
-                    if Some(entity_id) == self.player_id {
-                        return None;
-                    }
-                    if matches!(entity.attributes.ai_behavior, AiBehavior::Wander) {
-                        return Some(entity_id);
-                    }
-                }
-                None
-            })
-            .collect();
-
-        for npc_id in npc_entity_ids {
-            let Some(npc_entity) = self.entity_manager.get_entity(npc_id) else {
-                continue;
-            };
-
-            let current_position = npc_entity.position;
-            // NPC wander uses entity speed * 5 for larger jumps
-            let movement_step = (npc_entity.attributes.speed * 5.0) as i32;
-            let max_x = (world_bounds.x as i32 - npc_entity.size.x as i32).max(0);
-            let max_y = (world_bounds.y as i32 - npc_entity.size.y as i32).max(0);
-
-            // Choose random direction: 0=up, 1=down, 2=left, 3=right, 4=stay
-            let random_direction = fastrand::u32(0..5);
-
-            let new_position = match random_direction {
-                0 => glam::IVec2::new(
-                    current_position.x,
-                    (current_position.y - movement_step).max(0),
-                ),
-                1 => glam::IVec2::new(
-                    current_position.x,
-                    (current_position.y + movement_step).min(max_y),
-                ),
-                2 => glam::IVec2::new(
-                    (current_position.x - movement_step).max(0),
-                    current_position.y,
-                ),
-                3 => glam::IVec2::new(
-                    (current_position.x + movement_step).min(max_x),
-                    current_position.y,
-                ),
-                4 => current_position, // Stay in place
-                _ => current_position,
-            };
-
-            let npc_moved = if new_position != current_position {
-                if self.can_entity_move_to_position(npc_id, new_position, tilemap, atlas) {
-                    if let Some(npc_entity) = self.entity_manager.get_entity_mut(npc_id) {
-                        npc_entity.position = new_position;
-                    }
-                    self.emit_entity_movement_audio(
-                        npc_id,
-                        Self::movement_distance(current_position, new_position),
-                        result,
-                    );
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
-
-            if let Some(npc_entity) = self.entity_manager.get_entity_mut(npc_id) {
-                // Update NPC animation based on movement
-                if let Some(animation_controller) = &mut npc_entity.attributes.animation_controller
-                {
-                    let desired_animation = if npc_moved {
-                        AnimationState::Walk
-                    } else {
-                        AnimationState::Idle
-                    };
-
-                    if animation_controller.current_clip_state != desired_animation {
-                        animation_controller.play(desired_animation);
+        if let Some(animation) = ai_result.new_animation {
+            if let Some(entity) = self.entity_manager.get_entity_mut(ai_result.entity_id) {
+                if let Some(controller) = &mut entity.attributes.animation_controller {
+                    if controller.current_clip_state != animation {
+                        controller.play(animation);
                     }
                 }
             }

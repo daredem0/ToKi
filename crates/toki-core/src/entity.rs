@@ -220,9 +220,41 @@ impl ControlRole {
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum AiBehavior {
-    None,
     #[default]
+    None,
     Wander,
+    Chase,
+    Run,
+    RunAndMultiply,
+}
+
+/// Authored AI configuration for an entity.
+/// This replaces the bare `AiBehavior` flag with a structured config.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AiConfig {
+    pub behavior: AiBehavior,
+    /// Detection radius in pixels for Chase, Run, and RunAndMultiply behaviors
+    #[serde(default)]
+    pub detection_radius: u32,
+}
+
+impl Default for AiConfig {
+    fn default() -> Self {
+        Self {
+            behavior: AiBehavior::None,
+            detection_radius: 0,
+        }
+    }
+}
+
+impl AiConfig {
+    /// Create an AiConfig from a legacy AiBehavior value
+    pub fn from_legacy_behavior(behavior: AiBehavior) -> Self {
+        Self {
+            behavior,
+            detection_radius: 0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize, Default)]
@@ -268,7 +300,7 @@ pub struct EntityAttributes {
     #[serde(default)]
     pub interaction_reach: u32, // Extra pixels of reach for interaction (0 = must overlap)
     #[serde(default)]
-    pub ai_behavior: AiBehavior,
+    pub ai_config: AiConfig,
     #[serde(default)]
     pub movement_profile: MovementProfile,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -347,7 +379,7 @@ impl Default for EntityAttributes {
             can_move: true,
             interactable: false,
             interaction_reach: 0,
-            ai_behavior: AiBehavior::default(),
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::default(),
             primary_projectile: None,
             projectile: None,
@@ -773,7 +805,36 @@ pub struct RenderingDef {
     pub static_object: Option<StaticObjectRenderDef>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Wire format for deserializing attributes with backward compatibility
+#[derive(Debug, Clone, Deserialize)]
+struct AttributesDefWire {
+    pub health: Option<u32>,
+    #[serde(default)]
+    pub stats: HashMap<String, i32>,
+    pub speed: f32,
+    pub solid: bool,
+    pub active: bool,
+    pub can_move: bool,
+    #[serde(default)]
+    pub interactable: bool,
+    #[serde(default)]
+    pub interaction_reach: u32,
+    /// Legacy field for backward compatibility
+    #[serde(default)]
+    pub ai_behavior: Option<AiBehavior>,
+    /// New AI configuration (takes precedence over ai_behavior)
+    #[serde(default)]
+    pub ai_config: Option<AiConfig>,
+    #[serde(default)]
+    pub movement_profile: MovementProfile,
+    #[serde(default)]
+    pub primary_projectile: Option<PrimaryProjectileDef>,
+    #[serde(default)]
+    pub pickup: Option<PickupDef>,
+    pub has_inventory: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct AttributesDef {
     pub health: Option<u32>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
@@ -787,7 +848,7 @@ pub struct AttributesDef {
     #[serde(default)]
     pub interaction_reach: u32,
     #[serde(default)]
-    pub ai_behavior: AiBehavior,
+    pub ai_config: AiConfig,
     #[serde(default)]
     pub movement_profile: MovementProfile,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -795,6 +856,38 @@ pub struct AttributesDef {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pickup: Option<PickupDef>,
     pub has_inventory: bool,
+}
+
+impl<'de> Deserialize<'de> for AttributesDef {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = AttributesDefWire::deserialize(deserializer)?;
+
+        // Resolve AI config: ai_config takes precedence over legacy ai_behavior
+        let ai_config = match (wire.ai_config, wire.ai_behavior) {
+            (Some(config), _) => config,
+            (None, Some(behavior)) => AiConfig::from_legacy_behavior(behavior),
+            (None, None) => AiConfig::default(),
+        };
+
+        Ok(Self {
+            health: wire.health,
+            stats: wire.stats,
+            speed: wire.speed,
+            solid: wire.solid,
+            active: wire.active,
+            can_move: wire.can_move,
+            interactable: wire.interactable,
+            interaction_reach: wire.interaction_reach,
+            ai_config,
+            movement_profile: wire.movement_profile,
+            primary_projectile: wire.primary_projectile,
+            pickup: wire.pickup,
+            has_inventory: wire.has_inventory,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -936,7 +1029,7 @@ impl EntityDefinition {
             can_move: self.attributes.can_move,
             interactable: self.attributes.interactable,
             interaction_reach: self.attributes.interaction_reach,
-            ai_behavior: self.attributes.ai_behavior,
+            ai_config: self.attributes.ai_config,
             movement_profile: self.attributes.movement_profile,
             primary_projectile: self.attributes.primary_projectile.clone(),
             projectile: None,

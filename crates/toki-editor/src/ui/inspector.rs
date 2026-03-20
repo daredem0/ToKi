@@ -14,7 +14,7 @@ use std::collections::{HashMap, HashSet};
 use toki_core::animation::AnimationState;
 use toki_core::assets::object_sheet::ObjectSheetMeta;
 use toki_core::entity::{
-    AiBehavior, ControlRole, MovementProfile, MovementSoundTrigger, ATTACK_POWER_STAT_ID,
+    AiBehavior, AiConfig, ControlRole, MovementProfile, MovementSoundTrigger, ATTACK_POWER_STAT_ID,
     HEALTH_STAT_ID,
 };
 use toki_core::entity::EntityKind;
@@ -63,7 +63,7 @@ struct EntityPropertyDraft {
     interactable: bool,
     interaction_reach: u32,
     can_move: bool,
-    ai_behavior: AiBehavior,
+    ai_config: AiConfig,
     movement_profile: MovementProfile,
     movement_sound_trigger: MovementSoundTrigger,
     footstep_trigger_distance: f32,
@@ -207,7 +207,7 @@ impl EntityPropertyDraft {
             interactable: entity.attributes.interactable,
             interaction_reach: entity.attributes.interaction_reach,
             can_move: entity.attributes.can_move,
-            ai_behavior: entity.attributes.ai_behavior,
+            ai_config: entity.attributes.ai_config,
             movement_profile: entity.attributes.movement_profile,
             movement_sound_trigger: entity.audio.movement_sound_trigger,
             footstep_trigger_distance: entity.audio.footstep_trigger_distance,
@@ -282,7 +282,7 @@ impl EntityPropertyDraft {
             interactable: definition.attributes.interactable,
             interaction_reach: definition.attributes.interaction_reach,
             can_move: definition.attributes.can_move,
-            ai_behavior: definition.attributes.ai_behavior,
+            ai_config: definition.attributes.ai_config,
             movement_profile: definition.attributes.movement_profile,
             movement_sound_trigger: definition.audio.movement_sound_trigger,
             footstep_trigger_distance: definition.audio.footstep_trigger_distance,
@@ -326,7 +326,17 @@ fn ai_behavior_label(ai_behavior: AiBehavior) -> &'static str {
     match ai_behavior {
         AiBehavior::None => "None",
         AiBehavior::Wander => "Wander",
+        AiBehavior::Chase => "Chase",
+        AiBehavior::Run => "Run",
+        AiBehavior::RunAndMultiply => "Run And Multiply",
     }
+}
+
+fn ai_behavior_needs_detection_radius(behavior: AiBehavior) -> bool {
+    matches!(
+        behavior,
+        AiBehavior::Chase | AiBehavior::Run | AiBehavior::RunAndMultiply
+    )
 }
 
 fn control_role_label(control_role: ControlRole) -> &'static str {

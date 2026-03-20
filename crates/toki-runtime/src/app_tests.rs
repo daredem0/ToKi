@@ -59,7 +59,7 @@ fn write_player_definition(project_path: &std::path::Path, name: &str) {
             can_move: true,
             interactable: false,
             interaction_reach: 0,
-            ai_behavior: toki_core::entity::AiBehavior::None,
+            ai_config: toki_core::entity::AiConfig::default(),
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: None,
             pickup: None,

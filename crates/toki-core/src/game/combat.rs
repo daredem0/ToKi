@@ -149,7 +149,7 @@ impl GameState {
             solid: false,
             visible: true,
             can_move: false,
-            ai_behavior: crate::entity::AiBehavior::None,
+            ai_config: crate::entity::AiConfig::default(),
             movement_profile: crate::entity::MovementProfile::None,
             primary_projectile: None,
             projectile: Some(crate::entity::ProjectileState {

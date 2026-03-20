@@ -21,7 +21,7 @@ fn test_entity_definition_create_entity_basic() {
             solid: true,
             active: true,
             can_move: true,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
             pickup: None,
@@ -152,7 +152,7 @@ fn test_entity_definition_create_npc_entity() {
             solid: true,
             active: true,
             can_move: false,
-            ai_behavior: AiBehavior::Wander,
+            ai_config: AiConfig::from_legacy_behavior(AiBehavior::Wander),
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
             pickup: None,
@@ -207,7 +207,7 @@ fn test_entity_definition_create_npc_entity() {
     // Check attributes specific to NPC
     assert!(!entity.attributes.can_move);
     assert!(!entity.attributes.has_inventory);
-    assert_eq!(entity.attributes.ai_behavior, AiBehavior::Wander);
+    assert_eq!(entity.attributes.ai_config.behavior, AiBehavior::Wander);
     assert_eq!(
         entity.attributes.movement_profile,
         MovementProfile::LegacyDefault
@@ -219,12 +219,13 @@ fn test_entity_definition_create_npc_entity() {
 }
 
 #[test]
-fn test_entity_definition_missing_ai_behavior_defaults_to_wander() {
+fn test_entity_definition_missing_ai_fields_defaults_to_none() {
+    // Entities without any AI configuration default to behavior: None
     let entity_json = r#"
     {
       "name": "legacy_npc",
       "display_name": "Legacy NPC",
-      "description": "Old NPC without ai_behavior",
+      "description": "Old NPC without ai_behavior or ai_config",
       "rendering": {
         "size": [16, 16],
         "render_layer": 0,
@@ -266,13 +267,13 @@ fn test_entity_definition_missing_ai_behavior_defaults_to_wander() {
     "#;
 
     let entity_def: EntityDefinition =
-        serde_json::from_str(entity_json).expect("legacy entity json should deserialize");
-    assert_eq!(entity_def.attributes.ai_behavior, AiBehavior::Wander);
+        serde_json::from_str(entity_json).expect("entity without AI fields should deserialize");
+    assert_eq!(entity_def.attributes.ai_config.behavior, AiBehavior::None);
 
     let entity = entity_def
         .create_entity(IVec2::ZERO, 1)
-        .expect("legacy entity should still instantiate");
-    assert_eq!(entity.attributes.ai_behavior, AiBehavior::Wander);
+        .expect("entity should still instantiate");
+    assert_eq!(entity.attributes.ai_config.behavior, AiBehavior::None);
     assert_eq!(
         entity.attributes.movement_profile,
         MovementProfile::LegacyDefault
@@ -301,7 +302,7 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
             solid: true,
             active: true,
             can_move: true,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: None,
             pickup: None,
@@ -427,7 +428,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
             solid: true,
             active: true,
             can_move: true,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
             pickup: None,
@@ -515,7 +516,7 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
             solid: true,
             active: true,
             can_move: true,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: None,
             pickup: None,
@@ -612,7 +613,7 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
             solid: true,
             active: true,
             can_move: true,
-            ai_behavior: AiBehavior::Wander,
+            ai_config: AiConfig::from_legacy_behavior(AiBehavior::Wander),
             movement_profile: MovementProfile::None,
             primary_projectile: None,
             pickup: None,
@@ -678,7 +679,7 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
             solid: true,
             active: true,
             can_move: true,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: None,
             pickup: None,
@@ -745,7 +746,7 @@ fn test_entity_definition_copies_authored_primary_projectile() {
             solid: true,
             active: true,
             can_move: true,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: Some(PrimaryProjectileDef {
                 sheet: "fauna".to_string(),
@@ -827,7 +828,7 @@ fn test_entity_definition_copies_authored_pickup() {
             solid: false,
             active: true,
             can_move: false,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::None,
             primary_projectile: None,
             pickup: Some(PickupDef {
@@ -899,7 +900,7 @@ fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type()
             solid: false,
             active: true,
             can_move: false,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
             pickup: None,
@@ -955,7 +956,7 @@ fn test_entity_definition_invalid_animation_state() {
             solid: false,
             active: true,
             can_move: false,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
             pickup: None,
@@ -1014,7 +1015,7 @@ fn test_entity_definition_invalid_loop_mode() {
             solid: false,
             active: true,
             can_move: false,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
             pickup: None,
@@ -1073,7 +1074,7 @@ fn test_entity_definition_serialization() {
             solid: false,
             active: false,
             can_move: false,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
             pickup: None,
@@ -1144,7 +1145,7 @@ fn test_entity_definition_create_audio_component() {
             solid: true,
             active: true,
             can_move: true,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
             pickup: None,
@@ -1195,4 +1196,315 @@ fn test_entity_definition_create_audio_component() {
         audio_component.collision_sound.as_deref(),
         Some("sfx_custom_hit")
     );
+}
+
+// ============================================================================
+// Phase 2A: Extended AI Behavior Tests
+// ============================================================================
+
+#[test]
+fn test_ai_behavior_chase_serialization() {
+    let json = r#""chase""#;
+    let behavior: AiBehavior = serde_json::from_str(json).expect("should deserialize chase");
+    assert_eq!(behavior, AiBehavior::Chase);
+
+    let serialized = serde_json::to_string(&behavior).expect("should serialize chase");
+    assert_eq!(serialized, r#""chase""#);
+}
+
+#[test]
+fn test_ai_behavior_run_serialization() {
+    let json = r#""run""#;
+    let behavior: AiBehavior = serde_json::from_str(json).expect("should deserialize run");
+    assert_eq!(behavior, AiBehavior::Run);
+
+    let serialized = serde_json::to_string(&behavior).expect("should serialize run");
+    assert_eq!(serialized, r#""run""#);
+}
+
+#[test]
+fn test_ai_behavior_run_and_multiply_serialization() {
+    let json = r#""run_and_multiply""#;
+    let behavior: AiBehavior =
+        serde_json::from_str(json).expect("should deserialize run_and_multiply");
+    assert_eq!(behavior, AiBehavior::RunAndMultiply);
+
+    let serialized = serde_json::to_string(&behavior).expect("should serialize run_and_multiply");
+    assert_eq!(serialized, r#""run_and_multiply""#);
+}
+
+#[test]
+fn test_ai_config_default_values() {
+    let config = AiConfig::default();
+    assert_eq!(config.behavior, AiBehavior::None);
+    assert_eq!(config.detection_radius, 0);
+}
+
+#[test]
+fn test_ai_config_with_chase_behavior() {
+    let config = AiConfig {
+        behavior: AiBehavior::Chase,
+        detection_radius: 128,
+    };
+    assert_eq!(config.behavior, AiBehavior::Chase);
+    assert_eq!(config.detection_radius, 128);
+}
+
+#[test]
+fn test_ai_config_serialization_round_trip() {
+    let config = AiConfig {
+        behavior: AiBehavior::RunAndMultiply,
+        detection_radius: 96,
+    };
+
+    let json = serde_json::to_string(&config).expect("should serialize ai_config");
+    let deserialized: AiConfig = serde_json::from_str(&json).expect("should deserialize ai_config");
+
+    assert_eq!(deserialized.behavior, config.behavior);
+    assert_eq!(deserialized.detection_radius, config.detection_radius);
+}
+
+#[test]
+fn test_entity_definition_with_ai_config() {
+    let entity_json = r#"
+    {
+      "name": "chaser_npc",
+      "display_name": "Chaser NPC",
+      "description": "An NPC that chases the player",
+      "rendering": {
+        "size": [16, 16],
+        "render_layer": 0,
+        "visible": true
+      },
+      "attributes": {
+        "health": 20,
+        "speed": 2,
+        "solid": true,
+        "active": true,
+        "can_move": false,
+        "has_inventory": false,
+        "ai_config": {
+          "behavior": "chase",
+          "detection_radius": 100
+        }
+      },
+      "collision": {
+        "enabled": true,
+        "offset": [0, 0],
+        "size": [16, 16],
+        "trigger": false
+      },
+      "audio": {
+        "footstep_trigger_distance": 32.0,
+        "movement_sound": "npc_step"
+      },
+      "animations": {
+        "atlas_name": "creatures",
+        "clips": [
+          {
+            "state": "idle",
+            "frame_tiles": ["slime/idle_0"],
+            "frame_duration_ms": 200.0,
+            "loop_mode": "loop"
+          }
+        ],
+        "default_state": "idle"
+      },
+      "category": "creature",
+      "tags": []
+    }
+    "#;
+
+    let entity_def: EntityDefinition =
+        serde_json::from_str(entity_json).expect("entity with ai_config should deserialize");
+
+    assert_eq!(entity_def.attributes.ai_config.behavior, AiBehavior::Chase);
+    assert_eq!(entity_def.attributes.ai_config.detection_radius, 100);
+
+    let entity = entity_def
+        .create_entity(IVec2::ZERO, 1)
+        .expect("entity should instantiate");
+
+    assert_eq!(entity.attributes.ai_config.behavior, AiBehavior::Chase);
+    assert_eq!(entity.attributes.ai_config.detection_radius, 100);
+}
+
+#[test]
+fn test_legacy_ai_behavior_backward_compatibility() {
+    // Test that entities with only the old `ai_behavior` field still work
+    let entity_json = r#"
+    {
+      "name": "legacy_wanderer",
+      "display_name": "Legacy Wanderer",
+      "description": "Old entity with just ai_behavior field",
+      "rendering": {
+        "size": [16, 16],
+        "render_layer": 0,
+        "visible": true
+      },
+      "attributes": {
+        "health": 10,
+        "speed": 1,
+        "solid": true,
+        "active": true,
+        "can_move": false,
+        "has_inventory": false,
+        "ai_behavior": "wander"
+      },
+      "collision": {
+        "enabled": true,
+        "offset": [0, 0],
+        "size": [16, 16],
+        "trigger": false
+      },
+      "audio": {
+        "footstep_trigger_distance": 32.0,
+        "movement_sound": "npc_step"
+      },
+      "animations": {
+        "atlas_name": "creatures",
+        "clips": [
+          {
+            "state": "idle",
+            "frame_tiles": ["slime/idle_0"],
+            "frame_duration_ms": 200.0,
+            "loop_mode": "loop"
+          }
+        ],
+        "default_state": "idle"
+      },
+      "category": "creature",
+      "tags": []
+    }
+    "#;
+
+    let entity_def: EntityDefinition =
+        serde_json::from_str(entity_json).expect("legacy entity should deserialize");
+
+    // Legacy ai_behavior should be migrated to ai_config.behavior
+    assert_eq!(entity_def.attributes.ai_config.behavior, AiBehavior::Wander);
+    // detection_radius defaults to 0 for legacy entities
+    assert_eq!(entity_def.attributes.ai_config.detection_radius, 0);
+
+    let entity = entity_def
+        .create_entity(IVec2::ZERO, 1)
+        .expect("legacy entity should instantiate");
+
+    assert_eq!(entity.attributes.ai_config.behavior, AiBehavior::Wander);
+}
+
+#[test]
+fn test_ai_config_takes_precedence_over_legacy_ai_behavior() {
+    // When both ai_config and ai_behavior are present, ai_config takes precedence
+    let entity_json = r#"
+    {
+      "name": "mixed_ai_entity",
+      "display_name": "Mixed AI Entity",
+      "description": "Entity with both old and new AI fields",
+      "rendering": {
+        "size": [16, 16],
+        "render_layer": 0,
+        "visible": true
+      },
+      "attributes": {
+        "health": 10,
+        "speed": 1,
+        "solid": true,
+        "active": true,
+        "can_move": false,
+        "has_inventory": false,
+        "ai_behavior": "wander",
+        "ai_config": {
+          "behavior": "chase",
+          "detection_radius": 64
+        }
+      },
+      "collision": {
+        "enabled": true,
+        "offset": [0, 0],
+        "size": [16, 16],
+        "trigger": false
+      },
+      "audio": {
+        "footstep_trigger_distance": 32.0,
+        "movement_sound": "npc_step"
+      },
+      "animations": {
+        "atlas_name": "creatures",
+        "clips": [
+          {
+            "state": "idle",
+            "frame_tiles": ["slime/idle_0"],
+            "frame_duration_ms": 200.0,
+            "loop_mode": "loop"
+          }
+        ],
+        "default_state": "idle"
+      },
+      "category": "creature",
+      "tags": []
+    }
+    "#;
+
+    let entity_def: EntityDefinition =
+        serde_json::from_str(entity_json).expect("mixed entity should deserialize");
+
+    // ai_config should take precedence
+    assert_eq!(entity_def.attributes.ai_config.behavior, AiBehavior::Chase);
+    assert_eq!(entity_def.attributes.ai_config.detection_radius, 64);
+}
+
+#[test]
+fn test_entity_without_ai_fields_defaults_to_none() {
+    let entity_json = r#"
+    {
+      "name": "no_ai_entity",
+      "display_name": "No AI Entity",
+      "description": "Entity without any AI fields",
+      "rendering": {
+        "size": [16, 16],
+        "render_layer": 0,
+        "visible": true
+      },
+      "attributes": {
+        "health": 10,
+        "speed": 1,
+        "solid": true,
+        "active": true,
+        "can_move": false,
+        "has_inventory": false
+      },
+      "collision": {
+        "enabled": true,
+        "offset": [0, 0],
+        "size": [16, 16],
+        "trigger": false
+      },
+      "audio": {
+        "footstep_trigger_distance": 32.0,
+        "movement_sound": "npc_step"
+      },
+      "animations": {
+        "atlas_name": "creatures",
+        "clips": [
+          {
+            "state": "idle",
+            "frame_tiles": ["slime/idle_0"],
+            "frame_duration_ms": 200.0,
+            "loop_mode": "loop"
+          }
+        ],
+        "default_state": "idle"
+      },
+      "category": "creature",
+      "tags": []
+    }
+    "#;
+
+    let entity_def: EntityDefinition =
+        serde_json::from_str(entity_json).expect("entity without AI should deserialize");
+
+    // Should default to None behavior with 0 detection radius
+    assert_eq!(entity_def.attributes.ai_config.behavior, AiBehavior::None);
+    assert_eq!(entity_def.attributes.ai_config.detection_radius, 0);
 }

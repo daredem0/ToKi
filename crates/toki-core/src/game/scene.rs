@@ -1,4 +1,5 @@
 use super::{GameState, RuleRuntimeState};
+use crate::ai::AiSystem;
 use crate::animation::AnimationState;
 use crate::entity::{ControlRole, Entity, EntityDefinition, EntityId, EntityKind, EntityManager};
 use crate::rules::RuleSet;
@@ -37,7 +38,7 @@ impl GameState {
             profile_actions_held: HashMap::new(),
             pending_profile_actions: HashMap::new(),
             debug_collision_rendering: false,
-            npc_ai_frame_counter: 0,
+            ai_system: AiSystem::new(),
             rules: RuleSet::default(),
             rule_runtime: RuleRuntimeState::default(),
             pending_stat_changes: Vec::new(),
@@ -57,7 +58,7 @@ impl GameState {
             profile_actions_held: HashMap::new(),
             pending_profile_actions: HashMap::new(),
             debug_collision_rendering: false,
-            npc_ai_frame_counter: 0,
+            ai_system: AiSystem::new(),
             rules: RuleSet::default(),
             rule_runtime: RuleRuntimeState::default(),
             pending_stat_changes: Vec::new(),
@@ -114,7 +115,7 @@ impl GameState {
                 can_move: true,
                 interactable: false,
                 interaction_reach: 0,
-                ai_behavior: crate::entity::AiBehavior::None,
+                ai_config: crate::entity::AiConfig::default(),
                 movement_profile: crate::entity::MovementProfile::PlayerWasd,
                 primary_projectile: None,
                 pickup: None,
@@ -181,7 +182,9 @@ impl GameState {
                 can_move: false,
                 interactable: false,
                 interaction_reach: 0,
-                ai_behavior: crate::entity::AiBehavior::Wander,
+                ai_config: crate::entity::AiConfig::from_legacy_behavior(
+                    crate::entity::AiBehavior::Wander,
+                ),
                 movement_profile: crate::entity::MovementProfile::None,
                 primary_projectile: None,
                 pickup: None,

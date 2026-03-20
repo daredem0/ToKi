@@ -26,10 +26,10 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             can_move: true,
             interactable: false,
             interaction_reach: 0,
-            ai_behavior: if category == "creature" {
-                AiBehavior::Wander
+            ai_config: if category == "creature" {
+                AiConfig::from_legacy_behavior(AiBehavior::Wander)
             } else {
-                AiBehavior::None
+                AiConfig::default()
             },
             movement_profile: if category == "human" {
                 MovementProfile::PlayerWasd
@@ -92,7 +92,7 @@ fn create_test_entity() -> Entity {
         can_move: true,
         interactable: false,
         interaction_reach: 0,
-        ai_behavior: AiBehavior::None,
+        ai_config: AiConfig::default(),
         movement_profile: MovementProfile::PlayerWasd,
         primary_projectile: None,
         projectile: None,

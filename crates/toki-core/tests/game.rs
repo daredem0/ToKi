@@ -114,10 +114,12 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             can_move: true,
             interactable: false,
             interaction_reach: 0,
-            ai_behavior: if category == "creature" {
-                toki_core::entity::AiBehavior::Wander
+            ai_config: if category == "creature" {
+                toki_core::entity::AiConfig::from_legacy_behavior(
+                    toki_core::entity::AiBehavior::Wander,
+                )
             } else {
-                toki_core::entity::AiBehavior::None
+                toki_core::entity::AiConfig::default()
             },
             movement_profile: if category == "human" {
                 MovementProfile::PlayerWasd
@@ -176,7 +178,7 @@ fn player_definition(name: &str) -> EntityDefinition {
             can_move: true,
             interactable: false,
             interaction_reach: 0,
-            ai_behavior: toki_core::entity::AiBehavior::None,
+            ai_config: toki_core::entity::AiConfig::default(),
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: None,
             pickup: None,
@@ -1645,7 +1647,7 @@ fn game_state_static_entity_renderables_include_object_sheet_backed_entities() {
             can_move: false,
             interactable: false,
             interaction_reach: 0,
-            ai_behavior: toki_core::entity::AiBehavior::None,
+            ai_config: toki_core::entity::AiConfig::default(),
             movement_profile: MovementProfile::None,
             primary_projectile: None,
             pickup: Some(PickupDef {
@@ -1890,14 +1892,16 @@ fn game_state_only_updates_npcs_with_wander_ai() {
 
     let mut game_state = GameState::new_empty();
     let mut wandering_npc = test_definition("wandering_npc", "creature");
-    wandering_npc.attributes.ai_behavior = toki_core::entity::AiBehavior::Wander;
+    wandering_npc.attributes.ai_config = toki_core::entity::AiConfig::from_legacy_behavior(
+        toki_core::entity::AiBehavior::Wander,
+    );
     let wandering_npc_id = game_state
         .entity_manager_mut()
         .spawn_from_definition(&wandering_npc, IVec2::new(32, 32))
         .expect("wandering npc should spawn");
 
     let mut idle_npc = test_definition("idle_npc", "creature");
-    idle_npc.attributes.ai_behavior = toki_core::entity::AiBehavior::None;
+    idle_npc.attributes.ai_config = toki_core::entity::AiConfig::default();
     let idle_npc_id = game_state
         .entity_manager_mut()
         .spawn_from_definition(&idle_npc, IVec2::new(96, 96))
@@ -2661,7 +2665,7 @@ fn game_state_emits_movement_audio_for_wander_ai_movement() {
 fn game_state_emits_movement_audio_for_rule_velocity_movement() {
     let mut game_state = GameState::new_empty();
     let mut mover = test_definition("rule_mover", "creature");
-    mover.attributes.ai_behavior = toki_core::entity::AiBehavior::None;
+    mover.attributes.ai_config = toki_core::entity::AiConfig::default();
     mover.audio.footstep_trigger_distance = 1.0;
     mover.audio.movement_sound = "sfx_rule_step".to_string();
     let mover_id = game_state

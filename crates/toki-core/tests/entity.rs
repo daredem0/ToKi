@@ -22,10 +22,10 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             can_move: true,
             interactable: false,
             interaction_reach: 0,
-            ai_behavior: if category == "creature" {
-                AiBehavior::Wander
+            ai_config: if category == "creature" {
+                AiConfig::from_legacy_behavior(AiBehavior::Wander)
             } else {
-                AiBehavior::None
+                AiConfig::default()
             },
             movement_profile: if category == "human" {
                 MovementProfile::PlayerWasd
@@ -237,7 +237,7 @@ fn test_add_existing_entity_tracks_explicit_player_character_role() {
         control_role: ControlRole::PlayerCharacter,
         audio: EntityAudioSettings::default(),
         attributes: EntityAttributes {
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::PlayerWasd,
             ..EntityAttributes::default()
         },
@@ -274,7 +274,7 @@ fn test_add_existing_entity_seeds_generic_health_stat_from_legacy_health() {
         attributes: EntityAttributes {
             health: Some(25),
             stats: EntityStats::default(),
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::None,
             ..EntityAttributes::default()
         },

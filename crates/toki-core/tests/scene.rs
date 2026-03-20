@@ -1,7 +1,7 @@
 use glam::{IVec2, UVec2};
 use toki_core::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use toki_core::entity::{
-    AiBehavior, ControlRole, Entity, EntityAttributes, EntityKind, MovementProfile,
+    AiConfig, ControlRole, Entity, EntityAttributes, EntityKind, MovementProfile,
 };
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::scene::{Scene, SceneAnchor, SceneAnchorFacing, SceneAnchorKind, ScenePlayerEntry};
@@ -40,7 +40,7 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
             can_move: true,
             interactable: false,
             interaction_reach: 0,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: None,
             projectile: None,

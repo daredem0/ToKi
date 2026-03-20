@@ -236,7 +236,7 @@ fn viewport_resolves_shared_sprite_render_requests_for_static_entities() {
             can_move: false,
             interactable: false,
             interaction_reach: 0,
-            ai_behavior: toki_core::entity::AiBehavior::None,
+            ai_config: toki_core::entity::AiConfig::default(),
             movement_profile: toki_core::entity::MovementProfile::None,
             primary_projectile: None,
             pickup: Some(toki_core::entity::PickupDef {

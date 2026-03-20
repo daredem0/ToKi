@@ -38,6 +38,9 @@ pub use camera::{Camera, CameraController, CameraMode};
 pub mod events;
 pub use events::{EventHandler, EventQueue, GameEvent, GameUpdateResult, SceneSwitchRequest};
 
+pub mod ai;
+pub use ai::AiSystem;
+
 pub mod game;
 pub use game::{GameState, InputAction, InputKey, DEFAULT_TIMESTEP_MS};
 

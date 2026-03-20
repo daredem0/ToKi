@@ -5,7 +5,7 @@ use tracing::{debug, warn};
 use crate::animation::AnimationState;
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
-use crate::entity::{AiBehavior, Entity, EntityAttributes, EntityId, EntityKind, HEALTH_STAT_ID};
+use crate::entity::{Entity, EntityAttributes, EntityId, EntityKind, HEALTH_STAT_ID};
 use crate::events::GameUpdateResult;
 use crate::rules::{
     Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleSpawnEntityType, RuleTarget,
@@ -1035,7 +1035,6 @@ impl GameState {
                 EntityAttributes {
                     solid: false,
                     can_move: false,
-                    ai_behavior: AiBehavior::None,
                     ..EntityAttributes::default()
                 },
             ),
@@ -1046,7 +1045,6 @@ impl GameState {
                 EntityAttributes {
                     solid: false,
                     can_move: false,
-                    ai_behavior: AiBehavior::None,
                     ..EntityAttributes::default()
                 },
             ),
@@ -1058,7 +1056,6 @@ impl GameState {
                     solid: false,
                     can_move: false,
                     visible: false,
-                    ai_behavior: AiBehavior::None,
                     ..EntityAttributes::default()
                 },
             ),

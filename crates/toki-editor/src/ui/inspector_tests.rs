@@ -1,6 +1,6 @@
 use super::{
-    AiBehavior, EntityPropertyDraft, InspectorSystem, MovementProfile, MultiEntityBatchEdit,
-    ProjectSettingsDraft, RuleActionKind, RuleConditionKind, RuleTriggerKind,
+    AiBehavior, AiConfig, EntityPropertyDraft, InspectorSystem, MovementProfile,
+    MultiEntityBatchEdit, ProjectSettingsDraft, RuleActionKind, RuleConditionKind, RuleTriggerKind,
 };
 use crate::project::Project;
 use crate::ui::EditorUI;
@@ -39,7 +39,7 @@ fn sample_entity_with_id(id: u32) -> toki_core::entity::Entity {
             can_move: true,
             interactable: false,
             interaction_reach: 0,
-            ai_behavior: AiBehavior::Wander,
+            ai_config: AiConfig::from_legacy_behavior(AiBehavior::Wander),
             movement_profile: MovementProfile::LegacyDefault,
             primary_projectile: None,
             projectile: None,
@@ -91,7 +91,7 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
     draft.solid = false;
     draft.can_move = false;
     draft.control_role = ControlRole::PlayerCharacter;
-    draft.ai_behavior = AiBehavior::None;
+    draft.ai_config = AiConfig::default();
     draft.movement_profile = MovementProfile::PlayerWasd;
     draft.movement_sound_trigger = MovementSoundTrigger::AnimationLoop;
     draft.footstep_trigger_distance = -5.0;
@@ -120,7 +120,7 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
     assert!(!entity.attributes.solid);
     assert!(!entity.attributes.can_move);
     assert_eq!(entity.control_role, ControlRole::PlayerCharacter);
-    assert_eq!(entity.attributes.ai_behavior, AiBehavior::None);
+    assert_eq!(entity.attributes.ai_config.behavior, AiBehavior::None);
     assert_eq!(
         entity.attributes.movement_profile,
         MovementProfile::PlayerWasd
@@ -1052,7 +1052,7 @@ fn save_entity_definition_persists_audio_updates() {
             can_move: true,
             interactable: false,
             interaction_reach: 0,
-            ai_behavior: AiBehavior::None,
+            ai_config: AiConfig::default(),
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: None,
             pickup: None,
