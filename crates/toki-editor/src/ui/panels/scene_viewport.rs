@@ -16,19 +16,25 @@ impl PanelSystem {
             return;
         };
 
-        let entity_count = viewport
-            .game_state()
-            .entity_manager()
-            .active_entities()
-            .len();
-        let selected_entity = viewport.selected_entity();
-
         if let Err(e) = viewport.update() {
             tracing::error!("Scene viewport update error: {e}");
         }
 
         if let Some(cfg) = config.as_deref_mut() {
-            if Self::render_grid_toolbar(ui, cfg) {
+            let mut toolbar_changed = false;
+            let grid_size = Self::effective_grid_size(viewport, cfg);
+            ui.horizontal(|ui| {
+                toolbar_changed = Self::render_grid_toolbar_contents(ui, cfg);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.checkbox(&mut ui_state.viewport_cursor_show_tiles, "P/T");
+                    ui.label(Self::viewport_cursor_status_label(
+                        ui_state.viewport_cursor_world_position,
+                        ui_state.viewport_cursor_show_tiles,
+                        grid_size,
+                    ));
+                });
+            });
+            if toolbar_changed {
                 viewport.mark_dirty();
             }
             ui.separator();
@@ -39,6 +45,12 @@ impl PanelSystem {
             available_size,
             egui::Sense::click_and_drag().union(egui::Sense::hover()),
         );
+        let display_rect = viewport.display_rect_in(rect);
+
+        if let Some(pointer_pos) = response.hover_pos().filter(|pos| display_rect.contains(*pos)) {
+            let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, display_rect);
+            ui_state.remember_viewport_cursor_world_position(world_pos);
+        }
 
         if !ui_state.is_entity_move_drag_active() && !ui_state.is_scene_anchor_move_drag_active() {
             viewport.clear_suppressed_entity_rendering();
@@ -55,7 +67,7 @@ impl PanelSystem {
                         ui_state,
                         viewport,
                         drag_start_pos,
-                        rect,
+                        display_rect,
                         config.as_deref(),
                         ctrl_pressed,
                     );
@@ -74,7 +86,12 @@ impl PanelSystem {
 
         if response.drag_stopped() {
             if ui_state.is_marquee_selection_active() {
-                SelectionInteraction::handle_marquee_drag_release(ui_state, viewport, rect, true);
+                SelectionInteraction::handle_marquee_drag_release(
+                    ui_state,
+                    viewport,
+                    display_rect,
+                    true,
+                );
                 viewport.stop_camera_drag();
             } else {
                 let drop_pos = response
@@ -84,7 +101,7 @@ impl PanelSystem {
                     ui_state,
                     viewport,
                     drop_pos,
-                    rect,
+                    display_rect,
                     config.as_deref(),
                 );
             }
@@ -108,7 +125,7 @@ impl PanelSystem {
                         ui_state,
                         viewport,
                         click_pos,
-                        rect,
+                        display_rect,
                         config.as_deref(),
                     );
                 } else {
@@ -116,7 +133,7 @@ impl PanelSystem {
                         ui_state,
                         viewport,
                         click_pos,
-                        rect,
+                        display_rect,
                         config.as_deref(),
                         ctrl_pressed,
                     );
@@ -130,16 +147,5 @@ impl PanelSystem {
             Self::paint_viewport_grid_overlay(ui, rect, viewport, cfg);
         }
         Self::paint_marquee_selection_overlay(ui, ui_state);
-
-        ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-            ui.horizontal(|ui| {
-                ui.label("📊 Stats:");
-                ui.label(format!(
-                    "Entities: {} | Selected: {:?}",
-                    entity_count, selected_entity
-                ));
-                ui.label("Press F1/F2 to toggle panels");
-            });
-        });
     }
 }

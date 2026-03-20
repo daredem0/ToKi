@@ -77,6 +77,22 @@ enum GraphCommand {
 }
 
 impl PanelSystem {
+    fn viewport_cursor_status_label(
+        cursor_world: Option<glam::IVec2>,
+        show_tiles: bool,
+        grid_size: glam::UVec2,
+    ) -> String {
+        match cursor_world {
+            Some(pos) if show_tiles => {
+                let tile_x = pos.x.div_euclid(grid_size.x.max(1) as i32);
+                let tile_y = pos.y.div_euclid(grid_size.y.max(1) as i32);
+                format!("Cursor: {}, {}", tile_x, tile_y)
+            }
+            Some(pos) => format!("Cursor: {}, {}", pos.x, pos.y),
+            None => "Cursor: -, -".to_string(),
+        }
+    }
+
     /// Renders the main scene viewport panel in the center of the screen
     #[allow(clippy::too_many_arguments)]
     pub fn render_viewport(
@@ -289,49 +305,56 @@ impl PanelSystem {
         );
     }
 
-    fn render_grid_toolbar(ui: &mut egui::Ui, config: &mut EditorConfig) -> bool {
+    fn render_grid_toolbar_contents(ui: &mut egui::Ui, config: &mut EditorConfig) -> bool {
         let mut changed = false;
         let grid = &mut config.editor_settings.grid;
 
-        ui.horizontal(|ui| {
-            ui.label("Grid:");
+        ui.label("Grid:");
 
-            changed |= ui.checkbox(&mut grid.show_grid, "Show Grid").changed();
-            changed |= ui
-                .checkbox(&mut grid.snap_to_grid, "Snap To Grid")
-                .changed();
+        changed |= ui.checkbox(&mut grid.show_grid, "Show Grid").changed();
+        changed |= ui
+            .checkbox(&mut grid.snap_to_grid, "Snap To Grid")
+            .changed();
 
-            let mut grid_x = grid.grid_size[0] as i32;
-            let mut grid_y = grid.grid_size[1] as i32;
+        let mut grid_x = grid.grid_size[0] as i32;
+        let mut grid_y = grid.grid_size[1] as i32;
 
-            ui.label("Grid Size");
-            let x_changed = ui
-                .add(
-                    egui::DragValue::new(&mut grid_x)
-                        .prefix("x:")
-                        .range(1..=512)
-                        .speed(1),
-                )
-                .changed();
-            let y_changed = ui
-                .add(
-                    egui::DragValue::new(&mut grid_y)
-                        .prefix("y:")
-                        .range(1..=512)
-                        .speed(1),
-                )
-                .changed();
+        ui.label("Grid Size");
+        let x_changed = ui
+            .add(
+                egui::DragValue::new(&mut grid_x)
+                    .prefix("x:")
+                    .range(1..=512)
+                    .speed(1),
+            )
+            .changed();
+        let y_changed = ui
+            .add(
+                egui::DragValue::new(&mut grid_y)
+                    .prefix("y:")
+                    .range(1..=512)
+                    .speed(1),
+            )
+            .changed();
 
-            if x_changed || y_changed {
-                let new_size = [
-                    Self::sanitize_grid_size_axis(grid_x),
-                    Self::sanitize_grid_size_axis(grid_y),
-                ];
-                if grid.grid_size != new_size {
-                    grid.grid_size = new_size;
-                    changed = true;
-                }
+        if x_changed || y_changed {
+            let new_size = [
+                Self::sanitize_grid_size_axis(grid_x),
+                Self::sanitize_grid_size_axis(grid_y),
+            ];
+            if grid.grid_size != new_size {
+                grid.grid_size = new_size;
+                changed = true;
             }
+        }
+
+        changed
+    }
+
+    fn render_grid_toolbar(ui: &mut egui::Ui, config: &mut EditorConfig) -> bool {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            changed = Self::render_grid_toolbar_contents(ui, config);
         });
 
         changed

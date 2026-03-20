@@ -7,9 +7,9 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
+"Scene 2" = "scenes/Scene 2.json"
 main = "scenes/main.json"
 "Main Scene" = "scenes/Main Scene.json"
-"Scene 2" = "scenes/Scene 2.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -124,63 +124,6 @@ recent_files = []
 
 [editor.camera_settings]
 
-[editor.graph_layouts."Main Scene"]
-zoom = 0.791378378868103
-pan = [
-    -12.873878479003906,
-    -16.6015625,
-]
-
-[editor.graph_layouts."Main Scene".node_positions]
-"node:2" = [
-    800.0,
-    50.0,
-]
-"node:11" = [
-    800.0,
-    218.0,
-]
-"node:5" = [
-    800.0,
-    106.0,
-]
-"node:10" = [
-    60.0,
-    218.0,
-]
-"node:12" = [
-    430.0,
-    218.0,
-]
-"node:6" = [
-    430.0,
-    106.0,
-]
-"node:8" = [
-    800.0,
-    162.0,
-]
-"node:9" = [
-    430.0,
-    162.0,
-]
-"node:4" = [
-    60.0,
-    106.0,
-]
-"node:1" = [
-    60.0,
-    50.0,
-]
-"node:7" = [
-    60.0,
-    162.0,
-]
-"node:3" = [
-    430.0,
-    50.0,
-]
-
 [editor.graph_layouts."Scene 2"]
 zoom = 0.8264462351799011
 pan = [
@@ -189,21 +132,90 @@ pan = [
 ]
 
 [editor.graph_layouts."Scene 2".node_positions]
-"node:1" = [
-    60.0,
-    50.0,
-]
 "node:2" = [
     800.0,
     50.0,
 ]
-"node:3" = [
-    430.0,
+"node:1" = [
+    60.0,
     50.0,
 ]
 "node:4" = [
     656.8824462890625,
     177.01071166992188,
+]
+"node:3" = [
+    430.0,
+    50.0,
+]
+
+[editor.graph_layouts."Main Scene"]
+zoom = 0.791378378868103
+pan = [
+    35.512847900390625,
+    -24.64453125,
+]
+
+[editor.graph_layouts."Main Scene".node_positions]
+"node:9" = [
+    430.0,
+    162.0,
+]
+"node:2" = [
+    800.0,
+    50.0,
+]
+"node:5" = [
+    800.0,
+    106.0,
+]
+"node:3" = [
+    430.0,
+    50.0,
+]
+"node:10" = [
+    60.0,
+    218.0,
+]
+"node:1" = [
+    60.0,
+    50.0,
+]
+"node:15" = [
+    430.0,
+    274.0,
+]
+"node:13" = [
+    60.0,
+    274.0,
+]
+"node:12" = [
+    430.0,
+    218.0,
+]
+"node:11" = [
+    800.0,
+    218.0,
+]
+"node:8" = [
+    800.0,
+    162.0,
+]
+"node:7" = [
+    60.0,
+    162.0,
+]
+"node:6" = [
+    430.0,
+    106.0,
+]
+"node:4" = [
+    60.0,
+    106.0,
+]
+"node:14" = [
+    800.0,
+    274.0,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]
@@ -332,6 +344,38 @@ position = [
 target = "TriggerSelf"
 kind = "Npc"
 
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 13
+position = [
+    60.0,
+    274.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnTileEnter]
+x = 1
+y = 23
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 14
+position = [
+    800.0,
+    274.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Action.SwitchScene]
+scene_name = "Main Scene"
+spawn_point_id = "spawn_point_2"
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 15
+position = [
+    430.0,
+    274.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind]
+Condition = "Always"
+
 [[editor.rule_graph_drafts."Main Scene".edges]]
 from = 3
 to = 2
@@ -364,6 +408,14 @@ to = 11
 from = 10
 to = 12
 
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 15
+to = 14
+
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 13
+to = 15
+
 [[editor.rule_graph_drafts."Main Scene".chains]]
 rule_id = "rule_2"
 enabled = true
@@ -391,3 +443,10 @@ enabled = true
 priority = 0
 once = false
 trigger_node_id = 10
+
+[[editor.rule_graph_drafts."Main Scene".chains]]
+rule_id = "rule_5"
+enabled = true
+priority = 0
+once = false
+trigger_node_id = 13

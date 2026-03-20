@@ -488,6 +488,8 @@ pub struct EditorUI {
     pub multi_entity_delta_y_input: i32,
     pub multi_entity_inspector_selection_signature: Vec<EntityId>,
     pub menu_preview_font_families: Vec<String>,
+    pub viewport_cursor_world_position: Option<glam::IVec2>,
+    pub viewport_cursor_show_tiles: bool,
 }
 
 impl EditorUI {
@@ -531,7 +533,16 @@ impl EditorUI {
                 "Serif".to_string(),
                 "Mono".to_string(),
             ],
+            viewport_cursor_world_position: None,
+            viewport_cursor_show_tiles: false,
         }
+    }
+
+    pub fn remember_viewport_cursor_world_position(&mut self, world_pos: glam::Vec2) {
+        self.viewport_cursor_world_position = Some(glam::IVec2::new(
+            world_pos.x.floor() as i32,
+            world_pos.y.floor() as i32,
+        ));
     }
 
     // Scene management methods

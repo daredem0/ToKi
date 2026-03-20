@@ -526,12 +526,6 @@ impl SceneViewport {
         tracing::info!("Cleared tilemap from scene viewport");
     }
 
-    /// Get currently selected entity
-    pub fn selected_entity(&self) -> Option<u32> {
-        // TODO: Implement with unified renderer
-        None
-    }
-
     pub fn camera_state(&self) -> (glam::IVec2, f32) {
         (self.camera.position, self.effective_camera_scale())
     }

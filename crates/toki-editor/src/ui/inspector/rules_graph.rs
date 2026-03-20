@@ -561,6 +561,8 @@ impl InspectorSystem {
                     RuleTriggerKind::Death,
                     RuleTriggerKind::Trigger,
                     RuleTriggerKind::Interact,
+                    RuleTriggerKind::TileEnter,
+                    RuleTriggerKind::TileExit,
                 ] {
                     changed |= ui
                         .selectable_value(
@@ -637,6 +639,32 @@ impl InspectorSystem {
                 &format!("graph_node_trigger_interact_entity_{}_{}", scene_name, node_key),
                 entity,
             );
+        }
+
+        // Tile coordinate editors for OnTileEnter and OnTileExit
+        if let RuleTrigger::OnTileEnter { x, y } | RuleTrigger::OnTileExit { x, y } = trigger {
+            ui.horizontal(|ui| {
+                ui.label("Tile X:");
+                let mut x_val = *x as i32;
+                if ui
+                    .add(egui::DragValue::new(&mut x_val).speed(1.0).range(0..=9999))
+                    .changed()
+                {
+                    *x = x_val.max(0) as u32;
+                    changed = true;
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Tile Y:");
+                let mut y_val = *y as i32;
+                if ui
+                    .add(egui::DragValue::new(&mut y_val).speed(1.0).range(0..=9999))
+                    .changed()
+                {
+                    *y = y_val.max(0) as u32;
+                    changed = true;
+                }
+            });
         }
 
         changed

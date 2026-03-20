@@ -57,6 +57,34 @@ fn action_summary_is_semantic() {
 }
 
 #[test]
+fn viewport_cursor_status_label_formats_last_known_world_position() {
+    assert_eq!(
+        PanelSystem::viewport_cursor_status_label(
+            Some(glam::IVec2::new(12, 34)),
+            false,
+            glam::UVec2::new(16, 16),
+        ),
+        "Cursor: 12, 34"
+    );
+    assert_eq!(
+        PanelSystem::viewport_cursor_status_label(None, false, glam::UVec2::new(16, 16)),
+        "Cursor: -, -"
+    );
+}
+
+#[test]
+fn viewport_cursor_status_label_formats_tile_position_when_enabled() {
+    assert_eq!(
+        PanelSystem::viewport_cursor_status_label(
+            Some(glam::IVec2::new(31, 47)),
+            true,
+            glam::UVec2::new(16, 16),
+        ),
+        "Cursor: 1, 2"
+    );
+}
+
+#[test]
 fn sanitize_grid_size_axis_clamps_to_minimum_one() {
     assert_eq!(PanelSystem::sanitize_grid_size_axis(-32), 1);
     assert_eq!(PanelSystem::sanitize_grid_size_axis(0), 1);

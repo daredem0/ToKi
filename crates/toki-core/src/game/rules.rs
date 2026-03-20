@@ -291,13 +291,19 @@ impl GameState {
     /// - `Overlap`: Only matches `Overlap` spatial
     /// - `Adjacent`: Matches `Overlap`, `Adjacent`, or `InFront` (anything within reach)
     /// - `InFront`: Only matches `InFront` or `Overlap` (overlap implies you're "on" the entity)
-    fn interaction_mode_matches(mode: crate::rules::InteractionMode, spatial: InteractionSpatial) -> bool {
+    fn interaction_mode_matches(
+        mode: crate::rules::InteractionMode,
+        spatial: InteractionSpatial,
+    ) -> bool {
         use crate::rules::InteractionMode;
 
         match mode {
             InteractionMode::Overlap => matches!(spatial, InteractionSpatial::Overlap),
             InteractionMode::Adjacent => true, // Adjacent mode accepts any proximity
-            InteractionMode::InFront => matches!(spatial, InteractionSpatial::InFront | InteractionSpatial::Overlap),
+            InteractionMode::InFront => matches!(
+                spatial,
+                InteractionSpatial::InFront | InteractionSpatial::Overlap
+            ),
         }
     }
 
@@ -834,7 +840,11 @@ impl GameState {
     ///   When entity-owned rules are added, this should return the owning entity.
     ///
     /// Returns `None` if the target cannot be resolved (e.g., no player, context missing).
-    fn resolve_rule_target(&self, target: RuleTarget, context: &TriggerContext) -> Option<EntityId> {
+    fn resolve_rule_target(
+        &self,
+        target: RuleTarget,
+        context: &TriggerContext,
+    ) -> Option<EntityId> {
         match target {
             RuleTarget::Player => self.player_id,
             RuleTarget::Entity(entity_id) => Some(entity_id),
@@ -945,7 +955,32 @@ impl GameState {
                 continue;
             };
 
-            // Calculate current tile position based on entity's center point
+            // ═══════════════════════════════════════════════════════════════
+            // CENTER-POINT TILE DETECTION
+            // ═══════════════════════════════════════════════════════════════
+            // This implementation uses the entity's CENTER POINT to determine
+            // which single tile they occupy. This means:
+            //
+            // 1. Only ONE tile is tracked per entity at any time
+            // 2. Entities may physically overlap MULTIPLE tiles, but only the
+            //    tile containing their center point is considered "occupied"
+            // 3. Example: A 16x16 player on 8x8 tiles physically touches 4 tiles,
+            //    but is tracked as being on only the ONE tile containing their center
+            //
+            // DESIGN RATIONALE:
+            // - Simplicity: One tile per entity, clear transition events
+            // - Common pattern: Used in classic RPGs (Pokemon, Zelda, etc.)
+            // - Predictability: Center-point gives consistent behavior
+            //
+            // ALTERNATIVE (not implemented):
+            // - Full coverage detection would track ALL tiles an entity overlaps
+            // - More physically accurate but significantly more complex
+            // - Would generate multiple enter/exit events per movement
+            //
+            // If you need precise multi-tile detection for specific entities,
+            // consider adding a separate collision query system rather than
+            // modifying this core tile tracking logic.
+            // ═══════════════════════════════════════════════════════════════
             let center_x = entity.position.x + (entity.size.x as i32 / 2);
             let center_y = entity.position.y + (entity.size.y as i32 / 2);
             let current_tile_x = (center_x.max(0) as u32) / tile_w;
@@ -961,21 +996,46 @@ impl GameState {
             {
                 // If tile position changed, generate exit and enter events
                 if (prev_tile_x, prev_tile_y) != (current_tile_x, current_tile_y) {
+                    // Log player movement specifically
+                    if Some(entity_id) == self.player_id {
+                        tracing::trace!(
+                            "Player moved from_tile=({},{}) to_tile=({},{}) pixel_pos=({},{})",
+                            prev_tile_x,
+                            prev_tile_y,
+                            current_tile_x,
+                            current_tile_y,
+                            entity.position.x,
+                            entity.position.y
+                        );
+                    } else {
+                        tracing::trace!(
+                            entity = ?entity_id,
+                            from_tile = ?(prev_tile_x, prev_tile_y),
+                            to_tile = ?(current_tile_x, current_tile_y),
+                            pixel_pos = ?(entity.position.x, entity.position.y),
+                            "Tile transition detected"
+                        );
+                    }
+
                     // Exit previous tile
-                    self.rule_runtime.frame_tile_transitions.push(TileTransitionEvent {
-                        entity_id,
-                        tile_x: prev_tile_x,
-                        tile_y: prev_tile_y,
-                        is_enter: false,
-                    });
+                    self.rule_runtime
+                        .frame_tile_transitions
+                        .push(TileTransitionEvent {
+                            entity_id,
+                            tile_x: prev_tile_x,
+                            tile_y: prev_tile_y,
+                            is_enter: false,
+                        });
 
                     // Enter new tile
-                    self.rule_runtime.frame_tile_transitions.push(TileTransitionEvent {
-                        entity_id,
-                        tile_x: current_tile_x,
-                        tile_y: current_tile_y,
-                        is_enter: true,
-                    });
+                    self.rule_runtime
+                        .frame_tile_transitions
+                        .push(TileTransitionEvent {
+                            entity_id,
+                            tile_x: current_tile_x,
+                            tile_y: current_tile_y,
+                            is_enter: true,
+                        });
                 }
             }
 
