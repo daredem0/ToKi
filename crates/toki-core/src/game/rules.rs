@@ -64,6 +64,19 @@ pub struct InteractionEvent {
     pub spatial: InteractionSpatial,
 }
 
+/// A tile transition event recording when an entity enters or exits a specific tile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TileTransitionEvent {
+    /// The entity that entered or exited the tile.
+    pub entity_id: EntityId,
+    /// The tile x-coordinate.
+    pub tile_x: u32,
+    /// The tile y-coordinate.
+    pub tile_y: u32,
+    /// Whether this is an enter (true) or exit (false) event.
+    pub is_enter: bool,
+}
+
 #[derive(Debug, Default)]
 pub(super) struct RuleRuntimeState {
     pub(super) started: bool,
@@ -77,6 +90,11 @@ pub(super) struct RuleRuntimeState {
     pub(super) frame_death_events: Vec<DeathEvent>,
     /// Interaction events that occurred this frame.
     pub(super) frame_interactions: Vec<InteractionEvent>,
+    /// Previous tile positions for entities, used to detect tile transitions.
+    /// Key: EntityId, Value: (tile_x, tile_y)
+    pub(super) entity_tile_positions: HashMap<EntityId, (u32, u32)>,
+    /// Tile transition events that occurred this frame.
+    pub(super) frame_tile_transitions: Vec<TileTransitionEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -893,6 +911,146 @@ impl GameState {
 
             if animation_controller.current_clip_state != state {
                 animation_controller.play(state);
+            }
+        }
+    }
+
+    /// Gets the rule-assigned velocity for an entity, if any.
+    /// Used by tests to verify rule actions.
+    pub fn get_rule_velocity(&self, entity_id: EntityId) -> Option<glam::IVec2> {
+        self.rule_runtime.velocities.get(&entity_id).copied()
+    }
+
+    /// Sets the rule-assigned velocity for an entity directly.
+    /// Used by tests to set up specific scenarios.
+    pub fn set_rule_velocity(&mut self, entity_id: EntityId, velocity: glam::IVec2) {
+        self.rule_runtime.velocities.insert(entity_id, velocity);
+    }
+
+    /// Detects tile transitions for all active entities and populates frame_tile_transitions.
+    ///
+    /// This should be called after all movement is complete but before reactive rules fire.
+    /// It compares each entity's current tile position with their previous tile position
+    /// and generates OnTileExit and OnTileEnter events for transitions.
+    pub(super) fn detect_tile_transitions(&mut self, tilemap: &TileMap) {
+        if tilemap.tile_size.x == 0 || tilemap.tile_size.y == 0 {
+            return;
+        }
+
+        let tile_w = tilemap.tile_size.x;
+        let tile_h = tilemap.tile_size.y;
+
+        for entity_id in self.entity_manager.active_entities() {
+            let Some(entity) = self.entity_manager.get_entity(entity_id) else {
+                continue;
+            };
+
+            // Calculate current tile position based on entity's center point
+            let center_x = entity.position.x + (entity.size.x as i32 / 2);
+            let center_y = entity.position.y + (entity.size.y as i32 / 2);
+            let current_tile_x = (center_x.max(0) as u32) / tile_w;
+            let current_tile_y = (center_y.max(0) as u32) / tile_h;
+
+            // Clamp to map bounds
+            let current_tile_x = current_tile_x.min(tilemap.size.x.saturating_sub(1));
+            let current_tile_y = current_tile_y.min(tilemap.size.y.saturating_sub(1));
+
+            // Check if we have a previous tile position for this entity
+            if let Some(&(prev_tile_x, prev_tile_y)) =
+                self.rule_runtime.entity_tile_positions.get(&entity_id)
+            {
+                // If tile position changed, generate exit and enter events
+                if (prev_tile_x, prev_tile_y) != (current_tile_x, current_tile_y) {
+                    // Exit previous tile
+                    self.rule_runtime.frame_tile_transitions.push(TileTransitionEvent {
+                        entity_id,
+                        tile_x: prev_tile_x,
+                        tile_y: prev_tile_y,
+                        is_enter: false,
+                    });
+
+                    // Enter new tile
+                    self.rule_runtime.frame_tile_transitions.push(TileTransitionEvent {
+                        entity_id,
+                        tile_x: current_tile_x,
+                        tile_y: current_tile_y,
+                        is_enter: true,
+                    });
+                }
+            }
+
+            // Update stored tile position
+            self.rule_runtime
+                .entity_tile_positions
+                .insert(entity_id, (current_tile_x, current_tile_y));
+        }
+    }
+
+    /// Collects rule commands for tile transition events (OnTileEnter/OnTileExit).
+    pub(super) fn collect_rule_commands_for_tile_transitions(
+        &mut self,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        let tile_events = std::mem::take(&mut self.rule_runtime.frame_tile_transitions);
+
+        for event in tile_events {
+            let trigger = if event.is_enter {
+                RuleTrigger::OnTileEnter {
+                    x: event.tile_x,
+                    y: event.tile_y,
+                }
+            } else {
+                RuleTrigger::OnTileExit {
+                    x: event.tile_x,
+                    y: event.tile_y,
+                }
+            };
+
+            let context = TriggerContext::with_self_only(event.entity_id);
+
+            let mut matching_rules = self
+                .rules
+                .rules
+                .iter()
+                .filter(|rule| rule.enabled && rule.trigger == trigger)
+                .filter(|rule| {
+                    !(rule.once
+                        && self
+                            .rule_runtime
+                            .fired_once_rules
+                            .contains(rule.id.as_str()))
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+
+            matching_rules
+                .sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+
+            for rule in matching_rules {
+                let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
+                debug!(
+                    rule_id = %rule.id,
+                    trigger = ?trigger,
+                    entity = ?event.entity_id,
+                    tile_x = event.tile_x,
+                    tile_y = event.tile_y,
+                    is_enter = event.is_enter,
+                    conditions_passed = conditions_result,
+                    "Tile transition rule evaluated"
+                );
+
+                if !conditions_result {
+                    continue;
+                }
+
+                for action in &rule.actions {
+                    debug!(rule_id = %rule.id, action = ?action, "Executing tile transition action");
+                    self.buffer_rule_action(action, &context, command_buffer);
+                }
+
+                if rule.once {
+                    self.rule_runtime.fired_once_rules.insert(rule.id);
+                }
             }
         }
     }

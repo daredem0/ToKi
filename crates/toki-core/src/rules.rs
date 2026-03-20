@@ -81,6 +81,18 @@ pub enum RuleTrigger {
         #[serde(default)]
         entity: Option<RuleTarget>,
     },
+    OnTileEnter {
+        /// The tile x-coordinate (in tile units, not pixels).
+        x: u32,
+        /// The tile y-coordinate (in tile units, not pixels).
+        y: u32,
+    },
+    OnTileExit {
+        /// The tile x-coordinate (in tile units, not pixels).
+        x: u32,
+        /// The tile y-coordinate (in tile units, not pixels).
+        y: u32,
+    },
 }
 
 impl RuleTrigger {
@@ -95,6 +107,8 @@ impl RuleTrigger {
                 | RuleTrigger::OnDamaged { .. }
                 | RuleTrigger::OnDeath { .. }
                 | RuleTrigger::OnInteract { .. }
+                | RuleTrigger::OnTileEnter { .. }
+                | RuleTrigger::OnTileExit { .. }
         )
     }
 

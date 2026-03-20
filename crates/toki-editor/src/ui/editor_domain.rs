@@ -78,4 +78,6 @@ pub enum RuleTriggerEditorKind {
     Death,
     Trigger,
     Interact,
+    TileEnter,
+    TileExit,
 }

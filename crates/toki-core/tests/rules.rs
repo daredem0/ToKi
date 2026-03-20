@@ -3663,3 +3663,434 @@ fn has_inventory_item_does_not_match_when_item_missing() {
         "HasInventoryItem should NOT match when player lacks the item entirely"
     );
 }
+
+#[test]
+fn on_tile_enter_fires_when_entity_enters_tile() {
+    let mut state = GameState::new_empty();
+    let _player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "enter-tile-1-0",
+            RuleTrigger::OnTileEnter { x: 1, y: 0 },
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "entered_tile".to_string(),
+            }],
+        )],
+    });
+
+    // Initialize tile tracking with first update
+    state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    // Move player right to tile (1, 0) - player moves 2px per frame, needs ~8 frames to reach tile center
+    state.handle_key_press(InputKey::Right);
+    let mut fired = false;
+    for _ in 0..10 {
+        let result = state.update(
+            UVec2::new(256, 256),
+            &create_test_tilemap(),
+            &create_test_atlas(),
+        );
+        if result.events.iter().any(|event| matches!(
+            event,
+            AudioEvent::PlaySound { sound_id, .. } if sound_id == "entered_tile"
+        )) {
+            fired = true;
+            break;
+        }
+    }
+
+    assert!(
+        fired,
+        "OnTileEnter should fire when entity moves onto the specified tile"
+    );
+}
+
+#[test]
+fn on_tile_enter_does_not_fire_when_staying_on_same_tile() {
+    let mut state = GameState::new_empty();
+    let _player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "enter-tile-0-0",
+            RuleTrigger::OnTileEnter { x: 0, y: 0 },
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "entered_tile".to_string(),
+            }],
+        )],
+    });
+
+    // First frame - no movement, already on tile
+    let first = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    // Second frame - still no movement
+    let second = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(
+        first.events.is_empty(),
+        "OnTileEnter should not fire when entity spawns on tile"
+    );
+    assert!(
+        second.events.is_empty(),
+        "OnTileEnter should not fire repeatedly when staying on same tile"
+    );
+}
+
+#[test]
+fn on_tile_enter_fires_only_on_transition() {
+    let mut state = GameState::new_empty();
+    let _player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "enter-tile-1-0",
+            RuleTrigger::OnTileEnter { x: 1, y: 0 },
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "entered_tile".to_string(),
+            }],
+        )],
+    });
+
+    // Initialize tile tracking
+    state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    // Move to tile (1, 0)
+    state.handle_key_press(InputKey::Right);
+    let mut entered = false;
+    for _ in 0..10 {
+        let result = state.update(
+            UVec2::new(256, 256),
+            &create_test_tilemap(),
+            &create_test_atlas(),
+        );
+        if result.events.iter().any(|event| matches!(
+            event,
+            AudioEvent::PlaySound { sound_id, .. } if sound_id == "entered_tile"
+        )) {
+            entered = true;
+            break;
+        }
+    }
+
+    // Stay on tile (1, 0)
+    state.handle_key_release(InputKey::Right);
+    let second = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(entered, "OnTileEnter should fire on first entry");
+    assert!(
+        second.events.is_empty(),
+        "OnTileEnter should not fire again while staying on same tile"
+    );
+}
+
+#[test]
+fn on_tile_exit_fires_when_entity_leaves_tile() {
+    let mut state = GameState::new_empty();
+    let _player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "exit-tile-0-0",
+            RuleTrigger::OnTileExit { x: 0, y: 0 },
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "exited_tile".to_string(),
+            }],
+        )],
+    });
+
+    // Initialize tile tracking
+    let first = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    // Move right to tile (1, 0), leaving (0, 0)
+    state.handle_key_press(InputKey::Right);
+    let mut exited = false;
+    for _ in 0..10 {
+        let result = state.update(
+            UVec2::new(256, 256),
+            &create_test_tilemap(),
+            &create_test_atlas(),
+        );
+        if result.events.iter().any(|event| matches!(
+            event,
+            AudioEvent::PlaySound { sound_id, .. } if sound_id == "exited_tile"
+        )) {
+            exited = true;
+            break;
+        }
+    }
+
+    assert!(
+        first.events.is_empty(),
+        "OnTileExit should not fire before leaving tile"
+    );
+    assert!(exited, "OnTileExit should fire when entity leaves the specified tile");
+}
+
+#[test]
+fn on_tile_exit_does_not_fire_repeatedly() {
+    let mut state = GameState::new_empty();
+    let _player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "exit-tile-0-0",
+            RuleTrigger::OnTileExit { x: 0, y: 0 },
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "exited_tile".to_string(),
+            }],
+        )],
+    });
+
+    // Initialize tile tracking
+    state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    // Move to tile (1, 0), leaving (0, 0)
+    state.handle_key_press(InputKey::Right);
+    let mut exited = false;
+    for _ in 0..10 {
+        let result = state.update(
+            UVec2::new(256, 256),
+            &create_test_tilemap(),
+            &create_test_atlas(),
+        );
+        if result.events.iter().any(|event| matches!(
+            event,
+            AudioEvent::PlaySound { sound_id, .. } if sound_id == "exited_tile"
+        )) {
+            exited = true;
+            break;
+        }
+    }
+
+    // Stay on tile (1, 0)
+    state.handle_key_release(InputKey::Right);
+    let second = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(exited, "OnTileExit should fire when leaving tile");
+    assert!(
+        second.events.is_empty(),
+        "OnTileExit should not fire repeatedly after leaving tile"
+    );
+}
+
+#[test]
+fn on_tile_enter_provides_trigger_self_context() {
+    let mut state = GameState::new_empty();
+    let player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+
+    state.set_rules(RuleSet {
+        rules: vec![Rule {
+            id: "enter-with-velocity".to_string(),
+            enabled: true,
+            priority: 0,
+            once: false,
+            trigger: RuleTrigger::OnTileEnter { x: 1, y: 0 },
+            conditions: vec![RuleCondition::Always],
+            actions: vec![RuleAction::SetVelocity {
+                target: RuleTarget::TriggerSelf,
+                velocity: [0, 5],
+            }],
+        }],
+    });
+
+    // Initialize tile tracking
+    state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    // Move to tile (1, 0)
+    state.handle_key_press(InputKey::Right);
+    for _ in 0..10 {
+        state.update(
+            UVec2::new(256, 256),
+            &create_test_tilemap(),
+            &create_test_atlas(),
+        );
+    }
+
+    // Entity should have velocity set by the rule
+    let _player = state.entity_manager().get_entity(player_id).unwrap();
+    // Velocity will be applied on next update, check rule runtime state
+    let velocity = state.get_rule_velocity(player_id);
+    assert_eq!(
+        velocity,
+        Some(IVec2::new(0, 5)),
+        "OnTileEnter should provide TriggerSelf context for the entering entity"
+    );
+}
+
+#[test]
+fn on_tile_exit_provides_trigger_self_context() {
+    let mut state = GameState::new_empty();
+    let player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+
+    state.set_rules(RuleSet {
+        rules: vec![Rule {
+            id: "exit-with-velocity".to_string(),
+            enabled: true,
+            priority: 0,
+            once: false,
+            trigger: RuleTrigger::OnTileExit { x: 0, y: 0 },
+            conditions: vec![RuleCondition::Always],
+            actions: vec![RuleAction::SetVelocity {
+                target: RuleTarget::TriggerSelf,
+                velocity: [10, 0],
+            }],
+        }],
+    });
+
+    // Initialize tile tracking
+    state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    // Move to tile (1, 0), leaving (0, 0)
+    state.handle_key_press(InputKey::Right);
+    for _ in 0..10 {
+        state.update(
+            UVec2::new(256, 256),
+            &create_test_tilemap(),
+            &create_test_atlas(),
+        );
+    }
+
+    // Entity should have velocity set by the rule
+    let velocity = state.get_rule_velocity(player_id);
+    assert_eq!(
+        velocity,
+        Some(IVec2::new(10, 0)),
+        "OnTileExit should provide TriggerSelf context for the exiting entity"
+    );
+}
+
+#[test]
+fn multiple_entities_can_trigger_tile_events_independently() {
+    let mut state = GameState::new_empty();
+    let _player_id = state.spawn_player_at(IVec2::new(0, 0)); // Tile (0, 0)
+    let _npc_id = state.spawn_player_like_npc(IVec2::new(0, 16)); // Tile (0, 1)
+
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "enter-tile-1-0",
+            RuleTrigger::OnTileEnter { x: 1, y: 0 },
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "entity_entered".to_string(),
+            }],
+        )],
+    });
+
+    // Initialize tile tracking
+    state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    // Move player to tile (1, 0) - first entry
+    state.handle_key_press(InputKey::Right);
+    let mut first_enter_count = 0;
+    for _ in 0..10 {
+        let result = state.update(
+            UVec2::new(256, 256),
+            &create_test_tilemap(),
+            &create_test_atlas(),
+        );
+        first_enter_count += result
+            .events
+            .iter()
+            .filter(|event| matches!(
+                event,
+                AudioEvent::PlaySound { sound_id, .. } if sound_id == "entity_entered"
+            ))
+            .count();
+    }
+    state.handle_key_release(InputKey::Right);
+
+    // Move player back to tile (0, 0)
+    state.handle_key_press(InputKey::Left);
+    for _ in 0..10 {
+        state.update(
+            UVec2::new(256, 256),
+            &create_test_tilemap(),
+            &create_test_atlas(),
+        );
+    }
+    state.handle_key_release(InputKey::Left);
+
+    // Move player to tile (1, 0) again - second entry
+    state.handle_key_press(InputKey::Right);
+    let mut second_enter_count = 0;
+    for _ in 0..10 {
+        let result = state.update(
+            UVec2::new(256, 256),
+            &create_test_tilemap(),
+            &create_test_atlas(),
+        );
+        second_enter_count += result
+            .events
+            .iter()
+            .filter(|event| matches!(
+                event,
+                AudioEvent::PlaySound { sound_id, .. } if sound_id == "entity_entered"
+            ))
+            .count();
+    }
+
+    assert_eq!(
+        first_enter_count, 1,
+        "First entry to tile should trigger OnTileEnter"
+    );
+    assert_eq!(
+        second_enter_count, 1,
+        "Second entry to same tile should also trigger OnTileEnter"
+    );
+}

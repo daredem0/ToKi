@@ -244,6 +244,54 @@
                   }
                 }
               }
+            },
+            {
+              "type": "object",
+              "required": ["OnTileEnter"],
+              "additionalProperties": false,
+              "properties": {
+                "OnTileEnter": {
+                  "type": "object",
+                  "required": ["x", "y"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Tile x-coordinate (in tile units, not pixels)"
+                    },
+                    "y": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Tile y-coordinate (in tile units, not pixels)"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["OnTileExit"],
+              "additionalProperties": false,
+              "properties": {
+                "OnTileExit": {
+                  "type": "object",
+                  "required": ["x", "y"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Tile x-coordinate (in tile units, not pixels)"
+                    },
+                    "y": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Tile y-coordinate (in tile units, not pixels)"
+                    }
+                  }
+                }
+              }
             }
           ],
           "description": "Event that triggers this rule"

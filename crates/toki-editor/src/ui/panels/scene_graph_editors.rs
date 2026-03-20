@@ -27,6 +27,8 @@ impl PanelSystem {
             } => {
                 format!("OnInteract({})", Self::target_label(target))
             }
+            RuleTrigger::OnTileEnter { x, y } => format!("OnTileEnter({}, {})", x, y),
+            RuleTrigger::OnTileExit { x, y } => format!("OnTileExit({}, {})", x, y),
         }
     }
 
@@ -158,6 +160,8 @@ impl PanelSystem {
             RuleTrigger::OnDeath { .. } => GraphTriggerKind::Death,
             RuleTrigger::OnTrigger => GraphTriggerKind::Trigger,
             RuleTrigger::OnInteract { .. } => GraphTriggerKind::Interact,
+            RuleTrigger::OnTileEnter { .. } => GraphTriggerKind::TileEnter,
+            RuleTrigger::OnTileExit { .. } => GraphTriggerKind::TileExit,
         }
     }
 
@@ -172,6 +176,8 @@ impl PanelSystem {
             GraphTriggerKind::Death => "OnDeath",
             GraphTriggerKind::Trigger => "OnTrigger",
             GraphTriggerKind::Interact => "OnInteract",
+            GraphTriggerKind::TileEnter => "OnTileEnter",
+            GraphTriggerKind::TileExit => "OnTileExit",
         }
     }
 
@@ -189,6 +195,8 @@ impl PanelSystem {
                 mode: toki_core::rules::InteractionMode::default(),
                 entity: None,
             },
+            GraphTriggerKind::TileEnter => RuleTrigger::OnTileEnter { x: 0, y: 0 },
+            GraphTriggerKind::TileExit => RuleTrigger::OnTileExit { x: 0, y: 0 },
         }
     }
 

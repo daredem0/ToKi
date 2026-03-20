@@ -549,6 +549,8 @@ impl InspectorSystem {
             RuleTrigger::OnDeath { .. } => RuleTriggerKind::Death,
             RuleTrigger::OnTrigger => RuleTriggerKind::Trigger,
             RuleTrigger::OnInteract { .. } => RuleTriggerKind::Interact,
+            RuleTrigger::OnTileEnter { .. } => RuleTriggerKind::TileEnter,
+            RuleTrigger::OnTileExit { .. } => RuleTriggerKind::TileExit,
         }
     }
 
@@ -563,6 +565,8 @@ impl InspectorSystem {
             RuleTriggerKind::Death => "OnDeath",
             RuleTriggerKind::Trigger => "OnTrigger",
             RuleTriggerKind::Interact => "OnInteract",
+            RuleTriggerKind::TileEnter => "OnTileEnter",
+            RuleTriggerKind::TileExit => "OnTileExit",
         }
     }
 
@@ -580,6 +584,8 @@ impl InspectorSystem {
                 mode: toki_core::rules::InteractionMode::default(),
                 entity: None,
             },
+            RuleTriggerKind::TileEnter => RuleTrigger::OnTileEnter { x: 0, y: 0 },
+            RuleTriggerKind::TileExit => RuleTrigger::OnTileExit { x: 0, y: 0 },
         };
     }
 

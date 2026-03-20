@@ -159,6 +159,7 @@ impl GameState {
         self.rule_runtime.frame_damage_events.clear();
         self.rule_runtime.frame_death_events.clear();
         self.rule_runtime.frame_interactions.clear();
+        self.rule_runtime.frame_tile_transitions.clear();
 
         if !self.rule_runtime.started {
             self.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut rule_commands);
@@ -229,6 +230,9 @@ impl GameState {
         // Update NPC AI
         self.update_npc_ai(world_bounds, tilemap, atlas, &mut result);
 
+        // Detect tile transitions after all movement is complete
+        self.detect_tile_transitions(tilemap);
+
         let mut reactive_rule_commands = Vec::new();
         if result.player_moved {
             self.collect_rule_commands_for_trigger(
@@ -261,6 +265,9 @@ impl GameState {
             for event in &interaction_events {
                 self.collect_rule_commands_for_interaction(event, &mut reactive_rule_commands);
             }
+
+            // Fire tile transition triggers
+            self.collect_rule_commands_for_tile_transitions(&mut reactive_rule_commands);
         }
 
         if self.any_entity_overlaps_trigger_tile(tilemap, atlas) {
@@ -334,6 +341,7 @@ impl GameState {
         self.rule_runtime.frame_damage_events.clear();
         self.rule_runtime.frame_death_events.clear();
         self.rule_runtime.frame_interactions.clear();
+        self.rule_runtime.frame_tile_transitions.clear();
 
         if !self.rule_runtime.started {
             self.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut rule_commands);
@@ -374,6 +382,9 @@ impl GameState {
 
         // Update NPC AI
         self.update_npc_ai(world_bounds, tilemap, atlas, &mut result);
+
+        // Detect tile transitions after all movement is complete
+        self.detect_tile_transitions(tilemap);
 
         let mut reactive_rule_commands: Vec<rules::RuleCommand> = Vec::new();
         self.collect_reactive_rule_commands(&result, tilemap, atlas, &mut reactive_rule_commands);
@@ -478,6 +489,9 @@ impl GameState {
         for event in &interaction_events {
             self.collect_rule_commands_for_interaction(event, reactive_rule_commands);
         }
+
+        // Fire tile transition triggers
+        self.collect_rule_commands_for_tile_transitions(reactive_rule_commands);
 
         if self.any_entity_overlaps_trigger_tile(tilemap, atlas) {
             self.collect_rule_commands_for_trigger(RuleTrigger::OnTrigger, reactive_rule_commands);

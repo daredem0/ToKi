@@ -142,6 +142,20 @@ impl InspectorSystem {
                                 Self::trigger_kind_label(RuleTriggerKind::Interact),
                             )
                             .changed();
+                        outcome.changed |= ui
+                            .selectable_value(
+                                &mut trigger_kind,
+                                RuleTriggerKind::TileEnter,
+                                Self::trigger_kind_label(RuleTriggerKind::TileEnter),
+                            )
+                            .changed();
+                        outcome.changed |= ui
+                            .selectable_value(
+                                &mut trigger_kind,
+                                RuleTriggerKind::TileExit,
+                                Self::trigger_kind_label(RuleTriggerKind::TileExit),
+                            )
+                            .changed();
                     });
                     if trigger_kind != Self::trigger_kind(&rule.trigger) {
                         Self::set_rule_trigger_kind(rule, trigger_kind);
@@ -178,6 +192,25 @@ impl InspectorSystem {
                                     .changed();
                             }
                         });
+                    });
+                }
+
+                if let RuleTrigger::OnTileEnter { x, y } | RuleTrigger::OnTileExit { x, y } = &mut rule.trigger {
+                    ui.horizontal(|ui| {
+                        ui.label("Tile X:");
+                        let mut x_val = *x as i32;
+                        if ui.add(egui::DragValue::new(&mut x_val).speed(1.0).range(0..=9999)).changed() {
+                            *x = x_val.max(0) as u32;
+                            outcome.changed = true;
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Tile Y:");
+                        let mut y_val = *y as i32;
+                        if ui.add(egui::DragValue::new(&mut y_val).speed(1.0).range(0..=9999)).changed() {
+                            *y = y_val.max(0) as u32;
+                            outcome.changed = true;
+                        }
                     });
                 }
 

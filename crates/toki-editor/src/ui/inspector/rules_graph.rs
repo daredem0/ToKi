@@ -411,6 +411,8 @@ impl InspectorSystem {
             }
             RuleTrigger::OnTrigger => "OnTrigger".to_string(),
             RuleTrigger::OnInteract { .. } => "OnInteract".to_string(),
+            RuleTrigger::OnTileEnter { x, y } => format!("OnTileEnter({}, {})", x, y),
+            RuleTrigger::OnTileExit { x, y } => format!("OnTileExit({}, {})", x, y),
         }
     }
 
@@ -585,6 +587,8 @@ impl InspectorSystem {
                     mode: toki_core::rules::InteractionMode::default(),
                     entity: None,
                 },
+                RuleTriggerKind::TileEnter => RuleTrigger::OnTileEnter { x: 0, y: 0 },
+                RuleTriggerKind::TileExit => RuleTrigger::OnTileExit { x: 0, y: 0 },
             };
             changed = true;
         }
