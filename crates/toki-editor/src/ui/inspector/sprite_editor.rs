@@ -23,12 +23,24 @@ fn render_tool_palette(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.horizontal(|ui| {
         ui.selectable_value(&mut ui_state.sprite.tool, SpriteEditorTool::Drag, "Drag");
         ui.selectable_value(&mut ui_state.sprite.tool, SpriteEditorTool::Brush, "Brush");
-        ui.selectable_value(&mut ui_state.sprite.tool, SpriteEditorTool::Eraser, "Eraser");
+        ui.selectable_value(
+            &mut ui_state.sprite.tool,
+            SpriteEditorTool::Eraser,
+            "Eraser",
+        );
         ui.selectable_value(&mut ui_state.sprite.tool, SpriteEditorTool::Fill, "Fill");
     });
     ui.horizontal(|ui| {
-        ui.selectable_value(&mut ui_state.sprite.tool, SpriteEditorTool::Eyedropper, "Eyedrop");
-        ui.selectable_value(&mut ui_state.sprite.tool, SpriteEditorTool::Select, "Select");
+        ui.selectable_value(
+            &mut ui_state.sprite.tool,
+            SpriteEditorTool::Eyedropper,
+            "Eyedrop",
+        );
+        ui.selectable_value(
+            &mut ui_state.sprite.tool,
+            SpriteEditorTool::Select,
+            "Select",
+        );
         ui.selectable_value(&mut ui_state.sprite.tool, SpriteEditorTool::Line, "Line");
     });
 }
@@ -120,12 +132,7 @@ fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         }
 
         // Show hex value
-        let hex = format!(
-            "#{:02X}{:02X}{:02X}",
-            color.r(),
-            color.g(),
-            color.b()
-        );
+        let hex = format!("#{:02X}{:02X}{:02X}", color.r(), color.g(), color.b());
         ui.label(hex);
     });
 
@@ -243,7 +250,10 @@ fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             if let Some((cols, rows)) = ui_state.sprite.sheet_cell_count() {
                 let col = cell_idx as u32 % cols;
                 let row = cell_idx as u32 / cols;
-                ui.label(format!("Selected: Cell {} (col {}, row {})", cell_idx, col, row));
+                ui.label(format!(
+                    "Selected: Cell {} (col {}, row {})",
+                    cell_idx, col, row
+                ));
 
                 ui.add_space(4.0);
 

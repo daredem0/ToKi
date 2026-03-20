@@ -2,12 +2,12 @@ use super::editor_ui::EditorUI;
 use super::rule_graph::RuleGraph;
 use crate::project::{Project, ProjectMetadata, SceneGraphLayout};
 use glam::IVec2;
+use std::fs;
+use std::path::PathBuf;
 use toki_core::entity::{Entity, EntityId};
 use toki_core::menu::MenuSettings;
 use toki_core::rules::RuleSet;
 use toki_core::Scene;
-use std::fs;
-use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default)]
 pub struct UndoRedoHistory {

@@ -413,14 +413,14 @@ pub struct SpriteEditorState {
     pub selected_cell: Option<usize>,
     /// Show new canvas dialog
     pub show_new_canvas_dialog: bool,
-    /// New canvas dialog: width
-    pub new_canvas_width: u32,
-    /// New canvas dialog: height
-    pub new_canvas_height: u32,
-    /// New canvas dialog: cell width (for sheets)
-    pub new_canvas_cell_width: u32,
-    /// New canvas dialog: cell height (for sheets)
-    pub new_canvas_cell_height: u32,
+    /// New canvas dialog: sprite width (each cell/sprite's width)
+    pub new_sprite_width: u32,
+    /// New canvas dialog: sprite height (each cell/sprite's height)
+    pub new_sprite_height: u32,
+    /// New canvas dialog: number of columns (for sheets)
+    pub new_sheet_cols: u32,
+    /// New canvas dialog: number of rows (for sheets)
+    pub new_sheet_rows: u32,
     /// New canvas dialog: create as sheet
     pub new_canvas_is_sheet: bool,
     /// Whether to show the sheet cell grid overlay
@@ -447,6 +447,12 @@ pub struct SpriteEditorState {
     pub warning_message: String,
     /// Pending action after warning confirmation
     pub pending_warning_action: Option<WarningAction>,
+    /// Show the load sprite dialog
+    pub show_load_dialog: bool,
+    /// Discovered sprite assets in project
+    pub discovered_assets: Vec<DiscoveredSpriteAsset>,
+    /// Selected asset index in the load dialog
+    pub selected_asset_index: Option<usize>,
 }
 
 /// Actions that require warning confirmation
@@ -457,6 +463,19 @@ pub enum WarningAction {
     ClearCell(usize),
     /// Change cell grid size (may cause data loss)
     ChangeCellSize { new_width: u32, new_height: u32 },
+}
+
+/// Discovered sprite asset in the project
+#[derive(Debug, Clone)]
+pub struct DiscoveredSpriteAsset {
+    /// Asset name (filename without extension)
+    pub name: String,
+    /// Full path to JSON metadata file
+    pub json_path: std::path::PathBuf,
+    /// Full path to PNG image file
+    pub png_path: std::path::PathBuf,
+    /// Asset kind (atlas or object sheet)
+    pub kind: SpriteAssetKind,
 }
 
 impl Default for SpriteEditorState {
@@ -481,10 +500,10 @@ impl Default for SpriteEditorState {
             cell_size: glam::UVec2::new(16, 16),
             selected_cell: None,
             show_new_canvas_dialog: false,
-            new_canvas_width: 16,
-            new_canvas_height: 16,
-            new_canvas_cell_width: 16,
-            new_canvas_cell_height: 16,
+            new_sprite_width: 16,
+            new_sprite_height: 16,
+            new_sheet_cols: 4,
+            new_sheet_rows: 4,
             new_canvas_is_sheet: false,
             show_cell_grid: false,
             line_start_pos: None,
@@ -498,6 +517,9 @@ impl Default for SpriteEditorState {
             show_warning_dialog: false,
             warning_message: String::new(),
             pending_warning_action: None,
+            show_load_dialog: false,
+            discovered_assets: Vec::new(),
+            selected_asset_index: None,
         }
     }
 }
@@ -800,6 +822,114 @@ impl SpriteEditorState {
         }
     }
 
+    /// Open the load dialog and scan for assets
+    pub fn begin_load_dialog(&mut self, sprites_dir: &std::path::Path) {
+        self.discovered_assets = Self::scan_sprite_assets(sprites_dir);
+        self.selected_asset_index = None;
+        self.show_load_dialog = true;
+    }
+
+    /// Scan a sprites directory for available sprite assets
+    pub fn scan_sprite_assets(sprites_dir: &std::path::Path) -> Vec<DiscoveredSpriteAsset> {
+        use toki_core::project_assets::{classify_sprite_metadata_file, SpriteMetadataFileKind};
+
+        let mut assets = Vec::new();
+
+        let Ok(entries) = std::fs::read_dir(sprites_dir) else {
+            return assets;
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let Some(ext) = path.extension() else {
+                continue;
+            };
+            if ext != "json" {
+                continue;
+            }
+
+            let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+
+            // Check for matching PNG file
+            let png_path = sprites_dir.join(format!("{stem}.png"));
+            if !png_path.exists() {
+                continue;
+            }
+
+            // Classify the JSON file
+            let kind = match classify_sprite_metadata_file(&path) {
+                Ok(SpriteMetadataFileKind::Atlas) => SpriteAssetKind::TileAtlas,
+                Ok(SpriteMetadataFileKind::ObjectSheet) => SpriteAssetKind::ObjectSheet,
+                _ => continue,
+            };
+
+            assets.push(DiscoveredSpriteAsset {
+                name: stem.to_string(),
+                json_path: path,
+                png_path,
+                kind,
+            });
+        }
+
+        // Sort by name
+        assets.sort_by(|a, b| a.name.cmp(&b.name));
+        assets
+    }
+
+    /// Load an existing sprite asset into the canvas
+    pub fn load_sprite_asset(&mut self, asset: &DiscoveredSpriteAsset) -> Result<(), String> {
+        use toki_core::assets::atlas::AtlasMeta;
+        use toki_core::assets::object_sheet::ObjectSheetMeta;
+        use toki_core::graphics::image::load_image_rgba8;
+
+        // Load the PNG image
+        let decoded =
+            load_image_rgba8(&asset.png_path).map_err(|e| format!("Failed to load image: {e}"))?;
+
+        // Create canvas from image data
+        let canvas = SpriteCanvas::from_rgba(decoded.width, decoded.height, decoded.data)
+            .ok_or_else(|| "Failed to create canvas from image data".to_string())?;
+
+        // Load metadata to get cell size
+        let (cell_size, is_sheet) = match asset.kind {
+            SpriteAssetKind::TileAtlas => {
+                let meta = AtlasMeta::load_from_file(&asset.json_path)
+                    .map_err(|e| format!("Failed to load atlas metadata: {e}"))?;
+                let is_sheet = meta.tiles.len() > 1;
+                (meta.tile_size, is_sheet)
+            }
+            SpriteAssetKind::ObjectSheet => {
+                let meta = ObjectSheetMeta::load_from_file(&asset.json_path)
+                    .map_err(|e| format!("Failed to load object sheet metadata: {e}"))?;
+                let is_sheet = meta.objects.len() > 1;
+                (meta.tile_size, is_sheet)
+            }
+        };
+
+        // Update state
+        self.canvas = Some(canvas);
+        self.active_sprite = Some(asset.json_path.to_string_lossy().to_string());
+        self.asset_kind = Some(asset.kind);
+        self.save_asset_name = asset.name.clone();
+        self.save_asset_kind = asset.kind;
+        self.cell_size = cell_size;
+        self.show_cell_grid = is_sheet;
+        self.dirty = false;
+        self.history.clear();
+        self.selection = None;
+        self.canvas_texture = None;
+        self.viewport = SpriteCanvasViewport::default();
+        self.selected_cell = None;
+        self.show_load_dialog = false;
+
+        Ok(())
+    }
+
     /// Save the current canvas as a sprite asset.
     /// Returns Ok(()) on success, Err with message on failure.
     pub fn save_as_asset(&mut self, sprites_dir: &std::path::Path) -> Result<(), String> {
@@ -815,7 +945,9 @@ impl SpriteEditorState {
 
         // Validate name (alphanumeric and underscores only)
         if !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
-            return Err("Asset name can only contain letters, numbers, and underscores".to_string());
+            return Err(
+                "Asset name can only contain letters, numbers, and underscores".to_string(),
+            );
         }
 
         // Ensure sprites directory exists
@@ -845,7 +977,10 @@ impl SpriteEditorState {
                     AtlasMeta::new_grid(&png_filename, self.cell_size, cols, rows)
                 } else {
                     // Single tile atlas
-                    AtlasMeta::new_single_tile(&png_filename, UVec2::new(canvas.width, canvas.height))
+                    AtlasMeta::new_single_tile(
+                        &png_filename,
+                        UVec2::new(canvas.width, canvas.height),
+                    )
                 };
                 meta.save_to_file(&json_path)
                     .map_err(|e| format!("Failed to save metadata: {e}"))?;
@@ -875,6 +1010,53 @@ impl SpriteEditorState {
 
         Ok(())
     }
+
+    /// Import an external image file (png, jpg, bmp) into the canvas
+    pub fn import_external_image(&mut self, path: &std::path::Path) -> Result<(), String> {
+        use toki_core::graphics::image::load_image_rgba8;
+
+        // Load the image
+        let decoded = load_image_rgba8(path).map_err(|e| format!("Failed to load image: {e}"))?;
+
+        // Create canvas from image data
+        let canvas = SpriteCanvas::from_rgba(decoded.width, decoded.height, decoded.data)
+            .ok_or_else(|| "Failed to create canvas from image data".to_string())?;
+
+        // Update state - treat as new unsaved sprite
+        self.canvas = Some(canvas);
+        self.active_sprite = None;
+        self.asset_kind = None;
+        self.save_asset_name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("imported")
+            .to_string();
+        self.cell_size = glam::UVec2::new(decoded.width, decoded.height);
+        self.show_cell_grid = false;
+        self.dirty = true; // Mark as needing save
+        self.history.clear();
+        self.selection = None;
+        self.canvas_texture = None;
+        self.viewport = SpriteCanvasViewport::default();
+        self.selected_cell = None;
+
+        Ok(())
+    }
+
+    /// Export the current canvas as PNG
+    pub fn export_as_png(&self, path: &std::path::Path) -> Result<(), String> {
+        let canvas = self.canvas.as_ref().ok_or("No canvas to export")?;
+
+        toki_core::graphics::image::save_image_rgba8(
+            path,
+            canvas.width,
+            canvas.height,
+            canvas.pixels(),
+        )
+        .map_err(|e| format!("Failed to save image: {e}"))?;
+
+        Ok(())
+    }
 }
 
 impl EditorUI {
@@ -886,8 +1068,8 @@ impl EditorUI {
     /// Submit new canvas creation request
     #[allow(dead_code)]
     pub fn submit_new_sprite_canvas(&mut self) {
-        let width = self.sprite.new_canvas_width.max(1);
-        let height = self.sprite.new_canvas_height.max(1);
+        let width = self.sprite.new_sprite_width.max(1);
+        let height = self.sprite.new_sprite_height.max(1);
         self.sprite.new_canvas(width, height);
         self.sprite.show_new_canvas_dialog = false;
     }

@@ -643,11 +643,13 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
     });
     scene.entities.push(solid_entity(77, IVec2::new(16, 32)));
 
-    let game_state =
-        EditorApp::build_scene_preview_game_state(&scene, Some(&mut project_assets))
-            .expect("scene preview game state should build");
+    let game_state = EditorApp::build_scene_preview_game_state(&scene, Some(&mut project_assets))
+        .expect("scene preview game state should build");
 
-    assert_eq!(game_state.active_scene().map(|scene| scene.name.as_str()), Some("Main Scene"));
+    assert_eq!(
+        game_state.active_scene().map(|scene| scene.name.as_str()),
+        Some("Main Scene")
+    );
     assert!(game_state.player_entity().is_some());
     assert!(
         game_state

@@ -118,11 +118,16 @@ impl InspectorSystem {
                     });
                 }
 
-                if let RuleTrigger::OnTileEnter { x, y } | RuleTrigger::OnTileExit { x, y } = &mut rule.trigger {
+                if let RuleTrigger::OnTileEnter { x, y } | RuleTrigger::OnTileExit { x, y } =
+                    &mut rule.trigger
+                {
                     ui.horizontal(|ui| {
                         ui.label("Tile X:");
                         let mut x_val = *x as i32;
-                        if ui.add(egui::DragValue::new(&mut x_val).speed(1.0).range(0..=9999)).changed() {
+                        if ui
+                            .add(egui::DragValue::new(&mut x_val).speed(1.0).range(0..=9999))
+                            .changed()
+                        {
                             *x = x_val.max(0) as u32;
                             outcome.changed = true;
                         }
@@ -132,7 +137,10 @@ impl InspectorSystem {
                         if *x >= map_width {
                             ui.colored_label(
                                 egui::Color32::from_rgb(255, 150, 80),
-                                format!("⚠ X coordinate {} is out of bounds (map width: {})", *x, map_width),
+                                format!(
+                                    "⚠ X coordinate {} is out of bounds (map width: {})",
+                                    *x, map_width
+                                ),
                             );
                         }
                     }
@@ -140,7 +148,10 @@ impl InspectorSystem {
                     ui.horizontal(|ui| {
                         ui.label("Tile Y:");
                         let mut y_val = *y as i32;
-                        if ui.add(egui::DragValue::new(&mut y_val).speed(1.0).range(0..=9999)).changed() {
+                        if ui
+                            .add(egui::DragValue::new(&mut y_val).speed(1.0).range(0..=9999))
+                            .changed()
+                        {
                             *y = y_val.max(0) as u32;
                             outcome.changed = true;
                         }
@@ -150,7 +161,10 @@ impl InspectorSystem {
                         if *y >= map_height {
                             ui.colored_label(
                                 egui::Color32::from_rgb(255, 150, 80),
-                                format!("⚠ Y coordinate {} is out of bounds (map height: {})", *y, map_height),
+                                format!(
+                                    "⚠ Y coordinate {} is out of bounds (map height: {})",
+                                    *y, map_height
+                                ),
                             );
                         }
                     }
@@ -676,7 +690,10 @@ impl InspectorSystem {
             RuleCondition::TriggerOtherIsKind { kind } => {
                 changed |= Self::render_entity_kind_editor(
                     ui,
-                    &format!("rule_condition_other_kind_{}_{}", rule_index, condition_index),
+                    &format!(
+                        "rule_condition_other_kind_{}_{}",
+                        rule_index, condition_index
+                    ),
                     kind,
                 );
             }

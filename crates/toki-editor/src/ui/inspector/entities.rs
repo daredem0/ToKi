@@ -77,17 +77,15 @@ impl InspectorSystem {
         changed |= ui.checkbox(&mut draft.visible, "Visible").changed();
         changed |= ui.checkbox(&mut draft.active, "Active").changed();
         changed |= ui.checkbox(&mut draft.solid, "Solid").changed();
-        changed |= ui.checkbox(&mut draft.interactable, "Interactable").changed();
+        changed |= ui
+            .checkbox(&mut draft.interactable, "Interactable")
+            .changed();
         if draft.interactable {
             ui.horizontal(|ui| {
                 ui.label("Interaction Reach:");
                 let mut value = draft.interaction_reach as i64;
                 if ui
-                    .add(
-                        egui::DragValue::new(&mut value)
-                            .speed(1.0)
-                            .range(0..=256),
-                    )
+                    .add(egui::DragValue::new(&mut value).speed(1.0).range(0..=256))
                     .changed()
                 {
                     draft.interaction_reach = value as u32;

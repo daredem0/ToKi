@@ -13,11 +13,11 @@ use chrono::Utc;
 use std::collections::{HashMap, HashSet};
 use toki_core::animation::AnimationState;
 use toki_core::assets::object_sheet::ObjectSheetMeta;
+use toki_core::entity::EntityKind;
 use toki_core::entity::{
     AiBehavior, AiConfig, ControlRole, MovementProfile, MovementSoundTrigger, ATTACK_POWER_STAT_ID,
     HEALTH_STAT_ID,
 };
-use toki_core::entity::EntityKind;
 use toki_core::rules::{
     InteractionMode, Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel,
     RuleSpawnEntityType, RuleTarget, RuleTrigger,

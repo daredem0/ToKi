@@ -8,15 +8,21 @@ impl PanelSystem {
             RuleTrigger::OnPlayerMove => "OnPlayerMove".to_string(),
             RuleTrigger::OnKey { key } => format!("OnKey({})", Self::key_label(key)),
             RuleTrigger::OnCollision { entity: None } => "OnCollision".to_string(),
-            RuleTrigger::OnCollision { entity: Some(target) } => {
+            RuleTrigger::OnCollision {
+                entity: Some(target),
+            } => {
                 format!("OnCollision({})", Self::target_label(target))
             }
             RuleTrigger::OnDamaged { entity: None } => "OnDamaged".to_string(),
-            RuleTrigger::OnDamaged { entity: Some(target) } => {
+            RuleTrigger::OnDamaged {
+                entity: Some(target),
+            } => {
                 format!("OnDamaged({})", Self::target_label(target))
             }
             RuleTrigger::OnDeath { entity: None } => "OnDeath".to_string(),
-            RuleTrigger::OnDeath { entity: Some(target) } => {
+            RuleTrigger::OnDeath {
+                entity: Some(target),
+            } => {
                 format!("OnDeath({})", Self::target_label(target))
             }
             RuleTrigger::OnTrigger => "OnTrigger".to_string(),
@@ -47,10 +53,18 @@ impl PanelSystem {
                 )
             }
             RuleCondition::HealthBelow { target, threshold } => {
-                format!("HealthBelow({}, {})", Self::target_label(*target), threshold)
+                format!(
+                    "HealthBelow({}, {})",
+                    Self::target_label(*target),
+                    threshold
+                )
             }
             RuleCondition::HealthAbove { target, threshold } => {
-                format!("HealthAbove({}, {})", Self::target_label(*target), threshold)
+                format!(
+                    "HealthAbove({}, {})",
+                    Self::target_label(*target),
+                    threshold
+                )
             }
             RuleCondition::TriggerOtherIsPlayer => "TriggerOtherIsPlayer".to_string(),
             RuleCondition::EntityIsKind { target, kind } => {
@@ -304,9 +318,9 @@ impl PanelSystem {
                 target: RuleTarget::Player,
                 tag: String::new(),
             },
-            GraphConditionKind::TriggerOtherHasTag => RuleCondition::TriggerOtherHasTag {
-                tag: String::new(),
-            },
+            GraphConditionKind::TriggerOtherHasTag => {
+                RuleCondition::TriggerOtherHasTag { tag: String::new() }
+            }
             GraphConditionKind::HasInventoryItem => RuleCondition::HasInventoryItem {
                 target: RuleTarget::Player,
                 item_id: String::new(),

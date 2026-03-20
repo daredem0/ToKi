@@ -417,7 +417,11 @@ fn sprite_editor_state_undo_redo_integration() {
     state.new_canvas(4, 4);
 
     let before = state.canvas.clone().unwrap();
-    state.canvas.as_mut().unwrap().set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
+    state
+        .canvas
+        .as_mut()
+        .unwrap()
+        .set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
     state.push_undo_state(before);
 
     // Check pixel was changed
@@ -468,4 +472,235 @@ fn sprite_editor_state_recent_colors() {
     state.add_recent_color(color2);
     assert_eq!(state.recent_colors[0], color2);
     assert_eq!(state.recent_colors.len(), 3);
+}
+
+// ============================================================================
+// Import/Export Tests
+// ============================================================================
+
+fn create_test_png(path: &std::path::Path, width: u32, height: u32, data: &[u8]) {
+    toki_core::graphics::image::save_image_rgba8(path, width, height, data).unwrap();
+}
+
+#[test]
+fn sprite_editor_state_import_external_image() {
+    use tempfile::tempdir;
+
+    let temp = tempdir().unwrap();
+
+    // Create a simple 2x2 PNG image
+    let png_path = temp.path().join("test.png");
+    let pixel_data = vec![
+        255, 0, 0, 255, // Red
+        0, 255, 0, 255, // Green
+        0, 0, 255, 255, // Blue
+        255, 255, 0, 255, // Yellow
+    ];
+    create_test_png(&png_path, 2, 2, &pixel_data);
+
+    let mut state = SpriteEditorState::default();
+    let result = state.import_external_image(&png_path);
+
+    assert!(result.is_ok(), "Import should succeed");
+    assert!(state.has_canvas());
+    assert!(state.dirty); // Should be marked dirty since it's newly imported
+
+    let (w, h) = state.canvas_dimensions().unwrap();
+    assert_eq!(w, 2);
+    assert_eq!(h, 2);
+
+    // Check that name is derived from filename
+    assert_eq!(state.save_asset_name, "test");
+}
+
+#[test]
+fn sprite_editor_state_import_nonexistent_file_fails() {
+    let mut state = SpriteEditorState::default();
+    let result = state.import_external_image(std::path::Path::new("/nonexistent/path/file.png"));
+
+    assert!(result.is_err());
+    assert!(!state.has_canvas());
+}
+
+#[test]
+fn sprite_editor_state_export_as_png() {
+    use tempfile::tempdir;
+
+    let temp = tempdir().unwrap();
+    let png_path = temp.path().join("export.png");
+
+    // Create a canvas with some content
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(4, 4);
+
+    // Draw a red pixel
+    if let Some(canvas) = &mut state.canvas {
+        canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
+    }
+
+    let result = state.export_as_png(&png_path);
+    assert!(result.is_ok(), "Export should succeed");
+    assert!(png_path.exists(), "PNG file should exist");
+
+    // Verify file size is reasonable (non-empty)
+    let metadata = std::fs::metadata(&png_path).unwrap();
+    assert!(metadata.len() > 0, "PNG file should not be empty");
+}
+
+#[test]
+fn sprite_editor_state_export_without_canvas_fails() {
+    use tempfile::tempdir;
+
+    let temp = tempdir().unwrap();
+    let png_path = temp.path().join("export.png");
+
+    let state = SpriteEditorState::default();
+    let result = state.export_as_png(&png_path);
+
+    assert!(result.is_err());
+    assert!(!png_path.exists());
+}
+
+// ============================================================================
+// Asset Discovery Tests
+// ============================================================================
+
+#[test]
+fn sprite_editor_state_scan_sprite_assets_empty_dir() {
+    use tempfile::tempdir;
+
+    let temp = tempdir().unwrap();
+    let assets = SpriteEditorState::scan_sprite_assets(temp.path());
+
+    assert!(assets.is_empty());
+}
+
+#[test]
+fn sprite_editor_state_scan_sprite_assets_finds_atlas() {
+    use tempfile::tempdir;
+
+    let temp = tempdir().unwrap();
+
+    // Create a valid atlas JSON
+    let json_content = r#"{
+        "image": "test.png",
+        "tile_size": [16, 16],
+        "tiles": {
+            "default": {
+                "position": [0, 0],
+                "properties": { "solid": false }
+            }
+        }
+    }"#;
+    std::fs::write(temp.path().join("test.json"), json_content).unwrap();
+
+    // Create a matching PNG
+    create_test_png(
+        &temp.path().join("test.png"),
+        16,
+        16,
+        &vec![0u8; 16 * 16 * 4],
+    );
+
+    let assets = SpriteEditorState::scan_sprite_assets(temp.path());
+
+    assert_eq!(assets.len(), 1);
+    assert_eq!(assets[0].name, "test");
+    assert_eq!(assets[0].kind, SpriteAssetKind::TileAtlas);
+}
+
+#[test]
+fn sprite_editor_state_scan_sprite_assets_finds_object_sheet() {
+    use tempfile::tempdir;
+
+    let temp = tempdir().unwrap();
+
+    // Create a valid object sheet JSON
+    let json_content = r#"{
+        "sheet_type": "objects",
+        "image": "objects.png",
+        "tile_size": [32, 32],
+        "objects": {
+            "object_0": {
+                "position": [0, 0],
+                "size_tiles": [1, 1]
+            }
+        }
+    }"#;
+    std::fs::write(temp.path().join("objects.json"), json_content).unwrap();
+
+    // Create a matching PNG
+    create_test_png(
+        &temp.path().join("objects.png"),
+        32,
+        32,
+        &vec![0u8; 32 * 32 * 4],
+    );
+
+    let assets = SpriteEditorState::scan_sprite_assets(temp.path());
+
+    assert_eq!(assets.len(), 1);
+    assert_eq!(assets[0].name, "objects");
+    assert_eq!(assets[0].kind, SpriteAssetKind::ObjectSheet);
+}
+
+#[test]
+fn sprite_editor_state_scan_sprite_assets_ignores_json_without_png() {
+    use tempfile::tempdir;
+
+    let temp = tempdir().unwrap();
+
+    // Create a valid atlas JSON but no PNG
+    let json_content = r#"{
+        "image": "missing.png",
+        "tile_size": [16, 16],
+        "tiles": {}
+    }"#;
+    std::fs::write(temp.path().join("missing.json"), json_content).unwrap();
+
+    let assets = SpriteEditorState::scan_sprite_assets(temp.path());
+
+    assert!(assets.is_empty());
+}
+
+#[test]
+fn sprite_editor_state_load_sprite_asset() {
+    use tempfile::tempdir;
+
+    let temp = tempdir().unwrap();
+
+    // Create a valid atlas with 2x2 grid
+    let json_content = r#"{
+        "image": "sprite.png",
+        "tile_size": [8, 8],
+        "tiles": {
+            "tile_0": { "position": [0, 0], "properties": { "solid": false } },
+            "tile_1": { "position": [1, 0], "properties": { "solid": false } },
+            "tile_2": { "position": [0, 1], "properties": { "solid": false } },
+            "tile_3": { "position": [1, 1], "properties": { "solid": false } }
+        }
+    }"#;
+    std::fs::write(temp.path().join("sprite.json"), json_content).unwrap();
+
+    // Create a 16x16 PNG (2x2 tiles of 8x8)
+    create_test_png(
+        &temp.path().join("sprite.png"),
+        16,
+        16,
+        &vec![128u8; 16 * 16 * 4],
+    );
+
+    let mut state = SpriteEditorState::default();
+    let assets = SpriteEditorState::scan_sprite_assets(temp.path());
+
+    assert_eq!(assets.len(), 1);
+
+    let result = state.load_sprite_asset(&assets[0]);
+    assert!(result.is_ok());
+    assert!(state.has_canvas());
+    assert!(!state.dirty); // Should not be dirty - loaded from file
+    assert!(state.show_cell_grid); // Should show grid for multi-tile sprite
+    assert_eq!(state.cell_size.x, 8);
+    assert_eq!(state.cell_size.y, 8);
+    assert_eq!(state.save_asset_name, "sprite");
 }

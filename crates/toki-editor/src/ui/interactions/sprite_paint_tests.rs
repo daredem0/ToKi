@@ -40,8 +40,12 @@ fn brush_footprint_bounds_clips_to_canvas_edge() {
 #[test]
 fn brush_footprint_bounds_out_of_bounds_returns_none() {
     let canvas = create_test_canvas(8, 8);
-    assert!(SpritePaintInteraction::brush_footprint_bounds(&canvas, IVec2::new(-1, 4), 1).is_none());
-    assert!(SpritePaintInteraction::brush_footprint_bounds(&canvas, IVec2::new(4, -1), 1).is_none());
+    assert!(
+        SpritePaintInteraction::brush_footprint_bounds(&canvas, IVec2::new(-1, 4), 1).is_none()
+    );
+    assert!(
+        SpritePaintInteraction::brush_footprint_bounds(&canvas, IVec2::new(4, -1), 1).is_none()
+    );
     assert!(SpritePaintInteraction::brush_footprint_bounds(&canvas, IVec2::new(8, 4), 1).is_none());
     assert!(SpritePaintInteraction::brush_footprint_bounds(&canvas, IVec2::new(4, 8), 1).is_none());
 }
@@ -54,7 +58,11 @@ fn brush_footprint_bounds_out_of_bounds_returns_none() {
 fn paint_pixel_sets_color() {
     let mut canvas = create_test_canvas(8, 8);
     let color = PixelColor::rgb(255, 0, 0);
-    assert!(SpritePaintInteraction::paint_pixel(&mut canvas, IVec2::new(4, 4), color));
+    assert!(SpritePaintInteraction::paint_pixel(
+        &mut canvas,
+        IVec2::new(4, 4),
+        color
+    ));
     assert_eq!(canvas.get_pixel(4, 4), Some(color));
 }
 
@@ -62,8 +70,16 @@ fn paint_pixel_sets_color() {
 fn paint_pixel_negative_coords_returns_false() {
     let mut canvas = create_test_canvas(8, 8);
     let color = PixelColor::rgb(255, 0, 0);
-    assert!(!SpritePaintInteraction::paint_pixel(&mut canvas, IVec2::new(-1, 4), color));
-    assert!(!SpritePaintInteraction::paint_pixel(&mut canvas, IVec2::new(4, -1), color));
+    assert!(!SpritePaintInteraction::paint_pixel(
+        &mut canvas,
+        IVec2::new(-1, 4),
+        color
+    ));
+    assert!(!SpritePaintInteraction::paint_pixel(
+        &mut canvas,
+        IVec2::new(4, -1),
+        color
+    ));
 }
 
 // ============================================================================
@@ -74,7 +90,12 @@ fn paint_pixel_negative_coords_returns_false() {
 fn paint_brush_paints_area() {
     let mut canvas = create_test_canvas(8, 8);
     let color = PixelColor::rgb(0, 255, 0);
-    assert!(SpritePaintInteraction::paint_brush(&mut canvas, IVec2::new(4, 4), color, 3));
+    assert!(SpritePaintInteraction::paint_brush(
+        &mut canvas,
+        IVec2::new(4, 4),
+        color,
+        3
+    ));
 
     // Check 3x3 area is painted
     for y in 3..6 {
@@ -94,7 +115,11 @@ fn paint_brush_paints_area() {
 #[test]
 fn erase_brush_sets_transparent() {
     let mut canvas = SpriteCanvas::filled(8, 8, PixelColor::rgb(255, 255, 255));
-    assert!(SpritePaintInteraction::erase_brush(&mut canvas, IVec2::new(4, 4), 1));
+    assert!(SpritePaintInteraction::erase_brush(
+        &mut canvas,
+        IVec2::new(4, 4),
+        1
+    ));
     assert_eq!(canvas.get_pixel(4, 4), Some(PixelColor::transparent()));
 }
 
@@ -107,12 +132,20 @@ fn flood_fill_fills_connected_region() {
     let mut canvas = create_test_canvas(8, 8);
     let fill_color = PixelColor::rgb(255, 0, 0);
 
-    assert!(SpritePaintInteraction::flood_fill(&mut canvas, IVec2::new(0, 0), fill_color));
+    assert!(SpritePaintInteraction::flood_fill(
+        &mut canvas,
+        IVec2::new(0, 0),
+        fill_color
+    ));
 
     // Entire canvas should be filled
     for y in 0..8 {
         for x in 0..8 {
-            assert_eq!(canvas.get_pixel(x, y), Some(fill_color), "Pixel at ({x}, {y})");
+            assert_eq!(
+                canvas.get_pixel(x, y),
+                Some(fill_color),
+                "Pixel at ({x}, {y})"
+            );
         }
     }
 }
@@ -129,12 +162,20 @@ fn flood_fill_respects_boundaries() {
     }
 
     // Fill left side
-    assert!(SpritePaintInteraction::flood_fill(&mut canvas, IVec2::new(0, 0), fill_color));
+    assert!(SpritePaintInteraction::flood_fill(
+        &mut canvas,
+        IVec2::new(0, 0),
+        fill_color
+    ));
 
     // Left side should be filled
     for y in 0..8 {
         for x in 0..4 {
-            assert_eq!(canvas.get_pixel(x, y), Some(fill_color), "Left side ({x}, {y})");
+            assert_eq!(
+                canvas.get_pixel(x, y),
+                Some(fill_color),
+                "Left side ({x}, {y})"
+            );
         }
     }
 
@@ -151,7 +192,11 @@ fn flood_fill_respects_boundaries() {
 
     // Barrier should be unchanged
     for y in 0..8 {
-        assert_eq!(canvas.get_pixel(4, y), Some(barrier_color), "Barrier at y={y}");
+        assert_eq!(
+            canvas.get_pixel(4, y),
+            Some(barrier_color),
+            "Barrier at y={y}"
+        );
     }
 }
 
@@ -159,15 +204,27 @@ fn flood_fill_respects_boundaries() {
 fn flood_fill_same_color_returns_false() {
     let mut canvas = SpriteCanvas::filled(8, 8, PixelColor::rgb(255, 0, 0));
     let fill_color = PixelColor::rgb(255, 0, 0);
-    assert!(!SpritePaintInteraction::flood_fill(&mut canvas, IVec2::new(0, 0), fill_color));
+    assert!(!SpritePaintInteraction::flood_fill(
+        &mut canvas,
+        IVec2::new(0, 0),
+        fill_color
+    ));
 }
 
 #[test]
 fn flood_fill_out_of_bounds_returns_false() {
     let mut canvas = create_test_canvas(8, 8);
     let fill_color = PixelColor::rgb(255, 0, 0);
-    assert!(!SpritePaintInteraction::flood_fill(&mut canvas, IVec2::new(-1, 0), fill_color));
-    assert!(!SpritePaintInteraction::flood_fill(&mut canvas, IVec2::new(0, -1), fill_color));
+    assert!(!SpritePaintInteraction::flood_fill(
+        &mut canvas,
+        IVec2::new(-1, 0),
+        fill_color
+    ));
+    assert!(!SpritePaintInteraction::flood_fill(
+        &mut canvas,
+        IVec2::new(0, -1),
+        fill_color
+    ));
 }
 
 // ============================================================================

@@ -328,7 +328,8 @@ impl InspectorSystem {
                             issues.push(RuleValidationIssue {
                                 rule_index,
                                 action_index: Some(action_index),
-                                message: "AddInventoryItem requires a non-empty item id".to_string(),
+                                message: "AddInventoryItem requires a non-empty item id"
+                                    .to_string(),
                             });
                         }
                         if *count == 0 {
@@ -344,7 +345,8 @@ impl InspectorSystem {
                             issues.push(RuleValidationIssue {
                                 rule_index,
                                 action_index: Some(action_index),
-                                message: "RemoveInventoryItem requires a non-empty item id".to_string(),
+                                message: "RemoveInventoryItem requires a non-empty item id"
+                                    .to_string(),
                             });
                         }
                         if *count == 0 {
@@ -534,9 +536,9 @@ impl InspectorSystem {
                 target: RuleTarget::Player,
                 tag: String::new(),
             },
-            RuleConditionKind::TriggerOtherHasTag => RuleCondition::TriggerOtherHasTag {
-                tag: String::new(),
-            },
+            RuleConditionKind::TriggerOtherHasTag => {
+                RuleCondition::TriggerOtherHasTag { tag: String::new() }
+            }
             RuleConditionKind::HasInventoryItem => RuleCondition::HasInventoryItem {
                 target: RuleTarget::Player,
                 item_id: String::new(),

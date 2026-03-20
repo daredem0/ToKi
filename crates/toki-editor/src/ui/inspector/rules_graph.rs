@@ -56,15 +56,25 @@ impl InspectorSystem {
                 ui.label("Trigger");
                 let mut edited_trigger = trigger;
                 // Extract map size for validation if available
-                let map_size = ui_state.scenes.get(scene_index)
+                let map_size = ui_state
+                    .scenes
+                    .get(scene_index)
                     .and_then(|scene| scene.maps.first())
                     .and_then(|map_name| {
                         // Try to get map size from loaded map draft or pending sync
                         if ui_state.map.active_map.as_ref() == Some(map_name) {
-                            ui_state.map.draft.as_ref()
+                            ui_state
+                                .map
+                                .draft
+                                .as_ref()
                                 .map(|draft| (draft.tilemap.size.x, draft.tilemap.size.y))
-                                .or_else(|| ui_state.map.pending_tilemap_sync.as_ref()
-                                    .map(|tm| (tm.size.x, tm.size.y)))
+                                .or_else(|| {
+                                    ui_state
+                                        .map
+                                        .pending_tilemap_sync
+                                        .as_ref()
+                                        .map(|tm| (tm.size.x, tm.size.y))
+                                })
                         } else {
                             None
                         }
@@ -413,15 +423,21 @@ impl InspectorSystem {
             RuleTrigger::OnPlayerMove => "OnPlayerMove".to_string(),
             RuleTrigger::OnKey { key } => format!("OnKey({})", Self::rule_key_label(key)),
             RuleTrigger::OnCollision { entity: None } => "OnCollision".to_string(),
-            RuleTrigger::OnCollision { entity: Some(target) } => {
+            RuleTrigger::OnCollision {
+                entity: Some(target),
+            } => {
                 format!("OnCollision({})", Self::rule_graph_target_summary(target))
             }
             RuleTrigger::OnDamaged { entity: None } => "OnDamaged".to_string(),
-            RuleTrigger::OnDamaged { entity: Some(target) } => {
+            RuleTrigger::OnDamaged {
+                entity: Some(target),
+            } => {
                 format!("OnDamaged({})", Self::rule_graph_target_summary(target))
             }
             RuleTrigger::OnDeath { entity: None } => "OnDeath".to_string(),
-            RuleTrigger::OnDeath { entity: Some(target) } => {
+            RuleTrigger::OnDeath {
+                entity: Some(target),
+            } => {
                 format!("OnDeath({})", Self::rule_graph_target_summary(target))
             }
             RuleTrigger::OnTrigger => "OnTrigger".to_string(),
@@ -556,7 +572,11 @@ impl InspectorSystem {
                 item_id,
                 count,
             } => {
-                let item = if item_id.is_empty() { "<empty>" } else { item_id };
+                let item = if item_id.is_empty() {
+                    "<empty>"
+                } else {
+                    item_id
+                };
                 format!(
                     "AddItem({}, {}, {})",
                     Self::rule_graph_target_summary(*target),
@@ -569,7 +589,11 @@ impl InspectorSystem {
                 item_id,
                 count,
             } => {
-                let item = if item_id.is_empty() { "<empty>" } else { item_id };
+                let item = if item_id.is_empty() {
+                    "<empty>"
+                } else {
+                    item_id
+                };
                 format!(
                     "RemoveItem({}, {}, {})",
                     Self::rule_graph_target_summary(*target),
@@ -669,7 +693,10 @@ impl InspectorSystem {
         if let RuleTrigger::OnInteract { mode, .. } = trigger {
             changed |= Self::render_rule_interaction_mode_editor_with_salt(
                 ui,
-                &format!("graph_node_trigger_interact_mode_{}_{}", scene_name, node_key),
+                &format!(
+                    "graph_node_trigger_interact_mode_{}_{}",
+                    scene_name, node_key
+                ),
                 mode,
             );
         }
@@ -678,28 +705,40 @@ impl InspectorSystem {
         if let RuleTrigger::OnCollision { entity } = trigger {
             changed |= Self::render_optional_entity_filter_editor(
                 ui,
-                &format!("graph_node_trigger_collision_entity_{}_{}", scene_name, node_key),
+                &format!(
+                    "graph_node_trigger_collision_entity_{}_{}",
+                    scene_name, node_key
+                ),
                 entity,
             );
         }
         if let RuleTrigger::OnDamaged { entity } = trigger {
             changed |= Self::render_optional_entity_filter_editor(
                 ui,
-                &format!("graph_node_trigger_damaged_entity_{}_{}", scene_name, node_key),
+                &format!(
+                    "graph_node_trigger_damaged_entity_{}_{}",
+                    scene_name, node_key
+                ),
                 entity,
             );
         }
         if let RuleTrigger::OnDeath { entity } = trigger {
             changed |= Self::render_optional_entity_filter_editor(
                 ui,
-                &format!("graph_node_trigger_death_entity_{}_{}", scene_name, node_key),
+                &format!(
+                    "graph_node_trigger_death_entity_{}_{}",
+                    scene_name, node_key
+                ),
                 entity,
             );
         }
         if let RuleTrigger::OnInteract { entity, .. } = trigger {
             changed |= Self::render_optional_entity_filter_editor(
                 ui,
-                &format!("graph_node_trigger_interact_entity_{}_{}", scene_name, node_key),
+                &format!(
+                    "graph_node_trigger_interact_entity_{}_{}",
+                    scene_name, node_key
+                ),
                 entity,
             );
         }
@@ -722,7 +761,10 @@ impl InspectorSystem {
                 if *x >= map_width {
                     ui.colored_label(
                         egui::Color32::from_rgb(255, 150, 80),
-                        format!("⚠ X coordinate {} is out of bounds (map width: {})", *x, map_width),
+                        format!(
+                            "⚠ X coordinate {} is out of bounds (map width: {})",
+                            *x, map_width
+                        ),
                     );
                 }
             }
@@ -743,7 +785,10 @@ impl InspectorSystem {
                 if *y >= map_height {
                     ui.colored_label(
                         egui::Color32::from_rgb(255, 150, 80),
-                        format!("⚠ Y coordinate {} is out of bounds (map height: {})", *y, map_height),
+                        format!(
+                            "⚠ Y coordinate {} is out of bounds (map height: {})",
+                            *y, map_height
+                        ),
                     );
                 }
             }
@@ -818,7 +863,10 @@ impl InspectorSystem {
             | RuleCondition::HealthAbove { target, threshold } => {
                 changed |= Self::render_rule_target_editor_with_salt(
                     ui,
-                    &format!("graph_node_condition_health_target_{}_{}", scene_name, node_key),
+                    &format!(
+                        "graph_node_condition_health_target_{}_{}",
+                        scene_name, node_key
+                    ),
                     target,
                 );
                 ui.horizontal(|ui| {
@@ -831,26 +879,38 @@ impl InspectorSystem {
             RuleCondition::EntityIsKind { target, kind } => {
                 changed |= Self::render_rule_target_editor_with_salt(
                     ui,
-                    &format!("graph_node_condition_entity_kind_target_{}_{}", scene_name, node_key),
+                    &format!(
+                        "graph_node_condition_entity_kind_target_{}_{}",
+                        scene_name, node_key
+                    ),
                     target,
                 );
                 changed |= Self::render_entity_kind_editor(
                     ui,
-                    &format!("graph_node_condition_entity_kind_{}_{}", scene_name, node_key),
+                    &format!(
+                        "graph_node_condition_entity_kind_{}_{}",
+                        scene_name, node_key
+                    ),
                     kind,
                 );
             }
             RuleCondition::TriggerOtherIsKind { kind } => {
                 changed |= Self::render_entity_kind_editor(
                     ui,
-                    &format!("graph_node_condition_other_kind_{}_{}", scene_name, node_key),
+                    &format!(
+                        "graph_node_condition_other_kind_{}_{}",
+                        scene_name, node_key
+                    ),
                     kind,
                 );
             }
             RuleCondition::EntityHasTag { target, tag } => {
                 changed |= Self::render_rule_target_editor_with_salt(
                     ui,
-                    &format!("graph_node_condition_tag_target_{}_{}", scene_name, node_key),
+                    &format!(
+                        "graph_node_condition_tag_target_{}_{}",
+                        scene_name, node_key
+                    ),
                     target,
                 );
                 ui.horizontal(|ui| {
@@ -871,7 +931,10 @@ impl InspectorSystem {
             } => {
                 changed |= Self::render_rule_target_editor_with_salt(
                     ui,
-                    &format!("graph_node_condition_inv_target_{}_{}", scene_name, node_key),
+                    &format!(
+                        "graph_node_condition_inv_target_{}_{}",
+                        scene_name, node_key
+                    ),
                     target,
                 );
                 ui.horizontal(|ui| {
@@ -1224,7 +1287,10 @@ impl InspectorSystem {
                         changed = true;
                     }
                     if ui
-                        .selectable_label(matches!(target, RuleTarget::TriggerOther), "TriggerOther")
+                        .selectable_label(
+                            matches!(target, RuleTarget::TriggerOther),
+                            "TriggerOther",
+                        )
                         .clicked()
                         && !matches!(target, RuleTarget::TriggerOther)
                     {
@@ -1365,15 +1431,15 @@ impl InspectorSystem {
 
         ui.horizontal(|ui| {
             ui.label("Entity Filter:");
-            let filter_label = if is_filtered { "Specific Entity" } else { "All Entities" };
+            let filter_label = if is_filtered {
+                "Specific Entity"
+            } else {
+                "All Entities"
+            };
             egui::ComboBox::from_id_salt((id_salt, "filter_toggle"))
                 .selected_text(filter_label)
                 .show_ui(ui, |ui| {
-                    if ui
-                        .selectable_label(!is_filtered, "All Entities")
-                        .clicked()
-                        && is_filtered
-                    {
+                    if ui.selectable_label(!is_filtered, "All Entities").clicked() && is_filtered {
                         *entity = None;
                         changed = true;
                     }
@@ -1389,7 +1455,11 @@ impl InspectorSystem {
         });
 
         if let Some(target) = entity {
-            changed |= Self::render_rule_target_editor_with_salt(ui, &format!("{}_target", id_salt), target);
+            changed |= Self::render_rule_target_editor_with_salt(
+                ui,
+                &format!("{}_target", id_salt),
+                target,
+            );
         }
 
         changed

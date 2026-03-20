@@ -131,7 +131,7 @@ fn main_scene(ui_state: &EditorUI) -> toki_core::Scene {
         .iter()
         .find(|scene| scene.name == "Main Scene")
         .expect("main scene should exist")
-    .clone()
+        .clone()
 }
 
 #[test]
@@ -144,10 +144,10 @@ fn delete_scene_command_round_trips_ui_and_project_metadata_with_backing_file() 
         .expect("scene file should exist");
 
     let mut project = Project::new("TestProject".to_string(), project_root.clone());
-    project
-        .metadata
-        .scenes
-        .insert("Main Scene".to_string(), "scenes/Main Scene.json".to_string());
+    project.metadata.scenes.insert(
+        "Main Scene".to_string(),
+        "scenes/Main Scene.json".to_string(),
+    );
     std::fs::write(
         project.project_file_path(),
         toml::to_string_pretty(&project.metadata).expect("project metadata should serialize"),
@@ -164,8 +164,8 @@ fn delete_scene_command_round_trips_ui_and_project_metadata_with_backing_file() 
         "Main Scene".to_string(),
     ));
 
-    let command =
-        build_delete_scene_command(&ui_state, &project, "Main Scene").expect("command should build");
+    let command = build_delete_scene_command(&ui_state, &project, "Main Scene")
+        .expect("command should build");
 
     let mut history = UndoRedoHistory::default();
     assert!(history.execute(command, &mut ui_state, Some(&mut project)));

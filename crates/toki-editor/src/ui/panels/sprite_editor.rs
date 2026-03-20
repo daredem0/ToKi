@@ -9,6 +9,11 @@ pub fn render_sprite_editor(
     ctx: &egui::Context,
     project: Option<&mut Project>,
 ) {
+    // Get sprites directory from project (needed for multiple operations)
+    let sprites_dir = project
+        .as_ref()
+        .map(|p| p.path.join("assets").join("sprites"));
+
     // Handle new canvas dialog
     if ui_state.sprite.show_new_canvas_dialog {
         render_new_canvas_dialog(ui_state, ctx);
@@ -16,7 +21,12 @@ pub fn render_sprite_editor(
 
     // Handle save dialog
     if ui_state.sprite.show_save_dialog {
-        render_save_dialog(ui_state, ctx, project);
+        render_save_dialog(ui_state, ctx, sprites_dir.as_deref());
+    }
+
+    // Handle load dialog
+    if ui_state.sprite.show_load_dialog {
+        render_load_dialog(ui_state, ctx);
     }
 
     // Handle warning dialog
@@ -25,24 +35,70 @@ pub fn render_sprite_editor(
     }
 
     // Toolbar (simplified - tools are in inspector panel)
-    render_toolbar(ui, ui_state);
+    render_toolbar(ui, ui_state, sprites_dir.as_deref());
     ui.separator();
 
     // Main content area
     if ui_state.sprite.has_canvas() {
         render_canvas_viewport(ui, ui_state, ctx);
     } else {
-        render_no_canvas_message(ui, ui_state);
+        render_no_canvas_message(ui, ui_state, sprites_dir.as_deref());
     }
 }
 
-fn render_toolbar(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+fn render_toolbar(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    sprites_dir: Option<&std::path::Path>,
+) {
     ui.horizontal(|ui| {
         ui.heading("Sprite Editor");
         ui.separator();
 
         if ui.button("New Canvas").clicked() {
             ui_state.begin_new_sprite_canvas_dialog();
+        }
+
+        // Load button - only enabled if we have a project
+        let load_enabled = sprites_dir.is_some();
+        if ui
+            .add_enabled(load_enabled, egui::Button::new("Load Sprite"))
+            .clicked()
+        {
+            if let Some(dir) = sprites_dir {
+                ui_state.sprite.begin_load_dialog(dir);
+            }
+        }
+
+        // Import external image
+        if ui.button("Import...").clicked() {
+            if let Some(path) = rfd::FileDialog::new()
+                .set_title("Import Image")
+                .add_filter("Images", &["png", "jpg", "jpeg", "bmp"])
+                .pick_file()
+            {
+                if let Err(e) = ui_state.sprite.import_external_image(&path) {
+                    tracing::error!("Failed to import image: {}", e);
+                }
+            }
+        }
+
+        // Export as PNG
+        let has_canvas = ui_state.sprite.has_canvas();
+        if ui
+            .add_enabled(has_canvas, egui::Button::new("Export PNG..."))
+            .clicked()
+        {
+            if let Some(path) = rfd::FileDialog::new()
+                .set_title("Export PNG")
+                .add_filter("PNG Image", &["png"])
+                .set_file_name("sprite.png")
+                .save_file()
+            {
+                if let Err(e) = ui_state.sprite.export_as_png(&path) {
+                    tracing::error!("Failed to export image: {}", e);
+                }
+            }
         }
 
         if ui_state.sprite.has_canvas() && ui_state.sprite.dirty {
@@ -78,48 +134,58 @@ fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label("Width:");
+                ui.label("Sprite Width:");
                 ui.add(
-                    egui::DragValue::new(&mut ui_state.sprite.new_canvas_width)
-                        .range(1..=2048)
+                    egui::DragValue::new(&mut ui_state.sprite.new_sprite_width)
+                        .range(1..=512)
                         .speed(1),
                 );
             });
             ui.horizontal(|ui| {
-                ui.label("Height:");
+                ui.label("Sprite Height:");
                 ui.add(
-                    egui::DragValue::new(&mut ui_state.sprite.new_canvas_height)
-                        .range(1..=2048)
+                    egui::DragValue::new(&mut ui_state.sprite.new_sprite_height)
+                        .range(1..=512)
                         .speed(1),
                 );
             });
 
             ui.separator();
 
-            ui.checkbox(&mut ui_state.sprite.new_canvas_is_sheet, "Create as sprite sheet");
+            ui.checkbox(
+                &mut ui_state.sprite.new_canvas_is_sheet,
+                "Create as sprite sheet",
+            );
 
             if ui_state.sprite.new_canvas_is_sheet {
                 ui.horizontal(|ui| {
-                    ui.label("Cell Width:");
+                    ui.label("Columns:");
                     ui.add(
-                        egui::DragValue::new(&mut ui_state.sprite.new_canvas_cell_width)
-                            .range(1..=512)
+                        egui::DragValue::new(&mut ui_state.sprite.new_sheet_cols)
+                            .range(1..=64)
                             .speed(1),
                     );
                 });
                 ui.horizontal(|ui| {
-                    ui.label("Cell Height:");
+                    ui.label("Rows:");
                     ui.add(
-                        egui::DragValue::new(&mut ui_state.sprite.new_canvas_cell_height)
-                            .range(1..=512)
+                        egui::DragValue::new(&mut ui_state.sprite.new_sheet_rows)
+                            .range(1..=64)
                             .speed(1),
                     );
                 });
 
-                // Show calculated cell count
-                let cols = ui_state.sprite.new_canvas_width / ui_state.sprite.new_canvas_cell_width.max(1);
-                let rows = ui_state.sprite.new_canvas_height / ui_state.sprite.new_canvas_cell_height.max(1);
-                ui.label(format!("Grid: {}x{} = {} cells", cols, rows, cols * rows));
+                // Show calculated canvas size
+                let cols = ui_state.sprite.new_sheet_cols;
+                let rows = ui_state.sprite.new_sheet_rows;
+                let canvas_w = ui_state.sprite.new_sprite_width * cols;
+                let canvas_h = ui_state.sprite.new_sprite_height * rows;
+                ui.label(format!(
+                    "Canvas: {}x{} ({} cells)",
+                    canvas_w,
+                    canvas_h,
+                    cols * rows
+                ));
             }
 
             ui.separator();
@@ -136,18 +202,19 @@ fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
 }
 
 fn submit_new_canvas(ui_state: &mut EditorUI) {
+    let sprite_w = ui_state.sprite.new_sprite_width.max(1);
+    let sprite_h = ui_state.sprite.new_sprite_height.max(1);
+
     if ui_state.sprite.new_canvas_is_sheet {
-        ui_state.sprite.new_sheet(
-            ui_state.sprite.new_canvas_width,
-            ui_state.sprite.new_canvas_height,
-            ui_state.sprite.new_canvas_cell_width,
-            ui_state.sprite.new_canvas_cell_height,
-        );
+        let cols = ui_state.sprite.new_sheet_cols.max(1);
+        let rows = ui_state.sprite.new_sheet_rows.max(1);
+        let canvas_w = sprite_w * cols;
+        let canvas_h = sprite_h * rows;
+        ui_state
+            .sprite
+            .new_sheet(canvas_w, canvas_h, sprite_w, sprite_h);
     } else {
-        ui_state.sprite.new_canvas(
-            ui_state.sprite.new_canvas_width,
-            ui_state.sprite.new_canvas_height,
-        );
+        ui_state.sprite.new_canvas(sprite_w, sprite_h);
         ui_state.sprite.show_cell_grid = false;
     }
     ui_state.sprite.show_new_canvas_dialog = false;
@@ -156,7 +223,7 @@ fn submit_new_canvas(ui_state: &mut EditorUI) {
 fn render_save_dialog(
     ui_state: &mut EditorUI,
     ctx: &egui::Context,
-    project: Option<&mut Project>,
+    sprites_dir: Option<&std::path::Path>,
 ) {
     use crate::ui::editor_ui::SpriteAssetKind;
 
@@ -166,7 +233,7 @@ fn render_save_dialog(
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {
             // Check if we have a project to save to
-            let Some(project) = project else {
+            let Some(sprites_dir) = sprites_dir else {
                 ui.label("No project open. Cannot save sprite.");
                 if ui.button("Cancel").clicked() {
                     ui_state.sprite.show_save_dialog = false;
@@ -199,21 +266,25 @@ fn render_save_dialog(
             ui.add_space(4.0);
             if ui_state.sprite.is_sheet() {
                 if let Some((cols, rows)) = ui_state.sprite.sheet_cell_count() {
-                    ui.label(format!("Will create {}x{} grid ({} items)", cols, rows, cols * rows));
+                    ui.label(format!(
+                        "Will create {}x{} grid ({} items)",
+                        cols,
+                        rows,
+                        cols * rows
+                    ));
                 }
             } else {
                 ui.label("Will create single sprite asset");
             }
 
             // Show target path
-            let sprites_dir = project.path.join("assets").join("sprites");
             ui.label(format!("Target: {}", sprites_dir.display()));
 
             ui.separator();
 
             ui.horizontal(|ui| {
                 if ui.button("Save").clicked() {
-                    if let Err(e) = ui_state.sprite.save_as_asset(&sprites_dir) {
+                    if let Err(e) = ui_state.sprite.save_as_asset(sprites_dir) {
                         tracing::error!("Failed to save sprite: {}", e);
                     }
                 }
@@ -244,7 +315,10 @@ fn render_warning_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                                 ui_state.sprite.selected_cell = Some(cell_idx);
                                 ui_state.sprite.clear_selected_cell();
                             }
-                            WarningAction::ChangeCellSize { new_width, new_height } => {
+                            WarningAction::ChangeCellSize {
+                                new_width,
+                                new_height,
+                            } => {
                                 ui_state.sprite.cell_size.x = new_width;
                                 ui_state.sprite.cell_size.y = new_height;
                                 ui_state.sprite.selected_cell = None;
@@ -261,13 +335,102 @@ fn render_warning_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
         });
 }
 
-fn render_no_canvas_message(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+fn render_load_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
+    use crate::ui::editor_ui::SpriteAssetKind;
+
+    egui::Window::new("Load Sprite Asset")
+        .collapsible(false)
+        .resizable(true)
+        .default_size([400.0, 300.0])
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .show(ctx, |ui| {
+            if ui_state.sprite.discovered_assets.is_empty() {
+                ui.label("No sprite assets found in project.");
+                ui.add_space(8.0);
+                if ui.button("Cancel").clicked() {
+                    ui_state.sprite.show_load_dialog = false;
+                }
+                return;
+            }
+
+            ui.label(format!(
+                "Found {} sprite assets:",
+                ui_state.sprite.discovered_assets.len()
+            ));
+            ui.separator();
+
+            // Scrollable list of assets
+            egui::ScrollArea::vertical()
+                .max_height(200.0)
+                .show(ui, |ui| {
+                    for (i, asset) in ui_state.sprite.discovered_assets.iter().enumerate() {
+                        let is_selected = ui_state.sprite.selected_asset_index == Some(i);
+                        let kind_label = match asset.kind {
+                            SpriteAssetKind::TileAtlas => "Atlas",
+                            SpriteAssetKind::ObjectSheet => "Object",
+                        };
+
+                        let label = format!("{} [{}]", asset.name, kind_label);
+                        if ui.selectable_label(is_selected, label).clicked() {
+                            ui_state.sprite.selected_asset_index = Some(i);
+                        }
+                    }
+                });
+
+            ui.separator();
+
+            // Show selected asset info
+            if let Some(idx) = ui_state.sprite.selected_asset_index {
+                if let Some(asset) = ui_state.sprite.discovered_assets.get(idx) {
+                    ui.label(format!("Selected: {}", asset.name));
+                    ui.label(format!("Path: {}", asset.png_path.display()));
+                }
+            }
+
+            ui.add_space(8.0);
+
+            ui.horizontal(|ui| {
+                let can_load = ui_state.sprite.selected_asset_index.is_some();
+                if ui
+                    .add_enabled(can_load, egui::Button::new("Load"))
+                    .clicked()
+                {
+                    if let Some(idx) = ui_state.sprite.selected_asset_index {
+                        // Clone the asset to avoid borrow issues
+                        let asset = ui_state.sprite.discovered_assets[idx].clone();
+                        if let Err(e) = ui_state.sprite.load_sprite_asset(&asset) {
+                            tracing::error!("Failed to load sprite: {}", e);
+                        }
+                    }
+                }
+                if ui.button("Cancel").clicked() {
+                    ui_state.sprite.show_load_dialog = false;
+                }
+            });
+        });
+}
+
+fn render_no_canvas_message(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    sprites_dir: Option<&std::path::Path>,
+) {
     ui.centered_and_justified(|ui| {
         ui.vertical_centered(|ui| {
             ui.label("No canvas open");
             ui.add_space(10.0);
             if ui.button("Create New Canvas").clicked() {
                 ui_state.begin_new_sprite_canvas_dialog();
+            }
+            ui.add_space(5.0);
+            let load_enabled = sprites_dir.is_some();
+            if ui
+                .add_enabled(load_enabled, egui::Button::new("Load Existing Sprite"))
+                .clicked()
+            {
+                if let Some(dir) = sprites_dir {
+                    ui_state.sprite.begin_load_dialog(dir);
+                }
             }
         });
     });
@@ -305,8 +468,9 @@ fn render_canvas_viewport(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui
         }
     }
 
-    // Handle keyboard zoom (+/- keys)
+    // Handle keyboard shortcuts
     if !ui.ctx().wants_keyboard_input() {
+        // Zoom (+/- keys)
         if ui.input(|input| {
             input.key_pressed(egui::Key::Plus) || input.key_pressed(egui::Key::Equals)
         }) {
@@ -315,6 +479,12 @@ fn render_canvas_viewport(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui
         if ui.input(|input| input.key_pressed(egui::Key::Minus)) {
             ui_state.sprite.viewport.zoom_out();
         }
+
+        // Tool shortcuts
+        handle_tool_shortcuts(ui_state, ui);
+
+        // Undo/Redo (Ctrl+Z / Ctrl+Y)
+        handle_undo_redo_shortcuts(ui_state, ui);
     }
 
     // Update cursor position
@@ -545,7 +715,10 @@ fn draw_cell_grid(
 
     let canvas_screen_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
 
-    let stroke = egui::Stroke::new(2.0, egui::Color32::from_rgba_unmultiplied(255, 200, 50, 180));
+    let stroke = egui::Stroke::new(
+        2.0,
+        egui::Color32::from_rgba_unmultiplied(255, 200, 50, 180),
+    );
 
     let cols = canvas.width / cell_size.x.max(1);
     let rows = canvas.height / cell_size.y.max(1);
@@ -695,17 +868,9 @@ fn handle_tool_interaction(
     }
 }
 
-fn handle_drag_tool(
-    ui_state: &mut EditorUI,
-    response: &egui::Response,
-    canvas_pos: glam::IVec2,
-) {
+fn handle_drag_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
     // Click to select cell in sheet mode
-    if response.clicked()
-        && ui_state.sprite.is_sheet()
-        && canvas_pos.x >= 0
-        && canvas_pos.y >= 0
-    {
+    if response.clicked() && ui_state.sprite.is_sheet() && canvas_pos.x >= 0 && canvas_pos.y >= 0 {
         let cell = ui_state
             .sprite
             .cell_at_position(canvas_pos.x as u32, canvas_pos.y as u32);
@@ -722,11 +887,7 @@ fn handle_drag_tool(
     }
 }
 
-fn handle_brush_tool(
-    ui_state: &mut EditorUI,
-    response: &egui::Response,
-    canvas_pos: glam::IVec2,
-) {
+fn handle_brush_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
     use crate::ui::interactions::SpritePaintInteraction;
 
     if response.drag_started_by(egui::PointerButton::Primary) {
@@ -749,11 +910,7 @@ fn handle_brush_tool(
     }
 }
 
-fn handle_eraser_tool(
-    ui_state: &mut EditorUI,
-    response: &egui::Response,
-    canvas_pos: glam::IVec2,
-) {
+fn handle_eraser_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
     use crate::ui::interactions::SpritePaintInteraction;
 
     if response.drag_started_by(egui::PointerButton::Primary) {
@@ -775,11 +932,7 @@ fn handle_eraser_tool(
     }
 }
 
-fn handle_fill_tool(
-    ui_state: &mut EditorUI,
-    response: &egui::Response,
-    canvas_pos: glam::IVec2,
-) {
+fn handle_fill_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
     use crate::ui::interactions::SpritePaintInteraction;
 
     if response.clicked() {
@@ -812,11 +965,7 @@ fn handle_eyedropper_tool(
     }
 }
 
-fn handle_line_tool(
-    ui_state: &mut EditorUI,
-    response: &egui::Response,
-    canvas_pos: glam::IVec2,
-) {
+fn handle_line_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
     use crate::ui::interactions::SpritePaintInteraction;
 
     if response.drag_started_by(egui::PointerButton::Primary) {
@@ -839,12 +988,7 @@ fn handle_line_tool(
     }
 }
 
-fn handle_select_tool(
-    ui_state: &mut EditorUI,
-    response: &egui::Response,
-    canvas_pos: glam::IVec2,
-) {
-
+fn handle_select_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
     if response.drag_started_by(egui::PointerButton::Primary) {
         ui_state.sprite.selection_start_pos = Some(canvas_pos);
         ui_state.sprite.selection = None;
@@ -896,10 +1040,64 @@ fn finish_paint_stroke(ui_state: &mut EditorUI) {
             ui_state.sprite.push_undo_state(before);
         }
         // Add the used color to recent colors
-        ui_state.sprite.add_recent_color(ui_state.sprite.foreground_color);
+        ui_state
+            .sprite
+            .add_recent_color(ui_state.sprite.foreground_color);
     }
 }
 
 fn invalidate_canvas_texture(ui_state: &mut EditorUI) {
     ui_state.sprite.canvas_texture = None;
+}
+
+fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
+    use SpriteEditorTool::*;
+
+    // Tool shortcuts: B=Brush, E=Eraser, G=Fill, I=Eyedropper, M=Select, D=Drag, L=Line
+    if ui.input(|i| i.key_pressed(egui::Key::B)) {
+        ui_state.sprite.tool = Brush;
+    }
+    if ui.input(|i| i.key_pressed(egui::Key::E)) {
+        ui_state.sprite.tool = Eraser;
+    }
+    if ui.input(|i| i.key_pressed(egui::Key::G)) {
+        ui_state.sprite.tool = Fill;
+    }
+    if ui.input(|i| i.key_pressed(egui::Key::I)) {
+        ui_state.sprite.tool = Eyedropper;
+    }
+    if ui.input(|i| i.key_pressed(egui::Key::M)) {
+        ui_state.sprite.tool = Select;
+    }
+    if ui.input(|i| i.key_pressed(egui::Key::D)) {
+        ui_state.sprite.tool = Drag;
+    }
+    if ui.input(|i| i.key_pressed(egui::Key::L)) {
+        ui_state.sprite.tool = Line;
+    }
+
+    // Brush size: [ and ] to decrease/increase
+    if ui.input(|i| i.key_pressed(egui::Key::OpenBracket)) {
+        ui_state.sprite.brush_size = ui_state.sprite.brush_size.saturating_sub(1).max(1);
+    }
+    if ui.input(|i| i.key_pressed(egui::Key::CloseBracket)) {
+        ui_state.sprite.brush_size = (ui_state.sprite.brush_size + 1).min(32);
+    }
+}
+
+fn handle_undo_redo_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
+    let ctrl = ui.input(|i| i.modifiers.ctrl || i.modifiers.mac_cmd);
+    let shift = ui.input(|i| i.modifiers.shift);
+
+    // Ctrl+Z for undo (without shift)
+    if ctrl && !shift && ui.input(|i| i.key_pressed(egui::Key::Z)) && ui_state.sprite.undo() {
+        invalidate_canvas_texture(ui_state);
+    }
+
+    // Ctrl+Y or Ctrl+Shift+Z for redo
+    let redo_pressed = ui.input(|i| i.key_pressed(egui::Key::Y))
+        || (shift && ui.input(|i| i.key_pressed(egui::Key::Z)));
+    if ctrl && redo_pressed && ui_state.sprite.redo() {
+        invalidate_canvas_texture(ui_state);
+    }
 }

@@ -47,7 +47,10 @@ impl PanelSystem {
         );
         let display_rect = viewport.display_rect_in(rect);
 
-        if let Some(pointer_pos) = response.hover_pos().filter(|pos| display_rect.contains(*pos)) {
+        if let Some(pointer_pos) = response
+            .hover_pos()
+            .filter(|pos| display_rect.contains(*pos))
+        {
             let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, display_rect);
             ui_state.remember_viewport_cursor_world_position(world_pos);
         }

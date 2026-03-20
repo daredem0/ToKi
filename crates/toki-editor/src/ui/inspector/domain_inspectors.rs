@@ -90,7 +90,9 @@ impl SceneInspector {
 
         let mut choices = project_path
             .map(|path| {
-                InspectorSystem::discover_audio_asset_names(path.join("assets/audio/music").as_path())
+                InspectorSystem::discover_audio_asset_names(
+                    path.join("assets/audio/music").as_path(),
+                )
             })
             .unwrap_or_default();
 
@@ -324,29 +326,26 @@ impl Inspector for SceneInspector {
             let mut selected_background_music_track_id = scene.background_music_track_id.clone();
             ui.horizontal(|ui| {
                 ui.label("Background Music:");
-                egui::ComboBox::from_id_salt(format!(
-                    "scene_background_music_{}",
-                    self.scene_name
-                ))
-                .selected_text(
-                    selected_background_music_track_id
-                        .as_deref()
-                        .unwrap_or("<none>"),
-                )
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(
-                        &mut selected_background_music_track_id,
-                        None,
-                        "<none>",
-                    );
-                    for track_id in &music_choices {
+                egui::ComboBox::from_id_salt(format!("scene_background_music_{}", self.scene_name))
+                    .selected_text(
+                        selected_background_music_track_id
+                            .as_deref()
+                            .unwrap_or("<none>"),
+                    )
+                    .show_ui(ui, |ui| {
                         ui.selectable_value(
                             &mut selected_background_music_track_id,
-                            Some(track_id.clone()),
-                            track_id,
+                            None,
+                            "<none>",
                         );
-                    }
-                });
+                        for track_id in &music_choices {
+                            ui.selectable_value(
+                                &mut selected_background_music_track_id,
+                                Some(track_id.clone()),
+                                track_id,
+                            );
+                        }
+                    });
             });
             if selected_background_music_track_id != scene.background_music_track_id {
                 let before_scene = scene.clone();
@@ -434,15 +433,26 @@ impl Inspector for SceneInspector {
             let before_rules = ctx.ui_state.scenes[scene_index].rules.clone();
             let mut edited_rules = before_rules.clone();
             // Extract map size for validation if available
-            let map_size = ctx.ui_state.scenes.get(scene_index)
+            let map_size = ctx
+                .ui_state
+                .scenes
+                .get(scene_index)
                 .and_then(|scene| scene.maps.first())
                 .and_then(|map_name| {
                     // Try to get map size from loaded map draft or pending sync
                     if ctx.ui_state.map.active_map.as_ref() == Some(map_name) {
-                        ctx.ui_state.map.draft.as_ref()
+                        ctx.ui_state
+                            .map
+                            .draft
+                            .as_ref()
                             .map(|draft| (draft.tilemap.size.x, draft.tilemap.size.y))
-                            .or_else(|| ctx.ui_state.map.pending_tilemap_sync.as_ref()
-                                .map(|tm| (tm.size.x, tm.size.y)))
+                            .or_else(|| {
+                                ctx.ui_state
+                                    .map
+                                    .pending_tilemap_sync
+                                    .as_ref()
+                                    .map(|tm| (tm.size.x, tm.size.y))
+                            })
                     } else {
                         None
                     }
@@ -497,7 +507,11 @@ pub(crate) fn build_delete_scene_command(
     project: &Project,
     scene_name: &str,
 ) -> Result<crate::ui::undo_redo::EditorCommand, String> {
-    let Some(scene_index) = ui_state.scenes.iter().position(|scene| scene.name == scene_name) else {
+    let Some(scene_index) = ui_state
+        .scenes
+        .iter()
+        .position(|scene| scene.name == scene_name)
+    else {
         return Err(format!("scene '{scene_name}' not found"));
     };
 
@@ -539,12 +553,13 @@ pub(crate) fn build_delete_scene_command(
     let mut changes = Vec::new();
     if let Some(scene_relative_path) = try_resolve_scene_relative_path(project, scene_name)? {
         let scene_absolute_path = project.path.join(&scene_relative_path);
-        let scene_before_contents = std::fs::read_to_string(&scene_absolute_path).map_err(|error| {
-            format!(
-                "failed to read scene file '{}': {error}",
-                scene_absolute_path.display()
-            )
-        })?;
+        let scene_before_contents =
+            std::fs::read_to_string(&scene_absolute_path).map_err(|error| {
+                format!(
+                    "failed to read scene file '{}': {error}",
+                    scene_absolute_path.display()
+                )
+            })?;
         changes.push(crate::ui::undo_redo::ProjectFileChange {
             relative_path: scene_relative_path,
             before_contents: Some(scene_before_contents),
@@ -603,7 +618,8 @@ fn try_resolve_scene_relative_path(
         .filter_map(Result::ok)
         .map(|entry| entry.path())
         .find(|path| {
-            path.extension().is_some_and(|extension| extension == "json")
+            path.extension()
+                .is_some_and(|extension| extension == "json")
                 && path
                     .file_stem()
                     .and_then(|stem| stem.to_str())
@@ -1204,10 +1220,10 @@ mod tests {
         .expect("scene file should write");
 
         let mut project = Project::new("Demo".to_string(), project_root);
-        project
-            .metadata
-            .scenes
-            .insert("Main Scene".to_string(), "scenes/mainscene.json".to_string());
+        project.metadata.scenes.insert(
+            "Main Scene".to_string(),
+            "scenes/mainscene.json".to_string(),
+        );
         std::fs::write(
             project.project_file_path(),
             toml::to_string_pretty(&project.metadata).expect("project metadata should serialize"),
@@ -1284,7 +1300,8 @@ mod tests {
             config: None,
         };
 
-        let choices = SceneInspector::load_scene_music_choices(&inspector_ctx, Some("legacy_track"));
+        let choices =
+            SceneInspector::load_scene_music_choices(&inspector_ctx, Some("legacy_track"));
         assert_eq!(choices, vec!["legacy_track".to_string()]);
     }
 }
