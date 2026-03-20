@@ -28,21 +28,19 @@
       },
       "attributes": {
         "health": 50,
+        "stats": {
+          "base": {
+            "health": 50
+          },
+          "current": {
+            "health": 50
+          }
+        },
         "speed": 1.0,
         "solid": true,
         "visible": true,
         "animation_controller": {
           "clips": {
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -53,6 +51,16 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -66,7 +74,10 @@
         "can_move": false,
         "interactable": false,
         "interaction_reach": 0,
-        "ai_behavior": "wander",
+        "ai_config": {
+          "behavior": "chase",
+          "detection_radius": 50
+        },
         "movement_profile": "legacy_default",
         "has_inventory": false
       },
@@ -105,6 +116,14 @@
       },
       "attributes": {
         "health": 50,
+        "stats": {
+          "base": {
+            "health": 50
+          },
+          "current": {
+            "health": 50
+          }
+        },
         "speed": 1.0,
         "solid": true,
         "visible": true,
@@ -143,7 +162,10 @@
         "can_move": false,
         "interactable": false,
         "interaction_reach": 0,
-        "ai_behavior": "wander",
+        "ai_config": {
+          "behavior": "run",
+          "detection_radius": 50
+        },
         "movement_profile": "none",
         "has_inventory": false
       },
@@ -227,7 +249,10 @@
         "can_move": false,
         "interactable": false,
         "interaction_reach": 0,
-        "ai_behavior": "wander",
+        "ai_config": {
+          "behavior": "wander",
+          "detection_radius": 0
+        },
         "movement_profile": "legacy_default",
         "has_inventory": false
       },
@@ -278,16 +303,6 @@
         "visible": true,
         "animation_controller": {
           "clips": {
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -298,6 +313,16 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -311,7 +336,10 @@
         "can_move": false,
         "interactable": false,
         "interaction_reach": 0,
-        "ai_behavior": "wander",
+        "ai_config": {
+          "behavior": "run",
+          "detection_radius": 50
+        },
         "movement_profile": "legacy_default",
         "has_inventory": false
       },
@@ -362,16 +390,6 @@
         "visible": true,
         "animation_controller": {
           "clips": {
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -382,6 +400,16 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
+              "loop_mode": "Loop"
+            },
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -395,7 +423,10 @@
         "can_move": false,
         "interactable": false,
         "interaction_reach": 0,
-        "ai_behavior": "wander",
+        "ai_config": {
+          "behavior": "run",
+          "detection_radius": 50
+        },
         "movement_profile": "legacy_default",
         "has_inventory": false
       },
@@ -446,6 +477,16 @@
         "visible": true,
         "animation_controller": {
           "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "creatures.json",
+              "frame_tile_names": [
+                "slime/idle_0",
+                "slime/idle_1"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
             "Walk": {
               "state": "Walk",
               "atlas_name": "creatures.json",
@@ -456,16 +497,6 @@
                 "slime/walk_3"
               ],
               "frame_duration_ms": 150.0,
-              "loop_mode": "Loop"
-            },
-            "Idle": {
-              "state": "Idle",
-              "atlas_name": "creatures.json",
-              "frame_tile_names": [
-                "slime/idle_0",
-                "slime/idle_1"
-              ],
-              "frame_duration_ms": 300.0,
               "loop_mode": "Loop"
             }
           },
@@ -479,7 +510,10 @@
         "can_move": false,
         "interactable": false,
         "interaction_reach": 0,
-        "ai_behavior": "wander",
+        "ai_config": {
+          "behavior": "wander",
+          "detection_radius": 0
+        },
         "movement_profile": "legacy_default",
         "has_inventory": false
       },
@@ -526,7 +560,10 @@
         "can_move": false,
         "interactable": false,
         "interaction_reach": 0,
-        "ai_behavior": "none",
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
         "movement_profile": "none",
         "static_object_render": {
           "sheet": "items",
@@ -581,7 +618,10 @@
         "can_move": false,
         "interactable": false,
         "interaction_reach": 0,
-        "ai_behavior": "none",
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
         "movement_profile": "none",
         "static_object_render": {
           "sheet": "items",
@@ -636,7 +676,10 @@
         "can_move": false,
         "interactable": false,
         "interaction_reach": 0,
-        "ai_behavior": "none",
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
         "movement_profile": "none",
         "static_object_render": {
           "sheet": "items",
@@ -684,12 +727,12 @@
         "health": 100,
         "stats": {
           "base": {
-            "attack_power": 8,
-            "health": 100
+            "health": 100,
+            "attack_power": 8
           },
           "current": {
-            "attack_power": 8,
-            "health": 100
+            "health": 100,
+            "attack_power": 8
           }
         },
         "speed": 1.0,
@@ -697,54 +740,6 @@
         "visible": true,
         "animation_controller": {
           "clips": {
-            "WalkRight": {
-              "state": "WalkRight",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_right_a",
-                "player/walk_right_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Loop"
-            },
-            "AttackRight": {
-              "state": "AttackRight",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/attack_right_a",
-                "player/attack_right_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Once"
-            },
-            "IdleRight": {
-              "state": "IdleRight",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_right_a"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "IdleDown": {
-              "state": "IdleDown",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_down_a"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "AttackDown": {
-              "state": "AttackDown",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/attack_down_a",
-                "player/attack_down_b"
-              ],
-              "frame_duration_ms": 180.0,
-              "loop_mode": "Once"
-            },
             "AttackLeft": {
               "state": "AttackLeft",
               "atlas_name": "players.json",
@@ -765,33 +760,25 @@
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
-            "WalkLeft": {
-              "state": "WalkLeft",
+            "AttackDown": {
+              "state": "AttackDown",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_right_a",
-                "player/walk_right_b"
+                "player/attack_down_a",
+                "player/attack_down_b"
               ],
               "frame_duration_ms": 180.0,
-              "loop_mode": "Loop"
+              "loop_mode": "Once"
             },
-            "IdleLeft": {
-              "state": "IdleLeft",
+            "AttackRight": {
+              "state": "AttackRight",
               "atlas_name": "players.json",
               "frame_tile_names": [
-                "player/walk_right_a"
+                "player/attack_right_a",
+                "player/attack_right_b"
               ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
-            },
-            "IdleUp": {
-              "state": "IdleUp",
-              "atlas_name": "players.json",
-              "frame_tile_names": [
-                "player/walk_up_a"
-              ],
-              "frame_duration_ms": 300.0,
-              "loop_mode": "Loop"
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Once"
             },
             "WalkDown": {
               "state": "WalkDown",
@@ -803,6 +790,43 @@
               "frame_duration_ms": 180.0,
               "loop_mode": "Loop"
             },
+            "IdleRight": {
+              "state": "IdleRight",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_right_a"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "IdleLeft": {
+              "state": "IdleLeft",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_right_a"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkLeft": {
+              "state": "WalkLeft",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_right_a",
+                "player/walk_right_b"
+              ],
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Loop"
+            },
+            "IdleUp": {
+              "state": "IdleUp",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_up_a"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
             "AttackUp": {
               "state": "AttackUp",
               "atlas_name": "players.json",
@@ -812,6 +836,25 @@
               ],
               "frame_duration_ms": 180.0,
               "loop_mode": "Once"
+            },
+            "IdleDown": {
+              "state": "IdleDown",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_down_a"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            },
+            "WalkRight": {
+              "state": "WalkRight",
+              "atlas_name": "players.json",
+              "frame_tile_names": [
+                "player/walk_right_a",
+                "player/walk_right_b"
+              ],
+              "frame_duration_ms": 180.0,
+              "loop_mode": "Loop"
             }
           },
           "current_clip_state": "IdleDown",
@@ -824,7 +867,10 @@
         "can_move": true,
         "interactable": true,
         "interaction_reach": 0,
-        "ai_behavior": "none",
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
         "movement_profile": "none",
         "primary_projectile": {
           "sheet": "fauna",
