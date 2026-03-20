@@ -49,6 +49,12 @@ pub enum RuleActionEditorKind {
     Spawn,
     DestroySelf,
     SwitchScene,
+    DamageEntity,
+    HealEntity,
+    AddInventoryItem,
+    RemoveInventoryItem,
+    SetEntityActive,
+    TeleportEntity,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

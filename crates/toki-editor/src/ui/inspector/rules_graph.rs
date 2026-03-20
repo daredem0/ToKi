@@ -537,6 +537,61 @@ impl InspectorSystem {
                 };
                 format!("SwitchScene({scene} -> {spawn})")
             }
+            RuleAction::DamageEntity { target, amount } => {
+                format!(
+                    "DamageEntity({}, {})",
+                    Self::rule_graph_target_summary(*target),
+                    amount
+                )
+            }
+            RuleAction::HealEntity { target, amount } => {
+                format!(
+                    "HealEntity({}, {})",
+                    Self::rule_graph_target_summary(*target),
+                    amount
+                )
+            }
+            RuleAction::AddInventoryItem {
+                target,
+                item_id,
+                count,
+            } => {
+                let item = if item_id.is_empty() { "<empty>" } else { item_id };
+                format!(
+                    "AddItem({}, {}, {})",
+                    Self::rule_graph_target_summary(*target),
+                    item,
+                    count
+                )
+            }
+            RuleAction::RemoveInventoryItem {
+                target,
+                item_id,
+                count,
+            } => {
+                let item = if item_id.is_empty() { "<empty>" } else { item_id };
+                format!(
+                    "RemoveItem({}, {}, {})",
+                    Self::rule_graph_target_summary(*target),
+                    item,
+                    count
+                )
+            }
+            RuleAction::SetEntityActive { target, active } => {
+                format!(
+                    "SetActive({}, {})",
+                    Self::rule_graph_target_summary(*target),
+                    active
+                )
+            }
+            RuleAction::TeleportEntity { target, position } => {
+                format!(
+                    "Teleport({}, [{}, {}])",
+                    Self::rule_graph_target_summary(*target),
+                    position[0],
+                    position[1]
+                )
+            }
         }
     }
 
@@ -884,6 +939,12 @@ impl InspectorSystem {
                     RuleActionKind::Spawn,
                     RuleActionKind::DestroySelf,
                     RuleActionKind::SwitchScene,
+                    RuleActionKind::DamageEntity,
+                    RuleActionKind::HealEntity,
+                    RuleActionKind::AddInventoryItem,
+                    RuleActionKind::RemoveInventoryItem,
+                    RuleActionKind::SetEntityActive,
+                    RuleActionKind::TeleportEntity,
                 ] {
                     changed |= ui
                         .selectable_value(
@@ -1045,6 +1106,100 @@ impl InspectorSystem {
                     spawn_point_id,
                     scenes,
                 );
+            }
+            RuleAction::DamageEntity { target, amount } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!("graph_node_damage_target_{}_{}", scene_name, node_key),
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    ui.label("Amount:");
+                    changed |= ui
+                        .add(egui::DragValue::new(amount).speed(1.0).range(0..=9999))
+                        .changed();
+                });
+            }
+            RuleAction::HealEntity { target, amount } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!("graph_node_heal_target_{}_{}", scene_name, node_key),
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    ui.label("Amount:");
+                    changed |= ui
+                        .add(egui::DragValue::new(amount).speed(1.0).range(0..=9999))
+                        .changed();
+                });
+            }
+            RuleAction::AddInventoryItem {
+                target,
+                item_id,
+                count,
+            } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!("graph_node_add_inv_target_{}_{}", scene_name, node_key),
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    ui.label("Item Id:");
+                    changed |= ui.text_edit_singleline(item_id).changed();
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Count:");
+                    changed |= ui
+                        .add(egui::DragValue::new(count).speed(1.0).range(1..=9999))
+                        .changed();
+                });
+            }
+            RuleAction::RemoveInventoryItem {
+                target,
+                item_id,
+                count,
+            } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!("graph_node_rem_inv_target_{}_{}", scene_name, node_key),
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    ui.label("Item Id:");
+                    changed |= ui.text_edit_singleline(item_id).changed();
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Count:");
+                    changed |= ui
+                        .add(egui::DragValue::new(count).speed(1.0).range(1..=9999))
+                        .changed();
+                });
+            }
+            RuleAction::SetEntityActive { target, active } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!("graph_node_set_active_target_{}_{}", scene_name, node_key),
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    changed |= ui.checkbox(active, "Active").changed();
+                });
+            }
+            RuleAction::TeleportEntity { target, position } => {
+                changed |= Self::render_rule_target_editor_with_salt(
+                    ui,
+                    &format!("graph_node_teleport_target_{}_{}", scene_name, node_key),
+                    target,
+                );
+                ui.horizontal(|ui| {
+                    ui.label("Position:");
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut position[0]).speed(1.0))
+                        .changed();
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut position[1]).speed(1.0))
+                        .changed();
+                });
             }
         }
 

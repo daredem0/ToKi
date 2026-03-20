@@ -674,6 +674,143 @@
               }
             }
           }
+        },
+        {
+          "type": "object",
+          "required": ["DamageEntity"],
+          "additionalProperties": false,
+          "properties": {
+            "DamageEntity": {
+              "type": "object",
+              "required": ["target", "amount"],
+              "additionalProperties": false,
+              "properties": {
+                "target": {
+                  "$ref": "#/definitions/ruleTarget"
+                },
+                "amount": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["HealEntity"],
+          "additionalProperties": false,
+          "properties": {
+            "HealEntity": {
+              "type": "object",
+              "required": ["target", "amount"],
+              "additionalProperties": false,
+              "properties": {
+                "target": {
+                  "$ref": "#/definitions/ruleTarget"
+                },
+                "amount": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["AddInventoryItem"],
+          "additionalProperties": false,
+          "properties": {
+            "AddInventoryItem": {
+              "type": "object",
+              "required": ["target", "item_id", "count"],
+              "additionalProperties": false,
+              "properties": {
+                "target": {
+                  "$ref": "#/definitions/ruleTarget"
+                },
+                "item_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["RemoveInventoryItem"],
+          "additionalProperties": false,
+          "properties": {
+            "RemoveInventoryItem": {
+              "type": "object",
+              "required": ["target", "item_id", "count"],
+              "additionalProperties": false,
+              "properties": {
+                "target": {
+                  "$ref": "#/definitions/ruleTarget"
+                },
+                "item_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["SetEntityActive"],
+          "additionalProperties": false,
+          "properties": {
+            "SetEntityActive": {
+              "type": "object",
+              "required": ["target", "active"],
+              "additionalProperties": false,
+              "properties": {
+                "target": {
+                  "$ref": "#/definitions/ruleTarget"
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["TeleportEntity"],
+          "additionalProperties": false,
+          "properties": {
+            "TeleportEntity": {
+              "type": "object",
+              "required": ["target", "position"],
+              "additionalProperties": false,
+              "properties": {
+                "target": {
+                  "$ref": "#/definitions/ruleTarget"
+                },
+                "position": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              }
+            }
+          }
         }
       ]
     },

@@ -390,6 +390,12 @@ fn action_kind_label(action: &RuleAction) -> &'static str {
         RuleAction::Spawn { .. } => "Spawn",
         RuleAction::DestroySelf { .. } => "DestroySelf",
         RuleAction::SwitchScene { .. } => "SwitchScene",
+        RuleAction::DamageEntity { .. } => "DamageEntity",
+        RuleAction::HealEntity { .. } => "HealEntity",
+        RuleAction::AddInventoryItem { .. } => "AddInventoryItem",
+        RuleAction::RemoveInventoryItem { .. } => "RemoveInventoryItem",
+        RuleAction::SetEntityActive { .. } => "SetEntityActive",
+        RuleAction::TeleportEntity { .. } => "TeleportEntity",
     }
 }
 

@@ -444,6 +444,12 @@ impl PanelSystem {
                                                             GraphActionKind::Spawn,
                                                             GraphActionKind::DestroySelf,
                                                             GraphActionKind::SwitchScene,
+                                                            GraphActionKind::DamageEntity,
+                                                            GraphActionKind::HealEntity,
+                                                            GraphActionKind::AddInventoryItem,
+                                                            GraphActionKind::RemoveInventoryItem,
+                                                            GraphActionKind::SetEntityActive,
+                                                            GraphActionKind::TeleportEntity,
                                                         ] {
                                                             ui.selectable_value(
                                                                 &mut kind,

@@ -12,7 +12,7 @@ use crate::rules::{
     RuleTrigger, TriggerContext,
 };
 
-use super::{AudioChannel, AudioEvent, GameState};
+use super::{combat::StatChangeRequest, AudioChannel, AudioEvent, GameState};
 
 /// A collision event between an entity and another entity or the world.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -124,6 +124,32 @@ pub(super) enum RuleCommand {
     SwitchScene {
         scene_name: String,
         spawn_point_id: String,
+    },
+    DamageEntity {
+        entity_id: EntityId,
+        amount: i32,
+    },
+    HealEntity {
+        entity_id: EntityId,
+        amount: i32,
+    },
+    AddInventoryItem {
+        entity_id: EntityId,
+        item_id: String,
+        count: u32,
+    },
+    RemoveInventoryItem {
+        entity_id: EntityId,
+        item_id: String,
+        count: u32,
+    },
+    SetEntityActive {
+        entity_id: EntityId,
+        active: bool,
+    },
+    TeleportEntity {
+        entity_id: EntityId,
+        position: glam::IVec2,
     },
 }
 
@@ -756,6 +782,64 @@ impl GameState {
                     spawn_point_id: spawn_point_id.clone(),
                 });
             }
+            RuleAction::DamageEntity { target, amount } => {
+                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
+                    command_buffer.push(RuleCommand::DamageEntity {
+                        entity_id,
+                        amount: *amount,
+                    });
+                }
+            }
+            RuleAction::HealEntity { target, amount } => {
+                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
+                    command_buffer.push(RuleCommand::HealEntity {
+                        entity_id,
+                        amount: *amount,
+                    });
+                }
+            }
+            RuleAction::AddInventoryItem {
+                target,
+                item_id,
+                count,
+            } => {
+                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
+                    command_buffer.push(RuleCommand::AddInventoryItem {
+                        entity_id,
+                        item_id: item_id.clone(),
+                        count: *count,
+                    });
+                }
+            }
+            RuleAction::RemoveInventoryItem {
+                target,
+                item_id,
+                count,
+            } => {
+                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
+                    command_buffer.push(RuleCommand::RemoveInventoryItem {
+                        entity_id,
+                        item_id: item_id.clone(),
+                        count: *count,
+                    });
+                }
+            }
+            RuleAction::SetEntityActive { target, active } => {
+                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
+                    command_buffer.push(RuleCommand::SetEntityActive {
+                        entity_id,
+                        active: *active,
+                    });
+                }
+            }
+            RuleAction::TeleportEntity { target, position } => {
+                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
+                    command_buffer.push(RuleCommand::TeleportEntity {
+                        entity_id,
+                        position: glam::IVec2::new(position[0], position[1]),
+                    });
+                }
+            }
         }
     }
 
@@ -813,6 +897,69 @@ impl GameState {
                     let spawn = spawn_point_id.trim();
                     if !target.is_empty() && !spawn.is_empty() && pending_scene_switch.is_none() {
                         pending_scene_switch = Some((target.to_string(), spawn.to_string()));
+                    }
+                }
+                RuleCommand::DamageEntity { entity_id, amount } => {
+                    self.pending_stat_changes.push(StatChangeRequest {
+                        target_entity_id: entity_id,
+                        stat_id: HEALTH_STAT_ID.to_string(),
+                        delta: -amount,
+                        source_entity_id: None,
+                    });
+                }
+                RuleCommand::HealEntity { entity_id, amount } => {
+                    if let Some(entity) = self.entity_manager.get_entity(entity_id) {
+                        let current = entity.attributes.current_stat(HEALTH_STAT_ID).unwrap_or(0);
+                        let max = entity.attributes.base_stat(HEALTH_STAT_ID).unwrap_or(0);
+                        let capped_heal = amount.min(max - current);
+                        if capped_heal > 0 {
+                            self.pending_stat_changes.push(StatChangeRequest {
+                                target_entity_id: entity_id,
+                                stat_id: HEALTH_STAT_ID.to_string(),
+                                delta: capped_heal,
+                                source_entity_id: None,
+                            });
+                        }
+                    }
+                }
+                RuleCommand::AddInventoryItem {
+                    entity_id,
+                    item_id,
+                    count,
+                } => {
+                    if let Some(entity) = self.entity_manager.get_entity_mut(entity_id) {
+                        entity.attributes.inventory.add_item(&item_id, count);
+                    }
+                }
+                RuleCommand::RemoveInventoryItem {
+                    entity_id,
+                    item_id,
+                    count,
+                } => {
+                    if let Some(entity) = self.entity_manager.get_entity_mut(entity_id) {
+                        let available = entity.attributes.inventory.item_count(&item_id);
+                        let to_remove = count.min(available);
+                        if to_remove > 0 {
+                            let new_count = available.saturating_sub(to_remove);
+                            if new_count == 0 {
+                                entity.attributes.inventory.items.remove(&item_id);
+                            } else if let Some(entry) = entity.attributes.inventory.items.get_mut(&item_id) {
+                                *entry = new_count;
+                            }
+                        }
+                    }
+                }
+                RuleCommand::SetEntityActive { entity_id, active } => {
+                    if let Some(entity) = self.entity_manager.get_entity_mut(entity_id) {
+                        entity.attributes.active = active;
+                    }
+                }
+                RuleCommand::TeleportEntity {
+                    entity_id,
+                    position,
+                } => {
+                    if let Some(entity) = self.entity_manager.get_entity_mut(entity_id) {
+                        entity.position = position;
                     }
                 }
             }

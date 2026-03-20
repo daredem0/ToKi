@@ -305,6 +305,58 @@ impl InspectorSystem {
                             }
                         }
                     }
+                    RuleAction::DamageEntity { amount, .. } => {
+                        if *amount <= 0 {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "DamageEntity amount must be positive".to_string(),
+                            });
+                        }
+                    }
+                    RuleAction::HealEntity { amount, .. } => {
+                        if *amount <= 0 {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "HealEntity amount must be positive".to_string(),
+                            });
+                        }
+                    }
+                    RuleAction::AddInventoryItem { item_id, count, .. } => {
+                        if item_id.trim().is_empty() {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "AddInventoryItem requires a non-empty item id".to_string(),
+                            });
+                        }
+                        if *count == 0 {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "AddInventoryItem count must be at least 1".to_string(),
+                            });
+                        }
+                    }
+                    RuleAction::RemoveInventoryItem { item_id, count, .. } => {
+                        if item_id.trim().is_empty() {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "RemoveInventoryItem requires a non-empty item id".to_string(),
+                            });
+                        }
+                        if *count == 0 {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "RemoveInventoryItem count must be at least 1".to_string(),
+                            });
+                        }
+                    }
+                    RuleAction::SetEntityActive { .. } => {}
+                    RuleAction::TeleportEntity { .. } => {}
                 }
             }
         }
@@ -421,6 +473,32 @@ impl InspectorSystem {
                 scene_name: String::new(),
                 spawn_point_id: String::new(),
             },
+            RuleActionKind::DamageEntity => RuleAction::DamageEntity {
+                target: RuleTarget::Player,
+                amount: 10,
+            },
+            RuleActionKind::HealEntity => RuleAction::HealEntity {
+                target: RuleTarget::Player,
+                amount: 10,
+            },
+            RuleActionKind::AddInventoryItem => RuleAction::AddInventoryItem {
+                target: RuleTarget::Player,
+                item_id: String::new(),
+                count: 1,
+            },
+            RuleActionKind::RemoveInventoryItem => RuleAction::RemoveInventoryItem {
+                target: RuleTarget::Player,
+                item_id: String::new(),
+                count: 1,
+            },
+            RuleActionKind::SetEntityActive => RuleAction::SetEntityActive {
+                target: RuleTarget::Player,
+                active: false,
+            },
+            RuleActionKind::TeleportEntity => RuleAction::TeleportEntity {
+                target: RuleTarget::Player,
+                position: [0, 0],
+            },
         }
     }
 
@@ -511,6 +589,12 @@ impl InspectorSystem {
             RuleAction::Spawn { .. } => RuleActionKind::Spawn,
             RuleAction::DestroySelf { .. } => RuleActionKind::DestroySelf,
             RuleAction::SwitchScene { .. } => RuleActionKind::SwitchScene,
+            RuleAction::DamageEntity { .. } => RuleActionKind::DamageEntity,
+            RuleAction::HealEntity { .. } => RuleActionKind::HealEntity,
+            RuleAction::AddInventoryItem { .. } => RuleActionKind::AddInventoryItem,
+            RuleAction::RemoveInventoryItem { .. } => RuleActionKind::RemoveInventoryItem,
+            RuleAction::SetEntityActive { .. } => RuleActionKind::SetEntityActive,
+            RuleAction::TeleportEntity { .. } => RuleActionKind::TeleportEntity,
         }
     }
 
@@ -523,6 +607,12 @@ impl InspectorSystem {
             RuleActionKind::Spawn => "Spawn",
             RuleActionKind::DestroySelf => "DestroySelf",
             RuleActionKind::SwitchScene => "SwitchScene",
+            RuleActionKind::DamageEntity => "DamageEntity",
+            RuleActionKind::HealEntity => "HealEntity",
+            RuleActionKind::AddInventoryItem => "AddInventoryItem",
+            RuleActionKind::RemoveInventoryItem => "RemoveInventoryItem",
+            RuleActionKind::SetEntityActive => "SetEntityActive",
+            RuleActionKind::TeleportEntity => "TeleportEntity",
         }
     }
 

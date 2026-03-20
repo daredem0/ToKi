@@ -292,6 +292,44 @@ pub enum RuleAction {
         scene_name: String,
         spawn_point_id: String,
     },
+    /// Damages the target entity by the specified amount.
+    /// Does not reduce health below zero. Death is handled by the game state.
+    DamageEntity {
+        target: RuleTarget,
+        amount: i32,
+    },
+    /// Heals the target entity by the specified amount.
+    /// Does not exceed the entity's maximum health.
+    HealEntity {
+        target: RuleTarget,
+        amount: i32,
+    },
+    /// Adds the specified item to the target entity's inventory.
+    /// If the item already exists, increases the count.
+    AddInventoryItem {
+        target: RuleTarget,
+        item_id: String,
+        count: u32,
+    },
+    /// Removes the specified item from the target entity's inventory.
+    /// Removes up to the available count; never produces negative inventory.
+    RemoveInventoryItem {
+        target: RuleTarget,
+        item_id: String,
+        count: u32,
+    },
+    /// Sets the active state of the target entity.
+    /// Inactive entities are not updated, rendered, or collidable.
+    SetEntityActive {
+        target: RuleTarget,
+        active: bool,
+    },
+    /// Teleports the target entity to the specified world position instantly.
+    /// Uses world coordinates (pixels), not tile coordinates.
+    TeleportEntity {
+        target: RuleTarget,
+        position: [i32; 2],
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

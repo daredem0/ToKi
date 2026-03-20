@@ -16,6 +16,7 @@ impl RuleActionEditorContext<'_> {
 }
 
 impl InspectorSystem {
+    #[allow(clippy::too_many_arguments)]
     pub(in super::super) fn render_rule_editor(
         ui: &mut egui::Ui,
         scene_name: &str,
@@ -321,7 +322,7 @@ impl InspectorSystem {
                     outcome.changed |= Self::remove_action(rule, index);
                 }
 
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     if ui.small_button("+ PlaySound").clicked() {
                         Self::add_action(rule, RuleActionKind::PlaySound);
                         outcome.changed = true;
@@ -348,6 +349,30 @@ impl InspectorSystem {
                     }
                     if ui.small_button("+ SwitchScene").clicked() {
                         Self::add_action(rule, RuleActionKind::SwitchScene);
+                        outcome.changed = true;
+                    }
+                    if ui.small_button("+ DamageEntity").clicked() {
+                        Self::add_action(rule, RuleActionKind::DamageEntity);
+                        outcome.changed = true;
+                    }
+                    if ui.small_button("+ HealEntity").clicked() {
+                        Self::add_action(rule, RuleActionKind::HealEntity);
+                        outcome.changed = true;
+                    }
+                    if ui.small_button("+ AddInventoryItem").clicked() {
+                        Self::add_action(rule, RuleActionKind::AddInventoryItem);
+                        outcome.changed = true;
+                    }
+                    if ui.small_button("+ RemoveInventoryItem").clicked() {
+                        Self::add_action(rule, RuleActionKind::RemoveInventoryItem);
+                        outcome.changed = true;
+                    }
+                    if ui.small_button("+ SetEntityActive").clicked() {
+                        Self::add_action(rule, RuleActionKind::SetEntityActive);
+                        outcome.changed = true;
+                    }
+                    if ui.small_button("+ TeleportEntity").clicked() {
+                        Self::add_action(rule, RuleActionKind::TeleportEntity);
                         outcome.changed = true;
                     }
                 });
@@ -421,6 +446,48 @@ impl InspectorSystem {
                             &mut selected_kind,
                             RuleActionKind::SwitchScene,
                             Self::action_kind_label(RuleActionKind::SwitchScene),
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            RuleActionKind::DamageEntity,
+                            Self::action_kind_label(RuleActionKind::DamageEntity),
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            RuleActionKind::HealEntity,
+                            Self::action_kind_label(RuleActionKind::HealEntity),
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            RuleActionKind::AddInventoryItem,
+                            Self::action_kind_label(RuleActionKind::AddInventoryItem),
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            RuleActionKind::RemoveInventoryItem,
+                            Self::action_kind_label(RuleActionKind::RemoveInventoryItem),
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            RuleActionKind::SetEntityActive,
+                            Self::action_kind_label(RuleActionKind::SetEntityActive),
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut selected_kind,
+                            RuleActionKind::TeleportEntity,
+                            Self::action_kind_label(RuleActionKind::TeleportEntity),
                         )
                         .changed();
                 });
@@ -580,6 +647,120 @@ impl InspectorSystem {
                     spawn_point_id,
                     scenes,
                 );
+            }
+            RuleAction::DamageEntity { target, amount } => {
+                changed |= Self::render_rule_target_editor(
+                    ui,
+                    ctx.scene_name,
+                    ctx.rule_index,
+                    ctx.action_index,
+                    target,
+                );
+
+                ui.horizontal(|ui| {
+                    ui.label("Amount:");
+                    changed |= ui
+                        .add(egui::DragValue::new(amount).speed(1.0).range(0..=9999))
+                        .changed();
+                });
+            }
+            RuleAction::HealEntity { target, amount } => {
+                changed |= Self::render_rule_target_editor(
+                    ui,
+                    ctx.scene_name,
+                    ctx.rule_index,
+                    ctx.action_index,
+                    target,
+                );
+
+                ui.horizontal(|ui| {
+                    ui.label("Amount:");
+                    changed |= ui
+                        .add(egui::DragValue::new(amount).speed(1.0).range(0..=9999))
+                        .changed();
+                });
+            }
+            RuleAction::AddInventoryItem {
+                target,
+                item_id,
+                count,
+            } => {
+                changed |= Self::render_rule_target_editor(
+                    ui,
+                    ctx.scene_name,
+                    ctx.rule_index,
+                    ctx.action_index,
+                    target,
+                );
+
+                ui.horizontal(|ui| {
+                    ui.label("Item Id:");
+                    changed |= ui.text_edit_singleline(item_id).changed();
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Count:");
+                    changed |= ui
+                        .add(egui::DragValue::new(count).speed(1.0).range(1..=9999))
+                        .changed();
+                });
+            }
+            RuleAction::RemoveInventoryItem {
+                target,
+                item_id,
+                count,
+            } => {
+                changed |= Self::render_rule_target_editor(
+                    ui,
+                    ctx.scene_name,
+                    ctx.rule_index,
+                    ctx.action_index,
+                    target,
+                );
+
+                ui.horizontal(|ui| {
+                    ui.label("Item Id:");
+                    changed |= ui.text_edit_singleline(item_id).changed();
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Count:");
+                    changed |= ui
+                        .add(egui::DragValue::new(count).speed(1.0).range(1..=9999))
+                        .changed();
+                });
+            }
+            RuleAction::SetEntityActive { target, active } => {
+                changed |= Self::render_rule_target_editor(
+                    ui,
+                    ctx.scene_name,
+                    ctx.rule_index,
+                    ctx.action_index,
+                    target,
+                );
+
+                ui.horizontal(|ui| {
+                    changed |= ui.checkbox(active, "Active").changed();
+                });
+            }
+            RuleAction::TeleportEntity { target, position } => {
+                changed |= Self::render_rule_target_editor(
+                    ui,
+                    ctx.scene_name,
+                    ctx.rule_index,
+                    ctx.action_index,
+                    target,
+                );
+
+                ui.horizontal(|ui| {
+                    ui.label("Position:");
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut position[0]).speed(1.0))
+                        .changed();
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut position[1]).speed(1.0))
+                        .changed();
+                });
             }
         }
 

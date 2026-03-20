@@ -114,6 +114,41 @@ impl PanelSystem {
                 scene_name,
                 spawn_point_id,
             } => format!("SwitchScene({} -> {})", scene_name, spawn_point_id),
+            RuleAction::DamageEntity { target, amount } => {
+                format!("DamageEntity({}, {})", Self::target_label(*target), amount)
+            }
+            RuleAction::HealEntity { target, amount } => {
+                format!("HealEntity({}, {})", Self::target_label(*target), amount)
+            }
+            RuleAction::AddInventoryItem {
+                target,
+                item_id,
+                count,
+            } => format!(
+                "AddItem({}, {}, {})",
+                Self::target_label(*target),
+                item_id,
+                count
+            ),
+            RuleAction::RemoveInventoryItem {
+                target,
+                item_id,
+                count,
+            } => format!(
+                "RemoveItem({}, {}, {})",
+                Self::target_label(*target),
+                item_id,
+                count
+            ),
+            RuleAction::SetEntityActive { target, active } => {
+                format!("SetActive({}, {})", Self::target_label(*target), active)
+            }
+            RuleAction::TeleportEntity { target, position } => format!(
+                "Teleport({}, {}, {})",
+                Self::target_label(*target),
+                position[0],
+                position[1]
+            ),
         }
     }
 
@@ -285,6 +320,12 @@ impl PanelSystem {
             RuleAction::Spawn { .. } => GraphActionKind::Spawn,
             RuleAction::DestroySelf { .. } => GraphActionKind::DestroySelf,
             RuleAction::SwitchScene { .. } => GraphActionKind::SwitchScene,
+            RuleAction::DamageEntity { .. } => GraphActionKind::DamageEntity,
+            RuleAction::HealEntity { .. } => GraphActionKind::HealEntity,
+            RuleAction::AddInventoryItem { .. } => GraphActionKind::AddInventoryItem,
+            RuleAction::RemoveInventoryItem { .. } => GraphActionKind::RemoveInventoryItem,
+            RuleAction::SetEntityActive { .. } => GraphActionKind::SetEntityActive,
+            RuleAction::TeleportEntity { .. } => GraphActionKind::TeleportEntity,
         }
     }
 
@@ -297,6 +338,12 @@ impl PanelSystem {
             GraphActionKind::Spawn => "Spawn",
             GraphActionKind::DestroySelf => "DestroySelf",
             GraphActionKind::SwitchScene => "SwitchScene",
+            GraphActionKind::DamageEntity => "DamageEntity",
+            GraphActionKind::HealEntity => "HealEntity",
+            GraphActionKind::AddInventoryItem => "AddInventoryItem",
+            GraphActionKind::RemoveInventoryItem => "RemoveInventoryItem",
+            GraphActionKind::SetEntityActive => "SetEntityActive",
+            GraphActionKind::TeleportEntity => "TeleportEntity",
         }
     }
 
@@ -327,6 +374,32 @@ impl PanelSystem {
             GraphActionKind::SwitchScene => RuleAction::SwitchScene {
                 scene_name: String::new(),
                 spawn_point_id: String::new(),
+            },
+            GraphActionKind::DamageEntity => RuleAction::DamageEntity {
+                target: RuleTarget::TriggerOther,
+                amount: 10,
+            },
+            GraphActionKind::HealEntity => RuleAction::HealEntity {
+                target: RuleTarget::Player,
+                amount: 10,
+            },
+            GraphActionKind::AddInventoryItem => RuleAction::AddInventoryItem {
+                target: RuleTarget::Player,
+                item_id: String::new(),
+                count: 1,
+            },
+            GraphActionKind::RemoveInventoryItem => RuleAction::RemoveInventoryItem {
+                target: RuleTarget::Player,
+                item_id: String::new(),
+                count: 1,
+            },
+            GraphActionKind::SetEntityActive => RuleAction::SetEntityActive {
+                target: RuleTarget::TriggerOther,
+                active: false,
+            },
+            GraphActionKind::TeleportEntity => RuleAction::TeleportEntity {
+                target: RuleTarget::Player,
+                position: [0, 0],
             },
         }
     }
@@ -522,6 +595,57 @@ impl PanelSystem {
                 ui.end_row();
                 ui.label("Spawn Point");
                 changed |= ui.text_edit_singleline(spawn_point_id).changed();
+                changed
+            }
+            RuleAction::DamageEntity { target, amount } => {
+                let mut changed =
+                    Self::edit_rule_target(ui, target, &format!("{id_prefix}::damage_target"));
+                changed |= ui.add(egui::DragValue::new(amount).speed(1.0)).changed();
+                changed
+            }
+            RuleAction::HealEntity { target, amount } => {
+                let mut changed =
+                    Self::edit_rule_target(ui, target, &format!("{id_prefix}::heal_target"));
+                changed |= ui.add(egui::DragValue::new(amount).speed(1.0)).changed();
+                changed
+            }
+            RuleAction::AddInventoryItem {
+                target,
+                item_id,
+                count,
+            } => {
+                let mut changed =
+                    Self::edit_rule_target(ui, target, &format!("{id_prefix}::add_inv_target"));
+                changed |= ui.text_edit_singleline(item_id).changed();
+                changed |= ui.add(egui::DragValue::new(count).speed(1.0)).changed();
+                changed
+            }
+            RuleAction::RemoveInventoryItem {
+                target,
+                item_id,
+                count,
+            } => {
+                let mut changed =
+                    Self::edit_rule_target(ui, target, &format!("{id_prefix}::rem_inv_target"));
+                changed |= ui.text_edit_singleline(item_id).changed();
+                changed |= ui.add(egui::DragValue::new(count).speed(1.0)).changed();
+                changed
+            }
+            RuleAction::SetEntityActive { target, active } => {
+                let mut changed =
+                    Self::edit_rule_target(ui, target, &format!("{id_prefix}::active_target"));
+                changed |= ui.checkbox(active, "Active").changed();
+                changed
+            }
+            RuleAction::TeleportEntity { target, position } => {
+                let mut changed =
+                    Self::edit_rule_target(ui, target, &format!("{id_prefix}::teleport_target"));
+                changed |= ui
+                    .add(egui::DragValue::new(&mut position[0]).speed(1.0))
+                    .changed();
+                changed |= ui
+                    .add(egui::DragValue::new(&mut position[1]).speed(1.0))
+                    .changed();
                 changed
             }
         }
@@ -764,6 +888,12 @@ impl PanelSystem {
                             GraphActionKind::Spawn,
                             GraphActionKind::DestroySelf,
                             GraphActionKind::SwitchScene,
+                            GraphActionKind::DamageEntity,
+                            GraphActionKind::HealEntity,
+                            GraphActionKind::AddInventoryItem,
+                            GraphActionKind::RemoveInventoryItem,
+                            GraphActionKind::SetEntityActive,
+                            GraphActionKind::TeleportEntity,
                         ] {
                             ui.selectable_value(
                                 &mut kind,
