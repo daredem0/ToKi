@@ -1,3 +1,4 @@
+use super::rules::CollisionEvent;
 use super::{AudioChannel, AudioEvent, GameState, InputKey};
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
@@ -5,6 +6,14 @@ use crate::collision;
 use crate::entity::{EntityId, MovementSoundTrigger};
 use crate::events::GameUpdateResult;
 use std::collections::HashMap;
+
+/// Result of checking movement collision.
+struct MovementCollisionResult {
+    /// Whether movement is blocked.
+    blocked: bool,
+    /// The entity that caused the collision, if entity-entity collision.
+    collided_with: Option<EntityId>,
+}
 
 impl GameState {
     pub(super) fn movement_delta_from_keys(keys: &[InputKey]) -> glam::IVec2 {
@@ -87,7 +96,13 @@ impl GameState {
             return false;
         }
 
-        if self.can_entity_move_to_position(entity_id, new_position, tilemap, atlas) {
+        // Check for collisions and identify the colliding entity if any
+        let collision_result = self.check_movement_collision(entity_id, new_position, tilemap, atlas);
+
+        if collision_result.blocked {
+            self.handle_entity_collision_blocked(entity_id, collision_result.collided_with, result);
+            false
+        } else {
             if let Some((entity, entity_audio)) =
                 self.entity_manager.get_entity_with_audio_mut(entity_id)
             {
@@ -95,15 +110,59 @@ impl GameState {
                 entity_audio.last_collision_state = false;
             }
             true
-        } else {
-            self.handle_entity_collision_blocked(entity_id, result);
-            false
         }
     }
 
+    /// Checks if an entity can move to a position and identifies what blocked it.
+    fn check_movement_collision(
+        &self,
+        entity_id: EntityId,
+        new_position: glam::IVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> MovementCollisionResult {
+        let Some(entity) = self.entity_manager.get_entity(entity_id) else {
+            return MovementCollisionResult {
+                blocked: true,
+                collided_with: None,
+            };
+        };
+
+        // Check tile collision first
+        if !collision::can_entity_move_to_position(entity, new_position, tilemap, atlas) {
+            return MovementCollisionResult {
+                blocked: true,
+                collided_with: None, // Tile collision, no entity involved
+            };
+        }
+
+        // Check entity-entity collision
+        if let Some(colliding_entity) = self
+            .entity_manager
+            .find_colliding_entity(entity_id, new_position)
+        {
+            return MovementCollisionResult {
+                blocked: true,
+                collided_with: Some(colliding_entity),
+            };
+        }
+
+        MovementCollisionResult {
+            blocked: false,
+            collided_with: None,
+        }
+    }
+
+    /// Handles collision blocking for an entity.
+    ///
+    /// # Parameters
+    /// - `entity_id`: The entity that was blocked
+    /// - `collided_with`: The entity that caused the collision (if entity-entity collision)
+    /// - `result`: Audio event accumulator
     pub(super) fn handle_entity_collision_blocked(
         &mut self,
         entity_id: EntityId,
+        collided_with: Option<EntityId>,
         result: &mut GameUpdateResult<AudioEvent>,
     ) {
         let source_position = self
@@ -111,7 +170,11 @@ impl GameState {
             .get_entity(entity_id)
             .map(|entity| entity.position);
         let Some(entity_audio) = self.entity_manager.audio_component_mut(entity_id) else {
-            self.rule_runtime.frame_collision_detected = true;
+            // Record collision event even without audio component
+            self.rule_runtime.frame_collisions.push(CollisionEvent {
+                entity_a: entity_id,
+                entity_b: collided_with,
+            });
             return;
         };
 
@@ -129,7 +192,11 @@ impl GameState {
                     hearing_radius: Some(entity_audio.hearing_radius),
                 });
             }
-            self.rule_runtime.frame_collision_detected = true;
+            // Record collision event (with or without entity context)
+            self.rule_runtime.frame_collisions.push(CollisionEvent {
+                entity_a: entity_id,
+                entity_b: collided_with,
+            });
         }
         entity_audio.last_collision_state = true;
     }
@@ -408,8 +475,15 @@ impl GameState {
                 continue;
             }
 
-            if !self.can_entity_move_to_position(entity_id, candidate_position, tilemap, atlas) {
-                self.handle_entity_collision_blocked(entity_id, result);
+            let collision_result =
+                self.check_movement_collision(entity_id, candidate_position, tilemap, atlas);
+
+            if collision_result.blocked {
+                self.handle_entity_collision_blocked(
+                    entity_id,
+                    collision_result.collided_with,
+                    result,
+                );
                 continue;
             }
 

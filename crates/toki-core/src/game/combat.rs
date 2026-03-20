@@ -4,6 +4,7 @@ use crate::collision::CollisionBox;
 use crate::entity::{Entity, EntityId, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID};
 
 use super::animation::FacingDirection;
+use super::rules::{DamageEvent, DeathEvent};
 use super::{GameState, InputAction};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -363,11 +364,19 @@ impl GameState {
             );
 
             if change.stat_id == HEALTH_STAT_ID && change.delta < 0 {
-                self.rule_runtime.frame_damage_detected = true;
+                // Record damage event with victim/attacker context
+                self.rule_runtime.frame_damage_events.push(DamageEvent {
+                    victim: change.target_entity_id,
+                    attacker: change.source_entity_id,
+                });
             }
 
             if change.stat_id == HEALTH_STAT_ID && new_value <= 0 {
-                self.rule_runtime.frame_death_detected = true;
+                // Record death event with victim/attacker context
+                self.rule_runtime.frame_death_events.push(DeathEvent {
+                    victim: change.target_entity_id,
+                    attacker: change.source_entity_id,
+                });
                 tracing::info!(
                     "Entity {} reached zero {} and will be despawned",
                     change.target_entity_id,

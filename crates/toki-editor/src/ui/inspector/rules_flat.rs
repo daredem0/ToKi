@@ -680,6 +680,9 @@ impl InspectorSystem {
             .selected_text(match target {
                 RuleTarget::Player => "Player",
                 RuleTarget::Entity(_) => "Entity",
+                RuleTarget::RuleOwner => "RuleOwner",
+                RuleTarget::TriggerSelf => "TriggerSelf",
+                RuleTarget::TriggerOther => "TriggerOther",
             })
             .show_ui(ui, |ui| {
                 if ui
@@ -697,6 +700,33 @@ impl InspectorSystem {
                     && !matches!(target, RuleTarget::Entity(_))
                 {
                     *target = RuleTarget::Entity(1);
+                    changed = true;
+                }
+
+                if ui
+                    .selectable_label(matches!(target, RuleTarget::TriggerSelf), "TriggerSelf")
+                    .clicked()
+                    && !matches!(target, RuleTarget::TriggerSelf)
+                {
+                    *target = RuleTarget::TriggerSelf;
+                    changed = true;
+                }
+
+                if ui
+                    .selectable_label(matches!(target, RuleTarget::TriggerOther), "TriggerOther")
+                    .clicked()
+                    && !matches!(target, RuleTarget::TriggerOther)
+                {
+                    *target = RuleTarget::TriggerOther;
+                    changed = true;
+                }
+
+                if ui
+                    .selectable_label(matches!(target, RuleTarget::RuleOwner), "RuleOwner")
+                    .clicked()
+                    && !matches!(target, RuleTarget::RuleOwner)
+                {
+                    *target = RuleTarget::RuleOwner;
                     changed = true;
                 }
             });
@@ -741,6 +771,9 @@ impl InspectorSystem {
             .selected_text(match target {
                 RuleTarget::Player => "Player",
                 RuleTarget::Entity(_) => "Entity",
+                RuleTarget::RuleOwner => "RuleOwner",
+                RuleTarget::TriggerSelf => "TriggerSelf",
+                RuleTarget::TriggerOther => "TriggerOther",
             })
             .show_ui(ui, |ui| {
                 if ui
@@ -758,6 +791,33 @@ impl InspectorSystem {
                     && !matches!(target, RuleTarget::Entity(_))
                 {
                     *target = RuleTarget::Entity(1);
+                    changed = true;
+                }
+
+                if ui
+                    .selectable_label(matches!(target, RuleTarget::TriggerSelf), "TriggerSelf")
+                    .clicked()
+                    && !matches!(target, RuleTarget::TriggerSelf)
+                {
+                    *target = RuleTarget::TriggerSelf;
+                    changed = true;
+                }
+
+                if ui
+                    .selectable_label(matches!(target, RuleTarget::TriggerOther), "TriggerOther")
+                    .clicked()
+                    && !matches!(target, RuleTarget::TriggerOther)
+                {
+                    *target = RuleTarget::TriggerOther;
+                    changed = true;
+                }
+
+                if ui
+                    .selectable_label(matches!(target, RuleTarget::RuleOwner), "RuleOwner")
+                    .clicked()
+                    && !matches!(target, RuleTarget::RuleOwner)
+                {
+                    *target = RuleTarget::RuleOwner;
                     changed = true;
                 }
             });

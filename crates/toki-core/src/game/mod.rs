@@ -146,9 +146,9 @@ impl GameState {
     ) -> GameUpdateResult<AudioEvent> {
         let mut result = GameUpdateResult::new();
         let mut rule_commands = Vec::new();
-        self.rule_runtime.frame_collision_detected = false;
-        self.rule_runtime.frame_damage_detected = false;
-        self.rule_runtime.frame_death_detected = false;
+        self.rule_runtime.frame_collisions.clear();
+        self.rule_runtime.frame_damage_events.clear();
+        self.rule_runtime.frame_death_events.clear();
 
         if !self.rule_runtime.started {
             self.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut rule_commands);
@@ -225,24 +225,55 @@ impl GameState {
                 &mut reactive_rule_commands,
             );
         }
-        if self.rule_runtime.frame_collision_detected {
-            self.collect_rule_commands_for_trigger(
-                RuleTrigger::OnCollision,
-                &mut reactive_rule_commands,
-            );
+
+        // Fire collision triggers with context for each collision event
+        {
+            use crate::rules::TriggerContext;
+            let collision_events = std::mem::take(&mut self.rule_runtime.frame_collisions);
+            for event in collision_events {
+                let context = if let Some(entity_b) = event.entity_b {
+                    TriggerContext::with_pair(event.entity_a, entity_b)
+                } else {
+                    TriggerContext::with_self_only(event.entity_a)
+                };
+                self.collect_rule_commands_for_trigger_with_context(
+                    RuleTrigger::OnCollision,
+                    context,
+                    &mut reactive_rule_commands,
+                );
+            }
+
+            // Fire damage triggers with context for each damage event
+            let damage_events = std::mem::take(&mut self.rule_runtime.frame_damage_events);
+            for event in damage_events {
+                let context = if let Some(attacker) = event.attacker {
+                    TriggerContext::with_pair(event.victim, attacker)
+                } else {
+                    TriggerContext::with_self_only(event.victim)
+                };
+                self.collect_rule_commands_for_trigger_with_context(
+                    RuleTrigger::OnDamaged,
+                    context,
+                    &mut reactive_rule_commands,
+                );
+            }
+
+            // Fire death triggers with context for each death event
+            let death_events = std::mem::take(&mut self.rule_runtime.frame_death_events);
+            for event in death_events {
+                let context = if let Some(attacker) = event.attacker {
+                    TriggerContext::with_pair(event.victim, attacker)
+                } else {
+                    TriggerContext::with_self_only(event.victim)
+                };
+                self.collect_rule_commands_for_trigger_with_context(
+                    RuleTrigger::OnDeath,
+                    context,
+                    &mut reactive_rule_commands,
+                );
+            }
         }
-        if self.rule_runtime.frame_damage_detected {
-            self.collect_rule_commands_for_trigger(
-                RuleTrigger::OnDamaged,
-                &mut reactive_rule_commands,
-            );
-        }
-        if self.rule_runtime.frame_death_detected {
-            self.collect_rule_commands_for_trigger(
-                RuleTrigger::OnDeath,
-                &mut reactive_rule_commands,
-            );
-        }
+
         if self.any_entity_overlaps_trigger_tile(tilemap, atlas) {
             self.collect_rule_commands_for_trigger(
                 RuleTrigger::OnTrigger,
@@ -304,9 +335,9 @@ impl GameState {
     ) -> GameUpdateResult<AudioEvent> {
         let mut result = GameUpdateResult::new();
         let mut rule_commands = Vec::new();
-        self.rule_runtime.frame_collision_detected = false;
-        self.rule_runtime.frame_damage_detected = false;
-        self.rule_runtime.frame_death_detected = false;
+        self.rule_runtime.frame_collisions.clear();
+        self.rule_runtime.frame_damage_events.clear();
+        self.rule_runtime.frame_death_events.clear();
 
         if !self.rule_runtime.started {
             self.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut rule_commands);
@@ -414,24 +445,60 @@ impl GameState {
         atlas: &AtlasMeta,
         reactive_rule_commands: &mut Vec<rules::RuleCommand>,
     ) {
+        use crate::rules::TriggerContext;
+
         if result.player_moved {
             self.collect_rule_commands_for_trigger(
                 RuleTrigger::OnPlayerMove,
                 reactive_rule_commands,
             );
         }
-        if self.rule_runtime.frame_collision_detected {
-            self.collect_rule_commands_for_trigger(
+
+        // Fire collision triggers with context for each collision event
+        let collision_events = std::mem::take(&mut self.rule_runtime.frame_collisions);
+        for event in collision_events {
+            let context = if let Some(entity_b) = event.entity_b {
+                TriggerContext::with_pair(event.entity_a, entity_b)
+            } else {
+                TriggerContext::with_self_only(event.entity_a)
+            };
+            self.collect_rule_commands_for_trigger_with_context(
                 RuleTrigger::OnCollision,
+                context,
                 reactive_rule_commands,
             );
         }
-        if self.rule_runtime.frame_damage_detected {
-            self.collect_rule_commands_for_trigger(RuleTrigger::OnDamaged, reactive_rule_commands);
+
+        // Fire damage triggers with context for each damage event
+        let damage_events = std::mem::take(&mut self.rule_runtime.frame_damage_events);
+        for event in damage_events {
+            let context = if let Some(attacker) = event.attacker {
+                TriggerContext::with_pair(event.victim, attacker)
+            } else {
+                TriggerContext::with_self_only(event.victim)
+            };
+            self.collect_rule_commands_for_trigger_with_context(
+                RuleTrigger::OnDamaged,
+                context,
+                reactive_rule_commands,
+            );
         }
-        if self.rule_runtime.frame_death_detected {
-            self.collect_rule_commands_for_trigger(RuleTrigger::OnDeath, reactive_rule_commands);
+
+        // Fire death triggers with context for each death event
+        let death_events = std::mem::take(&mut self.rule_runtime.frame_death_events);
+        for event in death_events {
+            let context = if let Some(attacker) = event.attacker {
+                TriggerContext::with_pair(event.victim, attacker)
+            } else {
+                TriggerContext::with_self_only(event.victim)
+            };
+            self.collect_rule_commands_for_trigger_with_context(
+                RuleTrigger::OnDeath,
+                context,
+                reactive_rule_commands,
+            );
         }
+
         if self.any_entity_overlaps_trigger_tile(tilemap, atlas) {
             self.collect_rule_commands_for_trigger(RuleTrigger::OnTrigger, reactive_rule_commands);
         }

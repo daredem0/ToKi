@@ -659,14 +659,23 @@ impl EntityManager {
         moving_entity_id: EntityId,
         new_position: IVec2,
     ) -> bool {
-        let Some(moving_entity) = self.entities.get(&moving_entity_id) else {
-            return false;
-        };
-        let Some(moving_box) = &moving_entity.collision_box else {
-            return false;
-        };
+        self.find_colliding_entity(moving_entity_id, new_position)
+            .is_some()
+    }
+
+    /// Finds the first solid entity that would collide with `moving_entity_id`
+    /// if it moved to `new_position`.
+    ///
+    /// Returns `Some(entity_id)` of the colliding entity, or `None` if no collision.
+    pub fn find_colliding_entity(
+        &self,
+        moving_entity_id: EntityId,
+        new_position: IVec2,
+    ) -> Option<EntityId> {
+        let moving_entity = self.entities.get(&moving_entity_id)?;
+        let moving_box = moving_entity.collision_box.as_ref()?;
         if moving_box.trigger || !moving_entity.attributes.solid {
-            return false;
+            return None;
         }
 
         let (moving_pos, moving_size) = moving_box.world_bounds(new_position);
@@ -692,11 +701,11 @@ impl EntityManager {
 
             let (other_pos, other_size) = other_box.world_bounds(other_entity.position);
             if crate::collision::aabb_overlap(moving_pos, moving_size, other_pos, other_size) {
-                return true;
+                return Some(*other_id);
             }
         }
 
-        false
+        None
     }
 
     pub fn visible_entities(&self) -> Vec<EntityId> {

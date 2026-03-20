@@ -7,19 +7,50 @@ use crate::entity::{AiBehavior, Entity, EntityAttributes, EntityId, EntityKind};
 use crate::events::GameUpdateResult;
 use crate::rules::{
     Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleSpawnEntityType, RuleTarget,
-    RuleTrigger,
+    RuleTrigger, TriggerContext,
 };
 
 use super::{AudioChannel, AudioEvent, GameState};
+
+/// A collision event between an entity and another entity or the world.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CollisionEvent {
+    /// The entity that was moving/checking collision.
+    pub entity_a: EntityId,
+    /// The entity that was collided with, if entity-entity collision.
+    /// `None` for tile/world collisions.
+    pub entity_b: Option<EntityId>,
+}
+
+/// A damage event recording who was damaged and by whom.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DamageEvent {
+    /// The entity that received damage.
+    pub victim: EntityId,
+    /// The entity that caused the damage, if known.
+    pub attacker: Option<EntityId>,
+}
+
+/// A death event recording who died and who caused it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeathEvent {
+    /// The entity that died.
+    pub victim: EntityId,
+    /// The entity that caused the death, if known.
+    pub attacker: Option<EntityId>,
+}
 
 #[derive(Debug, Default)]
 pub(super) struct RuleRuntimeState {
     pub(super) started: bool,
     pub(super) fired_once_rules: HashSet<String>,
     pub(super) velocities: HashMap<EntityId, glam::IVec2>,
-    pub(super) frame_collision_detected: bool,
-    pub(super) frame_damage_detected: bool,
-    pub(super) frame_death_detected: bool,
+    /// Collision events that occurred this frame.
+    pub(super) frame_collisions: Vec<CollisionEvent>,
+    /// Damage events that occurred this frame.
+    pub(super) frame_damage_events: Vec<DamageEvent>,
+    /// Death events that occurred this frame.
+    pub(super) frame_death_events: Vec<DeathEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,9 +103,35 @@ impl GameState {
         self.rules.rules.push(rule);
     }
 
+    /// Collects rule commands for a trigger without context.
+    /// Use `collect_rule_commands_for_trigger_with_context` for triggers that provide context.
     pub(super) fn collect_rule_commands_for_trigger(
         &mut self,
         trigger: RuleTrigger,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        self.collect_rule_commands_for_trigger_with_context(
+            trigger,
+            TriggerContext::empty(),
+            command_buffer,
+        );
+    }
+
+    /// Collects rule commands for a trigger with entity context.
+    ///
+    /// # Architecture Note (for Phase 1.5B+ implementers)
+    ///
+    /// This is the core rule evaluation entry point when context is available.
+    /// The `context` parameter provides `trigger_self` and `trigger_other` entity IDs
+    /// that can be referenced via `RuleTarget::TriggerSelf` and `RuleTarget::TriggerOther`.
+    ///
+    /// When adding new context-providing triggers:
+    /// 1. Fire this method with appropriate `TriggerContext`
+    /// 2. Ensure conditions/actions using `TriggerSelf`/`TriggerOther` work correctly
+    pub(super) fn collect_rule_commands_for_trigger_with_context(
+        &mut self,
+        trigger: RuleTrigger,
+        context: TriggerContext,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
         let mut matching_rules = self
@@ -95,12 +152,12 @@ impl GameState {
         matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
 
         for rule in matching_rules {
-            if !self.rule_conditions_match(&rule.conditions) {
+            if !self.rule_conditions_match(&rule.conditions, &context) {
                 continue;
             }
 
             for action in &rule.actions {
-                self.buffer_rule_action(action, command_buffer);
+                self.buffer_rule_action(action, &context, command_buffer);
             }
 
             if rule.once {
@@ -185,24 +242,33 @@ impl GameState {
         false
     }
 
-    fn rule_conditions_match(&self, conditions: &[RuleCondition]) -> bool {
+    fn rule_conditions_match(
+        &self,
+        conditions: &[RuleCondition],
+        context: &TriggerContext,
+    ) -> bool {
         conditions.iter().all(|condition| match condition {
             RuleCondition::Always => true,
             RuleCondition::TargetExists { target } => self
-                .resolve_rule_target(*target)
+                .resolve_rule_target(*target, context)
                 .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
                 .is_some(),
             RuleCondition::KeyHeld { key } => {
                 self.all_held_keys().contains(&Self::to_input_key(*key))
             }
             RuleCondition::EntityActive { target, is_active } => self
-                .resolve_rule_target(*target)
+                .resolve_rule_target(*target, context)
                 .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
                 .is_some_and(|entity| entity.attributes.active == *is_active),
         })
     }
 
-    fn buffer_rule_action(&self, action: &RuleAction, command_buffer: &mut Vec<RuleCommand>) {
+    fn buffer_rule_action(
+        &self,
+        action: &RuleAction,
+        context: &TriggerContext,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
         match action {
             RuleAction::PlaySound { channel, sound_id } => {
                 let sound_id = sound_id.trim();
@@ -230,7 +296,7 @@ impl GameState {
                 });
             }
             RuleAction::PlayAnimation { target, state } => {
-                if let Some(entity_id) = self.resolve_rule_target(*target) {
+                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
                     command_buffer.push(RuleCommand::PlayAnimation {
                         entity_id,
                         state: *state,
@@ -238,7 +304,7 @@ impl GameState {
                 }
             }
             RuleAction::SetVelocity { target, velocity } => {
-                if let Some(entity_id) = self.resolve_rule_target(*target) {
+                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
                     command_buffer.push(RuleCommand::SetVelocity {
                         entity_id,
                         velocity: glam::IVec2::new(velocity[0], velocity[1]),
@@ -255,7 +321,7 @@ impl GameState {
                 });
             }
             RuleAction::DestroySelf { target } => {
-                if let Some(entity_id) = self.resolve_rule_target(*target) {
+                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
                     command_buffer.push(RuleCommand::DestroySelf { entity_id });
                 }
             }
@@ -339,10 +405,29 @@ impl GameState {
         (pending_animations, pending_scene_switch)
     }
 
-    fn resolve_rule_target(&self, target: RuleTarget) -> Option<EntityId> {
+    /// Resolves a rule target to an entity ID using the current trigger context.
+    ///
+    /// # Architecture Note (for Phase 1.5B+ implementers)
+    ///
+    /// This method handles all `RuleTarget` variants:
+    /// - `Player`: Returns the player entity ID
+    /// - `Entity(id)`: Returns the specified entity ID directly
+    /// - `TriggerSelf`: Returns `context.trigger_self` (the primary subject)
+    /// - `TriggerOther`: Returns `context.trigger_other` (the secondary entity)
+    /// - `RuleOwner`: Currently returns `None` for scene-owned rules.
+    ///   When entity-owned rules are added, this should return the owning entity.
+    ///
+    /// Returns `None` if the target cannot be resolved (e.g., no player, context missing).
+    fn resolve_rule_target(&self, target: RuleTarget, context: &TriggerContext) -> Option<EntityId> {
         match target {
             RuleTarget::Player => self.player_id,
             RuleTarget::Entity(entity_id) => Some(entity_id),
+            RuleTarget::TriggerSelf => context.trigger_self,
+            RuleTarget::TriggerOther => context.trigger_other,
+            // RuleOwner is only valid for entity-owned rules.
+            // Currently all rules are scene-owned, so this returns None.
+            // When entity-owned rules are added, pass the owner ID through context.
+            RuleTarget::RuleOwner => None,
         }
     }
 

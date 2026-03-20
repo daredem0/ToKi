@@ -89,6 +89,9 @@ impl PanelSystem {
         match target {
             RuleTarget::Player => "Player".to_string(),
             RuleTarget::Entity(entity_id) => format!("Entity({})", entity_id),
+            RuleTarget::RuleOwner => "RuleOwner".to_string(),
+            RuleTarget::TriggerSelf => "TriggerSelf".to_string(),
+            RuleTarget::TriggerOther => "TriggerOther".to_string(),
         }
     }
 
@@ -364,6 +367,9 @@ impl PanelSystem {
             .selected_text(match target {
                 RuleTarget::Player => "Player",
                 RuleTarget::Entity(_) => "Entity",
+                RuleTarget::RuleOwner => "RuleOwner",
+                RuleTarget::TriggerSelf => "TriggerSelf",
+                RuleTarget::TriggerOther => "TriggerOther",
             })
             .show_ui(ui, |ui| {
                 changed |= ui
@@ -371,7 +377,10 @@ impl PanelSystem {
                     .changed();
                 let entity_label = match target {
                     RuleTarget::Entity(entity_id) => format!("Entity({})", entity_id),
-                    RuleTarget::Player => "Entity(0)".to_string(),
+                    RuleTarget::Player
+                    | RuleTarget::RuleOwner
+                    | RuleTarget::TriggerSelf
+                    | RuleTarget::TriggerOther => "Entity(0)".to_string(),
                 };
                 if ui
                     .selectable_label(matches!(target, RuleTarget::Entity(_)), entity_label)
@@ -381,6 +390,15 @@ impl PanelSystem {
                     *target = RuleTarget::Entity(0);
                     changed = true;
                 }
+                changed |= ui
+                    .selectable_value(target, RuleTarget::TriggerSelf, "TriggerSelf")
+                    .changed();
+                changed |= ui
+                    .selectable_value(target, RuleTarget::TriggerOther, "TriggerOther")
+                    .changed();
+                changed |= ui
+                    .selectable_value(target, RuleTarget::RuleOwner, "RuleOwner")
+                    .changed();
             });
 
         if let RuleTarget::Entity(entity_id) = target {

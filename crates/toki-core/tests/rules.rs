@@ -1744,3 +1744,230 @@ fn sync_entities_to_active_scene_persists_rules() {
     assert_eq!(active_scene.rules.rules.len(), 1);
     assert_eq!(active_scene.rules.rules[0].id, "persist-me");
 }
+
+// ============================================================================
+// Phase 1.5A: Trigger Context Tests
+// ============================================================================
+
+#[test]
+fn on_collision_with_trigger_self_condition_resolves_correctly() {
+    // Tests that TriggerSelf resolves to the colliding entity
+    // and can be used in conditions/actions
+    let mut state = GameState::new_empty();
+    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    state
+        .entity_manager_mut()
+        .audio_component_mut(player_id)
+        .expect("player audio should exist")
+        .collision_sound = None;
+
+    // Rule uses TargetExists with TriggerSelf - should match when collision context is present
+    state.set_rules(RuleSet {
+        rules: vec![Rule {
+            id: "context-rule".to_string(),
+            enabled: true,
+            priority: 0,
+            once: false,
+            trigger: RuleTrigger::OnCollision,
+            conditions: vec![RuleCondition::TargetExists {
+                target: RuleTarget::TriggerSelf,
+            }],
+            actions: vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Collision,
+                sound_id: "trigger_self_matched".to_string(),
+            }],
+        }],
+    });
+
+    state.handle_key_press(InputKey::Right);
+    let blocked = state.update(
+        UVec2::new(256, 256),
+        &create_collision_test_tilemap(),
+        &create_collision_test_atlas(),
+    );
+
+    // TriggerSelf should resolve to the player entity (the one that collided)
+    assert!(blocked.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "trigger_self_matched"
+    )));
+}
+
+#[test]
+fn on_collision_with_trigger_other_condition_none_for_tile_collision() {
+    // For tile collisions, TriggerOther is None, so TargetExists should fail
+    let mut state = GameState::new_empty();
+    let player_id = state.spawn_player_at(IVec2::new(0, 0));
+    state
+        .entity_manager_mut()
+        .audio_component_mut(player_id)
+        .expect("player audio should exist")
+        .collision_sound = None;
+
+    // Rule requires TriggerOther to exist - should NOT match for tile collision
+    state.set_rules(RuleSet {
+        rules: vec![Rule {
+            id: "require-other-rule".to_string(),
+            enabled: true,
+            priority: 0,
+            once: false,
+            trigger: RuleTrigger::OnCollision,
+            conditions: vec![RuleCondition::TargetExists {
+                target: RuleTarget::TriggerOther,
+            }],
+            actions: vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Collision,
+                sound_id: "trigger_other_matched".to_string(),
+            }],
+        }],
+    });
+
+    state.handle_key_press(InputKey::Right);
+    let blocked = state.update(
+        UVec2::new(256, 256),
+        &create_collision_test_tilemap(),
+        &create_collision_test_atlas(),
+    );
+
+    // TriggerOther should be None for tile collision, so condition fails
+    assert!(!blocked.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "trigger_other_matched"
+    )));
+}
+
+#[test]
+fn on_damaged_with_trigger_self_refers_to_victim() {
+    // Tests that TriggerSelf in OnDamaged refers to the damaged entity (victim)
+    let mut state = GameState::new_empty();
+    let player_id = state.spawn_player_at(IVec2::new(50, 60));
+    let player = state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 120.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    // Spawn NPC to the right of player
+    state.spawn_player_like_npc(IVec2::new(66, 60));
+
+    // Rule uses TargetExists with TriggerSelf to verify victim is set
+    state.set_rules(RuleSet {
+        rules: vec![Rule {
+            id: "damage-context-rule".to_string(),
+            enabled: true,
+            priority: 0,
+            once: false,
+            trigger: RuleTrigger::OnDamaged,
+            conditions: vec![RuleCondition::TargetExists {
+                target: RuleTarget::TriggerSelf,
+            }],
+            actions: vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "victim_exists".to_string(),
+            }],
+        }],
+    });
+
+    state.handle_profile_action_press(
+        toki_core::entity::MovementProfile::PlayerWasd,
+        toki_core::game::InputAction::Primary,
+    );
+    let update = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    // TriggerSelf should resolve to the NPC (the victim)
+    assert!(update.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "victim_exists"
+    )));
+}
+
+#[test]
+fn on_damaged_with_trigger_other_refers_to_attacker() {
+    // Tests that TriggerOther in OnDamaged refers to the attacker
+    let mut state = GameState::new_empty();
+    let player_id = state.spawn_player_at(IVec2::new(50, 60));
+    let player = state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .expect("player should exist");
+    let controller = player
+        .attributes
+        .animation_controller
+        .as_mut()
+        .expect("player controller should exist");
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::IdleRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_duration_ms: 180.0,
+        loop_mode: toki_core::animation::LoopMode::Loop,
+    });
+    controller.add_clip(toki_core::animation::AnimationClip {
+        state: AnimationState::AttackRight,
+        atlas_name: "players.json".to_string(),
+        frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_duration_ms: 120.0,
+        loop_mode: toki_core::animation::LoopMode::Once,
+    });
+    controller.play(AnimationState::IdleRight);
+
+    // Spawn NPC to the right of player
+    state.spawn_player_like_npc(IVec2::new(66, 60));
+
+    // Rule uses TargetExists with TriggerOther to verify attacker is set
+    state.set_rules(RuleSet {
+        rules: vec![Rule {
+            id: "attacker-context-rule".to_string(),
+            enabled: true,
+            priority: 0,
+            once: false,
+            trigger: RuleTrigger::OnDamaged,
+            conditions: vec![RuleCondition::TargetExists {
+                target: RuleTarget::TriggerOther,
+            }],
+            actions: vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Movement,
+                sound_id: "attacker_exists".to_string(),
+            }],
+        }],
+    });
+
+    state.handle_profile_action_press(
+        toki_core::entity::MovementProfile::PlayerWasd,
+        toki_core::game::InputAction::Primary,
+    );
+    let update = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    // TriggerOther should resolve to the player (the attacker)
+    assert!(update.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "attacker_exists"
+    )));
+}
