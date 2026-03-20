@@ -913,3 +913,337 @@ fn ai_system_chase_transitions_from_wander_to_chase() {
         assert!(new_pos.x > 50, "Chaser should move toward player when in radius");
     }
 }
+
+// ============================================================================
+// RunAndMultiply Behavior Tests
+// ============================================================================
+
+#[test]
+fn ai_system_run_and_multiply_wanders_when_no_threats_or_mates() {
+    let mut ai_system = AiSystem::new();
+    let mut entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    // Player far away
+    let player = create_player_entity(1, IVec2::new(200, 200));
+    entity_manager.add_existing_entity(player);
+
+    // RunAndMultiply entity alone with no compatible entities
+    let entity = create_test_entity_with_detection_radius(
+        2,
+        IVec2::new(50, 50),
+        AiBehavior::RunAndMultiply,
+        64,
+    );
+    entity_manager.add_existing_entity(entity);
+
+    let results = ai_system.update(
+        &entity_manager,
+        entity_manager.get_player_id(),
+        UVec2::new(256, 256),
+        &tilemap,
+        &atlas,
+    );
+
+    assert_eq!(results.len(), 1);
+    // Should be wandering (starts in idle/wait phase)
+    assert_eq!(results[0].new_animation, Some(AnimationState::Idle));
+    assert!(results[0].spawn_request.is_none());
+}
+
+#[test]
+fn ai_system_run_and_multiply_flees_from_player() {
+    let mut ai_system = AiSystem::new();
+    let mut entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    // Player nearby
+    let player = create_player_entity(1, IVec2::new(100, 100));
+    entity_manager.add_existing_entity(player);
+
+    // RunAndMultiply entity within detection radius
+    let entity = create_test_entity_with_detection_radius(
+        2,
+        IVec2::new(120, 120),
+        AiBehavior::RunAndMultiply,
+        100,
+    );
+    entity_manager.add_existing_entity(entity);
+
+    let initial_distance = 28.28; // sqrt((120-100)^2 + (120-100)^2) ≈ 28.28
+
+    let results = ai_system.update(
+        &entity_manager,
+        entity_manager.get_player_id(),
+        UVec2::new(256, 256),
+        &tilemap,
+        &atlas,
+    );
+
+    assert_eq!(results.len(), 1);
+    if let Some(new_pos) = results[0].new_position {
+        let new_distance = ((new_pos.x - 100) as f32).hypot((new_pos.y - 100) as f32);
+        assert!(
+            new_distance > initial_distance,
+            "RunAndMultiply should flee: initial={}, new={}",
+            initial_distance,
+            new_distance
+        );
+    }
+}
+
+#[test]
+fn ai_system_run_and_multiply_seeks_compatible_entity() {
+    let mut ai_system = AiSystem::new();
+    let mut entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    // Player far away
+    let player = create_player_entity(1, IVec2::new(200, 200));
+    entity_manager.add_existing_entity(player);
+
+    // First RunAndMultiply entity
+    let entity1 = create_test_entity_with_detection_radius(
+        2,
+        IVec2::new(50, 50),
+        AiBehavior::RunAndMultiply,
+        100,
+    );
+    entity_manager.add_existing_entity(entity1);
+
+    // Second compatible entity (same definition_name) within detection radius
+    let entity2 = create_test_entity_with_detection_radius(
+        3,
+        IVec2::new(80, 50),
+        AiBehavior::RunAndMultiply,
+        100,
+    );
+    entity_manager.add_existing_entity(entity2);
+
+    let results = ai_system.update(
+        &entity_manager,
+        entity_manager.get_player_id(),
+        UVec2::new(256, 256),
+        &tilemap,
+        &atlas,
+    );
+
+    // Both entities should be updated
+    assert_eq!(results.len(), 2);
+
+    // Entity at (50, 50) should move toward entity at (80, 50)
+    let entity1_result = results.iter().find(|r| r.entity_id == 2).unwrap();
+    if let Some(new_pos) = entity1_result.new_position {
+        assert!(
+            new_pos.x > 50,
+            "Entity should seek compatible mate: moved to x={}",
+            new_pos.x
+        );
+    }
+}
+
+#[test]
+fn ai_system_run_and_multiply_spawns_on_collision() {
+    let mut ai_system = AiSystem::new();
+    let mut entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    // Player far away
+    let player = create_player_entity(1, IVec2::new(200, 200));
+    entity_manager.add_existing_entity(player);
+
+    // Two adjacent RunAndMultiply entities (touching at edges)
+    let entity1 = create_test_entity_with_detection_radius(
+        2,
+        IVec2::new(50, 50),
+        AiBehavior::RunAndMultiply,
+        100,
+    );
+    entity_manager.add_existing_entity(entity1);
+
+    let entity2 = create_test_entity_with_detection_radius(
+        3,
+        IVec2::new(66, 50), // Adjacent horizontally (16x16 entity at 50 ends at 66)
+        AiBehavior::RunAndMultiply,
+        100,
+    );
+    entity_manager.add_existing_entity(entity2);
+
+    let results = ai_system.update(
+        &entity_manager,
+        entity_manager.get_player_id(),
+        UVec2::new(256, 256),
+        &tilemap,
+        &atlas,
+    );
+
+    // One of the entities should have a spawn request
+    let spawn_results: Vec<_> = results.iter().filter(|r| r.spawn_request.is_some()).collect();
+    assert!(
+        !spawn_results.is_empty(),
+        "Adjacent entities should trigger spawn"
+    );
+
+    let spawn_request = spawn_results[0].spawn_request.as_ref().unwrap();
+    // Verify it's a clone spawn from one of the parent entities
+    match &spawn_request.mode {
+        SpawnMode::Clone { source_entity_id } => {
+            assert!(
+                *source_entity_id == 2 || *source_entity_id == 3,
+                "Clone should be from one of the parent entities"
+            );
+        }
+        SpawnMode::FromDefinition { .. } => {
+            panic!("Expected Clone spawn mode, got FromDefinition");
+        }
+    }
+}
+
+#[test]
+fn ai_system_run_and_multiply_enters_separation_after_spawn() {
+    let mut ai_system = AiSystem::new();
+    let mut entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    // Player far away
+    let player = create_player_entity(1, IVec2::new(200, 200));
+    entity_manager.add_existing_entity(player);
+
+    // Two adjacent RunAndMultiply entities (touching at edges)
+    let entity1 = create_test_entity_with_detection_radius(
+        2,
+        IVec2::new(50, 50),
+        AiBehavior::RunAndMultiply,
+        64,
+    );
+    entity_manager.add_existing_entity(entity1);
+
+    let entity2 = create_test_entity_with_detection_radius(
+        3,
+        IVec2::new(66, 50), // Adjacent horizontally
+        AiBehavior::RunAndMultiply,
+        64,
+    );
+    entity_manager.add_existing_entity(entity2);
+
+    // First update triggers spawn and separation
+    let _ = ai_system.update(
+        &entity_manager,
+        entity_manager.get_player_id(),
+        UVec2::new(256, 256),
+        &tilemap,
+        &atlas,
+    );
+
+    // Check that entities are in separation state
+    let state1 = ai_system.entity_states.get(&2);
+    assert!(
+        state1.is_some_and(|s| s.separation_state.is_some()),
+        "Entity should be in separation state after spawn"
+    );
+}
+
+#[test]
+fn ai_system_run_and_multiply_exits_separation_when_distance_met() {
+    let mut ai_system = AiSystem::new();
+    let mut entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    // Player far away
+    let player = create_player_entity(1, IVec2::new(200, 200));
+    entity_manager.add_existing_entity(player);
+
+    // Entity 2 in separation from entity 3
+    let entity1 = create_test_entity_with_detection_radius(
+        2,
+        IVec2::new(50, 50),
+        AiBehavior::RunAndMultiply,
+        32, // Small detection radius for quick exit
+    );
+    entity_manager.add_existing_entity(entity1);
+
+    // Entity 3 far enough away (distance > detection_radius * 2 = 64)
+    let entity2 = create_test_entity_with_detection_radius(
+        3,
+        IVec2::new(150, 50), // 100 pixels away
+        AiBehavior::RunAndMultiply,
+        32,
+    );
+    entity_manager.add_existing_entity(entity2);
+
+    // Manually set separation state
+    let state = ai_system.get_or_create_state(2);
+    state.separation_state = Some(SeparationState {
+        other_entity_ids: vec![3],
+        required_distance: 64.0,
+    });
+
+    // Update should exit separation
+    let _ = ai_system.update(
+        &entity_manager,
+        entity_manager.get_player_id(),
+        UVec2::new(256, 256),
+        &tilemap,
+        &atlas,
+    );
+
+    // Should have exited separation
+    let state = ai_system.entity_states.get(&2);
+    assert!(
+        state.is_some_and(|s| s.separation_state.is_none()),
+        "Entity should exit separation when distance is met"
+    );
+}
+
+#[test]
+fn ai_system_run_and_multiply_ignores_different_definition() {
+    let mut ai_system = AiSystem::new();
+    let mut entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    // Player far away
+    let player = create_player_entity(1, IVec2::new(200, 200));
+    entity_manager.add_existing_entity(player);
+
+    // First RunAndMultiply entity
+    let entity1 = create_test_entity_with_detection_radius(
+        2,
+        IVec2::new(50, 50),
+        AiBehavior::RunAndMultiply,
+        100,
+    );
+    entity_manager.add_existing_entity(entity1);
+
+    // Second entity with different definition_name
+    let mut entity2 = create_test_entity_with_detection_radius(
+        3,
+        IVec2::new(60, 50),
+        AiBehavior::RunAndMultiply,
+        100,
+    );
+    entity2.definition_name = Some("different_npc".to_string());
+    entity_manager.add_existing_entity(entity2);
+
+    let results = ai_system.update(
+        &entity_manager,
+        entity_manager.get_player_id(),
+        UVec2::new(256, 256),
+        &tilemap,
+        &atlas,
+    );
+
+    // Neither should have a spawn request since they're incompatible
+    for result in &results {
+        assert!(
+            result.spawn_request.is_none(),
+            "Incompatible entities should not spawn"
+        );
+    }
+}

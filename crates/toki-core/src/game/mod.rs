@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::ai::AiSystem;
+use crate::ai::{AiSystem, SpawnMode};
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::entity::{Entity, EntityDefinition, EntityId, EntityManager, MovementProfile};
@@ -544,5 +544,65 @@ impl GameState {
                 }
             }
         }
+
+        // Handle spawn requests from AI (e.g., RunAndMultiply)
+        if let Some(spawn_request) = ai_result.spawn_request {
+            let spawn_result = match &spawn_request.mode {
+                SpawnMode::Clone { source_entity_id } => {
+                    self.entity_manager
+                        .clone_entity(*source_entity_id, spawn_request.position)
+                        .ok_or_else(|| format!("Source entity {} not found", source_entity_id))
+                }
+                SpawnMode::FromDefinition { definition_name } => {
+                    self.spawn_entity_from_definition_name(definition_name, spawn_request.position)
+                }
+            };
+
+            match spawn_result {
+                Ok(new_entity_id) => {
+                    // Log the spawned entity's configuration for debugging
+                    if let Some(entity) = self.entity_manager.get_entity(new_entity_id) {
+                        tracing::debug!(
+                            entity_id = new_entity_id,
+                            definition_name = ?entity.definition_name,
+                            position = ?entity.position,
+                            ai_behavior = ?entity.attributes.ai_config.behavior,
+                            detection_radius = entity.attributes.ai_config.detection_radius,
+                            solid = entity.attributes.solid,
+                            speed = entity.attributes.speed,
+                            "AI spawn: child entity configuration"
+                        );
+                    }
+
+                    // Set up separation state for the spawned entity
+                    if !spawn_request.parent_entity_ids.is_empty() {
+                        self.ai_system.enter_separation_state(
+                            new_entity_id,
+                            spawn_request.parent_entity_ids,
+                            spawn_request.separation_distance,
+                        );
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "AI spawn request failed");
+                }
+            }
+        }
+    }
+
+    /// Spawn an entity from a definition name at the given position.
+    /// This is a reusable method for spawning entities programmatically.
+    pub fn spawn_entity_from_definition_name(
+        &mut self,
+        definition_name: &str,
+        position: glam::IVec2,
+    ) -> Result<EntityId, String> {
+        let definition = self
+            .entity_definitions
+            .get(definition_name)
+            .ok_or_else(|| format!("Entity definition '{}' not found", definition_name))?
+            .clone();
+
+        self.entity_manager.spawn_from_definition(&definition, position)
     }
 }

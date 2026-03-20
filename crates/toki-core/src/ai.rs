@@ -24,6 +24,37 @@ pub enum WanderPhase {
     },
 }
 
+/// State for RunAndMultiply separation phase after spawning.
+#[derive(Debug, Clone)]
+pub struct SeparationState {
+    /// The entities we're separating from
+    pub other_entity_ids: Vec<EntityId>,
+    /// Required distance to exit separation (detection_radius * 2)
+    pub required_distance: f32,
+}
+
+/// A request to spawn a new entity.
+#[derive(Debug, Clone)]
+pub struct AiSpawnRequest {
+    /// Position to spawn at (pixels)
+    pub position: IVec2,
+    /// Parent entity IDs (for setting up separation state on the spawned entity)
+    pub parent_entity_ids: Vec<EntityId>,
+    /// Required separation distance for the spawned entity
+    pub separation_distance: f32,
+    /// Spawn mode: clone from existing entity or create from definition
+    pub mode: SpawnMode,
+}
+
+/// How to spawn a new entity.
+#[derive(Debug, Clone)]
+pub enum SpawnMode {
+    /// Clone an existing entity (copies all attributes including AI config)
+    Clone { source_entity_id: EntityId },
+    /// Create from an entity definition
+    FromDefinition { definition_name: String },
+}
+
 /// Runtime AI state for an entity.
 /// This is separate from the authored `AiConfig` and tracks transient runtime data.
 #[derive(Debug, Clone)]
@@ -34,6 +65,10 @@ pub struct AiRuntimeState {
     pub wander_phase: WanderPhase,
     /// Frames remaining in current wait period
     pub wait_frames_remaining: u32,
+    /// RunAndMultiply: entity we're currently seeking to mate with
+    pub seeking_mate: Option<EntityId>,
+    /// RunAndMultiply: separation state after spawning
+    pub separation_state: Option<SeparationState>,
 }
 
 impl Default for AiRuntimeState {
@@ -43,6 +78,8 @@ impl Default for AiRuntimeState {
             wander_phase: WanderPhase::Waiting,
             // Start with random wait so entities don't all move at once
             wait_frames_remaining: fastrand::u32(30..=90),
+            seeking_mate: None,
+            separation_state: None,
         }
     }
 }
@@ -63,6 +100,8 @@ pub struct AiUpdateResult {
     pub new_position: Option<IVec2>,
     pub new_animation: Option<AnimationState>,
     pub movement_distance: f32,
+    /// Optional spawn request (used by RunAndMultiply)
+    pub spawn_request: Option<AiSpawnRequest>,
 }
 
 impl AiSystem {
@@ -109,7 +148,10 @@ impl AiSystem {
                 let behavior = entity.attributes.ai_config.behavior;
                 if matches!(
                     behavior,
-                    AiBehavior::Wander | AiBehavior::Chase | AiBehavior::Run
+                    AiBehavior::Wander
+                        | AiBehavior::Chase
+                        | AiBehavior::Run
+                        | AiBehavior::RunAndMultiply
                 ) {
                     Some((entity_id, behavior))
                 } else {
@@ -136,6 +178,14 @@ impl AiSystem {
                     atlas,
                 ),
                 AiBehavior::Run => self.update_run_entity(
+                    entity_id,
+                    entity_manager,
+                    player_position,
+                    world_bounds,
+                    tilemap,
+                    atlas,
+                ),
+                AiBehavior::RunAndMultiply => self.update_run_and_multiply_entity(
                     entity_id,
                     entity_manager,
                     player_position,
@@ -230,6 +280,7 @@ impl AiSystem {
             },
             new_animation: Some(desired_animation),
             movement_distance,
+            spawn_request: None,
         })
     }
 
@@ -328,6 +379,324 @@ impl AiSystem {
         )
     }
 
+    /// Update RunAndMultiply entity behavior.
+    /// Priority: separation > flee from player > seek mate > idle wander
+    #[allow(clippy::too_many_arguments)]
+    fn update_run_and_multiply_entity(
+        &mut self,
+        entity_id: EntityId,
+        entity_manager: &EntityManager,
+        player_position: Option<IVec2>,
+        world_bounds: UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> Option<AiUpdateResult> {
+        let entity = entity_manager.get_entity(entity_id)?;
+        let current_position = entity.position;
+        let detection_radius = entity.attributes.ai_config.detection_radius;
+        let definition_name = entity.definition_name.clone();
+
+        // Handle separation state first
+        if let Some(result) =
+            self.handle_separation(entity, entity_id, entity_manager, world_bounds, tilemap, atlas)
+        {
+            return Some(result);
+        }
+
+        let player_in_range = self.is_player_in_range(player_position, current_position, detection_radius);
+        let mate = self.find_compatible_entity(entity_id, &definition_name, entity_manager, detection_radius);
+
+        // Check for mating collision
+        if let Some(mate_id) = mate {
+            if let Some(result) = self.handle_mating_collision(
+                entity, entity_id, mate_id, entity_manager, detection_radius,
+            ) {
+                return Some(result);
+            }
+        }
+
+        // Flee from player if in range
+        if player_in_range {
+            return self.flee_and_seek(
+                entity, entity_id, player_position, mate, world_bounds, entity_manager, tilemap, atlas,
+            );
+        }
+
+        // Seek mate if one exists
+        if let Some(mate_id) = mate {
+            return self.seek_entity(
+                entity, entity_id, mate_id, entity_manager, world_bounds, tilemap, atlas,
+            );
+        }
+
+        // No threats or mates - idle wander
+        self.idle_wander(entity, entity_id, world_bounds, entity_manager, tilemap, atlas)
+    }
+
+    /// Check if player is within detection radius.
+    fn is_player_in_range(&self, player_pos: Option<IVec2>, entity_pos: IVec2, radius: u32) -> bool {
+        player_pos.is_some_and(|pos| Self::distance_between(entity_pos, pos) <= radius as f32)
+    }
+
+    /// Calculate distance between two positions.
+    fn distance_between(a: IVec2, b: IVec2) -> f32 {
+        let dx = (b.x - a.x) as f32;
+        let dy = (b.y - a.y) as f32;
+        (dx * dx + dy * dy).sqrt()
+    }
+
+    /// Find a compatible entity (same definition_name and entity_kind) within detection radius.
+    fn find_compatible_entity(
+        &self,
+        entity_id: EntityId,
+        definition_name: &Option<String>,
+        entity_manager: &EntityManager,
+        detection_radius: u32,
+    ) -> Option<EntityId> {
+        let def_name = definition_name.as_ref()?;
+        let entity = entity_manager.get_entity(entity_id)?;
+        let current_pos = entity.position;
+        let entity_kind = entity.entity_kind;
+
+        entity_manager
+            .active_entities()
+            .iter()
+            .filter(|&&other_id| other_id != entity_id)
+            .filter_map(|&other_id| {
+                let other = entity_manager.get_entity(other_id)?;
+                // Must have same definition_name AND same entity_kind (excludes player, items, etc.)
+                let other_def = other.definition_name.as_ref()?;
+                if other_def == def_name
+                    && other.entity_kind == entity_kind
+                    && !self.is_entity_separating(other_id)
+                {
+                    let dist = Self::distance_between(current_pos, other.position);
+                    if dist <= detection_radius as f32 {
+                        return Some(other_id);
+                    }
+                }
+                None
+            })
+            .next()
+    }
+
+    /// Check if an entity is currently in separation state.
+    fn is_entity_separating(&self, entity_id: EntityId) -> bool {
+        self.entity_states
+            .get(&entity_id)
+            .is_some_and(|state| state.separation_state.is_some())
+    }
+
+    /// Handle separation state - move away from all tracked entities until distance threshold is met.
+    #[allow(clippy::too_many_arguments)]
+    fn handle_separation(
+        &mut self,
+        entity: &crate::entity::Entity,
+        entity_id: EntityId,
+        entity_manager: &EntityManager,
+        world_bounds: UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> Option<AiUpdateResult> {
+        let state = self.entity_states.get(&entity_id)?;
+        let separation = state.separation_state.as_ref()?;
+        let other_ids = separation.other_entity_ids.clone();
+        let required_distance = separation.required_distance;
+
+        // Find the closest entity we need to separate from
+        let closest = other_ids
+            .iter()
+            .filter_map(|&id| {
+                let other = entity_manager.get_entity(id)?;
+                let dist = Self::distance_between(entity.position, other.position);
+                Some((id, other.position, dist))
+            })
+            .min_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal));
+
+        let Some((_, closest_pos, _)) = closest else {
+            // No valid entities to separate from - clear state
+            let state = self.entity_states.get_mut(&entity_id)?;
+            state.separation_state = None;
+            return None;
+        };
+
+        // Check if ALL entities are far enough away
+        let all_separated = other_ids.iter().all(|&id| {
+            entity_manager
+                .get_entity(id)
+                .map(|other| Self::distance_between(entity.position, other.position) >= required_distance)
+                .unwrap_or(true) // Treat missing entities as separated
+        });
+
+        if all_separated {
+            // Separation complete
+            let state = self.entity_states.get_mut(&entity_id)?;
+            state.separation_state = None;
+            return None;
+        }
+
+        // Continue moving away from the closest entity
+        let movement_step = entity.attributes.speed.round() as i32;
+        let directions = Self::compute_directions_away(entity.position, closest_pos, movement_step);
+
+        Self::try_movement_with_fallback(
+            entity, entity_id, entity.position, &directions, world_bounds, entity_manager, tilemap, atlas,
+        )
+    }
+
+    /// Find a free position to spawn a new entity adjacent to the parents.
+    /// Checks cardinal directions around both parents for a free tile.
+    fn find_free_spawn_position(
+        entity: &crate::entity::Entity,
+        mate: &crate::entity::Entity,
+        entity_manager: &EntityManager,
+    ) -> Option<IVec2> {
+        let tile_size = 16i32;
+        let size = entity.size;
+        let offsets = [
+            IVec2::new(tile_size, 0),  // Right
+            IVec2::new(-tile_size, 0), // Left
+            IVec2::new(0, tile_size),  // Down
+            IVec2::new(0, -tile_size), // Up
+        ];
+
+        // Check positions around both parents
+        for parent_pos in [entity.position, mate.position] {
+            for offset in &offsets {
+                let candidate = parent_pos + *offset;
+                if candidate.x >= 0 && candidate.y >= 0
+                    && entity_manager.is_spawn_position_free(candidate, size)
+                {
+                    return Some(candidate);
+                }
+            }
+        }
+        None
+    }
+
+    /// Handle mating collision - check adjacency and trigger spawn.
+    fn handle_mating_collision(
+        &mut self,
+        entity: &crate::entity::Entity,
+        entity_id: EntityId,
+        mate_id: EntityId,
+        entity_manager: &EntityManager,
+        detection_radius: u32,
+    ) -> Option<AiUpdateResult> {
+        let mate = entity_manager.get_entity(mate_id)?;
+        if !Self::entities_adjacent(entity, mate) {
+            return None;
+        }
+
+        // Find a free spawn position adjacent to the parents
+        let spawn_pos = Self::find_free_spawn_position(entity, mate, entity_manager)?;
+
+        // Enter separation state for BOTH parent entities
+        let required_distance = (detection_radius * 2) as f32;
+        self.enter_separation_state(entity_id, vec![mate_id], required_distance);
+        self.enter_separation_state(mate_id, vec![entity_id], required_distance);
+
+        Some(AiUpdateResult {
+            entity_id,
+            new_position: None,
+            new_animation: Some(AnimationState::Idle),
+            movement_distance: 0.0,
+            spawn_request: Some(AiSpawnRequest {
+                position: spawn_pos,
+                parent_entity_ids: vec![entity_id, mate_id],
+                separation_distance: required_distance,
+                mode: SpawnMode::Clone { source_entity_id: entity_id },
+            }),
+        })
+    }
+
+    /// Check if two entities are adjacent (touching at edges).
+    /// For solid entities that can't overlap, this detects when they are colliding.
+    fn entities_adjacent(a: &crate::entity::Entity, b: &crate::entity::Entity) -> bool {
+        let a_min = a.position;
+        let a_max = a.position + a.size.as_ivec2();
+        let b_min = b.position;
+        let b_max = b.position + b.size.as_ivec2();
+
+        // Check if they overlap in Y axis (for horizontal adjacency)
+        let y_overlap = a_min.y < b_max.y && a_max.y > b_min.y;
+        // Check if they overlap in X axis (for vertical adjacency)
+        let x_overlap = a_min.x < b_max.x && a_max.x > b_min.x;
+
+        // Adjacent horizontally: touching on left/right edges (within 2px tolerance)
+        let h_adjacent = y_overlap && ((a_max.x - b_min.x).abs() <= 2 || (b_max.x - a_min.x).abs() <= 2);
+        // Adjacent vertically: touching on top/bottom edges (within 2px tolerance)
+        let v_adjacent = x_overlap && ((a_max.y - b_min.y).abs() <= 2 || (b_max.y - a_min.y).abs() <= 2);
+
+        h_adjacent || v_adjacent
+    }
+
+    /// Enter separation state for an entity.
+    pub fn enter_separation_state(&mut self, entity_id: EntityId, other_ids: Vec<EntityId>, required_distance: f32) {
+        let state = self.entity_states.entry(entity_id).or_default();
+        state.separation_state = Some(SeparationState {
+            other_entity_ids: other_ids,
+            required_distance,
+        });
+    }
+
+    /// Flee from player while also seeking mate if available.
+    #[allow(clippy::too_many_arguments)]
+    fn flee_and_seek(
+        &mut self,
+        entity: &crate::entity::Entity,
+        entity_id: EntityId,
+        player_position: Option<IVec2>,
+        mate: Option<EntityId>,
+        world_bounds: UVec2,
+        entity_manager: &EntityManager,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> Option<AiUpdateResult> {
+        let player_pos = player_position?;
+        let movement_step = entity.attributes.speed.round() as i32;
+
+        // If we have a mate, try to move toward them while avoiding player
+        if let Some(mate_id) = mate {
+            if let Some(mate_entity) = entity_manager.get_entity(mate_id) {
+                let directions = Self::compute_directions_toward(entity.position, mate_entity.position, movement_step);
+                let result = Self::try_movement_with_fallback(
+                    entity, entity_id, entity.position, &directions, world_bounds, entity_manager, tilemap, atlas,
+                );
+                if result.as_ref().is_some_and(|r| r.new_position.is_some()) {
+                    return result;
+                }
+            }
+        }
+
+        // Fall back to fleeing from player
+        let directions = Self::compute_directions_away(entity.position, player_pos, movement_step);
+        Self::try_movement_with_fallback(
+            entity, entity_id, entity.position, &directions, world_bounds, entity_manager, tilemap, atlas,
+        )
+    }
+
+    /// Seek toward a specific entity.
+    #[allow(clippy::too_many_arguments)]
+    fn seek_entity(
+        &mut self,
+        entity: &crate::entity::Entity,
+        entity_id: EntityId,
+        target_id: EntityId,
+        entity_manager: &EntityManager,
+        world_bounds: UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> Option<AiUpdateResult> {
+        let target = entity_manager.get_entity(target_id)?;
+        let movement_step = entity.attributes.speed.round() as i32;
+        let directions = Self::compute_directions_toward(entity.position, target.position, movement_step);
+
+        Self::try_movement_with_fallback(
+            entity, entity_id, entity.position, &directions, world_bounds, entity_manager, tilemap, atlas,
+        )
+    }
+
     /// Idle wandering behavior for Chase/Run when player is outside detection radius.
     /// Uses a state machine: walk random tiles in one direction, then wait, repeat.
     #[allow(clippy::too_many_arguments)]
@@ -377,6 +746,7 @@ impl AiSystem {
                 new_position: None,
                 new_animation: Some(AnimationState::Idle),
                 movement_distance: 0.0,
+                spawn_request: None,
             });
         }
 
@@ -396,6 +766,7 @@ impl AiSystem {
             new_position: None,
             new_animation: Some(AnimationState::Walk),
             movement_distance: 0.0,
+            spawn_request: None,
         })
     }
 
@@ -464,6 +835,7 @@ impl AiSystem {
                 new_position: None,
                 new_animation: Some(AnimationState::Idle),
                 movement_distance: 0.0,
+                spawn_request: None,
             })
         }
     }
@@ -633,6 +1005,7 @@ impl AiSystem {
             },
             new_animation: Some(desired_animation),
             movement_distance,
+            spawn_request: None,
         }
     }
 

@@ -573,6 +573,34 @@ impl EntityManager {
         Ok(id)
     }
 
+    /// Clone an existing entity at a new position.
+    /// The cloned entity gets a new ID but inherits all attributes from the source.
+    pub fn clone_entity(&mut self, source_id: EntityId, position: IVec2) -> Option<EntityId> {
+        let source = self.entities.get(&source_id)?;
+        let id = self.next_id;
+        self.next_id += 1;
+
+        let mut cloned = source.clone();
+        cloned.id = id;
+        cloned.position = position;
+
+        let entity_kind = cloned.entity_kind;
+        let audio_component = cloned.audio.to_component();
+
+        self.entities_by_kind
+            .entry(entity_kind)
+            .or_default()
+            .insert(id);
+
+        if cloned.attributes.active {
+            self.active_entities.insert(id);
+        }
+
+        self.entities.insert(id, cloned);
+        self.audio_components.insert(id, audio_component);
+        Some(id)
+    }
+
     /// Add an existing entity to the manager (used for scene-to-gamestate conversion)
     pub fn add_existing_entity(&mut self, mut entity: Entity) -> EntityId {
         entity.attributes.ensure_legacy_health_stat();
@@ -749,6 +777,31 @@ impl EntityManager {
         }
 
         None
+    }
+
+    /// Check if spawning an entity at the given position with given size would be free.
+    /// Returns true if no solid entities would overlap.
+    pub fn is_spawn_position_free(&self, position: IVec2, size: glam::UVec2) -> bool {
+        for other_id in &self.active_entities {
+            let Some(other_entity) = self.entities.get(other_id) else {
+                continue;
+            };
+            if !other_entity.attributes.solid {
+                continue;
+            }
+            let Some(other_box) = &other_entity.collision_box else {
+                continue;
+            };
+            if other_box.trigger {
+                continue;
+            }
+
+            let (other_pos, other_size) = other_box.world_bounds(other_entity.position);
+            if crate::collision::aabb_overlap(position, size, other_pos, other_size) {
+                return false;
+            }
+        }
+        true
     }
 
     pub fn visible_entities(&self) -> Vec<EntityId> {
