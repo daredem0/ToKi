@@ -87,7 +87,7 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         render_save_controls(ui, ui_state);
     }
 
-    if ui_state.sprite.dirty {
+    if ui_state.sprite.active().dirty {
         ui.separator();
         ui.label("Canvas has unsaved changes.");
     }
@@ -101,7 +101,7 @@ fn render_save_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     }
 
     // Show current asset path if known
-    if let Some(path) = &ui_state.sprite.active_sprite {
+    if let Some(path) = &ui_state.sprite.active().active_sprite {
         ui.label(format!("File: {}", path));
     }
 }
@@ -181,19 +181,20 @@ fn render_recent_colors(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 fn render_viewport_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.label("Viewport:");
 
+    let zoom = ui_state.sprite.active().viewport.zoom;
     ui.horizontal(|ui| {
-        ui.label(format!("Zoom: {}x", ui_state.sprite.viewport.zoom as i32));
+        ui.label(format!("Zoom: {}x", zoom as i32));
         if ui.button("-").clicked() {
-            ui_state.sprite.viewport.zoom_out();
+            ui_state.sprite.active_mut().viewport.zoom_out();
         }
         if ui.button("+").clicked() {
-            ui_state.sprite.viewport.zoom_in();
+            ui_state.sprite.active_mut().viewport.zoom_in();
         }
     });
 
-    ui.checkbox(&mut ui_state.sprite.show_grid, "Show Pixel Grid");
+    ui.checkbox(&mut ui_state.sprite.active_mut().show_grid, "Show Pixel Grid");
 
-    if let Some(pos) = ui_state.sprite.cursor_canvas_pos {
+    if let Some(pos) = ui_state.sprite.active().cursor_canvas_pos {
         ui.label(format!("Cursor: {}, {}", pos.x, pos.y));
     }
 
@@ -255,34 +256,35 @@ fn render_canvas_transforms(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.label("Sprite Sheet:");
 
-    ui.checkbox(&mut ui_state.sprite.show_cell_grid, "Show Cell Grid");
+    ui.checkbox(&mut ui_state.sprite.active_mut().show_cell_grid, "Show Cell Grid");
 
-    if ui_state.sprite.show_cell_grid {
+    let show_cell_grid = ui_state.sprite.active().show_cell_grid;
+    if show_cell_grid {
         ui.horizontal(|ui| {
             ui.label("Cell Width:");
             if ui
                 .add(
-                    egui::DragValue::new(&mut ui_state.sprite.cell_size.x)
+                    egui::DragValue::new(&mut ui_state.sprite.active_mut().cell_size.x)
                         .range(1..=512)
                         .speed(1),
                 )
                 .changed()
             {
                 // Deselect cell if grid changed
-                ui_state.sprite.selected_cell = None;
+                ui_state.sprite.active_mut().selected_cell = None;
             }
         });
         ui.horizontal(|ui| {
             ui.label("Cell Height:");
             if ui
                 .add(
-                    egui::DragValue::new(&mut ui_state.sprite.cell_size.y)
+                    egui::DragValue::new(&mut ui_state.sprite.active_mut().cell_size.y)
                         .range(1..=512)
                         .speed(1),
                 )
                 .changed()
             {
-                ui_state.sprite.selected_cell = None;
+                ui_state.sprite.active_mut().selected_cell = None;
             }
         });
 
@@ -303,7 +305,8 @@ fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         });
 
         // Show selected cell info and operations
-        if let Some(cell_idx) = ui_state.sprite.selected_cell {
+        let selected_cell = ui_state.sprite.active().selected_cell;
+        if let Some(cell_idx) = selected_cell {
             if let Some((cols, rows)) = ui_state.sprite.sheet_cell_count() {
                 let col = cell_idx as u32 % cols;
                 let row = cell_idx as u32 / cols;
@@ -333,11 +336,11 @@ fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 ui.horizontal(|ui| {
                     ui.label("Swap with:");
                     ui.add(
-                        egui::DragValue::new(&mut ui_state.sprite.swap_target_cell)
+                        egui::DragValue::new(&mut ui_state.sprite.active_mut().swap_target_cell)
                             .range(0..=(total_cells.saturating_sub(1)))
                             .speed(1),
                     );
-                    let target = ui_state.sprite.swap_target_cell as usize;
+                    let target = ui_state.sprite.active().swap_target_cell as usize;
                     if ui.button("Swap").clicked() && target != cell_idx {
                         ui_state.sprite.swap_cells(cell_idx, target);
                     }

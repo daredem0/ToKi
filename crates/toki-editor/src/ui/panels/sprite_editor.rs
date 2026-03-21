@@ -1,5 +1,7 @@
 use crate::project::Project;
-use crate::ui::editor_ui::{SpriteCanvas, SpriteCanvasViewport, SpriteEditorTool};
+use crate::ui::editor_ui::{
+    CanvasSide, DualCanvasLayout, SpriteCanvas, SpriteCanvasViewport, SpriteEditorTool,
+};
 use crate::ui::EditorUI;
 
 /// Renders the sprite editor panel
@@ -58,11 +60,21 @@ pub fn render_sprite_editor(
     render_toolbar(ui, ui_state, sprites_dir.as_deref());
     ui.separator();
 
-    // Main content area
-    if ui_state.sprite.has_canvas() {
-        render_canvas_viewport(ui, ui_state, ctx);
-    } else {
-        render_no_canvas_message(ui, ui_state, sprites_dir.as_deref());
+    // Main content area - render based on layout mode
+    match ui_state.sprite.layout {
+        DualCanvasLayout::Single => {
+            if ui_state.sprite.has_canvas() {
+                render_canvas_viewport(ui, ui_state, ctx, None);
+            } else {
+                render_no_canvas_message(ui, ui_state, sprites_dir.as_deref());
+            }
+        }
+        DualCanvasLayout::Horizontal => {
+            render_dual_viewports_horizontal(ui, ui_state, ctx, sprites_dir.as_deref());
+        }
+        DualCanvasLayout::Vertical => {
+            render_dual_viewports_vertical(ui, ui_state, ctx, sprites_dir.as_deref());
+        }
     }
 }
 
@@ -132,8 +144,37 @@ fn render_toolbar(
             }
         }
 
-        if ui_state.sprite.has_canvas() && ui_state.sprite.dirty {
+        if ui_state.sprite.has_canvas() && ui_state.sprite.active().dirty {
             ui.label("Unsaved changes");
+        }
+
+        ui.separator();
+
+        // Layout toggle button
+        let layout_label = match ui_state.sprite.layout {
+            crate::ui::editor_ui::DualCanvasLayout::Single => "Single",
+            crate::ui::editor_ui::DualCanvasLayout::Horizontal => "Side-by-Side",
+            crate::ui::editor_ui::DualCanvasLayout::Vertical => "Stacked",
+        };
+        if ui
+            .button(format!("Layout: {}", layout_label))
+            .on_hover_text("Click to cycle between Single, Side-by-Side, and Stacked layouts")
+            .clicked()
+        {
+            ui_state.sprite.cycle_layout();
+        }
+
+        // Show active canvas indicator when in dual mode
+        if ui_state.sprite.layout != crate::ui::editor_ui::DualCanvasLayout::Single {
+            ui.separator();
+            let active_label = match ui_state.sprite.active_canvas {
+                crate::ui::editor_ui::CanvasSide::Left => "Left",
+                crate::ui::editor_ui::CanvasSide::Right => "Right",
+            };
+            ui.label(format!("Active: {}", active_label));
+            if ui.button("Switch").on_hover_text("Switch active canvas").clicked() {
+                ui_state.sprite.switch_active_canvas();
+            }
         }
     });
 
@@ -246,7 +287,7 @@ fn submit_new_canvas(ui_state: &mut EditorUI) {
             .new_sheet(canvas_w, canvas_h, sprite_w, sprite_h);
     } else {
         ui_state.sprite.new_canvas(sprite_w, sprite_h);
-        ui_state.sprite.show_cell_grid = false;
+        ui_state.sprite.active_mut().show_cell_grid = false;
     }
     ui_state.sprite.show_new_canvas_dialog = false;
 }
@@ -274,7 +315,7 @@ fn render_save_dialog(
 
             ui.horizontal(|ui| {
                 ui.label("Asset Name:");
-                ui.text_edit_singleline(&mut ui_state.sprite.save_asset_name);
+                ui.text_edit_singleline(&mut ui_state.sprite.active_mut().save_asset_name);
             });
 
             ui.separator();
@@ -282,12 +323,12 @@ fn render_save_dialog(
             ui.horizontal(|ui| {
                 ui.label("Save as:");
                 ui.selectable_value(
-                    &mut ui_state.sprite.save_asset_kind,
+                    &mut ui_state.sprite.active_mut().save_asset_kind,
                     SpriteAssetKind::ObjectSheet,
                     "Object Sheet",
                 );
                 ui.selectable_value(
-                    &mut ui_state.sprite.save_asset_kind,
+                    &mut ui_state.sprite.active_mut().save_asset_kind,
                     SpriteAssetKind::TileAtlas,
                     "Tile Atlas",
                 );
@@ -343,16 +384,16 @@ fn render_warning_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                     if let Some(action) = ui_state.sprite.pending_warning_action.take() {
                         match action {
                             WarningAction::ClearCell(cell_idx) => {
-                                ui_state.sprite.selected_cell = Some(cell_idx);
+                                ui_state.sprite.active_mut().selected_cell = Some(cell_idx);
                                 ui_state.sprite.clear_selected_cell();
                             }
                             WarningAction::ChangeCellSize {
                                 new_width,
                                 new_height,
                             } => {
-                                ui_state.sprite.cell_size.x = new_width;
-                                ui_state.sprite.cell_size.y = new_height;
-                                ui_state.sprite.selected_cell = None;
+                                ui_state.sprite.active_mut().cell_size.x = new_width;
+                                ui_state.sprite.active_mut().cell_size.y = new_height;
+                                ui_state.sprite.active_mut().selected_cell = None;
                             }
                         }
                     }
@@ -567,8 +608,8 @@ fn render_merge_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
 fn render_resize_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
     use crate::ui::editor_ui::ResizeAnchor;
 
-    let cell_w = ui_state.sprite.cell_size.x.max(1);
-    let cell_h = ui_state.sprite.cell_size.y.max(1);
+    let cell_w = ui_state.sprite.active().cell_size.x.max(1);
+    let cell_h = ui_state.sprite.active().cell_size.y.max(1);
 
     egui::Window::new("Resize Canvas")
         .collapsible(false)
@@ -779,48 +820,185 @@ fn render_no_canvas_message(
     });
 }
 
-fn render_canvas_viewport(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::Context) {
+/// Render dual viewports side-by-side (horizontal layout)
+fn render_dual_viewports_horizontal(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    ctx: &egui::Context,
+    sprites_dir: Option<&std::path::Path>,
+) {
+    let available = ui.available_size();
+    let half_width = ((available.x - 8.0) / 2.0).max(100.0); // 8px gap between panels
+
+    ui.horizontal(|ui| {
+        // Left canvas
+        ui.vertical(|ui| {
+            ui.set_width(half_width);
+            render_canvas_panel_header(ui, ui_state, CanvasSide::Left);
+            if ui_state.sprite.canvas_state(CanvasSide::Left).canvas.is_some() {
+                render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Left));
+            } else {
+                render_empty_canvas_slot(ui, ui_state, sprites_dir, CanvasSide::Left);
+            }
+        });
+
+        ui.separator();
+
+        // Right canvas
+        ui.vertical(|ui| {
+            ui.set_width(half_width);
+            render_canvas_panel_header(ui, ui_state, CanvasSide::Right);
+            if ui_state.sprite.canvas_state(CanvasSide::Right).canvas.is_some() {
+                render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Right));
+            } else {
+                render_empty_canvas_slot(ui, ui_state, sprites_dir, CanvasSide::Right);
+            }
+        });
+    });
+}
+
+/// Render dual viewports stacked (vertical layout)
+fn render_dual_viewports_vertical(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    ctx: &egui::Context,
+    sprites_dir: Option<&std::path::Path>,
+) {
+    let available = ui.available_size();
+    let half_height = ((available.y - 32.0) / 2.0).max(100.0); // Reserve space for headers and gap
+
+    // Top canvas
+    ui.vertical(|ui| {
+        ui.set_height(half_height);
+        render_canvas_panel_header(ui, ui_state, CanvasSide::Left);
+        if ui_state.sprite.canvas_state(CanvasSide::Left).canvas.is_some() {
+            render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Left));
+        } else {
+            render_empty_canvas_slot(ui, ui_state, sprites_dir, CanvasSide::Left);
+        }
+    });
+
+    ui.separator();
+
+    // Bottom canvas
+    ui.vertical(|ui| {
+        ui.set_height(half_height);
+        render_canvas_panel_header(ui, ui_state, CanvasSide::Right);
+        if ui_state.sprite.canvas_state(CanvasSide::Right).canvas.is_some() {
+            render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Right));
+        } else {
+            render_empty_canvas_slot(ui, ui_state, sprites_dir, CanvasSide::Right);
+        }
+    });
+}
+
+/// Render a header for a canvas panel showing its side and active state
+fn render_canvas_panel_header(ui: &mut egui::Ui, ui_state: &mut EditorUI, side: CanvasSide) {
+    let is_active = ui_state.sprite.active_canvas == side;
+    let label = side.label();
+
+    ui.horizontal(|ui| {
+        if is_active {
+            ui.label(egui::RichText::new(format!("● {}", label)).strong());
+        } else if ui.button(label).clicked() {
+            ui_state.sprite.set_active_canvas(side);
+        }
+
+        // Show dirty indicator
+        if ui_state.sprite.canvas_state(side).dirty {
+            ui.label("*");
+        }
+    });
+}
+
+/// Render an empty canvas slot with options to create/load
+fn render_empty_canvas_slot(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    sprites_dir: Option<&std::path::Path>,
+    side: CanvasSide,
+) {
+    ui.centered_and_justified(|ui| {
+        ui.vertical_centered(|ui| {
+            ui.label("Empty");
+            if ui.button("New").clicked() {
+                ui_state.sprite.set_active_canvas(side);
+                ui_state.begin_new_sprite_canvas_dialog();
+            }
+            let load_enabled = sprites_dir.is_some();
+            if ui.add_enabled(load_enabled, egui::Button::new("Load")).clicked() {
+                if let Some(dir) = sprites_dir {
+                    ui_state.sprite.set_active_canvas(side);
+                    ui_state.sprite.begin_load_dialog(dir);
+                }
+            }
+        });
+    });
+}
+
+fn render_canvas_viewport(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    ctx: &egui::Context,
+    target_side: Option<CanvasSide>,
+) {
     let available_size = ui.available_size();
 
-    // Allocate the viewport area
+    // Allocate the viewport area (ensure non-negative dimensions)
+    let viewport_height = (available_size.y - 24.0).max(50.0);
+    let viewport_width = available_size.x.max(50.0);
     let (rect, response) = ui.allocate_exact_size(
-        egui::vec2(available_size.x, available_size.y - 24.0), // Reserve space for status bar
+        egui::vec2(viewport_width, viewport_height),
         egui::Sense::click_and_drag(),
     );
 
-    // Handle pan with right-click drag or middle-click drag
+    // Determine which canvas side we're rendering
+    let render_side = target_side.unwrap_or(ui_state.sprite.active_canvas);
+
+    // If a target side is specified, set it as active when clicked (not just hovered)
+    if let Some(side) = target_side {
+        if response.clicked() || response.dragged() {
+            ui_state.sprite.set_active_canvas(side);
+        }
+    }
+
+    // Check if this viewport is the one being interacted with
+    let is_interactive = target_side.is_none() || target_side == Some(ui_state.sprite.active_canvas);
+
+    // Handle pan with right-click drag or middle-click drag (only for this canvas)
     if response.dragged_by(egui::PointerButton::Secondary)
         || response.dragged_by(egui::PointerButton::Middle)
     {
         let delta = response.drag_delta();
         ui_state
             .sprite
+            .canvas_state_mut(render_side)
             .viewport
             .pan_by(glam::Vec2::new(delta.x, delta.y));
     }
 
-    // Handle scroll zoom
+    // Handle scroll zoom (only for this canvas)
     if response.hovered() {
         let scroll_delta = ui.input(|input| input.smooth_scroll_delta.y);
         if scroll_delta != 0.0 {
             if scroll_delta > 0.0 {
-                ui_state.sprite.viewport.zoom_in();
+                ui_state.sprite.canvas_state_mut(render_side).viewport.zoom_in();
             } else {
-                ui_state.sprite.viewport.zoom_out();
+                ui_state.sprite.canvas_state_mut(render_side).viewport.zoom_out();
             }
         }
     }
 
-    // Handle keyboard shortcuts
-    if !ui.ctx().wants_keyboard_input() {
+    // Handle keyboard shortcuts (only for active canvas, and only once per frame)
+    if is_interactive && !ui.ctx().wants_keyboard_input() {
         // Zoom (+/- keys)
         if ui.input(|input| {
             input.key_pressed(egui::Key::Plus) || input.key_pressed(egui::Key::Equals)
         }) {
-            ui_state.sprite.viewport.zoom_in();
+            ui_state.sprite.active_mut().viewport.zoom_in();
         }
         if ui.input(|input| input.key_pressed(egui::Key::Minus)) {
-            ui_state.sprite.viewport.zoom_out();
+            ui_state.sprite.active_mut().viewport.zoom_out();
         }
 
         // Tool shortcuts
@@ -830,68 +1008,79 @@ fn render_canvas_viewport(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui
         handle_undo_redo_shortcuts(ui_state, ui);
     }
 
-    // Update cursor position
+    // Update cursor position for this canvas
     if let Some(hover_pos) = response.hover_pos() {
         let canvas_pos = ui_state
             .sprite
+            .canvas_state(render_side)
             .viewport
             .screen_to_canvas(glam::Vec2::new(hover_pos.x, hover_pos.y), rect);
-        ui_state.sprite.cursor_canvas_pos = Some(glam::IVec2::new(
+        ui_state.sprite.canvas_state_mut(render_side).cursor_canvas_pos = Some(glam::IVec2::new(
             canvas_pos.x.floor() as i32,
             canvas_pos.y.floor() as i32,
         ));
     } else {
-        ui_state.sprite.cursor_canvas_pos = None;
+        ui_state.sprite.canvas_state_mut(render_side).cursor_canvas_pos = None;
     }
 
-    // Handle tool interactions
-    handle_tool_interaction(ui_state, &response, rect, ctx);
+    // Handle tool interactions (only for active canvas)
+    if is_interactive {
+        handle_tool_interaction(ui_state, &response, rect, ctx);
+    }
 
     // Draw canvas background
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 0.0, egui::Color32::from_gray(40));
 
+    // Get references to this canvas's state for drawing
+    let canvas_state = ui_state.sprite.canvas_state(render_side);
+
     // Ensure canvas texture is created before drawing
-    if ui_state.sprite.canvas.is_some() {
-        ensure_canvas_texture(ui_state, ctx);
+    if canvas_state.canvas.is_some() {
+        ensure_canvas_texture_for_side(ui_state, ctx, render_side);
     }
 
     // Draw checkerboard transparency pattern and canvas
-    if ui_state.sprite.has_canvas() {
-        let viewport = ui_state.sprite.viewport.clone();
-        let canvas = ui_state.sprite.canvas.as_ref().unwrap();
-        let texture = ui_state.sprite.canvas_texture.as_ref();
+    let canvas_state = ui_state.sprite.canvas_state(render_side);
+    if let Some(canvas) = &canvas_state.canvas {
+        let viewport = canvas_state.viewport.clone();
+        let texture = canvas_state.canvas_texture.as_ref();
         draw_canvas_with_checkerboard(&painter, rect, &viewport, canvas, texture);
     }
 
     // Draw pixel grid overlay
-    if ui_state.sprite.show_grid && ui_state.sprite.viewport.zoom >= 4.0 {
-        if let Some(canvas) = &ui_state.sprite.canvas {
-            draw_pixel_grid(&painter, rect, &ui_state.sprite.viewport, canvas);
+    let canvas_state = ui_state.sprite.canvas_state(render_side);
+    if canvas_state.show_grid && canvas_state.viewport.zoom >= 4.0 {
+        if let Some(canvas) = &canvas_state.canvas {
+            draw_pixel_grid(&painter, rect, &canvas_state.viewport, canvas);
         }
     }
 
     // Draw cell grid overlay for sprite sheets
-    if ui_state.sprite.is_sheet() {
-        if let Some(canvas) = &ui_state.sprite.canvas {
+    let canvas_state = ui_state.sprite.canvas_state(render_side);
+    if canvas_state.show_cell_grid {
+        if let Some(canvas) = &canvas_state.canvas {
             draw_cell_grid(
                 &painter,
                 rect,
-                &ui_state.sprite.viewport,
+                &canvas_state.viewport,
                 canvas,
-                ui_state.sprite.cell_size,
-                ui_state.sprite.selected_cell,
+                canvas_state.cell_size,
+                canvas_state.selected_cell,
             );
         }
     }
 
     // Draw selection rectangle
-    if let Some(selection) = &ui_state.sprite.selection {
-        draw_selection_rect(&painter, rect, &ui_state.sprite.viewport, selection);
+    let canvas_state = ui_state.sprite.canvas_state(render_side);
+    if let Some(selection) = &canvas_state.selection {
+        draw_selection_rect(&painter, rect, &canvas_state.viewport, selection);
     }
 
-    // Status bar
-    render_status_bar(ui, ui_state);
+    // Status bar (only in single mode or when this is the active canvas)
+    if target_side.is_none() || target_side == Some(ui_state.sprite.active_canvas) {
+        render_status_bar(ui, ui_state);
+    }
 }
 
 fn draw_canvas_with_checkerboard(
@@ -969,13 +1158,17 @@ fn draw_checkerboard(painter: &egui::Painter, rect: egui::Rect, zoom: f32) {
     }
 }
 
-fn ensure_canvas_texture(ui_state: &mut EditorUI, ctx: &egui::Context) {
-    // Check if we already have a valid texture
-    if ui_state.sprite.canvas_texture.is_some() {
+fn ensure_canvas_texture_for_side(
+    ui_state: &mut EditorUI,
+    ctx: &egui::Context,
+    side: CanvasSide,
+) {
+    // Check if we already have a valid texture for this side
+    if ui_state.sprite.canvas_state(side).canvas_texture.is_some() {
         return;
     }
 
-    let Some(canvas) = &ui_state.sprite.canvas else {
+    let Some(canvas) = &ui_state.sprite.canvas_state(side).canvas else {
         return;
     };
 
@@ -985,13 +1178,14 @@ fn ensure_canvas_texture(ui_state: &mut EditorUI, ctx: &egui::Context) {
         canvas.pixels(),
     );
 
-    let texture = ctx.load_texture(
-        "sprite_editor_canvas",
-        color_image,
-        egui::TextureOptions::NEAREST,
-    );
+    let texture_name = match side {
+        CanvasSide::Left => "sprite_editor_canvas_left",
+        CanvasSide::Right => "sprite_editor_canvas_right",
+    };
 
-    ui_state.sprite.canvas_texture = Some(texture);
+    let texture = ctx.load_texture(texture_name, color_image, egui::TextureOptions::NEAREST);
+
+    ui_state.sprite.canvas_state_mut(side).canvas_texture = Some(texture);
 }
 
 fn draw_pixel_grid(
@@ -1161,7 +1355,7 @@ fn draw_selection_rect(
 fn render_status_bar(ui: &mut egui::Ui, ui_state: &EditorUI) {
     ui.horizontal(|ui| {
         // Cursor position
-        if let Some(pos) = ui_state.sprite.cursor_canvas_pos {
+        if let Some(pos) = ui_state.sprite.active().cursor_canvas_pos {
             ui.label(format!("Cursor: {}, {}", pos.x, pos.y));
         } else {
             ui.label("Cursor: -, -");
@@ -1177,12 +1371,12 @@ fn render_status_bar(ui: &mut egui::Ui, ui_state: &EditorUI) {
         ui.separator();
 
         // Zoom level
-        ui.label(format!("Zoom: {}x", ui_state.sprite.viewport.zoom as i32));
+        ui.label(format!("Zoom: {}x", ui_state.sprite.active().viewport.zoom as i32));
 
         ui.separator();
 
         // Dirty indicator
-        if ui_state.sprite.dirty {
+        if ui_state.sprite.active().dirty {
             ui.label("*Modified");
         }
     });
@@ -1196,7 +1390,7 @@ fn handle_tool_interaction(
 ) {
     use crate::ui::editor_ui::SpriteEditorTool;
 
-    let Some(canvas_pos) = ui_state.sprite.cursor_canvas_pos else {
+    let Some(canvas_pos) = ui_state.sprite.active().cursor_canvas_pos else {
         return;
     };
 
@@ -1217,7 +1411,7 @@ fn handle_drag_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_p
         let cell = ui_state
             .sprite
             .cell_at_position(canvas_pos.x as u32, canvas_pos.y as u32);
-        ui_state.sprite.selected_cell = cell;
+        ui_state.sprite.active_mut().selected_cell = cell;
     }
 
     // Primary drag for panning (same as secondary/middle)
@@ -1225,6 +1419,7 @@ fn handle_drag_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_p
         let delta = response.drag_delta();
         ui_state
             .sprite
+            .active_mut()
             .viewport
             .pan_by(glam::Vec2::new(delta.x, delta.y));
     }
@@ -1238,11 +1433,11 @@ fn handle_brush_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_
     }
 
     if response.dragged_by(egui::PointerButton::Primary) || response.clicked() {
-        if let Some(canvas) = &mut ui_state.sprite.canvas {
-            let color = ui_state.sprite.foreground_color;
-            let brush_size = ui_state.sprite.brush_size;
+        let color = ui_state.sprite.foreground_color;
+        let brush_size = ui_state.sprite.brush_size;
+        if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
             if SpritePaintInteraction::paint_brush(canvas, canvas_pos, color, brush_size) {
-                ui_state.sprite.dirty = true;
+                ui_state.sprite.active_mut().dirty = true;
                 invalidate_canvas_texture(ui_state);
             }
         }
@@ -1261,10 +1456,10 @@ fn handle_eraser_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas
     }
 
     if response.dragged_by(egui::PointerButton::Primary) || response.clicked() {
-        if let Some(canvas) = &mut ui_state.sprite.canvas {
-            let brush_size = ui_state.sprite.brush_size;
+        let brush_size = ui_state.sprite.brush_size;
+        if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
             if SpritePaintInteraction::erase_brush(canvas, canvas_pos, brush_size) {
-                ui_state.sprite.dirty = true;
+                ui_state.sprite.active_mut().dirty = true;
                 invalidate_canvas_texture(ui_state);
             }
         }
@@ -1280,10 +1475,10 @@ fn handle_fill_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_p
 
     if response.clicked() {
         start_paint_stroke(ui_state);
-        if let Some(canvas) = &mut ui_state.sprite.canvas {
-            let color = ui_state.sprite.foreground_color;
+        let color = ui_state.sprite.foreground_color;
+        if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
             if SpritePaintInteraction::flood_fill(canvas, canvas_pos, color) {
-                ui_state.sprite.dirty = true;
+                ui_state.sprite.active_mut().dirty = true;
                 invalidate_canvas_texture(ui_state);
             }
         }
@@ -1299,7 +1494,7 @@ fn handle_eyedropper_tool(
     use crate::ui::interactions::SpritePaintInteraction;
 
     if response.clicked() {
-        if let Some(canvas) = &ui_state.sprite.canvas {
+        if let Some(canvas) = &ui_state.sprite.active().canvas {
             if let Some(color) = SpritePaintInteraction::pick_color(canvas, canvas_pos) {
                 ui_state.sprite.foreground_color = color;
                 ui_state.sprite.add_recent_color(color);
@@ -1312,17 +1507,17 @@ fn handle_line_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_p
     use crate::ui::interactions::SpritePaintInteraction;
 
     if response.drag_started_by(egui::PointerButton::Primary) {
-        ui_state.sprite.line_start_pos = Some(canvas_pos);
+        ui_state.sprite.active_mut().line_start_pos = Some(canvas_pos);
         start_paint_stroke(ui_state);
     }
 
     if response.drag_stopped_by(egui::PointerButton::Primary) {
-        if let Some(start) = ui_state.sprite.line_start_pos.take() {
-            if let Some(canvas) = &mut ui_state.sprite.canvas {
-                let color = ui_state.sprite.foreground_color;
-                let brush_size = ui_state.sprite.brush_size;
+        let color = ui_state.sprite.foreground_color;
+        let brush_size = ui_state.sprite.brush_size;
+        if let Some(start) = ui_state.sprite.active_mut().line_start_pos.take() {
+            if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
                 if SpritePaintInteraction::draw_line(canvas, start, canvas_pos, color, brush_size) {
-                    ui_state.sprite.dirty = true;
+                    ui_state.sprite.active_mut().dirty = true;
                     invalidate_canvas_texture(ui_state);
                 }
             }
@@ -1333,31 +1528,31 @@ fn handle_line_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_p
 
 fn handle_select_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
     if response.drag_started_by(egui::PointerButton::Primary) {
-        ui_state.sprite.selection_start_pos = Some(canvas_pos);
-        ui_state.sprite.selection = None;
+        ui_state.sprite.active_mut().selection_start_pos = Some(canvas_pos);
+        ui_state.sprite.active_mut().selection = None;
     }
 
     if response.dragged_by(egui::PointerButton::Primary) {
-        if let Some(start) = ui_state.sprite.selection_start_pos {
-            ui_state.sprite.selection = Some(create_selection(start, canvas_pos));
+        if let Some(start) = ui_state.sprite.active().selection_start_pos {
+            ui_state.sprite.active_mut().selection = Some(create_selection(start, canvas_pos));
         }
     }
 
     if response.drag_stopped_by(egui::PointerButton::Primary) {
-        if let Some(start) = ui_state.sprite.selection_start_pos.take() {
+        if let Some(start) = ui_state.sprite.active_mut().selection_start_pos.take() {
             let selection = create_selection(start, canvas_pos);
             // Only keep selection if it has non-zero size
             if selection.width > 0 && selection.height > 0 {
-                ui_state.sprite.selection = Some(selection);
+                ui_state.sprite.active_mut().selection = Some(selection);
             } else {
-                ui_state.sprite.selection = None;
+                ui_state.sprite.active_mut().selection = None;
             }
         }
     }
 
     // Clear selection with right-click
     if response.clicked_by(egui::PointerButton::Secondary) {
-        ui_state.sprite.selection = None;
+        ui_state.sprite.active_mut().selection = None;
     }
 }
 
@@ -1370,16 +1565,17 @@ fn create_selection(start: glam::IVec2, end: glam::IVec2) -> crate::ui::editor_u
 }
 
 fn start_paint_stroke(ui_state: &mut EditorUI) {
-    if !ui_state.sprite.is_painting {
-        ui_state.sprite.is_painting = true;
-        ui_state.sprite.canvas_before_stroke = ui_state.sprite.canvas.clone();
+    if !ui_state.sprite.active().is_painting {
+        ui_state.sprite.active_mut().is_painting = true;
+        ui_state.sprite.active_mut().canvas_before_stroke =
+            ui_state.sprite.active().canvas.clone();
     }
 }
 
 fn finish_paint_stroke(ui_state: &mut EditorUI) {
-    if ui_state.sprite.is_painting {
-        ui_state.sprite.is_painting = false;
-        if let Some(before) = ui_state.sprite.canvas_before_stroke.take() {
+    if ui_state.sprite.active().is_painting {
+        ui_state.sprite.active_mut().is_painting = false;
+        if let Some(before) = ui_state.sprite.active_mut().canvas_before_stroke.take() {
             ui_state.sprite.push_undo_state(before);
         }
         // Add the used color to recent colors
@@ -1390,7 +1586,7 @@ fn finish_paint_stroke(ui_state: &mut EditorUI) {
 }
 
 fn invalidate_canvas_texture(ui_state: &mut EditorUI) {
-    ui_state.sprite.canvas_texture = None;
+    ui_state.sprite.active_mut().canvas_texture = None;
 }
 
 fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {

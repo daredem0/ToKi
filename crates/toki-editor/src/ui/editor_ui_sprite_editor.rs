@@ -372,9 +372,51 @@ impl SpriteEditorHistory {
     }
 }
 
-/// Sprite editor state
-#[allow(dead_code)]
-pub struct SpriteEditorState {
+/// Layout mode for dual canvas view
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DualCanvasLayout {
+    /// Only show the active canvas
+    #[default]
+    Single,
+    /// Side-by-side horizontal split
+    Horizontal,
+    /// Stacked vertical split
+    Vertical,
+}
+
+/// Which canvas is active/focused
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CanvasSide {
+    #[default]
+    Left,
+    Right,
+}
+
+impl CanvasSide {
+    pub fn index(self) -> usize {
+        match self {
+            Self::Left => 0,
+            Self::Right => 1,
+        }
+    }
+
+    pub fn other(self) -> Self {
+        match self {
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Left => "Left",
+            Self::Right => "Right",
+        }
+    }
+}
+
+/// Per-canvas state for the sprite editor
+pub struct CanvasState {
     /// Currently active sprite asset path (JSON metadata file)
     pub active_sprite: Option<String>,
     /// In-memory canvas being edited
@@ -383,14 +425,6 @@ pub struct SpriteEditorState {
     pub viewport: SpriteCanvasViewport,
     /// Has unsaved changes
     pub dirty: bool,
-    /// Current editing tool
-    pub tool: SpriteEditorTool,
-    /// Current foreground color
-    pub foreground_color: PixelColor,
-    /// Current background color (used by eraser)
-    pub background_color: PixelColor,
-    /// Brush size in pixels
-    pub brush_size: u32,
     /// Selection rectangle (if any)
     pub selection: Option<SpriteSelection>,
     /// Local undo/redo history
@@ -401,16 +435,81 @@ pub struct SpriteEditorState {
     pub cursor_canvas_pos: Option<glam::IVec2>,
     /// Cached texture handle for canvas preview
     pub canvas_texture: Option<egui::TextureHandle>,
-    /// Recent colors palette
-    pub recent_colors: Vec<PixelColor>,
-    /// Maximum recent colors to remember
-    pub max_recent_colors: usize,
     /// Asset kind being created/edited
     pub asset_kind: Option<SpriteAssetKind>,
     /// Grid cell size for sheet editing (width, height in pixels)
     pub cell_size: glam::UVec2,
     /// Selected cell index (for sheet editing)
     pub selected_cell: Option<usize>,
+    /// Whether to show the sheet cell grid overlay
+    pub show_cell_grid: bool,
+    /// Line tool: start position when dragging
+    pub line_start_pos: Option<glam::IVec2>,
+    /// Selection tool: start position when dragging
+    pub selection_start_pos: Option<glam::IVec2>,
+    /// Canvas state before current stroke (for undo)
+    pub canvas_before_stroke: Option<SpriteCanvas>,
+    /// Whether currently in a paint stroke
+    pub is_painting: bool,
+    /// Save dialog: asset name (without extension)
+    pub save_asset_name: String,
+    /// Save dialog: asset type (atlas vs object sheet)
+    pub save_asset_kind: SpriteAssetKind,
+    /// Original tile/object names from loaded asset (for preserving names on re-save)
+    pub original_cell_names: Option<Vec<String>>,
+    /// Swap target cell index (for cell reordering UI)
+    pub swap_target_cell: u32,
+}
+
+impl Default for CanvasState {
+    fn default() -> Self {
+        Self {
+            active_sprite: None,
+            canvas: None,
+            viewport: SpriteCanvasViewport::default(),
+            dirty: false,
+            selection: None,
+            history: SpriteEditorHistory::new(50),
+            show_grid: true,
+            cursor_canvas_pos: None,
+            canvas_texture: None,
+            asset_kind: None,
+            cell_size: glam::UVec2::new(16, 16),
+            selected_cell: None,
+            show_cell_grid: false,
+            line_start_pos: None,
+            selection_start_pos: None,
+            canvas_before_stroke: None,
+            is_painting: false,
+            save_asset_name: String::new(),
+            save_asset_kind: SpriteAssetKind::ObjectSheet,
+            original_cell_names: None,
+            swap_target_cell: 0,
+        }
+    }
+}
+
+/// Sprite editor state
+#[allow(dead_code)]
+pub struct SpriteEditorState {
+    /// Dual canvas states (left and right)
+    pub canvases: [CanvasState; 2],
+    /// Which canvas is currently active
+    pub active_canvas: CanvasSide,
+    /// Layout mode for canvas display
+    pub layout: DualCanvasLayout,
+    /// Current editing tool (shared across canvases)
+    pub tool: SpriteEditorTool,
+    /// Current foreground color (shared across canvases)
+    pub foreground_color: PixelColor,
+    /// Current background color used by eraser (shared across canvases)
+    pub background_color: PixelColor,
+    /// Brush size in pixels (shared across canvases)
+    pub brush_size: u32,
+    /// Recent colors palette (shared across canvases)
+    pub recent_colors: Vec<PixelColor>,
+    /// Maximum recent colors to remember
+    pub max_recent_colors: usize,
     /// Show new canvas dialog
     pub show_new_canvas_dialog: bool,
     /// New canvas dialog: sprite width (each cell/sprite's width)
@@ -423,26 +522,8 @@ pub struct SpriteEditorState {
     pub new_sheet_rows: u32,
     /// New canvas dialog: create as sheet
     pub new_canvas_is_sheet: bool,
-    /// Whether to show the sheet cell grid overlay
-    pub show_cell_grid: bool,
-    /// Line tool: start position when dragging
-    pub line_start_pos: Option<glam::IVec2>,
-    /// Selection tool: start position when dragging
-    pub selection_start_pos: Option<glam::IVec2>,
-    /// Canvas state before current stroke (for undo)
-    pub canvas_before_stroke: Option<SpriteCanvas>,
-    /// Whether currently in a paint stroke
-    pub is_painting: bool,
     /// Show save sprite dialog
     pub show_save_dialog: bool,
-    /// Save dialog: asset name (without extension)
-    pub save_asset_name: String,
-    /// Save dialog: asset type (atlas vs object sheet)
-    pub save_asset_kind: SpriteAssetKind,
-    /// Original tile/object names from loaded asset (for preserving names on re-save)
-    pub original_cell_names: Option<Vec<String>>,
-    /// Swap target cell index (for cell reordering UI)
-    pub swap_target_cell: u32,
     /// Show confirmation dialog for risky operations
     pub show_warning_dialog: bool,
     /// Warning dialog message
@@ -570,40 +651,22 @@ pub struct DiscoveredSpriteAsset {
 impl Default for SpriteEditorState {
     fn default() -> Self {
         Self {
-            active_sprite: None,
-            canvas: None,
-            viewport: SpriteCanvasViewport::default(),
-            dirty: false,
+            canvases: [CanvasState::default(), CanvasState::default()],
+            active_canvas: CanvasSide::default(),
+            layout: DualCanvasLayout::default(),
             tool: SpriteEditorTool::Drag,
             foreground_color: PixelColor::black(),
             background_color: PixelColor::transparent(),
             brush_size: 1,
-            selection: None,
-            history: SpriteEditorHistory::new(50),
-            show_grid: true,
-            cursor_canvas_pos: None,
-            canvas_texture: None,
             recent_colors: Vec::new(),
             max_recent_colors: 16,
-            asset_kind: None,
-            cell_size: glam::UVec2::new(16, 16),
-            selected_cell: None,
             show_new_canvas_dialog: false,
             new_sprite_width: 16,
             new_sprite_height: 16,
             new_sheet_cols: 4,
             new_sheet_rows: 4,
             new_canvas_is_sheet: false,
-            show_cell_grid: false,
-            line_start_pos: None,
-            selection_start_pos: None,
-            canvas_before_stroke: None,
-            is_painting: false,
             show_save_dialog: false,
-            save_asset_name: String::new(),
-            save_asset_kind: SpriteAssetKind::ObjectSheet,
-            original_cell_names: None,
-            swap_target_cell: 0,
             show_warning_dialog: false,
             warning_message: String::new(),
             pending_warning_action: None,
@@ -631,52 +694,100 @@ impl SpriteEditorState {
         Self::default()
     }
 
-    /// Create a new empty canvas
-    pub fn new_canvas(&mut self, width: u32, height: u32) {
-        self.canvas = Some(SpriteCanvas::new(width, height));
-        self.active_sprite = None;
-        self.dirty = true;
-        self.history.clear();
-        self.selection = None;
-        self.canvas_texture = None;
-        self.viewport = SpriteCanvasViewport::default();
-        self.original_cell_names = None;
+    // ========== Canvas Access Helpers ==========
+
+    /// Get a reference to the active canvas state
+    pub fn active(&self) -> &CanvasState {
+        &self.canvases[self.active_canvas.index()]
     }
 
-    /// Create a new canvas filled with a color
+    /// Get a mutable reference to the active canvas state
+    pub fn active_mut(&mut self) -> &mut CanvasState {
+        let idx = self.active_canvas.index();
+        &mut self.canvases[idx]
+    }
+
+    /// Get a reference to the canvas state for a specific side
+    pub fn canvas_state(&self, side: CanvasSide) -> &CanvasState {
+        &self.canvases[side.index()]
+    }
+
+    /// Get a mutable reference to the canvas state for a specific side
+    pub fn canvas_state_mut(&mut self, side: CanvasSide) -> &mut CanvasState {
+        &mut self.canvases[side.index()]
+    }
+
+    /// Switch the active canvas to the other side
+    pub fn switch_active_canvas(&mut self) {
+        self.active_canvas = self.active_canvas.other();
+    }
+
+    /// Set the active canvas to a specific side
+    pub fn set_active_canvas(&mut self, side: CanvasSide) {
+        self.active_canvas = side;
+    }
+
+    /// Cycle through layout modes
+    pub fn cycle_layout(&mut self) {
+        self.layout = match self.layout {
+            DualCanvasLayout::Single => DualCanvasLayout::Horizontal,
+            DualCanvasLayout::Horizontal => DualCanvasLayout::Vertical,
+            DualCanvasLayout::Vertical => DualCanvasLayout::Single,
+        };
+    }
+
+    // ========== Canvas Operations (on active canvas) ==========
+
+    /// Create a new empty canvas on the active canvas
+    pub fn new_canvas(&mut self, width: u32, height: u32) {
+        let cs = self.active_mut();
+        cs.canvas = Some(SpriteCanvas::new(width, height));
+        cs.active_sprite = None;
+        cs.dirty = true;
+        cs.history.clear();
+        cs.selection = None;
+        cs.canvas_texture = None;
+        cs.viewport = SpriteCanvasViewport::default();
+        cs.original_cell_names = None;
+    }
+
+    /// Create a new canvas filled with a color on the active canvas
     pub fn new_canvas_filled(&mut self, width: u32, height: u32, color: PixelColor) {
-        self.canvas = Some(SpriteCanvas::filled(width, height, color));
-        self.active_sprite = None;
-        self.dirty = true;
-        self.history.clear();
-        self.selection = None;
-        self.canvas_texture = None;
-        self.viewport = SpriteCanvasViewport::default();
-        self.original_cell_names = None;
+        let cs = self.active_mut();
+        cs.canvas = Some(SpriteCanvas::filled(width, height, color));
+        cs.active_sprite = None;
+        cs.dirty = true;
+        cs.history.clear();
+        cs.selection = None;
+        cs.canvas_texture = None;
+        cs.viewport = SpriteCanvasViewport::default();
+        cs.original_cell_names = None;
     }
 
     /// Check if there's an active canvas being edited
     pub fn has_canvas(&self) -> bool {
-        self.canvas.is_some()
+        self.active().canvas.is_some()
     }
 
     /// Get canvas dimensions if a canvas is active
     pub fn canvas_dimensions(&self) -> Option<(u32, u32)> {
-        self.canvas.as_ref().map(|c| (c.width, c.height))
+        self.active().canvas.as_ref().map(|c| (c.width, c.height))
     }
 
     /// Check if this is a sheet (has cell dimensions set)
     pub fn is_sheet(&self) -> bool {
-        self.cell_size.x > 0 && self.cell_size.y > 0 && self.show_cell_grid
+        let cs = self.active();
+        cs.cell_size.x > 0 && cs.cell_size.y > 0 && cs.show_cell_grid
     }
 
     /// Get the number of cells in the sheet (columns, rows)
     pub fn sheet_cell_count(&self) -> Option<(u32, u32)> {
+        let cs = self.active();
         let (w, h) = self.canvas_dimensions()?;
-        if self.cell_size.x == 0 || self.cell_size.y == 0 {
+        if cs.cell_size.x == 0 || cs.cell_size.y == 0 {
             return None;
         }
-        Some((w / self.cell_size.x, h / self.cell_size.y))
+        Some((w / cs.cell_size.x, h / cs.cell_size.y))
     }
 
     /// Get the total number of cells in the sheet
@@ -690,14 +801,16 @@ impl SpriteEditorState {
         if !self.is_sheet() {
             return None;
         }
+        let cs = self.active();
         let (cols, _rows) = self.sheet_cell_count()?;
-        let cell_x = x / self.cell_size.x;
-        let cell_y = y / self.cell_size.y;
+        let cell_x = x / cs.cell_size.x;
+        let cell_y = y / cs.cell_size.y;
         Some((cell_y * cols + cell_x) as usize)
     }
 
     /// Get cell bounds (start_x, start_y, end_x, end_y) for a cell index
     pub fn cell_bounds(&self, cell_index: usize) -> Option<(u32, u32, u32, u32)> {
+        let cs = self.active();
         let (cols, rows) = self.sheet_cell_count()?;
         let total = cols * rows;
         if cell_index as u32 >= total {
@@ -705,31 +818,32 @@ impl SpriteEditorState {
         }
         let col = cell_index as u32 % cols;
         let row = cell_index as u32 / cols;
-        let start_x = col * self.cell_size.x;
-        let start_y = row * self.cell_size.y;
-        let end_x = start_x + self.cell_size.x;
-        let end_y = start_y + self.cell_size.y;
+        let start_x = col * cs.cell_size.x;
+        let start_y = row * cs.cell_size.y;
+        let end_x = start_x + cs.cell_size.x;
+        let end_y = start_y + cs.cell_size.y;
         Some((start_x, start_y, end_x, end_y))
     }
 
-    /// Create a new sheet canvas
+    /// Create a new sheet canvas on the active canvas
     pub fn new_sheet(&mut self, width: u32, height: u32, cell_width: u32, cell_height: u32) {
-        self.canvas = Some(SpriteCanvas::new(width, height));
-        self.active_sprite = None;
-        self.dirty = true;
-        self.history.clear();
-        self.selection = None;
-        self.canvas_texture = None;
-        self.viewport = SpriteCanvasViewport::default();
-        self.cell_size = glam::UVec2::new(cell_width, cell_height);
-        self.show_cell_grid = true;
-        self.selected_cell = None;
-        self.original_cell_names = None;
+        let cs = self.active_mut();
+        cs.canvas = Some(SpriteCanvas::new(width, height));
+        cs.active_sprite = None;
+        cs.dirty = true;
+        cs.history.clear();
+        cs.selection = None;
+        cs.canvas_texture = None;
+        cs.viewport = SpriteCanvasViewport::default();
+        cs.cell_size = glam::UVec2::new(cell_width, cell_height);
+        cs.show_cell_grid = true;
+        cs.selected_cell = None;
+        cs.original_cell_names = None;
     }
 
     /// Clear the selected cell to transparent pixels
     pub fn clear_selected_cell(&mut self) -> bool {
-        let cell_idx = match self.selected_cell {
+        let cell_idx = match self.active().selected_cell {
             Some(idx) => idx,
             None => return false,
         };
@@ -739,7 +853,8 @@ impl SpriteEditorState {
             return false;
         };
 
-        let Some(canvas) = &mut self.canvas else {
+        let cs = self.active_mut();
+        let Some(canvas) = &mut cs.canvas else {
             return false;
         };
 
@@ -756,13 +871,13 @@ impl SpriteEditorState {
         );
 
         // Push undo state
-        self.history.push(SpriteEditCommand {
+        cs.history.push(SpriteEditCommand {
             before,
             after: canvas.clone(),
         });
 
-        self.dirty = true;
-        self.canvas_texture = None;
+        cs.dirty = true;
+        cs.canvas_texture = None;
         true
     }
 
@@ -781,7 +896,8 @@ impl SpriteEditorState {
             return false;
         };
 
-        let Some(canvas) = &mut self.canvas else {
+        let cs = self.active_mut();
+        let Some(canvas) = &mut cs.canvas else {
             return false;
         };
 
@@ -843,13 +959,13 @@ impl SpriteEditorState {
         }
 
         // Push undo state
-        self.history.push(SpriteEditCommand {
+        cs.history.push(SpriteEditCommand {
             before,
             after: canvas.clone(),
         });
 
-        self.dirty = true;
-        self.canvas_texture = None;
+        cs.dirty = true;
+        cs.canvas_texture = None;
         true
     }
 
@@ -859,13 +975,14 @@ impl SpriteEditorState {
             return false;
         }
 
-        let Some(canvas) = &self.canvas else {
+        let cs = self.active_mut();
+        let Some(canvas) = &cs.canvas else {
             return false;
         };
 
         let old_width = canvas.width;
         let old_height = canvas.height;
-        let new_height = old_height + self.cell_size.y;
+        let new_height = old_height + cs.cell_size.y;
 
         // Save state for undo
         let before = canvas.clone();
@@ -882,13 +999,13 @@ impl SpriteEditorState {
             }
         }
 
-        self.canvas = Some(new_canvas.clone());
-        self.history.push(SpriteEditCommand {
+        cs.canvas = Some(new_canvas.clone());
+        cs.history.push(SpriteEditCommand {
             before,
             after: new_canvas,
         });
-        self.dirty = true;
-        self.canvas_texture = None;
+        cs.dirty = true;
+        cs.canvas_texture = None;
         true
     }
 
@@ -898,13 +1015,14 @@ impl SpriteEditorState {
             return false;
         }
 
-        let Some(canvas) = &self.canvas else {
+        let cs = self.active_mut();
+        let Some(canvas) = &cs.canvas else {
             return false;
         };
 
         let old_width = canvas.width;
         let old_height = canvas.height;
-        let new_width = old_width + self.cell_size.x;
+        let new_width = old_width + cs.cell_size.x;
 
         // Save state for undo
         let before = canvas.clone();
@@ -921,19 +1039,19 @@ impl SpriteEditorState {
             }
         }
 
-        self.canvas = Some(new_canvas.clone());
-        self.history.push(SpriteEditCommand {
+        cs.canvas = Some(new_canvas.clone());
+        cs.history.push(SpriteEditCommand {
             before,
             after: new_canvas,
         });
-        self.dirty = true;
-        self.canvas_texture = None;
+        cs.dirty = true;
+        cs.canvas_texture = None;
         true
     }
 
     /// Delete the selected cell and collapse remaining cells to fill the gap
     pub fn delete_cell_with_collapse(&mut self) -> bool {
-        let cell_idx = match self.selected_cell {
+        let cell_idx = match self.active().selected_cell {
             Some(idx) => idx,
             None => return false,
         };
@@ -947,15 +1065,16 @@ impl SpriteEditorState {
             return false;
         }
 
-        let Some(canvas) = &mut self.canvas else {
+        let cs = self.active_mut();
+        let Some(canvas) = &mut cs.canvas else {
             return false;
         };
 
         // Save state for undo
         let before = canvas.clone();
 
-        let cell_w = self.cell_size.x;
-        let cell_h = self.cell_size.y;
+        let cell_w = cs.cell_size.x;
+        let cell_h = cs.cell_size.y;
 
         // Shift all cells after the deleted one to the left
         for i in cell_idx..(total_cells - 1) {
@@ -992,28 +1111,29 @@ impl SpriteEditorState {
             PixelColor::transparent(),
         );
 
-        self.history.push(SpriteEditCommand {
+        cs.history.push(SpriteEditCommand {
             before,
             after: canvas.clone(),
         });
 
         // Deselect or select the same index (now contains next cell's content)
         if cell_idx >= total_cells - 1 {
-            self.selected_cell = if total_cells > 1 {
+            cs.selected_cell = if total_cells > 1 {
                 Some(total_cells - 2)
             } else {
                 None
             };
         }
 
-        self.dirty = true;
-        self.canvas_texture = None;
+        cs.dirty = true;
+        cs.canvas_texture = None;
         true
     }
 
     /// Flip the entire canvas horizontally
     pub fn flip_horizontal(&mut self) -> bool {
-        let Some(canvas) = &self.canvas else {
+        let cs = self.active_mut();
+        let Some(canvas) = &cs.canvas else {
             return false;
         };
 
@@ -1030,19 +1150,20 @@ impl SpriteEditorState {
             }
         }
 
-        self.canvas = Some(new_canvas.clone());
-        self.history.push(SpriteEditCommand {
+        cs.canvas = Some(new_canvas.clone());
+        cs.history.push(SpriteEditCommand {
             before,
             after: new_canvas,
         });
-        self.dirty = true;
-        self.canvas_texture = None;
+        cs.dirty = true;
+        cs.canvas_texture = None;
         true
     }
 
     /// Flip the entire canvas vertically
     pub fn flip_vertical(&mut self) -> bool {
-        let Some(canvas) = &self.canvas else {
+        let cs = self.active_mut();
+        let Some(canvas) = &cs.canvas else {
             return false;
         };
 
@@ -1059,19 +1180,21 @@ impl SpriteEditorState {
             }
         }
 
-        self.canvas = Some(new_canvas.clone());
-        self.history.push(SpriteEditCommand {
+        cs.canvas = Some(new_canvas.clone());
+        cs.history.push(SpriteEditCommand {
             before,
             after: new_canvas,
         });
-        self.dirty = true;
-        self.canvas_texture = None;
+        cs.dirty = true;
+        cs.canvas_texture = None;
         true
     }
 
     /// Rotate the entire canvas 90° clockwise
     pub fn rotate_clockwise(&mut self) -> bool {
-        let Some(canvas) = &self.canvas else {
+        let is_sheet = self.is_sheet();
+        let cs = self.active_mut();
+        let Some(canvas) = &cs.canvas else {
             return false;
         };
 
@@ -1090,25 +1213,27 @@ impl SpriteEditorState {
             }
         }
 
-        self.canvas = Some(new_canvas.clone());
-        self.history.push(SpriteEditCommand {
+        cs.canvas = Some(new_canvas.clone());
+        cs.history.push(SpriteEditCommand {
             before,
             after: new_canvas,
         });
 
         // Swap cell size dimensions for sheets
-        if self.is_sheet() {
-            std::mem::swap(&mut self.cell_size.x, &mut self.cell_size.y);
+        if is_sheet {
+            std::mem::swap(&mut cs.cell_size.x, &mut cs.cell_size.y);
         }
 
-        self.dirty = true;
-        self.canvas_texture = None;
+        cs.dirty = true;
+        cs.canvas_texture = None;
         true
     }
 
     /// Rotate the entire canvas 90° counter-clockwise
     pub fn rotate_counter_clockwise(&mut self) -> bool {
-        let Some(canvas) = &self.canvas else {
+        let is_sheet = self.is_sheet();
+        let cs = self.active_mut();
+        let Some(canvas) = &cs.canvas else {
             return false;
         };
 
@@ -1127,25 +1252,26 @@ impl SpriteEditorState {
             }
         }
 
-        self.canvas = Some(new_canvas.clone());
-        self.history.push(SpriteEditCommand {
+        cs.canvas = Some(new_canvas.clone());
+        cs.history.push(SpriteEditCommand {
             before,
             after: new_canvas,
         });
 
         // Swap cell size dimensions for sheets
-        if self.is_sheet() {
-            std::mem::swap(&mut self.cell_size.x, &mut self.cell_size.y);
+        if is_sheet {
+            std::mem::swap(&mut cs.cell_size.x, &mut cs.cell_size.y);
         }
 
-        self.dirty = true;
-        self.canvas_texture = None;
+        cs.dirty = true;
+        cs.canvas_texture = None;
         true
     }
 
     /// Resize the canvas with anchor positioning
     pub fn resize_canvas(&mut self, new_w: u32, new_h: u32, anchor: ResizeAnchor) -> bool {
-        let Some(canvas) = &self.canvas else {
+        let cs = self.active_mut();
+        let Some(canvas) = &cs.canvas else {
             return false;
         };
 
@@ -1176,14 +1302,14 @@ impl SpriteEditorState {
             }
         }
 
-        self.canvas = Some(new_canvas.clone());
-        self.history.push(SpriteEditCommand {
+        cs.canvas = Some(new_canvas.clone());
+        cs.history.push(SpriteEditCommand {
             before,
             after: new_canvas,
         });
-        self.dirty = true;
-        self.canvas_texture = None;
-        self.selected_cell = None;
+        cs.dirty = true;
+        cs.canvas_texture = None;
+        cs.selected_cell = None;
         true
     }
 
@@ -1191,8 +1317,9 @@ impl SpriteEditorState {
     pub fn begin_resize_dialog(&mut self) {
         if let Some((w, h)) = self.canvas_dimensions() {
             // Calculate current tile counts from canvas dimensions and cell size
-            let cell_w = self.cell_size.x.max(1);
-            let cell_h = self.cell_size.y.max(1);
+            let cs = self.active();
+            let cell_w = cs.cell_size.x.max(1);
+            let cell_h = cs.cell_size.y.max(1);
             self.resize_tiles_x = w.div_ceil(cell_w);
             self.resize_tiles_y = h.div_ceil(cell_h);
             self.resize_anchor = ResizeAnchor::default();
@@ -1264,40 +1391,43 @@ impl SpriteEditorState {
 
     /// Mark the current state as dirty (has unsaved changes)
     pub fn mark_dirty(&mut self) {
-        self.dirty = true;
+        self.active_mut().dirty = true;
     }
 
     /// Clear the dirty flag
     pub fn clear_dirty(&mut self) {
-        self.dirty = false;
+        self.active_mut().dirty = false;
     }
 
     /// Push current canvas state for undo
     pub fn push_undo_state(&mut self, before: SpriteCanvas) {
-        if let Some(canvas) = &self.canvas {
-            self.history.push(SpriteEditCommand {
+        let cs = self.active_mut();
+        if let Some(canvas) = &cs.canvas {
+            cs.history.push(SpriteEditCommand {
                 before,
                 after: canvas.clone(),
             });
         }
     }
 
-    /// Perform undo
+    /// Perform undo on the active canvas
     pub fn undo(&mut self) -> bool {
-        if let Some(before) = self.history.take_undo() {
-            self.canvas = Some(before);
-            self.canvas_texture = None;
+        let cs = self.active_mut();
+        if let Some(before) = cs.history.take_undo() {
+            cs.canvas = Some(before);
+            cs.canvas_texture = None;
             true
         } else {
             false
         }
     }
 
-    /// Perform redo
+    /// Perform redo on the active canvas
     pub fn redo(&mut self) -> bool {
-        if let Some(after) = self.history.take_redo() {
-            self.canvas = Some(after);
-            self.canvas_texture = None;
+        let cs = self.active_mut();
+        if let Some(after) = cs.history.take_redo() {
+            cs.canvas = Some(after);
+            cs.canvas_texture = None;
             true
         } else {
             false
@@ -1318,21 +1448,23 @@ impl SpriteEditorState {
 
     /// Close the current canvas
     pub fn close_canvas(&mut self) {
-        self.canvas = None;
-        self.active_sprite = None;
-        self.dirty = false;
-        self.history.clear();
-        self.selection = None;
-        self.canvas_texture = None;
-        self.original_cell_names = None;
+        let cs = self.active_mut();
+        cs.canvas = None;
+        cs.active_sprite = None;
+        cs.dirty = false;
+        cs.history.clear();
+        cs.selection = None;
+        cs.canvas_texture = None;
+        cs.original_cell_names = None;
     }
 
     /// Open the save dialog
     pub fn begin_save_dialog(&mut self) {
         self.show_save_dialog = true;
         // Default to the existing name if editing
-        if self.save_asset_name.is_empty() {
-            self.save_asset_name = "new_sprite".to_string();
+        let cs = self.active_mut();
+        if cs.save_asset_name.is_empty() {
+            cs.save_asset_name = "new_sprite".to_string();
         }
     }
 
@@ -1423,20 +1555,21 @@ impl SpriteEditorState {
             }
         }
 
-        // Update state
-        self.canvas = Some(canvas);
-        self.active_sprite = None;
-        self.asset_kind = None;
-        self.cell_size = glam::UVec2::new(cell_w, cell_h);
-        self.show_cell_grid = true;
-        self.dirty = true;
-        self.history.clear();
-        self.selection = None;
-        self.canvas_texture = None;
-        self.viewport = SpriteCanvasViewport::default();
-        self.selected_cell = None;
+        // Update state on active canvas
+        let cs = self.active_mut();
+        cs.canvas = Some(canvas);
+        cs.active_sprite = None;
+        cs.asset_kind = None;
+        cs.cell_size = glam::UVec2::new(cell_w, cell_h);
+        cs.show_cell_grid = true;
+        cs.dirty = true;
+        cs.history.clear();
+        cs.selection = None;
+        cs.canvas_texture = None;
+        cs.viewport = SpriteCanvasViewport::default();
+        cs.selected_cell = None;
+        cs.original_cell_names = None; // Merged sheet has new names
         self.show_merge_dialog = false;
-        self.original_cell_names = None; // Merged sheet has new names
 
         Ok(())
     }
@@ -1529,21 +1662,22 @@ impl SpriteEditorState {
             }
         };
 
-        // Update state
-        self.canvas = Some(canvas);
-        self.active_sprite = Some(asset.json_path.to_string_lossy().to_string());
-        self.asset_kind = Some(asset.kind);
-        self.save_asset_name = asset.name.clone();
-        self.save_asset_kind = asset.kind;
-        self.original_cell_names = Some(original_names);
-        self.cell_size = cell_size;
-        self.show_cell_grid = is_sheet;
-        self.dirty = false;
-        self.history.clear();
-        self.selection = None;
-        self.canvas_texture = None;
-        self.viewport = SpriteCanvasViewport::default();
-        self.selected_cell = None;
+        // Update state on active canvas
+        let cs = self.active_mut();
+        cs.canvas = Some(canvas);
+        cs.active_sprite = Some(asset.json_path.to_string_lossy().to_string());
+        cs.asset_kind = Some(asset.kind);
+        cs.save_asset_name = asset.name.clone();
+        cs.save_asset_kind = asset.kind;
+        cs.original_cell_names = Some(original_names);
+        cs.cell_size = cell_size;
+        cs.show_cell_grid = is_sheet;
+        cs.dirty = false;
+        cs.history.clear();
+        cs.selection = None;
+        cs.canvas_texture = None;
+        cs.viewport = SpriteCanvasViewport::default();
+        cs.selected_cell = None;
         self.show_load_dialog = false;
 
         Ok(())
@@ -1556,11 +1690,13 @@ impl SpriteEditorState {
         use toki_core::assets::atlas::AtlasMeta;
         use toki_core::assets::object_sheet::ObjectSheetMeta;
 
-        let canvas = self.canvas.as_ref().ok_or("No canvas to save")?;
-        let name = self.save_asset_name.trim();
+        let cs = self.active();
+        let canvas = cs.canvas.as_ref().ok_or("No canvas to save")?;
+        let name = cs.save_asset_name.trim();
         if name.is_empty() {
             return Err("Asset name cannot be empty".to_string());
         }
+        let name = name.to_string(); // Clone to avoid borrow issues
 
         // Validate name (alphanumeric and underscores only)
         if !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
@@ -1577,28 +1713,24 @@ impl SpriteEditorState {
         let json_filename = format!("{name}.json");
         let png_path = sprites_dir.join(&png_filename);
         let json_path = sprites_dir.join(&json_filename);
+        let save_asset_kind = cs.save_asset_kind;
+        let canvas_width = canvas.width;
+        let canvas_height = canvas.height;
+        let pixels = canvas.pixels().to_vec();
 
         // Save PNG
-        toki_core::graphics::image::save_image_rgba8(
-            &png_path,
-            canvas.width,
-            canvas.height,
-            canvas.pixels(),
-        )
-        .map_err(|e| format!("Failed to save PNG: {e}"))?;
+        toki_core::graphics::image::save_image_rgba8(&png_path, canvas_width, canvas_height, &pixels)
+            .map_err(|e| format!("Failed to save PNG: {e}"))?;
 
         // Create and save metadata based on asset kind
-        match self.save_asset_kind {
+        match save_asset_kind {
             SpriteAssetKind::TileAtlas => {
                 let meta = if self.is_sheet() {
                     let (cols, rows) = self.sheet_cell_count().unwrap_or((1, 1));
                     self.create_atlas_with_names(&png_filename, cols, rows)
                 } else {
                     // Single tile atlas
-                    AtlasMeta::new_single_tile(
-                        &png_filename,
-                        UVec2::new(canvas.width, canvas.height),
-                    )
+                    AtlasMeta::new_single_tile(&png_filename, UVec2::new(canvas_width, canvas_height))
                 };
                 meta.save_to_file(&json_path)
                     .map_err(|e| format!("Failed to save metadata: {e}"))?;
@@ -1611,8 +1743,8 @@ impl SpriteEditorState {
                     // Single object
                     ObjectSheetMeta::new_single_object(
                         &png_filename,
-                        name,
-                        UVec2::new(canvas.width, canvas.height),
+                        &name,
+                        UVec2::new(canvas_width, canvas_height),
                     )
                 };
                 meta.save_to_file(&json_path)
@@ -1620,9 +1752,10 @@ impl SpriteEditorState {
             }
         }
 
-        // Update state
-        self.active_sprite = Some(json_path.to_string_lossy().to_string());
-        self.dirty = false;
+        // Update state on active canvas
+        let cs = self.active_mut();
+        cs.active_sprite = Some(json_path.to_string_lossy().to_string());
+        cs.dirty = false;
         self.show_save_dialog = false;
 
         Ok(())
@@ -1638,6 +1771,7 @@ impl SpriteEditorState {
         use std::collections::HashMap;
         use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 
+        let cs = self.active();
         let total_cells = (cols * rows) as usize;
         let mut tiles = HashMap::new();
 
@@ -1657,7 +1791,7 @@ impl SpriteEditorState {
 
         AtlasMeta {
             image: png_filename.into(),
-            tile_size: self.cell_size,
+            tile_size: cs.cell_size,
             tiles,
         }
     }
@@ -1672,6 +1806,7 @@ impl SpriteEditorState {
         use std::collections::HashMap;
         use toki_core::assets::object_sheet::{ObjectSheetMeta, ObjectSheetType, ObjectSpriteInfo};
 
+        let cs = self.active();
         let total_cells = (cols * rows) as usize;
         let mut objects = HashMap::new();
 
@@ -1692,15 +1827,16 @@ impl SpriteEditorState {
         ObjectSheetMeta {
             sheet_type: ObjectSheetType::Objects,
             image: png_filename.into(),
-            tile_size: self.cell_size,
+            tile_size: cs.cell_size,
             objects,
         }
     }
 
     /// Get the name for a cell, using original name if available
     fn get_cell_name(&self, index: usize, total_cells: usize, prefix: &str) -> String {
+        let cs = self.active();
         // Use original name if available and cell count matches
-        if let Some(ref names) = self.original_cell_names {
+        if let Some(ref names) = cs.original_cell_names {
             if names.len() == total_cells {
                 if let Some(name) = names.get(index) {
                     return name.clone();
@@ -1711,7 +1847,7 @@ impl SpriteEditorState {
         format!("{}_{}", prefix, index)
     }
 
-    /// Import an external image file (png, jpg, bmp) into the canvas
+    /// Import an external image file (png, jpg, bmp) into the active canvas
     pub fn import_external_image(&mut self, path: &std::path::Path) -> Result<(), String> {
         use toki_core::graphics::image::load_image_rgba8;
 
@@ -1722,31 +1858,36 @@ impl SpriteEditorState {
         let canvas = SpriteCanvas::from_rgba(decoded.width, decoded.height, decoded.data)
             .ok_or_else(|| "Failed to create canvas from image data".to_string())?;
 
-        // Update state - treat as new unsaved sprite
-        self.canvas = Some(canvas);
-        self.active_sprite = None;
-        self.asset_kind = None;
-        self.save_asset_name = path
+        let save_name = path
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("imported")
             .to_string();
-        self.cell_size = glam::UVec2::new(decoded.width, decoded.height);
-        self.show_cell_grid = false;
-        self.dirty = true; // Mark as needing save
-        self.history.clear();
-        self.selection = None;
-        self.canvas_texture = None;
-        self.viewport = SpriteCanvasViewport::default();
-        self.selected_cell = None;
-        self.original_cell_names = None; // New import has no original names
+        let cell_size = glam::UVec2::new(decoded.width, decoded.height);
+
+        // Update state on active canvas - treat as new unsaved sprite
+        let cs = self.active_mut();
+        cs.canvas = Some(canvas);
+        cs.active_sprite = None;
+        cs.asset_kind = None;
+        cs.save_asset_name = save_name;
+        cs.cell_size = cell_size;
+        cs.show_cell_grid = false;
+        cs.dirty = true; // Mark as needing save
+        cs.history.clear();
+        cs.selection = None;
+        cs.canvas_texture = None;
+        cs.viewport = SpriteCanvasViewport::default();
+        cs.selected_cell = None;
+        cs.original_cell_names = None; // New import has no original names
 
         Ok(())
     }
 
     /// Export the current canvas as PNG
     pub fn export_as_png(&self, path: &std::path::Path) -> Result<(), String> {
-        let canvas = self.canvas.as_ref().ok_or("No canvas to export")?;
+        let cs = self.active();
+        let canvas = cs.canvas.as_ref().ok_or("No canvas to export")?;
 
         toki_core::graphics::image::save_image_rgba8(
             path,

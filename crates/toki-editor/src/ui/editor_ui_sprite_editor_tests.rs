@@ -373,11 +373,11 @@ fn sprite_editor_history_respects_max_size() {
 #[test]
 fn sprite_editor_state_default_values() {
     let state = SpriteEditorState::default();
-    assert!(state.canvas.is_none());
-    assert!(!state.dirty);
+    assert!(state.active().canvas.is_none());
+    assert!(!state.active().dirty);
     assert_eq!(state.tool, SpriteEditorTool::Drag);
     assert_eq!(state.brush_size, 1);
-    assert!(state.show_grid);
+    assert!(state.active().show_grid);
 }
 
 #[test]
@@ -387,7 +387,7 @@ fn sprite_editor_state_new_canvas() {
 
     assert!(state.has_canvas());
     assert_eq!(state.canvas_dimensions(), Some((16, 32)));
-    assert!(state.dirty);
+    assert!(state.active().dirty);
 }
 
 #[test]
@@ -397,7 +397,7 @@ fn sprite_editor_state_new_canvas_filled() {
     state.new_canvas_filled(8, 8, color);
 
     assert!(state.has_canvas());
-    let canvas = state.canvas.as_ref().unwrap();
+    let canvas = state.active().canvas.as_ref().unwrap();
     assert_eq!(canvas.get_pixel(0, 0), Some(color));
 }
 
@@ -408,7 +408,7 @@ fn sprite_editor_state_close_canvas() {
     state.close_canvas();
 
     assert!(!state.has_canvas());
-    assert!(!state.dirty);
+    assert!(!state.active().dirty);
 }
 
 #[test]
@@ -416,8 +416,9 @@ fn sprite_editor_state_undo_redo_integration() {
     let mut state = SpriteEditorState::default();
     state.new_canvas(4, 4);
 
-    let before = state.canvas.clone().unwrap();
+    let before = state.active().canvas.clone().unwrap();
     state
+        .active_mut()
         .canvas
         .as_mut()
         .unwrap()
@@ -426,21 +427,21 @@ fn sprite_editor_state_undo_redo_integration() {
 
     // Check pixel was changed
     assert_eq!(
-        state.canvas.as_ref().unwrap().get_pixel(0, 0),
+        state.active().canvas.as_ref().unwrap().get_pixel(0, 0),
         Some(PixelColor::rgb(255, 0, 0))
     );
 
     // Undo
     assert!(state.undo());
     assert_eq!(
-        state.canvas.as_ref().unwrap().get_pixel(0, 0),
+        state.active().canvas.as_ref().unwrap().get_pixel(0, 0),
         Some(PixelColor::transparent())
     );
 
     // Redo
     assert!(state.redo());
     assert_eq!(
-        state.canvas.as_ref().unwrap().get_pixel(0, 0),
+        state.active().canvas.as_ref().unwrap().get_pixel(0, 0),
         Some(PixelColor::rgb(255, 0, 0))
     );
 }
@@ -503,14 +504,14 @@ fn sprite_editor_state_import_external_image() {
 
     assert!(result.is_ok(), "Import should succeed");
     assert!(state.has_canvas());
-    assert!(state.dirty); // Should be marked dirty since it's newly imported
+    assert!(state.active().dirty); // Should be marked dirty since it's newly imported
 
     let (w, h) = state.canvas_dimensions().unwrap();
     assert_eq!(w, 2);
     assert_eq!(h, 2);
 
     // Check that name is derived from filename
-    assert_eq!(state.save_asset_name, "test");
+    assert_eq!(state.active().save_asset_name, "test");
 }
 
 #[test]
@@ -534,7 +535,7 @@ fn sprite_editor_state_export_as_png() {
     state.new_canvas(4, 4);
 
     // Draw a red pixel
-    if let Some(canvas) = &mut state.canvas {
+    if let Some(canvas) = &mut state.active_mut().canvas {
         canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
     }
 
@@ -698,11 +699,11 @@ fn sprite_editor_state_load_sprite_asset() {
     let result = state.load_sprite_asset(&assets[0]);
     assert!(result.is_ok());
     assert!(state.has_canvas());
-    assert!(!state.dirty); // Should not be dirty - loaded from file
-    assert!(state.show_cell_grid); // Should show grid for multi-tile sprite
-    assert_eq!(state.cell_size.x, 8);
-    assert_eq!(state.cell_size.y, 8);
-    assert_eq!(state.save_asset_name, "sprite");
+    assert!(!state.active().dirty); // Should not be dirty - loaded from file
+    assert!(state.active().show_cell_grid); // Should show grid for multi-tile sprite
+    assert_eq!(state.active().cell_size.x, 8);
+    assert_eq!(state.active().cell_size.y, 8);
+    assert_eq!(state.active().save_asset_name, "sprite");
 }
 
 // ============================================================================
@@ -723,8 +724,8 @@ fn sprite_editor_state_append_row_expands_canvas() {
 
     assert_eq!(state.canvas_dimensions(), Some((16, 24)));
     assert_eq!(state.sheet_cell_count(), Some((2, 3)));
-    assert!(state.dirty);
-    assert!(state.history.can_undo());
+    assert!(state.active().dirty);
+    assert!(state.active().history.can_undo());
 }
 
 #[test]
@@ -741,8 +742,8 @@ fn sprite_editor_state_append_column_expands_canvas() {
 
     assert_eq!(state.canvas_dimensions(), Some((24, 16)));
     assert_eq!(state.sheet_cell_count(), Some((3, 2)));
-    assert!(state.dirty);
-    assert!(state.history.can_undo());
+    assert!(state.active().dirty);
+    assert!(state.active().history.can_undo());
 }
 
 #[test]
@@ -751,14 +752,14 @@ fn sprite_editor_state_append_row_preserves_existing_pixels() {
     state.new_sheet(8, 8, 8, 8); // 1x1 cell
 
     // Draw a red pixel in the original cell
-    if let Some(canvas) = &mut state.canvas {
+    if let Some(canvas) = &mut state.active_mut().canvas {
         canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
     }
 
     state.append_row();
 
     // Check the red pixel is still there
-    if let Some(canvas) = &state.canvas {
+    if let Some(canvas) = &state.active().canvas {
         assert_eq!(canvas.get_pixel(0, 0), Some(PixelColor::rgb(255, 0, 0)));
         // New row should be transparent
         assert_eq!(canvas.get_pixel(0, 8), Some(PixelColor::transparent()));
@@ -772,7 +773,7 @@ fn sprite_editor_state_delete_cell_with_collapse_shifts_cells() {
     state.new_sheet(8, 8, 4, 4);
 
     // Draw distinct colors in each cell
-    if let Some(canvas) = &mut state.canvas {
+    if let Some(canvas) = &mut state.active_mut().canvas {
         // Cell 0 (top-left): Red
         canvas.fill_rect(0, 0, 4, 4, PixelColor::rgb(255, 0, 0));
         // Cell 1 (top-right): Green
@@ -784,11 +785,11 @@ fn sprite_editor_state_delete_cell_with_collapse_shifts_cells() {
     }
 
     // Select and delete cell 0 (red)
-    state.selected_cell = Some(0);
+    state.active_mut().selected_cell = Some(0);
     assert!(state.delete_cell_with_collapse());
 
     // After collapse: cell 0 should now have green (was cell 1)
-    if let Some(canvas) = &state.canvas {
+    if let Some(canvas) = &state.active().canvas {
         assert_eq!(canvas.get_pixel(0, 0), Some(PixelColor::rgb(0, 255, 0)));
         // Cell 1 should have blue (was cell 2)
         assert_eq!(canvas.get_pixel(4, 0), Some(PixelColor::rgb(0, 0, 255)));
@@ -798,15 +799,15 @@ fn sprite_editor_state_delete_cell_with_collapse_shifts_cells() {
         assert_eq!(canvas.get_pixel(4, 4), Some(PixelColor::transparent()));
     }
 
-    assert!(state.dirty);
-    assert!(state.history.can_undo());
+    assert!(state.active().dirty);
+    assert!(state.active().history.can_undo());
 }
 
 #[test]
 fn sprite_editor_state_delete_cell_without_selection_fails() {
     let mut state = SpriteEditorState::default();
     state.new_sheet(8, 8, 4, 4);
-    state.selected_cell = None;
+    state.active_mut().selected_cell = None;
 
     assert!(!state.delete_cell_with_collapse());
 }
@@ -830,7 +831,7 @@ fn sprite_editor_state_flip_horizontal() {
     state.new_canvas(4, 2);
 
     // Draw red on left, green on right
-    if let Some(canvas) = &mut state.canvas {
+    if let Some(canvas) = &mut state.active_mut().canvas {
         canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
         canvas.set_pixel(3, 0, PixelColor::rgb(0, 255, 0));
     }
@@ -838,12 +839,12 @@ fn sprite_editor_state_flip_horizontal() {
     assert!(state.flip_horizontal());
 
     // After flip: red should be on right, green on left
-    if let Some(canvas) = &state.canvas {
+    if let Some(canvas) = &state.active().canvas {
         assert_eq!(canvas.get_pixel(3, 0), Some(PixelColor::rgb(255, 0, 0)));
         assert_eq!(canvas.get_pixel(0, 0), Some(PixelColor::rgb(0, 255, 0)));
     }
-    assert!(state.dirty);
-    assert!(state.history.can_undo());
+    assert!(state.active().dirty);
+    assert!(state.active().history.can_undo());
 }
 
 #[test]
@@ -852,7 +853,7 @@ fn sprite_editor_state_flip_vertical() {
     state.new_canvas(2, 4);
 
     // Draw red on top, green on bottom
-    if let Some(canvas) = &mut state.canvas {
+    if let Some(canvas) = &mut state.active_mut().canvas {
         canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
         canvas.set_pixel(0, 3, PixelColor::rgb(0, 255, 0));
     }
@@ -860,11 +861,11 @@ fn sprite_editor_state_flip_vertical() {
     assert!(state.flip_vertical());
 
     // After flip: red should be on bottom, green on top
-    if let Some(canvas) = &state.canvas {
+    if let Some(canvas) = &state.active().canvas {
         assert_eq!(canvas.get_pixel(0, 3), Some(PixelColor::rgb(255, 0, 0)));
         assert_eq!(canvas.get_pixel(0, 0), Some(PixelColor::rgb(0, 255, 0)));
     }
-    assert!(state.dirty);
+    assert!(state.active().dirty);
 }
 
 #[test]
@@ -873,7 +874,7 @@ fn sprite_editor_state_rotate_clockwise() {
     state.new_canvas(4, 2); // 4 wide, 2 tall
 
     // Draw red at top-left
-    if let Some(canvas) = &mut state.canvas {
+    if let Some(canvas) = &mut state.active_mut().canvas {
         canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
     }
 
@@ -882,11 +883,11 @@ fn sprite_editor_state_rotate_clockwise() {
     // After 90° CW: canvas should be 2 wide, 4 tall
     // top-left (0,0) -> top-right (1, 0) in new coords
     assert_eq!(state.canvas_dimensions(), Some((2, 4)));
-    if let Some(canvas) = &state.canvas {
+    if let Some(canvas) = &state.active().canvas {
         // Original (0,0) should now be at (1, 0)
         assert_eq!(canvas.get_pixel(1, 0), Some(PixelColor::rgb(255, 0, 0)));
     }
-    assert!(state.dirty);
+    assert!(state.active().dirty);
 }
 
 #[test]
@@ -895,7 +896,7 @@ fn sprite_editor_state_rotate_counter_clockwise() {
     state.new_canvas(4, 2); // 4 wide, 2 tall
 
     // Draw red at top-left
-    if let Some(canvas) = &mut state.canvas {
+    if let Some(canvas) = &mut state.active_mut().canvas {
         canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
     }
 
@@ -903,11 +904,11 @@ fn sprite_editor_state_rotate_counter_clockwise() {
 
     // After 90° CCW: canvas should be 2 wide, 4 tall
     assert_eq!(state.canvas_dimensions(), Some((2, 4)));
-    if let Some(canvas) = &state.canvas {
+    if let Some(canvas) = &state.active().canvas {
         // Original (0,0) should now be at (0, 3)
         assert_eq!(canvas.get_pixel(0, 3), Some(PixelColor::rgb(255, 0, 0)));
     }
-    assert!(state.dirty);
+    assert!(state.active().dirty);
 }
 
 #[test]
@@ -918,7 +919,7 @@ fn sprite_editor_state_resize_canvas_expand_center() {
     state.new_canvas(4, 4);
 
     // Draw red at center
-    if let Some(canvas) = &mut state.canvas {
+    if let Some(canvas) = &mut state.active_mut().canvas {
         canvas.set_pixel(1, 1, PixelColor::rgb(255, 0, 0));
     }
 
@@ -926,11 +927,11 @@ fn sprite_editor_state_resize_canvas_expand_center() {
     assert!(state.resize_canvas(8, 8, ResizeAnchor::MiddleCenter));
 
     assert_eq!(state.canvas_dimensions(), Some((8, 8)));
-    if let Some(canvas) = &state.canvas {
+    if let Some(canvas) = &state.active().canvas {
         // Original (1,1) should now be at (3,3) - shifted by (2,2)
         assert_eq!(canvas.get_pixel(3, 3), Some(PixelColor::rgb(255, 0, 0)));
     }
-    assert!(state.dirty);
+    assert!(state.active().dirty);
 }
 
 #[test]
@@ -941,7 +942,7 @@ fn sprite_editor_state_resize_canvas_shrink_top_left() {
     state.new_canvas(8, 8);
 
     // Draw red at top-left
-    if let Some(canvas) = &mut state.canvas {
+    if let Some(canvas) = &mut state.active_mut().canvas {
         canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
     }
 
@@ -949,7 +950,7 @@ fn sprite_editor_state_resize_canvas_shrink_top_left() {
     assert!(state.resize_canvas(4, 4, ResizeAnchor::TopLeft));
 
     assert_eq!(state.canvas_dimensions(), Some((4, 4)));
-    if let Some(canvas) = &state.canvas {
+    if let Some(canvas) = &state.active().canvas {
         // Red pixel should still be at (0,0)
         assert_eq!(canvas.get_pixel(0, 0), Some(PixelColor::rgb(255, 0, 0)));
     }
