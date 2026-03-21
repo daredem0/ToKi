@@ -201,9 +201,55 @@ fn render_viewport_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         ui.label(format!("Canvas: {}x{}", w, h));
     }
 
+    // Canvas transforms
+    ui.separator();
+    render_canvas_transforms(ui, ui_state);
+
     // Sheet controls
     ui.separator();
     render_sheet_controls(ui, ui_state);
+}
+
+fn render_canvas_transforms(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    ui.label("Transform:");
+
+    ui.horizontal(|ui| {
+        if ui
+            .button("Flip H")
+            .on_hover_text("Flip horizontally")
+            .clicked()
+        {
+            ui_state.sprite.flip_horizontal();
+        }
+        if ui
+            .button("Flip V")
+            .on_hover_text("Flip vertically")
+            .clicked()
+        {
+            ui_state.sprite.flip_vertical();
+        }
+    });
+
+    ui.horizontal(|ui| {
+        if ui
+            .button("Rot CW")
+            .on_hover_text("Rotate 90° clockwise")
+            .clicked()
+        {
+            ui_state.sprite.rotate_clockwise();
+        }
+        if ui
+            .button("Rot CCW")
+            .on_hover_text("Rotate 90° counter-clockwise")
+            .clicked()
+        {
+            ui_state.sprite.rotate_counter_clockwise();
+        }
+    });
+
+    if ui.button("Resize...").clicked() {
+        ui_state.sprite.begin_resize_dialog();
+    }
 }
 
 fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {

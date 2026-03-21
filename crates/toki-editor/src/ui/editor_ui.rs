@@ -28,8 +28,8 @@ pub(crate) use editor_ui_map_editor::{
     MapEditorTileInfo, MapEditorTool, MapObjectMoveDragState, NewMapRequest,
 };
 pub(crate) use editor_ui_sprite_editor::{
-    PixelColor, SpriteAssetKind, SpriteCanvas, SpriteCanvasViewport, SpriteEditorState,
-    SpriteEditorTool, SpriteSelection, WarningAction,
+    PixelColor, ResizeAnchor, SpriteAssetKind, SpriteCanvas, SpriteCanvasViewport,
+    SpriteEditorState, SpriteEditorTool, SpriteSelection, WarningAction,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;

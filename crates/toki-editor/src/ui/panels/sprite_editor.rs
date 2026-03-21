@@ -34,6 +34,21 @@ pub fn render_sprite_editor(
         render_merge_dialog(ui_state, ctx);
     }
 
+    // Handle resize dialog
+    if ui_state.sprite.show_resize_dialog {
+        render_resize_dialog(ui_state, ctx);
+    }
+
+    // Handle rename dialog
+    if ui_state.sprite.show_rename_dialog {
+        render_rename_dialog(ui_state, ctx, sprites_dir.as_deref());
+    }
+
+    // Handle delete confirmation
+    if ui_state.sprite.show_delete_confirm {
+        render_delete_confirm_dialog(ui_state, ctx, sprites_dir.as_deref());
+    }
+
     // Handle warning dialog
     if ui_state.sprite.show_warning_dialog {
         render_warning_dialog(ui_state, ctx);
@@ -419,6 +434,28 @@ fn render_load_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                         }
                     }
                 }
+                if ui
+                    .add_enabled(can_load, egui::Button::new("Rename"))
+                    .clicked()
+                {
+                    if let Some(idx) = ui_state.sprite.selected_asset_index {
+                        if let Some(asset) = ui_state.sprite.discovered_assets.get(idx) {
+                            ui_state.sprite.rename_new_name = asset.name.clone();
+                            ui_state.sprite.show_rename_dialog = true;
+                        }
+                    }
+                }
+                if ui
+                    .add_enabled(can_load, egui::Button::new("Delete"))
+                    .clicked()
+                {
+                    if let Some(idx) = ui_state.sprite.selected_asset_index {
+                        if let Some(asset) = ui_state.sprite.discovered_assets.get(idx) {
+                            ui_state.sprite.delete_asset_name = asset.name.clone();
+                            ui_state.sprite.show_delete_confirm = true;
+                        }
+                    }
+                }
                 if ui.button("Cancel").clicked() {
                     ui_state.sprite.show_load_dialog = false;
                 }
@@ -524,6 +561,195 @@ fn render_merge_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
             if count < 2 {
                 ui.label("Select at least 2 sprites to merge.");
             }
+        });
+}
+
+fn render_resize_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
+    use crate::ui::editor_ui::ResizeAnchor;
+
+    let cell_w = ui_state.sprite.cell_size.x.max(1);
+    let cell_h = ui_state.sprite.cell_size.y.max(1);
+
+    egui::Window::new("Resize Canvas")
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .show(ctx, |ui| {
+            // Current size info
+            if let Some((w, h)) = ui_state.sprite.canvas_dimensions() {
+                let tiles_x = w.div_ceil(cell_w);
+                let tiles_y = h.div_ceil(cell_h);
+                ui.label(format!(
+                    "Current: {}x{} tiles ({}x{} px)",
+                    tiles_x, tiles_y, w, h
+                ));
+            }
+
+            ui.separator();
+
+            // New size inputs in tiles
+            ui.horizontal(|ui| {
+                ui.label("Tiles X:");
+                ui.add(
+                    egui::DragValue::new(&mut ui_state.sprite.resize_tiles_x)
+                        .range(1..=128)
+                        .speed(1),
+                );
+            });
+            ui.horizontal(|ui| {
+                ui.label("Tiles Y:");
+                ui.add(
+                    egui::DragValue::new(&mut ui_state.sprite.resize_tiles_y)
+                        .range(1..=128)
+                        .speed(1),
+                );
+            });
+
+            // Show calculated pixel dimensions
+            let new_w = ui_state.sprite.resize_tiles_x * cell_w;
+            let new_h = ui_state.sprite.resize_tiles_y * cell_h;
+            ui.label(format!("Result: {}x{} px", new_w, new_h));
+
+            ui.separator();
+
+            // Anchor grid
+            ui.label("Anchor:");
+            egui::Grid::new("resize_anchor_grid")
+                .spacing([2.0, 2.0])
+                .show(ui, |ui| {
+                    for (i, anchor) in ResizeAnchor::all().iter().enumerate() {
+                        let is_selected = ui_state.sprite.resize_anchor == *anchor;
+                        if ui.selectable_label(is_selected, anchor.label()).clicked() {
+                            ui_state.sprite.resize_anchor = *anchor;
+                        }
+                        if (i + 1) % 3 == 0 {
+                            ui.end_row();
+                        }
+                    }
+                });
+
+            ui.separator();
+
+            ui.horizontal(|ui| {
+                if ui.button("Resize").clicked() {
+                    let w = ui_state.sprite.resize_tiles_x * cell_w;
+                    let h = ui_state.sprite.resize_tiles_y * cell_h;
+                    let anchor = ui_state.sprite.resize_anchor;
+                    ui_state.sprite.resize_canvas(w, h, anchor);
+                    ui_state.sprite.show_resize_dialog = false;
+                }
+                if ui.button("Cancel").clicked() {
+                    ui_state.sprite.show_resize_dialog = false;
+                }
+            });
+        });
+}
+
+fn render_rename_dialog(
+    ui_state: &mut EditorUI,
+    ctx: &egui::Context,
+    sprites_dir: Option<&std::path::Path>,
+) {
+    use crate::ui::editor_ui::SpriteEditorState;
+
+    // Extract asset name before mutable borrow
+    let old_name = ui_state
+        .sprite
+        .selected_asset_index
+        .and_then(|idx| ui_state.sprite.discovered_assets.get(idx))
+        .map(|a| a.name.clone());
+
+    let Some(old_name) = old_name else {
+        ui_state.sprite.show_rename_dialog = false;
+        return;
+    };
+
+    egui::Window::new("Rename Asset")
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .show(ctx, |ui| {
+            ui.label(format!("Current name: {}", old_name));
+
+            ui.horizontal(|ui| {
+                ui.label("New name:");
+                ui.text_edit_singleline(&mut ui_state.sprite.rename_new_name);
+            });
+
+            ui.add_space(8.0);
+
+            ui.horizontal(|ui| {
+                let new_name = ui_state.sprite.rename_new_name.clone();
+                let can_rename = !new_name.is_empty() && new_name != old_name;
+
+                if ui
+                    .add_enabled(can_rename, egui::Button::new("Rename"))
+                    .clicked()
+                {
+                    if let Some(dir) = sprites_dir {
+                        match SpriteEditorState::rename_asset(dir, &old_name, &new_name) {
+                            Ok(()) => {
+                                // Refresh the asset list
+                                ui_state.sprite.discovered_assets =
+                                    SpriteEditorState::scan_sprite_assets(dir);
+                                ui_state.sprite.selected_asset_index = None;
+                                ui_state.sprite.show_rename_dialog = false;
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to rename asset: {}", e);
+                            }
+                        }
+                    }
+                }
+                if ui.button("Cancel").clicked() {
+                    ui_state.sprite.show_rename_dialog = false;
+                }
+            });
+        });
+}
+
+fn render_delete_confirm_dialog(
+    ui_state: &mut EditorUI,
+    ctx: &egui::Context,
+    sprites_dir: Option<&std::path::Path>,
+) {
+    use crate::ui::editor_ui::SpriteEditorState;
+
+    egui::Window::new("Delete Asset")
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .show(ctx, |ui| {
+            let name = &ui_state.sprite.delete_asset_name;
+
+            ui.label(format!("Are you sure you want to delete \"{}\"?", name));
+            ui.label("This will remove the PNG and JSON files.");
+            ui.label("This action cannot be undone.");
+
+            ui.add_space(8.0);
+
+            ui.horizontal(|ui| {
+                if ui.button("Delete").clicked() {
+                    if let Some(dir) = sprites_dir {
+                        let name_clone = name.clone();
+                        match SpriteEditorState::delete_asset(dir, &name_clone) {
+                            Ok(()) => {
+                                // Refresh the asset list
+                                ui_state.sprite.discovered_assets =
+                                    SpriteEditorState::scan_sprite_assets(dir);
+                                ui_state.sprite.selected_asset_index = None;
+                                ui_state.sprite.show_delete_confirm = false;
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to delete asset: {}", e);
+                            }
+                        }
+                    }
+                }
+                if ui.button("Cancel").clicked() {
+                    ui_state.sprite.show_delete_confirm = false;
+                }
+            });
         });
 }
 

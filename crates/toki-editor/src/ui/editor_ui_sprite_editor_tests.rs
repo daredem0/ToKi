@@ -819,3 +819,149 @@ fn sprite_editor_state_append_on_non_sheet_fails() {
     assert!(!state.append_row());
     assert!(!state.append_column());
 }
+
+// ============================================================================
+// Flip/Rotate/Resize Tests
+// ============================================================================
+
+#[test]
+fn sprite_editor_state_flip_horizontal() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(4, 2);
+
+    // Draw red on left, green on right
+    if let Some(canvas) = &mut state.canvas {
+        canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
+        canvas.set_pixel(3, 0, PixelColor::rgb(0, 255, 0));
+    }
+
+    assert!(state.flip_horizontal());
+
+    // After flip: red should be on right, green on left
+    if let Some(canvas) = &state.canvas {
+        assert_eq!(canvas.get_pixel(3, 0), Some(PixelColor::rgb(255, 0, 0)));
+        assert_eq!(canvas.get_pixel(0, 0), Some(PixelColor::rgb(0, 255, 0)));
+    }
+    assert!(state.dirty);
+    assert!(state.history.can_undo());
+}
+
+#[test]
+fn sprite_editor_state_flip_vertical() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(2, 4);
+
+    // Draw red on top, green on bottom
+    if let Some(canvas) = &mut state.canvas {
+        canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
+        canvas.set_pixel(0, 3, PixelColor::rgb(0, 255, 0));
+    }
+
+    assert!(state.flip_vertical());
+
+    // After flip: red should be on bottom, green on top
+    if let Some(canvas) = &state.canvas {
+        assert_eq!(canvas.get_pixel(0, 3), Some(PixelColor::rgb(255, 0, 0)));
+        assert_eq!(canvas.get_pixel(0, 0), Some(PixelColor::rgb(0, 255, 0)));
+    }
+    assert!(state.dirty);
+}
+
+#[test]
+fn sprite_editor_state_rotate_clockwise() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(4, 2); // 4 wide, 2 tall
+
+    // Draw red at top-left
+    if let Some(canvas) = &mut state.canvas {
+        canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
+    }
+
+    assert!(state.rotate_clockwise());
+
+    // After 90° CW: canvas should be 2 wide, 4 tall
+    // top-left (0,0) -> top-right (1, 0) in new coords
+    assert_eq!(state.canvas_dimensions(), Some((2, 4)));
+    if let Some(canvas) = &state.canvas {
+        // Original (0,0) should now be at (1, 0)
+        assert_eq!(canvas.get_pixel(1, 0), Some(PixelColor::rgb(255, 0, 0)));
+    }
+    assert!(state.dirty);
+}
+
+#[test]
+fn sprite_editor_state_rotate_counter_clockwise() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(4, 2); // 4 wide, 2 tall
+
+    // Draw red at top-left
+    if let Some(canvas) = &mut state.canvas {
+        canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
+    }
+
+    assert!(state.rotate_counter_clockwise());
+
+    // After 90° CCW: canvas should be 2 wide, 4 tall
+    assert_eq!(state.canvas_dimensions(), Some((2, 4)));
+    if let Some(canvas) = &state.canvas {
+        // Original (0,0) should now be at (0, 3)
+        assert_eq!(canvas.get_pixel(0, 3), Some(PixelColor::rgb(255, 0, 0)));
+    }
+    assert!(state.dirty);
+}
+
+#[test]
+fn sprite_editor_state_resize_canvas_expand_center() {
+    use super::ResizeAnchor;
+
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(4, 4);
+
+    // Draw red at center
+    if let Some(canvas) = &mut state.canvas {
+        canvas.set_pixel(1, 1, PixelColor::rgb(255, 0, 0));
+    }
+
+    // Expand to 8x8 with center anchor
+    assert!(state.resize_canvas(8, 8, ResizeAnchor::MiddleCenter));
+
+    assert_eq!(state.canvas_dimensions(), Some((8, 8)));
+    if let Some(canvas) = &state.canvas {
+        // Original (1,1) should now be at (3,3) - shifted by (2,2)
+        assert_eq!(canvas.get_pixel(3, 3), Some(PixelColor::rgb(255, 0, 0)));
+    }
+    assert!(state.dirty);
+}
+
+#[test]
+fn sprite_editor_state_resize_canvas_shrink_top_left() {
+    use super::ResizeAnchor;
+
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+
+    // Draw red at top-left
+    if let Some(canvas) = &mut state.canvas {
+        canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
+    }
+
+    // Shrink to 4x4 with top-left anchor
+    assert!(state.resize_canvas(4, 4, ResizeAnchor::TopLeft));
+
+    assert_eq!(state.canvas_dimensions(), Some((4, 4)));
+    if let Some(canvas) = &state.canvas {
+        // Red pixel should still be at (0,0)
+        assert_eq!(canvas.get_pixel(0, 0), Some(PixelColor::rgb(255, 0, 0)));
+    }
+}
+
+#[test]
+fn sprite_editor_state_resize_zero_size_fails() {
+    use super::ResizeAnchor;
+
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(4, 4);
+
+    assert!(!state.resize_canvas(0, 4, ResizeAnchor::MiddleCenter));
+    assert!(!state.resize_canvas(4, 0, ResizeAnchor::MiddleCenter));
+}
