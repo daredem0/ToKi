@@ -8,323 +8,43 @@ impl InspectorSystem {
         node_key: &str,
         config: Option<&EditorConfig>,
     ) -> bool {
-        let Some(scene_index) = ui_state
-            .scenes
-            .iter()
-            .position(|scene| scene.name == scene_name)
-        else {
+        let Some((mut graph, ctx)) = NodeEditorContext::new(ui_state, scene_name, node_key, config) else {
             ui.label("Scene not found.");
             return false;
         };
-        let scene_rules = ui_state.scenes[scene_index].rules.clone();
-        let before_rules = scene_rules.clone();
-        let before_graph = ui_state.rule_graph_for_scene(scene_name).cloned();
-        let before_layout = ui_state.graph.layouts_by_scene.get(scene_name).cloned();
-        ui_state.sync_rule_graph_with_rule_set(scene_name, &scene_rules);
 
-        let audio_choices = Self::load_rule_audio_choices(config);
-        let validation_issues = Self::validate_rule_set(&scene_rules);
-        let mut graph = ui_state
-            .rule_graph_for_scene(scene_name)
-            .cloned()
-            .unwrap_or_else(|| RuleGraph::from_rule_set(&scene_rules));
-        let node_badges = Self::rule_graph_node_badges(&graph);
         let Some(node_id) = graph.node_id_for_stable_key(node_key) else {
-            ui.colored_label(
-                egui::Color32::from_rgb(255, 210, 80),
-                "Selected node no longer exists in this scene.",
-            );
-            return false;
-        };
-        let Some(node_kind) = graph
-            .nodes
-            .iter()
-            .find(|node| node.id == node_id)
-            .map(|node| node.kind.clone())
-        else {
-            ui.colored_label(
-                egui::Color32::from_rgb(255, 120, 120),
-                "Failed to resolve selected node.",
-            );
+            ui.colored_label(egui::Color32::from_rgb(255, 210, 80), "Selected node no longer exists.");
             return false;
         };
 
-        let mut graph_mutated = false;
-        let mut operation_error = None::<String>;
-        match node_kind {
-            RuleGraphNodeKind::Trigger(trigger) => {
-                ui.label("Trigger");
-                let mut edited_trigger = trigger;
-                // Extract map size for validation if available
-                let map_size = ui_state
-                    .scenes
-                    .get(scene_index)
-                    .and_then(|scene| scene.maps.first())
-                    .and_then(|map_name| {
-                        // Try to get map size from loaded map draft or pending sync
-                        if ui_state.map.active_map.as_ref() == Some(map_name) {
-                            ui_state
-                                .map
-                                .draft
-                                .as_ref()
-                                .map(|draft| (draft.tilemap.size.x, draft.tilemap.size.y))
-                                .or_else(|| {
-                                    ui_state
-                                        .map
-                                        .pending_tilemap_sync
-                                        .as_ref()
-                                        .map(|tm| (tm.size.x, tm.size.y))
-                                })
-                        } else {
-                            None
-                        }
-                    });
-                let changed = Self::render_rule_graph_trigger_editor(
-                    ui,
-                    scene_name,
-                    node_key,
-                    &mut edited_trigger,
-                    map_size,
-                );
-                if changed && edited_trigger != trigger {
-                    if let Err(error) = graph.set_trigger_for_chain(node_id, edited_trigger) {
-                        ui.colored_label(
-                            egui::Color32::from_rgb(255, 120, 120),
-                            format!("Failed to update trigger: {:?}", error),
-                        );
-                        return false;
-                    }
-                    graph_mutated = true;
-                }
-            }
-            RuleGraphNodeKind::Condition(condition) => {
-                ui.label("Condition");
-                let mut edited_condition = condition.clone();
-                let changed = Self::render_rule_graph_condition_editor(
-                    ui,
-                    scene_name,
-                    node_key,
-                    &mut edited_condition,
-                );
-                if changed && edited_condition != condition {
-                    if let Err(error) = graph.set_condition_for_node(node_id, edited_condition) {
-                        ui.colored_label(
-                            egui::Color32::from_rgb(255, 120, 120),
-                            format!("Failed to update condition: {:?}", error),
-                        );
-                        return false;
-                    }
-                    graph_mutated = true;
-                }
-            }
-            RuleGraphNodeKind::Action(action) => {
-                ui.label("Action");
-                let mut edited_action = action.clone();
-                let changed = Self::render_rule_graph_action_editor(
-                    ui,
-                    scene_name,
-                    node_key,
-                    &mut edited_action,
-                    &validation_issues,
-                    &audio_choices,
-                    &ui_state.scenes,
-                );
-                if changed && edited_action != action {
-                    if let Err(error) = graph.set_action_for_node(node_id, edited_action) {
-                        ui.colored_label(
-                            egui::Color32::from_rgb(255, 120, 120),
-                            format!("Failed to update action: {:?}", error),
-                        );
-                        return false;
-                    }
-                    graph_mutated = true;
-                }
-            }
-        }
+        let Some(node_kind) = graph.nodes.iter().find(|n| n.id == node_id).map(|n| n.kind.clone()) else {
+            ui.colored_label(egui::Color32::from_rgb(255, 120, 120), "Failed to resolve selected node.");
+            return false;
+        };
+
+        let params = NodeEditParams { scene_name, node_key, node_id };
+        let mut graph_mutated = Self::render_node_kind_editor(
+            ui, ui_state, &params, &node_kind, &mut graph, &ctx,
+        );
 
         ui.separator();
-        let mut outgoing_connected_ids = graph
-            .edges
-            .iter()
-            .filter(|edge| edge.from == node_id)
-            .map(|edge| edge.to)
-            .collect::<Vec<_>>();
-        outgoing_connected_ids.sort_unstable();
-        outgoing_connected_ids.dedup();
-        let mut incoming_connected_ids = graph
-            .edges
-            .iter()
-            .filter(|edge| edge.to == node_id)
-            .map(|edge| edge.from)
-            .collect::<Vec<_>>();
-        incoming_connected_ids.sort_unstable();
-        incoming_connected_ids.dedup();
+        let (outgoing_ids, incoming_ids) = Self::collect_connection_ids(&graph, node_id);
+        let connectable_to = Self::build_connectable_nodes(&graph, &ctx.node_badges, node_id, &outgoing_ids, false);
+        let connectable_from = Self::build_connectable_nodes(&graph, &ctx.node_badges, node_id, &incoming_ids, true);
 
-        let connectable_to_nodes = graph
-            .nodes
-            .iter()
-            .filter_map(|node| {
-                (node.id != node_id
-                    && !outgoing_connected_ids.contains(&node.id)
-                    && graph.can_connect_nodes(node_id, node.id).is_ok())
-                .then_some((
-                    node.id,
-                    Self::rule_graph_node_label_for_inspector(&graph, &node_badges, node.id),
-                ))
-            })
-            .filter_map(|(id, label)| label.map(|label| (id, label)))
-            .collect::<Vec<_>>();
-        let connectable_from_nodes = graph
-            .nodes
-            .iter()
-            .filter_map(|node| {
-                (node.id != node_id
-                    && !incoming_connected_ids.contains(&node.id)
-                    && graph.can_connect_nodes(node.id, node_id).is_ok())
-                .then_some((
-                    node.id,
-                    Self::rule_graph_node_label_for_inspector(&graph, &node_badges, node.id),
-                ))
-            })
-            .filter_map(|(id, label)| label.map(|label| (id, label)))
-            .collect::<Vec<_>>();
+        let action_result = Self::render_node_action_buttons(
+            ui, scene_name, node_id, &mut graph, &connectable_from, &connectable_to,
+        );
 
-        let mut pending_connect_to = None::<u64>;
-        let mut pending_connect_from = None::<u64>;
-        let mut pending_disconnect_edge = None::<(u64, u64)>;
-        ui.push_id(("graph_node_action_buttons", scene_name, node_id), |ui| {
-            egui::Grid::new("graph_node_action_grid")
-                .num_columns(2)
-                .spacing([8.0, 6.0])
-                .show(ui, |ui| {
-                    if ui.button("Disconnect Node").clicked() {
-                        if let Err(error) = graph.disconnect_node(node_id) {
-                            operation_error =
-                                Some(format!("Failed to disconnect node: {:?}", error));
-                        } else {
-                            graph_mutated = true;
-                        }
-                    }
-                    if ui
-                        .add(
-                            egui::Button::new("Delete Node")
-                                .fill(egui::Color32::from_rgb(120, 30, 30)),
-                        )
-                        .clicked()
-                    {
-                        if let Err(error) = graph.remove_node(node_id) {
-                            operation_error = Some(format!("Failed to delete node: {:?}", error));
-                        } else {
-                            graph_mutated = true;
-                        }
-                    }
-                    ui.end_row();
-
-                    ui.menu_button("Connect From", |ui| {
-                        if connectable_from_nodes.is_empty() {
-                            ui.label("No available nodes");
-                            return;
-                        }
-                        for (candidate_id, label) in &connectable_from_nodes {
-                            if ui.button(label).clicked() {
-                                pending_connect_from = Some(*candidate_id);
-                                ui.close();
-                            }
-                        }
-                    });
-                    ui.menu_button("Connect To", |ui| {
-                        if connectable_to_nodes.is_empty() {
-                            ui.label("No available nodes");
-                            return;
-                        }
-                        for (candidate_id, label) in &connectable_to_nodes {
-                            if ui.button(label).clicked() {
-                                pending_connect_to = Some(*candidate_id);
-                                ui.close();
-                            }
-                        }
-                    });
-                    ui.end_row();
-                });
-        });
         ui.separator();
-        let outgoing_edges = graph
-            .edges
-            .iter()
-            .filter(|edge| edge.from == node_id)
-            .copied()
-            .collect::<Vec<_>>();
-        let incoming_edges = graph
-            .edges
-            .iter()
-            .filter(|edge| edge.to == node_id)
-            .copied()
-            .collect::<Vec<_>>();
-        ui.label("Connections");
-        if outgoing_edges.is_empty() && incoming_edges.is_empty() {
-            ui.label("None");
-        } else {
-            egui::ScrollArea::vertical()
-                .max_height(220.0)
-                .show(ui, |ui| {
-                    if !outgoing_edges.is_empty() {
-                        ui.label("Outgoing");
-                        for edge in &outgoing_edges {
-                            let label = Self::rule_graph_node_label_for_inspector(
-                                &graph,
-                                &node_badges,
-                                edge.to,
-                            )
-                            .unwrap_or_else(|| format!("node {}", edge.to));
-                            ui.horizontal(|ui| {
-                                ui.label(format!("-> {}", label));
-                                if ui.small_button("Disconnect").clicked() {
-                                    pending_disconnect_edge = Some((edge.from, edge.to));
-                                }
-                            });
-                        }
-                    }
-                    if !incoming_edges.is_empty() {
-                        ui.label("Incoming");
-                        for edge in &incoming_edges {
-                            let label = Self::rule_graph_node_label_for_inspector(
-                                &graph,
-                                &node_badges,
-                                edge.from,
-                            )
-                            .unwrap_or_else(|| format!("node {}", edge.from));
-                            ui.horizontal(|ui| {
-                                ui.label(format!("<- {}", label));
-                                if ui.small_button("Disconnect").clicked() {
-                                    pending_disconnect_edge = Some((edge.from, edge.to));
-                                }
-                            });
-                        }
-                    }
-                });
-        }
-        if let Some((from, to)) = pending_disconnect_edge {
-            if graph.disconnect_nodes(from, to) {
-                graph_mutated = true;
-            } else {
-                operation_error = Some("Failed to disconnect selected connection".to_string());
-            }
-        }
-        if let Some(connect_from) = pending_connect_from {
-            if let Err(error) = graph.connect_nodes(connect_from, node_id) {
-                operation_error = Some(format!("Failed to connect nodes: {:?}", error));
-            } else {
-                graph_mutated = true;
-            }
-        }
-        if let Some(connect_to) = pending_connect_to {
-            if let Err(error) = graph.connect_nodes(node_id, connect_to) {
-                operation_error = Some(format!("Failed to connect nodes: {:?}", error));
-            } else {
-                graph_mutated = true;
-            }
-        }
-        if let Some(message) = operation_error {
+        let pending_disconnect = Self::render_connections_list(ui, &graph, &ctx.node_badges, node_id);
+        let (ops_mutated, ops_error) = Self::process_pending_operations(
+            &mut graph, node_id, &action_result, pending_disconnect,
+        );
+        graph_mutated |= ops_mutated;
+
+        if let Some(message) = ops_error {
             ui.colored_label(egui::Color32::from_rgb(255, 120, 120), message);
         }
 
@@ -332,17 +52,131 @@ impl InspectorSystem {
             return false;
         }
 
+        Self::commit_graph_changes(ui, ui_state, scene_name, graph, &ctx)
+    }
+
+    fn render_node_kind_editor(
+        ui: &mut egui::Ui,
+        ui_state: &EditorUI,
+        params: &NodeEditParams,
+        node_kind: &RuleGraphNodeKind,
+        graph: &mut RuleGraph,
+        ctx: &NodeEditorContext,
+    ) -> bool {
+        match node_kind {
+            RuleGraphNodeKind::Trigger(trigger) => {
+                ui.label("Trigger");
+                Self::edit_trigger_node(ui, ui_state, params, *trigger, graph, ctx)
+            }
+            RuleGraphNodeKind::Condition(condition) => {
+                ui.label("Condition");
+                Self::edit_condition_node(ui, params, condition, graph)
+            }
+            RuleGraphNodeKind::Action(action) => {
+                ui.label("Action");
+                Self::edit_action_node(ui, ui_state, params, action, graph, ctx)
+            }
+        }
+    }
+
+    fn edit_trigger_node(
+        ui: &mut egui::Ui,
+        ui_state: &EditorUI,
+        params: &NodeEditParams,
+        trigger: RuleTrigger,
+        graph: &mut RuleGraph,
+        ctx: &NodeEditorContext,
+    ) -> bool {
+        let mut edited_trigger = trigger;
+        let map_size = Self::extract_map_size(ui_state, ctx.scene_index);
+        let changed = Self::render_rule_graph_trigger_editor(
+            ui, params.scene_name, params.node_key, &mut edited_trigger, map_size,
+        );
+
+        if changed && edited_trigger != trigger {
+            if let Err(error) = graph.set_trigger_for_chain(params.node_id, edited_trigger) {
+                ui.colored_label(egui::Color32::from_rgb(255, 120, 120), format!("Failed to update trigger: {:?}", error));
+                return false;
+            }
+            return true;
+        }
+        false
+    }
+
+    fn edit_condition_node(
+        ui: &mut egui::Ui,
+        params: &NodeEditParams,
+        condition: &RuleCondition,
+        graph: &mut RuleGraph,
+    ) -> bool {
+        let mut edited_condition = condition.clone();
+        let changed = Self::render_rule_graph_condition_editor(
+            ui, params.scene_name, params.node_key, &mut edited_condition,
+        );
+
+        if changed && edited_condition != *condition {
+            if let Err(error) = graph.set_condition_for_node(params.node_id, edited_condition) {
+                ui.colored_label(egui::Color32::from_rgb(255, 120, 120), format!("Failed to update condition: {:?}", error));
+                return false;
+            }
+            return true;
+        }
+        false
+    }
+
+    fn edit_action_node(
+        ui: &mut egui::Ui,
+        ui_state: &EditorUI,
+        params: &NodeEditParams,
+        action: &RuleAction,
+        graph: &mut RuleGraph,
+        ctx: &NodeEditorContext,
+    ) -> bool {
+        let mut edited_action = action.clone();
+        let changed = Self::render_rule_graph_action_editor(
+            ui, params.scene_name, params.node_key, &mut edited_action,
+            &ctx.validation_issues, &ctx.audio_choices, &ui_state.scenes,
+        );
+
+        if changed && edited_action != *action {
+            if let Err(error) = graph.set_action_for_node(params.node_id, edited_action) {
+                ui.colored_label(egui::Color32::from_rgb(255, 120, 120), format!("Failed to update action: {:?}", error));
+                return false;
+            }
+            return true;
+        }
+        false
+    }
+
+    fn extract_map_size(ui_state: &EditorUI, scene_index: usize) -> Option<(u32, u32)> {
+        let scene = ui_state.scenes.get(scene_index)?;
+        let map_name = scene.maps.first()?;
+        if ui_state.map.active_map.as_ref() != Some(map_name) {
+            return None;
+        }
+        ui_state.map.draft.as_ref()
+            .map(|draft| (draft.tilemap.size.x, draft.tilemap.size.y))
+            .or_else(|| ui_state.map.pending_tilemap_sync.as_ref().map(|tm| (tm.size.x, tm.size.y)))
+    }
+
+    fn commit_graph_changes(
+        ui: &mut egui::Ui,
+        ui_state: &mut EditorUI,
+        scene_name: &str,
+        graph: RuleGraph,
+        ctx: &NodeEditorContext,
+    ) -> bool {
         match graph.to_rule_set() {
             Ok(updated_rules) => {
                 let (zoom, pan) = ui_state.graph_view_for_scene(scene_name);
                 ui_state.execute_scene_rules_graph_command(
                     scene_name,
                     SceneRulesGraphCommandData {
-                        before_rule_set: before_rules,
+                        before_rule_set: ctx.before_rules.clone(),
                         after_rule_set: updated_rules,
-                        before_graph,
+                        before_graph: ctx.before_graph.clone(),
                         after_graph: graph,
-                        before_layout,
+                        before_layout: ctx.before_layout.clone(),
                         zoom,
                         pan,
                     },
@@ -1463,5 +1297,302 @@ impl InspectorSystem {
         }
 
         changed
+    }
+
+    // Helper: Collect outgoing and incoming edge node IDs for a given node
+    fn collect_connection_ids(graph: &RuleGraph, node_id: u64) -> (Vec<u64>, Vec<u64>) {
+        let mut outgoing: Vec<u64> = graph
+            .edges
+            .iter()
+            .filter(|edge| edge.from == node_id)
+            .map(|edge| edge.to)
+            .collect();
+        outgoing.sort_unstable();
+        outgoing.dedup();
+
+        let mut incoming: Vec<u64> = graph
+            .edges
+            .iter()
+            .filter(|edge| edge.to == node_id)
+            .map(|edge| edge.from)
+            .collect();
+        incoming.sort_unstable();
+        incoming.dedup();
+
+        (outgoing, incoming)
+    }
+
+    // Helper: Build list of nodes that can be connected to/from current node
+    fn build_connectable_nodes(
+        graph: &RuleGraph,
+        node_badges: &HashMap<u64, String>,
+        node_id: u64,
+        connected_ids: &[u64],
+        connect_from: bool,
+    ) -> Vec<(u64, String)> {
+        graph
+            .nodes
+            .iter()
+            .filter_map(|node| {
+                if node.id == node_id || connected_ids.contains(&node.id) {
+                    return None;
+                }
+                let can_connect = if connect_from {
+                    graph.can_connect_nodes(node.id, node_id).is_ok()
+                } else {
+                    graph.can_connect_nodes(node_id, node.id).is_ok()
+                };
+                if !can_connect {
+                    return None;
+                }
+                Self::rule_graph_node_label_for_inspector(graph, node_badges, node.id)
+                    .map(|label| (node.id, label))
+            })
+            .collect()
+    }
+
+    // Helper: Render the action buttons grid (Disconnect Node, Delete Node, Connect From/To)
+    fn render_node_action_buttons(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        node_id: u64,
+        graph: &mut RuleGraph,
+        connectable_from: &[(u64, String)],
+        connectable_to: &[(u64, String)],
+    ) -> NodeActionResult {
+        let mut result = NodeActionResult::default();
+
+        ui.push_id(("graph_node_action_buttons", scene_name, node_id), |ui| {
+            egui::Grid::new("graph_node_action_grid")
+                .num_columns(2)
+                .spacing([8.0, 6.0])
+                .show(ui, |ui| {
+                    Self::render_disconnect_delete_buttons(ui, node_id, graph, &mut result);
+                    ui.end_row();
+                    Self::render_connect_menus(ui, connectable_from, connectable_to, &mut result);
+                    ui.end_row();
+                });
+        });
+
+        result
+    }
+
+    fn render_disconnect_delete_buttons(
+        ui: &mut egui::Ui,
+        node_id: u64,
+        graph: &mut RuleGraph,
+        result: &mut NodeActionResult,
+    ) {
+        if ui.button("Disconnect Node").clicked() {
+            if let Err(error) = graph.disconnect_node(node_id) {
+                result.error = Some(format!("Failed to disconnect node: {:?}", error));
+            } else {
+                result.mutated = true;
+            }
+        }
+        if ui
+            .add(egui::Button::new("Delete Node").fill(egui::Color32::from_rgb(120, 30, 30)))
+            .clicked()
+        {
+            if let Err(error) = graph.remove_node(node_id) {
+                result.error = Some(format!("Failed to delete node: {:?}", error));
+            } else {
+                result.mutated = true;
+            }
+        }
+    }
+
+    fn render_connect_menus(
+        ui: &mut egui::Ui,
+        connectable_from: &[(u64, String)],
+        connectable_to: &[(u64, String)],
+        result: &mut NodeActionResult,
+    ) {
+        ui.menu_button("Connect From", |ui| {
+            if connectable_from.is_empty() {
+                ui.label("No available nodes");
+                return;
+            }
+            for (candidate_id, label) in connectable_from {
+                if ui.button(label).clicked() {
+                    result.pending_connect_from = Some(*candidate_id);
+                    ui.close();
+                }
+            }
+        });
+        ui.menu_button("Connect To", |ui| {
+            if connectable_to.is_empty() {
+                ui.label("No available nodes");
+                return;
+            }
+            for (candidate_id, label) in connectable_to {
+                if ui.button(label).clicked() {
+                    result.pending_connect_to = Some(*candidate_id);
+                    ui.close();
+                }
+            }
+        });
+    }
+
+    // Helper: Render the connections list (incoming and outgoing edges)
+    fn render_connections_list(
+        ui: &mut egui::Ui,
+        graph: &RuleGraph,
+        node_badges: &HashMap<u64, String>,
+        node_id: u64,
+    ) -> Option<(u64, u64)> {
+        let outgoing: Vec<_> = graph
+            .edges
+            .iter()
+            .filter(|edge| edge.from == node_id)
+            .copied()
+            .collect();
+        let incoming: Vec<_> = graph
+            .edges
+            .iter()
+            .filter(|edge| edge.to == node_id)
+            .copied()
+            .collect();
+
+        ui.label("Connections");
+        if outgoing.is_empty() && incoming.is_empty() {
+            ui.label("None");
+            return None;
+        }
+
+        let mut pending_disconnect = None;
+        egui::ScrollArea::vertical()
+            .max_height(220.0)
+            .show(ui, |ui| {
+                Self::render_edge_list(ui, graph, node_badges, &outgoing, true, &mut pending_disconnect);
+                Self::render_edge_list(ui, graph, node_badges, &incoming, false, &mut pending_disconnect);
+            });
+        pending_disconnect
+    }
+
+    fn render_edge_list(
+        ui: &mut egui::Ui,
+        graph: &RuleGraph,
+        node_badges: &HashMap<u64, String>,
+        edges: &[RuleGraphEdge],
+        is_outgoing: bool,
+        pending_disconnect: &mut Option<(u64, u64)>,
+    ) {
+        if edges.is_empty() {
+            return;
+        }
+        ui.label(if is_outgoing { "Outgoing" } else { "Incoming" });
+        for edge in edges {
+            let target_id = if is_outgoing { edge.to } else { edge.from };
+            let label = Self::rule_graph_node_label_for_inspector(graph, node_badges, target_id)
+                .unwrap_or_else(|| format!("node {}", target_id));
+            let prefix = if is_outgoing { "->" } else { "<-" };
+            ui.horizontal(|ui| {
+                ui.label(format!("{} {}", prefix, label));
+                if ui.small_button("Disconnect").clicked() {
+                    *pending_disconnect = Some((edge.from, edge.to));
+                }
+            });
+        }
+    }
+
+    // Helper: Process pending connection operations
+    fn process_pending_operations(
+        graph: &mut RuleGraph,
+        node_id: u64,
+        action_result: &NodeActionResult,
+        pending_disconnect: Option<(u64, u64)>,
+    ) -> (bool, Option<String>) {
+        let mut mutated = action_result.mutated;
+        let mut error = action_result.error.clone();
+
+        if let Some((from, to)) = pending_disconnect {
+            if graph.disconnect_nodes(from, to) {
+                mutated = true;
+            } else {
+                error = Some("Failed to disconnect selected connection".to_string());
+            }
+        }
+        if let Some(connect_from) = action_result.pending_connect_from {
+            if let Err(e) = graph.connect_nodes(connect_from, node_id) {
+                error = Some(format!("Failed to connect nodes: {:?}", e));
+            } else {
+                mutated = true;
+            }
+        }
+        if let Some(connect_to) = action_result.pending_connect_to {
+            if let Err(e) = graph.connect_nodes(node_id, connect_to) {
+                error = Some(format!("Failed to connect nodes: {:?}", e));
+            } else {
+                mutated = true;
+            }
+        }
+
+        (mutated, error)
+    }
+}
+
+/// Result of node action button interactions
+#[derive(Default)]
+struct NodeActionResult {
+    mutated: bool,
+    error: Option<String>,
+    pending_connect_from: Option<u64>,
+    pending_connect_to: Option<u64>,
+}
+
+/// Parameters for node editing operations
+struct NodeEditParams<'a> {
+    scene_name: &'a str,
+    node_key: &'a str,
+    node_id: u64,
+}
+
+/// Context for node editor operations, captures state before modifications
+struct NodeEditorContext {
+    scene_index: usize,
+    before_rules: toki_core::rules::RuleSet,
+    before_graph: Option<RuleGraph>,
+    before_layout: Option<SceneGraphLayout>,
+    node_badges: HashMap<u64, String>,
+    audio_choices: RuleAudioChoices,
+    validation_issues: Vec<RuleValidationIssue>,
+}
+
+impl NodeEditorContext {
+    /// Creates context and returns both the graph (for mutation) and the context (for read-only data)
+    fn new(
+        ui_state: &mut EditorUI,
+        scene_name: &str,
+        _node_key: &str,
+        config: Option<&EditorConfig>,
+    ) -> Option<(RuleGraph, Self)> {
+        let scene_index = ui_state.scenes.iter().position(|s| s.name == scene_name)?;
+        let scene_rules = ui_state.scenes[scene_index].rules.clone();
+        let before_rules = scene_rules.clone();
+        let before_graph = ui_state.rule_graph_for_scene(scene_name).cloned();
+        let before_layout = ui_state.graph.layouts_by_scene.get(scene_name).cloned();
+
+        ui_state.sync_rule_graph_with_rule_set(scene_name, &scene_rules);
+
+        let graph = ui_state
+            .rule_graph_for_scene(scene_name)
+            .cloned()
+            .unwrap_or_else(|| RuleGraph::from_rule_set(&scene_rules));
+        let node_badges = InspectorSystem::rule_graph_node_badges(&graph);
+        let audio_choices = InspectorSystem::load_rule_audio_choices(config);
+        let validation_issues = InspectorSystem::validate_rule_set(&scene_rules);
+
+        let ctx = Self {
+            scene_index,
+            before_rules,
+            before_graph,
+            before_layout,
+            node_badges,
+            audio_choices,
+            validation_issues,
+        };
+
+        Some((graph, ctx))
     }
 }

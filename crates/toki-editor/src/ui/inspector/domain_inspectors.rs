@@ -124,24 +124,9 @@ impl SceneInspector {
     ) -> bool {
         ui.label("Scene Player Entry:");
 
-        let entity_definition_names = ctx
-            .project
-            .as_ref()
-            .map(|project| {
-                InspectorSystem::discover_entity_definition_names(
-                    project.path.join("entities").as_path(),
-                )
-            })
-            .unwrap_or_default();
-        let spawn_point_ids = scene
-            .anchors
-            .iter()
-            .filter(|anchor| anchor.kind == SceneAnchorKind::SpawnPoint)
-            .map(|anchor| anchor.id.clone())
-            .collect::<Vec<_>>();
-        let has_authored_player_entity = Self::scene_has_authored_player_entity(scene);
+        let entry_ctx = PlayerEntryContext::new(scene, ctx.project.as_deref());
 
-        if has_authored_player_entity {
+        if Self::scene_has_authored_player_entity(scene) {
             ui.colored_label(
                 egui::Color32::YELLOW,
                 "This scene already contains a placed player entity. Scene Player Entry preview stays disabled until that authored player entity is removed.",
@@ -149,128 +134,143 @@ impl SceneInspector {
         }
 
         match scene.player_entry.clone() {
-            Some(current_entry) => {
-                let mut edited_entry = current_entry.clone();
-                let mut entry_changed = false;
+            Some(entry) => Self::render_existing_player_entry(ui, scene_name, scene, ctx, &entry_ctx, entry),
+            None => Self::render_add_player_entry_button(ui, scene_name, scene, ctx, &entry_ctx),
+        }
+    }
 
-                ui.horizontal(|ui| {
-                    ui.label("Entity Definition:");
-                    egui::ComboBox::from_id_salt(("scene_player_entity_definition", scene_name))
-                        .selected_text(edited_entry.entity_definition_name.as_str())
-                        .show_ui(ui, |ui| {
-                            for entity_definition_name in &entity_definition_names {
-                                entry_changed |= ui
-                                    .selectable_value(
-                                        &mut edited_entry.entity_definition_name,
-                                        entity_definition_name.clone(),
-                                        entity_definition_name,
-                                    )
-                                    .changed();
-                            }
-                        });
-                });
+    fn render_existing_player_entry(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        scene: &toki_core::Scene,
+        ctx: &mut InspectorContext<'_>,
+        entry_ctx: &PlayerEntryContext,
+        current_entry: ScenePlayerEntry,
+    ) -> bool {
+        let mut edited_entry = current_entry.clone();
+        let mut entry_changed = false;
 
-                ui.horizontal(|ui| {
-                    ui.label("Spawn Point:");
-                    egui::ComboBox::from_id_salt(("scene_player_spawn_point", scene_name))
-                        .selected_text(edited_entry.spawn_point_id.as_str())
-                        .show_ui(ui, |ui| {
-                            for spawn_point_id in &spawn_point_ids {
-                                entry_changed |= ui
-                                    .selectable_value(
-                                        &mut edited_entry.spawn_point_id,
-                                        spawn_point_id.clone(),
-                                        spawn_point_id,
-                                    )
-                                    .changed();
-                            }
-                        });
-                });
+        entry_changed |= Self::render_entry_definition_combo(ui, scene_name, &entry_ctx.entity_defs, &mut edited_entry.entity_definition_name);
+        entry_changed |= Self::render_entry_spawn_point_combo(ui, scene_name, &entry_ctx.spawn_points, &mut edited_entry.spawn_point_id);
 
-                if entry_changed {
-                    let before_scene = scene.clone();
-                    let mut after_scene = before_scene.clone();
-                    after_scene.player_entry = Some(edited_entry);
-                    if ctx.ui_state.execute_command(
-                        crate::ui::undo_redo::EditorCommand::update_scene(
-                            scene_name.to_string(),
-                            before_scene,
-                            after_scene,
-                        ),
-                    ) {
-                        return true;
-                    }
-                }
+        if entry_changed && Self::commit_player_entry_change(scene_name, scene, Some(edited_entry), ctx) {
+            return true;
+        }
 
-                if entity_definition_names.is_empty() {
-                    ui.label("No entity definitions found in this project.");
-                }
-                if spawn_point_ids.is_empty() {
-                    ui.label("Add a spawn point before assigning a scene player entry.");
-                }
+        Self::render_entry_validation_hints(ui, entry_ctx);
 
-                if ui.button("➖ Remove Scene Player Entry").clicked() {
-                    let before_scene = scene.clone();
-                    let mut after_scene = before_scene.clone();
-                    after_scene.player_entry = None;
-                    if ctx.ui_state.execute_command(
-                        crate::ui::undo_redo::EditorCommand::update_scene(
-                            scene_name.to_string(),
-                            before_scene,
-                            after_scene,
-                        ),
-                    ) {
-                        if matches!(
-                            ctx.ui_state.selection,
-                            Some(crate::ui::editor_ui::Selection::ScenePlayerEntry(ref selected_scene))
-                                if selected_scene == scene_name
-                        ) {
-                            ctx.ui_state
-                                .set_selection(crate::ui::editor_ui::Selection::Scene(
-                                    scene_name.to_string(),
-                                ));
-                        }
-                        return true;
-                    }
-                }
-            }
-            None => {
-                if entity_definition_names.is_empty() {
-                    ui.label("No entity definitions found in this project.");
-                }
-                if spawn_point_ids.is_empty() {
-                    ui.label("Add a spawn point before creating a scene player entry.");
-                }
-
-                let can_add_scene_player_entry =
-                    !entity_definition_names.is_empty() && !spawn_point_ids.is_empty();
-                if ui
-                    .add_enabled(
-                        can_add_scene_player_entry,
-                        egui::Button::new("➕ Add Scene Player Entry"),
-                    )
-                    .clicked()
-                {
-                    let before_scene = scene.clone();
-                    let mut after_scene = before_scene.clone();
-                    after_scene.player_entry = Some(ScenePlayerEntry {
-                        entity_definition_name: entity_definition_names[0].clone(),
-                        spawn_point_id: spawn_point_ids[0].clone(),
-                    });
-                    if ctx.ui_state.execute_command(
-                        crate::ui::undo_redo::EditorCommand::update_scene(
-                            scene_name.to_string(),
-                            before_scene,
-                            after_scene,
-                        ),
-                    ) {
-                        return true;
-                    }
-                }
-            }
+        if ui.button("➖ Remove Scene Player Entry").clicked() {
+            return Self::remove_player_entry(scene_name, scene, ctx);
         }
 
         false
+    }
+
+    fn render_entry_definition_combo(ui: &mut egui::Ui, scene_name: &str, choices: &[String], value: &mut String) -> bool {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Entity Definition:");
+            egui::ComboBox::from_id_salt(("scene_player_entity_definition", scene_name))
+                .selected_text(value.as_str())
+                .show_ui(ui, |ui| {
+                    for name in choices {
+                        changed |= ui.selectable_value(value, name.clone(), name).changed();
+                    }
+                });
+        });
+        changed
+    }
+
+    fn render_entry_spawn_point_combo(ui: &mut egui::Ui, scene_name: &str, choices: &[String], value: &mut String) -> bool {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Spawn Point:");
+            egui::ComboBox::from_id_salt(("scene_player_spawn_point", scene_name))
+                .selected_text(value.as_str())
+                .show_ui(ui, |ui| {
+                    for id in choices {
+                        changed |= ui.selectable_value(value, id.clone(), id).changed();
+                    }
+                });
+        });
+        changed
+    }
+
+    fn render_entry_validation_hints(ui: &mut egui::Ui, entry_ctx: &PlayerEntryContext) {
+        if entry_ctx.entity_defs.is_empty() {
+            ui.label("No entity definitions found in this project.");
+        }
+        if entry_ctx.spawn_points.is_empty() {
+            ui.label("Add a spawn point before assigning a scene player entry.");
+        }
+    }
+
+    fn commit_player_entry_change(
+        scene_name: &str,
+        scene: &toki_core::Scene,
+        new_entry: Option<ScenePlayerEntry>,
+        ctx: &mut InspectorContext<'_>,
+    ) -> bool {
+        let before_scene = scene.clone();
+        let mut after_scene = before_scene.clone();
+        after_scene.player_entry = new_entry;
+        ctx.ui_state.execute_command(
+            crate::ui::undo_redo::EditorCommand::update_scene(scene_name.to_string(), before_scene, after_scene),
+        )
+    }
+
+    fn remove_player_entry(scene_name: &str, scene: &toki_core::Scene, ctx: &mut InspectorContext<'_>) -> bool {
+        if Self::commit_player_entry_change(scene_name, scene, None, ctx) {
+            if matches!(ctx.ui_state.selection, Some(crate::ui::editor_ui::Selection::ScenePlayerEntry(ref s)) if s == scene_name) {
+                ctx.ui_state.set_selection(crate::ui::editor_ui::Selection::Scene(scene_name.to_string()));
+            }
+            return true;
+        }
+        false
+    }
+
+    fn render_add_player_entry_button(
+        ui: &mut egui::Ui,
+        scene_name: &str,
+        scene: &toki_core::Scene,
+        ctx: &mut InspectorContext<'_>,
+        entry_ctx: &PlayerEntryContext,
+    ) -> bool {
+        if entry_ctx.entity_defs.is_empty() {
+            ui.label("No entity definitions found in this project.");
+        }
+        if entry_ctx.spawn_points.is_empty() {
+            ui.label("Add a spawn point before creating a scene player entry.");
+        }
+
+        let can_add = !entry_ctx.entity_defs.is_empty() && !entry_ctx.spawn_points.is_empty();
+        if ui.add_enabled(can_add, egui::Button::new("➕ Add Scene Player Entry")).clicked() {
+            let new_entry = ScenePlayerEntry {
+                entity_definition_name: entry_ctx.entity_defs[0].clone(),
+                spawn_point_id: entry_ctx.spawn_points[0].clone(),
+            };
+            return Self::commit_player_entry_change(scene_name, scene, Some(new_entry), ctx);
+        }
+        false
+    }
+}
+
+/// Context for player entry editing
+struct PlayerEntryContext {
+    entity_defs: Vec<String>,
+    spawn_points: Vec<String>,
+}
+
+impl PlayerEntryContext {
+    fn new(scene: &toki_core::Scene, project: Option<&crate::project::Project>) -> Self {
+        let entity_defs = project
+            .map(|p| InspectorSystem::discover_entity_definition_names(p.path.join("entities").as_path()))
+            .unwrap_or_default();
+        let spawn_points = scene.anchors.iter()
+            .filter(|a| a.kind == SceneAnchorKind::SpawnPoint)
+            .map(|a| a.id.clone())
+            .collect();
+        Self { entity_defs, spawn_points }
     }
 }
 

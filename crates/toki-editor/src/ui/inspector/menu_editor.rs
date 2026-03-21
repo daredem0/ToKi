@@ -2,9 +2,24 @@ use super::{EditorUI, InspectorSystem, Selection};
 use crate::project::Project;
 use crate::ui::undo_redo::EditorCommand;
 use toki_core::menu::{
-    MenuBorderStyle, MenuDialogDefinition, MenuItemDefinition, MenuListSource,
+    MenuAppearance, MenuBorderStyle, MenuDialogDefinition, MenuItemDefinition, MenuListSource,
     MenuScreenDefinition, MenuSettings, UiAction,
 };
+
+/// Context for editing menu appearance settings
+struct AppearanceEditContext {
+    appearance: MenuAppearance,
+    changed: bool,
+}
+
+impl AppearanceEditContext {
+    fn new(appearance: &MenuAppearance) -> Self {
+        Self {
+            appearance: appearance.clone(),
+            changed: false,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MenuEditorItemKind {
@@ -76,30 +91,39 @@ impl InspectorSystem {
         project: &mut Project,
     ) {
         let before_settings = project.metadata.runtime.menu.clone();
-        let available_screen_ids = project
-            .metadata
-            .runtime
-            .menu
-            .screens
-            .iter()
-            .map(|screen| screen.id.clone())
-            .collect::<Vec<_>>();
-        let mut appearance = project.metadata.runtime.menu.appearance.clone();
-        let mut appearance_changed = false;
+        let available_screen_ids: Vec<_> = project.metadata.runtime.menu.screens
+            .iter().map(|s| s.id.clone()).collect();
+
+        Self::render_runtime_menu_header(ui, project, &available_screen_ids);
+
+        let mut ctx = AppearanceEditContext::new(&project.metadata.runtime.menu.appearance);
+        Self::render_typography_header(ui, ui_state, &mut ctx);
+        Self::render_layout_header(ui, &mut ctx);
+        Self::render_style_header(ui, &mut ctx);
+        Self::render_backgrounds_header(ui, &mut ctx);
+        Self::render_footer_header(ui, &mut ctx);
+
+        if ctx.changed {
+            project.metadata.runtime.menu.appearance = ctx.appearance;
+        }
+        Self::commit_menu_settings_change(ui_state, project, before_settings);
+
+        Self::render_screens_dialogs_headers(ui, ui_state, project);
+    }
+
+    fn render_runtime_menu_header(ui: &mut egui::Ui, project: &mut Project, screen_ids: &[String]) {
         egui::CollapsingHeader::new("Runtime Menu Settings")
             .default_open(false)
             .show(ui, |ui| {
                 ui.checkbox(
                     &mut project.metadata.runtime.menu.gate_gameplay_when_open,
                     "Gate gameplay while menu is open",
-                )
-                .changed();
-
+                );
                 let mut pause_root = project.metadata.runtime.menu.pause_root_screen_id.clone();
                 egui::ComboBox::from_label("Pause Root Screen")
                     .selected_text(pause_root.clone())
                     .show_ui(ui, |ui| {
-                        for screen_id in &available_screen_ids {
+                        for screen_id in screen_ids {
                             ui.selectable_value(&mut pause_root, screen_id.clone(), screen_id);
                         }
                     });
@@ -107,7 +131,9 @@ impl InspectorSystem {
                     project.metadata.runtime.menu.pause_root_screen_id = pause_root;
                 }
             });
+    }
 
+    fn render_typography_header(ui: &mut egui::Ui, ui_state: &EditorUI, ctx: &mut AppearanceEditContext) {
         egui::CollapsingHeader::new("Typography")
             .default_open(false)
             .show(ui, |ui| {
@@ -116,276 +142,153 @@ impl InspectorSystem {
                 } else {
                     ui_state.menu_preview_font_families.clone()
                 };
-                let mut selected_font_family = appearance.font_family.clone();
-                egui::ComboBox::from_label("Font Family")
-                    .selected_text(selected_font_family.clone())
-                    .show_ui(ui, |ui| {
-                        for family in &font_choices {
-                            ui.selectable_value(&mut selected_font_family, family.clone(), family);
-                        }
-                    });
-                if selected_font_family != appearance.font_family {
-                    appearance.font_family = selected_font_family;
-                    appearance_changed = true;
-                }
-
-                let mut font_size = appearance.font_size_px;
-                ui.horizontal(|ui| {
-                    ui.label("Font Size");
-                    if ui
-                        .add(
-                            egui::DragValue::new(&mut font_size)
-                                .range(8..=64)
-                                .speed(1.0),
-                        )
-                        .changed()
-                    {
-                        appearance.font_size_px = font_size;
-                        appearance_changed = true;
-                    }
-                });
+                ctx.changed |= Self::render_font_family_combo(ui, &mut ctx.appearance.font_family, &font_choices);
+                ctx.changed |= Self::render_drag_value(ui, "Font Size", &mut ctx.appearance.font_size_px, 8..=64);
             });
+    }
 
+    fn render_font_family_combo(ui: &mut egui::Ui, current: &mut String, choices: &[String]) -> bool {
+        let mut selected = current.clone();
+        egui::ComboBox::from_label("Font Family")
+            .selected_text(selected.clone())
+            .show_ui(ui, |ui| {
+                for family in choices {
+                    ui.selectable_value(&mut selected, family.clone(), family);
+                }
+            });
+        if selected != *current {
+            *current = selected;
+            return true;
+        }
+        false
+    }
+
+    fn render_drag_value(ui: &mut egui::Ui, label: &str, value: &mut u16, range: std::ops::RangeInclusive<u16>) -> bool {
+        let mut changed = false;
+        let mut val = *value;
+        ui.horizontal(|ui| {
+            ui.label(label);
+            if ui.add(egui::DragValue::new(&mut val).range(range).speed(1.0)).changed() {
+                *value = val;
+                changed = true;
+            }
+        });
+        changed
+    }
+
+    fn render_layout_header(ui: &mut egui::Ui, ctx: &mut AppearanceEditContext) {
         egui::CollapsingHeader::new("Layout")
             .default_open(false)
             .show(ui, |ui| {
-                let mut menu_width_percent = appearance.menu_width_percent;
-                ui.horizontal(|ui| {
-                    ui.label("Menu Width %");
-                    if ui
-                        .add(
-                            egui::DragValue::new(&mut menu_width_percent)
-                                .range(20..=100)
-                                .speed(1.0),
-                        )
-                        .changed()
-                    {
-                        appearance.menu_width_percent = menu_width_percent;
-                        appearance_changed = true;
-                    }
-                });
-
-                let mut menu_height_percent = appearance.menu_height_percent;
-                ui.horizontal(|ui| {
-                    ui.label("Menu Height %");
-                    if ui
-                        .add(
-                            egui::DragValue::new(&mut menu_height_percent)
-                                .range(20..=100)
-                                .speed(1.0),
-                        )
-                        .changed()
-                    {
-                        appearance.menu_height_percent = menu_height_percent;
-                        appearance_changed = true;
-                    }
-                });
-
-                let mut title_spacing = appearance.title_spacing_px;
-                ui.horizontal(|ui| {
-                    ui.label("Title Spacing");
-                    if ui
-                        .add(
-                            egui::DragValue::new(&mut title_spacing)
-                                .range(0..=64)
-                                .speed(1.0),
-                        )
-                        .changed()
-                    {
-                        appearance.title_spacing_px = title_spacing;
-                        appearance_changed = true;
-                    }
-                });
-
-                let mut button_spacing = appearance.button_spacing_px;
-                ui.horizontal(|ui| {
-                    ui.label("Button Spacing");
-                    if ui
-                        .add(
-                            egui::DragValue::new(&mut button_spacing)
-                                .range(0..=64)
-                                .speed(1.0),
-                        )
-                        .changed()
-                    {
-                        appearance.button_spacing_px = button_spacing;
-                        appearance_changed = true;
-                    }
-                });
-
-                let mut footer_spacing = appearance.footer_spacing_px;
-                ui.horizontal(|ui| {
-                    ui.label("Footer Spacing");
-                    if ui
-                        .add(
-                            egui::DragValue::new(&mut footer_spacing)
-                                .range(0..=128)
-                                .speed(1.0),
-                        )
-                        .changed()
-                    {
-                        appearance.footer_spacing_px = footer_spacing;
-                        appearance_changed = true;
-                    }
-                });
+                ctx.changed |= Self::render_drag_value(ui, "Menu Width %", &mut ctx.appearance.menu_width_percent, 20..=100);
+                ctx.changed |= Self::render_drag_value(ui, "Menu Height %", &mut ctx.appearance.menu_height_percent, 20..=100);
+                ctx.changed |= Self::render_drag_value(ui, "Title Spacing", &mut ctx.appearance.title_spacing_px, 0..=64);
+                ctx.changed |= Self::render_drag_value(ui, "Button Spacing", &mut ctx.appearance.button_spacing_px, 0..=64);
+                ctx.changed |= Self::render_drag_value(ui, "Footer Spacing", &mut ctx.appearance.footer_spacing_px, 0..=128);
             });
+    }
 
+    fn render_style_header(ui: &mut egui::Ui, ctx: &mut AppearanceEditContext) {
         egui::CollapsingHeader::new("Style")
             .default_open(false)
             .show(ui, |ui| {
-                let mut opacity_percent = appearance.opacity_percent;
-                ui.horizontal(|ui| {
-                    ui.label("Menu Opacity %");
-                    if ui
-                        .add(
-                            egui::Slider::new(&mut opacity_percent, 0..=100)
-                                .clamping(egui::SliderClamping::Always),
-                        )
-                        .changed()
-                    {
-                        appearance.opacity_percent = opacity_percent;
-                        appearance_changed = true;
-                    }
-                });
-
-                let mut border_style = appearance.border_style;
-                egui::ComboBox::from_label("Border Style")
-                    .selected_text(match border_style {
-                        MenuBorderStyle::None => "None",
-                        MenuBorderStyle::Square => "Square",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut border_style, MenuBorderStyle::None, "None");
-                        ui.selectable_value(&mut border_style, MenuBorderStyle::Square, "Square");
-                    });
-                if border_style != appearance.border_style {
-                    appearance.border_style = border_style;
-                    appearance_changed = true;
-                }
-
-                ui.label("Border Color Hex");
-                if ui
-                    .text_edit_singleline(&mut appearance.border_color_hex)
-                    .changed()
-                {
-                    appearance_changed = true;
-                }
-                if !Self::is_valid_menu_hex_color(&appearance.border_color_hex) {
-                    ui.colored_label(
-                        egui::Color32::from_rgb(215, 120, 120),
-                        "Use a 6-digit hex color like #7CFF7C",
-                    );
-                }
-
-                ui.label("Text Color Hex");
-                if ui
-                    .text_edit_singleline(&mut appearance.text_color_hex)
-                    .changed()
-                {
-                    appearance_changed = true;
-                }
-                if !Self::is_valid_menu_hex_color(&appearance.text_color_hex) {
-                    ui.colored_label(
-                        egui::Color32::from_rgb(215, 120, 120),
-                        "Use a 6-digit hex color like #FFFFFF",
-                    );
-                }
+                ctx.changed |= Self::render_opacity_slider(ui, &mut ctx.appearance.opacity_percent);
+                ctx.changed |= Self::render_border_style_combo(ui, &mut ctx.appearance.border_style);
+                ctx.changed |= Self::render_hex_color_field(ui, "Border Color Hex", &mut ctx.appearance.border_color_hex, "#7CFF7C");
+                ctx.changed |= Self::render_hex_color_field(ui, "Text Color Hex", &mut ctx.appearance.text_color_hex, "#FFFFFF");
             });
+    }
 
+    fn render_opacity_slider(ui: &mut egui::Ui, value: &mut u16) -> bool {
+        let mut changed = false;
+        let mut val = *value;
+        ui.horizontal(|ui| {
+            ui.label("Menu Opacity %");
+            if ui.add(egui::Slider::new(&mut val, 0..=100).clamping(egui::SliderClamping::Always)).changed() {
+                *value = val;
+                changed = true;
+            }
+        });
+        changed
+    }
+
+    fn render_border_style_combo(ui: &mut egui::Ui, style: &mut MenuBorderStyle) -> bool {
+        let mut selected = *style;
+        egui::ComboBox::from_label("Border Style")
+            .selected_text(match selected {
+                MenuBorderStyle::None => "None",
+                MenuBorderStyle::Square => "Square",
+            })
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut selected, MenuBorderStyle::None, "None");
+                ui.selectable_value(&mut selected, MenuBorderStyle::Square, "Square");
+            });
+        if selected != *style {
+            *style = selected;
+            return true;
+        }
+        false
+    }
+
+    fn render_hex_color_field(ui: &mut egui::Ui, label: &str, value: &mut String, example: &str) -> bool {
+        ui.label(label);
+        let changed = ui.text_edit_singleline(value).changed();
+        if !Self::is_valid_menu_hex_color(value) {
+            ui.colored_label(
+                egui::Color32::from_rgb(215, 120, 120),
+                format!("Use a 6-digit hex color like {}", example),
+            );
+        }
+        changed
+    }
+
+    fn render_backgrounds_header(ui: &mut egui::Ui, ctx: &mut AppearanceEditContext) {
         egui::CollapsingHeader::new("Backgrounds")
             .default_open(false)
             .show(ui, |ui| {
-                ui.label("Menu Background");
-                if ui
-                    .checkbox(
-                        &mut appearance.menu_background_transparent,
-                        "Transparent Menu Background",
-                    )
-                    .changed()
-                {
-                    appearance_changed = true;
-                }
-                if ui
-                    .text_edit_singleline(&mut appearance.menu_background_color_hex)
-                    .changed()
-                {
-                    appearance_changed = true;
-                }
-                if !Self::is_valid_menu_hex_color(&appearance.menu_background_color_hex) {
-                    ui.colored_label(
-                        egui::Color32::from_rgb(215, 120, 120),
-                        "Use a 6-digit hex color like #142914",
-                    );
-                }
-
-                ui.label("Title Background");
-                if ui
-                    .checkbox(
-                        &mut appearance.title_background_transparent,
-                        "Transparent Title Background",
-                    )
-                    .changed()
-                {
-                    appearance_changed = true;
-                }
-                if ui
-                    .text_edit_singleline(&mut appearance.title_background_color_hex)
-                    .changed()
-                {
-                    appearance_changed = true;
-                }
-                if !Self::is_valid_menu_hex_color(&appearance.title_background_color_hex) {
-                    ui.colored_label(
-                        egui::Color32::from_rgb(215, 120, 120),
-                        "Use a 6-digit hex color like #143614",
-                    );
-                }
-
-                ui.label("Entry Background");
-                if ui
-                    .checkbox(
-                        &mut appearance.entry_background_transparent,
-                        "Transparent Entry Background",
-                    )
-                    .changed()
-                {
-                    appearance_changed = true;
-                }
-                if ui
-                    .text_edit_singleline(&mut appearance.entry_background_color_hex)
-                    .changed()
-                {
-                    appearance_changed = true;
-                }
-                if !Self::is_valid_menu_hex_color(&appearance.entry_background_color_hex) {
-                    ui.colored_label(
-                        egui::Color32::from_rgb(215, 120, 120),
-                        "Use a 6-digit hex color like #0F1F0F",
-                    );
-                }
+                ctx.changed |= Self::render_background_section(ui, "Menu Background", "Transparent Menu Background",
+                    &mut ctx.appearance.menu_background_transparent, &mut ctx.appearance.menu_background_color_hex, "#142914");
+                ctx.changed |= Self::render_background_section(ui, "Title Background", "Transparent Title Background",
+                    &mut ctx.appearance.title_background_transparent, &mut ctx.appearance.title_background_color_hex, "#143614");
+                ctx.changed |= Self::render_background_section(ui, "Entry Background", "Transparent Entry Background",
+                    &mut ctx.appearance.entry_background_transparent, &mut ctx.appearance.entry_background_color_hex, "#0F1F0F");
             });
+    }
 
+    fn render_background_section(
+        ui: &mut egui::Ui,
+        label: &str,
+        checkbox_label: &str,
+        transparent: &mut bool,
+        color_hex: &mut String,
+        example: &str,
+    ) -> bool {
+        ui.label(label);
+        let mut changed = ui.checkbox(transparent, checkbox_label).changed();
+        changed |= ui.text_edit_singleline(color_hex).changed();
+        if !Self::is_valid_menu_hex_color(color_hex) {
+            ui.colored_label(
+                egui::Color32::from_rgb(215, 120, 120),
+                format!("Use a 6-digit hex color like {}", example),
+            );
+        }
+        changed
+    }
+
+    fn render_footer_header(ui: &mut egui::Ui, ctx: &mut AppearanceEditContext) {
         egui::CollapsingHeader::new("Footer")
             .default_open(false)
             .show(ui, |ui| {
                 ui.label("Footer Text");
-                if ui
-                    .add(
-                        egui::TextEdit::multiline(&mut appearance.footer_text)
-                            .desired_rows(3)
-                            .lock_focus(true),
-                    )
-                    .changed()
-                {
-                    appearance_changed = true;
-                }
+                ctx.changed |= ui.add(
+                    egui::TextEdit::multiline(&mut ctx.appearance.footer_text)
+                        .desired_rows(3)
+                        .lock_focus(true),
+                ).changed();
             });
+    }
 
-        if appearance_changed {
-            project.metadata.runtime.menu.appearance = appearance;
-        }
-        Self::commit_menu_settings_change(ui_state, project, before_settings);
-
+    fn render_screens_dialogs_headers(ui: &mut egui::Ui, ui_state: &mut EditorUI, project: &mut Project) {
         egui::CollapsingHeader::new("Screens")
             .default_open(false)
             .show(ui, |ui| {

@@ -5,10 +5,10 @@ use super::editor_domain::{
     RuleConditionEditorKind as RuleConditionKind, RuleTriggerEditorKind as RuleTriggerKind,
 };
 use super::editor_ui::{EditorUI, MapEditorTool, SceneRulesGraphCommandData, Selection};
-use super::rule_graph::{RuleGraph, RuleGraphNodeKind};
+use super::rule_graph::{RuleGraph, RuleGraphEdge, RuleGraphNodeKind};
 use super::undo_redo::EditorCommand;
 use crate::config::EditorConfig;
-use crate::project::Project;
+use crate::project::{Project, SceneGraphLayout};
 use chrono::Utc;
 use std::collections::{HashMap, HashSet};
 use toki_core::animation::AnimationState;
