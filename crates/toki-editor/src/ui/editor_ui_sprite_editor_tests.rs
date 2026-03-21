@@ -215,9 +215,11 @@ fn sprite_canvas_viewport_zoom_clamped_to_min() {
 
 #[test]
 fn sprite_canvas_viewport_pan_by_screen_delta() {
-    let mut viewport = SpriteCanvasViewport::default();
-    viewport.zoom = 2.0;
-    viewport.pan = glam::Vec2::ZERO;
+    let mut viewport = SpriteCanvasViewport {
+        zoom: 2.0,
+        pan: glam::Vec2::ZERO,
+        ..Default::default()
+    };
 
     // Pan by 10 screen pixels at zoom 2.0 should move 5 canvas pixels
     viewport.pan_by(glam::Vec2::new(10.0, 20.0));
@@ -227,9 +229,11 @@ fn sprite_canvas_viewport_pan_by_screen_delta() {
 
 #[test]
 fn sprite_canvas_viewport_screen_to_canvas_conversion() {
-    let mut viewport = SpriteCanvasViewport::default();
-    viewport.zoom = 4.0;
-    viewport.pan = glam::Vec2::new(10.0, 20.0);
+    let viewport = SpriteCanvasViewport {
+        zoom: 4.0,
+        pan: glam::Vec2::new(10.0, 20.0),
+        ..Default::default()
+    };
 
     let rect = egui::Rect::from_min_size(egui::pos2(100.0, 50.0), egui::vec2(200.0, 200.0));
     let screen_pos = glam::Vec2::new(140.0, 90.0); // 40 pixels into viewport
@@ -241,9 +245,11 @@ fn sprite_canvas_viewport_screen_to_canvas_conversion() {
 
 #[test]
 fn sprite_canvas_viewport_canvas_to_screen_conversion() {
-    let mut viewport = SpriteCanvasViewport::default();
-    viewport.zoom = 4.0;
-    viewport.pan = glam::Vec2::new(10.0, 20.0);
+    let viewport = SpriteCanvasViewport {
+        zoom: 4.0,
+        pan: glam::Vec2::new(10.0, 20.0),
+        ..Default::default()
+    };
 
     let rect = egui::Rect::from_min_size(egui::pos2(100.0, 50.0), egui::vec2(200.0, 200.0));
     let canvas_pos = glam::Vec2::new(20.0, 30.0);
@@ -448,8 +454,10 @@ fn sprite_editor_state_undo_redo_integration() {
 
 #[test]
 fn sprite_editor_state_recent_colors() {
-    let mut state = SpriteEditorState::default();
-    state.max_recent_colors = 3;
+    let mut state = SpriteEditorState {
+        max_recent_colors: 3,
+        ..Default::default()
+    };
 
     let color1 = PixelColor::rgb(1, 0, 0);
     let color2 = PixelColor::rgb(2, 0, 0);
