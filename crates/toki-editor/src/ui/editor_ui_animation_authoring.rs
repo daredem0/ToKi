@@ -7,6 +7,7 @@
 #![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
+use toki_core::animation::LoopMode;
 use toki_core::entity::{AnimationClipDef, AnimationsDef};
 
 /// A single frame in an animation clip, using position-based references
@@ -121,6 +122,28 @@ impl AuthoredClip {
     /// Check if any frame has a per-frame duration override
     pub fn has_per_frame_durations(&self) -> bool {
         self.frames.iter().any(|f| f.duration_ms.is_some())
+    }
+
+    /// Get the number of frames in this clip
+    pub fn frame_count(&self) -> usize {
+        self.frames.len()
+    }
+
+    /// Parse the loop_mode string into the LoopMode enum
+    pub fn loop_mode_enum(&self) -> LoopMode {
+        match self.loop_mode.as_str() {
+            "once" => LoopMode::Once,
+            "ping_pong" => LoopMode::PingPong,
+            _ => LoopMode::Loop, // Default to Loop
+        }
+    }
+
+    /// Get frame duration at index (for ClipPlayback compatibility)
+    pub fn frame_duration_at(&self, index: usize) -> f32 {
+        self.frames
+            .get(index)
+            .and_then(|f| f.duration_ms)
+            .unwrap_or(self.default_duration_ms)
     }
 
     /// Clear all per-frame duration overrides

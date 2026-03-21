@@ -8,6 +8,7 @@
 
 use super::editor_ui_animation_authoring::{AnimationAuthoringState, AuthoredClip};
 use std::path::PathBuf;
+use toki_core::animation::ClipPlayback;
 
 /// Viewport state for the atlas canvas view
 #[derive(Debug, Clone)]
@@ -53,131 +54,118 @@ impl AtlasViewport {
     }
 }
 
-/// Playback state for animation preview
+/// Playback state for animation preview.
+/// Wraps the shared ClipPlayback from toki-core for consistent behavior
+/// between editor preview and runtime animation playback.
 #[derive(Debug, Clone, Default)]
 pub struct AnimationPreviewState {
-    /// Whether the animation is currently playing
-    pub playing: bool,
-    /// Current frame index in the active clip
-    pub current_frame: usize,
-    /// Time elapsed since last frame change (in seconds)
-    pub elapsed_time: f32,
-    /// Playback speed multiplier (1.0 = normal speed)
-    pub speed: f32,
+    /// Core playback state (shared with runtime)
+    playback: ClipPlayback,
 }
 
 impl AnimationPreviewState {
     pub fn new() -> Self {
         Self {
-            playing: false,
-            current_frame: 0,
-            elapsed_time: 0.0,
-            speed: 1.0,
+            playback: ClipPlayback::new(),
         }
+    }
+
+    /// Whether the animation is currently playing
+    pub fn playing(&self) -> bool {
+        self.playback.playing
+    }
+
+    /// Current frame index in the active clip
+    pub fn current_frame(&self) -> usize {
+        self.playback.current_frame
+    }
+
+    /// Playback speed multiplier (1.0 = normal)
+    pub fn speed(&self) -> f32 {
+        self.playback.speed
+    }
+
+    /// Set playback speed multiplier
+    pub fn set_speed(&mut self, speed: f32) {
+        self.playback.speed = speed;
+    }
+
+    /// Whether playback has finished (for "once" mode)
+    pub fn is_finished(&self) -> bool {
+        self.playback.is_finished
     }
 
     /// Start playback
     pub fn play(&mut self) {
-        self.playing = true;
+        self.playback.play();
     }
 
     /// Pause playback
     pub fn pause(&mut self) {
-        self.playing = false;
+        self.playback.pause();
     }
 
     /// Toggle play/pause
     pub fn toggle_playback(&mut self) {
-        self.playing = !self.playing;
+        self.playback.toggle();
     }
 
     /// Reset to first frame
     pub fn reset(&mut self) {
-        self.current_frame = 0;
-        self.elapsed_time = 0.0;
+        self.playback.reset();
     }
 
     /// Stop playback and reset
     pub fn stop(&mut self) {
-        self.playing = false;
-        self.reset();
+        self.playback.stop();
     }
 
     /// Update playback state given delta time and clip info.
     /// Returns true if frame changed.
     pub fn update(&mut self, delta_seconds: f32, clip: &AuthoredClip) -> bool {
-        if !self.playing || clip.frames.is_empty() {
+        use toki_core::animation::PlaybackEvent;
+
+        if clip.frames.is_empty() {
             return false;
         }
 
-        self.elapsed_time += delta_seconds * self.speed;
+        // Convert seconds to milliseconds for ClipPlayback
+        let delta_ms = delta_seconds * 1000.0;
+        let loop_mode = clip.loop_mode_enum();
 
-        let frame_duration_secs = clip.effective_duration(self.current_frame)
-            .unwrap_or(clip.default_duration_ms) / 1000.0;
+        let event = self.playback.update(
+            delta_ms,
+            clip.frame_count(),
+            |i| clip.frame_duration_at(i),
+            &loop_mode,
+        );
 
-        if self.elapsed_time >= frame_duration_secs {
-            self.elapsed_time -= frame_duration_secs;
-            let old_frame = self.current_frame;
-            self.advance_frame(clip);
-            return self.current_frame != old_frame;
-        }
-
-        false
-    }
-
-    /// Advance to next frame based on loop mode
-    fn advance_frame(&mut self, clip: &AuthoredClip) {
-        if clip.frames.is_empty() {
-            return;
-        }
-
-        match clip.loop_mode.as_str() {
-            "loop" => {
-                self.current_frame = (self.current_frame + 1) % clip.frames.len();
-            }
-            "once" => {
-                if self.current_frame + 1 < clip.frames.len() {
-                    self.current_frame += 1;
-                } else {
-                    self.playing = false;
-                }
-            }
-            "ping_pong" => {
-                // Simplified ping-pong: just loop for now
-                self.current_frame = (self.current_frame + 1) % clip.frames.len();
-            }
-            _ => {
-                self.current_frame = (self.current_frame + 1) % clip.frames.len();
-            }
-        }
+        matches!(
+            event,
+            PlaybackEvent::FrameChanged { .. }
+                | PlaybackEvent::LoopCompleted
+                | PlaybackEvent::Finished
+        )
     }
 
     /// Go to specific frame
-    pub fn go_to_frame(&mut self, frame: usize) {
-        self.current_frame = frame;
-        self.elapsed_time = 0.0;
+    pub fn go_to_frame(&mut self, frame: usize, frame_count: usize) {
+        self.playback.go_to_frame(frame, frame_count);
     }
 
     /// Step to next frame (manual)
     pub fn step_forward(&mut self, frame_count: usize) {
-        if frame_count == 0 {
-            return;
-        }
-        self.current_frame = (self.current_frame + 1) % frame_count;
-        self.elapsed_time = 0.0;
+        self.playback.step_forward(frame_count);
     }
 
     /// Step to previous frame (manual)
     pub fn step_backward(&mut self, frame_count: usize) {
-        if frame_count == 0 {
-            return;
-        }
-        self.current_frame = if self.current_frame == 0 {
-            frame_count - 1
-        } else {
-            self.current_frame - 1
-        };
-        self.elapsed_time = 0.0;
+        self.playback.step_backward(frame_count);
+    }
+
+    /// Get normalized progress through current frame (0.0 to 1.0)
+    pub fn frame_progress(&self, clip: &AuthoredClip) -> f32 {
+        self.playback.frame_progress(|i| clip.frame_duration_at(i))
     }
 }
 
@@ -291,13 +279,13 @@ impl AnimationEditorState {
 
     /// Check if preview is currently playing
     pub fn is_playing(&self) -> bool {
-        self.preview.playing
+        self.preview.playing()
     }
 
     /// Get current frame position in atlas
     pub fn current_frame_position(&self) -> Option<[u32; 2]> {
         let clip = self.selected_clip()?;
-        let frame = clip.frames.get(self.preview.current_frame)?;
+        let frame = clip.frames.get(self.preview.current_frame())?;
         Some(frame.position)
     }
 }
@@ -311,16 +299,16 @@ mod tests {
     #[test]
     fn preview_state_defaults_to_paused() {
         let state = AnimationPreviewState::new();
-        assert!(!state.playing);
-        assert_eq!(state.current_frame, 0);
-        assert_eq!(state.speed, 1.0);
+        assert!(!state.playing());
+        assert_eq!(state.current_frame(), 0);
+        assert_eq!(state.speed(), 1.0);
     }
 
     #[test]
     fn preview_play_starts_playback() {
         let mut state = AnimationPreviewState::new();
         state.play();
-        assert!(state.playing);
+        assert!(state.playing());
     }
 
     #[test]
@@ -328,53 +316,50 @@ mod tests {
         let mut state = AnimationPreviewState::new();
         state.play();
         state.pause();
-        assert!(!state.playing);
+        assert!(!state.playing());
     }
 
     #[test]
     fn preview_toggle_flips_playback() {
         let mut state = AnimationPreviewState::new();
-        assert!(!state.playing);
+        assert!(!state.playing());
         state.toggle_playback();
-        assert!(state.playing);
+        assert!(state.playing());
         state.toggle_playback();
-        assert!(!state.playing);
+        assert!(!state.playing());
     }
 
     #[test]
     fn preview_stop_resets_state() {
         let mut state = AnimationPreviewState::new();
         state.play();
-        state.current_frame = 5;
-        state.elapsed_time = 0.5;
+        // Use go_to_frame to set position
+        state.go_to_frame(5, 10);
         state.stop();
-        assert!(!state.playing);
-        assert_eq!(state.current_frame, 0);
-        assert_eq!(state.elapsed_time, 0.0);
+        assert!(!state.playing());
+        assert_eq!(state.current_frame(), 0);
     }
 
     #[test]
     fn preview_go_to_frame_sets_frame() {
         let mut state = AnimationPreviewState::new();
-        state.go_to_frame(3);
-        assert_eq!(state.current_frame, 3);
-        assert_eq!(state.elapsed_time, 0.0);
+        state.go_to_frame(3, 5);
+        assert_eq!(state.current_frame(), 3);
     }
 
     #[test]
     fn preview_step_forward_wraps() {
         let mut state = AnimationPreviewState::new();
-        state.current_frame = 2;
+        state.go_to_frame(2, 3);
         state.step_forward(3); // 3 frames total
-        assert_eq!(state.current_frame, 0); // wraps to 0
+        assert_eq!(state.current_frame(), 0); // wraps to 0
     }
 
     #[test]
     fn preview_step_backward_wraps() {
         let mut state = AnimationPreviewState::new();
-        state.current_frame = 0;
         state.step_backward(3); // 3 frames total
-        assert_eq!(state.current_frame, 2); // wraps to last frame
+        assert_eq!(state.current_frame(), 2); // wraps to last frame
     }
 
     #[test]
@@ -390,12 +375,12 @@ mod tests {
         // First update - not enough time
         let changed = state.update(0.05, &clip); // 50ms
         assert!(!changed);
-        assert_eq!(state.current_frame, 0);
+        assert_eq!(state.current_frame(), 0);
 
         // Second update - enough time to advance
         let changed = state.update(0.06, &clip); // 60ms more = 110ms total
         assert!(changed);
-        assert_eq!(state.current_frame, 1);
+        assert_eq!(state.current_frame(), 1);
     }
 
     #[test]
@@ -409,12 +394,13 @@ mod tests {
         clip.default_duration_ms = 100.0;
         clip.loop_mode = "once".to_string();
 
-        // Advance to last frame
-        state.current_frame = 1;
+        // Start at last frame
+        state.go_to_frame(1, 2);
+        state.play(); // Re-play after go_to_frame
         state.update(0.2, &clip); // Should stop at last frame
 
-        assert!(!state.playing); // Playback should stop
-        assert_eq!(state.current_frame, 1); // Should stay on last frame
+        assert!(!state.playing()); // Playback should stop
+        assert_eq!(state.current_frame(), 1); // Should stay on last frame
     }
 
     #[test]
@@ -428,19 +414,21 @@ mod tests {
         clip.default_duration_ms = 100.0;
         clip.loop_mode = "loop".to_string();
 
-        // Advance to last frame
-        state.current_frame = 1;
-        state.update(0.2, &clip); // Should loop back
+        // Start at last frame
+        state.go_to_frame(1, 2);
+        state.play(); // Re-play after go_to_frame
+        // 150ms: frame 1 completes (100ms), loops to frame 0, 50ms remaining
+        state.update(0.15, &clip);
 
-        assert!(state.playing);
-        assert_eq!(state.current_frame, 0);
+        assert!(state.playing());
+        assert_eq!(state.current_frame(), 0);
     }
 
     #[test]
     fn preview_update_applies_speed_multiplier() {
         let mut state = AnimationPreviewState::new();
         state.play();
-        state.speed = 2.0; // Double speed
+        state.set_speed(2.0); // Double speed
 
         let mut clip = AuthoredClip::new("test");
         clip.add_frame(0, 0);
@@ -450,7 +438,26 @@ mod tests {
         // At 2x speed, 50ms of real time = 100ms of animation time
         let changed = state.update(0.05, &clip);
         assert!(changed);
-        assert_eq!(state.current_frame, 1);
+        assert_eq!(state.current_frame(), 1);
+    }
+
+    #[test]
+    fn preview_ping_pong_mode_works() {
+        let mut state = AnimationPreviewState::new();
+        state.play();
+
+        let mut clip = AuthoredClip::new("test");
+        clip.add_frame(0, 0);
+        clip.add_frame(1, 0);
+        clip.add_frame(2, 0);
+        clip.add_frame(3, 0);
+        clip.default_duration_ms = 100.0;
+        clip.loop_mode = "ping_pong".to_string();
+
+        // Advance through: 0 -> 1 -> 2 -> 3 -> reverse to 2
+        state.update(0.45, &clip); // 450ms
+        assert_eq!(state.current_frame(), 2);
+        assert!(state.playing());
     }
 
     // AnimationEditorState tests
