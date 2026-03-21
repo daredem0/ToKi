@@ -197,6 +197,42 @@ impl SpriteCanvas {
             chunk.copy_from_slice(&rgba);
         }
     }
+
+    /// Extract a rectangular region as a new canvas
+    pub fn extract_region(&self, x: u32, y: u32, width: u32, height: u32) -> Option<Self> {
+        if width == 0 || height == 0 {
+            return None;
+        }
+        let mut result = Self::new(width, height);
+        for dy in 0..height {
+            for dx in 0..width {
+                let src_x = x + dx;
+                let src_y = y + dy;
+                if let Some(color) = self.get_pixel(src_x, src_y) {
+                    result.set_pixel(dx, dy, color);
+                }
+            }
+        }
+        Some(result)
+    }
+
+    /// Blit (copy) another canvas onto this one at the specified position
+    pub fn blit(&mut self, source: &Self, x: i32, y: i32) {
+        for sy in 0..source.height {
+            for sx in 0..source.width {
+                let dest_x = x + sx as i32;
+                let dest_y = y + sy as i32;
+                if dest_x >= 0 && dest_y >= 0 {
+                    if let Some(color) = source.get_pixel(sx, sy) {
+                        // Only blit non-transparent pixels (alpha > 0)
+                        if color.a > 0 {
+                            self.set_pixel(dest_x as u32, dest_y as u32, color);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Viewport state for the sprite canvas
@@ -500,6 +536,8 @@ pub struct SpriteEditorState {
     pub layout: DualCanvasLayout,
     /// Current editing tool (shared across canvases)
     pub tool: SpriteEditorTool,
+    /// Clipboard for copy/paste operations (shared across canvases)
+    pub clipboard: Option<SpriteCanvas>,
     /// Current foreground color (shared across canvases)
     pub foreground_color: PixelColor,
     /// Current background color used by eraser (shared across canvases)
@@ -655,6 +693,7 @@ impl Default for SpriteEditorState {
             active_canvas: CanvasSide::default(),
             layout: DualCanvasLayout::default(),
             tool: SpriteEditorTool::Drag,
+            clipboard: None,
             foreground_color: PixelColor::black(),
             background_color: PixelColor::transparent(),
             brush_size: 1,
@@ -1432,6 +1471,99 @@ impl SpriteEditorState {
         } else {
             false
         }
+    }
+
+    /// Copy the selected region from the active canvas to the clipboard
+    pub fn copy_selection(&mut self) -> bool {
+        let cs = self.active();
+        let Some(selection) = &cs.selection else {
+            return false;
+        };
+        let Some(canvas) = &cs.canvas else {
+            return false;
+        };
+        let Some(copied) = canvas.extract_region(
+            selection.x,
+            selection.y,
+            selection.width,
+            selection.height,
+        ) else {
+            return false;
+        };
+        self.clipboard = Some(copied);
+        true
+    }
+
+    /// Paste clipboard contents at the best position on a specific canvas.
+    /// If a cell is selected, centers the paste in that cell.
+    /// Otherwise, uses the cursor position.
+    pub fn paste_at_cursor(&mut self, side: CanvasSide) -> bool {
+        let clipboard = match &self.clipboard {
+            Some(c) => c.clone(),
+            None => return false,
+        };
+        let cs = self.canvas_state(side);
+        if cs.canvas.is_none() {
+            return false;
+        }
+
+        // Determine paste position: center in selected cell, or use cursor position
+        let paste_pos = self.calculate_paste_position(side, &clipboard);
+        let Some(paste_pos) = paste_pos else {
+            return false;
+        };
+
+        // Store canvas state before paste
+        let before = self.canvas_state(side).canvas.clone().unwrap();
+
+        // Perform the paste
+        let cs = self.canvas_state_mut(side);
+        if let Some(canvas) = &mut cs.canvas {
+            canvas.blit(&clipboard, paste_pos.x, paste_pos.y);
+            cs.dirty = true;
+            cs.canvas_texture = None;
+        }
+
+        // Push undo state with before and after
+        let after = self.canvas_state(side).canvas.clone().unwrap();
+        self.canvas_state_mut(side)
+            .history
+            .push(SpriteEditCommand { before, after });
+        true
+    }
+
+    /// Calculate the paste position, centering in selected cell if available
+    fn calculate_paste_position(
+        &self,
+        side: CanvasSide,
+        clipboard: &SpriteCanvas,
+    ) -> Option<glam::IVec2> {
+        let cs = self.canvas_state(side);
+        let canvas = cs.canvas.as_ref()?;
+
+        // If a cell is selected, center the paste in that cell
+        if let Some(cell_idx) = cs.selected_cell {
+            let cell_w = cs.cell_size.x;
+            let cell_h = cs.cell_size.y;
+            if cell_w > 0 && cell_h > 0 {
+                let cols = canvas.width / cell_w;
+                if cols > 0 {
+                    let cell_x = (cell_idx as u32 % cols) * cell_w;
+                    let cell_y = (cell_idx as u32 / cols) * cell_h;
+
+                    // Center the clipboard in the cell
+                    let center_x =
+                        cell_x as i32 + (cell_w as i32 - clipboard.width as i32) / 2;
+                    let center_y =
+                        cell_y as i32 + (cell_h as i32 - clipboard.height as i32) / 2;
+
+                    return Some(glam::IVec2::new(center_x, center_y));
+                }
+            }
+        }
+
+        // Fall back to cursor position
+        cs.cursor_canvas_pos
     }
 
     /// Add a color to the recent colors palette

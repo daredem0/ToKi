@@ -1,5 +1,6 @@
 use anyhow::Result;
 use egui_winit::winit;
+use glam::IVec2;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -137,6 +138,8 @@ struct EditorApp {
 enum EditorShortcutAction {
     Undo,
     Redo,
+    Copy,
+    Paste,
 }
 
 impl EditorApp {
@@ -278,6 +281,8 @@ impl EditorApp {
             "z" if modifiers.shift_key() => Some(EditorShortcutAction::Redo),
             "z" => Some(EditorShortcutAction::Undo),
             "y" => Some(EditorShortcutAction::Redo),
+            "c" => Some(EditorShortcutAction::Copy),
+            "v" => Some(EditorShortcutAction::Paste),
             _ => None,
         }
     }
@@ -619,6 +624,28 @@ impl ApplicationHandler for EditorApp {
                                     .unwrap_or_else(|| self.core.ui.redo());
                                 if redone {
                                     tracing::info!("Redo applied via Ctrl+Y/Ctrl+Shift+Z");
+                                }
+                            }
+                            EditorShortcutAction::Copy => {
+                                // Copy only applies to sprite editor
+                                if self.core.ui.center_panel_tab == CenterPanelTab::SpriteEditor {
+                                    if self.core.ui.sprite.copy_selection() {
+                                        tracing::info!("Sprite editor: copied selection to clipboard");
+                                    }
+                                }
+                            }
+                            EditorShortcutAction::Paste => {
+                                // Paste only applies to sprite editor
+                                if self.core.ui.center_panel_tab == CenterPanelTab::SpriteEditor {
+                                    let side = self.core.ui.sprite.active_canvas;
+                                    // Use (0, 0) as fallback if no cursor position
+                                    if self.core.ui.sprite.canvas_state(side).cursor_canvas_pos.is_none() {
+                                        self.core.ui.sprite.canvas_state_mut(side).cursor_canvas_pos =
+                                            Some(IVec2::new(0, 0));
+                                    }
+                                    if self.core.ui.sprite.paste_at_cursor(side) {
+                                        tracing::info!("Sprite editor: pasted at cursor on {:?}", side);
+                                    }
                                 }
                             }
                         }

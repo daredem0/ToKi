@@ -966,3 +966,141 @@ fn sprite_editor_state_resize_zero_size_fails() {
     assert!(!state.resize_canvas(0, 4, ResizeAnchor::MiddleCenter));
     assert!(!state.resize_canvas(4, 0, ResizeAnchor::MiddleCenter));
 }
+
+// ============================================================================
+// Copy/Paste Tests
+// ============================================================================
+
+#[test]
+fn sprite_editor_copy_selection_copies_to_clipboard() {
+    use super::SpriteSelection;
+
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+
+    // Draw a red square at (2,2) to (4,4)
+    if let Some(canvas) = &mut state.active_mut().canvas {
+        canvas.fill_rect(2, 2, 2, 2, PixelColor::rgb(255, 0, 0));
+    }
+
+    // Create a selection covering the red square
+    state.active_mut().selection = Some(SpriteSelection::new(2, 2, 2, 2));
+
+    // Copy should succeed
+    assert!(state.copy_selection());
+    assert!(state.clipboard.is_some());
+
+    // Clipboard should have correct dimensions
+    let clipboard = state.clipboard.as_ref().unwrap();
+    assert_eq!(clipboard.width, 2);
+    assert_eq!(clipboard.height, 2);
+
+    // Clipboard should contain the red pixels
+    assert_eq!(clipboard.get_pixel(0, 0), Some(PixelColor::rgb(255, 0, 0)));
+}
+
+#[test]
+fn sprite_editor_copy_without_selection_fails() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+
+    // No selection
+    state.active_mut().selection = None;
+
+    assert!(!state.copy_selection());
+    assert!(state.clipboard.is_none());
+}
+
+#[test]
+fn sprite_editor_paste_at_cursor() {
+    use super::{CanvasSide, SpriteSelection};
+
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+
+    // Draw red square and copy it
+    if let Some(canvas) = &mut state.active_mut().canvas {
+        canvas.fill_rect(0, 0, 2, 2, PixelColor::rgb(255, 0, 0));
+    }
+    state.active_mut().selection = Some(SpriteSelection::new(0, 0, 2, 2));
+    assert!(state.copy_selection());
+
+    // Set cursor position for paste
+    state.active_mut().cursor_canvas_pos = Some(glam::IVec2::new(4, 4));
+
+    // Paste should succeed
+    assert!(state.paste_at_cursor(CanvasSide::Left));
+
+    // Check pixels were pasted at (4,4)
+    if let Some(canvas) = &state.active().canvas {
+        assert_eq!(canvas.get_pixel(4, 4), Some(PixelColor::rgb(255, 0, 0)));
+        assert_eq!(canvas.get_pixel(5, 5), Some(PixelColor::rgb(255, 0, 0)));
+    }
+
+    // Should be marked dirty and have undo history
+    assert!(state.active().dirty);
+    assert!(state.active().history.can_undo());
+}
+
+#[test]
+fn sprite_editor_paste_without_cursor_fails() {
+    use super::{CanvasSide, SpriteSelection};
+
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+
+    // Copy something
+    state.active_mut().selection = Some(SpriteSelection::new(0, 0, 2, 2));
+    state.copy_selection();
+
+    // No cursor position
+    state.active_mut().cursor_canvas_pos = None;
+
+    assert!(!state.paste_at_cursor(CanvasSide::Left));
+}
+
+#[test]
+fn sprite_editor_paste_without_clipboard_fails() {
+    use super::CanvasSide;
+
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+
+    // Set cursor but no clipboard
+    state.active_mut().cursor_canvas_pos = Some(glam::IVec2::new(0, 0));
+    state.clipboard = None;
+
+    assert!(!state.paste_at_cursor(CanvasSide::Left));
+}
+
+#[test]
+fn sprite_editor_paste_centers_in_selected_cell() {
+    use super::{CanvasSide, SpriteSelection};
+
+    let mut state = SpriteEditorState::default();
+    // Create a 16x16 sheet with 8x8 cells (2x2 grid)
+    state.new_sheet(16, 16, 8, 8);
+
+    // Draw a 2x2 red square at (0,0) and copy it
+    if let Some(canvas) = &mut state.active_mut().canvas {
+        canvas.fill_rect(0, 0, 2, 2, PixelColor::rgb(255, 0, 0));
+    }
+    state.active_mut().selection = Some(SpriteSelection::new(0, 0, 2, 2));
+    assert!(state.copy_selection());
+
+    // Select cell 3 (bottom-right, at position 8,8)
+    state.active_mut().selected_cell = Some(3);
+
+    // Paste - should center the 2x2 clipboard in the 8x8 cell
+    // Cell 3 starts at (8, 8), center position should be (8 + (8-2)/2, 8 + (8-2)/2) = (11, 11)
+    assert!(state.paste_at_cursor(CanvasSide::Left));
+
+    // Check that pixels were pasted centered in cell 3
+    if let Some(canvas) = &state.active().canvas {
+        // The 2x2 paste should be at (11, 11) to (12, 12)
+        assert_eq!(canvas.get_pixel(11, 11), Some(PixelColor::rgb(255, 0, 0)));
+        assert_eq!(canvas.get_pixel(12, 12), Some(PixelColor::rgb(255, 0, 0)));
+        // Pixels outside the paste area in cell 3 should be transparent
+        assert_eq!(canvas.get_pixel(8, 8), Some(PixelColor::transparent()));
+    }
+}
