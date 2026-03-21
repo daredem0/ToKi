@@ -355,7 +355,12 @@ impl AnimationController {
             self.is_finished = false;
             true // Success
         } else {
-            tracing::warn!("Animation doesn't exist.");
+            let available: Vec<_> = self.clips.keys().collect();
+            tracing::warn!(
+                "Animation doesn't exist: {:?}. Available clips: {:?}",
+                clip_state,
+                available
+            );
             false // Animation doesn't exist
         }
     }

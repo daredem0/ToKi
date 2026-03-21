@@ -1,0 +1,269 @@
+{
+  "image": "soldier.png",
+  "tile_size": [
+    16,
+    16
+  ],
+  "tiles": {
+    "soldier/walk_right_b": {
+      "position": [
+        1,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_c": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_left_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_left_d": {
+      "position": [
+        3,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_up_c": {
+      "position": [
+        2,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_right_d": {
+      "position": [
+        3,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_down_b": {
+      "position": [
+        1,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/idle_left_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_down_d": {
+      "position": [
+        3,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/idle_b": {
+      "position": [
+        3,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_down_c": {
+      "position": [
+        2,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_left_c": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_left_b": {
+      "position": [
+        1,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_up_d": {
+      "position": [
+        3,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_up_b": {
+      "position": [
+        1,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/idle_down_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/idle_up_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_up_a": {
+      "position": [
+        0,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_down_a": {
+      "position": [
+        0,
+        1
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_d": {
+      "position": [
+        3,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_right_c": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/idle_right_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/idle_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_b": {
+      "position": [
+        1,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_right_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "soldier/walk_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    }
+  }
+}

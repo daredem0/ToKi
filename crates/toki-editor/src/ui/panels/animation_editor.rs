@@ -335,8 +335,6 @@ fn render_center_panel(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::C
 
     // Get preview height from state
     let preview_height = ui_state.animation.preview_height;
-    let separator_height = 8.0;
-    let atlas_header_height = 30.0;
 
     // Preview area with stored height
     ui.group(|ui| {
@@ -356,17 +354,8 @@ fn render_center_panel(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::C
     // Atlas grid (for selecting frames)
     ui.heading("Atlas");
 
-    // Calculate remaining height for atlas
-    let controls_height = ui.min_rect().height();
-    let remaining = (available_height - controls_height - preview_height - separator_height - atlas_header_height).max(100.0);
-
-    ui.allocate_ui_with_layout(
-        egui::vec2(available_width, remaining),
-        egui::Layout::top_down(egui::Align::LEFT),
-        |ui| {
-            render_atlas_grid(ui, ui_state, ctx);
-        },
-    );
+    // Use all remaining space for atlas grid
+    render_atlas_grid(ui, ui_state, ctx);
 }
 
 fn render_preview_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::Context) {
@@ -683,9 +672,9 @@ fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::Con
         ui.label("Click cells to add frames to clip");
     });
 
-    // Allocate viewport area
+    // Allocate viewport area - use all remaining space
     let available_size = ui.available_size();
-    let viewport_height = (available_size.y - 8.0).max(100.0);
+    let viewport_height = available_size.y.max(100.0);
     let viewport_width = available_size.x.max(100.0);
     let (rect, response) = ui.allocate_exact_size(
         egui::vec2(viewport_width, viewport_height),
@@ -1103,7 +1092,14 @@ fn load_atlas_info(project_path: &Path, atlas_name: &str) -> Option<(glam::UVec2
         return None;
     }
 
-    let atlas_path = project_path.join("assets").join("sprites").join(atlas_name);
+    // Normalize atlas name: ensure .json extension
+    let atlas_filename = if atlas_name.ends_with(".json") {
+        atlas_name.to_string()
+    } else {
+        format!("{}.json", atlas_name)
+    };
+
+    let atlas_path = project_path.join("assets").join("sprites").join(&atlas_filename);
     let atlas = toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_path).ok()?;
 
     // Get PNG path relative to atlas JSON
@@ -1121,8 +1117,15 @@ fn load_atlas_tile_lookup(
         return None;
     }
 
+    // Normalize atlas name: ensure .json extension
+    let atlas_filename = if atlas_name.ends_with(".json") {
+        atlas_name.to_string()
+    } else {
+        format!("{}.json", atlas_name)
+    };
+
     // Atlas files are in assets/sprites/
-    let atlas_path = project_path.join("assets").join("sprites").join(atlas_name);
+    let atlas_path = project_path.join("assets").join("sprites").join(&atlas_filename);
 
     // Use AtlasMeta from toki-core to load and parse the atlas
     let atlas = toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_path).ok()?;
@@ -1158,6 +1161,11 @@ fn save_current_entity(ui_state: &mut EditorUI) {
     // Update animations from authoring state
     definition.animations = ui_state.animation.authoring.to_animations_def();
 
+    // Update atlas metadata with tile names for all frame positions
+    if let Some(project_path) = file_path.parent().and_then(|p| p.parent()) {
+        sync_atlas_tile_names(project_path, &definition.name, &mut definition.animations);
+    }
+
     // Write back
     let Ok(json) = serde_json::to_string_pretty(&definition) else {
         tracing::error!("Failed to serialize entity definition");
@@ -1171,6 +1179,95 @@ fn save_current_entity(ui_state: &mut EditorUI) {
 
     ui_state.animation.authoring.dirty = false;
     tracing::info!("Saved animation changes to {:?}", file_path);
+}
+
+/// Sync atlas metadata to have proper tile names for all frame positions used in animations.
+/// Clears all existing tiles and writes fresh entries with proper naming convention.
+/// Naming convention: `<entity_name>/<state>_<frame_letter>` (e.g., soldier/walk_down_a)
+fn sync_atlas_tile_names(
+    project_path: &Path,
+    entity_name: &str,
+    animations: &mut toki_core::entity::AnimationsDef,
+) {
+    use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
+
+    let atlas_name = &animations.atlas_name;
+    if atlas_name.is_empty() {
+        return;
+    }
+
+    let atlas_path = resolve_atlas_path(project_path, atlas_name);
+    let Ok(mut atlas) = AtlasMeta::load_from_file(&atlas_path) else {
+        tracing::warn!("Failed to load atlas for tile name sync: {:?}", atlas_path);
+        return;
+    };
+
+    // Clear all existing tiles
+    atlas.tiles.clear();
+
+    // Process each animation clip
+    for clip in &mut animations.clips {
+        let Some(positions) = clip.frame_positions.take() else {
+            continue;
+        };
+
+        // Generate proper tile names for this clip
+        let tile_names = generate_tile_names(entity_name, &clip.state, positions.len());
+
+        // Add tiles with proper names
+        for (i, pos) in positions.iter().enumerate() {
+            let tile_name = &tile_names[i];
+            atlas.tiles.insert(
+                tile_name.clone(),
+                TileInfo {
+                    position: glam::UVec2::new(pos[0], pos[1]),
+                    properties: TileProperties::default(),
+                },
+            );
+        }
+
+        clip.frame_tiles = tile_names;
+    }
+
+    save_atlas(&atlas_path, &atlas);
+}
+
+/// Resolve atlas filename to full path
+fn resolve_atlas_path(project_path: &Path, atlas_name: &str) -> PathBuf {
+    let atlas_filename = if atlas_name.ends_with(".json") {
+        atlas_name.to_string()
+    } else {
+        format!("{}.json", atlas_name)
+    };
+    project_path
+        .join("assets")
+        .join("sprites")
+        .join(&atlas_filename)
+}
+
+/// Generate proper tile names for frame positions following the naming convention.
+/// Always creates names in format `entity/state_letter` (e.g., soldier/walk_down_a).
+fn generate_tile_names(entity_name: &str, state: &str, frame_count: usize) -> Vec<String> {
+    const FRAME_LETTERS: &[char] = &[
+        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r',
+        's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+    ];
+
+    (0..frame_count)
+        .map(|i| {
+            let letter = FRAME_LETTERS.get(i).unwrap_or(&'z');
+            format!("{}/{}_{}", entity_name, state, letter)
+        })
+        .collect()
+}
+
+/// Save atlas metadata to file
+fn save_atlas(atlas_path: &Path, atlas: &toki_core::assets::atlas::AtlasMeta) {
+    if let Err(e) = atlas.save_to_file(atlas_path) {
+        tracing::error!("Failed to save atlas with new tile names: {}", e);
+    } else {
+        tracing::info!("Updated atlas with tile names: {:?}", atlas_path);
+    }
 }
 
 fn render_new_clip_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {

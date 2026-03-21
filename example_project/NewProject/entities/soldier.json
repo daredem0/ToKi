@@ -1,0 +1,154 @@
+{
+  "name": "soldier",
+  "display_name": "Human Soldier",
+  "description": "A human soldier",
+  "rendering": {
+    "size": [
+      16,
+      16
+    ],
+    "render_layer": 0,
+    "visible": true
+  },
+  "attributes": {
+    "health": 200,
+    "speed": 1.0,
+    "solid": true,
+    "active": true,
+    "can_move": true,
+    "interactable": true,
+    "interaction_reach": 32,
+    "ai_config": {
+      "behavior": "wander",
+      "detection_radius": 128
+    },
+    "movement_profile": "legacy_default",
+    "has_inventory": false
+  },
+  "collision": {
+    "enabled": true,
+    "offset": [
+      0,
+      0
+    ],
+    "size": [
+      16,
+      16
+    ],
+    "trigger": false
+  },
+  "audio": {
+    "footstep_trigger_distance": 16.0,
+    "hearing_radius": 192,
+    "movement_sound_trigger": "animation_loop",
+    "movement_sound": "sfx_step",
+    "collision_sound": "sfx_bump_soft"
+  },
+  "animations": {
+    "atlas_name": "soldier.json",
+    "clips": [
+      {
+        "state": "idle_down",
+        "frame_tiles": [
+          "soldier/idle_down_a"
+        ],
+        "frame_duration_ms": 100.0,
+        "loop_mode": "once"
+      },
+      {
+        "state": "idle_left",
+        "frame_tiles": [
+          "soldier/idle_left_a"
+        ],
+        "frame_duration_ms": 100.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "idle_right",
+        "frame_tiles": [
+          "soldier/idle_right_a"
+        ],
+        "frame_duration_ms": 100.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "idle_up",
+        "frame_tiles": [
+          "soldier/idle_up_a"
+        ],
+        "frame_duration_ms": 100.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_right",
+        "frame_tiles": [
+          "soldier/walk_right_a",
+          "soldier/walk_right_b",
+          "soldier/walk_right_c",
+          "soldier/walk_right_d"
+        ],
+        "frame_duration_ms": 180.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_left",
+        "frame_tiles": [
+          "soldier/walk_left_a",
+          "soldier/walk_left_b",
+          "soldier/walk_left_c",
+          "soldier/walk_left_d"
+        ],
+        "frame_duration_ms": 180.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_up",
+        "frame_tiles": [
+          "soldier/walk_up_a",
+          "soldier/walk_up_b",
+          "soldier/walk_up_c",
+          "soldier/walk_up_d"
+        ],
+        "frame_duration_ms": 180.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_down",
+        "frame_tiles": [
+          "soldier/walk_down_a",
+          "soldier/walk_down_b",
+          "soldier/walk_down_c",
+          "soldier/walk_down_d"
+        ],
+        "frame_duration_ms": 180.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "idle",
+        "frame_tiles": [
+          "soldier/idle_a",
+          "soldier/idle_b"
+        ],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk",
+        "frame_tiles": [
+          "soldier/walk_a",
+          "soldier/walk_b",
+          "soldier/walk_c",
+          "soldier/walk_d"
+        ],
+        "frame_duration_ms": 180.0,
+        "loop_mode": "loop"
+      }
+    ],
+    "default_state": "walk"
+  },
+  "category": "human",
+  "tags": [
+    "human",
+    "knight"
+  ]
+}

@@ -2,11 +2,19 @@
 // Provides visual entity definition editing with category/tag filtering
 //
 // Phase 4.5A: Entity Editor Tab And Definition Browser
+// Phase 4.5B: Optional Component Toggles
+// Phase 4.5C: Property Editing
 
 #![allow(dead_code)]
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+
+use toki_core::entity::{
+    AiBehavior, AiConfig, AnimationsDef, AttributesDef, AudioDef, CollisionDef,
+    EntityDefinition, MovementProfile, MovementSoundTrigger, PickupDef,
+    PrimaryProjectileDef, RenderingDef,
+};
 
 /// Predefined entity categories for v1
 /// Built to allow easy extension to user-defined categories later
@@ -269,6 +277,345 @@ impl DeleteConfirmationState {
     }
 }
 
+// ============================================================================
+// Phase 4.5B: Component Toggles
+// ============================================================================
+
+/// Tracks which optional components are enabled for the current entity.
+/// Components with toggles:
+/// - Health: Optional<u32> health value
+/// - Inventory: has_inventory flag
+/// - Projectile: Optional PrimaryProjectileDef
+/// - Pickup: Optional PickupDef
+/// - AI: AiConfig (None behavior = disabled)
+/// - Collision: collision.enabled flag
+/// - Audio: treated as enabled when any audio settings configured
+#[derive(Debug, Clone, Default)]
+pub struct ComponentToggles {
+    pub health_enabled: bool,
+    pub inventory_enabled: bool,
+    pub projectile_enabled: bool,
+    pub pickup_enabled: bool,
+    pub ai_enabled: bool,
+    pub collision_enabled: bool,
+    pub audio_enabled: bool,
+}
+
+impl ComponentToggles {
+    /// Create toggles from an EntityDefinition, detecting which components are active
+    pub fn from_definition(def: &EntityDefinition) -> Self {
+        Self {
+            health_enabled: def.attributes.health.is_some(),
+            inventory_enabled: def.attributes.has_inventory,
+            projectile_enabled: def.attributes.primary_projectile.is_some(),
+            pickup_enabled: def.attributes.pickup.is_some(),
+            ai_enabled: def.attributes.ai_config.behavior != AiBehavior::None,
+            collision_enabled: def.collision.enabled,
+            audio_enabled: Self::has_audio_config(&def.audio),
+        }
+    }
+
+    /// Check if audio has any meaningful configuration
+    fn has_audio_config(audio: &AudioDef) -> bool {
+        !audio.movement_sound.is_empty() || audio.collision_sound.is_some()
+    }
+
+    /// Count how many components are enabled
+    pub fn enabled_count(&self) -> usize {
+        [
+            self.health_enabled,
+            self.inventory_enabled,
+            self.projectile_enabled,
+            self.pickup_enabled,
+            self.ai_enabled,
+            self.collision_enabled,
+            self.audio_enabled,
+        ]
+        .iter()
+        .filter(|&&b| b)
+        .count()
+    }
+}
+
+// ============================================================================
+// Phase 4.5C: Entity Edit State
+// ============================================================================
+
+/// State for editing an entity definition.
+/// Holds the full definition plus UI state for the editing session.
+#[derive(Debug, Clone)]
+pub struct EntityEditState {
+    /// The entity definition being edited
+    pub definition: EntityDefinition,
+    /// Path to the definition file
+    pub file_path: PathBuf,
+    /// Which optional components are enabled
+    pub toggles: ComponentToggles,
+    /// Tags as editable comma-separated string
+    pub tags_input: String,
+    /// Whether changes have been made
+    pub dirty: bool,
+    /// Validation errors by field
+    pub validation_errors: HashMap<String, String>,
+}
+
+impl EntityEditState {
+    /// Create edit state from a loaded entity definition
+    pub fn from_definition(def: EntityDefinition, file_path: PathBuf) -> Self {
+        let toggles = ComponentToggles::from_definition(&def);
+        let tags_input = def.tags.join(", ");
+        Self {
+            definition: def,
+            file_path,
+            toggles,
+            tags_input,
+            dirty: false,
+            validation_errors: HashMap::new(),
+        }
+    }
+
+    /// Mark the entity as modified
+    pub fn mark_dirty(&mut self) {
+        self.dirty = true;
+    }
+
+    /// Sync tags from the input string back to the definition
+    pub fn sync_tags(&mut self) {
+        self.definition.tags = self
+            .tags_input
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+    }
+
+    // --- Component Toggle Methods ---
+
+    /// Toggle health component on/off
+    pub fn toggle_health(&mut self) {
+        self.toggles.health_enabled = !self.toggles.health_enabled;
+        if self.toggles.health_enabled {
+            // Initialize with default health
+            self.definition.attributes.health = Some(100);
+        } else {
+            self.definition.attributes.health = None;
+        }
+        self.mark_dirty();
+    }
+
+    /// Toggle inventory component on/off
+    pub fn toggle_inventory(&mut self) {
+        self.toggles.inventory_enabled = !self.toggles.inventory_enabled;
+        self.definition.attributes.has_inventory = self.toggles.inventory_enabled;
+        self.mark_dirty();
+    }
+
+    /// Toggle projectile component on/off
+    pub fn toggle_projectile(&mut self) {
+        self.toggles.projectile_enabled = !self.toggles.projectile_enabled;
+        if self.toggles.projectile_enabled {
+            self.definition.attributes.primary_projectile = Some(default_projectile_def());
+        } else {
+            self.definition.attributes.primary_projectile = None;
+        }
+        self.mark_dirty();
+    }
+
+    /// Toggle pickup component on/off
+    pub fn toggle_pickup(&mut self) {
+        self.toggles.pickup_enabled = !self.toggles.pickup_enabled;
+        if self.toggles.pickup_enabled {
+            self.definition.attributes.pickup = Some(default_pickup_def());
+        } else {
+            self.definition.attributes.pickup = None;
+        }
+        self.mark_dirty();
+    }
+
+    /// Toggle AI component on/off
+    pub fn toggle_ai(&mut self) {
+        self.toggles.ai_enabled = !self.toggles.ai_enabled;
+        if self.toggles.ai_enabled {
+            self.definition.attributes.ai_config = AiConfig {
+                behavior: AiBehavior::Wander,
+                detection_radius: 128,
+            };
+        } else {
+            self.definition.attributes.ai_config = AiConfig::default();
+        }
+        self.mark_dirty();
+    }
+
+    /// Toggle collision component on/off
+    pub fn toggle_collision(&mut self) {
+        self.toggles.collision_enabled = !self.toggles.collision_enabled;
+        self.definition.collision.enabled = self.toggles.collision_enabled;
+        self.mark_dirty();
+    }
+
+    /// Toggle audio component on/off
+    pub fn toggle_audio(&mut self) {
+        self.toggles.audio_enabled = !self.toggles.audio_enabled;
+        if !self.toggles.audio_enabled {
+            // Clear audio settings
+            self.definition.audio.movement_sound.clear();
+            self.definition.audio.collision_sound = None;
+        }
+        self.mark_dirty();
+    }
+
+    // --- Validation Methods ---
+
+    /// Validate the current entity definition
+    pub fn validate(&mut self) -> bool {
+        self.validation_errors.clear();
+
+        // Name validation
+        let name = self.definition.name.trim();
+        if name.is_empty() {
+            self.validation_errors
+                .insert("name".to_string(), "Name is required".to_string());
+        } else if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            self.validation_errors.insert(
+                "name".to_string(),
+                "Name must contain only letters, numbers, and underscores".to_string(),
+            );
+        } else if name.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+            self.validation_errors.insert(
+                "name".to_string(),
+                "Name must not start with a number".to_string(),
+            );
+        }
+
+        // Display name validation
+        if self.definition.display_name.trim().is_empty() {
+            self.validation_errors.insert(
+                "display_name".to_string(),
+                "Display name is required".to_string(),
+            );
+        }
+
+        // Size validation
+        if self.definition.rendering.size[0] == 0 || self.definition.rendering.size[1] == 0 {
+            self.validation_errors.insert(
+                "size".to_string(),
+                "Size must be greater than zero".to_string(),
+            );
+        }
+
+        // Health validation (if enabled)
+        if self.toggles.health_enabled {
+            if let Some(health) = self.definition.attributes.health {
+                if health == 0 {
+                    self.validation_errors
+                        .insert("health".to_string(), "Health must be greater than zero".to_string());
+                }
+            }
+        }
+
+        // Collision size validation (if enabled)
+        if self.toggles.collision_enabled
+            && (self.definition.collision.size[0] == 0 || self.definition.collision.size[1] == 0)
+        {
+            self.validation_errors.insert(
+                "collision_size".to_string(),
+                "Collision size must be greater than zero".to_string(),
+            );
+        }
+
+        self.validation_errors.is_empty()
+    }
+
+    /// Check if a specific field has a validation error
+    pub fn has_error(&self, field: &str) -> bool {
+        self.validation_errors.contains_key(field)
+    }
+
+    /// Get the validation error for a field
+    pub fn get_error(&self, field: &str) -> Option<&String> {
+        self.validation_errors.get(field)
+    }
+}
+
+// ============================================================================
+// Default Component Values
+// ============================================================================
+
+/// Create default projectile definition
+fn default_projectile_def() -> PrimaryProjectileDef {
+    PrimaryProjectileDef {
+        sheet: String::new(),
+        object_name: String::new(),
+        size: [8, 8],
+        speed: 200,
+        damage: 10,
+        lifetime_ticks: 60,
+        spawn_offset: [0, 0],
+    }
+}
+
+/// Create default pickup definition
+fn default_pickup_def() -> PickupDef {
+    PickupDef {
+        item_id: String::new(),
+        count: 1,
+    }
+}
+
+/// Create a default entity definition with sensible defaults
+pub fn create_default_definition(name: &str, display_name: &str, category: &str) -> EntityDefinition {
+    EntityDefinition {
+        name: name.to_string(),
+        display_name: display_name.to_string(),
+        description: String::new(),
+        rendering: RenderingDef {
+            size: [32, 32],
+            render_layer: 0,
+            visible: true,
+            static_object: None,
+        },
+        attributes: AttributesDef {
+            health: None,
+            stats: HashMap::new(),
+            speed: 100.0,
+            solid: true,
+            active: true,
+            can_move: true,
+            interactable: false,
+            interaction_reach: 32,
+            ai_config: AiConfig::default(),
+            movement_profile: MovementProfile::default(),
+            primary_projectile: None,
+            pickup: None,
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: true, // Collision enabled by default
+            offset: [0, 0],
+            size: [32, 32],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 32.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: String::new(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: String::new(),
+            clips: Vec::new(),
+            default_state: "idle".to_string(),
+        },
+        category: category.to_string(),
+        tags: Vec::new(),
+    }
+}
+
+// ============================================================================
+// Entity Editor State
+// ============================================================================
+
 /// Main state for the Entity Editor tab
 #[derive(Debug, Clone, Default)]
 pub struct EntityEditorState {
@@ -277,6 +624,9 @@ pub struct EntityEditorState {
 
     /// Currently selected entity name
     pub selected_entity: Option<String>,
+
+    /// Currently loaded entity for editing (Phase 4.5B/C)
+    pub edit_state: Option<EntityEditState>,
 
     /// Browser filter state
     pub filter: EntityBrowserFilter,
@@ -293,12 +643,15 @@ pub struct EntityEditorState {
     /// Whether the entity list needs refresh
     pub needs_refresh: bool,
 
-    /// Whether the currently selected entity has unsaved changes
-    pub dirty: bool,
-
     // Layout state
     /// Width of the entity browser panel (left)
     pub browser_panel_width: f32,
+
+    /// Available SFX sound names (discovered from assets/audio/sfx)
+    pub available_sfx: Vec<String>,
+
+    /// Available sprite atlas names (discovered from assets/sprites/*.json)
+    pub available_atlases: Vec<String>,
 }
 
 impl EntityEditorState {
@@ -314,6 +667,11 @@ impl EntityEditorState {
         self.selected_entity.is_some()
     }
 
+    /// Check if there are unsaved changes
+    pub fn is_dirty(&self) -> bool {
+        self.edit_state.as_ref().map(|e| e.dirty).unwrap_or(false)
+    }
+
     /// Get the currently selected entity summary
     pub fn selected_entity_summary(&self) -> Option<&EntitySummary> {
         let name = self.selected_entity.as_ref()?;
@@ -327,10 +685,27 @@ impl EntityEditorState {
         }
     }
 
+    /// Load an entity definition for editing
+    pub fn load_for_editing(&mut self, def: EntityDefinition, file_path: PathBuf) {
+        let name = def.name.clone();
+        self.selected_entity = Some(name);
+        self.edit_state = Some(EntityEditState::from_definition(def, file_path));
+    }
+
+    /// Clear the current edit state
+    pub fn clear_edit_state(&mut self) {
+        self.edit_state = None;
+    }
+
     /// Clear selection
     pub fn clear_selection(&mut self) {
         self.selected_entity = None;
-        self.dirty = false;
+        self.edit_state = None;
+    }
+
+    /// Get mutable reference to the edit state
+    pub fn edit_state_mut(&mut self) -> Option<&mut EntityEditState> {
+        self.edit_state.as_mut()
     }
 
     /// Get filtered entities based on current filter state
@@ -377,8 +752,9 @@ impl EntityEditorState {
 
         if self.entities.len() < initial_len {
             // Clear selection if we removed the selected entity
-            if self.selected_entity.as_ref().map(|s| s == name).unwrap_or(false) {
+            if self.selected_entity.as_ref().is_some_and(|s| s == name) {
                 self.selected_entity = None;
+                self.edit_state = None;
             }
             true
         } else {
@@ -390,12 +766,12 @@ impl EntityEditorState {
     pub fn clear(&mut self) {
         self.entities.clear();
         self.selected_entity = None;
+        self.edit_state = None;
         self.filter.clear();
         self.new_entity_dialog.close();
         self.delete_confirmation.close();
         self.entities_dir = None;
         self.needs_refresh = false;
-        self.dirty = false;
     }
 }
 
@@ -638,7 +1014,7 @@ mod tests {
         let state = EntityEditorState::new();
         assert!(!state.has_entity());
         assert!(state.entities.is_empty());
-        assert!(!state.dirty);
+        assert!(!state.is_dirty());
         assert!(state.browser_panel_width > 0.0);
     }
 
@@ -663,12 +1039,12 @@ mod tests {
     fn editor_state_clear_selection() {
         let mut state = EntityEditorState::new();
         state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
-        state.select_entity("goblin");
-        state.dirty = true;
+        let def = create_default_definition("goblin", "Goblin", "enemy");
+        state.load_for_editing(def, PathBuf::from("/test/goblin.json"));
 
         state.clear_selection();
         assert!(!state.has_entity());
-        assert!(!state.dirty);
+        assert!(state.edit_state.is_none());
     }
 
     #[test]
@@ -739,14 +1115,397 @@ mod tests {
     fn editor_state_clear() {
         let mut state = EntityEditorState::new();
         state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
-        state.selected_entity = Some("goblin".to_string());
-        state.dirty = true;
+        let def = create_default_definition("goblin", "Goblin", "enemy");
+        state.load_for_editing(def, PathBuf::from("/test/goblin.json"));
         state.filter.search_query = "test".to_string();
 
         state.clear();
         assert!(state.entities.is_empty());
         assert!(state.selected_entity.is_none());
-        assert!(!state.dirty);
+        assert!(state.edit_state.is_none());
         assert!(!state.filter.is_active());
+    }
+
+    #[test]
+    fn editor_state_load_for_editing() {
+        let mut state = EntityEditorState::new();
+        let def = create_default_definition("goblin", "Goblin", "enemy");
+
+        state.load_for_editing(def, PathBuf::from("/test/goblin.json"));
+        assert!(state.has_entity());
+        assert_eq!(state.selected_entity, Some("goblin".to_string()));
+        assert!(state.edit_state.is_some());
+
+        let edit = state.edit_state.as_ref().unwrap();
+        assert_eq!(edit.definition.name, "goblin");
+        assert!(!edit.dirty);
+    }
+
+    #[test]
+    fn editor_state_is_dirty_when_edit_state_dirty() {
+        let mut state = EntityEditorState::new();
+        assert!(!state.is_dirty());
+
+        let def = create_default_definition("goblin", "Goblin", "enemy");
+        state.load_for_editing(def, PathBuf::from("/test/goblin.json"));
+        assert!(!state.is_dirty());
+
+        state.edit_state.as_mut().unwrap().mark_dirty();
+        assert!(state.is_dirty());
+    }
+
+    // === ComponentToggles Tests ===
+
+    fn make_test_definition() -> EntityDefinition {
+        create_default_definition("test_entity", "Test Entity", "npc")
+    }
+
+    #[test]
+    fn toggles_from_definition_defaults() {
+        let def = make_test_definition();
+        let toggles = ComponentToggles::from_definition(&def);
+
+        // Default definition has collision enabled, nothing else
+        assert!(!toggles.health_enabled);
+        assert!(!toggles.inventory_enabled);
+        assert!(!toggles.projectile_enabled);
+        assert!(!toggles.pickup_enabled);
+        assert!(!toggles.ai_enabled);
+        assert!(toggles.collision_enabled); // Collision enabled by default
+        assert!(!toggles.audio_enabled);
+    }
+
+    #[test]
+    fn toggles_from_definition_detects_health() {
+        let mut def = make_test_definition();
+        def.attributes.health = Some(50);
+
+        let toggles = ComponentToggles::from_definition(&def);
+        assert!(toggles.health_enabled);
+    }
+
+    #[test]
+    fn toggles_from_definition_detects_inventory() {
+        let mut def = make_test_definition();
+        def.attributes.has_inventory = true;
+
+        let toggles = ComponentToggles::from_definition(&def);
+        assert!(toggles.inventory_enabled);
+    }
+
+    #[test]
+    fn toggles_from_definition_detects_projectile() {
+        let mut def = make_test_definition();
+        def.attributes.primary_projectile = Some(default_projectile_def());
+
+        let toggles = ComponentToggles::from_definition(&def);
+        assert!(toggles.projectile_enabled);
+    }
+
+    #[test]
+    fn toggles_from_definition_detects_pickup() {
+        let mut def = make_test_definition();
+        def.attributes.pickup = Some(default_pickup_def());
+
+        let toggles = ComponentToggles::from_definition(&def);
+        assert!(toggles.pickup_enabled);
+    }
+
+    #[test]
+    fn toggles_from_definition_detects_ai() {
+        let mut def = make_test_definition();
+        def.attributes.ai_config = AiConfig {
+            behavior: AiBehavior::Chase,
+            detection_radius: 128,
+        };
+
+        let toggles = ComponentToggles::from_definition(&def);
+        assert!(toggles.ai_enabled);
+    }
+
+    #[test]
+    fn toggles_from_definition_detects_audio() {
+        let mut def = make_test_definition();
+        def.audio.movement_sound = "walk.ogg".to_string();
+
+        let toggles = ComponentToggles::from_definition(&def);
+        assert!(toggles.audio_enabled);
+    }
+
+    #[test]
+    fn toggles_enabled_count() {
+        let mut toggles = ComponentToggles::default();
+        assert_eq!(toggles.enabled_count(), 0);
+
+        toggles.health_enabled = true;
+        toggles.collision_enabled = true;
+        assert_eq!(toggles.enabled_count(), 2);
+    }
+
+    // === EntityEditState Tests ===
+
+    fn make_edit_state() -> EntityEditState {
+        let def = make_test_definition();
+        EntityEditState::from_definition(def, PathBuf::from("/test/entity.json"))
+    }
+
+    #[test]
+    fn edit_state_from_definition() {
+        let state = make_edit_state();
+        assert_eq!(state.definition.name, "test_entity");
+        assert!(!state.dirty);
+        assert!(state.validation_errors.is_empty());
+    }
+
+    #[test]
+    fn edit_state_mark_dirty() {
+        let mut state = make_edit_state();
+        assert!(!state.dirty);
+        state.mark_dirty();
+        assert!(state.dirty);
+    }
+
+    #[test]
+    fn edit_state_sync_tags() {
+        let mut state = make_edit_state();
+        state.tags_input = "hostile, forest, strong".to_string();
+        state.sync_tags();
+
+        assert_eq!(state.definition.tags.len(), 3);
+        assert!(state.definition.tags.contains(&"hostile".to_string()));
+        assert!(state.definition.tags.contains(&"forest".to_string()));
+        assert!(state.definition.tags.contains(&"strong".to_string()));
+    }
+
+    #[test]
+    fn edit_state_sync_tags_handles_empty() {
+        let mut state = make_edit_state();
+        state.tags_input = "  ,  ,  ".to_string();
+        state.sync_tags();
+        assert!(state.definition.tags.is_empty());
+    }
+
+    #[test]
+    fn edit_state_toggle_health() {
+        let mut state = make_edit_state();
+        assert!(!state.toggles.health_enabled);
+        assert!(state.definition.attributes.health.is_none());
+
+        state.toggle_health();
+        assert!(state.toggles.health_enabled);
+        assert_eq!(state.definition.attributes.health, Some(100));
+        assert!(state.dirty);
+
+        state.toggle_health();
+        assert!(!state.toggles.health_enabled);
+        assert!(state.definition.attributes.health.is_none());
+    }
+
+    #[test]
+    fn edit_state_toggle_inventory() {
+        let mut state = make_edit_state();
+        assert!(!state.toggles.inventory_enabled);
+        assert!(!state.definition.attributes.has_inventory);
+
+        state.toggle_inventory();
+        assert!(state.toggles.inventory_enabled);
+        assert!(state.definition.attributes.has_inventory);
+        assert!(state.dirty);
+    }
+
+    #[test]
+    fn edit_state_toggle_projectile() {
+        let mut state = make_edit_state();
+        assert!(!state.toggles.projectile_enabled);
+
+        state.toggle_projectile();
+        assert!(state.toggles.projectile_enabled);
+        assert!(state.definition.attributes.primary_projectile.is_some());
+
+        let proj = state.definition.attributes.primary_projectile.as_ref().unwrap();
+        assert_eq!(proj.damage, 10);
+        assert_eq!(proj.speed, 200);
+    }
+
+    #[test]
+    fn edit_state_toggle_pickup() {
+        let mut state = make_edit_state();
+        assert!(!state.toggles.pickup_enabled);
+
+        state.toggle_pickup();
+        assert!(state.toggles.pickup_enabled);
+        assert!(state.definition.attributes.pickup.is_some());
+
+        let pickup = state.definition.attributes.pickup.as_ref().unwrap();
+        assert_eq!(pickup.count, 1);
+    }
+
+    #[test]
+    fn edit_state_toggle_ai() {
+        let mut state = make_edit_state();
+        assert!(!state.toggles.ai_enabled);
+        assert_eq!(state.definition.attributes.ai_config.behavior, AiBehavior::None);
+
+        state.toggle_ai();
+        assert!(state.toggles.ai_enabled);
+        assert_eq!(state.definition.attributes.ai_config.behavior, AiBehavior::Wander);
+        assert_eq!(state.definition.attributes.ai_config.detection_radius, 128);
+
+        state.toggle_ai();
+        assert!(!state.toggles.ai_enabled);
+        assert_eq!(state.definition.attributes.ai_config.behavior, AiBehavior::None);
+    }
+
+    #[test]
+    fn edit_state_toggle_collision() {
+        let mut state = make_edit_state();
+        assert!(state.toggles.collision_enabled); // Enabled by default
+
+        state.toggle_collision();
+        assert!(!state.toggles.collision_enabled);
+        assert!(!state.definition.collision.enabled);
+
+        state.toggle_collision();
+        assert!(state.toggles.collision_enabled);
+        assert!(state.definition.collision.enabled);
+    }
+
+    #[test]
+    fn edit_state_toggle_audio() {
+        let mut state = make_edit_state();
+        state.definition.audio.movement_sound = "walk.ogg".to_string();
+        state.toggles.audio_enabled = true;
+
+        state.toggle_audio();
+        assert!(!state.toggles.audio_enabled);
+        assert!(state.definition.audio.movement_sound.is_empty());
+        assert!(state.definition.audio.collision_sound.is_none());
+    }
+
+    // === Validation Tests ===
+
+    #[test]
+    fn validation_passes_for_valid_entity() {
+        let mut state = make_edit_state();
+        assert!(state.validate());
+        assert!(state.validation_errors.is_empty());
+    }
+
+    #[test]
+    fn validation_fails_for_empty_name() {
+        let mut state = make_edit_state();
+        state.definition.name = "  ".to_string();
+
+        assert!(!state.validate());
+        assert!(state.has_error("name"));
+    }
+
+    #[test]
+    fn validation_fails_for_invalid_name_chars() {
+        let mut state = make_edit_state();
+        state.definition.name = "my-entity".to_string();
+
+        assert!(!state.validate());
+        assert!(state.has_error("name"));
+    }
+
+    #[test]
+    fn validation_fails_for_name_starting_with_digit() {
+        let mut state = make_edit_state();
+        state.definition.name = "123entity".to_string();
+
+        assert!(!state.validate());
+        assert!(state.has_error("name"));
+    }
+
+    #[test]
+    fn validation_fails_for_empty_display_name() {
+        let mut state = make_edit_state();
+        state.definition.display_name = "".to_string();
+
+        assert!(!state.validate());
+        assert!(state.has_error("display_name"));
+    }
+
+    #[test]
+    fn validation_fails_for_zero_size() {
+        let mut state = make_edit_state();
+        state.definition.rendering.size = [0, 32];
+
+        assert!(!state.validate());
+        assert!(state.has_error("size"));
+    }
+
+    #[test]
+    fn validation_fails_for_zero_health_when_enabled() {
+        let mut state = make_edit_state();
+        state.toggles.health_enabled = true;
+        state.definition.attributes.health = Some(0);
+
+        assert!(!state.validate());
+        assert!(state.has_error("health"));
+    }
+
+    #[test]
+    fn validation_skips_health_when_disabled() {
+        let mut state = make_edit_state();
+        state.toggles.health_enabled = false;
+        state.definition.attributes.health = Some(0); // Shouldn't matter
+
+        assert!(state.validate());
+    }
+
+    #[test]
+    fn validation_fails_for_zero_collision_size_when_enabled() {
+        let mut state = make_edit_state();
+        state.toggles.collision_enabled = true;
+        state.definition.collision.size = [0, 32];
+
+        assert!(!state.validate());
+        assert!(state.has_error("collision_size"));
+    }
+
+    #[test]
+    fn get_error_returns_message() {
+        let mut state = make_edit_state();
+        state.definition.name = "".to_string();
+        state.validate();
+
+        let error = state.get_error("name");
+        assert!(error.is_some());
+        assert!(error.unwrap().contains("required"));
+    }
+
+    // === create_default_definition Tests ===
+
+    #[test]
+    fn default_definition_has_collision_enabled() {
+        let def = create_default_definition("test", "Test", "npc");
+        assert!(def.collision.enabled);
+    }
+
+    #[test]
+    fn default_definition_has_no_health() {
+        let def = create_default_definition("test", "Test", "npc");
+        assert!(def.attributes.health.is_none());
+    }
+
+    #[test]
+    fn default_definition_has_sensible_defaults() {
+        let def = create_default_definition("test", "Test Entity", "enemy");
+
+        assert_eq!(def.name, "test");
+        assert_eq!(def.display_name, "Test Entity");
+        assert_eq!(def.category, "enemy");
+        assert_eq!(def.rendering.size, [32, 32]);
+        assert!(def.rendering.visible);
+        assert_eq!(def.attributes.speed, 100.0);
+        assert!(def.attributes.solid);
+        assert!(def.attributes.active);
+        assert!(def.attributes.can_move);
+        assert!(!def.attributes.interactable);
+        assert!(def.collision.enabled);
+        assert_eq!(def.collision.size, [32, 32]);
+        assert!(!def.collision.trigger);
     }
 }

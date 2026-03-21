@@ -1,12 +1,17 @@
 // Entity editor panel
 // Provides a dedicated tab for creating and editing entity definitions
 // Phase 4.5A: Entity Editor Tab And Definition Browser
+// Phase 4.5B: Optional Component Toggles
+// Phase 4.5C: Property Editing
 
 use crate::project::Project;
-use crate::ui::editor_ui::{EntityCategory, EntitySummary, Selection};
+use crate::ui::editor_ui::{
+    create_default_definition, EntityCategory, EntityEditState, EntitySummary, Selection,
+};
 use crate::ui::EditorUI;
 use std::path::Path;
-use toki_core::entity::EntityDefinition;
+use toki_core::entity::{AiBehavior, EntityDefinition};
+use toki_core::project_assets::{classify_sprite_metadata_file, SpriteMetadataFileKind};
 
 /// Renders the entity editor panel
 pub fn render_entity_editor(
@@ -63,7 +68,7 @@ fn render_toolbar(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         if let Some(name) = &ui_state.entity_editor.selected_entity {
             ui.separator();
             ui.label(format!("Selected: {}", name));
-            if ui_state.entity_editor.dirty {
+            if ui_state.entity_editor.is_dirty() {
                 ui.label("*");
             }
         }
@@ -231,7 +236,20 @@ fn render_entity_browser(ui: &mut egui::Ui, ui_state: &mut EditorUI, _project_pa
 
     // Handle deferred actions
     if let Some(name) = select_entity {
-        ui_state.entity_editor.select_entity(&name);
+        // Load full entity definition for editing
+        if let Some(summary) = ui_state
+            .entity_editor
+            .entities
+            .iter()
+            .find(|e| e.name == name)
+            .cloned()
+        {
+            if let Some(def) = load_entity_definition(&summary.file_path) {
+                ui_state
+                    .entity_editor
+                    .load_for_editing(def, summary.file_path);
+            }
+        }
         // Also update the global selection so inspector works
         ui_state.selection = Some(Selection::EntityDefinition(name));
     }
@@ -249,7 +267,7 @@ fn render_entity_browser(ui: &mut egui::Ui, ui_state: &mut EditorUI, _project_pa
 }
 
 fn render_entity_details(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    if ui_state.entity_editor.selected_entity.is_none() {
+    if ui_state.entity_editor.edit_state.is_none() {
         ui.centered_and_justified(|ui| {
             ui.vertical_centered(|ui| {
                 ui.label("No entity selected");
@@ -260,21 +278,649 @@ fn render_entity_details(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         return;
     }
 
-    // Show entity name
-    if let Some(summary) = ui_state.entity_editor.selected_entity_summary() {
-        ui.heading(&summary.display_name);
-        ui.label(format!("ID: {}", summary.name));
-        ui.label(format!("Category: {}", summary.category));
+    egui::ScrollArea::vertical()
+        .id_salt("entity_details_scroll")
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            render_core_properties(ui, ui_state);
+            ui.add_space(8.0);
+            render_component_toggles(ui, ui_state);
+            ui.add_space(8.0);
+            render_save_section(ui, ui_state);
+        });
+}
 
-        if !summary.tags.is_empty() {
-            ui.label(format!("Tags: {}", summary.tags.join(", ")));
+fn render_core_properties(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let Some(edit) = ui_state.entity_editor.edit_state.as_mut() else {
+        return;
+    };
+
+    ui.heading("Core Properties");
+    ui.separator();
+
+    // Name (identifier)
+    ui.horizontal(|ui| {
+        ui.label("Name:");
+        if ui.text_edit_singleline(&mut edit.definition.name).changed() {
+            edit.mark_dirty();
+        }
+    });
+    show_field_error(ui, edit, "name");
+
+    // Display name
+    ui.horizontal(|ui| {
+        ui.label("Display Name:");
+        if ui
+            .text_edit_singleline(&mut edit.definition.display_name)
+            .changed()
+        {
+            edit.mark_dirty();
+        }
+    });
+    show_field_error(ui, edit, "display_name");
+
+    // Description
+    ui.label("Description:");
+    if ui
+        .text_edit_multiline(&mut edit.definition.description)
+        .changed()
+    {
+        edit.mark_dirty();
+    }
+
+    // Category
+    ui.horizontal(|ui| {
+        ui.label("Category:");
+        if ui
+            .text_edit_singleline(&mut edit.definition.category)
+            .changed()
+        {
+            edit.mark_dirty();
+        }
+    });
+
+    // Tags
+    ui.horizontal(|ui| {
+        ui.label("Tags:");
+        if ui.text_edit_singleline(&mut edit.tags_input).changed() {
+            edit.sync_tags();
+            edit.mark_dirty();
+        }
+    });
+    ui.label("(comma-separated)");
+}
+
+fn render_component_toggles(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    ui.heading("Components");
+    ui.separator();
+
+    render_rendering_section(ui, ui_state);
+    render_attributes_section(ui, ui_state);
+    render_collision_section(ui, ui_state);
+    render_health_section(ui, ui_state);
+    render_ai_section(ui, ui_state);
+    render_inventory_section(ui, ui_state);
+    render_projectile_section(ui, ui_state);
+    render_pickup_section(ui, ui_state);
+    render_audio_section(ui, ui_state);
+}
+
+fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let available_atlases = ui_state.entity_editor.available_atlases.clone();
+    let Some(edit) = ui_state.entity_editor.edit_state.as_mut() else {
+        return;
+    };
+
+    egui::CollapsingHeader::new("Rendering")
+        .default_open(true)
+        .show(ui, |ui| {
+            // Sprite Atlas dropdown
+            ui.horizontal(|ui| {
+                ui.label("Sprite Atlas:");
+                render_atlas_dropdown(
+                    ui,
+                    "sprite_atlas",
+                    &mut edit.definition.animations.atlas_name,
+                    &available_atlases,
+                    &mut edit.dirty,
+                );
+            });
+
+            // Size
+            ui.horizontal(|ui| {
+                ui.label("Size:");
+                let mut w = edit.definition.rendering.size[0] as i32;
+                let mut h = edit.definition.rendering.size[1] as i32;
+                if ui.add(egui::DragValue::new(&mut w).range(1..=1024)).changed() {
+                    edit.definition.rendering.size[0] = w.max(1) as u32;
+                    edit.mark_dirty();
+                }
+                ui.label("x");
+                if ui.add(egui::DragValue::new(&mut h).range(1..=1024)).changed() {
+                    edit.definition.rendering.size[1] = h.max(1) as u32;
+                    edit.mark_dirty();
+                }
+            });
+            show_field_error(ui, edit, "size");
+
+            // Render layer
+            ui.horizontal(|ui| {
+                ui.label("Render Layer:");
+                if ui
+                    .add(egui::DragValue::new(&mut edit.definition.rendering.render_layer))
+                    .changed()
+                {
+                    edit.mark_dirty();
+                }
+            });
+
+            // Visible
+            if ui
+                .checkbox(&mut edit.definition.rendering.visible, "Visible")
+                .changed()
+            {
+                edit.mark_dirty();
+            }
+        });
+}
+
+fn render_attributes_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let Some(edit) = ui_state.entity_editor.edit_state.as_mut() else {
+        return;
+    };
+
+    egui::CollapsingHeader::new("Attributes")
+        .default_open(true)
+        .show(ui, |ui| {
+            // Speed
+            ui.horizontal(|ui| {
+                ui.label("Speed:");
+                if ui
+                    .add(egui::DragValue::new(&mut edit.definition.attributes.speed).speed(0.1))
+                    .changed()
+                {
+                    edit.mark_dirty();
+                }
+            });
+
+            // Boolean attributes
+            if ui
+                .checkbox(&mut edit.definition.attributes.solid, "Solid")
+                .changed()
+            {
+                edit.mark_dirty();
+            }
+            if ui
+                .checkbox(&mut edit.definition.attributes.active, "Active")
+                .changed()
+            {
+                edit.mark_dirty();
+            }
+            if ui
+                .checkbox(&mut edit.definition.attributes.can_move, "Can Move")
+                .changed()
+            {
+                edit.mark_dirty();
+            }
+            if ui
+                .checkbox(&mut edit.definition.attributes.interactable, "Interactable")
+                .changed()
+            {
+                edit.mark_dirty();
+            }
+
+            // Interaction reach (only if interactable)
+            if edit.definition.attributes.interactable {
+                ui.horizontal(|ui| {
+                    ui.label("Interaction Reach:");
+                    let mut reach = edit.definition.attributes.interaction_reach as i32;
+                    if ui.add(egui::DragValue::new(&mut reach).range(0..=256)).changed() {
+                        edit.definition.attributes.interaction_reach = reach.max(0) as u32;
+                        edit.mark_dirty();
+                    }
+                });
+            }
+        });
+}
+
+fn render_collision_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let Some(edit) = ui_state.entity_editor.edit_state.as_mut() else {
+        return;
+    };
+
+    ui.horizontal(|ui| {
+        if ui
+            .checkbox(&mut edit.toggles.collision_enabled, "Collision")
+            .changed()
+        {
+            edit.definition.collision.enabled = edit.toggles.collision_enabled;
+            edit.mark_dirty();
+        }
+    });
+
+    if edit.toggles.collision_enabled {
+        egui::CollapsingHeader::new("  Collision Settings")
+            .default_open(false)
+            .show(ui, |ui| {
+                // Offset
+                ui.horizontal(|ui| {
+                    ui.label("Offset:");
+                    if ui
+                        .add(egui::DragValue::new(&mut edit.definition.collision.offset[0]))
+                        .changed()
+                    {
+                        edit.mark_dirty();
+                    }
+                    ui.label(",");
+                    if ui
+                        .add(egui::DragValue::new(&mut edit.definition.collision.offset[1]))
+                        .changed()
+                    {
+                        edit.mark_dirty();
+                    }
+                });
+
+                // Size
+                ui.horizontal(|ui| {
+                    ui.label("Size:");
+                    let mut w = edit.definition.collision.size[0] as i32;
+                    let mut h = edit.definition.collision.size[1] as i32;
+                    if ui.add(egui::DragValue::new(&mut w).range(1..=1024)).changed() {
+                        edit.definition.collision.size[0] = w.max(1) as u32;
+                        edit.mark_dirty();
+                    }
+                    ui.label("x");
+                    if ui.add(egui::DragValue::new(&mut h).range(1..=1024)).changed() {
+                        edit.definition.collision.size[1] = h.max(1) as u32;
+                        edit.mark_dirty();
+                    }
+                });
+                show_field_error(ui, edit, "collision_size");
+
+                // Trigger
+                if ui
+                    .checkbox(&mut edit.definition.collision.trigger, "Is Trigger")
+                    .changed()
+                {
+                    edit.mark_dirty();
+                }
+            });
+    }
+}
+
+fn render_health_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let Some(edit) = ui_state.entity_editor.edit_state.as_mut() else {
+        return;
+    };
+
+    let mut toggle = edit.toggles.health_enabled;
+    if ui.checkbox(&mut toggle, "Health").changed() {
+        edit.toggle_health();
+    }
+
+    if edit.toggles.health_enabled {
+        ui.horizontal(|ui| {
+            ui.label("  Max HP:");
+            let mut hp = edit.definition.attributes.health.unwrap_or(100) as i32;
+            if ui.add(egui::DragValue::new(&mut hp).range(1..=99999)).changed() {
+                edit.definition.attributes.health = Some(hp.max(1) as u32);
+                edit.mark_dirty();
+            }
+        });
+        show_field_error(ui, edit, "health");
+    }
+}
+
+fn render_ai_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let Some(edit) = ui_state.entity_editor.edit_state.as_mut() else {
+        return;
+    };
+
+    let mut toggle = edit.toggles.ai_enabled;
+    if ui.checkbox(&mut toggle, "AI").changed() {
+        edit.toggle_ai();
+    }
+
+    if edit.toggles.ai_enabled {
+        egui::CollapsingHeader::new("  AI Settings")
+            .default_open(false)
+            .show(ui, |ui| {
+                // Behavior dropdown
+                ui.horizontal(|ui| {
+                    ui.label("Behavior:");
+                    let current = format!("{:?}", edit.definition.attributes.ai_config.behavior);
+                    egui::ComboBox::from_id_salt("ai_behavior")
+                        .selected_text(&current)
+                        .show_ui(ui, |ui| {
+                            for behavior in [
+                                AiBehavior::Wander,
+                                AiBehavior::Chase,
+                                AiBehavior::Run,
+                                AiBehavior::RunAndMultiply,
+                            ] {
+                                let label = format!("{:?}", behavior);
+                                if ui
+                                    .selectable_value(
+                                        &mut edit.definition.attributes.ai_config.behavior,
+                                        behavior,
+                                        &label,
+                                    )
+                                    .changed()
+                                {
+                                    edit.mark_dirty();
+                                }
+                            }
+                        });
+                });
+
+                // Detection radius
+                ui.horizontal(|ui| {
+                    ui.label("Detection Radius:");
+                    let mut radius = edit.definition.attributes.ai_config.detection_radius as i32;
+                    if ui.add(egui::DragValue::new(&mut radius).range(0..=1024)).changed() {
+                        edit.definition.attributes.ai_config.detection_radius = radius.max(0) as u32;
+                        edit.mark_dirty();
+                    }
+                });
+            });
+    }
+}
+
+fn render_inventory_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let Some(edit) = ui_state.entity_editor.edit_state.as_mut() else {
+        return;
+    };
+
+    let mut toggle = edit.toggles.inventory_enabled;
+    if ui.checkbox(&mut toggle, "Inventory").changed() {
+        edit.toggle_inventory();
+    }
+}
+
+fn render_projectile_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let Some(edit) = ui_state.entity_editor.edit_state.as_mut() else {
+        return;
+    };
+
+    let mut toggle = edit.toggles.projectile_enabled;
+    if ui.checkbox(&mut toggle, "Projectile").changed() {
+        edit.toggle_projectile();
+    }
+
+    if edit.toggles.projectile_enabled {
+        if let Some(proj) = edit.definition.attributes.primary_projectile.as_mut() {
+            egui::CollapsingHeader::new("  Projectile Settings")
+                .default_open(false)
+                .show(ui, |ui| {
+                    // Sheet
+                    ui.horizontal(|ui| {
+                        ui.label("Sheet:");
+                        if ui.text_edit_singleline(&mut proj.sheet).changed() {
+                            edit.dirty = true;
+                        }
+                    });
+
+                    // Object name
+                    ui.horizontal(|ui| {
+                        ui.label("Object:");
+                        if ui.text_edit_singleline(&mut proj.object_name).changed() {
+                            edit.dirty = true;
+                        }
+                    });
+
+                    // Size
+                    ui.horizontal(|ui| {
+                        ui.label("Size:");
+                        let mut w = proj.size[0] as i32;
+                        let mut h = proj.size[1] as i32;
+                        if ui.add(egui::DragValue::new(&mut w).range(1..=256)).changed() {
+                            proj.size[0] = w.max(1) as u32;
+                            edit.dirty = true;
+                        }
+                        ui.label("x");
+                        if ui.add(egui::DragValue::new(&mut h).range(1..=256)).changed() {
+                            proj.size[1] = h.max(1) as u32;
+                            edit.dirty = true;
+                        }
+                    });
+
+                    // Speed
+                    ui.horizontal(|ui| {
+                        ui.label("Speed:");
+                        let mut speed = proj.speed as i32;
+                        if ui.add(egui::DragValue::new(&mut speed).range(1..=9999)).changed() {
+                            proj.speed = speed.max(1) as u32;
+                            edit.dirty = true;
+                        }
+                    });
+
+                    // Damage
+                    ui.horizontal(|ui| {
+                        ui.label("Damage:");
+                        if ui.add(egui::DragValue::new(&mut proj.damage)).changed() {
+                            edit.dirty = true;
+                        }
+                    });
+
+                    // Lifetime
+                    ui.horizontal(|ui| {
+                        ui.label("Lifetime (ticks):");
+                        let mut lifetime = proj.lifetime_ticks as i32;
+                        if ui.add(egui::DragValue::new(&mut lifetime).range(1..=9999)).changed() {
+                            proj.lifetime_ticks = lifetime.max(1) as u32;
+                            edit.dirty = true;
+                        }
+                    });
+                });
+        }
+    }
+}
+
+fn render_pickup_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let Some(edit) = ui_state.entity_editor.edit_state.as_mut() else {
+        return;
+    };
+
+    let mut toggle = edit.toggles.pickup_enabled;
+    if ui.checkbox(&mut toggle, "Pickup").changed() {
+        edit.toggle_pickup();
+    }
+
+    if edit.toggles.pickup_enabled {
+        if let Some(pickup) = edit.definition.attributes.pickup.as_mut() {
+            egui::CollapsingHeader::new("  Pickup Settings")
+                .default_open(false)
+                .show(ui, |ui| {
+                    // Item ID
+                    ui.horizontal(|ui| {
+                        ui.label("Item ID:");
+                        if ui.text_edit_singleline(&mut pickup.item_id).changed() {
+                            edit.dirty = true;
+                        }
+                    });
+
+                    // Count
+                    ui.horizontal(|ui| {
+                        ui.label("Count:");
+                        let mut count = pickup.count as i32;
+                        if ui.add(egui::DragValue::new(&mut count).range(1..=9999)).changed() {
+                            pickup.count = count.max(1) as u32;
+                            edit.dirty = true;
+                        }
+                    });
+                });
+        }
+    }
+}
+
+fn render_audio_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let available_sfx = ui_state.entity_editor.available_sfx.clone();
+    let Some(edit) = ui_state.entity_editor.edit_state.as_mut() else {
+        return;
+    };
+
+    let mut toggle = edit.toggles.audio_enabled;
+    if ui.checkbox(&mut toggle, "Audio").changed() {
+        edit.toggle_audio();
+    }
+
+    if edit.toggles.audio_enabled {
+        egui::CollapsingHeader::new("  Audio Settings")
+            .default_open(false)
+            .show(ui, |ui| {
+                // Movement sound - dropdown from discovered SFX
+                ui.horizontal(|ui| {
+                    ui.label("Movement Sound:");
+                    render_sfx_dropdown(
+                        ui,
+                        "movement_sound",
+                        &mut edit.definition.audio.movement_sound,
+                        &available_sfx,
+                        &mut edit.dirty,
+                    );
+                });
+
+                // Collision sound - dropdown from discovered SFX
+                ui.horizontal(|ui| {
+                    ui.label("Collision Sound:");
+                    let mut sound = edit.definition.audio.collision_sound.clone().unwrap_or_default();
+                    if render_sfx_dropdown(ui, "collision_sound", &mut sound, &available_sfx, &mut edit.dirty) {
+                        edit.definition.audio.collision_sound = if sound.is_empty() {
+                            None
+                        } else {
+                            Some(sound)
+                        };
+                    }
+                });
+
+                // Hearing radius
+                ui.horizontal(|ui| {
+                    ui.label("Hearing Radius:");
+                    let mut radius = edit.definition.audio.hearing_radius as i32;
+                    if ui.add(egui::DragValue::new(&mut radius).range(0..=1024)).changed() {
+                        edit.definition.audio.hearing_radius = radius.max(0) as u32;
+                        edit.mark_dirty();
+                    }
+                });
+
+                // Footstep distance
+                ui.horizontal(|ui| {
+                    ui.label("Footstep Distance:");
+                    if ui
+                        .add(egui::DragValue::new(&mut edit.definition.audio.footstep_trigger_distance).speed(0.1))
+                        .changed()
+                    {
+                        edit.mark_dirty();
+                    }
+                });
+            });
+    }
+}
+
+/// Render a dropdown for selecting SFX sounds. Returns true if the value changed.
+fn render_sfx_dropdown(
+    ui: &mut egui::Ui,
+    id: &str,
+    current: &mut String,
+    available: &[String],
+    dirty: &mut bool,
+) -> bool {
+    let display_text = if current.is_empty() {
+        "(None)"
+    } else {
+        current.as_str()
+    };
+
+    let mut changed = false;
+
+    egui::ComboBox::from_id_salt(id)
+        .selected_text(display_text)
+        .show_ui(ui, |ui| {
+            // None option
+            if ui.selectable_label(current.is_empty(), "(None)").clicked() {
+                current.clear();
+                *dirty = true;
+                changed = true;
+            }
+
+            // Available SFX
+            for sfx in available {
+                let is_selected = current == sfx;
+                if ui.selectable_label(is_selected, sfx).clicked() {
+                    *current = sfx.clone();
+                    *dirty = true;
+                    changed = true;
+                }
+            }
+        });
+
+    changed
+}
+
+/// Render a dropdown for selecting sprite atlases.
+fn render_atlas_dropdown(
+    ui: &mut egui::Ui,
+    id: &str,
+    current: &mut String,
+    available: &[String],
+    dirty: &mut bool,
+) {
+    let display_text = if current.is_empty() {
+        "(None)"
+    } else {
+        current.as_str()
+    };
+
+    egui::ComboBox::from_id_salt(id)
+        .selected_text(display_text)
+        .show_ui(ui, |ui| {
+            // None option
+            if ui.selectable_label(current.is_empty(), "(None)").clicked() {
+                current.clear();
+                *dirty = true;
+            }
+
+            // Available atlases
+            for atlas in available {
+                let is_selected = current == atlas;
+                if ui.selectable_label(is_selected, atlas).clicked() {
+                    *current = atlas.clone();
+                    *dirty = true;
+                }
+            }
+        });
+}
+
+fn render_save_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    ui.separator();
+
+    let is_dirty = ui_state.entity_editor.is_dirty();
+
+    ui.horizontal(|ui| {
+        let save_enabled = is_dirty;
+        if ui.add_enabled(save_enabled, egui::Button::new("Save")).clicked() {
+            save_entity(ui_state);
         }
 
-        ui.separator();
+        if ui.add_enabled(is_dirty, egui::Button::new("Revert")).clicked() {
+            revert_entity(ui_state);
+        }
+    });
 
-        // Placeholder for Phase 4.5B/C - property editing will go here
-        ui.label("Property editing will be available in Phase 4.5B/C");
-        ui.label("For now, use the Animation Editor to configure animations.");
+    // Show validation errors summary
+    if let Some(edit) = &ui_state.entity_editor.edit_state {
+        if !edit.validation_errors.is_empty() {
+            ui.colored_label(
+                egui::Color32::RED,
+                format!("{} validation error(s)", edit.validation_errors.len()),
+            );
+        }
+    }
+}
+
+fn show_field_error(ui: &mut egui::Ui, edit: &EntityEditState, field: &str) {
+    if let Some(error) = edit.get_error(field) {
+        ui.colored_label(egui::Color32::RED, error);
     }
 }
 
@@ -417,38 +1063,97 @@ fn render_delete_confirmation_dialog(
 
 fn refresh_entity_list(ui_state: &mut EditorUI, project_path: Option<&Path>) {
     ui_state.entity_editor.entities.clear();
+    ui_state.entity_editor.available_sfx.clear();
+    ui_state.entity_editor.available_atlases.clear();
 
     let Some(path) = project_path else {
         return;
     };
 
+    // Scan entities
     let entities_dir = path.join("entities");
     ui_state.entity_editor.entities_dir = Some(entities_dir.clone());
 
-    if !entities_dir.exists() {
-        return;
-    }
-
-    let Ok(entries) = std::fs::read_dir(&entities_dir) else {
-        return;
-    };
-
-    for entry in entries.flatten() {
-        let file_path = entry.path();
-        if file_path.extension().map(|e| e == "json").unwrap_or(false) {
-            if let Some(summary) = load_entity_summary(&file_path) {
-                ui_state.entity_editor.entities.push(summary);
+    if entities_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&entities_dir) {
+            for entry in entries.flatten() {
+                let file_path = entry.path();
+                if file_path.extension().map(|e| e == "json").unwrap_or(false) {
+                    if let Some(summary) = load_entity_summary(&file_path) {
+                        ui_state.entity_editor.entities.push(summary);
+                    }
+                }
             }
         }
     }
 
     // Sort by name
     ui_state.entity_editor.entities.sort_by(|a, b| a.name.cmp(&b.name));
+
+    // Scan SFX directory for available sound effects
+    let sfx_dir = path.join("assets/audio/sfx");
+    if sfx_dir.exists() {
+        scan_sfx_directory(&sfx_dir, &mut ui_state.entity_editor.available_sfx);
+        ui_state.entity_editor.available_sfx.sort();
+    }
+
+    // Scan sprites directory for available atlases
+    let sprites_dir = path.join("assets/sprites");
+    if sprites_dir.exists() {
+        scan_atlas_directory(&sprites_dir, &mut ui_state.entity_editor.available_atlases);
+        ui_state.entity_editor.available_atlases.sort();
+    }
+}
+
+fn scan_sfx_directory(dir: &Path, sfx_list: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            scan_sfx_directory(&path, sfx_list);
+            continue;
+        }
+
+        let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+            continue;
+        };
+
+        if matches!(ext.to_ascii_lowercase().as_str(), "ogg" | "wav" | "mp3") {
+            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                sfx_list.push(stem.to_string());
+            }
+        }
+    }
+}
+
+fn scan_atlas_directory(dir: &Path, atlas_list: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            continue;
+        }
+
+        if path.extension().map(|e| e == "json").unwrap_or(false) {
+            // Use classify_sprite_metadata_file to check if it's an atlas
+            if let Ok(SpriteMetadataFileKind::Atlas) = classify_sprite_metadata_file(&path) {
+                // Include .json extension for consistency with animation editor
+                if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
+                    atlas_list.push(filename.to_string());
+                }
+            }
+        }
+    }
 }
 
 fn load_entity_summary(file_path: &Path) -> Option<EntitySummary> {
-    let content = std::fs::read_to_string(file_path).ok()?;
-    let def: EntityDefinition = serde_json::from_str(&content).ok()?;
+    let def = load_entity_definition(file_path)?;
 
     Some(EntitySummary {
         name: def.name.clone(),
@@ -463,6 +1168,76 @@ fn load_entity_summary(file_path: &Path) -> Option<EntitySummary> {
     })
 }
 
+fn load_entity_definition(file_path: &Path) -> Option<EntityDefinition> {
+    let content = std::fs::read_to_string(file_path).ok()?;
+    serde_json::from_str(&content).ok()
+}
+
+fn save_entity(ui_state: &mut EditorUI) {
+    let Some(edit) = ui_state.entity_editor.edit_state.as_mut() else {
+        return;
+    };
+
+    // Validate before saving
+    if !edit.validate() {
+        tracing::warn!("Entity validation failed, cannot save");
+        return;
+    }
+
+    // Serialize to JSON
+    let json = match serde_json::to_string_pretty(&edit.definition) {
+        Ok(j) => j,
+        Err(e) => {
+            tracing::error!("Failed to serialize entity definition: {}", e);
+            return;
+        }
+    };
+
+    // Write to file
+    if let Err(e) = std::fs::write(&edit.file_path, json) {
+        tracing::error!("Failed to write entity definition: {}", e);
+        return;
+    }
+
+    // Clear dirty flag
+    edit.dirty = false;
+
+    // Update the summary in the browser list
+    if let Some(summary) = ui_state
+        .entity_editor
+        .entities
+        .iter_mut()
+        .find(|e| e.file_path == edit.file_path)
+    {
+        summary.name = edit.definition.name.clone();
+        summary.display_name = if edit.definition.display_name.is_empty() {
+            edit.definition.name.clone()
+        } else {
+            edit.definition.display_name.clone()
+        };
+        summary.category = edit.definition.category.clone();
+        summary.tags = edit.definition.tags.clone();
+    }
+
+    tracing::info!("Saved entity definition: {}", edit.definition.name);
+}
+
+fn revert_entity(ui_state: &mut EditorUI) {
+    let Some(edit) = &ui_state.entity_editor.edit_state else {
+        return;
+    };
+
+    let file_path = edit.file_path.clone();
+
+    // Reload from file
+    if let Some(def) = load_entity_definition(&file_path) {
+        ui_state
+            .entity_editor
+            .load_for_editing(def, file_path);
+        tracing::info!("Reverted entity changes");
+    }
+}
+
 fn create_new_entity(ui_state: &mut EditorUI, project_path: &Path) {
     let dialog = &ui_state.entity_editor.new_entity_dialog;
     let name = dialog.name_input.trim().to_string();
@@ -471,11 +1246,11 @@ fn create_new_entity(ui_state: &mut EditorUI, project_path: &Path) {
     } else {
         dialog.display_name_input.trim().to_string()
     };
-    let description = dialog.description_input.trim().to_string();
     let category = dialog.category.clone();
 
     // Create entity definition with sensible defaults
-    let def = create_default_entity_definition(&name, &display_name, &description, &category);
+    let mut def = create_default_definition(&name, &display_name, &category);
+    def.description = dialog.description_input.trim().to_string();
 
     // Save to file
     let entities_dir = project_path.join("entities");
@@ -503,78 +1278,19 @@ fn create_new_entity(ui_state: &mut EditorUI, project_path: &Path) {
     // Add to browser and select
     let summary = EntitySummary {
         name: name.clone(),
-        display_name,
+        display_name: display_name.clone(),
         category,
         tags: Vec::new(),
-        file_path,
+        file_path: file_path.clone(),
     };
 
     ui_state.entity_editor.add_entity(summary);
-    ui_state.selection = Some(Selection::EntityDefinition(name));
+    ui_state.selection = Some(Selection::EntityDefinition(name.clone()));
 
-    tracing::info!("Created new entity definition: {}", def.name);
-}
+    // Load for editing immediately
+    ui_state.entity_editor.load_for_editing(def, file_path);
 
-fn create_default_entity_definition(
-    name: &str,
-    display_name: &str,
-    description: &str,
-    category: &str,
-) -> EntityDefinition {
-    use toki_core::entity::{
-        AiBehavior, AiConfig, AnimationsDef, AttributesDef, AudioDef, CollisionDef,
-        MovementProfile, MovementSoundTrigger, RenderingDef,
-    };
-
-    EntityDefinition {
-        name: name.to_string(),
-        display_name: display_name.to_string(),
-        description: description.to_string(),
-        rendering: RenderingDef {
-            size: [32, 32],
-            render_layer: 0,
-            visible: true,
-            static_object: None,
-        },
-        attributes: AttributesDef {
-            health: None,
-            stats: std::collections::HashMap::new(),
-            speed: 1.0,
-            solid: true,
-            active: true,
-            can_move: false,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: AiConfig {
-                behavior: AiBehavior::None,
-                detection_radius: 0,
-            },
-            movement_profile: MovementProfile::default(),
-            primary_projectile: None,
-            pickup: None,
-            has_inventory: false,
-        },
-        collision: CollisionDef {
-            enabled: true, // Collision enabled by default per design decision
-            offset: [0, 0],
-            size: [32, 32],
-            trigger: false,
-        },
-        audio: AudioDef {
-            footstep_trigger_distance: 32.0,
-            hearing_radius: 192,
-            movement_sound_trigger: MovementSoundTrigger::Distance,
-            movement_sound: String::new(),
-            collision_sound: None,
-        },
-        animations: AnimationsDef {
-            atlas_name: String::new(),
-            clips: Vec::new(),
-            default_state: "idle".to_string(),
-        },
-        category: category.to_string(),
-        tags: Vec::new(),
-    }
+    tracing::info!("Created new entity definition: {}", name);
 }
 
 fn delete_entity(ui_state: &mut EditorUI, project_path: &Path, entity_name: &str) {

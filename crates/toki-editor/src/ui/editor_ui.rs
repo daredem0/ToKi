@@ -30,7 +30,9 @@ mod editor_ui_entity_editor;
 
 pub(crate) use editor_ui_animation_authoring::AnimationAuthoringState;
 pub(crate) use editor_ui_animation_editor::AnimationEditorState;
-pub(crate) use editor_ui_entity_editor::{EntityCategory, EntityEditorState, EntitySummary};
+pub(crate) use editor_ui_entity_editor::{
+    create_default_definition, EntityCategory, EntityEditState, EntityEditorState, EntitySummary,
+};
 pub(crate) use editor_ui_graph::SceneRulesGraphCommandData;
 pub(crate) use editor_ui_map_editor::{
     MapEditorDraft, MapEditorHistory, MapEditorObjectInfo, MapEditorObjectPropertyEditRequest,
