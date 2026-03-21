@@ -985,8 +985,7 @@ impl Inspector for EntityDefinitionInspector {
         ui.label("Entity Definition");
         ui.separator();
 
-        InspectorSystem::render_entity_definition_details(ui, &self.entity_name, ctx.config);
-        false
+        InspectorSystem::render_entity_definition_details(ui, &self.entity_name, ctx.config)
     }
 
     fn name(&self) -> &'static str {

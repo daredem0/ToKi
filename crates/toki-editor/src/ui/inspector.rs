@@ -23,6 +23,7 @@ use toki_core::rules::{
     RuleSpawnEntityType, RuleTarget, RuleTrigger,
 };
 
+mod animation_editor;
 mod assets;
 mod domain_inspectors;
 mod entities;
@@ -430,6 +431,11 @@ impl InspectorSystem {
 
         if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::SpriteEditor {
             Self::render_sprite_editor_inspector(ui_state, ui, ctx);
+            return;
+        }
+
+        if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::AnimationEditor {
+            Self::render_animation_editor_inspector(ui_state, ui);
             return;
         }
 

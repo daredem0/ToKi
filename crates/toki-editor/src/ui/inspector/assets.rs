@@ -123,11 +123,13 @@ impl InspectorSystem {
     }
 
     /// Renders detailed information about an entity definition
+    /// Returns true if any changes were made
     pub(super) fn render_entity_definition_details(
         ui: &mut egui::Ui,
         entity_name: &str,
         config: Option<&EditorConfig>,
-    ) {
+    ) -> bool {
+        let entity_changed = false;
         // Try to load and show entity definition details
         if let Some(config) = config {
             if let Some(project_path) = config.current_project_path() {
@@ -790,5 +792,6 @@ impl InspectorSystem {
                 }
             }
         }
+        entity_changed
     }
 }

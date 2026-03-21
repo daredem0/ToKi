@@ -19,6 +19,7 @@ use toki_core::rules::{
     RuleTrigger,
 };
 
+mod animation_editor;
 mod map_editor;
 mod map_editor_interactions;
 mod map_editor_preview;
@@ -138,6 +139,11 @@ impl PanelSystem {
                     CenterPanelTab::SpriteEditor,
                     "Sprite Editor",
                 );
+                ui.selectable_value(
+                    &mut ui_state.center_panel_tab,
+                    CenterPanelTab::AnimationEditor,
+                    "Animation Editor",
+                );
             });
             ui.separator();
 
@@ -170,6 +176,11 @@ impl PanelSystem {
 
             if ui_state.center_panel_tab == CenterPanelTab::SpriteEditor {
                 sprite_editor::render_sprite_editor(ui, ui_state, ctx, project);
+                return;
+            }
+
+            if ui_state.center_panel_tab == CenterPanelTab::AnimationEditor {
+                animation_editor::render_animation_editor(ui, ui_state, ctx, project);
                 return;
             }
 
