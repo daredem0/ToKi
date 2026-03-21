@@ -170,7 +170,7 @@ impl AnimationPreviewState {
 }
 
 /// State for the animation editor tab
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct AnimationEditorState {
     /// Currently loaded entity definition name
     pub active_entity: Option<String>,
@@ -203,6 +203,16 @@ pub struct AnimationEditorState {
     pub new_clip_state_input: String,
     /// Discovered entity definitions for load dialog
     pub discovered_entities: Vec<String>,
+
+    // Panel layout sizes (draggable dividers)
+    /// Width of the clip list panel (left)
+    pub clip_list_width: f32,
+    /// Width of the frame sequence panel (right)
+    pub frame_sequence_width: f32,
+    /// Height of the preview area (center top)
+    pub preview_height: f32,
+    /// Height ratio of clip list vs default state selector (0.0-1.0)
+    pub clip_list_ratio: f32,
 }
 
 impl std::fmt::Debug for AnimationEditorState {
@@ -220,18 +230,44 @@ impl std::fmt::Debug for AnimationEditorState {
             .field("atlas_viewport", &self.atlas_viewport)
             .field("preview_zoom", &self.preview_zoom)
             .field("show_grid", &self.show_grid)
+            .field("clip_list_width", &self.clip_list_width)
+            .field("frame_sequence_width", &self.frame_sequence_width)
+            .field("preview_height", &self.preview_height)
+            .field("clip_list_ratio", &self.clip_list_ratio)
             .finish()
+    }
+}
+
+impl Default for AnimationEditorState {
+    fn default() -> Self {
+        Self {
+            active_entity: None,
+            entity_file_path: None,
+            authoring: AnimationAuthoringState::default(),
+            preview: AnimationPreviewState::default(),
+            atlas_texture: None,
+            atlas_texture_path: None,
+            atlas_image_size: None,
+            atlas_grid_size: None,
+            atlas_cell_size: None,
+            atlas_viewport: AtlasViewport::default(),
+            preview_zoom: 2.0,
+            show_grid: true,
+            show_load_dialog: false,
+            show_new_clip_dialog: false,
+            new_clip_state_input: String::new(),
+            discovered_entities: Vec::new(),
+            clip_list_width: 180.0,
+            frame_sequence_width: 200.0,
+            preview_height: 180.0,
+            clip_list_ratio: 0.7,
+        }
     }
 }
 
 impl AnimationEditorState {
     pub fn new() -> Self {
-        Self {
-            preview_zoom: 2.0,
-            show_grid: true,
-            new_clip_state_input: String::new(),
-            ..Default::default()
-        }
+        Self::default()
     }
 
     /// Load an entity definition for editing

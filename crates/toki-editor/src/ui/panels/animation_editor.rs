@@ -102,36 +102,54 @@ fn render_no_entity_message(ui: &mut egui::Ui) {
 fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::Context) {
     // Left: Clip list. Center: Atlas grid + Preview. Right: Frame sequence
     let available_width = ui.available_width();
-    let clip_list_width = 180.0;
-    let frame_sequence_width = 200.0;
-    let center_width = (available_width - clip_list_width - frame_sequence_width - 16.0).max(200.0);
+    let available_height = ui.available_height();
+
+    // Get panel widths from state
+    let clip_list_width = ui_state.animation.clip_list_width;
+    let frame_sequence_width = ui_state.animation.frame_sequence_width;
+    let separator_width = 8.0; // Width of draggable separator
+    let center_width =
+        (available_width - clip_list_width - frame_sequence_width - separator_width * 2.0).max(200.0);
 
     ui.horizontal(|ui| {
         // Left panel: Clip list
         ui.allocate_ui_with_layout(
-            egui::vec2(clip_list_width, ui.available_height()),
+            egui::vec2(clip_list_width, available_height),
             egui::Layout::top_down(egui::Align::LEFT),
             |ui| {
                 render_clip_list(ui, ui_state);
             },
         );
 
-        ui.separator();
+        // Draggable separator between clip list and center
+        let sep_response = render_vertical_separator(ui, available_height);
+        if sep_response.dragged() {
+            ui_state.animation.clip_list_width =
+                (ui_state.animation.clip_list_width + sep_response.drag_delta().x)
+                    .clamp(120.0, available_width * 0.4);
+        }
 
         // Center panel: Atlas grid and preview
         ui.allocate_ui_with_layout(
-            egui::vec2(center_width, ui.available_height()),
+            egui::vec2(center_width, available_height),
             egui::Layout::top_down(egui::Align::LEFT),
             |ui| {
                 render_center_panel(ui, ui_state, ctx);
             },
         );
 
-        ui.separator();
+        // Draggable separator between center and frame sequence
+        let sep_response = render_vertical_separator(ui, available_height);
+        if sep_response.dragged() {
+            // Dragging right makes frame panel smaller
+            ui_state.animation.frame_sequence_width =
+                (ui_state.animation.frame_sequence_width - sep_response.drag_delta().x)
+                    .clamp(150.0, available_width * 0.4);
+        }
 
         // Right panel: Frame sequence
         ui.allocate_ui_with_layout(
-            egui::vec2(frame_sequence_width, ui.available_height()),
+            egui::vec2(frame_sequence_width, available_height),
             egui::Layout::top_down(egui::Align::LEFT),
             |ui| {
                 render_frame_sequence(ui, ui_state);
@@ -140,7 +158,72 @@ fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
     });
 }
 
+/// Render a vertical draggable separator
+fn render_vertical_separator(ui: &mut egui::Ui, height: f32) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(8.0, height), egui::Sense::drag());
+
+    let color = if response.dragged() {
+        egui::Color32::from_gray(180)
+    } else if response.hovered() {
+        egui::Color32::from_gray(140)
+    } else {
+        egui::Color32::from_gray(80)
+    };
+
+    ui.painter().rect_filled(
+        egui::Rect::from_center_size(rect.center(), egui::vec2(2.0, height)),
+        0.0,
+        color,
+    );
+
+    if response.hovered() || response.dragged() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+    }
+
+    response
+}
+
+/// Render a horizontal draggable separator
+fn render_horizontal_separator(ui: &mut egui::Ui, width: f32) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 8.0), egui::Sense::drag());
+
+    let color = if response.dragged() {
+        egui::Color32::from_gray(180)
+    } else if response.hovered() {
+        egui::Color32::from_gray(140)
+    } else {
+        egui::Color32::from_gray(80)
+    };
+
+    ui.painter().rect_filled(
+        egui::Rect::from_center_size(rect.center(), egui::vec2(width, 2.0)),
+        0.0,
+        color,
+    );
+
+    if response.hovered() || response.dragged() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeVertical);
+    }
+
+    response
+}
+
 fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let available_height = ui.available_height();
+    let available_width = ui.available_width();
+
+    // Calculate heights based on ratio
+    let header_height = 30.0; // Space for "Clips" heading
+    let button_height = 30.0; // Space for "+ New Clip" button
+    let bottom_section_min = 60.0; // Minimum height for default state section
+    let separator_height = 8.0;
+
+    let content_height = available_height - header_height - button_height - separator_height;
+    let clip_list_height = (content_height * ui_state.animation.clip_list_ratio)
+        .max(50.0)
+        .min(content_height - bottom_section_min);
+    let bottom_height = content_height - clip_list_height;
+
     ui.heading("Clips");
 
     // Add new clip button
@@ -148,7 +231,7 @@ fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         ui_state.animation.show_new_clip_dialog = true;
     }
 
-    ui.separator();
+    ui.add_space(4.0);
 
     // Collect clip info to avoid borrow issues
     let clip_info: Vec<_> = ui_state
@@ -170,6 +253,7 @@ fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     egui::ScrollArea::vertical()
         .id_salt("anim_clip_list")
         .auto_shrink([false, false])
+        .max_height(clip_list_height)
         .show(ui, |ui| {
             for (idx, state, frame_count, is_selected, is_default) in &clip_info {
                 ui.horizontal(|ui| {
@@ -200,55 +284,89 @@ fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         ui_state.animation.authoring.delete_clip(idx);
     }
 
-    ui.separator();
+    // Draggable separator between clip list and default state
+    let sep_response = render_horizontal_separator(ui, available_width);
+    if sep_response.dragged() {
+        let delta_ratio = sep_response.drag_delta().y / content_height;
+        ui_state.animation.clip_list_ratio =
+            (ui_state.animation.clip_list_ratio + delta_ratio).clamp(0.2, 0.9);
+    }
 
     // Default state selector
-    if !ui_state.animation.authoring.clips.is_empty() {
-        ui.label("Default State:");
-        let clip_states: Vec<String> = ui_state
-            .animation
-            .authoring
-            .clips
-            .iter()
-            .map(|c| c.state.clone())
-            .collect();
+    ui.allocate_ui_with_layout(
+        egui::vec2(available_width, bottom_height),
+        egui::Layout::top_down(egui::Align::LEFT),
+        |ui| {
+            if !ui_state.animation.authoring.clips.is_empty() {
+                ui.label("Default State:");
+                let clip_states: Vec<String> = ui_state
+                    .animation
+                    .authoring
+                    .clips
+                    .iter()
+                    .map(|c| c.state.clone())
+                    .collect();
 
-        let mut default_state = ui_state.animation.authoring.default_state.clone();
-        egui::ComboBox::from_id_salt("anim_default_state")
-            .selected_text(&default_state)
-            .show_ui(ui, |ui| {
-                for state in &clip_states {
-                    if ui
-                        .selectable_value(&mut default_state, state.clone(), state)
-                        .changed()
-                    {
-                        ui_state.animation.authoring.default_state = default_state.clone();
-                        ui_state.animation.authoring.dirty = true;
-                    }
-                }
-            });
-    }
+                let mut default_state = ui_state.animation.authoring.default_state.clone();
+                egui::ComboBox::from_id_salt("anim_default_state")
+                    .selected_text(&default_state)
+                    .show_ui(ui, |ui| {
+                        for state in &clip_states {
+                            if ui
+                                .selectable_value(&mut default_state, state.clone(), state)
+                                .changed()
+                            {
+                                ui_state.animation.authoring.default_state = default_state.clone();
+                                ui_state.animation.authoring.dirty = true;
+                            }
+                        }
+                    });
+            }
+        },
+    );
 }
 
 fn render_center_panel(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::Context) {
-    // Preview controls at top
+    let available_width = ui.available_width();
+    let available_height = ui.available_height();
+
+    // Preview controls at top (fixed height)
     render_preview_controls(ui, ui_state, ctx);
 
-    ui.separator();
+    // Get preview height from state
+    let preview_height = ui_state.animation.preview_height;
+    let separator_height = 8.0;
+    let atlas_header_height = 30.0;
 
-    // Preview area
-    let preview_height = 150.0;
+    // Preview area with stored height
     ui.group(|ui| {
         ui.set_min_height(preview_height);
+        ui.set_max_height(preview_height);
         render_preview_area(ui, ui_state);
     });
 
-    ui.separator();
+    // Draggable separator between preview and atlas
+    let sep_response = render_horizontal_separator(ui, available_width);
+    if sep_response.dragged() {
+        ui_state.animation.preview_height = (ui_state.animation.preview_height
+            + sep_response.drag_delta().y)
+            .clamp(100.0, available_height - 150.0);
+    }
 
     // Atlas grid (for selecting frames)
     ui.heading("Atlas");
 
-    render_atlas_grid(ui, ui_state, ctx);
+    // Calculate remaining height for atlas
+    let controls_height = ui.min_rect().height();
+    let remaining = (available_height - controls_height - preview_height - separator_height - atlas_header_height).max(100.0);
+
+    ui.allocate_ui_with_layout(
+        egui::vec2(available_width, remaining),
+        egui::Layout::top_down(egui::Align::LEFT),
+        |ui| {
+            render_atlas_grid(ui, ui_state, ctx);
+        },
+    );
 }
 
 fn render_preview_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::Context) {
