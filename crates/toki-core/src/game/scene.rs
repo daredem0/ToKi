@@ -258,6 +258,12 @@ impl GameState {
         &mut self.entity_manager
     }
 
+    /// Set the player entity ID directly (for testing purposes).
+    #[cfg(test)]
+    pub fn set_player_id(&mut self, id: EntityId) {
+        self.player_id = Some(id);
+    }
+
     /// Get access to the scene manager
     pub fn scene_manager(&self) -> &SceneManager {
         &self.scene_manager

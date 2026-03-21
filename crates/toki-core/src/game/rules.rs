@@ -174,6 +174,45 @@ impl GameState {
         self.rules.rules.push(rule);
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // UNIFIED RULE EVALUATION HELPERS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Collects matching rules after applying trigger-specific filtering.
+    ///
+    /// This extracts the common filter-sort pattern shared by collision, damage,
+    /// death, and interaction rule evaluation. The caller provides a predicate
+    /// that implements trigger-specific matching (e.g., OnCollision with entity filter).
+    ///
+    /// Returns rules sorted by priority (highest first), then by ID for stability.
+    fn collect_filtered_rules<F>(&self, rule_filter: F) -> Vec<Rule>
+    where
+        F: Fn(&Rule) -> bool,
+    {
+        let mut matching_rules = self
+            .rules
+            .rules
+            .iter()
+            .filter(|rule| rule.enabled)
+            .filter(|rule| rule_filter(rule))
+            .filter(|rule| {
+                !(rule.once
+                    && self
+                        .rule_runtime
+                        .fired_once_rules
+                        .contains(rule.id.as_str()))
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+
+        matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+        matching_rules
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // RULE COMMAND COLLECTION METHODS
+    // ═══════════════════════════════════════════════════════════════════════════
+
     /// Collects rule commands for a trigger without context.
     /// Use `collect_rule_commands_for_trigger_with_context` for triggers that provide context.
     pub(super) fn collect_rule_commands_for_trigger(
@@ -258,33 +297,18 @@ impl GameState {
     ) {
         let context = TriggerContext::with_pair(event.interactor, event.interactable);
 
-        let mut matching_rules = self
-            .rules
-            .rules
-            .iter()
-            .filter(|rule| rule.enabled)
-            .filter(|rule| matches!(rule.trigger, RuleTrigger::OnInteract { .. }))
-            .filter(|rule| {
-                !(rule.once
-                    && self
-                        .rule_runtime
-                        .fired_once_rules
-                        .contains(rule.id.as_str()))
-            })
-            .filter(|rule| {
-                // Check if the rule's interaction mode matches the event's spatial
-                let mode = rule.trigger.interaction_mode().unwrap_or_default();
-                Self::interaction_mode_matches(mode, event.spatial)
-            })
-            .filter(|rule| {
-                // Check if entity filter matches the interactable
-                let entity_filter = rule.trigger.interact_entity_filter();
-                self.entity_filter_matches(entity_filter, event.interactable, &context)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-
-        matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+        let matching_rules = self.collect_filtered_rules(|rule| {
+            if !matches!(rule.trigger, RuleTrigger::OnInteract { .. }) {
+                return false;
+            }
+            let mode = rule.trigger.interaction_mode().unwrap_or_default();
+            Self::interaction_mode_matches(mode, event.spatial)
+                && self.entity_filter_matches(
+                    rule.trigger.interact_entity_filter(),
+                    event.interactable,
+                    &context,
+                )
+        });
 
         for rule in matching_rules {
             let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
@@ -350,28 +374,14 @@ impl GameState {
             TriggerContext::with_self_only(event.entity_a)
         };
 
-        let mut matching_rules = self
-            .rules
-            .rules
-            .iter()
-            .filter(|rule| rule.enabled)
-            .filter(|rule| matches!(rule.trigger, RuleTrigger::OnCollision { .. }))
-            .filter(|rule| {
-                !(rule.once
-                    && self
-                        .rule_runtime
-                        .fired_once_rules
-                        .contains(rule.id.as_str()))
-            })
-            .filter(|rule| {
-                // Check if entity filter matches entity_a (the colliding entity)
-                let entity_filter = rule.trigger.collision_entity_filter();
-                self.entity_filter_matches(entity_filter, event.entity_a, &context)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-
-        matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+        let matching_rules = self.collect_filtered_rules(|rule| {
+            matches!(rule.trigger, RuleTrigger::OnCollision { .. })
+                && self.entity_filter_matches(
+                    rule.trigger.collision_entity_filter(),
+                    event.entity_a,
+                    &context,
+                )
+        });
 
         for rule in matching_rules {
             let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
@@ -431,28 +441,14 @@ impl GameState {
             TriggerContext::with_self_only(event.victim)
         };
 
-        let mut matching_rules = self
-            .rules
-            .rules
-            .iter()
-            .filter(|rule| rule.enabled)
-            .filter(|rule| matches!(rule.trigger, RuleTrigger::OnDamaged { .. }))
-            .filter(|rule| {
-                !(rule.once
-                    && self
-                        .rule_runtime
-                        .fired_once_rules
-                        .contains(rule.id.as_str()))
-            })
-            .filter(|rule| {
-                // Check if entity filter matches the victim
-                let entity_filter = rule.trigger.damaged_entity_filter();
-                self.entity_filter_matches(entity_filter, event.victim, &context)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-
-        matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+        let matching_rules = self.collect_filtered_rules(|rule| {
+            matches!(rule.trigger, RuleTrigger::OnDamaged { .. })
+                && self.entity_filter_matches(
+                    rule.trigger.damaged_entity_filter(),
+                    event.victim,
+                    &context,
+                )
+        });
 
         for rule in matching_rules {
             let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
@@ -514,28 +510,14 @@ impl GameState {
             TriggerContext::with_self_only(event.victim)
         };
 
-        let mut matching_rules = self
-            .rules
-            .rules
-            .iter()
-            .filter(|rule| rule.enabled)
-            .filter(|rule| matches!(rule.trigger, RuleTrigger::OnDeath { .. }))
-            .filter(|rule| {
-                !(rule.once
-                    && self
-                        .rule_runtime
-                        .fired_once_rules
-                        .contains(rule.id.as_str()))
-            })
-            .filter(|rule| {
-                // Check if entity filter matches the victim
-                let entity_filter = rule.trigger.death_entity_filter();
-                self.entity_filter_matches(entity_filter, event.victim, &context)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-
-        matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+        let matching_rules = self.collect_filtered_rules(|rule| {
+            matches!(rule.trigger, RuleTrigger::OnDeath { .. })
+                && self.entity_filter_matches(
+                    rule.trigger.death_entity_filter(),
+                    event.victim,
+                    &context,
+                )
+        });
 
         for rule in matching_rules {
             let conditions_result = self.rule_conditions_match(&rule.conditions, &context);

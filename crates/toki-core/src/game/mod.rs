@@ -20,6 +20,9 @@ mod render_queries;
 mod rules;
 mod scene;
 
+#[cfg(test)]
+mod rules_tests;
+
 /// Default timestep in milliseconds for fixed 60 FPS game logic.
 /// Used as the baseline for delta time scaling.
 pub const DEFAULT_TIMESTEP_MS: f32 = 16.667;
