@@ -85,17 +85,17 @@ fn write_player_definition(project_path: &std::path::Path, name: &str) {
                     state: "idle_down".to_string(),
                     frame_tiles: vec!["idle".to_string()],
                     frame_positions: None,
-                        frame_duration_ms: 300.0,
+                    frame_duration_ms: 300.0,
                     frame_durations_ms: None,
-                        loop_mode: "loop".to_string(),
+                    loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "idle_right".to_string(),
                     frame_tiles: vec!["idle".to_string()],
                     frame_positions: None,
-                        frame_duration_ms: 300.0,
+                    frame_duration_ms: 300.0,
                     frame_durations_ms: None,
-                        loop_mode: "loop".to_string(),
+                    loop_mode: "loop".to_string(),
                 },
             ],
             default_state: "idle_down".to_string(),
@@ -607,7 +607,10 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
     .expect("scene");
 
     fs::write(
-        project_dir.join("assets").join("sprites").join("creatures.json"),
+        project_dir
+            .join("assets")
+            .join("sprites")
+            .join("creatures.json"),
         r#"{
   "image": "creatures.png",
   "tile_size": [16, 16],
@@ -616,7 +619,10 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
     )
     .expect("creatures atlas");
     fs::write(
-        project_dir.join("assets").join("tilemaps").join("demo_map.json"),
+        project_dir
+            .join("assets")
+            .join("tilemaps")
+            .join("demo_map.json"),
         r#"{
   "size": [1, 1],
   "tile_size": [16, 16],
@@ -626,7 +632,10 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
     )
     .expect("tilemap");
     fs::write(
-        project_dir.join("assets").join("tilemaps").join("terrain.json"),
+        project_dir
+            .join("assets")
+            .join("tilemaps")
+            .join("terrain.json"),
         r#"{
   "image": "terrain.png",
   "tile_size": [16, 16],
@@ -756,7 +765,10 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
     .expect("write second scene");
 
     fs::write(
-        project_dir.join("assets").join("sprites").join("creatures.json"),
+        project_dir
+            .join("assets")
+            .join("sprites")
+            .join("creatures.json"),
         r#"{
   "image": "creatures.png",
   "tile_size": [16, 16],
@@ -765,7 +777,10 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
     )
     .expect("creatures atlas");
     fs::write(
-        project_dir.join("assets").join("tilemaps").join("demo_map.json"),
+        project_dir
+            .join("assets")
+            .join("tilemaps")
+            .join("demo_map.json"),
         r#"{
   "size": [1, 1],
   "tile_size": [16, 16],
@@ -775,7 +790,10 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
     )
     .expect("tilemap");
     fs::write(
-        project_dir.join("assets").join("tilemaps").join("terrain.json"),
+        project_dir
+            .join("assets")
+            .join("tilemaps")
+            .join("terrain.json"),
         r#"{
   "image": "terrain.png",
   "tile_size": [16, 16],
@@ -843,7 +861,10 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
         )
         .expect("fade-in should start");
 
-    assert_eq!(game_state.scene_manager().active_scene_name(), Some("Second"));
+    assert_eq!(
+        game_state.scene_manager().active_scene_name(),
+        Some("Second")
+    );
     assert_eq!(game_state.player_position(), glam::IVec2::new(96, 48));
     assert!(transition.is_active());
 

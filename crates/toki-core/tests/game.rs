@@ -149,9 +149,9 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
                 state: "idle".to_string(),
                 frame_tiles: vec!["slime/idle_0".to_string()],
                 frame_positions: None,
-                        frame_duration_ms: 150.0,
+                frame_duration_ms: 150.0,
                 frame_durations_ms: None,
-                        loop_mode: "loop".to_string(),
+                loop_mode: "loop".to_string(),
             }],
             default_state: "idle".to_string(),
         },
@@ -206,33 +206,33 @@ fn player_definition(name: &str) -> EntityDefinition {
                     state: "idle_down".to_string(),
                     frame_tiles: vec!["player/walk_down_a".to_string()],
                     frame_positions: None,
-                        frame_duration_ms: 300.0,
+                    frame_duration_ms: 300.0,
                     frame_durations_ms: None,
-                        loop_mode: "loop".to_string(),
+                    loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "idle_up".to_string(),
                     frame_tiles: vec!["player/walk_up_a".to_string()],
                     frame_positions: None,
-                        frame_duration_ms: 300.0,
+                    frame_duration_ms: 300.0,
                     frame_durations_ms: None,
-                        loop_mode: "loop".to_string(),
+                    loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "idle_left".to_string(),
                     frame_tiles: vec!["player/walk_left_a".to_string()],
                     frame_positions: None,
-                        frame_duration_ms: 300.0,
+                    frame_duration_ms: 300.0,
                     frame_durations_ms: None,
-                        loop_mode: "loop".to_string(),
+                    loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "idle_right".to_string(),
                     frame_tiles: vec!["player/walk_right_a".to_string()],
                     frame_positions: None,
-                        frame_duration_ms: 300.0,
+                    frame_duration_ms: 300.0,
                     frame_durations_ms: None,
-                        loop_mode: "loop".to_string(),
+                    loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "walk_right".to_string(),
@@ -241,9 +241,9 @@ fn player_definition(name: &str) -> EntityDefinition {
                         "player/walk_right_b".to_string(),
                     ],
                     frame_positions: None,
-                        frame_duration_ms: 180.0,
+                    frame_duration_ms: 180.0,
                     frame_durations_ms: None,
-                        loop_mode: "loop".to_string(),
+                    loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "attack_right".to_string(),
@@ -252,9 +252,9 @@ fn player_definition(name: &str) -> EntityDefinition {
                         "player/attack_right_b".to_string(),
                     ],
                     frame_positions: None,
-                        frame_duration_ms: 180.0,
+                    frame_duration_ms: 180.0,
                     frame_durations_ms: None,
-                        loop_mode: "once".to_string(),
+                    loop_mode: "once".to_string(),
                 },
             ],
             default_state: "idle_down".to_string(),
@@ -1994,9 +1994,8 @@ fn game_state_only_updates_npcs_with_wander_ai() {
 
     let mut game_state = GameState::new_empty();
     let mut wandering_npc = test_definition("wandering_npc", "creature");
-    wandering_npc.attributes.ai_config = toki_core::entity::AiConfig::from_legacy_behavior(
-        toki_core::entity::AiBehavior::Wander,
-    );
+    wandering_npc.attributes.ai_config =
+        toki_core::entity::AiConfig::from_legacy_behavior(toki_core::entity::AiBehavior::Wander);
     let wandering_npc_id = game_state
         .entity_manager_mut()
         .spawn_from_definition(&wandering_npc, IVec2::new(32, 32))

@@ -176,7 +176,11 @@ fn render_toolbar(
                 crate::ui::editor_ui::CanvasSide::Right => "Right",
             };
             ui.label(format!("Active: {}", active_label));
-            if ui.button("Switch").on_hover_text("Switch active canvas").clicked() {
+            if ui
+                .button("Switch")
+                .on_hover_text("Switch active canvas")
+                .clicked()
+            {
                 ui_state.sprite.switch_active_canvas();
             }
         }
@@ -846,7 +850,12 @@ fn render_dual_viewports_horizontal(
         ui.vertical(|ui| {
             ui.set_width(left_width);
             render_canvas_panel_header(ui, ui_state, CanvasSide::Left);
-            if ui_state.sprite.canvas_state(CanvasSide::Left).canvas.is_some() {
+            if ui_state
+                .sprite
+                .canvas_state(CanvasSide::Left)
+                .canvas
+                .is_some()
+            {
                 render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Left));
             } else {
                 render_empty_canvas_slot(ui, ui_state, sprites_dir, CanvasSide::Left);
@@ -865,7 +874,12 @@ fn render_dual_viewports_horizontal(
         ui.vertical(|ui| {
             ui.set_width(right_width);
             render_canvas_panel_header(ui, ui_state, CanvasSide::Right);
-            if ui_state.sprite.canvas_state(CanvasSide::Right).canvas.is_some() {
+            if ui_state
+                .sprite
+                .canvas_state(CanvasSide::Right)
+                .canvas
+                .is_some()
+            {
                 render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Right));
             } else {
                 render_empty_canvas_slot(ui, ui_state, sprites_dir, CanvasSide::Right);
@@ -894,7 +908,12 @@ fn render_dual_viewports_vertical(
     ui.vertical(|ui| {
         ui.set_height(top_height);
         render_canvas_panel_header(ui, ui_state, CanvasSide::Left);
-        if ui_state.sprite.canvas_state(CanvasSide::Left).canvas.is_some() {
+        if ui_state
+            .sprite
+            .canvas_state(CanvasSide::Left)
+            .canvas
+            .is_some()
+        {
             render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Left));
         } else {
             render_empty_canvas_slot(ui, ui_state, sprites_dir, CanvasSide::Left);
@@ -913,7 +932,12 @@ fn render_dual_viewports_vertical(
     ui.vertical(|ui| {
         ui.set_height(bottom_height);
         render_canvas_panel_header(ui, ui_state, CanvasSide::Right);
-        if ui_state.sprite.canvas_state(CanvasSide::Right).canvas.is_some() {
+        if ui_state
+            .sprite
+            .canvas_state(CanvasSide::Right)
+            .canvas
+            .is_some()
+        {
             render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Right));
         } else {
             render_empty_canvas_slot(ui, ui_state, sprites_dir, CanvasSide::Right);
@@ -923,10 +947,8 @@ fn render_dual_viewports_vertical(
 
 /// Render a vertical splitter (for horizontal layout - splits left/right)
 fn render_vertical_splitter(ui: &mut egui::Ui, height: f32) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(
-        egui::vec2(8.0, height),
-        egui::Sense::click_and_drag(),
-    );
+    let (rect, response) =
+        ui.allocate_exact_size(egui::vec2(8.0, height), egui::Sense::click_and_drag());
 
     // Change cursor on hover
     if response.hovered() || response.dragged() {
@@ -944,7 +966,10 @@ fn render_vertical_splitter(ui: &mut egui::Ui, height: f32) -> egui::Response {
     // Draw a thin line in the center
     let center_x = rect.center().x;
     painter.line_segment(
-        [egui::pos2(center_x, rect.top()), egui::pos2(center_x, rect.bottom())],
+        [
+            egui::pos2(center_x, rect.top()),
+            egui::pos2(center_x, rect.bottom()),
+        ],
         egui::Stroke::new(2.0, color),
     );
 
@@ -953,10 +978,8 @@ fn render_vertical_splitter(ui: &mut egui::Ui, height: f32) -> egui::Response {
 
 /// Render a horizontal splitter (for vertical layout - splits top/bottom)
 fn render_horizontal_splitter(ui: &mut egui::Ui, width: f32) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(
-        egui::vec2(width, 8.0),
-        egui::Sense::click_and_drag(),
-    );
+    let (rect, response) =
+        ui.allocate_exact_size(egui::vec2(width, 8.0), egui::Sense::click_and_drag());
 
     // Change cursor on hover
     if response.hovered() || response.dragged() {
@@ -974,7 +997,10 @@ fn render_horizontal_splitter(ui: &mut egui::Ui, width: f32) -> egui::Response {
     // Draw a thin line in the center
     let center_y = rect.center().y;
     painter.line_segment(
-        [egui::pos2(rect.left(), center_y), egui::pos2(rect.right(), center_y)],
+        [
+            egui::pos2(rect.left(), center_y),
+            egui::pos2(rect.right(), center_y),
+        ],
         egui::Stroke::new(2.0, color),
     );
 
@@ -1015,7 +1041,10 @@ fn render_empty_canvas_slot(
                 ui_state.begin_new_sprite_canvas_dialog();
             }
             let load_enabled = sprites_dir.is_some();
-            if ui.add_enabled(load_enabled, egui::Button::new("Load")).clicked() {
+            if ui
+                .add_enabled(load_enabled, egui::Button::new("Load"))
+                .clicked()
+            {
                 if let Some(dir) = sprites_dir {
                     ui_state.sprite.set_active_canvas(side);
                     ui_state.sprite.begin_load_dialog(dir);
@@ -1052,7 +1081,8 @@ fn render_canvas_viewport(
     }
 
     // Check if this viewport is the one being interacted with
-    let is_interactive = target_side.is_none() || target_side == Some(ui_state.sprite.active_canvas);
+    let is_interactive =
+        target_side.is_none() || target_side == Some(ui_state.sprite.active_canvas);
 
     // Handle pan with right-click drag or middle-click drag (only for this canvas)
     if response.dragged_by(egui::PointerButton::Secondary)
@@ -1071,9 +1101,17 @@ fn render_canvas_viewport(
         let scroll_delta = ui.input(|input| input.smooth_scroll_delta.y);
         if scroll_delta != 0.0 {
             if scroll_delta > 0.0 {
-                ui_state.sprite.canvas_state_mut(render_side).viewport.zoom_in();
+                ui_state
+                    .sprite
+                    .canvas_state_mut(render_side)
+                    .viewport
+                    .zoom_in();
             } else {
-                ui_state.sprite.canvas_state_mut(render_side).viewport.zoom_out();
+                ui_state
+                    .sprite
+                    .canvas_state_mut(render_side)
+                    .viewport
+                    .zoom_out();
             }
         }
     }
@@ -1104,12 +1142,18 @@ fn render_canvas_viewport(
             .canvas_state(render_side)
             .viewport
             .screen_to_canvas(glam::Vec2::new(hover_pos.x, hover_pos.y), rect);
-        ui_state.sprite.canvas_state_mut(render_side).cursor_canvas_pos = Some(glam::IVec2::new(
+        ui_state
+            .sprite
+            .canvas_state_mut(render_side)
+            .cursor_canvas_pos = Some(glam::IVec2::new(
             canvas_pos.x.floor() as i32,
             canvas_pos.y.floor() as i32,
         ));
     } else {
-        ui_state.sprite.canvas_state_mut(render_side).cursor_canvas_pos = None;
+        ui_state
+            .sprite
+            .canvas_state_mut(render_side)
+            .cursor_canvas_pos = None;
     }
 
     // Handle tool interactions (only for active canvas)
@@ -1267,11 +1311,7 @@ fn draw_checkerboard(
     }
 }
 
-fn ensure_canvas_texture_for_side(
-    ui_state: &mut EditorUI,
-    ctx: &egui::Context,
-    side: CanvasSide,
-) {
+fn ensure_canvas_texture_for_side(ui_state: &mut EditorUI, ctx: &egui::Context, side: CanvasSide) {
     // Check if we already have a valid texture for this side
     if ui_state.sprite.canvas_state(side).canvas_texture.is_some() {
         return;
@@ -1480,7 +1520,10 @@ fn render_status_bar(ui: &mut egui::Ui, ui_state: &EditorUI) {
         ui.separator();
 
         // Zoom level
-        ui.label(format!("Zoom: {}x", ui_state.sprite.active().viewport.zoom as i32));
+        ui.label(format!(
+            "Zoom: {}x",
+            ui_state.sprite.active().viewport.zoom as i32
+        ));
 
         ui.separator();
 
@@ -1722,8 +1765,7 @@ fn create_selection(start: glam::IVec2, end: glam::IVec2) -> crate::ui::editor_u
 fn start_paint_stroke(ui_state: &mut EditorUI) {
     if !ui_state.sprite.active().is_painting {
         ui_state.sprite.active_mut().is_painting = true;
-        ui_state.sprite.active_mut().canvas_before_stroke =
-            ui_state.sprite.active().canvas.clone();
+        ui_state.sprite.active_mut().canvas_before_stroke = ui_state.sprite.active().canvas.clone();
     }
 }
 
@@ -1885,8 +1927,10 @@ fn handle_copy_paste_shortcuts(ui_state: &mut EditorUI, ctx: &egui::Context) {
         // If no cursor position on the target canvas, use (0, 0) as fallback
         if cursor_pos.is_none() {
             tracing::info!("No cursor position, using (0, 0) fallback");
-            ui_state.sprite.canvas_state_mut(paste_side).cursor_canvas_pos =
-                Some(glam::IVec2::new(0, 0));
+            ui_state
+                .sprite
+                .canvas_state_mut(paste_side)
+                .cursor_canvas_pos = Some(glam::IVec2::new(0, 0));
         }
 
         if ui_state.sprite.paste_at_cursor(paste_side) {

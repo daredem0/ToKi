@@ -11,9 +11,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use toki_core::entity::{
-    AiBehavior, AiConfig, AnimationsDef, AttributesDef, AudioDef, CollisionDef,
-    EntityDefinition, MovementProfile, MovementSoundTrigger, PickupDef,
-    PrimaryProjectileDef, RenderingDef,
+    AiBehavior, AiConfig, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
+    MovementProfile, MovementSoundTrigger, PickupDef, PrimaryProjectileDef, RenderingDef,
 };
 
 /// Predefined entity categories for v1
@@ -111,7 +110,10 @@ impl EntitySummary {
         }
         let query_lower = query.to_ascii_lowercase();
         self.name.to_ascii_lowercase().contains(&query_lower)
-            || self.display_name.to_ascii_lowercase().contains(&query_lower)
+            || self
+                .display_name
+                .to_ascii_lowercase()
+                .contains(&query_lower)
     }
 
     /// Check if this entity matches a category filter
@@ -243,10 +245,7 @@ impl NewEntityDialogState {
         }
 
         // Name must be unique
-        if existing_names
-            .iter()
-            .any(|n| n.eq_ignore_ascii_case(name))
-        {
+        if existing_names.iter().any(|n| n.eq_ignore_ascii_case(name)) {
             self.error_message = Some("An entity with this name already exists".to_string());
             return false;
         }
@@ -507,8 +506,10 @@ impl EntityEditState {
         if self.toggles.health_enabled {
             if let Some(health) = self.definition.attributes.health {
                 if health == 0 {
-                    self.validation_errors
-                        .insert("health".to_string(), "Health must be greater than zero".to_string());
+                    self.validation_errors.insert(
+                        "health".to_string(),
+                        "Health must be greater than zero".to_string(),
+                    );
                 }
             }
         }
@@ -563,7 +564,11 @@ fn default_pickup_def() -> PickupDef {
 }
 
 /// Create a default entity definition with sensible defaults
-pub fn create_default_definition(name: &str, display_name: &str, category: &str) -> EntityDefinition {
+pub fn create_default_definition(
+    name: &str,
+    display_name: &str,
+    category: &str,
+) -> EntityDefinition {
     EntityDefinition {
         name: name.to_string(),
         display_name: display_name.to_string(),
@@ -785,8 +790,14 @@ mod tests {
     fn category_from_str_handles_common_cases() {
         assert_eq!(EntityCategory::from_str("npc"), Some(EntityCategory::Npc));
         assert_eq!(EntityCategory::from_str("NPC"), Some(EntityCategory::Npc));
-        assert_eq!(EntityCategory::from_str("enemy"), Some(EntityCategory::Enemy));
-        assert_eq!(EntityCategory::from_str("items"), Some(EntityCategory::Item));
+        assert_eq!(
+            EntityCategory::from_str("enemy"),
+            Some(EntityCategory::Enemy)
+        );
+        assert_eq!(
+            EntityCategory::from_str("items"),
+            Some(EntityCategory::Item)
+        );
         assert_eq!(EntityCategory::from_str("unknown"), None);
     }
 
@@ -803,7 +814,12 @@ mod tests {
 
     // === EntitySummary Tests ===
 
-    fn make_test_summary(name: &str, display_name: &str, category: &str, tags: Vec<&str>) -> EntitySummary {
+    fn make_test_summary(
+        name: &str,
+        display_name: &str,
+        category: &str,
+        tags: Vec<&str>,
+    ) -> EntitySummary {
         EntitySummary {
             name: name.to_string(),
             display_name: display_name.to_string(),
@@ -994,7 +1010,11 @@ mod tests {
 
         let existing = vec!["goblin".to_string(), "orc".to_string()];
         assert!(!dialog.validate(&existing));
-        assert!(dialog.error_message.as_ref().unwrap().contains("already exists"));
+        assert!(dialog
+            .error_message
+            .as_ref()
+            .unwrap()
+            .contains("already exists"));
     }
 
     #[test]
@@ -1021,7 +1041,9 @@ mod tests {
     #[test]
     fn editor_state_select_entity() {
         let mut state = EntityEditorState::new();
-        state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
+        state
+            .entities
+            .push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
 
         state.select_entity("goblin");
         assert!(state.has_entity());
@@ -1038,7 +1060,9 @@ mod tests {
     #[test]
     fn editor_state_clear_selection() {
         let mut state = EntityEditorState::new();
-        state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
+        state
+            .entities
+            .push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
         let def = create_default_definition("goblin", "Goblin", "enemy");
         state.load_for_editing(def, PathBuf::from("/test/goblin.json"));
 
@@ -1050,8 +1074,18 @@ mod tests {
     #[test]
     fn editor_state_filtered_entities() {
         let mut state = EntityEditorState::new();
-        state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec!["hostile"]));
-        state.entities.push(make_test_summary("villager", "Villager", "npc", vec!["friendly"]));
+        state.entities.push(make_test_summary(
+            "goblin",
+            "Goblin",
+            "enemy",
+            vec!["hostile"],
+        ));
+        state.entities.push(make_test_summary(
+            "villager",
+            "Villager",
+            "npc",
+            vec!["friendly"],
+        ));
 
         // No filter - all entities
         assert_eq!(state.filtered_entities().len(), 2);
@@ -1066,8 +1100,18 @@ mod tests {
     #[test]
     fn editor_state_all_tags() {
         let mut state = EntityEditorState::new();
-        state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec!["hostile", "forest"]));
-        state.entities.push(make_test_summary("orc", "Orc", "enemy", vec!["hostile", "mountain"]));
+        state.entities.push(make_test_summary(
+            "goblin",
+            "Goblin",
+            "enemy",
+            vec!["hostile", "forest"],
+        ));
+        state.entities.push(make_test_summary(
+            "orc",
+            "Orc",
+            "enemy",
+            vec!["hostile", "mountain"],
+        ));
 
         let tags = state.all_tags();
         assert_eq!(tags.len(), 3);
@@ -1089,8 +1133,12 @@ mod tests {
     #[test]
     fn editor_state_remove_entity() {
         let mut state = EntityEditorState::new();
-        state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
-        state.entities.push(make_test_summary("orc", "Orc", "enemy", vec![]));
+        state
+            .entities
+            .push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
+        state
+            .entities
+            .push(make_test_summary("orc", "Orc", "enemy", vec![]));
         state.selected_entity = Some("goblin".to_string());
 
         assert!(state.remove_entity("goblin"));
@@ -1103,8 +1151,12 @@ mod tests {
     #[test]
     fn editor_state_remove_entity_preserves_other_selection() {
         let mut state = EntityEditorState::new();
-        state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
-        state.entities.push(make_test_summary("orc", "Orc", "enemy", vec![]));
+        state
+            .entities
+            .push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
+        state
+            .entities
+            .push(make_test_summary("orc", "Orc", "enemy", vec![]));
         state.selected_entity = Some("orc".to_string());
 
         state.remove_entity("goblin");
@@ -1114,7 +1166,9 @@ mod tests {
     #[test]
     fn editor_state_clear() {
         let mut state = EntityEditorState::new();
-        state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
+        state
+            .entities
+            .push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
         let def = create_default_definition("goblin", "Goblin", "enemy");
         state.load_for_editing(def, PathBuf::from("/test/goblin.json"));
         state.filter.search_query = "test".to_string();
@@ -1322,7 +1376,12 @@ mod tests {
         assert!(state.toggles.projectile_enabled);
         assert!(state.definition.attributes.primary_projectile.is_some());
 
-        let proj = state.definition.attributes.primary_projectile.as_ref().unwrap();
+        let proj = state
+            .definition
+            .attributes
+            .primary_projectile
+            .as_ref()
+            .unwrap();
         assert_eq!(proj.damage, 10);
         assert_eq!(proj.speed, 200);
     }
@@ -1344,16 +1403,25 @@ mod tests {
     fn edit_state_toggle_ai() {
         let mut state = make_edit_state();
         assert!(!state.toggles.ai_enabled);
-        assert_eq!(state.definition.attributes.ai_config.behavior, AiBehavior::None);
+        assert_eq!(
+            state.definition.attributes.ai_config.behavior,
+            AiBehavior::None
+        );
 
         state.toggle_ai();
         assert!(state.toggles.ai_enabled);
-        assert_eq!(state.definition.attributes.ai_config.behavior, AiBehavior::Wander);
+        assert_eq!(
+            state.definition.attributes.ai_config.behavior,
+            AiBehavior::Wander
+        );
         assert_eq!(state.definition.attributes.ai_config.detection_radius, 128);
 
         state.toggle_ai();
         assert!(!state.toggles.ai_enabled);
-        assert_eq!(state.definition.attributes.ai_config.behavior, AiBehavior::None);
+        assert_eq!(
+            state.definition.attributes.ai_config.behavior,
+            AiBehavior::None
+        );
     }
 
     #[test]

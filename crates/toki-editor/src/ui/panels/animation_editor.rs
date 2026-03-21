@@ -109,7 +109,8 @@ fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
     let frame_sequence_width = ui_state.animation.frame_sequence_width;
     let separator_width = 8.0; // Width of draggable separator
     let center_width =
-        (available_width - clip_list_width - frame_sequence_width - separator_width * 2.0).max(200.0);
+        (available_width - clip_list_width - frame_sequence_width - separator_width * 2.0)
+            .max(200.0);
 
     ui.horizontal(|ui| {
         // Left panel: Clip list
@@ -124,9 +125,9 @@ fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
         // Draggable separator between clip list and center
         let sep_response = render_vertical_separator(ui, available_height);
         if sep_response.dragged() {
-            ui_state.animation.clip_list_width =
-                (ui_state.animation.clip_list_width + sep_response.drag_delta().x)
-                    .clamp(120.0, available_width * 0.4);
+            ui_state.animation.clip_list_width = (ui_state.animation.clip_list_width
+                + sep_response.drag_delta().x)
+                .clamp(120.0, available_width * 0.4);
         }
 
         // Center panel: Atlas grid and preview
@@ -142,9 +143,9 @@ fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
         let sep_response = render_vertical_separator(ui, available_height);
         if sep_response.dragged() {
             // Dragging right makes frame panel smaller
-            ui_state.animation.frame_sequence_width =
-                (ui_state.animation.frame_sequence_width - sep_response.drag_delta().x)
-                    .clamp(150.0, available_width * 0.4);
+            ui_state.animation.frame_sequence_width = (ui_state.animation.frame_sequence_width
+                - sep_response.drag_delta().x)
+                .clamp(150.0, available_width * 0.4);
         }
 
         // Right panel: Frame sequence
@@ -243,7 +244,13 @@ fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         .map(|(idx, clip)| {
             let is_selected = ui_state.animation.authoring.selected_clip_index == Some(idx);
             let is_default = clip.state == ui_state.animation.authoring.default_state;
-            (idx, clip.state.clone(), clip.frames.len(), is_selected, is_default)
+            (
+                idx,
+                clip.state.clone(),
+                clip.frames.len(),
+                is_selected,
+                is_default,
+            )
         })
         .collect();
 
@@ -476,7 +483,11 @@ fn render_preview_area(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         return;
     }
 
-    let current_frame_idx = ui_state.animation.preview.current_frame().min(clip.frames.len() - 1);
+    let current_frame_idx = ui_state
+        .animation
+        .preview
+        .current_frame()
+        .min(clip.frames.len() - 1);
     let frame = &clip.frames[current_frame_idx];
     let frame_duration = clip.frame_duration_at(current_frame_idx);
     let frame_progress = ui_state.animation.preview.frame_progress(&clip);
@@ -500,8 +511,7 @@ fn render_preview_area(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 
         // Frame progress bar (compact, only when playing)
         if ui_state.animation.is_playing() {
-            let progress_bar = egui::ProgressBar::new(frame_progress)
-                .desired_width(60.0);
+            let progress_bar = egui::ProgressBar::new(frame_progress).desired_width(60.0);
             ui.add(progress_bar);
         }
     });
@@ -513,7 +523,13 @@ fn render_preview_area(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     let remaining_width = available.x;
 
     // Try to render actual sprite frame from atlas texture
-    let rendered = render_sprite_frame_scaled(ui, ui_state, frame.position, remaining_width, remaining_height);
+    let rendered = render_sprite_frame_scaled(
+        ui,
+        ui_state,
+        frame.position,
+        remaining_width,
+        remaining_height,
+    );
 
     if !rendered {
         // Fallback to placeholder if texture not available
@@ -606,11 +622,9 @@ fn draw_checkered_background(painter: &egui::Painter, rect: egui::Rect) {
             let color = if (row + col) % 2 == 0 { light } else { dark };
             let x = rect.left() + col as f32 * check_size;
             let y = rect.top() + row as f32 * check_size;
-            let cell_rect = egui::Rect::from_min_size(
-                egui::pos2(x, y),
-                egui::vec2(check_size, check_size),
-            )
-            .intersect(rect);
+            let cell_rect =
+                egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(check_size, check_size))
+                    .intersect(rect);
             painter.rect_filled(cell_rect, 0.0, color);
         }
     }
@@ -746,7 +760,10 @@ fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::Con
     );
 
     // Draw cell grid overlay
-    let grid_stroke = egui::Stroke::new(1.0, egui::Color32::from_rgba_unmultiplied(255, 200, 50, 150));
+    let grid_stroke = egui::Stroke::new(
+        1.0,
+        egui::Color32::from_rgba_unmultiplied(255, 200, 50, 150),
+    );
 
     // Vertical lines
     for col in 0..=cols {
@@ -875,14 +892,14 @@ fn ensure_atlas_texture(ui_state: &mut EditorUI, ctx: &egui::Context) {
         &decoded.data,
     );
 
-    let texture = ctx.load_texture("animation_editor_atlas", color_image, egui::TextureOptions::NEAREST);
+    let texture = ctx.load_texture(
+        "animation_editor_atlas",
+        color_image,
+        egui::TextureOptions::NEAREST,
+    );
     ui_state.animation.atlas_texture = Some(texture);
 
-    tracing::info!(
-        "Loaded atlas texture: {}x{}",
-        decoded.width,
-        decoded.height
-    );
+    tracing::info!("Loaded atlas texture: {}x{}", decoded.width, decoded.height);
 }
 
 fn render_frame_sequence(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
@@ -899,7 +916,9 @@ fn render_frame_sequence(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 
     // Clip settings - get values first to avoid borrow issues
     let current_duration = ui_state.animation.authoring.clips[clip_idx].default_duration_ms;
-    let current_loop_mode = ui_state.animation.authoring.clips[clip_idx].loop_mode.clone();
+    let current_loop_mode = ui_state.animation.authoring.clips[clip_idx]
+        .loop_mode
+        .clone();
 
     ui.horizontal(|ui| {
         ui.label("Duration (ms):");
@@ -954,9 +973,16 @@ fn render_frame_sequence(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 .iter()
                 .enumerate()
                 .map(|(idx, frame)| {
-                    let is_selected = ui_state.animation.authoring.selected_frame_index == Some(idx);
+                    let is_selected =
+                        ui_state.animation.authoring.selected_frame_index == Some(idx);
                     let is_preview = ui_state.animation.preview.current_frame() == idx;
-                    (idx, frame.position, frame.duration_ms, is_selected, is_preview)
+                    (
+                        idx,
+                        frame.position,
+                        frame.duration_ms,
+                        is_selected,
+                        is_preview,
+                    )
                 })
                 .collect()
         })
@@ -1049,7 +1075,9 @@ fn render_frame_sequence(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 }
 
 fn load_entity(ui_state: &mut EditorUI, project_path: &Path, entity_name: &str) {
-    let file_path = project_path.join("entities").join(format!("{}.json", entity_name));
+    let file_path = project_path
+        .join("entities")
+        .join(format!("{}.json", entity_name));
 
     let Ok(content) = std::fs::read_to_string(&file_path) else {
         tracing::error!("Failed to read entity file: {:?}", file_path);
@@ -1099,7 +1127,10 @@ fn load_atlas_info(project_path: &Path, atlas_name: &str) -> Option<(glam::UVec2
         format!("{}.json", atlas_name)
     };
 
-    let atlas_path = project_path.join("assets").join("sprites").join(&atlas_filename);
+    let atlas_path = project_path
+        .join("assets")
+        .join("sprites")
+        .join(&atlas_filename);
     let atlas = toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_path).ok()?;
 
     // Get PNG path relative to atlas JSON
@@ -1125,7 +1156,10 @@ fn load_atlas_tile_lookup(
     };
 
     // Atlas files are in assets/sprites/
-    let atlas_path = project_path.join("assets").join("sprites").join(&atlas_filename);
+    let atlas_path = project_path
+        .join("assets")
+        .join("sprites")
+        .join(&atlas_filename);
 
     // Use AtlasMeta from toki-core to load and parse the atlas
     let atlas = toki_core::assets::atlas::AtlasMeta::load_from_file(&atlas_path).ok()?;
@@ -1154,7 +1188,10 @@ fn save_current_entity(ui_state: &mut EditorUI) {
     let Ok(mut definition): Result<toki_core::entity::EntityDefinition, _> =
         serde_json::from_str(&content)
     else {
-        tracing::error!("Failed to parse entity definition for saving: {:?}", file_path);
+        tracing::error!(
+            "Failed to parse entity definition for saving: {:?}",
+            file_path
+        );
         return;
     };
 

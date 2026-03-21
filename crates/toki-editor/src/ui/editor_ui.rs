@@ -7,8 +7,14 @@ use crate::project::ProjectTemplateKind;
 use crate::project::SceneGraphLayout;
 use crate::scene::SceneViewport;
 
+#[path = "editor_ui_animation_authoring.rs"]
+mod editor_ui_animation_authoring;
+#[path = "editor_ui_animation_editor.rs"]
+mod editor_ui_animation_editor;
 #[path = "editor_ui_asset_palette.rs"]
 mod editor_ui_asset_palette;
+#[path = "editor_ui_entity_editor.rs"]
+mod editor_ui_entity_editor;
 #[path = "editor_ui_graph.rs"]
 mod editor_ui_graph;
 #[path = "editor_ui_hierarchy_panel.rs"]
@@ -21,12 +27,6 @@ mod editor_ui_menu_editor;
 mod editor_ui_scene_tree;
 #[path = "editor_ui_sprite_editor.rs"]
 mod editor_ui_sprite_editor;
-#[path = "editor_ui_animation_authoring.rs"]
-mod editor_ui_animation_authoring;
-#[path = "editor_ui_animation_editor.rs"]
-mod editor_ui_animation_editor;
-#[path = "editor_ui_entity_editor.rs"]
-mod editor_ui_entity_editor;
 
 pub(crate) use editor_ui_animation_authoring::AnimationAuthoringState;
 pub(crate) use editor_ui_animation_editor::AnimationEditorState;

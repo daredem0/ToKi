@@ -182,7 +182,8 @@ impl GameManager {
         scene_name: &str,
         spawn_point_id: &str,
     ) -> Result<(), String> {
-        self.game_state.transition_to_scene(scene_name, spawn_point_id)
+        self.game_state
+            .transition_to_scene(scene_name, spawn_point_id)
     }
 
     /// Get entities for camera system integration

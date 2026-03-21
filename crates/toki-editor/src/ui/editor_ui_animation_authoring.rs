@@ -114,9 +114,9 @@ impl AuthoredClip {
 
     /// Get the effective duration for a frame (per-frame override or default)
     pub fn effective_duration(&self, index: usize) -> Option<f32> {
-        self.frames.get(index).map(|frame| {
-            frame.duration_ms.unwrap_or(self.default_duration_ms)
-        })
+        self.frames
+            .get(index)
+            .map(|frame| frame.duration_ms.unwrap_or(self.default_duration_ms))
     }
 
     /// Check if any frame has a per-frame duration override
@@ -158,9 +158,12 @@ impl AuthoredClip {
         let frame_positions: Vec<[u32; 2]> = self.frames.iter().map(|f| f.position).collect();
 
         let frame_durations_ms: Option<Vec<f32>> = if self.has_per_frame_durations() {
-            Some(self.frames.iter().map(|f| {
-                f.duration_ms.unwrap_or(self.default_duration_ms)
-            }).collect())
+            Some(
+                self.frames
+                    .iter()
+                    .map(|f| f.duration_ms.unwrap_or(self.default_duration_ms))
+                    .collect(),
+            )
         } else {
             None
         };
@@ -168,7 +171,11 @@ impl AuthoredClip {
         AnimationClipDef {
             state: self.state.clone(),
             frame_tiles: Vec::new(), // Position-based, not name-based
-            frame_positions: if frame_positions.is_empty() { None } else { Some(frame_positions) },
+            frame_positions: if frame_positions.is_empty() {
+                None
+            } else {
+                Some(frame_positions)
+            },
             frame_duration_ms: self.default_duration_ms,
             frame_durations_ms,
             loop_mode: self.loop_mode.clone(),
@@ -210,8 +217,7 @@ impl AuthoredClip {
                 .iter()
                 .enumerate()
                 .filter_map(|(i, tile_name)| {
-                    let position = tile_lookup
-                        .and_then(|lookup| lookup.get(tile_name).copied())?;
+                    let position = tile_lookup.and_then(|lookup| lookup.get(tile_name).copied())?;
                     let duration_ms = def
                         .frame_durations_ms
                         .as_ref()
@@ -468,10 +474,21 @@ impl AnimationAuthoringState {
     /// Get available animation states that don't have clips yet
     pub fn available_states(&self) -> Vec<&'static str> {
         const ALL_STATES: &[&str] = &[
-            "idle", "walk", "attack",
-            "idle_down", "idle_up", "idle_left", "idle_right",
-            "walk_down", "walk_up", "walk_left", "walk_right",
-            "attack_down", "attack_up", "attack_left", "attack_right",
+            "idle",
+            "walk",
+            "attack",
+            "idle_down",
+            "idle_up",
+            "idle_left",
+            "idle_right",
+            "walk_down",
+            "walk_up",
+            "walk_left",
+            "walk_right",
+            "attack_down",
+            "attack_up",
+            "attack_left",
+            "attack_right",
         ];
 
         ALL_STATES

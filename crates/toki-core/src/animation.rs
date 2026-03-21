@@ -570,7 +570,10 @@ mod tests {
 
         let event = playback.update(110.0, 3, uniform_duration(100.0), &LoopMode::Loop);
 
-        assert!(matches!(event, PlaybackEvent::FrameChanged { old: 0, new: 1 }));
+        assert!(matches!(
+            event,
+            PlaybackEvent::FrameChanged { old: 0, new: 1 }
+        ));
         assert_eq!(playback.current_frame, 1);
         assert_eq!(playback.frame_timer, 10.0); // Remainder carried over
     }
@@ -586,7 +589,10 @@ mod tests {
         assert_eq!(playback.current_frame, 2);
         assert_eq!(playback.frame_timer, 50.0);
         // Event reflects the most recent change
-        assert!(matches!(event, PlaybackEvent::FrameChanged { old: 1, new: 2 }));
+        assert!(matches!(
+            event,
+            PlaybackEvent::FrameChanged { old: 1, new: 2 }
+        ));
     }
 
     #[test]
@@ -596,7 +602,12 @@ mod tests {
 
         let durations = vec![50.0, 100.0, 200.0];
         // Advance past first frame (50ms), should be on frame 1
-        playback.update(60.0, 3, varying_durations(durations.clone()), &LoopMode::Loop);
+        playback.update(
+            60.0,
+            3,
+            varying_durations(durations.clone()),
+            &LoopMode::Loop,
+        );
         assert_eq!(playback.current_frame, 1);
         assert_eq!(playback.frame_timer, 10.0);
 

@@ -42,8 +42,8 @@ mod app_transition;
 #[path = "runtime_menu.rs"]
 mod runtime_menu;
 
-use app_transition::SceneTransitionController;
 use app_splash::{ResolvedSplashConfig, SplashPolicy};
+use app_transition::SceneTransitionController;
 use toki_core::project_assets::first_existing_path;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -234,7 +234,8 @@ impl App {
         audio_system
             .set_channel_volume_percent("collision", launch_options.audio_mix.collision_percent);
         let menu_system = MenuController::new(launch_options.menu.clone());
-        let mut scene_transition = SceneTransitionController::new(launch_options.transition.clone());
+        let mut scene_transition =
+            SceneTransitionController::new(launch_options.transition.clone());
         if let Some(track_id) = game_system
             .active_scene()
             .and_then(|scene| scene.background_music_track_id.as_deref())
@@ -244,7 +245,9 @@ impl App {
                 Some(track_id),
                 launch_options.audio_mix.music_percent,
             ) {
-                tracing::warn!("Failed to start initial scene background music '{track_id}': {error}");
+                tracing::warn!(
+                    "Failed to start initial scene background music '{track_id}': {error}"
+                );
             }
         }
 

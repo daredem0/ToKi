@@ -183,7 +183,9 @@ impl SceneTransitionController {
                 audio.set_channel_volume_percent(current.slot.channel_name(), base_music_percent);
                 Ok(())
             }
-            (None, Some(track_id)) => self.prime_scene_music(audio, Some(track_id), base_music_percent),
+            (None, Some(track_id)) => {
+                self.prime_scene_music(audio, Some(track_id), base_music_percent)
+            }
             (Some(current), None) => {
                 audio.stop_channel(current.slot.channel_name());
                 self.current_music = None;
@@ -286,7 +288,11 @@ impl SceneTransitionController {
                 .as_ref()
                 .map(|music| music.slot.alternate())
                 .unwrap_or(MusicChannelSlot::A);
-            audio.play_background_music_in_channel(next_slot.channel_name(), track_id, BASE_MUSIC_GAIN)?;
+            audio.play_background_music_in_channel(
+                next_slot.channel_name(),
+                track_id,
+                BASE_MUSIC_GAIN,
+            )?;
             audio.set_channel_volume_percent(next_slot.channel_name(), 0);
             if success {
                 if let Some(outgoing_music) = outgoing_music.as_ref() {
@@ -438,7 +444,11 @@ mod tests {
 
         assert_eq!(
             audio.plays,
-            vec![(MUSIC_CHANNEL_B.to_string(), "track_b".to_string(), BASE_MUSIC_GAIN)]
+            vec![(
+                MUSIC_CHANNEL_B.to_string(),
+                "track_b".to_string(),
+                BASE_MUSIC_GAIN
+            )]
         );
         assert_eq!(audio.stops, vec![MUSIC_CHANNEL_A.to_string()]);
     }
@@ -454,7 +464,11 @@ mod tests {
 
         assert_eq!(
             audio.plays,
-            vec![(MUSIC_CHANNEL_A.to_string(), "track_a".to_string(), BASE_MUSIC_GAIN)]
+            vec![(
+                MUSIC_CHANNEL_A.to_string(),
+                "track_a".to_string(),
+                BASE_MUSIC_GAIN
+            )]
         );
         assert!(audio
             .volume_changes

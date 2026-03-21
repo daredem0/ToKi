@@ -55,10 +55,7 @@ impl InspectorSystem {
 
         // Playback info
         ui.label("Playback:");
-        ui.label(format!(
-            "Speed: {:.1}x",
-            ui_state.animation.preview.speed()
-        ));
+        ui.label(format!("Speed: {:.1}x", ui_state.animation.preview.speed()));
 
         if let Some(clip) = ui_state.animation.selected_clip() {
             ui.label(format!("Clip: {}", clip.state));

@@ -200,7 +200,10 @@ fn render_viewport_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         }
     });
 
-    ui.checkbox(&mut ui_state.sprite.active_mut().show_grid, "Show Pixel Grid");
+    ui.checkbox(
+        &mut ui_state.sprite.active_mut().show_grid,
+        "Show Pixel Grid",
+    );
 
     if let Some(pos) = ui_state.sprite.active().cursor_canvas_pos {
         ui.label(format!("Cursor: {}, {}", pos.x, pos.y));
@@ -264,7 +267,10 @@ fn render_canvas_transforms(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 fn render_sheet_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.label("Sprite Sheet:");
 
-    ui.checkbox(&mut ui_state.sprite.active_mut().show_cell_grid, "Show Cell Grid");
+    ui.checkbox(
+        &mut ui_state.sprite.active_mut().show_cell_grid,
+        "Show Cell Grid",
+    );
 
     let show_cell_grid = ui_state.sprite.active().show_cell_grid;
     if show_cell_grid {

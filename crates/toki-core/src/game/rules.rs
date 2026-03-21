@@ -950,7 +950,9 @@ impl GameState {
                             let new_count = available.saturating_sub(to_remove);
                             if new_count == 0 {
                                 entity.attributes.inventory.items.remove(&item_id);
-                            } else if let Some(entry) = entity.attributes.inventory.items.get_mut(&item_id) {
+                            } else if let Some(entry) =
+                                entity.attributes.inventory.items.get_mut(&item_id)
+                            {
                                 *entry = new_count;
                             }
                         }

@@ -234,7 +234,10 @@ fn discover_project_scene_paths_falls_back_when_manifest_paths_are_stale() {
 
     assert_eq!(discovered.len(), 1);
     assert_eq!(discovered[0].0, "Main Scene");
-    assert_eq!(discovered[0].1, project.join("scenes").join("Main Scene.json"));
+    assert_eq!(
+        discovered[0].1,
+        project.join("scenes").join("Main Scene.json")
+    );
 }
 
 #[test]
@@ -253,6 +256,15 @@ fn discover_project_scene_paths_includes_unlisted_scene_files_alongside_manifest
     let discovered = discover_project_scene_paths(project).expect("discover scenes");
 
     assert_eq!(discovered.len(), 2);
-    assert_eq!(discovered[0], ("Extra".to_string(), project.join("scenes").join("Extra.json")));
-    assert_eq!(discovered[1], ("Main".to_string(), project.join("scenes").join("Main.json")));
+    assert_eq!(
+        discovered[0],
+        (
+            "Extra".to_string(),
+            project.join("scenes").join("Extra.json")
+        )
+    );
+    assert_eq!(
+        discovered[1],
+        ("Main".to_string(), project.join("scenes").join("Main.json"))
+    );
 }

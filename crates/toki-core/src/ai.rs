@@ -397,19 +397,34 @@ impl AiSystem {
         let definition_name = entity.definition_name.clone();
 
         // Handle separation state first
-        if let Some(result) =
-            self.handle_separation(entity, entity_id, entity_manager, world_bounds, tilemap, atlas)
-        {
+        if let Some(result) = self.handle_separation(
+            entity,
+            entity_id,
+            entity_manager,
+            world_bounds,
+            tilemap,
+            atlas,
+        ) {
             return Some(result);
         }
 
-        let player_in_range = self.is_player_in_range(player_position, current_position, detection_radius);
-        let mate = self.find_compatible_entity(entity_id, &definition_name, entity_manager, detection_radius);
+        let player_in_range =
+            self.is_player_in_range(player_position, current_position, detection_radius);
+        let mate = self.find_compatible_entity(
+            entity_id,
+            &definition_name,
+            entity_manager,
+            detection_radius,
+        );
 
         // Check for mating collision
         if let Some(mate_id) = mate {
             if let Some(result) = self.handle_mating_collision(
-                entity, entity_id, mate_id, entity_manager, detection_radius,
+                entity,
+                entity_id,
+                mate_id,
+                entity_manager,
+                detection_radius,
             ) {
                 return Some(result);
             }
@@ -418,23 +433,48 @@ impl AiSystem {
         // Flee from player if in range
         if player_in_range {
             return self.flee_and_seek(
-                entity, entity_id, player_position, mate, world_bounds, entity_manager, tilemap, atlas,
+                entity,
+                entity_id,
+                player_position,
+                mate,
+                world_bounds,
+                entity_manager,
+                tilemap,
+                atlas,
             );
         }
 
         // Seek mate if one exists
         if let Some(mate_id) = mate {
             return self.seek_entity(
-                entity, entity_id, mate_id, entity_manager, world_bounds, tilemap, atlas,
+                entity,
+                entity_id,
+                mate_id,
+                entity_manager,
+                world_bounds,
+                tilemap,
+                atlas,
             );
         }
 
         // No threats or mates - idle wander
-        self.idle_wander(entity, entity_id, world_bounds, entity_manager, tilemap, atlas)
+        self.idle_wander(
+            entity,
+            entity_id,
+            world_bounds,
+            entity_manager,
+            tilemap,
+            atlas,
+        )
     }
 
     /// Check if player is within detection radius.
-    fn is_player_in_range(&self, player_pos: Option<IVec2>, entity_pos: IVec2, radius: u32) -> bool {
+    fn is_player_in_range(
+        &self,
+        player_pos: Option<IVec2>,
+        entity_pos: IVec2,
+        radius: u32,
+    ) -> bool {
         player_pos.is_some_and(|pos| Self::distance_between(entity_pos, pos) <= radius as f32)
     }
 
@@ -524,7 +564,9 @@ impl AiSystem {
         let all_separated = other_ids.iter().all(|&id| {
             entity_manager
                 .get_entity(id)
-                .map(|other| Self::distance_between(entity.position, other.position) >= required_distance)
+                .map(|other| {
+                    Self::distance_between(entity.position, other.position) >= required_distance
+                })
                 .unwrap_or(true) // Treat missing entities as separated
         });
 
@@ -540,7 +582,14 @@ impl AiSystem {
         let directions = Self::compute_directions_away(entity.position, closest_pos, movement_step);
 
         Self::try_movement_with_fallback(
-            entity, entity_id, entity.position, &directions, world_bounds, entity_manager, tilemap, atlas,
+            entity,
+            entity_id,
+            entity.position,
+            &directions,
+            world_bounds,
+            entity_manager,
+            tilemap,
+            atlas,
         )
     }
 
@@ -564,7 +613,8 @@ impl AiSystem {
         for parent_pos in [entity.position, mate.position] {
             for offset in &offsets {
                 let candidate = parent_pos + *offset;
-                if candidate.x >= 0 && candidate.y >= 0
+                if candidate.x >= 0
+                    && candidate.y >= 0
                     && entity_manager.is_spawn_position_free(candidate, size)
                 {
                     return Some(candidate);
@@ -605,7 +655,9 @@ impl AiSystem {
                 position: spawn_pos,
                 parent_entity_ids: vec![entity_id, mate_id],
                 separation_distance: required_distance,
-                mode: SpawnMode::Clone { source_entity_id: entity_id },
+                mode: SpawnMode::Clone {
+                    source_entity_id: entity_id,
+                },
             }),
         })
     }
@@ -624,15 +676,22 @@ impl AiSystem {
         let x_overlap = a_min.x < b_max.x && a_max.x > b_min.x;
 
         // Adjacent horizontally: touching on left/right edges (within 2px tolerance)
-        let h_adjacent = y_overlap && ((a_max.x - b_min.x).abs() <= 2 || (b_max.x - a_min.x).abs() <= 2);
+        let h_adjacent =
+            y_overlap && ((a_max.x - b_min.x).abs() <= 2 || (b_max.x - a_min.x).abs() <= 2);
         // Adjacent vertically: touching on top/bottom edges (within 2px tolerance)
-        let v_adjacent = x_overlap && ((a_max.y - b_min.y).abs() <= 2 || (b_max.y - a_min.y).abs() <= 2);
+        let v_adjacent =
+            x_overlap && ((a_max.y - b_min.y).abs() <= 2 || (b_max.y - a_min.y).abs() <= 2);
 
         h_adjacent || v_adjacent
     }
 
     /// Enter separation state for an entity.
-    pub fn enter_separation_state(&mut self, entity_id: EntityId, other_ids: Vec<EntityId>, required_distance: f32) {
+    pub fn enter_separation_state(
+        &mut self,
+        entity_id: EntityId,
+        other_ids: Vec<EntityId>,
+        required_distance: f32,
+    ) {
         let state = self.entity_states.entry(entity_id).or_default();
         state.separation_state = Some(SeparationState {
             other_entity_ids: other_ids,
@@ -659,9 +718,20 @@ impl AiSystem {
         // If we have a mate, try to move toward them while avoiding player
         if let Some(mate_id) = mate {
             if let Some(mate_entity) = entity_manager.get_entity(mate_id) {
-                let directions = Self::compute_directions_toward(entity.position, mate_entity.position, movement_step);
+                let directions = Self::compute_directions_toward(
+                    entity.position,
+                    mate_entity.position,
+                    movement_step,
+                );
                 let result = Self::try_movement_with_fallback(
-                    entity, entity_id, entity.position, &directions, world_bounds, entity_manager, tilemap, atlas,
+                    entity,
+                    entity_id,
+                    entity.position,
+                    &directions,
+                    world_bounds,
+                    entity_manager,
+                    tilemap,
+                    atlas,
                 );
                 if result.as_ref().is_some_and(|r| r.new_position.is_some()) {
                     return result;
@@ -672,7 +742,14 @@ impl AiSystem {
         // Fall back to fleeing from player
         let directions = Self::compute_directions_away(entity.position, player_pos, movement_step);
         Self::try_movement_with_fallback(
-            entity, entity_id, entity.position, &directions, world_bounds, entity_manager, tilemap, atlas,
+            entity,
+            entity_id,
+            entity.position,
+            &directions,
+            world_bounds,
+            entity_manager,
+            tilemap,
+            atlas,
         )
     }
 
@@ -690,10 +767,18 @@ impl AiSystem {
     ) -> Option<AiUpdateResult> {
         let target = entity_manager.get_entity(target_id)?;
         let movement_step = entity.attributes.speed.round() as i32;
-        let directions = Self::compute_directions_toward(entity.position, target.position, movement_step);
+        let directions =
+            Self::compute_directions_toward(entity.position, target.position, movement_step);
 
         Self::try_movement_with_fallback(
-            entity, entity_id, entity.position, &directions, world_bounds, entity_manager, tilemap, atlas,
+            entity,
+            entity_id,
+            entity.position,
+            &directions,
+            world_bounds,
+            entity_manager,
+            tilemap,
+            atlas,
         )
     }
 

@@ -48,7 +48,11 @@ impl AtlasViewport {
     }
 
     /// Convert screen position to canvas position
-    pub fn screen_to_canvas(&self, screen_pos: glam::Vec2, viewport_rect: egui::Rect) -> glam::Vec2 {
+    pub fn screen_to_canvas(
+        &self,
+        screen_pos: glam::Vec2,
+        viewport_rect: egui::Rect,
+    ) -> glam::Vec2 {
         let viewport_pos = screen_pos - glam::Vec2::new(viewport_rect.left(), viewport_rect.top());
         viewport_pos / self.zoom + self.pan
     }
@@ -222,7 +226,10 @@ impl std::fmt::Debug for AnimationEditorState {
             .field("entity_file_path", &self.entity_file_path)
             .field("authoring", &self.authoring)
             .field("preview", &self.preview)
-            .field("atlas_texture", &self.atlas_texture.as_ref().map(|_| "TextureHandle"))
+            .field(
+                "atlas_texture",
+                &self.atlas_texture.as_ref().map(|_| "TextureHandle"),
+            )
             .field("atlas_texture_path", &self.atlas_texture_path)
             .field("atlas_image_size", &self.atlas_image_size)
             .field("atlas_grid_size", &self.atlas_grid_size)
@@ -271,7 +278,12 @@ impl AnimationEditorState {
     }
 
     /// Load an entity definition for editing
-    pub fn load_entity(&mut self, entity_name: &str, file_path: PathBuf, authoring: AnimationAuthoringState) {
+    pub fn load_entity(
+        &mut self,
+        entity_name: &str,
+        file_path: PathBuf,
+        authoring: AnimationAuthoringState,
+    ) {
         self.active_entity = Some(entity_name.to_string());
         self.entity_file_path = Some(file_path);
         self.authoring = authoring;
@@ -453,7 +465,7 @@ mod tests {
         // Start at last frame
         state.go_to_frame(1, 2);
         state.play(); // Re-play after go_to_frame
-        // 150ms: frame 1 completes (100ms), loops to frame 0, 50ms remaining
+                      // 150ms: frame 1 completes (100ms), loops to frame 0, 50ms remaining
         state.update(0.15, &clip);
 
         assert!(state.playing());

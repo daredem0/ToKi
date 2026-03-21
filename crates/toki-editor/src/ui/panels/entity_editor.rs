@@ -144,17 +144,23 @@ fn render_entity_browser(ui: &mut egui::Ui, ui_state: &mut EditorUI, _project_pa
     });
 
     // Category filter - built from actual categories in loaded entities
-    let mut categories: Vec<String> = ui_state.entity_editor.all_categories().into_iter().collect();
+    let mut categories: Vec<String> = ui_state
+        .entity_editor
+        .all_categories()
+        .into_iter()
+        .collect();
     categories.sort();
 
     ui.horizontal(|ui| {
         ui.label("Category:");
         egui::ComboBox::from_id_salt("entity_category_filter")
-            .selected_text(if ui_state.entity_editor.filter.category_filter.is_empty() {
-                "All"
-            } else {
-                &ui_state.entity_editor.filter.category_filter
-            })
+            .selected_text(
+                if ui_state.entity_editor.filter.category_filter.is_empty() {
+                    "All"
+                } else {
+                    &ui_state.entity_editor.filter.category_filter
+                },
+            )
             .show_ui(ui, |ui| {
                 if ui
                     .selectable_label(
@@ -391,12 +397,18 @@ fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 ui.label("Size:");
                 let mut w = edit.definition.rendering.size[0] as i32;
                 let mut h = edit.definition.rendering.size[1] as i32;
-                if ui.add(egui::DragValue::new(&mut w).range(1..=1024)).changed() {
+                if ui
+                    .add(egui::DragValue::new(&mut w).range(1..=1024))
+                    .changed()
+                {
                     edit.definition.rendering.size[0] = w.max(1) as u32;
                     edit.mark_dirty();
                 }
                 ui.label("x");
-                if ui.add(egui::DragValue::new(&mut h).range(1..=1024)).changed() {
+                if ui
+                    .add(egui::DragValue::new(&mut h).range(1..=1024))
+                    .changed()
+                {
                     edit.definition.rendering.size[1] = h.max(1) as u32;
                     edit.mark_dirty();
                 }
@@ -407,7 +419,9 @@ fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             ui.horizontal(|ui| {
                 ui.label("Render Layer:");
                 if ui
-                    .add(egui::DragValue::new(&mut edit.definition.rendering.render_layer))
+                    .add(egui::DragValue::new(
+                        &mut edit.definition.rendering.render_layer,
+                    ))
                     .changed()
                 {
                     edit.mark_dirty();
@@ -474,7 +488,10 @@ fn render_attributes_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 ui.horizontal(|ui| {
                     ui.label("Interaction Reach:");
                     let mut reach = edit.definition.attributes.interaction_reach as i32;
-                    if ui.add(egui::DragValue::new(&mut reach).range(0..=256)).changed() {
+                    if ui
+                        .add(egui::DragValue::new(&mut reach).range(0..=256))
+                        .changed()
+                    {
                         edit.definition.attributes.interaction_reach = reach.max(0) as u32;
                         edit.mark_dirty();
                     }
@@ -506,14 +523,18 @@ fn render_collision_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 ui.horizontal(|ui| {
                     ui.label("Offset:");
                     if ui
-                        .add(egui::DragValue::new(&mut edit.definition.collision.offset[0]))
+                        .add(egui::DragValue::new(
+                            &mut edit.definition.collision.offset[0],
+                        ))
                         .changed()
                     {
                         edit.mark_dirty();
                     }
                     ui.label(",");
                     if ui
-                        .add(egui::DragValue::new(&mut edit.definition.collision.offset[1]))
+                        .add(egui::DragValue::new(
+                            &mut edit.definition.collision.offset[1],
+                        ))
                         .changed()
                     {
                         edit.mark_dirty();
@@ -525,12 +546,18 @@ fn render_collision_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                     ui.label("Size:");
                     let mut w = edit.definition.collision.size[0] as i32;
                     let mut h = edit.definition.collision.size[1] as i32;
-                    if ui.add(egui::DragValue::new(&mut w).range(1..=1024)).changed() {
+                    if ui
+                        .add(egui::DragValue::new(&mut w).range(1..=1024))
+                        .changed()
+                    {
                         edit.definition.collision.size[0] = w.max(1) as u32;
                         edit.mark_dirty();
                     }
                     ui.label("x");
-                    if ui.add(egui::DragValue::new(&mut h).range(1..=1024)).changed() {
+                    if ui
+                        .add(egui::DragValue::new(&mut h).range(1..=1024))
+                        .changed()
+                    {
                         edit.definition.collision.size[1] = h.max(1) as u32;
                         edit.mark_dirty();
                     }
@@ -562,7 +589,10 @@ fn render_health_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         ui.horizontal(|ui| {
             ui.label("  Max HP:");
             let mut hp = edit.definition.attributes.health.unwrap_or(100) as i32;
-            if ui.add(egui::DragValue::new(&mut hp).range(1..=99999)).changed() {
+            if ui
+                .add(egui::DragValue::new(&mut hp).range(1..=99999))
+                .changed()
+            {
                 edit.definition.attributes.health = Some(hp.max(1) as u32);
                 edit.mark_dirty();
             }
@@ -617,8 +647,12 @@ fn render_ai_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 ui.horizontal(|ui| {
                     ui.label("Detection Radius:");
                     let mut radius = edit.definition.attributes.ai_config.detection_radius as i32;
-                    if ui.add(egui::DragValue::new(&mut radius).range(0..=1024)).changed() {
-                        edit.definition.attributes.ai_config.detection_radius = radius.max(0) as u32;
+                    if ui
+                        .add(egui::DragValue::new(&mut radius).range(0..=1024))
+                        .changed()
+                    {
+                        edit.definition.attributes.ai_config.detection_radius =
+                            radius.max(0) as u32;
                         edit.mark_dirty();
                     }
                 });
@@ -673,12 +707,18 @@ fn render_projectile_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                         ui.label("Size:");
                         let mut w = proj.size[0] as i32;
                         let mut h = proj.size[1] as i32;
-                        if ui.add(egui::DragValue::new(&mut w).range(1..=256)).changed() {
+                        if ui
+                            .add(egui::DragValue::new(&mut w).range(1..=256))
+                            .changed()
+                        {
                             proj.size[0] = w.max(1) as u32;
                             edit.dirty = true;
                         }
                         ui.label("x");
-                        if ui.add(egui::DragValue::new(&mut h).range(1..=256)).changed() {
+                        if ui
+                            .add(egui::DragValue::new(&mut h).range(1..=256))
+                            .changed()
+                        {
                             proj.size[1] = h.max(1) as u32;
                             edit.dirty = true;
                         }
@@ -688,7 +728,10 @@ fn render_projectile_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                     ui.horizontal(|ui| {
                         ui.label("Speed:");
                         let mut speed = proj.speed as i32;
-                        if ui.add(egui::DragValue::new(&mut speed).range(1..=9999)).changed() {
+                        if ui
+                            .add(egui::DragValue::new(&mut speed).range(1..=9999))
+                            .changed()
+                        {
                             proj.speed = speed.max(1) as u32;
                             edit.dirty = true;
                         }
@@ -706,7 +749,10 @@ fn render_projectile_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                     ui.horizontal(|ui| {
                         ui.label("Lifetime (ticks):");
                         let mut lifetime = proj.lifetime_ticks as i32;
-                        if ui.add(egui::DragValue::new(&mut lifetime).range(1..=9999)).changed() {
+                        if ui
+                            .add(egui::DragValue::new(&mut lifetime).range(1..=9999))
+                            .changed()
+                        {
                             proj.lifetime_ticks = lifetime.max(1) as u32;
                             edit.dirty = true;
                         }
@@ -743,7 +789,10 @@ fn render_pickup_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                     ui.horizontal(|ui| {
                         ui.label("Count:");
                         let mut count = pickup.count as i32;
-                        if ui.add(egui::DragValue::new(&mut count).range(1..=9999)).changed() {
+                        if ui
+                            .add(egui::DragValue::new(&mut count).range(1..=9999))
+                            .changed()
+                        {
                             pickup.count = count.max(1) as u32;
                             edit.dirty = true;
                         }
@@ -783,13 +832,21 @@ fn render_audio_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 // Collision sound - dropdown from discovered SFX
                 ui.horizontal(|ui| {
                     ui.label("Collision Sound:");
-                    let mut sound = edit.definition.audio.collision_sound.clone().unwrap_or_default();
-                    if render_sfx_dropdown(ui, "collision_sound", &mut sound, &available_sfx, &mut edit.dirty) {
-                        edit.definition.audio.collision_sound = if sound.is_empty() {
-                            None
-                        } else {
-                            Some(sound)
-                        };
+                    let mut sound = edit
+                        .definition
+                        .audio
+                        .collision_sound
+                        .clone()
+                        .unwrap_or_default();
+                    if render_sfx_dropdown(
+                        ui,
+                        "collision_sound",
+                        &mut sound,
+                        &available_sfx,
+                        &mut edit.dirty,
+                    ) {
+                        edit.definition.audio.collision_sound =
+                            if sound.is_empty() { None } else { Some(sound) };
                     }
                 });
 
@@ -797,7 +854,10 @@ fn render_audio_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 ui.horizontal(|ui| {
                     ui.label("Hearing Radius:");
                     let mut radius = edit.definition.audio.hearing_radius as i32;
-                    if ui.add(egui::DragValue::new(&mut radius).range(0..=1024)).changed() {
+                    if ui
+                        .add(egui::DragValue::new(&mut radius).range(0..=1024))
+                        .changed()
+                    {
                         edit.definition.audio.hearing_radius = radius.max(0) as u32;
                         edit.mark_dirty();
                     }
@@ -807,7 +867,12 @@ fn render_audio_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                 ui.horizontal(|ui| {
                     ui.label("Footstep Distance:");
                     if ui
-                        .add(egui::DragValue::new(&mut edit.definition.audio.footstep_trigger_distance).speed(0.1))
+                        .add(
+                            egui::DragValue::new(
+                                &mut edit.definition.audio.footstep_trigger_distance,
+                            )
+                            .speed(0.1),
+                        )
                         .changed()
                     {
                         edit.mark_dirty();
@@ -898,11 +963,17 @@ fn render_save_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 
     ui.horizontal(|ui| {
         let save_enabled = is_dirty;
-        if ui.add_enabled(save_enabled, egui::Button::new("Save")).clicked() {
+        if ui
+            .add_enabled(save_enabled, egui::Button::new("Save"))
+            .clicked()
+        {
             save_entity(ui_state);
         }
 
-        if ui.add_enabled(is_dirty, egui::Button::new("Revert")).clicked() {
+        if ui
+            .add_enabled(is_dirty, egui::Button::new("Revert"))
+            .clicked()
+        {
             revert_entity(ui_state);
         }
     });
@@ -952,9 +1023,7 @@ fn render_new_entity_dialog(
             ui.horizontal(|ui| {
                 ui.label("Description:");
             });
-            ui.text_edit_multiline(
-                &mut ui_state.entity_editor.new_entity_dialog.description_input,
-            );
+            ui.text_edit_multiline(&mut ui_state.entity_editor.new_entity_dialog.description_input);
 
             // Build category list: existing categories + predefined suggestions
             let mut all_categories: std::collections::HashSet<String> =
@@ -977,7 +1046,8 @@ fn render_new_entity_dialog(
                     .show_ui(ui, |ui| {
                         for category in &category_list {
                             if ui.selectable_label(false, category).clicked() {
-                                ui_state.entity_editor.new_entity_dialog.category = category.clone();
+                                ui_state.entity_editor.new_entity_dialog.category =
+                                    category.clone();
                             }
                         }
                     });
@@ -1020,7 +1090,11 @@ fn render_delete_confirmation_dialog(
     ctx: &egui::Context,
     project_path: Option<&Path>,
 ) {
-    let entity_name = ui_state.entity_editor.delete_confirmation.entity_name.clone();
+    let entity_name = ui_state
+        .entity_editor
+        .delete_confirmation
+        .entity_name
+        .clone();
     let mut close_dialog = false;
     let mut confirm_delete = false;
 
@@ -1088,7 +1162,10 @@ fn refresh_entity_list(ui_state: &mut EditorUI, project_path: Option<&Path>) {
     }
 
     // Sort by name
-    ui_state.entity_editor.entities.sort_by(|a, b| a.name.cmp(&b.name));
+    ui_state
+        .entity_editor
+        .entities
+        .sort_by(|a, b| a.name.cmp(&b.name));
 
     // Scan SFX directory for available sound effects
     let sfx_dir = path.join("assets/audio/sfx");
@@ -1231,9 +1308,7 @@ fn revert_entity(ui_state: &mut EditorUI) {
 
     // Reload from file
     if let Some(def) = load_entity_definition(&file_path) {
-        ui_state
-            .entity_editor
-            .load_for_editing(def, file_path);
+        ui_state.entity_editor.load_for_editing(def, file_path);
         tracing::info!("Reverted entity changes");
     }
 }

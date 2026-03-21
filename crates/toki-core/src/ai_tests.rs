@@ -160,7 +160,8 @@ fn ai_system_updates_every_tick() {
     entity_manager.add_existing_entity(player);
 
     // Chaser at (50, 100) - within detection radius
-    let chaser = create_test_entity_with_detection_radius(2, IVec2::new(50, 100), AiBehavior::Chase, 64);
+    let chaser =
+        create_test_entity_with_detection_radius(2, IVec2::new(50, 100), AiBehavior::Chase, 64);
     entity_manager.add_existing_entity(chaser);
 
     // First update should return results immediately
@@ -311,7 +312,8 @@ fn ai_system_chase_moves_toward_player_when_in_radius() {
     entity_manager.add_existing_entity(player);
 
     // Chaser at (50, 100) - 50 pixels away, within detection radius of 64
-    let chaser = create_test_entity_with_detection_radius(2, IVec2::new(50, 100), AiBehavior::Chase, 64);
+    let chaser =
+        create_test_entity_with_detection_radius(2, IVec2::new(50, 100), AiBehavior::Chase, 64);
     entity_manager.add_existing_entity(chaser);
 
     // Fast forward to update frame
@@ -348,7 +350,8 @@ fn ai_system_chase_wanders_with_walk_wait_cycle() {
     entity_manager.add_existing_entity(player);
 
     // Chaser at (50, 100) - 150 pixels away, outside detection radius of 64
-    let chaser = create_test_entity_with_detection_radius(2, IVec2::new(50, 100), AiBehavior::Chase, 64);
+    let chaser =
+        create_test_entity_with_detection_radius(2, IVec2::new(50, 100), AiBehavior::Chase, 64);
     entity_manager.add_existing_entity(chaser);
 
     // First call starts in waiting phase (idle)
@@ -388,7 +391,10 @@ fn ai_system_chase_wanders_with_walk_wait_cycle() {
         }
     }
     assert!(found_walk, "Chaser should eventually enter walk phase");
-    assert!(found_idle_after_walk, "Chaser should return to idle after walking");
+    assert!(
+        found_idle_after_walk,
+        "Chaser should return to idle after walking"
+    );
 }
 
 #[test]
@@ -403,7 +409,8 @@ fn ai_system_chase_closes_distance_to_player() {
     entity_manager.add_existing_entity(player);
 
     // Chaser at (60, 60) - diagonally away, within detection radius of 100
-    let chaser = create_test_entity_with_detection_radius(2, IVec2::new(60, 60), AiBehavior::Chase, 100);
+    let chaser =
+        create_test_entity_with_detection_radius(2, IVec2::new(60, 60), AiBehavior::Chase, 100);
     entity_manager.add_existing_entity(chaser);
 
     let initial_distance = ((100 - 60) as f32).hypot((100 - 60) as f32);
@@ -448,7 +455,8 @@ fn ai_system_run_moves_away_from_player_when_in_radius() {
     entity_manager.add_existing_entity(player);
 
     // Runner at (120, 100) - 20 pixels away, within detection radius of 64
-    let runner = create_test_entity_with_detection_radius(2, IVec2::new(120, 100), AiBehavior::Run, 64);
+    let runner =
+        create_test_entity_with_detection_radius(2, IVec2::new(120, 100), AiBehavior::Run, 64);
     entity_manager.add_existing_entity(runner);
 
     // Fast forward to update frame
@@ -467,7 +475,10 @@ fn ai_system_run_moves_away_from_player_when_in_radius() {
 
     // Runner should move away from player (increasing x position, away from player at 100)
     if let Some(new_pos) = result.new_position {
-        assert!(new_pos.x > 120, "Runner should move away from player (right)");
+        assert!(
+            new_pos.x > 120,
+            "Runner should move away from player (right)"
+        );
     }
     assert_eq!(result.new_animation, Some(AnimationState::Walk));
 }
@@ -485,7 +496,8 @@ fn ai_system_run_wanders_with_walk_wait_cycle() {
     entity_manager.add_existing_entity(player);
 
     // Runner at (50, 100) - 150 pixels away, outside detection radius of 64
-    let runner = create_test_entity_with_detection_radius(2, IVec2::new(50, 100), AiBehavior::Run, 64);
+    let runner =
+        create_test_entity_with_detection_radius(2, IVec2::new(50, 100), AiBehavior::Run, 64);
     entity_manager.add_existing_entity(runner);
 
     // First call starts in waiting phase (idle)
@@ -534,7 +546,8 @@ fn ai_system_run_increases_distance_from_player() {
     entity_manager.add_existing_entity(player);
 
     // Runner at (120, 120) - diagonally away, within detection radius of 100
-    let runner = create_test_entity_with_detection_radius(2, IVec2::new(120, 120), AiBehavior::Run, 100);
+    let runner =
+        create_test_entity_with_detection_radius(2, IVec2::new(120, 120), AiBehavior::Run, 100);
     entity_manager.add_existing_entity(runner);
 
     let initial_distance = ((120 - 100) as f32).hypot((120 - 100) as f32);
@@ -579,7 +592,8 @@ fn ai_system_chase_respects_world_bounds() {
     entity_manager.add_existing_entity(player);
 
     // Chaser at (20, 100) - will try to move left toward player
-    let chaser = create_test_entity_with_detection_radius(2, IVec2::new(20, 100), AiBehavior::Chase, 64);
+    let chaser =
+        create_test_entity_with_detection_radius(2, IVec2::new(20, 100), AiBehavior::Chase, 64);
     entity_manager.add_existing_entity(chaser);
 
     // Fast forward to update frame
@@ -597,8 +611,14 @@ fn ai_system_chase_respects_world_bounds() {
 
     // Position should never go negative
     if let Some(new_pos) = result.new_position {
-        assert!(new_pos.x >= 0, "Chaser should not move outside world bounds");
-        assert!(new_pos.y >= 0, "Chaser should not move outside world bounds");
+        assert!(
+            new_pos.x >= 0,
+            "Chaser should not move outside world bounds"
+        );
+        assert!(
+            new_pos.y >= 0,
+            "Chaser should not move outside world bounds"
+        );
     }
 }
 
@@ -615,7 +635,8 @@ fn ai_system_run_respects_world_bounds() {
 
     // Runner at (230, 100) - near right edge, will try to move right away from player
     // World bounds are 256x256, entity size is 16x16, so max x is 240
-    let runner = create_test_entity_with_detection_radius(2, IVec2::new(230, 100), AiBehavior::Run, 200);
+    let runner =
+        create_test_entity_with_detection_radius(2, IVec2::new(230, 100), AiBehavior::Run, 200);
     entity_manager.add_existing_entity(runner);
 
     // Fast forward to update frame
@@ -633,8 +654,14 @@ fn ai_system_run_respects_world_bounds() {
 
     // Position should stay within world bounds
     if let Some(new_pos) = result.new_position {
-        assert!(new_pos.x <= 240, "Runner should not move outside world bounds (max_x=240)");
-        assert!(new_pos.y <= 240, "Runner should not move outside world bounds");
+        assert!(
+            new_pos.x <= 240,
+            "Runner should not move outside world bounds (max_x=240)"
+        );
+        assert!(
+            new_pos.y <= 240,
+            "Runner should not move outside world bounds"
+        );
     }
 }
 
@@ -655,7 +682,8 @@ fn ai_system_chase_navigates_around_vertical_wall() {
 
     // Chaser at (48, 50) - on the left side of the wall, same y as player
     // Primary direction would be right (+x), but wall blocks it
-    let chaser = create_test_entity_with_detection_radius(2, IVec2::new(48, 50), AiBehavior::Chase, 100);
+    let chaser =
+        create_test_entity_with_detection_radius(2, IVec2::new(48, 50), AiBehavior::Chase, 100);
     entity_manager.add_existing_entity(chaser);
 
     let results = ai_system.update(
@@ -696,7 +724,8 @@ fn ai_system_run_navigates_around_horizontal_wall() {
     // Wait, if player is at y=100 and runner at y=80, runner wants to move UP (decrease y)
     // Let me reconsider: Runner at (50, 48) wants to run away from player at (50, 100)
     // Runner would move up (decrease y), but let's put a wall above
-    let runner = create_test_entity_with_detection_radius(2, IVec2::new(50, 48), AiBehavior::Run, 100);
+    let runner =
+        create_test_entity_with_detection_radius(2, IVec2::new(50, 48), AiBehavior::Run, 100);
     entity_manager.add_existing_entity(runner);
 
     let results = ai_system.update(
@@ -732,7 +761,8 @@ fn ai_system_chase_tries_perpendicular_when_blocked() {
 
     // Chaser at x=46 - entity size is 16, so right edge is at x=62, just before the wall (64)
     // When it tries to move right (speed=4 -> to x=50, right edge at 66), it would hit the wall
-    let mut chaser = create_test_entity_with_detection_radius(2, IVec2::new(46, 32), AiBehavior::Chase, 100);
+    let mut chaser =
+        create_test_entity_with_detection_radius(2, IVec2::new(46, 32), AiBehavior::Chase, 100);
     chaser.attributes.speed = 4.0; // Move 4 pixels per tick to ensure it tries to enter wall
     entity_manager.add_existing_entity(chaser);
 
@@ -777,7 +807,8 @@ fn ai_system_chase_wanders_when_player_outside_radius() {
     entity_manager.add_existing_entity(player);
 
     // Chaser at (50, 50) - 170 pixels away, outside detection radius of 64
-    let chaser = create_test_entity_with_detection_radius(2, IVec2::new(50, 50), AiBehavior::Chase, 64);
+    let chaser =
+        create_test_entity_with_detection_radius(2, IVec2::new(50, 50), AiBehavior::Chase, 64);
     entity_manager.add_existing_entity(chaser);
 
     // Advance to wander update frame (every 30 frames for idle wandering)
@@ -814,7 +845,8 @@ fn ai_system_run_wanders_when_player_outside_radius() {
     entity_manager.add_existing_entity(player);
 
     // Runner at (50, 50) - outside detection radius of 64
-    let runner = create_test_entity_with_detection_radius(2, IVec2::new(50, 50), AiBehavior::Run, 64);
+    let runner =
+        create_test_entity_with_detection_radius(2, IVec2::new(50, 50), AiBehavior::Run, 64);
     entity_manager.add_existing_entity(runner);
 
     // Advance to wander update frame (every 30 frames for idle wandering)
@@ -849,7 +881,8 @@ fn ai_system_chase_idle_wander_is_throttled() {
     entity_manager.add_existing_entity(player);
 
     // Chaser outside detection radius
-    let chaser = create_test_entity_with_detection_radius(2, IVec2::new(50, 50), AiBehavior::Chase, 64);
+    let chaser =
+        create_test_entity_with_detection_radius(2, IVec2::new(50, 50), AiBehavior::Chase, 64);
     entity_manager.add_existing_entity(chaser);
 
     // First update (frame 1) - should not wander yet
@@ -881,7 +914,8 @@ fn ai_system_chase_transitions_from_wander_to_chase() {
     entity_manager.add_existing_entity(player);
 
     // Chaser outside detection radius
-    let chaser = create_test_entity_with_detection_radius(2, IVec2::new(50, 50), AiBehavior::Chase, 64);
+    let chaser =
+        create_test_entity_with_detection_radius(2, IVec2::new(50, 50), AiBehavior::Chase, 64);
     entity_manager.add_existing_entity(chaser);
 
     // First update - wandering (player outside)
@@ -896,10 +930,7 @@ fn ai_system_chase_transitions_from_wander_to_chase() {
     assert_eq!(results.len(), 1);
 
     // Move player into detection radius
-    entity_manager
-        .get_entity_mut(1)
-        .unwrap()
-        .position = IVec2::new(80, 50);
+    entity_manager.get_entity_mut(1).unwrap().position = IVec2::new(80, 50);
 
     // Next update - should chase immediately (every tick)
     let results = ai_system.update(
@@ -914,7 +945,10 @@ fn ai_system_chase_transitions_from_wander_to_chase() {
 
     // Should move toward player (chasing, not wandering)
     if let Some(new_pos) = result.new_position {
-        assert!(new_pos.x > 50, "Chaser should move toward player when in radius");
+        assert!(
+            new_pos.x > 50,
+            "Chaser should move toward player when in radius"
+        );
     }
 }
 
@@ -1086,7 +1120,10 @@ fn ai_system_run_and_multiply_spawns_on_collision() {
     );
 
     // One of the entities should have a spawn request
-    let spawn_results: Vec<_> = results.iter().filter(|r| r.spawn_request.is_some()).collect();
+    let spawn_results: Vec<_> = results
+        .iter()
+        .filter(|r| r.spawn_request.is_some())
+        .collect();
     assert!(
         !spawn_results.is_empty(),
         "Adjacent entities should trigger spawn"

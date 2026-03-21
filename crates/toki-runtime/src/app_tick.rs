@@ -29,23 +29,23 @@ impl App {
             self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
             self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
         );
-        let game_result = if self.should_gate_gameplay_for_menu() || self.scene_transition.is_active()
-        {
-            GameUpdateResult::new()
-        } else if let Some(delta) = delta_ms {
-            self.game_system.update_with_delta(
-                delta,
-                world_bounds,
-                self.resources.get_tilemap(),
-                self.resources.get_terrain_atlas(),
-            )
-        } else {
-            self.game_system.update(
-                world_bounds,
-                self.resources.get_tilemap(),
-                self.resources.get_terrain_atlas(),
-            )
-        };
+        let game_result =
+            if self.should_gate_gameplay_for_menu() || self.scene_transition.is_active() {
+                GameUpdateResult::new()
+            } else if let Some(delta) = delta_ms {
+                self.game_system.update_with_delta(
+                    delta,
+                    world_bounds,
+                    self.resources.get_tilemap(),
+                    self.resources.get_terrain_atlas(),
+                )
+            } else {
+                self.game_system.update(
+                    world_bounds,
+                    self.resources.get_tilemap(),
+                    self.resources.get_terrain_atlas(),
+                )
+            };
 
         let listener_position = self
             .game_system
@@ -87,7 +87,9 @@ impl App {
                             true,
                             active_track,
                         ) {
-                            tracing::warn!("Failed to complete scene-transition audio handoff: {error}");
+                            tracing::warn!(
+                                "Failed to complete scene-transition audio handoff: {error}"
+                            );
                         }
                         world_bounds = glam::UVec2::new(
                             self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
@@ -312,7 +314,6 @@ impl App {
             self.rendering.update_projection(view);
             self.refresh_tilemap_vertices_for_current_camera();
         }
-
     }
 
     fn render_entity_health_bars(&mut self) {

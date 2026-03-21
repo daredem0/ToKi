@@ -729,7 +729,8 @@ fn entity_active_condition_checks_target_active_flag() {
         .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
-        .attributes.active = false;
+        .attributes
+        .active = false;
 
     let inactive = state.update(world_bounds, &tilemap, &atlas);
     assert!(inactive.events.is_empty());
@@ -738,7 +739,8 @@ fn entity_active_condition_checks_target_active_flag() {
         .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
-        .attributes.active = true;
+        .attributes
+        .active = true;
     let active = state.update(world_bounds, &tilemap, &atlas);
     assert!(active.events.iter().any(|event| matches!(
         event,
@@ -2084,7 +2086,10 @@ fn on_interact_fires_when_player_overlaps_interactable_and_presses_interact() {
     state.set_rules(RuleSet {
         rules: vec![base_rule(
             "npc-interact",
-            RuleTrigger::OnInteract { mode: InteractionMode::default(), entity: None },
+            RuleTrigger::OnInteract {
+                mode: InteractionMode::default(),
+                entity: None,
+            },
             0,
             vec![RuleAction::PlaySound {
                 channel: RuleSoundChannel::Movement,
@@ -2136,7 +2141,10 @@ fn on_interact_does_not_fire_when_not_overlapping() {
     state.set_rules(RuleSet {
         rules: vec![base_rule(
             "npc-interact",
-            RuleTrigger::OnInteract { mode: InteractionMode::default(), entity: None },
+            RuleTrigger::OnInteract {
+                mode: InteractionMode::default(),
+                entity: None,
+            },
             0,
             vec![RuleAction::PlaySound {
                 channel: RuleSoundChannel::Movement,
@@ -2176,7 +2184,10 @@ fn on_interact_does_not_fire_when_entity_is_not_interactable() {
     state.set_rules(RuleSet {
         rules: vec![base_rule(
             "npc-interact",
-            RuleTrigger::OnInteract { mode: InteractionMode::default(), entity: None },
+            RuleTrigger::OnInteract {
+                mode: InteractionMode::default(),
+                entity: None,
+            },
             0,
             vec![RuleAction::PlaySound {
                 channel: RuleSoundChannel::Movement,
@@ -2220,7 +2231,10 @@ fn on_interact_provides_trigger_context() {
             enabled: true,
             priority: 0,
             once: false,
-            trigger: RuleTrigger::OnInteract { mode: InteractionMode::default(), entity: None },
+            trigger: RuleTrigger::OnInteract {
+                mode: InteractionMode::default(),
+                entity: None,
+            },
             conditions: vec![
                 RuleCondition::TargetExists {
                     target: RuleTarget::TriggerSelf,
@@ -3570,7 +3584,8 @@ fn has_inventory_item_matches_when_player_has_enough_items() {
         .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
-        .attributes.inventory
+        .attributes
+        .inventory
         .add_item("key", 3);
 
     state.set_rules(RuleSet {
@@ -3617,7 +3632,8 @@ fn has_inventory_item_does_not_match_when_player_has_insufficient_items() {
         .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
-        .attributes.inventory
+        .attributes
+        .inventory
         .add_item("key", 1);
 
     state.set_rules(RuleSet {
@@ -3721,10 +3737,12 @@ fn on_tile_enter_fires_when_entity_enters_tile() {
             &create_test_tilemap(),
             &create_test_atlas(),
         );
-        if result.events.iter().any(|event| matches!(
-            event,
-            AudioEvent::PlaySound { sound_id, .. } if sound_id == "entered_tile"
-        )) {
+        if result.events.iter().any(|event| {
+            matches!(
+                event,
+                AudioEvent::PlaySound { sound_id, .. } if sound_id == "entered_tile"
+            )
+        }) {
             fired = true;
             break;
         }
@@ -3810,10 +3828,12 @@ fn on_tile_enter_fires_only_on_transition() {
             &create_test_tilemap(),
             &create_test_atlas(),
         );
-        if result.events.iter().any(|event| matches!(
-            event,
-            AudioEvent::PlaySound { sound_id, .. } if sound_id == "entered_tile"
-        )) {
+        if result.events.iter().any(|event| {
+            matches!(
+                event,
+                AudioEvent::PlaySound { sound_id, .. } if sound_id == "entered_tile"
+            )
+        }) {
             entered = true;
             break;
         }
@@ -3867,10 +3887,12 @@ fn on_tile_exit_fires_when_entity_leaves_tile() {
             &create_test_tilemap(),
             &create_test_atlas(),
         );
-        if result.events.iter().any(|event| matches!(
-            event,
-            AudioEvent::PlaySound { sound_id, .. } if sound_id == "exited_tile"
-        )) {
+        if result.events.iter().any(|event| {
+            matches!(
+                event,
+                AudioEvent::PlaySound { sound_id, .. } if sound_id == "exited_tile"
+            )
+        }) {
             exited = true;
             break;
         }
@@ -3880,7 +3902,10 @@ fn on_tile_exit_fires_when_entity_leaves_tile() {
         first.events.is_empty(),
         "OnTileExit should not fire before leaving tile"
     );
-    assert!(exited, "OnTileExit should fire when entity leaves the specified tile");
+    assert!(
+        exited,
+        "OnTileExit should fire when entity leaves the specified tile"
+    );
 }
 
 #[test]
@@ -3916,10 +3941,12 @@ fn on_tile_exit_does_not_fire_repeatedly() {
             &create_test_tilemap(),
             &create_test_atlas(),
         );
-        if result.events.iter().any(|event| matches!(
-            event,
-            AudioEvent::PlaySound { sound_id, .. } if sound_id == "exited_tile"
-        )) {
+        if result.events.iter().any(|event| {
+            matches!(
+                event,
+                AudioEvent::PlaySound { sound_id, .. } if sound_id == "exited_tile"
+            )
+        }) {
             exited = true;
             break;
         }
@@ -4071,10 +4098,12 @@ fn multiple_entities_can_trigger_tile_events_independently() {
         first_enter_count += result
             .events
             .iter()
-            .filter(|event| matches!(
-                event,
-                AudioEvent::PlaySound { sound_id, .. } if sound_id == "entity_entered"
-            ))
+            .filter(|event| {
+                matches!(
+                    event,
+                    AudioEvent::PlaySound { sound_id, .. } if sound_id == "entity_entered"
+                )
+            })
             .count();
     }
     state.handle_key_release(InputKey::Right);
@@ -4102,10 +4131,12 @@ fn multiple_entities_can_trigger_tile_events_independently() {
         second_enter_count += result
             .events
             .iter()
-            .filter(|event| matches!(
-                event,
-                AudioEvent::PlaySound { sound_id, .. } if sound_id == "entity_entered"
-            ))
+            .filter(|event| {
+                matches!(
+                    event,
+                    AudioEvent::PlaySound { sound_id, .. } if sound_id == "entity_entered"
+                )
+            })
             .count();
     }
 
@@ -4127,7 +4158,7 @@ fn multiple_entities_can_trigger_tile_events_independently() {
 fn damage_entity_reduces_health_by_specified_amount() {
     let mut state = GameState::new_empty();
     let target_id = state.spawn_player_like_npc(IVec2::new(50, 50));
-    
+
     // Verify initial health
     let initial_health = state
         .entity_manager()
@@ -4166,7 +4197,7 @@ fn damage_entity_reduces_health_by_specified_amount() {
 fn damage_entity_triggers_death_when_health_reaches_zero() {
     let mut state = GameState::new_empty();
     let target_id = state.spawn_player_like_npc(IVec2::new(50, 50));
-    
+
     state.set_rules(RuleSet {
         rules: vec![
             base_rule(
@@ -4189,16 +4220,16 @@ fn damage_entity_triggers_death_when_health_reaches_zero() {
             ),
         ],
     });
-    
+
     let result = state.update(
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    
+
     // Entity should be despawned
     assert!(state.entity_manager().get_entity(target_id).is_none());
-    
+
     // Death sound should have played
     assert!(result.events.iter().any(|e| matches!(
         e,
@@ -4210,7 +4241,7 @@ fn damage_entity_triggers_death_when_health_reaches_zero() {
 fn heal_entity_increases_health_by_specified_amount() {
     let mut state = GameState::new_empty();
     let target_id = state.spawn_player_like_npc(IVec2::new(50, 50));
-    
+
     // Damage first to reduce health (NPC starts at 50)
     state.set_rules(RuleSet {
         rules: vec![base_rule(
@@ -4267,7 +4298,7 @@ fn heal_entity_increases_health_by_specified_amount() {
 fn heal_entity_does_not_exceed_base_health() {
     let mut state = GameState::new_empty();
     let target_id = state.spawn_player_like_npc(IVec2::new(50, 50));
-    
+
     state.set_rules(RuleSet {
         rules: vec![base_rule(
             "overheal-attempt",
@@ -4298,7 +4329,7 @@ fn heal_entity_does_not_exceed_base_health() {
 fn add_inventory_item_adds_to_empty_inventory() {
     let mut state = GameState::new_empty();
     let player_id = state.spawn_player_at(IVec2::new(50, 50));
-    
+
     state.set_rules(RuleSet {
         rules: vec![base_rule(
             "grant-key",
@@ -4311,18 +4342,19 @@ fn add_inventory_item_adds_to_empty_inventory() {
             }],
         )],
     });
-    
+
     state.update(
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    
+
     let inventory = &state
         .entity_manager()
         .get_entity(player_id)
         .unwrap()
-        .attributes.inventory;
+        .attributes
+        .inventory;
     assert_eq!(inventory.item_count("key_red"), 1);
 }
 
@@ -4330,7 +4362,7 @@ fn add_inventory_item_adds_to_empty_inventory() {
 fn add_inventory_item_stacks_with_existing() {
     let mut state = GameState::new_empty();
     let player_id = state.spawn_player_at(IVec2::new(50, 50));
-    
+
     state.set_rules(RuleSet {
         rules: vec![base_rule(
             "grant-coins",
@@ -4343,26 +4375,27 @@ fn add_inventory_item_stacks_with_existing() {
             }],
         )],
     });
-    
+
     // Add first batch
     state.update(
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    
+
     // Add second batch
     state.update(
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    
+
     let inventory = &state
         .entity_manager()
         .get_entity(player_id)
         .unwrap()
-        .attributes.inventory;
+        .attributes
+        .inventory;
     assert_eq!(inventory.item_count("coin"), 20);
 }
 
@@ -4370,15 +4403,16 @@ fn add_inventory_item_stacks_with_existing() {
 fn remove_inventory_item_reduces_count() {
     let mut state = GameState::new_empty();
     let player_id = state.spawn_player_at(IVec2::new(50, 50));
-    
+
     // Add items first
     state
         .entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
-        .attributes.inventory
+        .attributes
+        .inventory
         .add_item("potion", 5);
-    
+
     state.set_rules(RuleSet {
         rules: vec![base_rule(
             "use-potion",
@@ -4391,18 +4425,19 @@ fn remove_inventory_item_reduces_count() {
             }],
         )],
     });
-    
+
     state.update(
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    
+
     let inventory = &state
         .entity_manager()
         .get_entity(player_id)
         .unwrap()
-        .attributes.inventory;
+        .attributes
+        .inventory;
     assert_eq!(inventory.item_count("potion"), 3);
 }
 
@@ -4410,15 +4445,16 @@ fn remove_inventory_item_reduces_count() {
 fn remove_inventory_item_never_goes_negative() {
     let mut state = GameState::new_empty();
     let player_id = state.spawn_player_at(IVec2::new(50, 50));
-    
+
     // Add only 2 items
     state
         .entity_manager_mut()
         .get_entity_mut(player_id)
         .unwrap()
-        .attributes.inventory
+        .attributes
+        .inventory
         .add_item("arrow", 2);
-    
+
     state.set_rules(RuleSet {
         rules: vec![base_rule(
             "use-many-arrows",
@@ -4431,28 +4467,40 @@ fn remove_inventory_item_never_goes_negative() {
             }],
         )],
     });
-    
+
     state.update(
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    
+
     let inventory = &state
         .entity_manager()
         .get_entity(player_id)
         .unwrap()
-        .attributes.inventory;
-    assert_eq!(inventory.item_count("arrow"), 0, "Should remove all but not go negative");
+        .attributes
+        .inventory;
+    assert_eq!(
+        inventory.item_count("arrow"),
+        0,
+        "Should remove all but not go negative"
+    );
 }
 
 #[test]
 fn set_entity_active_false_makes_entity_inactive() {
     let mut state = GameState::new_empty();
     let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
-    
-    assert!(state.entity_manager().get_entity(npc_id).unwrap().attributes.active);
-    
+
+    assert!(
+        state
+            .entity_manager()
+            .get_entity(npc_id)
+            .unwrap()
+            .attributes
+            .active
+    );
+
     state.set_rules(RuleSet {
         rules: vec![base_rule(
             "deactivate-npc",
@@ -4464,13 +4512,13 @@ fn set_entity_active_false_makes_entity_inactive() {
             }],
         )],
     });
-    
+
     state.update(
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    
+
     let entity = state.entity_manager().get_entity(npc_id).unwrap();
     assert!(!entity.attributes.active, "Entity should be inactive");
 }
@@ -4479,14 +4527,15 @@ fn set_entity_active_false_makes_entity_inactive() {
 fn set_entity_active_true_makes_entity_active() {
     let mut state = GameState::new_empty();
     let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
-    
+
     // Deactivate first
     state
         .entity_manager_mut()
         .get_entity_mut(npc_id)
         .unwrap()
-        .attributes.active = false;
-    
+        .attributes
+        .active = false;
+
     state.set_rules(RuleSet {
         rules: vec![base_rule(
             "activate-npc",
@@ -4498,13 +4547,13 @@ fn set_entity_active_true_makes_entity_active() {
             }],
         )],
     });
-    
+
     state.update(
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    
+
     let entity = state.entity_manager().get_entity(npc_id).unwrap();
     assert!(entity.attributes.active, "Entity should be active");
 }
@@ -4513,14 +4562,10 @@ fn set_entity_active_true_makes_entity_active() {
 fn teleport_entity_moves_to_specified_position() {
     let mut state = GameState::new_empty();
     let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
-    
-    let initial_pos = state
-        .entity_manager()
-        .get_entity(npc_id)
-        .unwrap()
-        .position;
+
+    let initial_pos = state.entity_manager().get_entity(npc_id).unwrap().position;
     assert_eq!(initial_pos, IVec2::new(50, 50));
-    
+
     state.set_rules(RuleSet {
         rules: vec![base_rule(
             "teleport-npc",
@@ -4540,11 +4585,7 @@ fn teleport_entity_moves_to_specified_position() {
         &create_test_atlas(),
     );
 
-    let new_pos = state
-        .entity_manager()
-        .get_entity(npc_id)
-        .unwrap()
-        .position;
+    let new_pos = state.entity_manager().get_entity(npc_id).unwrap().position;
     // tile_x=5, tile_y=6 with 16x16 tiles -> pixel position (80, 96)
     assert_eq!(new_pos, IVec2::new(80, 96));
 }
@@ -4554,7 +4595,7 @@ fn teleport_entity_works_with_trigger_self() {
     let mut state = GameState::new_empty();
     let _npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
     let player_id = state.spawn_player_at(IVec2::new(48, 48));
-    
+
     state.set_rules(RuleSet {
         rules: vec![base_rule(
             "teleport-on-collision",
@@ -4583,7 +4624,11 @@ fn teleport_entity_works_with_trigger_self() {
         &create_test_atlas(),
     );
 
-    let player_pos = state.entity_manager().get_entity(player_id).unwrap().position;
+    let player_pos = state
+        .entity_manager()
+        .get_entity(player_id)
+        .unwrap()
+        .position;
     // Player (TriggerSelf in collision) should have been teleported when collision occurred
     // tile_x=6, tile_y=6 with 16x16 tiles -> pixel position (96, 96)
     assert_eq!(player_pos, IVec2::new(96, 96));

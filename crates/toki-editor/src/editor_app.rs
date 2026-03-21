@@ -641,12 +641,25 @@ impl ApplicationHandler for EditorApp {
                                 if self.core.ui.center_panel_tab == CenterPanelTab::SpriteEditor {
                                     let side = self.core.ui.sprite.active_canvas;
                                     // Use (0, 0) as fallback if no cursor position
-                                    if self.core.ui.sprite.canvas_state(side).cursor_canvas_pos.is_none() {
-                                        self.core.ui.sprite.canvas_state_mut(side).cursor_canvas_pos =
-                                            Some(IVec2::new(0, 0));
+                                    if self
+                                        .core
+                                        .ui
+                                        .sprite
+                                        .canvas_state(side)
+                                        .cursor_canvas_pos
+                                        .is_none()
+                                    {
+                                        self.core
+                                            .ui
+                                            .sprite
+                                            .canvas_state_mut(side)
+                                            .cursor_canvas_pos = Some(IVec2::new(0, 0));
                                     }
                                     if self.core.ui.sprite.paste_at_cursor(side) {
-                                        tracing::info!("Sprite editor: pasted at cursor on {:?}", side);
+                                        tracing::info!(
+                                            "Sprite editor: pasted at cursor on {:?}",
+                                            side
+                                        );
                                     }
                                 }
                             }

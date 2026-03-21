@@ -54,7 +54,9 @@ pub enum RuleTrigger {
     OnStart,
     OnUpdate,
     OnPlayerMove,
-    OnKey { key: RuleKey },
+    OnKey {
+        key: RuleKey,
+    },
     OnCollision {
         /// Optional entity filter. If set, trigger only fires when this entity collides.
         /// If None, fires for all collision events.
@@ -179,26 +181,49 @@ pub enum RuleKey {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RuleCondition {
     Always,
-    TargetExists { target: RuleTarget },
-    KeyHeld { key: RuleKey },
-    EntityActive { target: RuleTarget, is_active: bool },
+    TargetExists {
+        target: RuleTarget,
+    },
+    KeyHeld {
+        key: RuleKey,
+    },
+    EntityActive {
+        target: RuleTarget,
+        is_active: bool,
+    },
     /// True when the target entity's health is strictly below the threshold.
-    HealthBelow { target: RuleTarget, threshold: i32 },
+    HealthBelow {
+        target: RuleTarget,
+        threshold: i32,
+    },
     /// True when the target entity's health is strictly above the threshold.
-    HealthAbove { target: RuleTarget, threshold: i32 },
+    HealthAbove {
+        target: RuleTarget,
+        threshold: i32,
+    },
     /// True when the trigger_other entity from trigger context is the player.
     /// Fails safely (returns false) when no trigger context is available.
     TriggerOtherIsPlayer,
     /// True when the target entity's kind matches the specified kind.
-    EntityIsKind { target: RuleTarget, kind: EntityKind },
+    EntityIsKind {
+        target: RuleTarget,
+        kind: EntityKind,
+    },
     /// True when the trigger_other entity from trigger context has the specified kind.
     /// Fails safely (returns false) when no trigger context is available.
-    TriggerOtherIsKind { kind: EntityKind },
+    TriggerOtherIsKind {
+        kind: EntityKind,
+    },
     /// True when the target entity has the specified tag.
-    EntityHasTag { target: RuleTarget, tag: String },
+    EntityHasTag {
+        target: RuleTarget,
+        tag: String,
+    },
     /// True when the trigger_other entity from trigger context has the specified tag.
     /// Fails safely (returns false) when no trigger context is available.
-    TriggerOtherHasTag { tag: String },
+    TriggerOtherHasTag {
+        tag: String,
+    },
     /// True when the target entity's inventory contains at least `min_count` of the specified item.
     HasInventoryItem {
         target: RuleTarget,

@@ -548,11 +548,10 @@ impl GameState {
         // Handle spawn requests from AI (e.g., RunAndMultiply)
         if let Some(spawn_request) = ai_result.spawn_request {
             let spawn_result = match &spawn_request.mode {
-                SpawnMode::Clone { source_entity_id } => {
-                    self.entity_manager
-                        .clone_entity(*source_entity_id, spawn_request.position)
-                        .ok_or_else(|| format!("Source entity {} not found", source_entity_id))
-                }
+                SpawnMode::Clone { source_entity_id } => self
+                    .entity_manager
+                    .clone_entity(*source_entity_id, spawn_request.position)
+                    .ok_or_else(|| format!("Source entity {} not found", source_entity_id)),
                 SpawnMode::FromDefinition { definition_name } => {
                     self.spawn_entity_from_definition_name(definition_name, spawn_request.position)
                 }
@@ -603,6 +602,7 @@ impl GameState {
             .ok_or_else(|| format!("Entity definition '{}' not found", definition_name))?
             .clone();
 
-        self.entity_manager.spawn_from_definition(&definition, position)
+        self.entity_manager
+            .spawn_from_definition(&definition, position)
     }
 }

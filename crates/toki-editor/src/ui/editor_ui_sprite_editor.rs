@@ -262,7 +262,9 @@ impl SpriteCanvas {
             for dx in 0..new_width {
                 let src_x = ((dx as f32 + 0.5) / scale).floor() as u32;
                 let src_y = ((dy as f32 + 0.5) / scale).floor() as u32;
-                if let Some(color) = self.get_pixel(src_x.min(self.width - 1), src_y.min(self.height - 1)) {
+                if let Some(color) =
+                    self.get_pixel(src_x.min(self.width - 1), src_y.min(self.height - 1))
+                {
                     result.set_pixel(dx, dy, color);
                 }
             }
@@ -275,7 +277,11 @@ impl SpriteCanvas {
     /// Uses 8-connectivity (includes diagonals) for better sprite selection.
     /// Returns the bounding box (x, y, width, height) of all connected pixels,
     /// or None if the starting pixel is transparent or out of bounds.
-    pub fn find_connected_sprite(&self, start_x: u32, start_y: u32) -> Option<(u32, u32, u32, u32)> {
+    pub fn find_connected_sprite(
+        &self,
+        start_x: u32,
+        start_y: u32,
+    ) -> Option<(u32, u32, u32, u32)> {
         // Check bounds
         if start_x >= self.width || start_y >= self.height {
             return None;
@@ -1599,12 +1605,9 @@ impl SpriteEditorState {
         let Some(canvas) = &cs.canvas else {
             return false;
         };
-        let Some(copied) = canvas.extract_region(
-            selection.x,
-            selection.y,
-            selection.width,
-            selection.height,
-        ) else {
+        let Some(copied) =
+            canvas.extract_region(selection.x, selection.y, selection.width, selection.height)
+        else {
             return false;
         };
         self.clipboard = Some(copied);
@@ -1675,10 +1678,8 @@ impl SpriteEditorState {
                     let scaled = clipboard.scaled_to_fit(cell_w, cell_h);
 
                     // Center the scaled clipboard in the cell
-                    let center_x =
-                        cell_x as i32 + (cell_w as i32 - scaled.width as i32) / 2;
-                    let center_y =
-                        cell_y as i32 + (cell_h as i32 - scaled.height as i32) / 2;
+                    let center_x = cell_x as i32 + (cell_w as i32 - scaled.width as i32) / 2;
+                    let center_y = cell_y as i32 + (cell_h as i32 - scaled.height as i32) / 2;
 
                     return (scaled, Some(glam::IVec2::new(center_x, center_y)));
                 }
@@ -1974,8 +1975,13 @@ impl SpriteEditorState {
         let pixels = canvas.pixels().to_vec();
 
         // Save PNG
-        toki_core::graphics::image::save_image_rgba8(&png_path, canvas_width, canvas_height, &pixels)
-            .map_err(|e| format!("Failed to save PNG: {e}"))?;
+        toki_core::graphics::image::save_image_rgba8(
+            &png_path,
+            canvas_width,
+            canvas_height,
+            &pixels,
+        )
+        .map_err(|e| format!("Failed to save PNG: {e}"))?;
 
         // Create and save metadata based on asset kind
         match save_asset_kind {
@@ -1985,7 +1991,10 @@ impl SpriteEditorState {
                     self.create_atlas_with_names(&png_filename, cols, rows)
                 } else {
                     // Single tile atlas
-                    AtlasMeta::new_single_tile(&png_filename, UVec2::new(canvas_width, canvas_height))
+                    AtlasMeta::new_single_tile(
+                        &png_filename,
+                        UVec2::new(canvas_width, canvas_height),
+                    )
                 };
                 meta.save_to_file(&json_path)
                     .map_err(|e| format!("Failed to save metadata: {e}"))?;

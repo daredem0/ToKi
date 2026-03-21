@@ -22,10 +22,10 @@ pub fn save_image_rgba8<P: AsRef<std::path::Path>>(
         )));
     }
 
-    let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-        ImageBuffer::from_raw(width, height, data.to_vec()).ok_or_else(|| {
-            CoreError::ImageLoad("Failed to create image buffer from raw data".to_string())
-        })?;
+    let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(width, height, data.to_vec())
+        .ok_or_else(|| {
+        CoreError::ImageLoad("Failed to create image buffer from raw data".to_string())
+    })?;
 
     img.save(&path).map_err(|e| {
         CoreError::ImageLoad(format!("Failed to save image to {:?}: {e}", path.as_ref()))

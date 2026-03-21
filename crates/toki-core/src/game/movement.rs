@@ -102,7 +102,8 @@ impl GameState {
         }
 
         // Check for collisions and identify the colliding entity if any
-        let collision_result = self.check_movement_collision(entity_id, new_position, tilemap, atlas);
+        let collision_result =
+            self.check_movement_collision(entity_id, new_position, tilemap, atlas);
 
         if collision_result.blocked {
             self.handle_entity_collision_blocked(entity_id, collision_result.collided_with, result);

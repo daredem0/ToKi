@@ -681,16 +681,14 @@ fn animation_authoring_state_to_animations_def() {
 fn animation_authoring_state_roundtrip_conversion() {
     let original = AnimationsDef {
         atlas_name: "test.json".to_string(),
-        clips: vec![
-            AnimationClipDef {
-                state: "idle".to_string(),
-                frame_tiles: Vec::new(),
-                frame_positions: Some(vec![[0, 0], [1, 0]]),
-                frame_duration_ms: 200.0,
-                frame_durations_ms: Some(vec![200.0, 300.0]),
-                loop_mode: "ping_pong".to_string(),
-            },
-        ],
+        clips: vec![AnimationClipDef {
+            state: "idle".to_string(),
+            frame_tiles: Vec::new(),
+            frame_positions: Some(vec![[0, 0], [1, 0]]),
+            frame_duration_ms: 200.0,
+            frame_durations_ms: Some(vec![200.0, 300.0]),
+            loop_mode: "ping_pong".to_string(),
+        }],
         default_state: "idle".to_string(),
     };
 
@@ -701,6 +699,9 @@ fn animation_authoring_state_roundtrip_conversion() {
     assert_eq!(restored.default_state, original.default_state);
     assert_eq!(restored.clips.len(), original.clips.len());
     assert_eq!(restored.clips[0].state, original.clips[0].state);
-    assert_eq!(restored.clips[0].frame_positions, original.clips[0].frame_positions);
+    assert_eq!(
+        restored.clips[0].frame_positions,
+        original.clips[0].frame_positions
+    );
     assert_eq!(restored.clips[0].loop_mode, original.clips[0].loop_mode);
 }

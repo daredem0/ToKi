@@ -40,7 +40,9 @@ impl GameState {
                 }
                 self.entity_manager
                     .get_entity(entity_id)
-                    .is_some_and(|entity| entity.attributes.interactable && entity.attributes.active)
+                    .is_some_and(|entity| {
+                        entity.attributes.interactable && entity.attributes.active
+                    })
             })
             .collect::<Vec<_>>();
         interactable_ids.sort_unstable();
@@ -66,13 +68,11 @@ impl GameState {
             );
 
             if let Some(spatial) = spatial {
-                self.rule_runtime
-                    .frame_interactions
-                    .push(InteractionEvent {
-                        interactor: player_id,
-                        interactable: interactable_id,
-                        spatial,
-                    });
+                self.rule_runtime.frame_interactions.push(InteractionEvent {
+                    interactor: player_id,
+                    interactable: interactable_id,
+                    spatial,
+                });
 
                 tracing::debug!(
                     "Player {} interacting with entity {} (spatial: {:?})",
@@ -95,12 +95,8 @@ impl GameState {
         interaction_reach: i32,
     ) -> Option<InteractionSpatial> {
         // Check strict overlap first
-        let overlaps = collision::aabb_overlap(
-            player_pos,
-            player_size,
-            interactable_pos,
-            interactable_size,
-        );
+        let overlaps =
+            collision::aabb_overlap(player_pos, player_size, interactable_pos, interactable_size);
 
         if overlaps {
             return Some(InteractionSpatial::Overlap);
@@ -122,10 +118,7 @@ impl GameState {
 
         // Check if adjacent (within reach in any direction)
         let reach = interaction_reach.max(1); // At least 1 pixel reach for adjacent
-        let expanded_pos = glam::IVec2::new(
-            player_pos.x - reach,
-            player_pos.y - reach,
-        );
+        let expanded_pos = glam::IVec2::new(player_pos.x - reach, player_pos.y - reach);
         let expanded_size = glam::UVec2::new(
             player_size.x + (reach * 2) as u32,
             player_size.y + (reach * 2) as u32,

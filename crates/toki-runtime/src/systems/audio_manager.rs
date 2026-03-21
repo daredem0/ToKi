@@ -75,7 +75,8 @@ impl AudioAssetCache {
             return Ok(());
         }
 
-        let inventory = classify_sfx_inventory(&discover_supported_audio_assets(&sfx_dir)?, preload_names);
+        let inventory =
+            classify_sfx_inventory(&discover_supported_audio_assets(&sfx_dir)?, preload_names);
         for (name, path) in inventory.all_paths {
             let path_str = path.to_string_lossy().to_string();
             self.sfx_paths.insert(name.clone(), path_str.clone());
@@ -270,7 +271,11 @@ impl AudioPlaybackState {
                     tracing::trace!("  Static handle {}: state={:?}", i, handle.handle.state());
                 }
                 for (i, handle) in channel.active_streaming_handles.iter().enumerate() {
-                    tracing::trace!("  Streaming handle {}: state={:?}", i, handle.handle.state());
+                    tracing::trace!(
+                        "  Streaming handle {}: state={:?}",
+                        i,
+                        handle.handle.state()
+                    );
                 }
             }
 
@@ -619,10 +624,12 @@ impl AudioManager {
 
             let handle = self.playback.play_streaming_sound(sound_data)?;
             let channel_data = self.playback.get_channel_mut(channel).unwrap();
-            channel_data.active_streaming_handles.push(ActiveStreamingSound {
-                handle,
-                base_gain: volume,
-            });
+            channel_data
+                .active_streaming_handles
+                .push(ActiveStreamingSound {
+                    handle,
+                    base_gain: volume,
+                });
 
             let duration = start.elapsed();
             let new_total =
