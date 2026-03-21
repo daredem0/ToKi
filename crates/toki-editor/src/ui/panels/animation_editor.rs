@@ -474,6 +474,14 @@ fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::Con
                 ui_state.animation.atlas_viewport.zoom_out();
             }
         }
+
+        // Handle +/- keys for zoom
+        if ui.input(|i| i.key_pressed(egui::Key::Plus) || i.key_pressed(egui::Key::Equals)) {
+            ui_state.animation.atlas_viewport.zoom_in();
+        }
+        if ui.input(|i| i.key_pressed(egui::Key::Minus)) {
+            ui_state.animation.atlas_viewport.zoom_out();
+        }
     }
 
     // Update cursor position
