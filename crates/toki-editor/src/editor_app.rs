@@ -628,10 +628,10 @@ impl ApplicationHandler for EditorApp {
                             }
                             EditorShortcutAction::Copy => {
                                 // Copy only applies to sprite editor
-                                if self.core.ui.center_panel_tab == CenterPanelTab::SpriteEditor {
-                                    if self.core.ui.sprite.copy_selection() {
-                                        tracing::info!("Sprite editor: copied selection to clipboard");
-                                    }
+                                if self.core.ui.center_panel_tab == CenterPanelTab::SpriteEditor
+                                    && self.core.ui.sprite.copy_selection()
+                                {
+                                    tracing::info!("Sprite editor: copied selection to clipboard");
                                 }
                             }
                             EditorShortcutAction::Paste => {

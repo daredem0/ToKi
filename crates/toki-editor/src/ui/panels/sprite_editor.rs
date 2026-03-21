@@ -1109,7 +1109,7 @@ fn draw_canvas_with_checkerboard(
     let visible_rect = canvas_screen_rect.intersect(rect);
     if visible_rect.is_positive() {
         // Draw checkerboard pattern for transparency
-        draw_checkerboard(painter, visible_rect, zoom);
+        draw_checkerboard(painter, rect, visible_rect, viewport, canvas);
 
         // Draw canvas texture
         if let Some(tex) = texture {
@@ -1131,34 +1131,54 @@ fn draw_canvas_with_checkerboard(
     );
 }
 
-fn draw_checkerboard(painter: &egui::Painter, rect: egui::Rect, zoom: f32) {
-    // Draw a simple checkerboard pattern
-    let check_size = (8.0 * (zoom / 8.0).max(1.0)).min(16.0);
+fn draw_checkerboard(
+    painter: &egui::Painter,
+    viewport_rect: egui::Rect,
+    visible_rect: egui::Rect,
+    viewport: &SpriteCanvasViewport,
+    canvas: &SpriteCanvas,
+) {
+    let zoom = viewport.zoom;
+    let pan = viewport.pan;
+
+    // Each checkerboard square = 1 pixel, aligned with the pixel grid
+    let pixel_size = zoom;
     let color1 = egui::Color32::from_gray(180);
     let color2 = egui::Color32::from_gray(220);
 
-    let start_x = rect.left();
-    let start_y = rect.top();
-    let end_x = rect.right();
-    let end_y = rect.bottom();
+    // Calculate where pixel (0,0) appears on screen (using original viewport rect, not clipped)
+    let canvas_screen_min = egui::pos2(
+        viewport_rect.left() + (-pan.x * zoom),
+        viewport_rect.top() + (-pan.y * zoom),
+    );
 
-    let mut y = start_y;
-    let mut row = 0;
-    while y < end_y {
-        let mut x = start_x;
-        let mut col = 0;
-        while x < end_x {
-            let color = if (row + col) % 2 == 0 { color1 } else { color2 };
+    // Find the range of visible pixels (use visible_rect for bounds)
+    let first_visible_x = ((visible_rect.left() - canvas_screen_min.x) / pixel_size).floor() as i32;
+    let first_visible_y = ((visible_rect.top() - canvas_screen_min.y) / pixel_size).floor() as i32;
+    let last_visible_x = ((visible_rect.right() - canvas_screen_min.x) / pixel_size).ceil() as i32;
+    let last_visible_y = ((visible_rect.bottom() - canvas_screen_min.y) / pixel_size).ceil() as i32;
+
+    // Clamp to canvas bounds
+    let start_x = first_visible_x.max(0) as u32;
+    let start_y = first_visible_y.max(0) as u32;
+    let end_x = (last_visible_x as u32).min(canvas.width);
+    let end_y = (last_visible_y as u32).min(canvas.height);
+
+    for py in start_y..end_y {
+        for px in start_x..end_x {
+            let color = if (px + py) % 2 == 0 { color1 } else { color2 };
+            let screen_x = canvas_screen_min.x + px as f32 * pixel_size;
+            let screen_y = canvas_screen_min.y + py as f32 * pixel_size;
             let check_rect = egui::Rect::from_min_size(
-                egui::pos2(x, y),
-                egui::vec2(check_size.min(end_x - x), check_size.min(end_y - y)),
+                egui::pos2(screen_x, screen_y),
+                egui::vec2(pixel_size, pixel_size),
             );
-            painter.rect_filled(check_rect, 0.0, color);
-            x += check_size;
-            col += 1;
+            // Clip to the visible rect
+            let clipped = check_rect.intersect(visible_rect);
+            if clipped.width() > 0.0 && clipped.height() > 0.0 {
+                painter.rect_filled(clipped, 0.0, color);
+            }
         }
-        y += check_size;
-        row += 1;
     }
 }
 
@@ -1203,8 +1223,8 @@ fn draw_pixel_grid(
 
     let canvas_screen_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
 
-    // Use a cyan tint that contrasts with both light and dark checkerboard squares
-    let stroke = egui::Stroke::new(1.0, egui::Color32::from_rgba_unmultiplied(0, 180, 200, 100));
+    // Use a dark gray that contrasts with the light checkerboard squares
+    let stroke = egui::Stroke::new(1.0, egui::Color32::from_rgba_unmultiplied(80, 80, 80, 180));
 
     // Vertical lines
     for x in 0..=canvas.width {
