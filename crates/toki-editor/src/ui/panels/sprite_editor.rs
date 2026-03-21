@@ -832,12 +832,18 @@ fn render_dual_viewports_horizontal(
     sprites_dir: Option<&std::path::Path>,
 ) {
     let available = ui.available_size();
-    let half_width = ((available.x - 8.0) / 2.0).max(100.0); // 8px gap between panels
+    let splitter_width = 8.0;
+    let usable_width = (available.x - splitter_width).max(200.0);
+
+    // Calculate widths based on split ratio
+    let split_ratio = ui_state.sprite.split_ratio.clamp(0.1, 0.9);
+    let left_width = (usable_width * split_ratio).max(100.0);
+    let right_width = (usable_width * (1.0 - split_ratio)).max(100.0);
 
     ui.horizontal(|ui| {
         // Left canvas
         ui.vertical(|ui| {
-            ui.set_width(half_width);
+            ui.set_width(left_width);
             render_canvas_panel_header(ui, ui_state, CanvasSide::Left);
             if ui_state.sprite.canvas_state(CanvasSide::Left).canvas.is_some() {
                 render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Left));
@@ -846,11 +852,17 @@ fn render_dual_viewports_horizontal(
             }
         });
 
-        ui.separator();
+        // Draggable splitter
+        let splitter_response = render_vertical_splitter(ui, available.y);
+        if splitter_response.dragged() {
+            let delta = splitter_response.drag_delta().x;
+            let new_ratio = ui_state.sprite.split_ratio + delta / usable_width;
+            ui_state.sprite.split_ratio = new_ratio.clamp(0.1, 0.9);
+        }
 
         // Right canvas
         ui.vertical(|ui| {
-            ui.set_width(half_width);
+            ui.set_width(right_width);
             render_canvas_panel_header(ui, ui_state, CanvasSide::Right);
             if ui_state.sprite.canvas_state(CanvasSide::Right).canvas.is_some() {
                 render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Right));
@@ -869,11 +881,17 @@ fn render_dual_viewports_vertical(
     sprites_dir: Option<&std::path::Path>,
 ) {
     let available = ui.available_size();
-    let half_height = ((available.y - 32.0) / 2.0).max(100.0); // Reserve space for headers and gap
+    let splitter_height = 8.0;
+    let usable_height = (available.y - splitter_height - 48.0).max(200.0); // Reserve space for headers
+
+    // Calculate heights based on split ratio
+    let split_ratio = ui_state.sprite.split_ratio.clamp(0.1, 0.9);
+    let top_height = (usable_height * split_ratio).max(100.0);
+    let bottom_height = (usable_height * (1.0 - split_ratio)).max(100.0);
 
     // Top canvas
     ui.vertical(|ui| {
-        ui.set_height(half_height);
+        ui.set_height(top_height);
         render_canvas_panel_header(ui, ui_state, CanvasSide::Left);
         if ui_state.sprite.canvas_state(CanvasSide::Left).canvas.is_some() {
             render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Left));
@@ -882,11 +900,17 @@ fn render_dual_viewports_vertical(
         }
     });
 
-    ui.separator();
+    // Draggable splitter
+    let splitter_response = render_horizontal_splitter(ui, available.x);
+    if splitter_response.dragged() {
+        let delta = splitter_response.drag_delta().y;
+        let new_ratio = ui_state.sprite.split_ratio + delta / usable_height;
+        ui_state.sprite.split_ratio = new_ratio.clamp(0.1, 0.9);
+    }
 
     // Bottom canvas
     ui.vertical(|ui| {
-        ui.set_height(half_height);
+        ui.set_height(bottom_height);
         render_canvas_panel_header(ui, ui_state, CanvasSide::Right);
         if ui_state.sprite.canvas_state(CanvasSide::Right).canvas.is_some() {
             render_canvas_viewport(ui, ui_state, ctx, Some(CanvasSide::Right));
@@ -894,6 +918,66 @@ fn render_dual_viewports_vertical(
             render_empty_canvas_slot(ui, ui_state, sprites_dir, CanvasSide::Right);
         }
     });
+}
+
+/// Render a vertical splitter (for horizontal layout - splits left/right)
+fn render_vertical_splitter(ui: &mut egui::Ui, height: f32) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(8.0, height),
+        egui::Sense::click_and_drag(),
+    );
+
+    // Change cursor on hover
+    if response.hovered() || response.dragged() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+    }
+
+    // Draw the splitter
+    let painter = ui.painter();
+    let color = if response.hovered() || response.dragged() {
+        egui::Color32::from_gray(120)
+    } else {
+        egui::Color32::from_gray(80)
+    };
+
+    // Draw a thin line in the center
+    let center_x = rect.center().x;
+    painter.line_segment(
+        [egui::pos2(center_x, rect.top()), egui::pos2(center_x, rect.bottom())],
+        egui::Stroke::new(2.0, color),
+    );
+
+    response
+}
+
+/// Render a horizontal splitter (for vertical layout - splits top/bottom)
+fn render_horizontal_splitter(ui: &mut egui::Ui, width: f32) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(width, 8.0),
+        egui::Sense::click_and_drag(),
+    );
+
+    // Change cursor on hover
+    if response.hovered() || response.dragged() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeVertical);
+    }
+
+    // Draw the splitter
+    let painter = ui.painter();
+    let color = if response.hovered() || response.dragged() {
+        egui::Color32::from_gray(120)
+    } else {
+        egui::Color32::from_gray(80)
+    };
+
+    // Draw a thin line in the center
+    let center_y = rect.center().y;
+    painter.line_segment(
+        [egui::pos2(rect.left(), center_y), egui::pos2(rect.right(), center_y)],
+        egui::Stroke::new(2.0, color),
+    );
+
+    response
 }
 
 /// Render a header for a canvas panel showing its side and active state

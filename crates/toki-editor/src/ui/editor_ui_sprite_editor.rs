@@ -569,6 +569,8 @@ pub struct SpriteEditorState {
     pub active_canvas: CanvasSide,
     /// Layout mode for canvas display
     pub layout: DualCanvasLayout,
+    /// Split ratio for dual canvas layout (0.0 to 1.0, where 0.5 is equal split)
+    pub split_ratio: f32,
     /// Current editing tool (shared across canvases)
     pub tool: SpriteEditorTool,
     /// Clipboard for copy/paste operations (shared across canvases)
@@ -727,6 +729,7 @@ impl Default for SpriteEditorState {
             canvases: [CanvasState::default(), CanvasState::default()],
             active_canvas: CanvasSide::default(),
             layout: DualCanvasLayout::default(),
+            split_ratio: 0.5,
             tool: SpriteEditorTool::Drag,
             clipboard: None,
             foreground_color: PixelColor::black(),
