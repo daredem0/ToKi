@@ -27,6 +27,7 @@ mod animation_editor;
 mod assets;
 mod domain_inspectors;
 mod entities;
+mod entity_editor;
 mod map_editor;
 mod menu_editor;
 mod project;
@@ -436,6 +437,11 @@ impl InspectorSystem {
 
         if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::AnimationEditor {
             Self::render_animation_editor_inspector(ui_state, ui);
+            return;
+        }
+
+        if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::EntityEditor {
+            Self::render_entity_editor_inspector(ui_state, ui);
             return;
         }
 

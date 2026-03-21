@@ -20,6 +20,7 @@ use toki_core::rules::{
 };
 
 mod animation_editor;
+mod entity_editor;
 mod map_editor;
 mod map_editor_interactions;
 mod map_editor_preview;
@@ -144,6 +145,11 @@ impl PanelSystem {
                     CenterPanelTab::AnimationEditor,
                     "Animation Editor",
                 );
+                ui.selectable_value(
+                    &mut ui_state.center_panel_tab,
+                    CenterPanelTab::EntityEditor,
+                    "Entity Editor",
+                );
             });
             ui.separator();
 
@@ -181,6 +187,11 @@ impl PanelSystem {
 
             if ui_state.center_panel_tab == CenterPanelTab::AnimationEditor {
                 animation_editor::render_animation_editor(ui, ui_state, ctx, project);
+                return;
+            }
+
+            if ui_state.center_panel_tab == CenterPanelTab::EntityEditor {
+                entity_editor::render_entity_editor(ui, ui_state, ctx, project);
                 return;
             }
 

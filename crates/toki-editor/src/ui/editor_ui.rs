@@ -25,9 +25,12 @@ mod editor_ui_sprite_editor;
 mod editor_ui_animation_authoring;
 #[path = "editor_ui_animation_editor.rs"]
 mod editor_ui_animation_editor;
+#[path = "editor_ui_entity_editor.rs"]
+mod editor_ui_entity_editor;
 
 pub(crate) use editor_ui_animation_authoring::AnimationAuthoringState;
 pub(crate) use editor_ui_animation_editor::AnimationEditorState;
+pub(crate) use editor_ui_entity_editor::{EntityCategory, EntityEditorState, EntitySummary};
 pub(crate) use editor_ui_graph::SceneRulesGraphCommandData;
 pub(crate) use editor_ui_map_editor::{
     MapEditorDraft, MapEditorHistory, MapEditorObjectInfo, MapEditorObjectPropertyEditRequest,
@@ -80,6 +83,7 @@ pub(crate) enum CenterPanelTab {
     MenuEditor,
     SpriteEditor,
     AnimationEditor,
+    EntityEditor,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -492,6 +496,9 @@ pub struct EditorUI {
     // Animation editor state
     pub animation: AnimationEditorState,
 
+    // Entity editor state
+    pub entity_editor: EntityEditorState,
+
     // Entity placement system
     pub placement: PlacementState,
 
@@ -540,6 +547,9 @@ impl EditorUI {
 
             // Animation editor state
             animation: AnimationEditorState::default(),
+
+            // Entity editor state
+            entity_editor: EntityEditorState::default(),
 
             // Entity placement system
             placement: PlacementState::default(),

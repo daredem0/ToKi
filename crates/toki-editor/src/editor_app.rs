@@ -582,7 +582,8 @@ impl ApplicationHandler for EditorApp {
                         | CenterPanelTab::SceneRules
                         | CenterPanelTab::MenuEditor
                         | CenterPanelTab::SpriteEditor
-                        | CenterPanelTab::AnimationEditor => None,
+                        | CenterPanelTab::AnimationEditor
+                        | CenterPanelTab::EntityEditor => None,
                     };
                     if let Some(viewport) = active_viewport {
                         tracing::debug!("Passing logical key {:?} to viewport", event.logical_key);
@@ -878,7 +879,8 @@ impl EditorApp {
                     | CenterPanelTab::SceneRules
                     | CenterPanelTab::MenuEditor
                     | CenterPanelTab::SpriteEditor
-                    | CenterPanelTab::AnimationEditor => {}
+                    | CenterPanelTab::AnimationEditor
+                    | CenterPanelTab::EntityEditor => {}
                 }
             } else if self.core.project_manager.current_project.is_some() {
                 tracing::warn!(
