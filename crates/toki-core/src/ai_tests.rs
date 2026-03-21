@@ -7,6 +7,207 @@ use crate::entity::{AiConfig, ControlRole, Entity, EntityAttributes, EntityKind}
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+// ============================================================================
+// BehaviorHandler Trait Tests
+// ============================================================================
+
+#[test]
+fn chase_handler_returns_result_when_player_in_range() {
+    let mut entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    // Player at (100, 100)
+    let player = create_player_entity(1, IVec2::new(100, 100));
+    entity_manager.add_existing_entity(player);
+
+    // Chaser at (70, 100) - within detection radius
+    let chaser =
+        create_test_entity_with_detection_radius(2, IVec2::new(70, 100), AiBehavior::Chase, 64);
+    entity_manager.add_existing_entity(chaser);
+
+    let ctx = AiContext::new(&entity_manager, UVec2::new(256, 256), &tilemap, &atlas);
+    let entity = entity_manager.get_entity(2).unwrap();
+    let handler = ChaseHandler;
+
+    let mut ai_state = AiRuntimeState::default();
+    let result = handler.update(entity, 2, Some(IVec2::new(100, 100)), &ctx, &mut ai_state);
+
+    assert!(result.is_some());
+    let result = result.unwrap();
+    assert_eq!(result.entity_id, 2);
+    // Should move toward player
+    if let Some(new_pos) = result.new_position {
+        assert!(new_pos.x > 70, "Should move toward player");
+    }
+}
+
+#[test]
+fn run_handler_moves_away_from_player() {
+    let mut entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    // Player at (100, 100)
+    let player = create_player_entity(1, IVec2::new(100, 100));
+    entity_manager.add_existing_entity(player);
+
+    // Runner at (120, 100) - within detection radius
+    let runner =
+        create_test_entity_with_detection_radius(2, IVec2::new(120, 100), AiBehavior::Run, 64);
+    entity_manager.add_existing_entity(runner);
+
+    let ctx = AiContext::new(&entity_manager, UVec2::new(256, 256), &tilemap, &atlas);
+    let entity = entity_manager.get_entity(2).unwrap();
+    let handler = RunHandler;
+
+    let mut ai_state = AiRuntimeState::default();
+    let result = handler.update(entity, 2, Some(IVec2::new(100, 100)), &ctx, &mut ai_state);
+
+    assert!(result.is_some());
+    let result = result.unwrap();
+    // Should move away from player
+    if let Some(new_pos) = result.new_position {
+        assert!(new_pos.x > 120, "Should move away from player");
+    }
+}
+
+#[test]
+fn wander_handler_respects_frame_throttling() {
+    let mut entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    let entity = create_test_entity(1, IVec2::new(50, 50), AiBehavior::Wander);
+    entity_manager.add_existing_entity(entity);
+
+    let ctx = AiContext::new(&entity_manager, UVec2::new(256, 256), &tilemap, &atlas);
+    let entity = entity_manager.get_entity(1).unwrap();
+    let handler = WanderHandler::new(1); // frame_counter = 1 (not divisible by 60)
+
+    let mut ai_state = AiRuntimeState::default();
+    let result = handler.update(entity, 1, None, &ctx, &mut ai_state);
+
+    // Should return None when not on update frame
+    assert!(result.is_none(), "Wander should be throttled");
+
+    // Test on update frame
+    let handler_at_60 = WanderHandler::new(60);
+    let result = handler_at_60.update(entity, 1, None, &ctx, &mut ai_state);
+
+    // Should return Some on update frame
+    assert!(result.is_some(), "Wander should update on frame 60");
+}
+
+#[test]
+fn behavior_for_returns_correct_handler() {
+    // Chase
+    assert!(matches!(
+        BehaviorHandler::for_behavior(AiBehavior::Chase, 0),
+        Some(BehaviorHandler::Chase(_))
+    ));
+
+    // Run
+    assert!(matches!(
+        BehaviorHandler::for_behavior(AiBehavior::Run, 0),
+        Some(BehaviorHandler::Run(_))
+    ));
+
+    // Wander
+    assert!(matches!(
+        BehaviorHandler::for_behavior(AiBehavior::Wander, 0),
+        Some(BehaviorHandler::Wander(_))
+    ));
+
+    // None behavior returns None handler
+    assert!(BehaviorHandler::for_behavior(AiBehavior::None, 0).is_none());
+}
+
+// ============================================================================
+// AiContext Tests
+// ============================================================================
+
+#[test]
+fn ai_context_creates_from_components() {
+    let entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+    let world_bounds = UVec2::new(256, 256);
+
+    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &atlas);
+
+    assert_eq!(context.world_bounds, UVec2::new(256, 256));
+}
+
+#[test]
+fn ai_context_computes_max_position() {
+    let entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+    let world_bounds = UVec2::new(256, 256);
+
+    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &atlas);
+    let entity_size = UVec2::new(16, 16);
+
+    let (max_x, max_y) = context.max_position(entity_size);
+    assert_eq!(max_x, 240); // 256 - 16
+    assert_eq!(max_y, 240);
+}
+
+#[test]
+fn ai_context_max_position_clamps_to_zero() {
+    let entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+    let world_bounds = UVec2::new(10, 10); // Smaller than entity
+
+    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &atlas);
+    let entity_size = UVec2::new(16, 16);
+
+    let (max_x, max_y) = context.max_position(entity_size);
+    assert_eq!(max_x, 0); // Clamped to 0
+    assert_eq!(max_y, 0);
+}
+
+#[test]
+fn ai_context_validates_movement() {
+    let mut entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+    let world_bounds = UVec2::new(256, 256);
+
+    let entity = create_test_entity(1, IVec2::new(50, 50), AiBehavior::Chase);
+    entity_manager.add_existing_entity(entity);
+
+    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &atlas);
+    let entity = entity_manager.get_entity(1).unwrap();
+
+    // Movement to open position should be valid
+    assert!(context.is_movement_valid(entity, 1, IVec2::new(60, 50)));
+}
+
+#[test]
+fn ai_context_rejects_movement_into_solid_entity() {
+    let mut entity_manager = EntityManager::new();
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+    let world_bounds = UVec2::new(256, 256);
+
+    let entity = create_test_entity(1, IVec2::new(50, 50), AiBehavior::Chase);
+    entity_manager.add_existing_entity(entity);
+
+    // Add a blocking solid entity
+    let mut blocker = create_test_entity(2, IVec2::new(60, 50), AiBehavior::None);
+    blocker.attributes.solid = true;
+    entity_manager.add_existing_entity(blocker);
+
+    let context = AiContext::new(&entity_manager, world_bounds, &tilemap, &atlas);
+    let entity = entity_manager.get_entity(1).unwrap();
+
+    // Movement should be blocked by solid entity
+    assert!(!context.is_movement_valid(entity, 1, IVec2::new(60, 50)));
+}
+
 /// Creates a minimal TileMap for AI testing with all passable tiles.
 fn create_test_tilemap() -> TileMap {
     TileMap {

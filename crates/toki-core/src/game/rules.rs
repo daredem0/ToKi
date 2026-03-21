@@ -184,12 +184,13 @@ impl GameState {
     /// death, and interaction rule evaluation. The caller provides a predicate
     /// that implements trigger-specific matching (e.g., OnCollision with entity filter).
     ///
-    /// Returns rules sorted by priority (highest first), then by ID for stability.
-    fn collect_filtered_rules<F>(&self, rule_filter: F) -> Vec<Rule>
+    /// Returns rule references sorted by priority (highest first), then by ID for stability.
+    /// Uses references to avoid cloning entire Rule structs on every evaluation.
+    fn collect_filtered_rules<F>(&self, rule_filter: F) -> Vec<&Rule>
     where
         F: Fn(&Rule) -> bool,
     {
-        let mut matching_rules = self
+        let mut matching_rules: Vec<&Rule> = self
             .rules
             .rules
             .iter()
@@ -202,8 +203,7 @@ impl GameState {
                         .fired_once_rules
                         .contains(rule.id.as_str()))
             })
-            .cloned()
-            .collect::<Vec<_>>();
+            .collect();
 
         matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
         matching_rules
@@ -244,7 +244,7 @@ impl GameState {
         context: TriggerContext,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        let mut matching_rules = self
+        let mut matching_rules: Vec<&Rule> = self
             .rules
             .rules
             .iter()
@@ -256,11 +256,11 @@ impl GameState {
                         .fired_once_rules
                         .contains(rule.id.as_str()))
             })
-            .cloned()
-            .collect::<Vec<_>>();
+            .collect();
 
         matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
 
+        let mut fired_once_ids = Vec::new();
         for rule in matching_rules {
             let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
             debug!(
@@ -280,9 +280,10 @@ impl GameState {
             }
 
             if rule.once {
-                self.rule_runtime.fired_once_rules.insert(rule.id);
+                fired_once_ids.push(rule.id.clone());
             }
         }
+        self.rule_runtime.fired_once_rules.extend(fired_once_ids);
     }
 
     /// Collects rule commands for OnInteract triggers, filtering by interaction mode and entity.
@@ -310,6 +311,7 @@ impl GameState {
                 )
         });
 
+        let mut fired_once_ids = Vec::new();
         for rule in matching_rules {
             let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
             debug!(
@@ -332,9 +334,10 @@ impl GameState {
             }
 
             if rule.once {
-                self.rule_runtime.fired_once_rules.insert(rule.id);
+                fired_once_ids.push(rule.id.clone());
             }
         }
+        self.rule_runtime.fired_once_rules.extend(fired_once_ids);
     }
 
     /// Checks if an interaction mode matches a spatial relationship.
@@ -383,6 +386,7 @@ impl GameState {
                 )
         });
 
+        let mut fired_once_ids = Vec::new();
         for rule in matching_rules {
             let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
 
@@ -420,9 +424,10 @@ impl GameState {
             }
 
             if rule.once {
-                self.rule_runtime.fired_once_rules.insert(rule.id);
+                fired_once_ids.push(rule.id.clone());
             }
         }
+        self.rule_runtime.fired_once_rules.extend(fired_once_ids);
     }
 
     /// Collects rule commands for OnDamaged triggers, filtering by entity if specified.
@@ -450,6 +455,7 @@ impl GameState {
                 )
         });
 
+        let mut fired_once_ids = Vec::new();
         for rule in matching_rules {
             let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
             debug!(
@@ -471,9 +477,10 @@ impl GameState {
             }
 
             if rule.once {
-                self.rule_runtime.fired_once_rules.insert(rule.id);
+                fired_once_ids.push(rule.id.clone());
             }
         }
+        self.rule_runtime.fired_once_rules.extend(fired_once_ids);
     }
 
     /// Checks if an entity filter matches a target entity.
@@ -519,6 +526,7 @@ impl GameState {
                 )
         });
 
+        let mut fired_once_ids = Vec::new();
         for rule in matching_rules {
             let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
             tracing::info!(
@@ -540,9 +548,10 @@ impl GameState {
             }
 
             if rule.once {
-                self.rule_runtime.fired_once_rules.insert(rule.id);
+                fired_once_ids.push(rule.id.clone());
             }
         }
+        self.rule_runtime.fired_once_rules.extend(fired_once_ids);
     }
 
     pub(super) fn collect_rule_commands_for_key_triggers(
@@ -1213,7 +1222,7 @@ impl GameState {
 
             let context = TriggerContext::with_self_only(event.entity_id);
 
-            let mut matching_rules = self
+            let mut matching_rules: Vec<&Rule> = self
                 .rules
                 .rules
                 .iter()
@@ -1225,12 +1234,12 @@ impl GameState {
                             .fired_once_rules
                             .contains(rule.id.as_str()))
                 })
-                .cloned()
-                .collect::<Vec<_>>();
+                .collect();
 
             matching_rules
                 .sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
 
+            let mut fired_once_ids = Vec::new();
             for rule in matching_rules {
                 // Validate tile coordinates are within map bounds
                 if let Some((tile_x, tile_y)) = rule.trigger.tile_coordinates() {
@@ -1269,9 +1278,10 @@ impl GameState {
                 }
 
                 if rule.once {
-                    self.rule_runtime.fired_once_rules.insert(rule.id);
+                    fired_once_ids.push(rule.id.clone());
                 }
             }
+            self.rule_runtime.fired_once_rules.extend(fired_once_ids);
         }
     }
 }

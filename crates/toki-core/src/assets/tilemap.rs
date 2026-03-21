@@ -80,7 +80,13 @@ impl TileMap {
             });
         }
         let index = (y * self.size.x + x) as usize;
-        Ok(self.tiles.get(index).map(String::as_str).unwrap())
+        self.tiles
+            .get(index)
+            .map(String::as_str)
+            .ok_or(CoreError::InvalidMapSize {
+                expected: (self.size.x * self.size.y) as usize,
+                actual: self.tiles.len(),
+            })
     }
 
     pub fn validate(&self) -> Result<(), CoreError> {

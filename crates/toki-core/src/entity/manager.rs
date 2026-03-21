@@ -102,6 +102,11 @@ impl EntityManager {
             tags: Vec::new(),
             movement_accumulator: glam::Vec2::ZERO,
         };
+
+        // Capture values before moving entity into storage
+        let is_player = Self::tracks_player_role(&entity);
+        let is_active = entity.attributes.active;
+
         self.audio_components
             .insert(id, EntityAudioComponent::default());
 
@@ -109,7 +114,7 @@ impl EntityManager {
         self.entities.insert(id, entity);
 
         // Update lookup tables
-        if Self::tracks_player_role(self.entities.get(&id).unwrap()) {
+        if is_player {
             self.player_id = Some(id);
         }
 
@@ -118,7 +123,7 @@ impl EntityManager {
             .or_default()
             .insert(id);
 
-        if self.entities.get(&id).unwrap().attributes.active {
+        if is_active {
             self.active_entities.insert(id);
         }
 
