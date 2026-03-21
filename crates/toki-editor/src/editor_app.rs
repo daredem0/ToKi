@@ -951,6 +951,7 @@ impl EditorApp {
         self.handle_pending_map_editor_tilemap_sync();
         self.handle_save_map_editor_request();
         self.handle_map_editor_map_requests();
+        self.handle_sprite_asset_rescan();
 
         if self
             .viewports
@@ -967,6 +968,16 @@ impl EditorApp {
             .is_some_and(crate::scene::SceneViewport::needs_render)
         {
             window.request_redraw();
+        }
+    }
+
+    /// Handle sprite asset rescan request (after saving new sprites)
+    fn handle_sprite_asset_rescan(&mut self) {
+        if self.core.ui.sprite.needs_asset_rescan {
+            if let Err(e) = self.core.project_manager.rescan_assets() {
+                tracing::error!("Failed to rescan assets: {}", e);
+            }
+            self.core.ui.sprite.needs_asset_rescan = false;
         }
     }
 }

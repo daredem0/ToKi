@@ -264,14 +264,18 @@ fn on_damaged_rule_runs_when_primary_action_applies_health_damage() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -323,14 +327,18 @@ fn on_damaged_rule_only_fires_once_for_sustained_held_primary_action() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -394,14 +402,18 @@ fn on_death_rule_runs_when_primary_action_is_lethal() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -459,14 +471,18 @@ fn on_death_rule_only_fires_once_after_lethal_hit() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -1852,14 +1868,18 @@ fn on_damaged_with_trigger_self_refers_to_victim() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -1920,14 +1940,18 @@ fn on_damaged_with_trigger_other_refers_to_attacker() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -3315,14 +3339,18 @@ fn trigger_other_is_kind_matches_npc_on_damage() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);

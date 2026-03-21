@@ -11,6 +11,8 @@ pub(crate) enum SpriteEditorTool {
     Eyedropper,
     Select,
     Line,
+    /// Magic wand: select all connected non-transparent pixels
+    MagicWand,
 }
 
 /// Type of sprite asset being edited
@@ -267,6 +269,80 @@ impl SpriteCanvas {
         }
 
         result
+    }
+
+    /// Find all non-transparent pixels connected to the given starting point.
+    /// Uses 8-connectivity (includes diagonals) for better sprite selection.
+    /// Returns the bounding box (x, y, width, height) of all connected pixels,
+    /// or None if the starting pixel is transparent or out of bounds.
+    pub fn find_connected_sprite(&self, start_x: u32, start_y: u32) -> Option<(u32, u32, u32, u32)> {
+        // Check bounds
+        if start_x >= self.width || start_y >= self.height {
+            return None;
+        }
+
+        // Check if starting pixel is non-transparent
+        let start_color = self.get_pixel(start_x, start_y)?;
+        if start_color.a == 0 {
+            return None;
+        }
+
+        // Track visited pixels and bounding box
+        let mut visited = vec![false; (self.width * self.height) as usize];
+        let mut min_x = start_x;
+        let mut max_x = start_x;
+        let mut min_y = start_y;
+        let mut max_y = start_y;
+
+        // Flood fill using a stack (8-connectivity)
+        let mut stack = vec![(start_x, start_y)];
+
+        while let Some((x, y)) = stack.pop() {
+            let idx = (y * self.width + x) as usize;
+            if visited[idx] {
+                continue;
+            }
+            visited[idx] = true;
+
+            // Check if this pixel is non-transparent
+            if let Some(color) = self.get_pixel(x, y) {
+                if color.a == 0 {
+                    continue;
+                }
+
+                // Update bounding box
+                min_x = min_x.min(x);
+                max_x = max_x.max(x);
+                min_y = min_y.min(y);
+                max_y = max_y.max(y);
+
+                // Add 8 neighbors to stack
+                for dy in -1i32..=1 {
+                    for dx in -1i32..=1 {
+                        if dx == 0 && dy == 0 {
+                            continue;
+                        }
+                        let nx = x as i32 + dx;
+                        let ny = y as i32 + dy;
+                        if nx >= 0 && ny >= 0 {
+                            let nx = nx as u32;
+                            let ny = ny as u32;
+                            if nx < self.width && ny < self.height {
+                                let nidx = (ny * self.width + nx) as usize;
+                                if !visited[nidx] {
+                                    stack.push((nx, ny));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Return bounding box
+        let width = max_x - min_x + 1;
+        let height = max_y - min_y + 1;
+        Some((min_x, min_y, width, height))
     }
 }
 
@@ -633,6 +709,8 @@ pub struct SpriteEditorState {
     pub show_delete_confirm: bool,
     /// Asset name pending deletion
     pub delete_asset_name: String,
+    /// Flag to indicate project assets need rescanning (after save/delete/rename)
+    pub needs_asset_rescan: bool,
 }
 
 /// Actions that require warning confirmation
@@ -761,6 +839,7 @@ impl Default for SpriteEditorState {
             rename_new_name: String::new(),
             show_delete_confirm: false,
             delete_asset_name: String::new(),
+            needs_asset_rescan: false,
         }
     }
 }
@@ -1933,6 +2012,9 @@ impl SpriteEditorState {
         cs.active_sprite = Some(json_path.to_string_lossy().to_string());
         cs.dirty = false;
         self.show_save_dialog = false;
+
+        // Signal that project assets need rescanning
+        self.needs_asset_rescan = true;
 
         Ok(())
     }

@@ -32,10 +32,38 @@ pub enum LoopMode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnimationClip {
     pub state: AnimationState,
-    pub atlas_name: String,            // Reference to the atlas
-    pub frame_tile_names: Vec<String>, // Which named tiles from the atlas
-    pub frame_duration_ms: f32,        // How long each animation frame lasts
-    pub loop_mode: LoopMode,           // Repeat?
+    pub atlas_name: String,
+    /// Legacy name-based frame references (may be empty if using positions)
+    pub frame_tile_names: Vec<String>,
+    /// Position-based frame references as grid [column, row] pairs
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame_positions: Option<Vec<[u32; 2]>>,
+    /// Uniform frame duration in milliseconds (used unless per-frame overrides exist)
+    pub frame_duration_ms: f32,
+    /// Optional per-frame duration overrides in milliseconds
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame_durations_ms: Option<Vec<f32>>,
+    pub loop_mode: LoopMode,
+}
+
+impl AnimationClip {
+    /// Returns the number of frames in this clip.
+    /// Prefers frame_positions if available, otherwise uses frame_tile_names.
+    pub fn frame_count(&self) -> usize {
+        self.frame_positions
+            .as_ref()
+            .map(|p| p.len())
+            .unwrap_or(self.frame_tile_names.len())
+    }
+
+    /// Returns the duration for a specific frame index.
+    /// Uses per-frame override if available, otherwise falls back to uniform duration.
+    pub fn frame_duration_at(&self, frame_index: usize) -> f32 {
+        self.frame_durations_ms
+            .as_ref()
+            .and_then(|durations| durations.get(frame_index).copied())
+            .unwrap_or(self.frame_duration_ms)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,16 +118,26 @@ impl AnimationController {
     pub fn update(&mut self, delta_time_ms: f32) -> u32 {
         let current_clip = match self.clips.get(&self.current_clip_state) {
             Some(clip) => clip,
-            None => return 0, // No current animation
+            None => return 0,
         };
+
+        let frame_count = current_clip.frame_count();
+        if frame_count == 0 {
+            return 0;
+        }
+
         let mut completed_loops = 0;
         self.frame_timer += delta_time_ms;
-        while (self.frame_timer >= current_clip.frame_duration_ms) && !self.is_finished {
-            self.frame_timer -= current_clip.frame_duration_ms;
 
+        while !self.is_finished {
+            let frame_duration = current_clip.frame_duration_at(self.current_frame_index);
+            if self.frame_timer < frame_duration {
+                break;
+            }
+            self.frame_timer -= frame_duration;
             self.current_frame_index += 1;
 
-            if self.current_frame_index >= current_clip.frame_tile_names.len() {
+            if self.current_frame_index >= frame_count {
                 match current_clip.loop_mode {
                     LoopMode::Loop => {
                         self.current_frame_index = 0;
@@ -107,7 +145,7 @@ impl AnimationController {
                     }
                     LoopMode::Once => self.is_finished = true,
                     LoopMode::PingPong => {
-                        self.current_frame_index = 0; //TODO we still have to implement that one
+                        self.current_frame_index = 0; // TODO: implement ping-pong
                         completed_loops += 1;
                     }
                 }

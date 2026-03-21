@@ -48,8 +48,10 @@ fn test_entity_definition_create_entity_basic() {
                 AnimationClipDef {
                     state: "idle".to_string(),
                     frame_tiles: vec!["player/idle_0".to_string(), "player/idle_1".to_string()],
-                    frame_duration_ms: 300.0,
-                    loop_mode: "loop".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 300.0,
+                    frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "walk".to_string(),
@@ -59,8 +61,10 @@ fn test_entity_definition_create_entity_basic() {
                         "player/walk_2".to_string(),
                         "player/walk_3".to_string(),
                     ],
-                    frame_duration_ms: 150.0,
-                    loop_mode: "loop".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 150.0,
+                    frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
                 },
             ],
             default_state: "idle".to_string(),
@@ -178,8 +182,10 @@ fn test_entity_definition_create_npc_entity() {
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["npc/idle_0".to_string()],
-                frame_duration_ms: 500.0,
-                loop_mode: "loop".to_string(),
+                frame_positions: None,
+                        frame_duration_ms: 500.0,
+                frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
             }],
             default_state: "idle".to_string(),
         },
@@ -328,8 +334,10 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["creature/idle_0".to_string()],
-                frame_duration_ms: 200.0,
-                loop_mode: "loop".to_string(),
+                frame_positions: None,
+                        frame_duration_ms: 200.0,
+                frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
             }],
             default_state: "idle".to_string(),
         },
@@ -455,8 +463,10 @@ fn test_entity_definition_accepts_directional_animation_states() {
                 AnimationClipDef {
                     state: "idle_down".to_string(),
                     frame_tiles: vec!["player/walk_down_a".to_string()],
-                    frame_duration_ms: 300.0,
-                    loop_mode: "loop".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 300.0,
+                    frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "walk_down".to_string(),
@@ -464,8 +474,10 @@ fn test_entity_definition_accepts_directional_animation_states() {
                         "player/walk_down_a".to_string(),
                         "player/walk_down_b".to_string(),
                     ],
-                    frame_duration_ms: 180.0,
-                    loop_mode: "loop".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 180.0,
+                    frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "walk_right".to_string(),
@@ -473,8 +485,10 @@ fn test_entity_definition_accepts_directional_animation_states() {
                         "player/walk_right_a".to_string(),
                         "player/walk_right_b".to_string(),
                     ],
-                    frame_duration_ms: 180.0,
-                    loop_mode: "loop".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 180.0,
+                    frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
                 },
             ],
             default_state: "idle_down".to_string(),
@@ -543,8 +557,10 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
                 AnimationClipDef {
                     state: "idle_down".to_string(),
                     frame_tiles: vec!["player/walk_down_a".to_string()],
-                    frame_duration_ms: 300.0,
-                    loop_mode: "loop".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 300.0,
+                    frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "attack_down".to_string(),
@@ -552,8 +568,10 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
                         "player/attack_down_a".to_string(),
                         "player/attack_down_b".to_string(),
                     ],
-                    frame_duration_ms: 120.0,
-                    loop_mode: "once".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 120.0,
+                    frame_durations_ms: None,
+                        loop_mode: "once".to_string(),
                 },
                 AnimationClipDef {
                     state: "attack_left".to_string(),
@@ -561,14 +579,18 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
                         "player/attack_right_a".to_string(),
                         "player/attack_right_b".to_string(),
                     ],
-                    frame_duration_ms: 120.0,
-                    loop_mode: "once".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 120.0,
+                    frame_durations_ms: None,
+                        loop_mode: "once".to_string(),
                 },
                 AnimationClipDef {
                     state: "attack".to_string(),
                     frame_tiles: vec!["player/attack_down_a".to_string()],
-                    frame_duration_ms: 120.0,
-                    loop_mode: "once".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 120.0,
+                    frame_durations_ms: None,
+                        loop_mode: "once".to_string(),
                 },
             ],
             default_state: "idle_down".to_string(),
@@ -639,8 +661,10 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["slime/idle_0".to_string()],
-                frame_duration_ms: 150.0,
-                loop_mode: "loop".to_string(),
+                frame_positions: None,
+                        frame_duration_ms: 150.0,
+                frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
             }],
             default_state: "idle".to_string(),
         },
@@ -705,8 +729,10 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["fighter/idle_0".to_string()],
-                frame_duration_ms: 150.0,
-                loop_mode: "loop".to_string(),
+                frame_positions: None,
+                        frame_duration_ms: 150.0,
+                frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
             }],
             default_state: "idle".to_string(),
         },
@@ -780,8 +806,10 @@ fn test_entity_definition_copies_authored_primary_projectile() {
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["ranger/idle_0".to_string()],
-                frame_duration_ms: 150.0,
-                loop_mode: "loop".to_string(),
+                frame_positions: None,
+                        frame_duration_ms: 150.0,
+                frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
             }],
             default_state: "idle".to_string(),
         },
@@ -982,8 +1010,10 @@ fn test_entity_definition_invalid_animation_state() {
             clips: vec![AnimationClipDef {
                 state: "invalid_state".to_string(), // Invalid state
                 frame_tiles: vec!["test/frame_0".to_string()],
-                frame_duration_ms: 100.0,
-                loop_mode: "loop".to_string(),
+                frame_positions: None,
+                        frame_duration_ms: 100.0,
+                frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
             }],
             default_state: "invalid_state".to_string(),
         },
@@ -1041,8 +1071,10 @@ fn test_entity_definition_invalid_loop_mode() {
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["test/frame_0".to_string()],
-                frame_duration_ms: 100.0,
-                loop_mode: "invalid_loop".to_string(), // Invalid loop mode
+                frame_positions: None,
+                        frame_duration_ms: 100.0,
+                frame_durations_ms: None,
+                        loop_mode: "invalid_loop".to_string(), // Invalid loop mode
             }],
             default_state: "idle".to_string(),
         },
@@ -1171,8 +1203,10 @@ fn test_entity_definition_create_audio_component() {
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["test_0".to_string()],
-                frame_duration_ms: 100.0,
-                loop_mode: "loop".to_string(),
+                frame_positions: None,
+                        frame_duration_ms: 100.0,
+                frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
             }],
             default_state: "idle".to_string(),
         },
@@ -1507,4 +1541,255 @@ fn test_entity_without_ai_fields_defaults_to_none() {
     // Should default to None behavior with 0 detection radius
     assert_eq!(entity_def.attributes.ai_config.behavior, AiBehavior::None);
     assert_eq!(entity_def.attributes.ai_config.detection_radius, 0);
+}
+
+// ============================================================================
+// Phase 4A: Animation Data Model - Position-Based Frame References
+// ============================================================================
+
+#[test]
+fn test_animation_clip_def_with_frame_positions() {
+    // Test that AnimationClipDef can use position-based frame references
+    let clip_def = AnimationClipDef {
+        state: "walk_down".to_string(),
+        frame_tiles: vec![], // Empty when using positions
+        frame_positions: Some(vec![[0, 0], [1, 0], [2, 0]]),
+        frame_duration_ms: 150.0,
+        frame_durations_ms: None,
+        loop_mode: "loop".to_string(),
+    };
+
+    assert!(clip_def.frame_positions.is_some());
+    let positions = clip_def.frame_positions.as_ref().unwrap();
+    assert_eq!(positions.len(), 3);
+    assert_eq!(positions[0], [0, 0]);
+    assert_eq!(positions[1], [1, 0]);
+    assert_eq!(positions[2], [2, 0]);
+}
+
+#[test]
+fn test_animation_clip_def_with_per_frame_durations() {
+    // Test optional per-frame duration overrides
+    let clip_def = AnimationClipDef {
+        state: "attack".to_string(),
+        frame_tiles: vec![],
+        frame_positions: Some(vec![[0, 1], [1, 1], [2, 1]]),
+        frame_duration_ms: 100.0, // Default/fallback
+        frame_durations_ms: Some(vec![50.0, 200.0, 50.0]), // Per-frame overrides
+        loop_mode: "once".to_string(),
+    };
+
+    assert!(clip_def.frame_durations_ms.is_some());
+    let durations = clip_def.frame_durations_ms.as_ref().unwrap();
+    assert_eq!(durations.len(), 3);
+    assert_eq!(durations[0], 50.0);
+    assert_eq!(durations[1], 200.0);
+    assert_eq!(durations[2], 50.0);
+}
+
+#[test]
+fn test_animation_clip_def_json_with_frame_positions() {
+    // Test JSON deserialization with position-based frames
+    let json = r#"{
+        "state": "idle_down",
+        "frame_positions": [[0, 0], [1, 0]],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+    }"#;
+
+    let clip_def: AnimationClipDef =
+        serde_json::from_str(json).expect("should deserialize position-based clip");
+
+    assert!(clip_def.frame_positions.is_some());
+    assert!(clip_def.frame_tiles.is_empty());
+    assert_eq!(clip_def.frame_positions.as_ref().unwrap().len(), 2);
+}
+
+#[test]
+fn test_animation_clip_def_json_with_per_frame_durations() {
+    // Test JSON deserialization with per-frame duration overrides
+    let json = r#"{
+        "state": "attack_down",
+        "frame_positions": [[0, 1], [1, 1], [2, 1]],
+        "frame_duration_ms": 100.0,
+        "frame_durations_ms": [80.0, 150.0, 80.0],
+        "loop_mode": "once"
+    }"#;
+
+    let clip_def: AnimationClipDef =
+        serde_json::from_str(json).expect("should deserialize clip with per-frame durations");
+
+    assert!(clip_def.frame_durations_ms.is_some());
+    let durations = clip_def.frame_durations_ms.as_ref().unwrap();
+    assert_eq!(durations, &[80.0, 150.0, 80.0]);
+}
+
+#[test]
+fn test_animation_clip_def_legacy_frame_tiles_still_works() {
+    // Ensure backward compatibility with legacy frame_tiles format
+    let json = r#"{
+        "state": "walk",
+        "frame_tiles": ["player/walk_0", "player/walk_1", "player/walk_2"],
+        "frame_duration_ms": 150.0,
+        "loop_mode": "loop"
+    }"#;
+
+    let clip_def: AnimationClipDef =
+        serde_json::from_str(json).expect("legacy frame_tiles should still deserialize");
+
+    assert_eq!(clip_def.frame_tiles.len(), 3);
+    assert!(clip_def.frame_positions.is_none());
+    assert!(clip_def.frame_durations_ms.is_none());
+}
+
+#[test]
+fn test_entity_definition_with_position_based_animations() {
+    // Test full entity definition with position-based animation clips
+    let entity_def = EntityDefinition {
+        name: "position_animated".to_string(),
+        display_name: "Position Animated Entity".to_string(),
+        description: "Entity using position-based animation frames".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 1,
+            visible: true,
+            static_object: None,
+        },
+        attributes: AttributesDef {
+            health: Some(50),
+            stats: std::collections::HashMap::new(),
+            speed: 1.5,
+            solid: true,
+            active: true,
+            can_move: true,
+            ai_config: AiConfig::default(),
+            movement_profile: MovementProfile::LegacyDefault,
+            primary_projectile: None,
+            pickup: None,
+            has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: "step".to_string(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "sprites.json".to_string(),
+            clips: vec![
+                AnimationClipDef {
+                    state: "idle".to_string(),
+                    frame_tiles: vec![],
+                    frame_positions: Some(vec![[0, 0]]),
+                    frame_duration_ms: 300.0,
+                    frame_durations_ms: None,
+                    loop_mode: "loop".to_string(),
+                },
+                AnimationClipDef {
+                    state: "walk".to_string(),
+                    frame_tiles: vec![],
+                    frame_positions: Some(vec![[0, 0], [1, 0], [2, 0], [3, 0]]),
+                    frame_duration_ms: 120.0,
+                    frame_durations_ms: None,
+                    loop_mode: "loop".to_string(),
+                },
+            ],
+            default_state: "idle".to_string(),
+        },
+        category: "creature".to_string(),
+        tags: vec![],
+    };
+
+    let entity = entity_def
+        .create_entity(IVec2::new(0, 0), 1)
+        .expect("entity with position-based animations should create");
+
+    let controller = entity
+        .attributes
+        .animation_controller
+        .expect("should have animation controller");
+
+    assert!(controller.clips.contains_key(&AnimationState::Idle));
+    assert!(controller.clips.contains_key(&AnimationState::Walk));
+
+    // Verify frame positions are stored in the runtime clip
+    let idle_clip = controller.clips.get(&AnimationState::Idle).unwrap();
+    assert!(idle_clip.frame_positions.is_some());
+    assert_eq!(idle_clip.frame_positions.as_ref().unwrap().len(), 1);
+
+    let walk_clip = controller.clips.get(&AnimationState::Walk).unwrap();
+    assert!(walk_clip.frame_positions.is_some());
+    assert_eq!(walk_clip.frame_positions.as_ref().unwrap().len(), 4);
+}
+
+#[test]
+fn test_animation_controller_per_frame_duration_timing() {
+    // Test that per-frame durations work correctly in the animation controller
+    use toki_core::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
+
+    let mut controller = AnimationController::new();
+
+    let clip = AnimationClip {
+        state: AnimationState::Attack,
+        atlas_name: "test".to_string(),
+        frame_tile_names: vec![
+            "frame_0".to_string(),
+            "frame_1".to_string(),
+            "frame_2".to_string(),
+        ],
+        frame_positions: None,
+        frame_duration_ms: 100.0, // Default fallback
+        frame_durations_ms: Some(vec![50.0, 200.0, 50.0]), // Per-frame overrides
+        loop_mode: LoopMode::Once,
+    };
+
+    controller.add_clip(clip);
+    controller.play(AnimationState::Attack);
+
+    // Frame 0: 50ms duration
+    assert_eq!(controller.current_frame_index, 0);
+    controller.update(40.0); // Not enough to advance
+    assert_eq!(controller.current_frame_index, 0);
+    controller.update(15.0); // Now at 55ms, should advance to frame 1
+    assert_eq!(controller.current_frame_index, 1);
+
+    // Frame 1: 200ms duration
+    controller.update(100.0); // At 100ms into frame 1
+    assert_eq!(controller.current_frame_index, 1);
+    controller.update(100.0); // At 200ms, should advance to frame 2
+    assert_eq!(controller.current_frame_index, 2);
+
+    // Frame 2: 50ms duration
+    controller.update(60.0); // Should finish (LoopMode::Once)
+    assert!(controller.is_finished);
+}
+
+#[test]
+fn test_animation_clip_serialization_roundtrip_with_positions() {
+    // Test that AnimationClipDef round-trips through JSON with new fields
+    let original = AnimationClipDef {
+        state: "walk_right".to_string(),
+        frame_tiles: vec![],
+        frame_positions: Some(vec![[4, 0], [5, 0], [6, 0]]),
+        frame_duration_ms: 150.0,
+        frame_durations_ms: Some(vec![100.0, 150.0, 100.0]),
+        loop_mode: "loop".to_string(),
+    };
+
+    let json = serde_json::to_string(&original).expect("should serialize");
+    let deserialized: AnimationClipDef =
+        serde_json::from_str(&json).expect("should deserialize");
+
+    assert_eq!(deserialized.frame_positions, original.frame_positions);
+    assert_eq!(deserialized.frame_durations_ms, original.frame_durations_ms);
+    assert_eq!(deserialized.frame_duration_ms, original.frame_duration_ms);
 }

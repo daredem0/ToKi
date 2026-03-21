@@ -58,8 +58,10 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["slime/idle_0".to_string()],
-                frame_duration_ms: 150.0,
-                loop_mode: "loop".to_string(),
+                frame_positions: None,
+                        frame_duration_ms: 150.0,
+                frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
             }],
             default_state: "idle".to_string(),
         },
@@ -74,7 +76,9 @@ fn create_test_entity() -> Entity {
         state: AnimationState::Walk,
         atlas_name: "test_atlas".to_string(),
         frame_tile_names: vec!["frame1".to_string(), "frame2".to_string()],
+        frame_positions: None,
         frame_duration_ms: 100.0,
+        frame_durations_ms: None,
         loop_mode: LoopMode::Loop,
     };
     controller.add_clip(clip);

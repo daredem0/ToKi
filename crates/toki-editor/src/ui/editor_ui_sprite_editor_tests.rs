@@ -1176,3 +1176,88 @@ fn sprite_canvas_scaled_to_fit_no_upscale() {
     assert_eq!(scaled.width, 4);
     assert_eq!(scaled.height, 4);
 }
+
+// ============================================================================
+// Magic Wand / Find Connected Sprite Tests
+// ============================================================================
+
+#[test]
+fn sprite_canvas_find_connected_sprite_simple() {
+    use super::SpriteCanvas;
+
+    // Create an 8x8 canvas with a 3x3 sprite in the center
+    let mut canvas = SpriteCanvas::new(8, 8);
+    for y in 2..5 {
+        for x in 2..5 {
+            canvas.set_pixel(x, y, PixelColor::rgb(255, 0, 0));
+        }
+    }
+
+    // Click on the sprite should return its bounding box
+    let result = canvas.find_connected_sprite(3, 3);
+    assert_eq!(result, Some((2, 2, 3, 3)));
+
+    // Click on a different part of the sprite should return the same box
+    let result = canvas.find_connected_sprite(2, 2);
+    assert_eq!(result, Some((2, 2, 3, 3)));
+}
+
+#[test]
+fn sprite_canvas_find_connected_sprite_transparent_returns_none() {
+    use super::SpriteCanvas;
+
+    let canvas = SpriteCanvas::new(8, 8);
+
+    // Clicking on transparent area returns None
+    let result = canvas.find_connected_sprite(4, 4);
+    assert_eq!(result, None);
+}
+
+#[test]
+fn sprite_canvas_find_connected_sprite_out_of_bounds_returns_none() {
+    use super::SpriteCanvas;
+
+    let canvas = SpriteCanvas::new(8, 8);
+
+    // Out of bounds returns None
+    assert_eq!(canvas.find_connected_sprite(10, 10), None);
+    assert_eq!(canvas.find_connected_sprite(8, 0), None);
+    assert_eq!(canvas.find_connected_sprite(0, 8), None);
+}
+
+#[test]
+fn sprite_canvas_find_connected_sprite_diagonal_connection() {
+    use super::SpriteCanvas;
+
+    // Create a diagonal line - should be connected via 8-connectivity
+    let mut canvas = SpriteCanvas::new(8, 8);
+    canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
+    canvas.set_pixel(1, 1, PixelColor::rgb(255, 0, 0));
+    canvas.set_pixel(2, 2, PixelColor::rgb(255, 0, 0));
+
+    // All three should be connected
+    let result = canvas.find_connected_sprite(1, 1);
+    assert_eq!(result, Some((0, 0, 3, 3)));
+}
+
+#[test]
+fn sprite_canvas_find_connected_sprite_separate_sprites() {
+    use super::SpriteCanvas;
+
+    // Create two separate sprites
+    let mut canvas = SpriteCanvas::new(16, 8);
+
+    // Sprite 1: 2x2 at (0, 0)
+    canvas.fill_rect(0, 0, 2, 2, PixelColor::rgb(255, 0, 0));
+
+    // Sprite 2: 2x2 at (10, 0) - not connected to sprite 1
+    canvas.fill_rect(10, 0, 2, 2, PixelColor::rgb(0, 255, 0));
+
+    // Clicking sprite 1 should only select sprite 1
+    let result = canvas.find_connected_sprite(0, 0);
+    assert_eq!(result, Some((0, 0, 2, 2)));
+
+    // Clicking sprite 2 should only select sprite 2
+    let result = canvas.find_connected_sprite(10, 0);
+    assert_eq!(result, Some((10, 0, 2, 2)));
+}

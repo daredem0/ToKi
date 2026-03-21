@@ -54,8 +54,10 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["slime/idle_0".to_string()],
-                frame_duration_ms: 150.0,
-                loop_mode: "loop".to_string(),
+                frame_positions: None,
+                        frame_duration_ms: 150.0,
+                frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
             }],
             default_state: "idle".to_string(),
         },
@@ -87,8 +89,10 @@ fn npc_definition(animation_name: &str) -> EntityDefinition {
             format!("{animation_name}/walk_2"),
             format!("{animation_name}/walk_3"),
         ],
-        frame_duration_ms: 150.0,
-        loop_mode: "loop".to_string(),
+        frame_positions: None,
+                        frame_duration_ms: 150.0,
+        frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
     }];
     def.animations.default_state = "walk".to_string();
     def
@@ -108,8 +112,10 @@ fn item_definition(item_name: &str) -> EntityDefinition {
             format!("{item_name}_2"),
             format!("{item_name}_3"),
         ],
-        frame_duration_ms: 150.0,
-        loop_mode: "loop".to_string(),
+        frame_positions: None,
+                        frame_duration_ms: 150.0,
+        frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
     }];
     def.animations.default_state = "idle".to_string();
     def
@@ -130,8 +136,10 @@ fn decoration_definition(decoration_name: &str) -> EntityDefinition {
             format!("{decoration_name}_2"),
             format!("{decoration_name}_3"),
         ],
-        frame_duration_ms: 150.0,
-        loop_mode: "loop".to_string(),
+        frame_positions: None,
+                        frame_duration_ms: 150.0,
+        frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
     }];
     def.animations.default_state = "idle".to_string();
     def

@@ -42,6 +42,11 @@ fn render_tool_palette(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             "Select",
         );
         ui.selectable_value(&mut ui_state.sprite.tool, SpriteEditorTool::Line, "Line");
+        ui.selectable_value(
+            &mut ui_state.sprite.tool,
+            SpriteEditorTool::MagicWand,
+            "Magic",
+        );
     });
 }
 
@@ -72,6 +77,9 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         SpriteEditorTool::Line => {
             ui.label("Click and drag to draw a line.");
             render_brush_size(ui, ui_state);
+        }
+        SpriteEditorTool::MagicWand => {
+            ui.label("Click to select connected sprite pixels.");
         }
     }
 

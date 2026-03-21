@@ -88,14 +88,18 @@ fn create_test_entity(id: EntityId, position: IVec2, behavior: AiBehavior) -> En
         state: AnimationState::Idle,
         atlas_name: "test".to_string(),
         frame_tile_names: vec!["idle_0".to_string()],
+        frame_positions: None,
         frame_duration_ms: 100.0,
+        frame_durations_ms: None,
         loop_mode: LoopMode::Loop,
     });
     controller.add_clip(AnimationClip {
         state: AnimationState::Walk,
         atlas_name: "test".to_string(),
         frame_tile_names: vec!["walk_0".to_string()],
+        frame_positions: None,
         frame_duration_ms: 100.0,
+        frame_durations_ms: None,
         loop_mode: LoopMode::Loop,
     });
     controller.play(AnimationState::Idle);

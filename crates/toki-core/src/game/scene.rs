@@ -140,7 +140,9 @@ impl GameState {
                     crate::entity::AnimationClipDef {
                         state: "idle".to_string(),
                         frame_tiles: vec!["slime/idle_0".to_string(), "slime/idle_1".to_string()],
+                        frame_positions: None,
                         frame_duration_ms: 300.0,
+                        frame_durations_ms: None,
                         loop_mode: "loop".to_string(),
                     },
                     crate::entity::AnimationClipDef {
@@ -151,7 +153,9 @@ impl GameState {
                             "slime/walk_2".to_string(),
                             "slime/walk_3".to_string(),
                         ],
+                        frame_positions: None,
                         frame_duration_ms: 150.0,
+                        frame_durations_ms: None,
                         loop_mode: "loop".to_string(),
                     },
                 ],
@@ -209,7 +213,9 @@ impl GameState {
                     crate::entity::AnimationClipDef {
                         state: "idle".to_string(),
                         frame_tiles: vec!["slime/idle_0".to_string(), "slime/idle_1".to_string()],
+                        frame_positions: None,
                         frame_duration_ms: 300.0,
+                        frame_durations_ms: None,
                         loop_mode: "loop".to_string(),
                     },
                     crate::entity::AnimationClipDef {
@@ -220,7 +226,9 @@ impl GameState {
                             "slime/walk_2".to_string(),
                             "slime/walk_3".to_string(),
                         ],
+                        frame_positions: None,
                         frame_duration_ms: 150.0,
+                        frame_durations_ms: None,
                         loop_mode: "loop".to_string(),
                     },
                 ],

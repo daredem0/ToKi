@@ -148,8 +148,10 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["slime/idle_0".to_string()],
-                frame_duration_ms: 150.0,
-                loop_mode: "loop".to_string(),
+                frame_positions: None,
+                        frame_duration_ms: 150.0,
+                frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
             }],
             default_state: "idle".to_string(),
         },
@@ -203,26 +205,34 @@ fn player_definition(name: &str) -> EntityDefinition {
                 AnimationClipDef {
                     state: "idle_down".to_string(),
                     frame_tiles: vec!["player/walk_down_a".to_string()],
-                    frame_duration_ms: 300.0,
-                    loop_mode: "loop".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 300.0,
+                    frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "idle_up".to_string(),
                     frame_tiles: vec!["player/walk_up_a".to_string()],
-                    frame_duration_ms: 300.0,
-                    loop_mode: "loop".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 300.0,
+                    frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "idle_left".to_string(),
                     frame_tiles: vec!["player/walk_left_a".to_string()],
-                    frame_duration_ms: 300.0,
-                    loop_mode: "loop".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 300.0,
+                    frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "idle_right".to_string(),
                     frame_tiles: vec!["player/walk_right_a".to_string()],
-                    frame_duration_ms: 300.0,
-                    loop_mode: "loop".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 300.0,
+                    frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "walk_right".to_string(),
@@ -230,8 +240,10 @@ fn player_definition(name: &str) -> EntityDefinition {
                         "player/walk_right_a".to_string(),
                         "player/walk_right_b".to_string(),
                     ],
-                    frame_duration_ms: 180.0,
-                    loop_mode: "loop".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 180.0,
+                    frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
                 },
                 AnimationClipDef {
                     state: "attack_right".to_string(),
@@ -239,8 +251,10 @@ fn player_definition(name: &str) -> EntityDefinition {
                         "player/attack_right_a".to_string(),
                         "player/attack_right_b".to_string(),
                     ],
-                    frame_duration_ms: 180.0,
-                    loop_mode: "once".to_string(),
+                    frame_positions: None,
+                        frame_duration_ms: 180.0,
+                    frame_durations_ms: None,
+                        loop_mode: "once".to_string(),
                 },
             ],
             default_state: "idle_down".to_string(),
@@ -525,35 +539,45 @@ fn game_state_directional_walk_animation_follows_movement_direction() {
         state: AnimationState::IdleDown,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::WalkDown,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::WalkUp,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_up_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::WalkLeft,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::WalkRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.play(AnimationState::IdleDown);
@@ -598,14 +622,18 @@ fn game_state_left_direction_requests_horizontal_flip() {
         state: AnimationState::IdleDown,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::WalkLeft,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.play(AnimationState::IdleDown);
@@ -639,7 +667,9 @@ fn game_state_attack_left_requests_horizontal_flip() {
         state: AnimationState::AttackLeft,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::AttackLeft);
@@ -665,14 +695,18 @@ fn game_state_primary_action_plays_attack_clip_when_present() {
         state: AnimationState::IdleDown,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackDown,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_down_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleDown);
@@ -707,7 +741,9 @@ fn game_state_primary_action_is_ignored_without_attack_clip() {
         state: AnimationState::IdleDown,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.play(AnimationState::IdleDown);
@@ -742,14 +778,18 @@ fn game_state_attack_animation_persists_while_clip_is_unfinished() {
         state: AnimationState::IdleDown,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackDown,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_down_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 100.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleDown);
@@ -787,14 +827,18 @@ fn game_state_returns_to_locomotion_after_attack_animation_finishes() {
         state: AnimationState::IdleDown,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackDown,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_down_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 20.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleDown);
@@ -833,21 +877,27 @@ fn game_state_attack_animation_overrides_walk_while_movement_is_held() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::WalkRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 100.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -887,21 +937,27 @@ fn game_state_returns_to_walk_after_attack_animation_finishes_with_movement_held
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::WalkRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 20.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -942,14 +998,18 @@ fn game_state_primary_action_applies_damage_to_adjacent_target_health_stat() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -997,14 +1057,18 @@ fn game_state_primary_action_uses_attack_power_stat_for_damage() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -1048,14 +1112,18 @@ fn game_state_held_primary_action_does_not_apply_repeated_damage_every_frame() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -1101,14 +1169,18 @@ fn game_state_primary_action_can_damage_again_after_release_and_repress() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -1155,14 +1227,18 @@ fn game_state_primary_action_does_not_damage_out_of_range_target() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -1206,14 +1282,18 @@ fn game_state_primary_action_despawns_target_when_health_reaches_zero() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -1257,14 +1337,18 @@ fn game_state_primary_action_damages_scene_loaded_legacy_health_target() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -1335,14 +1419,18 @@ fn game_state_primary_action_spawns_projectile_when_authored() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -1411,14 +1499,18 @@ fn game_state_projectile_moves_and_expires_after_lifetime() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -1490,14 +1582,18 @@ fn game_state_projectile_applies_damage_and_despawns_on_hit() {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::AttackRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(AnimationState::IdleRight);
@@ -1771,14 +1867,18 @@ fn game_state_blocked_player_input_still_updates_facing_direction() {
         state: AnimationState::IdleDown,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::IdleRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     // Walk animation plays when trying to move (intent-based), even if blocked
@@ -1786,7 +1886,9 @@ fn game_state_blocked_player_input_still_updates_facing_direction() {
         state: AnimationState::WalkRight,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.play(AnimationState::IdleDown);
@@ -2575,7 +2677,9 @@ fn game_state_emits_movement_audio_on_animation_loop_when_configured() {
         state: AnimationState::Walk,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_right_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 1.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
 

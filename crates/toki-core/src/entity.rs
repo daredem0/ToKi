@@ -973,8 +973,17 @@ pub struct AnimationsDef {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnimationClipDef {
     pub state: String,
+    /// Legacy name-based frame references (e.g., ["player/walk_0", "player/walk_1"])
+    #[serde(default)]
     pub frame_tiles: Vec<String>,
+    /// Position-based frame references as grid [column, row] pairs (e.g., [[0, 0], [1, 0]])
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame_positions: Option<Vec<[u32; 2]>>,
+    /// Uniform frame duration in milliseconds (applies to all frames unless overridden)
     pub frame_duration_ms: f32,
+    /// Optional per-frame duration overrides in milliseconds
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame_durations_ms: Option<Vec<f32>>,
     pub loop_mode: String, // "loop", "once", "ping_pong"
 }
 
@@ -1036,7 +1045,9 @@ impl EntityDefinition {
                     state,
                     atlas_name: self.animations.atlas_name.clone(),
                     frame_tile_names: clip_def.frame_tiles.clone(),
+                    frame_positions: clip_def.frame_positions.clone(),
                     frame_duration_ms: clip_def.frame_duration_ms,
+                    frame_durations_ms: clip_def.frame_durations_ms.clone(),
                     loop_mode,
                 };
                 animation_controller.add_clip(clip);

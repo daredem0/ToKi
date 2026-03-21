@@ -200,6 +200,7 @@ fn tool_label(tool: SpriteEditorTool) -> &'static str {
         SpriteEditorTool::Eyedropper => "Eyedropper",
         SpriteEditorTool::Select => "Select",
         SpriteEditorTool::Line => "Line",
+        SpriteEditorTool::MagicWand => "Magic Wand",
     }
 }
 
@@ -1510,6 +1511,7 @@ fn handle_tool_interaction(
         SpriteEditorTool::Eyedropper => handle_eyedropper_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Line => handle_line_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Select => handle_select_tool(ui_state, response, canvas_pos),
+        SpriteEditorTool::MagicWand => handle_magic_wand_tool(ui_state, response, canvas_pos),
     }
 }
 
@@ -1674,6 +1676,41 @@ fn handle_select_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas
     }
 }
 
+fn handle_magic_wand_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    canvas_pos: glam::IVec2,
+) {
+    use crate::ui::editor_ui::SpriteSelection;
+
+    if response.clicked() && canvas_pos.x >= 0 && canvas_pos.y >= 0 {
+        if let Some(canvas) = &ui_state.sprite.active().canvas {
+            let x = canvas_pos.x as u32;
+            let y = canvas_pos.y as u32;
+
+            if let Some((sel_x, sel_y, sel_w, sel_h)) = canvas.find_connected_sprite(x, y) {
+                tracing::info!(
+                    "Magic wand: selected sprite at ({}, {}) with size {}x{}",
+                    sel_x,
+                    sel_y,
+                    sel_w,
+                    sel_h
+                );
+                ui_state.sprite.active_mut().selection =
+                    Some(SpriteSelection::new(sel_x, sel_y, sel_w, sel_h));
+            } else {
+                tracing::info!("Magic wand: clicked on transparent pixel, clearing selection");
+                ui_state.sprite.active_mut().selection = None;
+            }
+        }
+    }
+
+    // Clear selection with right-click
+    if response.clicked_by(egui::PointerButton::Secondary) {
+        ui_state.sprite.active_mut().selection = None;
+    }
+}
+
 fn create_selection(start: glam::IVec2, end: glam::IVec2) -> crate::ui::editor_ui::SpriteSelection {
     let x = start.x.min(end.x).max(0) as u32;
     let y = start.y.min(end.y).max(0) as u32;
@@ -1710,7 +1747,7 @@ fn invalidate_canvas_texture(ui_state: &mut EditorUI) {
 fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
     use SpriteEditorTool::*;
 
-    // Tool shortcuts: B=Brush, E=Eraser, G=Fill, I=Eyedropper, M=Select, D=Drag, L=Line
+    // Tool shortcuts: B=Brush, E=Eraser, G=Fill, I=Eyedropper, M=Select, D=Drag, L=Line, W=MagicWand
     if ui.input(|i| i.key_pressed(egui::Key::B)) {
         ui_state.sprite.tool = Brush;
     }
@@ -1731,6 +1768,9 @@ fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
     }
     if ui.input(|i| i.key_pressed(egui::Key::L)) {
         ui_state.sprite.tool = Line;
+    }
+    if ui.input(|i| i.key_pressed(egui::Key::W)) {
+        ui_state.sprite.tool = MagicWand;
     }
 
     // Brush size: [ and ] to decrease/increase

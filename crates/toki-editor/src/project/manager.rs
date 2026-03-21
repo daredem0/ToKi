@@ -210,6 +210,15 @@ impl ProjectManager {
         self.project_assets.as_mut()
     }
 
+    /// Rescan project assets (e.g., after saving new sprites)
+    pub fn rescan_assets(&mut self) -> Result<()> {
+        if let Some(project_assets) = &mut self.project_assets {
+            project_assets.scan_assets()?;
+            tracing::info!("Rescanned project assets");
+        }
+        Ok(())
+    }
+
     /// Load scenes from the asset manager
     pub fn load_scenes(&mut self) -> Result<Vec<Scene>> {
         if let Some(project_assets) = &mut self.project_assets {

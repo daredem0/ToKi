@@ -288,14 +288,18 @@ fn player_wasd_space_triggers_primary_action_attack_when_clip_exists() {
         state: toki_core::animation::AnimationState::IdleDown,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/walk_down_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 180.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Loop,
     });
     controller.add_clip(toki_core::animation::AnimationClip {
         state: toki_core::animation::AnimationState::AttackDown,
         atlas_name: "players.json".to_string(),
         frame_tile_names: vec!["player/attack_down_a".to_string()],
+        frame_positions: None,
         frame_duration_ms: 120.0,
+        frame_durations_ms: None,
         loop_mode: toki_core::animation::LoopMode::Once,
     });
     controller.play(toki_core::animation::AnimationState::IdleDown);

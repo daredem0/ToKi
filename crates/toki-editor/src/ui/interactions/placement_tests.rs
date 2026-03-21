@@ -59,8 +59,10 @@ fn sample_entity_definition(name: &str) -> EntityDefinition {
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["slime/idle_0".to_string()],
-                frame_duration_ms: 120.0,
-                loop_mode: "loop".to_string(),
+                frame_positions: None,
+                        frame_duration_ms: 120.0,
+                frame_durations_ms: None,
+                        loop_mode: "loop".to_string(),
             }],
             default_state: "idle".to_string(),
         },

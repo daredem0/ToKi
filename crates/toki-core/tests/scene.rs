@@ -12,7 +12,9 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
         state: AnimationState::Idle,
         atlas_name: "test_atlas".to_string(),
         frame_tile_names: vec!["idle_0".to_string()],
+        frame_positions: None,
         frame_duration_ms: 300.0,
+        frame_durations_ms: None,
         loop_mode: LoopMode::Loop,
     };
     controller.add_clip(idle_clip);
