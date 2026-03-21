@@ -158,6 +158,16 @@ Commit Message Shape Rules
 6. Use bullets to state what changed and why; avoid long prose paragraphs.
 7. Only use more than 3 bullets for very large commits
 
+Example:
+```text
+Change: Add tile trigger editing and viewport cursor readout
+
+- Add `OnTileEnter` and `OnTileExit` rule editing in the core and inspector
+- Migrate the example project rule graph and scene data to the new trigger shape
+- Show the scene viewport cursor position in the toolbar with a `P/T` tile toggle
+- Remove the dead selected-entity viewport stub and keep cursor state persistent
+```
+
 ## License
 
 This workspace currently uses a mixed licensing model:

@@ -7,6 +7,47 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-21
+
+### Added
+- Added a full-featured Sprite Editor with pixel-level editing, drawing tools (brush, eraser, fill, line, rectangle), color picker, undo/redo history, and keyboard shortcuts.
+- Added dual-canvas support in the Sprite Editor for side-by-side sprite sheet editing with copy/paste between canvases.
+- Added sprite sheet extension and import/merge capabilities to combine existing sprite assets.
+- Added canvas resize tools (expand, shrink, crop to content) in the Sprite Editor.
+- Added an Animation Editor with sprite atlas preview, clip management, frame duration editing, and live animation playback preview.
+- Added draggable panel dividers in the Animation Editor for customizable layout.
+- Added zoom controls (+/- keys) in the Animation Editor and scroll-wheel zoom across editor viewports.
+- Added an Entity Editor panel foundation with entity browsing, category filtering, and property editing infrastructure.
+- Added entity definition authoring with sprite atlas dropdown selection and SFX audio dropdown selection.
+- Added spawn point authoring in scenes with draggable viewport placement and facing direction configuration.
+- Added scene deletion support in the editor.
+- Added scene-to-scene transitions with fade-to-black effects and music crossfade.
+- Added player state preservation across scene transitions (health, inventory, stats transfer; transient state resets).
+- Added tile-based rule triggers (`OnTileEnter`, `OnTileExit`) with viewport cursor position readout.
+- Added context-aware rule triggers exposing collision pairs, damage attacker/victim, and death context.
+- Added rule conditions for querying entity state, stats, and game context.
+- Added rule actions for modifying entity stats, setting velocity, and teleporting entities.
+- Added runtime validation for out-of-bound rule references.
+- Added AI behavior system with `Wander`, `Chase`, `Run`, and `RunAndMultiply` behaviors.
+- Added authored AI configuration in entity definitions with detection radius and behavior-specific parameters.
+- Added `RunAndMultiply` AI that flees from threats, seeks allies, and spawns new entities on collision with cooldown.
+
+### Changed
+- Changed rule editor to use streamlined flat editing alongside the graph view.
+- Changed teleport action to use tile-based coordinates instead of pixel coordinates.
+- Changed player entity model to be unique per scene and connected to spawn points.
+- Changed scene hierarchy to support cleaner spawn point and player entity visualization.
+- Changed animation editor to sync atlas metadata on save, preserving tile names from entity definitions.
+- Changed sprite editor to auto-shrink pasted content that exceeds cell boundaries.
+- Refactored editor UI to use `EnumIter` pattern for cleaner enum iteration.
+
+### Fixed
+- Fixed background music playback and added smooth transition effects between tracks.
+- Fixed spawn point interaction in viewport (draggable and clickable).
+- Fixed rendering issues after player entity refactoring.
+- Fixed chessboard and canvas drag alignment in sprite editor.
+- Fixed clippy warnings across the workspace.
+
 ## [0.1.1] - 2026-03-19
 
 ### Added
@@ -324,7 +365,9 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Fixed camera/map-bound movement and projection distortion on resize.
 - Improved tilemap upload strategy and window/surface resize handling.
 
-[Unreleased]: https://github.com/daredem0/ToKi/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/daredem0/ToKi/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/daredem0/ToKi/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/daredem0/ToKi/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/daredem0/ToKi/compare/v0.0.14...v0.1.0
 [0.0.14]: https://github.com/daredem0/ToKi/compare/v0.0.13...v0.0.14
 [0.0.13]: https://github.com/daredem0/ToKi/compare/0.0.12...v0.0.13
