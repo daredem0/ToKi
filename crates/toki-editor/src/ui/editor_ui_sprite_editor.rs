@@ -233,6 +233,41 @@ impl SpriteCanvas {
             }
         }
     }
+
+    /// Scale the canvas to fit within max dimensions while maintaining aspect ratio.
+    /// Uses nearest-neighbor sampling for pixel art.
+    pub fn scaled_to_fit(&self, max_width: u32, max_height: u32) -> Self {
+        if max_width == 0 || max_height == 0 {
+            return self.clone();
+        }
+
+        // Calculate scale factor to fit within bounds
+        let scale_x = max_width as f32 / self.width as f32;
+        let scale_y = max_height as f32 / self.height as f32;
+        let scale = scale_x.min(scale_y).min(1.0); // Don't upscale, only downscale
+
+        if scale >= 1.0 {
+            return self.clone(); // No scaling needed
+        }
+
+        let new_width = ((self.width as f32 * scale).round() as u32).max(1);
+        let new_height = ((self.height as f32 * scale).round() as u32).max(1);
+
+        let mut result = Self::new(new_width, new_height);
+
+        // Nearest-neighbor downscaling
+        for dy in 0..new_height {
+            for dx in 0..new_width {
+                let src_x = ((dx as f32 + 0.5) / scale).floor() as u32;
+                let src_y = ((dy as f32 + 0.5) / scale).floor() as u32;
+                if let Some(color) = self.get_pixel(src_x.min(self.width - 1), src_y.min(self.height - 1)) {
+                    result.set_pixel(dx, dy, color);
+                }
+            }
+        }
+
+        result
+    }
 }
 
 /// Viewport state for the sprite canvas
@@ -1495,7 +1530,7 @@ impl SpriteEditorState {
     }
 
     /// Paste clipboard contents at the best position on a specific canvas.
-    /// If a cell is selected, centers the paste in that cell.
+    /// If a cell is selected, scales to fit and centers the paste in that cell.
     /// Otherwise, uses the cursor position.
     pub fn paste_at_cursor(&mut self, side: CanvasSide) -> bool {
         let clipboard = match &self.clipboard {
@@ -1507,8 +1542,8 @@ impl SpriteEditorState {
             return false;
         }
 
-        // Determine paste position: center in selected cell, or use cursor position
-        let paste_pos = self.calculate_paste_position(side, &clipboard);
+        // Prepare clipboard (possibly scaled) and position
+        let (to_paste, paste_pos) = self.prepare_paste(side, &clipboard);
         let Some(paste_pos) = paste_pos else {
             return false;
         };
@@ -1519,7 +1554,7 @@ impl SpriteEditorState {
         // Perform the paste
         let cs = self.canvas_state_mut(side);
         if let Some(canvas) = &mut cs.canvas {
-            canvas.blit(&clipboard, paste_pos.x, paste_pos.y);
+            canvas.blit(&to_paste, paste_pos.x, paste_pos.y);
             cs.dirty = true;
             cs.canvas_texture = None;
         }
@@ -1532,16 +1567,19 @@ impl SpriteEditorState {
         true
     }
 
-    /// Calculate the paste position, centering in selected cell if available
-    fn calculate_paste_position(
+    /// Prepare clipboard for pasting: scale if needed and calculate position.
+    /// Returns (canvas_to_paste, position).
+    fn prepare_paste(
         &self,
         side: CanvasSide,
         clipboard: &SpriteCanvas,
-    ) -> Option<glam::IVec2> {
+    ) -> (SpriteCanvas, Option<glam::IVec2>) {
         let cs = self.canvas_state(side);
-        let canvas = cs.canvas.as_ref()?;
+        let Some(canvas) = cs.canvas.as_ref() else {
+            return (clipboard.clone(), None);
+        };
 
-        // If a cell is selected, center the paste in that cell
+        // If a cell is selected, scale to fit and center in that cell
         if let Some(cell_idx) = cs.selected_cell {
             let cell_w = cs.cell_size.x;
             let cell_h = cs.cell_size.y;
@@ -1551,19 +1589,22 @@ impl SpriteEditorState {
                     let cell_x = (cell_idx as u32 % cols) * cell_w;
                     let cell_y = (cell_idx as u32 / cols) * cell_h;
 
-                    // Center the clipboard in the cell
-                    let center_x =
-                        cell_x as i32 + (cell_w as i32 - clipboard.width as i32) / 2;
-                    let center_y =
-                        cell_y as i32 + (cell_h as i32 - clipboard.height as i32) / 2;
+                    // Scale clipboard to fit in cell if larger
+                    let scaled = clipboard.scaled_to_fit(cell_w, cell_h);
 
-                    return Some(glam::IVec2::new(center_x, center_y));
+                    // Center the scaled clipboard in the cell
+                    let center_x =
+                        cell_x as i32 + (cell_w as i32 - scaled.width as i32) / 2;
+                    let center_y =
+                        cell_y as i32 + (cell_h as i32 - scaled.height as i32) / 2;
+
+                    return (scaled, Some(glam::IVec2::new(center_x, center_y)));
                 }
             }
         }
 
-        // Fall back to cursor position
-        cs.cursor_canvas_pos
+        // Fall back to cursor position without scaling
+        (clipboard.clone(), cs.cursor_canvas_pos)
     }
 
     /// Add a color to the recent colors palette

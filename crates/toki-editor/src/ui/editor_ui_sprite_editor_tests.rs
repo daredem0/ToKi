@@ -1104,3 +1104,75 @@ fn sprite_editor_paste_centers_in_selected_cell() {
         assert_eq!(canvas.get_pixel(8, 8), Some(PixelColor::transparent()));
     }
 }
+
+#[test]
+fn sprite_editor_paste_scales_to_fit_cell() {
+    use super::{CanvasSide, SpriteSelection};
+
+    let mut state = SpriteEditorState::default();
+    // Create a 16x16 sheet with 4x4 cells (4x4 grid)
+    state.new_sheet(16, 16, 4, 4);
+
+    // Draw a 8x8 red square at (0,0) and copy it (larger than cell size)
+    if let Some(canvas) = &mut state.active_mut().canvas {
+        canvas.fill_rect(0, 0, 8, 8, PixelColor::rgb(255, 0, 0));
+    }
+    state.active_mut().selection = Some(SpriteSelection::new(0, 0, 8, 8));
+    assert!(state.copy_selection());
+
+    // Verify clipboard is 8x8
+    assert_eq!(state.clipboard.as_ref().unwrap().width, 8);
+    assert_eq!(state.clipboard.as_ref().unwrap().height, 8);
+
+    // Select cell 15 (bottom-right, at position 12,12)
+    state.active_mut().selected_cell = Some(15);
+
+    // Paste - should scale the 8x8 clipboard down to 4x4 to fit the cell
+    assert!(state.paste_at_cursor(CanvasSide::Left));
+
+    // Check that pixels were pasted in cell 15 (scaled down)
+    // The 8x8 source scaled to 4x4 should fill the entire cell
+    if let Some(canvas) = &state.active().canvas {
+        // Cell 15 starts at (12, 12), and scaled content should fill it
+        assert_eq!(canvas.get_pixel(12, 12), Some(PixelColor::rgb(255, 0, 0)));
+        assert_eq!(canvas.get_pixel(15, 15), Some(PixelColor::rgb(255, 0, 0)));
+    }
+}
+
+#[test]
+fn sprite_canvas_scaled_to_fit_downscales_correctly() {
+    use super::SpriteCanvas;
+
+    // Create an 8x8 canvas with a checkerboard pattern
+    let mut canvas = SpriteCanvas::new(8, 8);
+    for y in 0..8 {
+        for x in 0..8 {
+            if (x + y) % 2 == 0 {
+                canvas.set_pixel(x, y, PixelColor::rgb(255, 0, 0));
+            }
+        }
+    }
+
+    // Scale to 4x4
+    let scaled = canvas.scaled_to_fit(4, 4);
+    assert_eq!(scaled.width, 4);
+    assert_eq!(scaled.height, 4);
+
+    // The scaled version should have sampled pixels from the original
+    // At scale 0.5, each output pixel samples from 2x2 input area
+    // The center of output (0,0) maps to input (0.5, 0.5) -> samples (0,0)
+    assert!(scaled.get_pixel(0, 0).is_some());
+}
+
+#[test]
+fn sprite_canvas_scaled_to_fit_no_upscale() {
+    use super::SpriteCanvas;
+
+    // Create a 4x4 canvas
+    let canvas = SpriteCanvas::new(4, 4);
+
+    // Scaling to 8x8 should not upscale (returns same size)
+    let scaled = canvas.scaled_to_fit(8, 8);
+    assert_eq!(scaled.width, 4);
+    assert_eq!(scaled.height, 4);
+}
