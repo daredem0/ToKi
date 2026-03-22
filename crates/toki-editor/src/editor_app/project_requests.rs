@@ -45,12 +45,21 @@ impl EditorApp {
                     );
                 }
 
-                if let Some(project) = self.core.project_manager.current_project.as_ref() {
-                    self.core.ui.set_title(&project.name.to_string());
-                    self.core
-                        .ui
-                        .project
-                        .set_available_palettes(&project.metadata.runtime.palettes);
+                let project_name = self
+                    .core
+                    .project_manager
+                    .current_project
+                    .as_ref()
+                    .map(|project| project.name.clone());
+                let project_palettes = self
+                    .core
+                    .project_manager
+                    .get_project_assets_mut()
+                    .and_then(|assets| assets.load_project_palettes().ok())
+                    .unwrap_or_default();
+                if let Some(project_name) = project_name {
+                    self.core.ui.set_title(&project_name);
+                    self.core.ui.project.set_available_palettes(&project_palettes);
                 }
 
                 match self.core.project_manager.load_scenes() {

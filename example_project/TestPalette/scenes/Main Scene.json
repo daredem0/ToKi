@@ -1,0 +1,163 @@
+{
+  "name": "Main Scene",
+  "description": "Palette rendering demo scene.",
+  "maps": [
+    "palette_demo_map"
+  ],
+  "entities": [
+    {
+      "id": 2,
+      "position": [
+        72,
+        64
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Npc",
+      "category": "palette_demo",
+      "definition_name": "palette_guide",
+      "control_role": "none",
+      "audio": {
+        "footstep_trigger_distance": 16.0,
+        "hearing_radius": 192,
+        "movement_sound_trigger": "distance",
+        "movement_sound": null,
+        "collision_sound": null
+      },
+      "attributes": {
+        "health": 10,
+        "stats": {
+          "base": {
+            "health": 10
+          },
+          "current": {
+            "health": 10
+          }
+        },
+        "speed": 0.0,
+        "solid": false,
+        "visible": true,
+        "has_shadow": true,
+        "palette_override": "night",
+        "animation_controller": {
+          "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "indexed_demo.json",
+              "frame_tile_names": [
+                "guide/idle"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            }
+          },
+          "current_clip_state": "Idle",
+          "current_frame_index": 0,
+          "frame_timer": 0.0,
+          "is_finished": false
+        },
+        "render_layer": 1,
+        "active": true,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "none",
+        "has_inventory": false
+      },
+      "collision_box": null,
+      "tags": [
+        "palette_demo",
+        "indexed_override"
+      ]
+    },
+    {
+      "id": 3,
+      "position": [
+        112,
+        64
+      ],
+      "size": [
+        16,
+        16
+      ],
+      "entity_kind": "Decoration",
+      "category": "palette_demo",
+      "definition_name": "truecolor_flower",
+      "control_role": "none",
+      "audio": {
+        "footstep_trigger_distance": 16.0,
+        "hearing_radius": 192,
+        "movement_sound_trigger": "distance",
+        "movement_sound": null,
+        "collision_sound": null
+      },
+      "attributes": {
+        "health": null,
+        "speed": 0.0,
+        "solid": false,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": {
+          "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "truecolor_demo.json",
+              "frame_tile_names": [
+                "flower/idle"
+              ],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            }
+          },
+          "current_clip_state": "Idle",
+          "current_frame_index": 0,
+          "frame_timer": 0.0,
+          "is_finished": false
+        },
+        "render_layer": 1,
+        "active": true,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": {
+          "behavior": "none",
+          "detection_radius": 0
+        },
+        "movement_profile": "none",
+        "has_inventory": false
+      },
+      "collision_box": null,
+      "tags": [
+        "palette_demo",
+        "truecolor_control"
+      ]
+    }
+  ],
+  "rules": {
+    "rules": []
+  },
+  "camera_position": null,
+  "camera_scale": null,
+  "background_music_track_id": null,
+  "anchors": [
+    {
+      "id": "spawn_a",
+      "kind": "SpawnPoint",
+      "position": [
+        32,
+        64
+      ],
+      "facing": "Down"
+    }
+  ],
+  "player_entry": {
+    "entity_definition_name": "palette_player",
+    "spawn_point_id": "spawn_a"
+  }
+}

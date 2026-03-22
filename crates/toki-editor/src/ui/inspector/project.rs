@@ -1,6 +1,10 @@
 use super::*;
 use crate::project::apply_project_settings_draft;
-use toki_core::palette::Palette4;
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::PathBuf;
+use toki_core::palette::{save_palette_asset_to_path, Palette4};
+use toki_core::project_assets::load_project_palettes;
 
 impl InspectorSystem {
     pub(super) fn render_project_settings_panel(
@@ -22,6 +26,7 @@ impl InspectorSystem {
 
         let mut draft = ProjectSettingsDraft::from_project(project);
         let mut changed = false;
+        let mut palette_files_changed = false;
 
         ui.collapsing("General", |ui| {
             ui.horizontal(|ui| {
@@ -264,12 +269,14 @@ impl InspectorSystem {
             });
 
             ui.separator();
-            ui.label("Project Palettes:");
+            ui.label("Built-in palettes are always available.");
+            ui.separator();
+            ui.label("Project Palette Files:");
+            let mut project_palettes = load_project_palette_files(project);
             let mut remove_palette_id = None;
-            let palette_ids = draft.palettes.keys().cloned().collect::<Vec<_>>();
+            let palette_ids = project_palettes.keys().cloned().collect::<Vec<_>>();
             for palette_id in palette_ids {
-                let mut palette = draft
-                    .palettes
+                let mut palette = project_palettes
                     .get(&palette_id)
                     .copied()
                     .unwrap_or(Palette4::new([[0, 0, 0, 255]; 4]));
@@ -292,42 +299,81 @@ impl InspectorSystem {
                                     color32.b(),
                                     color32.a(),
                                 ];
-                                changed = true;
+                                palette_files_changed = true;
                             }
                         }
                     });
                 });
-                if draft.palettes.get(&palette_id).copied() != Some(palette) {
-                    draft.palettes.insert(palette_id.clone(), palette);
+                if project_palettes.get(&palette_id).copied() != Some(palette) {
+                    match save_project_palette_file(project, &palette_id, palette) {
+                        Ok(()) => {
+                            project_palettes.insert(palette_id.clone(), palette);
+                            palette_files_changed = true;
+                        }
+                        Err(error) => {
+                            tracing::warn!(
+                                "Failed to save project palette '{}' in '{}': {}",
+                                palette_id,
+                                project.path.display(),
+                                error
+                            );
+                        }
+                    }
                 }
             }
             if let Some(remove_palette_id) = remove_palette_id {
-                draft.palettes.remove(&remove_palette_id);
-                if draft.indexed_palette_override.as_deref() == Some(remove_palette_id.as_str()) {
-                    draft.indexed_palette_override = None;
+                match remove_project_palette_file(project, &remove_palette_id) {
+                    Ok(()) => {
+                        if draft.indexed_palette_override.as_deref()
+                            == Some(remove_palette_id.as_str())
+                        {
+                            draft.indexed_palette_override = None;
+                            changed = true;
+                        }
+                        palette_files_changed = true;
+                    }
+                    Err(error) => {
+                        tracing::warn!(
+                            "Failed to remove project palette '{}' in '{}': {}",
+                            remove_palette_id,
+                            project.path.display(),
+                            error
+                        );
+                    }
                 }
-                changed = true;
             }
 
             if ui.button("Add Project Palette").clicked() {
-                let mut index = draft.palettes.len() + 1;
+                let mut index = project_palettes.len() + 1;
                 let palette_id = loop {
                     let candidate = format!("custom_palette_{index}");
-                    if !draft.palettes.contains_key(&candidate) {
+                    if !ui_state.project.available_palettes.contains_key(&candidate) {
                         break candidate;
                     }
                     index += 1;
                 };
-                draft.palettes.insert(
-                    palette_id,
+                match save_project_palette_file(
+                    project,
+                    &palette_id,
                     Palette4::new([
                         [0x00, 0x00, 0x00, 0xFF],
                         [0x55, 0x55, 0x55, 0xFF],
                         [0xAA, 0xAA, 0xAA, 0xFF],
                         [0xFF, 0xFF, 0xFF, 0xFF],
                     ]),
-                );
-                changed = true;
+                ) {
+                    Ok(()) => {
+                        palette_files_changed = true;
+                    }
+                    Err(error) => {
+                        tracing::warn!(
+                            "Failed to create project palette '{}' in '{}': {}",
+                            palette_id,
+                            project.path.display(),
+                            error
+                        );
+                    }
+                }
             }
         });
 
@@ -355,7 +401,11 @@ impl InspectorSystem {
             ui_state.set_title(&project.name);
             ui_state
                 .project
-                .set_available_palettes(&project.metadata.runtime.palettes);
+                .set_available_palettes(&load_project_palette_files(project));
+        } else if palette_files_changed {
+            ui_state
+                .project
+                .set_available_palettes(&load_project_palette_files(project));
         }
     }
 
@@ -366,4 +416,39 @@ impl InspectorSystem {
     ) -> bool {
         apply_project_settings_draft(project, draft)
     }
+}
+
+fn load_project_palette_files(project: &Project) -> BTreeMap<String, Palette4> {
+    load_project_palettes(&project.path).unwrap_or_else(|error| {
+        tracing::warn!(
+            "Failed to load project palettes from '{}': {}",
+            project.path.display(),
+            error
+        );
+        BTreeMap::new()
+    })
+}
+
+fn project_palette_file_path(project: &Project, palette_id: &str) -> PathBuf {
+    project
+        .path
+        .join("palettes")
+        .join(format!("{palette_id}.json"))
+}
+
+fn save_project_palette_file(
+    project: &Project,
+    palette_id: &str,
+    palette: Palette4,
+) -> anyhow::Result<()> {
+    let path = project_palette_file_path(project, palette_id);
+    save_palette_asset_to_path(&path, palette).map_err(anyhow::Error::from)
+}
+
+fn remove_project_palette_file(project: &Project, palette_id: &str) -> anyhow::Result<()> {
+    let path = project_palette_file_path(project, palette_id);
+    if path.exists() {
+        fs::remove_file(&path)?;
+    }
+    Ok(())
 }

@@ -1,0 +1,21 @@
+{
+  "image": "terrain.png",
+  "tile_size": [
+    16,
+    16
+  ],
+  "color_mode": "palette_indexed",
+  "palette": "gb_default",
+  "tiles": {
+    "grass": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    }
+  }
+}

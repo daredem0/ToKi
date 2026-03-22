@@ -1,0 +1,22 @@
+{
+  "image": "indexed_demo.png",
+  "tile_size": [16, 16],
+  "color_mode": "palette_indexed",
+  "palette": "gb_default",
+  "tiles": {
+    "hero/idle": {
+      "position": [0, 0],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "guide/idle": {
+      "position": [1, 0],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    }
+  }
+}

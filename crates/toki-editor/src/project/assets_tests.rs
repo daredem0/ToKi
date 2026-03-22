@@ -1,6 +1,7 @@
 use super::{ProjectAssets, ProjectAudioAssetKind};
 use std::fs;
 use tempfile::tempdir;
+use toki_core::palette::{save_palette_asset_to_path, Palette4};
 
 #[test]
 fn scan_assets_discovers_atlases_and_object_sheets_separately() {
@@ -103,4 +104,62 @@ fn discover_project_entity_definition_names_reads_json_files() {
 
     let names = ProjectAssets::discover_project_entity_definition_names(temp_dir.path());
     assert_eq!(names, vec!["player", "slime"]);
+}
+
+#[test]
+fn load_project_palettes_reads_palette_json_files() {
+    let temp_dir = tempdir().expect("temp dir should be created");
+    let palettes_dir = temp_dir.path().join("palettes");
+    fs::create_dir_all(&palettes_dir).expect("palettes dir should be created");
+
+    save_palette_asset_to_path(
+        &palettes_dir.join("forest.json"),
+        Palette4::new([
+            [1, 2, 3, 255],
+            [4, 5, 6, 255],
+            [7, 8, 9, 255],
+            [10, 11, 12, 255],
+        ]),
+    )
+    .expect("palette write");
+    save_palette_asset_to_path(
+        &palettes_dir.join("night.json"),
+        Palette4::new([
+            [11, 12, 13, 255],
+            [14, 15, 16, 255],
+            [17, 18, 19, 255],
+            [20, 21, 22, 255],
+        ]),
+    )
+    .expect("palette write");
+
+    let mut assets = ProjectAssets::new(temp_dir.path().to_path_buf());
+    assets.scan_assets().expect("asset scan should succeed");
+
+    let palettes = assets
+        .load_project_palettes()
+        .expect("palette load should succeed");
+    assert_eq!(palettes.keys().cloned().collect::<Vec<_>>(), vec!["forest", "night"]);
+}
+
+#[test]
+fn scan_assets_discovers_palette_files() {
+    let temp_dir = tempdir().expect("temp dir should be created");
+    let palettes_dir = temp_dir.path().join("palettes");
+    fs::create_dir_all(&palettes_dir).expect("palettes dir should be created");
+    save_palette_asset_to_path(
+        &palettes_dir.join("swamp.json"),
+        Palette4::new([
+            [8, 24, 8, 255],
+            [32, 72, 24, 255],
+            [96, 144, 56, 255],
+            [184, 216, 104, 255],
+        ]),
+    )
+    .expect("palette write");
+
+    let mut assets = ProjectAssets::new(temp_dir.path().to_path_buf());
+    assets.scan_assets().expect("asset scan should succeed");
+
+    assert!(assets.palettes.contains_key("swamp"));
 }

@@ -262,7 +262,6 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
         movement_mix_percent: 55,
         collision_mix_percent: 35,
         indexed_palette_override: None,
-        palettes: std::collections::BTreeMap::new(),
     };
 
     let changed = InspectorSystem::apply_project_settings_draft(&mut project, &draft);

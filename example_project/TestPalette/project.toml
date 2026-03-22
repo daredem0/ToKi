@@ -1,0 +1,105 @@
+[project]
+name = "TestPalette"
+version = "1.0.0"
+created = "2026-03-22T20:30:00Z"
+modified = "2026-03-22T21:29:07.851765198Z"
+toki_editor_version = "0.1.0"
+description = "Minimal palette-indexed rendering example with one indexed player, one indexed NPC override, and one true-color control sprite."
+
+[scenes]
+"Main Scene" = "scenes/Main Scene.json"
+
+[assets]
+sprites = "assets/sprites/"
+tilemaps = "assets/tilemaps/"
+audio = "assets/audio/"
+
+[runtime.splash]
+duration_ms = 3000
+
+[runtime.audio]
+master_percent = 100
+music_percent = 100
+movement_percent = 100
+collision_percent = 100
+
+[runtime.display]
+show_entity_health_bars = false
+show_ground_shadows = true
+indexed_palette_override = "gb_default"
+resolution_width = 160
+resolution_height = 144
+zoom_percent = 100
+vsync = false
+target_fps = 60
+timing_mode = "delta"
+
+[runtime.menu]
+pause_root_screen_id = "pause_menu"
+gate_gameplay_when_open = true
+dialogs = []
+
+[runtime.menu.appearance]
+font_family = "Sans"
+font_size_px = 14
+menu_width_percent = 88
+menu_height_percent = 70
+title_spacing_px = 8
+button_spacing_px = 8
+footer_spacing_px = 16
+opacity_percent = 100
+border_color_hex = "#7CFF7C"
+text_color_hex = "#FFFFFF"
+menu_background_color_hex = "#142914"
+menu_background_transparent = false
+title_background_color_hex = "#143614"
+title_background_transparent = false
+entry_background_color_hex = "#0F1F0F"
+entry_background_transparent = false
+footer_text = "Esc: Back   Enter/Space: Select"
+border_style = "square"
+
+[[runtime.menu.screens]]
+id = "pause_menu"
+title = "Paused"
+
+[[runtime.menu.screens.items]]
+kind = "button"
+text = "Resume"
+
+[runtime.menu.screens.items.action]
+kind = "close_ui"
+
+[[runtime.menu.screens.items]]
+kind = "button"
+text = "Inventory"
+
+[runtime.menu.screens.items.action]
+kind = "open_surface"
+surface_id = "inventory_menu"
+
+[[runtime.menu.screens]]
+id = "inventory_menu"
+title = "Inventory"
+
+[[runtime.menu.screens.items]]
+kind = "dynamic_list"
+heading = "Items"
+source = "player_inventory"
+empty_text = "Inventory is empty"
+
+[[runtime.menu.screens.items]]
+kind = "button"
+text = "Back"
+
+[runtime.menu.screens.items.action]
+kind = "back"
+
+[editor]
+recent_files = []
+
+[editor.camera_settings]
+
+[editor.graph_layouts]
+
+[editor.rule_graph_drafts]

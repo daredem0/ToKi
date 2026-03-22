@@ -1,0 +1,14 @@
+{
+  "image": "truecolor_demo.png",
+  "tile_size": [16, 16],
+  "color_mode": "truecolor",
+  "tiles": {
+    "flower/idle": {
+      "position": [0, 0],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    }
+  }
+}

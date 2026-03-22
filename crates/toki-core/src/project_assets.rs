@@ -1,7 +1,9 @@
 use crate::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
 use crate::entity::EntityDefinition;
+use crate::palette::{load_palette_asset_from_path, Palette4};
 use crate::scene::Scene;
 use crate::CoreError;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -42,6 +44,13 @@ pub struct DiscoveredAudioAsset {
 pub struct DiscoveredSpriteMetadata {
     pub sprite_atlas_paths: Vec<PathBuf>,
     pub object_sheet_paths: Vec<PathBuf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiscoveredPaletteAsset {
+    pub name: String,
+    pub path: PathBuf,
+    pub palette: Palette4,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -271,6 +280,36 @@ pub fn discover_audio_files(dir: &Path) -> Result<Vec<DiscoveredAudioAsset>, Pro
         .collect::<Vec<_>>();
     assets.sort_by(|left, right| left.name.cmp(&right.name).then(left.path.cmp(&right.path)));
     Ok(assets)
+}
+
+pub fn discover_palette_assets(dir: &Path) -> Result<Vec<DiscoveredPaletteAsset>, ProjectAssetError> {
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut assets = Vec::new();
+    for path in find_json_files(dir)? {
+        let Some(name) = path.file_stem().and_then(|stem| stem.to_str()) else {
+            continue;
+        };
+        let palette = load_palette_asset_from_path(&path)?;
+        assets.push(DiscoveredPaletteAsset {
+            name: name.to_string(),
+            path,
+            palette,
+        });
+    }
+    assets.sort_by(|left, right| left.name.cmp(&right.name).then(left.path.cmp(&right.path)));
+    Ok(assets)
+}
+
+pub fn load_project_palettes(project_path: &Path) -> Result<BTreeMap<String, Palette4>, ProjectAssetError> {
+    let palette_dir = project_path.join("palettes");
+    let discovered = discover_palette_assets(&palette_dir)?;
+    Ok(discovered
+        .into_iter()
+        .map(|asset| (asset.name, asset.palette))
+        .collect())
 }
 
 pub fn resolve_tilemap_atlas_path(

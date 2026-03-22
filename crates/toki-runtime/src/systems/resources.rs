@@ -2,9 +2,10 @@ use std::collections::{BTreeMap, HashMap};
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
 use toki_core::palette::{resolve_palette, Palette4};
 pub use toki_core::project_assets::{
-    classify_sprite_metadata_file, find_first_json_file, first_existing_path, normalize_asset_name,
-    resolve_atlas_texture_path, resolve_object_sheet_texture_path, resolve_project_resource_paths,
-    resolve_tilemap_atlas_path, ResolvedProjectResourcePaths, SpriteMetadataFileKind,
+    classify_sprite_metadata_file, find_first_json_file, first_existing_path, load_project_palettes,
+    normalize_asset_name, resolve_atlas_texture_path, resolve_object_sheet_texture_path,
+    resolve_project_resource_paths, resolve_tilemap_atlas_path, ResolvedProjectResourcePaths,
+    SpriteMetadataFileKind,
 };
 use toki_core::project_runtime::ProjectRuntimeMetadata;
 use toki_core::sprite_render::{
@@ -310,18 +311,16 @@ impl SpriteAssetResolver for ResourceManager {
 fn load_palette_settings(
     project_path: &std::path::Path,
 ) -> Result<(BTreeMap<String, Palette4>, Option<String>), String> {
+    let project_palettes = load_project_palettes(project_path).map_err(|error| error.to_string())?;
     let project_file = project_path.join("project.toml");
     if !project_file.exists() {
-        return Ok((BTreeMap::new(), None));
+        return Ok((project_palettes, None));
     }
 
     let content = std::fs::read_to_string(&project_file).map_err(|error| error.to_string())?;
     let metadata =
         toml::from_str::<ProjectRuntimeMetadata>(&content).map_err(|error| error.to_string())?;
-    Ok((
-        metadata.runtime.palettes,
-        metadata.runtime.display.indexed_palette_override,
-    ))
+    Ok((project_palettes, metadata.runtime.display.indexed_palette_override))
 }
 
 fn register_sprite_atlas(

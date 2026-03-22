@@ -1,7 +1,4 @@
-use std::collections::BTreeMap;
-
 use crate::menu::MenuSettings;
-use crate::palette::Palette4;
 use serde::{Deserialize, Serialize};
 
 /// Controls how game logic timing is handled.
@@ -58,8 +55,6 @@ pub struct RuntimeSettings {
     pub splash: RuntimeSplashSettings,
     #[serde(default)]
     pub audio: RuntimeAudioMixSettings,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub palettes: BTreeMap<String, Palette4>,
     #[serde(default)]
     pub display: RuntimeDisplaySettings,
     #[serde(default)]

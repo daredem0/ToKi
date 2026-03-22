@@ -1,0 +1,56 @@
+{
+  "name": "palette_player",
+  "display_name": "Palette Player",
+  "description": "Indexed player sprite using the atlas default palette.",
+  "rendering": {
+    "size": [16, 16],
+    "render_layer": 1,
+    "visible": true,
+    "has_shadow": true
+  },
+  "attributes": {
+    "health": 10,
+    "stats": {
+      "health": 10
+    },
+    "speed": 0.0,
+    "solid": false,
+    "active": true,
+    "can_move": false,
+    "interactable": false,
+    "interaction_reach": 0,
+    "ai_config": {
+      "behavior": "none",
+      "detection_radius": 0
+    },
+    "movement_profile": "none",
+    "has_inventory": false
+  },
+  "collision": {
+    "enabled": false,
+    "offset": [0, 0],
+    "size": [16, 16],
+    "trigger": false
+  },
+  "audio": {
+    "footstep_trigger_distance": 16.0,
+    "hearing_radius": 192,
+    "movement_sound_trigger": "distance",
+    "movement_sound": "",
+    "collision_sound": null
+  },
+  "animations": {
+    "atlas_name": "indexed_demo.json",
+    "clips": [
+      {
+        "state": "idle",
+        "frame_tiles": ["hero/idle"],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      }
+    ],
+    "default_state": "idle"
+  },
+  "category": "human",
+  "tags": ["palette_demo", "player"]
+}

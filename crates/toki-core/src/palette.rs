@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
+use std::fs;
+use std::path::Path;
 
 use crate::graphics::image::DecodedImage;
+use crate::CoreError;
 use serde::{Deserialize, Serialize};
 
 pub const CANONICAL_INDEXED_SHADES: [[u8; 3]; 4] = [
@@ -22,6 +25,27 @@ impl Palette4 {
 
     pub fn color(self, index: usize) -> [u8; 4] {
         self.colors[index]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PaletteAssetFile {
+    pub colors: [[u8; 4]; 4],
+}
+
+impl From<Palette4> for PaletteAssetFile {
+    fn from(value: Palette4) -> Self {
+        Self {
+            colors: value.colors,
+        }
+    }
+}
+
+impl From<PaletteAssetFile> for Palette4 {
+    fn from(value: PaletteAssetFile) -> Self {
+        Self {
+            colors: value.colors,
+        }
     }
 }
 
@@ -116,6 +140,21 @@ pub fn resolve_palette(
         .get(palette_id)
         .copied()
         .or_else(|| builtin_palettes().get(palette_id).copied())
+}
+
+pub fn load_palette_asset_from_path(path: &Path) -> Result<Palette4, CoreError> {
+    let content = fs::read_to_string(path)?;
+    let file = serde_json::from_str::<PaletteAssetFile>(&content)?;
+    Ok(file.into())
+}
+
+pub fn save_palette_asset_to_path(path: &Path, palette: Palette4) -> Result<(), CoreError> {
+    let content = serde_json::to_string_pretty(&PaletteAssetFile::from(palette))?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, content)?;
+    Ok(())
 }
 
 pub fn validate_indexed_rgba8(data: &[u8]) -> IndexedImageValidation {
@@ -240,5 +279,22 @@ mod tests {
                 255, 255, 255, 0,
             ]
         );
+    }
+
+    #[test]
+    fn palette_asset_roundtrips_via_json_file() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let path = temp_dir.path().join("forest.json");
+        let palette = Palette4::new([
+            [1, 2, 3, 255],
+            [4, 5, 6, 255],
+            [7, 8, 9, 255],
+            [10, 11, 12, 255],
+        ]);
+
+        save_palette_asset_to_path(&path, palette).expect("save palette");
+        let loaded = load_palette_asset_from_path(&path).expect("load palette");
+
+        assert_eq!(loaded, palette);
     }
 }

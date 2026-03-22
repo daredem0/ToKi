@@ -5,11 +5,13 @@ pub const ENTITY_SCHEMA: &str = include_str!("../schemas/entity.json");
 pub const ATLAS_SCHEMA: &str = include_str!("../schemas/atlas.json");
 pub const MAP_SCHEMA: &str = include_str!("../schemas/map.json");
 pub const OBJECT_SHEET_SCHEMA: &str = include_str!("../schemas/object_sheet.json");
+pub const PALETTE_SCHEMA: &str = include_str!("../schemas/palette.json");
 
-pub const SCHEMA_FILES: [(&str, &str); 5] = [
+pub const SCHEMA_FILES: [(&str, &str); 6] = [
     ("scene", SCENE_SCHEMA),
     ("entity", ENTITY_SCHEMA),
     ("atlas", ATLAS_SCHEMA),
     ("map", MAP_SCHEMA),
     ("object_sheet", OBJECT_SHEET_SCHEMA),
+    ("palette", PALETTE_SCHEMA),
 ];

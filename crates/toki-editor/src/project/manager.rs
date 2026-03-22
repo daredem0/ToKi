@@ -268,6 +268,7 @@ impl ProjectManager {
         fs::create_dir_all(project_path.join("assets").join("tilemaps"))?;
         fs::create_dir_all(project_path.join("assets").join("audio"))?;
         fs::create_dir_all(project_path.join("entities"))?;
+        fs::create_dir_all(project_path.join("palettes"))?;
         fs::create_dir_all(project_path.join("settings"))?;
 
         tracing::debug!("Created project folder structure at {:?}", project_path);

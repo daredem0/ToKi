@@ -1,9 +1,10 @@
 use anyhow::Result;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
+use toki_core::palette::{load_palette_asset_from_path, Palette4};
 use toki_core::project_assets::{
-    classify_sprite_metadata_file, discover_audio_files,
+    classify_sprite_metadata_file, discover_audio_files, discover_palette_assets,
     load_entity_definition_from_path as load_entity_definition_from_project_path,
     load_scene_from_path as load_scene_from_project_path, SpriteMetadataFileKind,
 };
@@ -24,6 +25,8 @@ pub struct ProjectAssets {
     pub object_sheets: HashMap<String, ObjectSheetAsset>,
     /// Discovered entity definitions
     pub entities: HashMap<String, EntityAsset>,
+    /// Discovered project palette assets
+    pub palettes: BTreeMap<String, PaletteAsset>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,6 +74,12 @@ pub struct EntityAsset {
     pub definition: Option<EntityDefinition>,
 }
 
+#[derive(Debug, Clone)]
+pub struct PaletteAsset {
+    pub path: PathBuf,
+    pub palette: Option<Palette4>,
+}
+
 impl ProjectAssets {
     /// Create new project assets manager
     pub fn new(project_path: PathBuf) -> Self {
@@ -81,6 +90,7 @@ impl ProjectAssets {
             sprite_atlases: HashMap::new(),
             object_sheets: HashMap::new(),
             entities: HashMap::new(),
+            palettes: BTreeMap::new(),
         }
     }
 
@@ -90,14 +100,16 @@ impl ProjectAssets {
         self.scan_tilemaps()?;
         self.scan_sprite_atlases()?;
         self.scan_entities()?;
+        self.scan_palettes()?;
 
         tracing::info!(
-            "Scanned project assets: {} scenes, {} tilemaps, {} atlases, {} object sheets, {} entities",
+            "Scanned project assets: {} scenes, {} tilemaps, {} atlases, {} object sheets, {} entities, {} palettes",
             self.scenes.len(),
             self.tilemaps.len(),
             self.sprite_atlases.len(),
             self.object_sheets.len(),
-            self.entities.len()
+            self.entities.len(),
+            self.palettes.len()
         );
 
         Ok(())
@@ -272,6 +284,27 @@ impl ProjectAssets {
         }
     }
 
+    fn scan_palettes(&mut self) -> Result<()> {
+        let palettes_dir = self.project_path.join("palettes");
+        self.palettes.clear();
+        if !palettes_dir.exists() {
+            tracing::debug!("Palettes directory does not exist: {:?}", palettes_dir);
+            return Ok(());
+        }
+
+        tracing::info!("🔍 Scanning for palettes in {:?}", palettes_dir);
+        for asset in discover_palette_assets(&palettes_dir)? {
+            self.palettes.insert(
+                asset.name,
+                PaletteAsset {
+                    path: asset.path,
+                    palette: Some(asset.palette),
+                },
+            );
+        }
+        Ok(())
+    }
+
     /// Scan for entity definition files
     fn scan_entities(&mut self) -> Result<()> {
         let entities_dir = self.project_path.join("entities");
@@ -415,6 +448,22 @@ impl ProjectAssets {
         } else {
             Ok(None)
         }
+    }
+
+    pub fn load_project_palettes(&mut self) -> Result<BTreeMap<String, Palette4>> {
+        if self.palettes.values().any(|asset| asset.palette.is_none()) {
+            for asset in self.palettes.values_mut() {
+                if asset.palette.is_none() {
+                    asset.palette = Some(load_palette_asset_from_path(&asset.path)?);
+                }
+            }
+        }
+
+        Ok(self
+            .palettes
+            .iter()
+            .filter_map(|(name, asset)| asset.palette.map(|palette| (name.clone(), palette)))
+            .collect())
     }
 }
 

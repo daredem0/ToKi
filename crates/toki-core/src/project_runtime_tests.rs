@@ -43,7 +43,6 @@ fn runtime_settings_defaults_match_engine_baseline() {
     assert_eq!(settings.audio.music_percent, 100);
     assert_eq!(settings.audio.movement_percent, 100);
     assert_eq!(settings.audio.collision_percent, 100);
-    assert!(settings.palettes.is_empty());
     assert!(!settings.display.show_entity_health_bars);
     assert!(settings.display.show_ground_shadows);
     assert_eq!(settings.display.indexed_palette_override, None);
@@ -68,28 +67,19 @@ fn project_runtime_metadata_defaults_runtime_section() {
 }
 
 #[test]
-fn runtime_metadata_supports_project_palettes_and_global_override() {
+fn runtime_metadata_supports_global_indexed_palette_override() {
     let metadata: ProjectRuntimeMetadata = toml::from_str(
         r#"
-        [runtime.palettes.gb_swamp]
-        colors = [
-          [8, 24, 8, 255],
-          [32, 72, 24, 255],
-          [96, 144, 56, 255],
-          [184, 216, 104, 255],
-        ]
-
         [runtime.display]
         indexed_palette_override = "gb_swamp"
         "#,
     )
-    .expect("palette metadata should deserialize");
+    .expect("runtime metadata should deserialize");
 
     assert_eq!(
         metadata.runtime.display.indexed_palette_override.as_deref(),
         Some("gb_swamp")
     );
-    assert!(metadata.runtime.palettes.contains_key("gb_swamp"));
 }
 
 #[test]

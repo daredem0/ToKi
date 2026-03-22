@@ -36,6 +36,7 @@ fn create_top_down_starter_project_populates_template_content() {
     let project_path = parent.join("starter_project");
     assert!(project_path.join("entities/player.json").exists());
     assert!(project_path.join("entities/villager.json").exists());
+    assert!(project_path.join("palettes").exists());
     assert!(project_path.join("assets/sprites/terrain.png").exists());
     assert!(project_path.join("assets/sprites/creatures.png").exists());
     assert!(project_path
