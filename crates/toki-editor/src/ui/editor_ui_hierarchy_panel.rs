@@ -1,4 +1,5 @@
 use super::EditorUI;
+use crate::ui::panel_layout::SIDE_PANEL_DEFAULT_WIDTH;
 impl EditorUI {
     pub fn render_hierarchy_and_maps_combined_panel(
         &mut self,
@@ -8,7 +9,7 @@ impl EditorUI {
     ) {
         egui::SidePanel::left("hierarchy_panel")
             .resizable(true)
-            .default_width(250.0)
+            .default_width(SIDE_PANEL_DEFAULT_WIDTH)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.heading("Scene Hierarchy");

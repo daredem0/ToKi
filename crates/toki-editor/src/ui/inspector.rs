@@ -8,6 +8,7 @@ use super::editor_ui::{EditorUI, MapEditorTool, SceneRulesGraphCommandData, Sele
 use super::rule_graph::{RuleGraph, RuleGraphNodeKind};
 use crate::config::EditorConfig;
 use crate::project::Project;
+use crate::ui::panel_layout::SIDE_PANEL_DEFAULT_WIDTH;
 pub(crate) use crate::project::ProjectSettingsDraft;
 use std::collections::HashMap;
 use toki_core::assets::object_sheet::ObjectSheetMeta;
@@ -338,7 +339,7 @@ impl InspectorSystem {
     ) {
         egui::SidePanel::right("inspector_panel")
             .resizable(true)
-            .default_width(300.0)
+            .default_width(SIDE_PANEL_DEFAULT_WIDTH)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.selectable_value(
@@ -354,11 +355,7 @@ impl InspectorSystem {
                 });
                 ui.separator();
 
-                // Wrap all inspector content in a scrollable area
-                egui::ScrollArea::vertical()
-                    .auto_shrink([false, true])
-                    .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
-                    .show(ui, |ui| match ui_state.right_panel_tab {
+                egui::ScrollArea::vertical().show(ui, |ui| match ui_state.right_panel_tab {
                         super::editor_ui::RightPanelTab::Inspector => {
                             Self::render_selection_inspector_contents(
                                 ui_state, ui, ctx, game_state, project, config,

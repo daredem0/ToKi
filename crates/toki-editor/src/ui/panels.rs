@@ -20,6 +20,7 @@ use super::interactions::{
 };
 use super::rule_graph::{RuleGraph, RuleGraphError, RuleGraphNodeKind};
 use crate::config::EditorConfig;
+use crate::editor_tab_strip::{render_tab_strip, EditorTabSpec};
 use crate::editor_viewport::EditorViewportContext;
 use crate::scene::SceneViewport;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -93,6 +94,43 @@ enum GraphCommand {
 }
 
 impl PanelSystem {
+    fn center_panel_tabs() -> [EditorTabSpec<CenterPanelTab>; 8] {
+        [
+            EditorTabSpec {
+                value: CenterPanelTab::SceneViewport,
+                label: "Scene Viewport",
+            },
+            EditorTabSpec {
+                value: CenterPanelTab::SceneGraph,
+                label: "Scene Graph",
+            },
+            EditorTabSpec {
+                value: CenterPanelTab::SceneRules,
+                label: "Scene Rules",
+            },
+            EditorTabSpec {
+                value: CenterPanelTab::MapEditor,
+                label: "Map Editor",
+            },
+            EditorTabSpec {
+                value: CenterPanelTab::MenuEditor,
+                label: "Menu Editor",
+            },
+            EditorTabSpec {
+                value: CenterPanelTab::SpriteEditor,
+                label: "Sprite Editor",
+            },
+            EditorTabSpec {
+                value: CenterPanelTab::AnimationEditor,
+                label: "Animation Editor",
+            },
+            EditorTabSpec {
+                value: CenterPanelTab::EntityEditor,
+                label: "Entity Editor",
+            },
+        ]
+    }
+
     fn viewport_cursor_status_label(
         cursor_world: Option<glam::IVec2>,
         show_tiles: bool,
@@ -121,48 +159,13 @@ impl PanelSystem {
         renderer: Option<&mut egui_wgpu::Renderer>,
     ) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.selectable_value(
-                    &mut ui_state.center_panel_tab,
-                    CenterPanelTab::SceneViewport,
-                    "Scene Viewport",
-                );
-                ui.selectable_value(
-                    &mut ui_state.center_panel_tab,
-                    CenterPanelTab::SceneGraph,
-                    "Scene Graph",
-                );
-                ui.selectable_value(
-                    &mut ui_state.center_panel_tab,
-                    CenterPanelTab::SceneRules,
-                    "Scene Rules",
-                );
-                ui.selectable_value(
-                    &mut ui_state.center_panel_tab,
-                    CenterPanelTab::MapEditor,
-                    "Map Editor",
-                );
-                ui.selectable_value(
-                    &mut ui_state.center_panel_tab,
-                    CenterPanelTab::MenuEditor,
-                    "Menu Editor",
-                );
-                ui.selectable_value(
-                    &mut ui_state.center_panel_tab,
-                    CenterPanelTab::SpriteEditor,
-                    "Sprite Editor",
-                );
-                ui.selectable_value(
-                    &mut ui_state.center_panel_tab,
-                    CenterPanelTab::AnimationEditor,
-                    "Animation Editor",
-                );
-                ui.selectable_value(
-                    &mut ui_state.center_panel_tab,
-                    CenterPanelTab::EntityEditor,
-                    "Entity Editor",
-                );
-            });
+            render_tab_strip(
+                ui,
+                "center_panel_tabs",
+                &mut ui_state.center_panel_tab_strip,
+                &mut ui_state.center_panel_tab,
+                &Self::center_panel_tabs(),
+            );
             ui.separator();
 
             if ui_state.center_panel_tab == CenterPanelTab::SceneGraph {

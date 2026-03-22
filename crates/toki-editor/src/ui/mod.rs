@@ -6,6 +6,7 @@ pub mod inspector;
 pub mod inspector_trait;
 pub mod interactions;
 pub mod menus;
+pub mod panel_layout;
 pub mod panels;
 pub mod sprite_editor;
 pub mod undo_redo;

@@ -3,6 +3,7 @@ use super::menus::MenuSystem;
 use super::panels::PanelSystem;
 use super::rule_graph::RuleGraph;
 use super::undo_redo::UndoRedoHistory;
+use crate::editor_tab_strip::EditorTabStripState;
 use crate::editor_types::PlacementPreviewVisual;
 use crate::project::ProjectTemplateKind;
 use crate::project::SceneGraphLayout;
@@ -513,6 +514,7 @@ pub struct EditorUI {
     pub menu_preview_font_families: Vec<String>,
     pub viewport_cursor_world_position: Option<glam::IVec2>,
     pub viewport_cursor_show_tiles: bool,
+    pub center_panel_tab_strip: EditorTabStripState,
 }
 
 impl EditorUI {
@@ -567,6 +569,7 @@ impl EditorUI {
             ],
             viewport_cursor_world_position: None,
             viewport_cursor_show_tiles: false,
+            center_panel_tab_strip: EditorTabStripState::default(),
         }
     }
 
