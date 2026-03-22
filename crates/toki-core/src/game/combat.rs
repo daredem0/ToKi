@@ -4,16 +4,8 @@ use crate::collision::CollisionBox;
 use crate::entity::{Entity, EntityId, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID};
 
 use super::animation::FacingDirection;
-use super::rules::{DamageEvent, DeathEvent};
+use super::stat_effects::StatChangeRequest;
 use super::{GameState, InputAction};
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct StatChangeRequest {
-    pub(super) target_entity_id: EntityId,
-    pub(super) stat_id: String,
-    pub(super) delta: i32,
-    pub(super) source_entity_id: Option<EntityId>,
-}
 
 impl GameState {
     fn facing_vector(facing: FacingDirection) -> glam::IVec2 {
@@ -302,12 +294,8 @@ impl GameState {
                     damage,
                     HEALTH_STAT_ID
                 );
-                self.pending_stat_changes.push(StatChangeRequest {
-                    target_entity_id: target_id,
-                    stat_id: HEALTH_STAT_ID.to_string(),
-                    delta: -damage,
-                    source_entity_id: owner_id,
-                });
+                self.stat_effect_service()
+                    .queue_damage(target_id, damage, owner_id);
                 despawn_ids.push(projectile_id);
                 continue;
             }
@@ -332,64 +320,6 @@ impl GameState {
         for entity_id in despawn_ids {
             self.entity_manager.despawn_entity(entity_id);
         }
-    }
-
-    pub(super) fn resolve_pending_stat_changes(&mut self) {
-        let pending_stat_changes = std::mem::take(&mut self.pending_stat_changes);
-        if pending_stat_changes.is_empty() {
-            return;
-        }
-
-        let mut despawn_ids = Vec::new();
-        for change in pending_stat_changes {
-            let Some(entity) = self.entity_manager.get_entity_mut(change.target_entity_id) else {
-                continue;
-            };
-            let previous_value = entity.attributes.current_stat(&change.stat_id);
-            let Some(new_value) = entity
-                .attributes
-                .apply_stat_delta(&change.stat_id, change.delta)
-            else {
-                continue;
-            };
-
-            tracing::debug!(
-                "Applied stat change: source={:?} target={} stat={} delta={} previous={:?} new={}",
-                change.source_entity_id,
-                change.target_entity_id,
-                change.stat_id,
-                change.delta,
-                previous_value,
-                new_value
-            );
-
-            if change.stat_id == HEALTH_STAT_ID && change.delta < 0 {
-                // Record damage event with victim/attacker context
-                self.rule_runtime.frame_damage_events.push(DamageEvent {
-                    victim: change.target_entity_id,
-                    attacker: change.source_entity_id,
-                });
-            }
-
-            if change.stat_id == HEALTH_STAT_ID && new_value <= 0 {
-                // Record death event with victim/attacker context
-                self.rule_runtime.frame_death_events.push(DeathEvent {
-                    victim: change.target_entity_id,
-                    attacker: change.source_entity_id,
-                });
-                tracing::info!(
-                    "Entity {} reached zero {} and will be deferred for despawn",
-                    change.target_entity_id,
-                    change.stat_id
-                );
-                despawn_ids.push(change.target_entity_id);
-            }
-        }
-
-        // Defer despawning until after death events are processed
-        despawn_ids.sort_unstable();
-        despawn_ids.dedup();
-        self.pending_despawns.extend(despawn_ids);
     }
 
     fn trigger_entity_primary_action(&mut self, entity_id: EntityId) -> bool {
@@ -470,11 +400,7 @@ impl GameState {
         damage: i32,
         attacker_id: Option<EntityId>,
     ) {
-        self.pending_stat_changes.push(StatChangeRequest {
-            target_entity_id: target_id,
-            stat_id: HEALTH_STAT_ID.to_string(),
-            delta: -damage,
-            source_entity_id: attacker_id,
-        });
+        self.stat_effect_service()
+            .queue_damage(target_id, damage, attacker_id);
     }
 }

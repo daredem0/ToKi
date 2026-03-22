@@ -1,18 +1,12 @@
+use super::transition::SceneTransitionPlanner;
 use super::{GameState, RuleRuntimeState};
 use crate::ai::AiSystem;
-use crate::animation::AnimationState;
-use crate::entity::{ControlRole, Entity, EntityDefinition, EntityId, EntityKind, EntityManager};
+use crate::entity::{Entity, EntityDefinition, EntityId, EntityManager};
 use crate::rules::RuleSet;
-use crate::scene::{Scene, SceneAnchorFacing};
+use crate::scene::Scene;
 use crate::scene_manager::SceneManager;
 use crate::sprite::SpriteInstance;
 use std::collections::{HashMap, HashSet};
-
-struct PreparedSceneLoad {
-    entity_manager: EntityManager,
-    player_id: Option<EntityId>,
-    rules: RuleSet,
-}
 
 impl GameState {
     /// Create a new GameState with the given player sprite
@@ -283,15 +277,9 @@ impl GameState {
             .ok_or_else(|| format!("Scene '{}' not found", scene_name))?
             .clone();
 
-        let prepared = self.prepare_scene_load(&scene, None, None)?;
-        self.scene_manager.set_active_scene(scene_name)?;
-        self.clear_runtime_inputs();
-        self.pending_stat_changes.clear();
-        self.entity_manager = prepared.entity_manager;
-        self.player_id = prepared.player_id;
-        self.set_rules(prepared.rules);
-
-        Ok(())
+        let prepared = SceneTransitionPlanner::new(&self.entity_definitions)
+            .prepare_scene_load(&scene, None, None)?;
+        self.apply_prepared_scene_load(scene_name, prepared)
     }
 
     pub fn transition_to_scene(
@@ -305,16 +293,13 @@ impl GameState {
             .ok_or_else(|| format!("Scene '{}' not found", scene_name))?
             .clone();
         let preserved_player = self.player_entity().cloned();
-        let prepared = self.prepare_scene_load(&scene, Some(spawn_point_id), preserved_player)?;
+        let prepared = SceneTransitionPlanner::new(&self.entity_definitions).prepare_scene_load(
+            &scene,
+            Some(spawn_point_id),
+            preserved_player,
+        )?;
 
-        self.scene_manager.set_active_scene(scene_name)?;
-        self.clear_runtime_inputs();
-        self.pending_stat_changes.clear();
-        self.entity_manager = prepared.entity_manager;
-        self.player_id = prepared.player_id;
-        self.set_rules(prepared.rules);
-
-        Ok(())
+        self.apply_prepared_scene_load(scene_name, prepared)
     }
 
     /// Add a scene to the scene manager
@@ -365,187 +350,18 @@ impl GameState {
             .collect()
     }
 
-    fn prepare_scene_load(
-        &self,
-        scene: &Scene,
-        transition_spawn_point_id: Option<&str>,
-        preserved_player: Option<Entity>,
-    ) -> Result<PreparedSceneLoad, String> {
-        let mut entity_manager = EntityManager::new();
-        let preserve_player_across_transition =
-            transition_spawn_point_id.is_some() && preserved_player.is_some();
-
-        for entity in &scene.entities {
-            let authored_player = matches!(
-                entity.effective_control_role(),
-                ControlRole::PlayerCharacter
-            );
-            if authored_player
-                && (scene.player_entry.is_some() || preserve_player_across_transition)
-            {
-                continue;
-            }
-            entity_manager.add_existing_entity(entity.clone());
-        }
-
-        let player_id = if let Some(player_entry) = &scene.player_entry {
-            let spawn_point_id = transition_spawn_point_id.unwrap_or(&player_entry.spawn_point_id);
-            if let Some(preserved_player) = preserved_player.as_ref() {
-                let mut player = self.instantiate_scene_player_entry(
-                    scene,
-                    &player_entry.entity_definition_name,
-                    spawn_point_id,
-                    preserved_player,
-                )?;
-                let player_id = player.id;
-                self.reset_spawned_player_transient_state(&mut player, scene, spawn_point_id);
-                entity_manager.add_existing_entity(player);
-                entity_manager.set_control_role(player_id, ControlRole::PlayerCharacter);
-                if let Some(player) = entity_manager.get_entity_mut(player_id) {
-                    player.entity_kind = EntityKind::Player;
-                }
-                Some(player_id)
-            } else {
-                let (position, facing) = self.resolve_spawn_anchor(scene, spawn_point_id)?;
-                let definition = self
-                    .entity_definitions
-                    .get(&player_entry.entity_definition_name)
-                    .ok_or_else(|| {
-                        format!(
-                            "Scene '{}' references missing player entity definition '{}'",
-                            scene.name, player_entry.entity_definition_name
-                        )
-                    })?;
-                let player_id = entity_manager.spawn_from_definition(definition, position)?;
-                entity_manager.set_control_role(player_id, ControlRole::PlayerCharacter);
-                if let Some(player) = entity_manager.get_entity_mut(player_id) {
-                    player.entity_kind = EntityKind::Player;
-                    Self::reset_player_transient_state(player, facing);
-                }
-                Some(player_id)
-            }
-        } else if let (Some(spawn_point_id), Some(mut player)) =
-            (transition_spawn_point_id, preserved_player)
-        {
-            self.reposition_preserved_player(&mut player, scene, spawn_point_id)?;
-            let player_id = player.id;
-            entity_manager.add_existing_entity(player);
-            entity_manager.set_control_role(player_id, ControlRole::PlayerCharacter);
-            if let Some(player) = entity_manager.get_entity_mut(player_id) {
-                player.entity_kind = EntityKind::Player;
-            }
-            Some(player_id)
-        } else {
-            entity_manager.get_player_id()
-        };
-
-        Ok(PreparedSceneLoad {
-            entity_manager,
-            player_id,
-            rules: scene.rules.clone(),
-        })
-    }
-
-    fn instantiate_scene_player_entry(
-        &self,
-        scene: &Scene,
-        entity_definition_name: &str,
-        spawn_point_id: &str,
-        preserved_player: &Entity,
-    ) -> Result<Entity, String> {
-        let definition = self
-            .entity_definitions
-            .get(entity_definition_name)
-            .ok_or_else(|| {
-                format!(
-                    "Scene '{}' references missing player entity definition '{}'",
-                    scene.name, entity_definition_name
-                )
-            })?;
-        let (position, _) = self.resolve_spawn_anchor(scene, spawn_point_id)?;
-        let mut player = definition.create_entity(position, preserved_player.id)?;
-        player.control_role = ControlRole::PlayerCharacter;
-        player.entity_kind = EntityKind::Player;
-        Self::apply_durable_player_state(&mut player, preserved_player);
-        Ok(player)
-    }
-
-    fn reposition_preserved_player(
-        &self,
-        player: &mut Entity,
-        scene: &Scene,
-        spawn_point_id: &str,
+    fn apply_prepared_scene_load(
+        &mut self,
+        scene_name: &str,
+        prepared: super::transition::PreparedSceneLoad,
     ) -> Result<(), String> {
-        let (position, facing) = self.resolve_spawn_anchor(scene, spawn_point_id)?;
-        player.position = position;
-        Self::reset_player_transient_state(player, facing);
+        self.scene_manager.set_active_scene(scene_name)?;
+        self.clear_runtime_inputs();
+        self.pending_stat_changes.clear();
+        self.pending_despawns.clear();
+        self.entity_manager = prepared.entity_manager;
+        self.player_id = prepared.player_id;
+        self.set_rules(prepared.rules);
         Ok(())
-    }
-
-    fn reset_spawned_player_transient_state(
-        &self,
-        player: &mut Entity,
-        scene: &Scene,
-        spawn_point_id: &str,
-    ) {
-        let anchor_facing = scene
-            .get_anchor(spawn_point_id)
-            .and_then(|anchor| anchor.facing);
-        Self::reset_player_transient_state(player, anchor_facing);
-    }
-
-    fn reset_player_transient_state(player: &mut Entity, anchor_facing: Option<SceneAnchorFacing>) {
-        player.movement_accumulator = glam::Vec2::ZERO;
-        if let Some(animation_controller) = player.attributes.animation_controller.as_mut() {
-            let facing = anchor_facing
-                .map(Self::scene_anchor_facing_to_animation_state)
-                .or_else(|| {
-                    Some(Self::directional_animation_state(
-                        false,
-                        Self::facing_from_animation_state(animation_controller.current_clip_state),
-                    ))
-                })
-                .unwrap_or(AnimationState::Idle);
-            let desired_state = if animation_controller.has_clip(facing) {
-                facing
-            } else if animation_controller.has_clip(AnimationState::Idle) {
-                AnimationState::Idle
-            } else {
-                animation_controller.current_clip_state
-            };
-            let _ = animation_controller.play(desired_state);
-        }
-    }
-
-    fn apply_durable_player_state(target: &mut Entity, source: &Entity) {
-        target.attributes.health = source.attributes.health;
-        target.attributes.stats = source.attributes.stats.clone();
-        target.attributes.inventory = source.attributes.inventory.clone();
-        target.attributes.has_inventory = target.attributes.has_inventory
-            || source.attributes.has_inventory
-            || !source.attributes.inventory.is_empty();
-    }
-
-    fn scene_anchor_facing_to_animation_state(facing: SceneAnchorFacing) -> AnimationState {
-        match facing {
-            SceneAnchorFacing::Up => AnimationState::IdleUp,
-            SceneAnchorFacing::Down => AnimationState::IdleDown,
-            SceneAnchorFacing::Left => AnimationState::IdleLeft,
-            SceneAnchorFacing::Right => AnimationState::IdleRight,
-        }
-    }
-
-    fn resolve_spawn_anchor(
-        &self,
-        scene: &Scene,
-        spawn_point_id: &str,
-    ) -> Result<(glam::IVec2, Option<SceneAnchorFacing>), String> {
-        let anchor = scene.get_anchor(spawn_point_id).ok_or_else(|| {
-            format!(
-                "Scene '{}' could not resolve spawn point '{}'",
-                scene.name, spawn_point_id
-            )
-        })?;
-        Ok((anchor.position, anchor.facing))
     }
 }

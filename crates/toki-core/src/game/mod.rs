@@ -17,8 +17,10 @@ mod interaction;
 mod inventory;
 mod movement;
 mod render_queries;
+mod stat_effects;
 pub(crate) mod rules;
 mod scene;
+mod transition;
 
 #[cfg(test)]
 mod rules_tests;
@@ -145,7 +147,7 @@ pub struct GameState {
     pending_despawns: Vec<EntityId>,
 }
 
-use combat::StatChangeRequest;
+use stat_effects::StatChangeRequest;
 use rules::RuleRuntimeState;
 
 impl GameState {
@@ -293,10 +295,7 @@ impl GameState {
         self.apply_rule_animations(pending_rule_animations);
 
         // Despawn entities that died after death events have been processed
-        let pending_despawns = std::mem::take(&mut self.pending_despawns);
-        for entity_id in pending_despawns {
-            self.entity_manager.despawn_entity(entity_id);
-        }
+        self.flush_pending_despawns();
 
         // Update entity animation timing and emit animation-loop-based movement sounds.
         let completed_animation_loops = self.entity_manager.update_animations(17.0);
@@ -405,10 +404,7 @@ impl GameState {
         self.apply_rule_animations(pending_rule_animations);
 
         // Despawn entities that died after death events have been processed
-        let pending_despawns = std::mem::take(&mut self.pending_despawns);
-        for entity_id in pending_despawns {
-            self.entity_manager.despawn_entity(entity_id);
-        }
+        self.flush_pending_despawns();
 
         // Update entity animation timing with actual delta
         let completed_animation_loops = self.entity_manager.update_animations(animation_delta_ms);
