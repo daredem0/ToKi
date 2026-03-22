@@ -1,4 +1,3 @@
-/// TODO: #[allow(dead_code)] is broadly used here and needs to be removed later on
 use anyhow::Result;
 use std::collections::HashMap;
 use std::fs;
@@ -9,7 +8,6 @@ use toki_core::project_assets::{
 use toki_core::{entity::EntityDefinition, Scene};
 
 /// Asset discovery and management for project
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ProjectAssets {
     /// Project root path
@@ -30,9 +28,12 @@ pub struct ProjectAssets {
     pub entities: HashMap<String, EntityAsset>,
 }
 
-/// Scene asset information
+/// Scene asset information.
+///
+/// The `name` field duplicates the HashMap key but makes the struct self-contained
+/// for potential serialization or when returned individually.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Fields kept for self-contained struct (HashMap key duplicates name)
 pub struct SceneAsset {
     /// Scene name (from filename)
     pub name: String,
@@ -42,9 +43,9 @@ pub struct SceneAsset {
     pub scene: Option<Scene>,
 }
 
-/// Tilemap asset information
+/// Tilemap asset information.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Fields kept for self-contained struct (HashMap key duplicates name)
 pub struct TilemapAsset {
     /// Tilemap name (from filename)
     pub name: String,
@@ -52,9 +53,9 @@ pub struct TilemapAsset {
     pub path: PathBuf,
 }
 
-/// Sprite atlas asset information
+/// Sprite atlas asset information.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Fields kept for self-contained struct (HashMap key duplicates name)
 pub struct SpriteAtlasAsset {
     /// Atlas name (from filename)
     pub name: String,
@@ -62,9 +63,9 @@ pub struct SpriteAtlasAsset {
     pub path: PathBuf,
 }
 
-/// Object sheet asset information
+/// Object sheet asset information.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Fields kept for self-contained struct (HashMap key duplicates name)
 pub struct ObjectSheetAsset {
     /// Object sheet name (from filename)
     pub name: String,
@@ -72,9 +73,9 @@ pub struct ObjectSheetAsset {
     pub path: PathBuf,
 }
 
-/// Audio asset information
+/// Audio asset information.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Fields kept for self-contained struct (HashMap key duplicates name)
 pub struct AudioAsset {
     /// Audio name (from filename)
     pub name: String,
@@ -84,9 +85,9 @@ pub struct AudioAsset {
     pub format: ProjectAudioFormat,
 }
 
-/// Entity definition asset information
+/// Entity definition asset information.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Fields kept for self-contained struct (HashMap key duplicates name)
 pub struct EntityAsset {
     /// Entity name (from filename)
     pub name: String,
@@ -395,37 +396,40 @@ impl ProjectAssets {
     }
 
     /// Get all tilemap names
-    #[allow(dead_code)]
+    /// Get all tilemap names.
+    /// Part of complete asset discovery API for future editor features.
+    #[allow(dead_code)] // API completeness - will be used when tilemap picker is implemented
     pub fn get_tilemap_names(&self) -> Vec<String> {
         self.tilemaps.keys().cloned().collect()
     }
 
     /// Get all sprite atlas names
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), allow(dead_code))] // Used in tests
     pub fn get_sprite_atlas_names(&self) -> Vec<String> {
         self.sprite_atlases.keys().cloned().collect()
     }
 
     /// Get all object sheet names
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), allow(dead_code))] // Used in tests
     pub fn get_object_sheet_names(&self) -> Vec<String> {
         self.object_sheets.keys().cloned().collect()
     }
 
-    /// Get all music names
-    #[allow(dead_code)]
+    /// Get all music names.
+    /// Part of complete asset discovery API for future editor features.
+    #[allow(dead_code)] // API completeness - will be used when audio browser is implemented
     pub fn get_music_names(&self) -> Vec<String> {
         self.music.keys().cloned().collect()
     }
 
-    /// Get all SFX names
-    #[allow(dead_code)]
+    /// Get all SFX names.
+    /// Part of complete asset discovery API for future editor features.
+    #[allow(dead_code)] // API completeness - will be used when audio browser is implemented
     pub fn get_sfx_names(&self) -> Vec<String> {
         self.sfx.keys().cloned().collect()
     }
 
     /// Load an entity definition by name
-    #[allow(dead_code)]
     pub fn load_entity_definition(
         &mut self,
         entity_name: &str,
@@ -458,14 +462,15 @@ impl ProjectAssets {
         }
     }
 
-    /// Get all entity definition names
-    #[allow(dead_code)]
+    /// Get all entity definition names.
+    /// Used internally by `get_entities_by_category`.
     pub fn get_entity_names(&self) -> Vec<String> {
         self.entities.keys().cloned().collect()
     }
 
-    /// Get entities by category for organization in the editor
-    #[allow(dead_code)]
+    /// Get entities by category for organization in the editor.
+    /// Part of complete asset discovery API for future editor features.
+    #[allow(dead_code)] // API completeness - will be used when entity browser groups by category
     pub fn get_entities_by_category(&mut self) -> Result<HashMap<String, Vec<String>>> {
         let mut categories = HashMap::new();
 

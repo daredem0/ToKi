@@ -5,6 +5,52 @@ use crate::text::{TextAnchor, TextStyle, TextWeight};
 pub use crate::ui::{UiAction, UiCommand};
 use crate::ui::{UiBlock, UiComposition, UiRect, UiTextBlock};
 
+// ============================================================================
+// Menu Constants
+// ============================================================================
+
+/// Default font family for menus.
+pub const DEFAULT_FONT_FAMILY: &str = "Sans";
+
+/// Default font size in pixels.
+pub const DEFAULT_FONT_SIZE_PX: u16 = 14;
+
+/// Default menu width as percentage of screen width.
+pub const DEFAULT_WIDTH_PERCENT: u16 = 88;
+
+/// Default menu height as percentage of screen height.
+pub const DEFAULT_HEIGHT_PERCENT: u16 = 70;
+
+/// Default spacing between title and content in pixels.
+pub const DEFAULT_TITLE_SPACING_PX: u16 = 8;
+
+/// Default spacing between buttons in pixels.
+pub const DEFAULT_BUTTON_SPACING_PX: u16 = 8;
+
+/// Default spacing for footer section in pixels.
+pub const DEFAULT_FOOTER_SPACING_PX: u16 = 16;
+
+/// Default menu opacity (100 = fully opaque).
+pub const DEFAULT_OPACITY_PERCENT: u16 = 100;
+
+/// Default menu border color (green tint).
+pub const DEFAULT_BORDER_COLOR: &str = "#7CFF7C";
+
+/// Default menu text color (white).
+pub const DEFAULT_TEXT_COLOR: &str = "#FFFFFF";
+
+/// Default menu background color (dark green).
+pub const DEFAULT_BACKGROUND_COLOR: &str = "#142914";
+
+/// Default title background color (slightly lighter green).
+pub const DEFAULT_TITLE_BACKGROUND_COLOR: &str = "#143614";
+
+/// Default entry background color (darker green).
+pub const DEFAULT_ENTRY_BACKGROUND_COLOR: &str = "#0F1F0F";
+
+/// Default footer text.
+pub const DEFAULT_FOOTER_TEXT: &str = "Esc: Back   Enter/Space: Select";
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MenuSettings {
     #[serde(default = "default_pause_root_screen_id")]
@@ -596,59 +642,59 @@ fn default_gate_gameplay_when_open() -> bool {
 }
 
 fn default_menu_font_family() -> String {
-    "Sans".to_string()
+    DEFAULT_FONT_FAMILY.to_string()
 }
 
 fn default_menu_font_size_px() -> u16 {
-    14
+    DEFAULT_FONT_SIZE_PX
 }
 
 fn default_menu_width_percent() -> u16 {
-    88
+    DEFAULT_WIDTH_PERCENT
 }
 
 fn default_menu_height_percent() -> u16 {
-    70
+    DEFAULT_HEIGHT_PERCENT
 }
 
 fn default_menu_title_spacing_px() -> u16 {
-    8
+    DEFAULT_TITLE_SPACING_PX
 }
 
 fn default_menu_button_spacing_px() -> u16 {
-    8
+    DEFAULT_BUTTON_SPACING_PX
 }
 
 fn default_menu_footer_spacing_px() -> u16 {
-    16
+    DEFAULT_FOOTER_SPACING_PX
 }
 
 fn default_menu_opacity_percent() -> u16 {
-    100
+    DEFAULT_OPACITY_PERCENT
 }
 
 fn default_menu_border_color_hex() -> String {
-    "#7CFF7C".to_string()
+    DEFAULT_BORDER_COLOR.to_string()
 }
 
 fn default_menu_text_color_hex() -> String {
-    "#FFFFFF".to_string()
+    DEFAULT_TEXT_COLOR.to_string()
 }
 
 fn default_menu_background_color_hex() -> String {
-    "#142914".to_string()
+    DEFAULT_BACKGROUND_COLOR.to_string()
 }
 
 fn default_menu_title_background_color_hex() -> String {
-    "#143614".to_string()
+    DEFAULT_TITLE_BACKGROUND_COLOR.to_string()
 }
 
 fn default_menu_entry_background_color_hex() -> String {
-    "#0F1F0F".to_string()
+    DEFAULT_ENTRY_BACKGROUND_COLOR.to_string()
 }
 
 fn default_menu_footer_text() -> String {
-    "Esc: Back   Enter/Space: Select".to_string()
+    DEFAULT_FOOTER_TEXT.to_string()
 }
 
 fn default_menu_screens() -> Vec<MenuScreenDefinition> {

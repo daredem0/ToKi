@@ -313,6 +313,18 @@ impl EntityManager {
         self.active_entities.iter().copied().collect()
     }
 
+    /// Returns an iterator over active entity IDs without allocating.
+    ///
+    /// Prefer this over `active_entities()` when you only need to iterate.
+    pub fn active_entities_iter(&self) -> impl Iterator<Item = EntityId> + '_ {
+        self.active_entities.iter().copied()
+    }
+
+    /// Returns the number of active entities without allocating.
+    pub fn active_entity_count(&self) -> usize {
+        self.active_entities.len()
+    }
+
     pub fn would_collide_with_solid_entity(
         &self,
         moving_entity_id: EntityId,

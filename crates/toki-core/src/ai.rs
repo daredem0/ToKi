@@ -11,6 +11,38 @@ use crate::entity::{AiBehavior, Entity, EntityId, EntityManager};
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
 
+// ============================================================================
+// AI Constants
+// ============================================================================
+
+/// Standard tile size in pixels used for movement calculations.
+pub const TILE_SIZE_PX: i32 = 16;
+
+/// Wander behavior update frequency in frames.
+/// Lower values = more frequent updates = more erratic movement.
+pub const WANDER_UPDATE_FREQUENCY: u64 = 60;
+
+/// Speed multiplier for wander behavior (compensates for less frequent updates).
+pub const WANDER_SPEED_MULTIPLIER: f32 = 5.0;
+
+/// Minimum tiles to walk during wander movement.
+pub const WANDER_MIN_TILES: u32 = 1;
+
+/// Maximum tiles to walk during wander movement.
+pub const WANDER_MAX_TILES: u32 = 3;
+
+/// Minimum frames to wait when idle (at 60fps, ~0.5 seconds).
+pub const IDLE_WAIT_MIN_FRAMES: u32 = 30;
+
+/// Maximum frames to wait when idle (at 60fps, ~3 seconds).
+pub const IDLE_WAIT_MAX_FRAMES: u32 = 180;
+
+/// Minimum frames for initial entity wait (at 60fps, ~0.5 seconds).
+pub const INITIAL_WAIT_MIN_FRAMES: u32 = 30;
+
+/// Maximum frames for initial entity wait (at 60fps, ~1.5 seconds).
+pub const INITIAL_WAIT_MAX_FRAMES: u32 = 90;
+
 /// Context for AI movement operations, grouping related parameters.
 ///
 /// This reduces parameter counts for AI methods by bundling commonly-used
@@ -127,7 +159,7 @@ impl Default for AiRuntimeState {
             frame_counter: 0,
             wander_phase: WanderPhase::Waiting,
             // Start with random wait so entities don't all move at once
-            wait_frames_remaining: fastrand::u32(30..=90),
+            wait_frames_remaining: fastrand::u32(INITIAL_WAIT_MIN_FRAMES..=INITIAL_WAIT_MAX_FRAMES),
             seeking_mate: None,
             separation_state: None,
         }
@@ -246,13 +278,13 @@ impl BehaviorUpdate for WanderHandler {
         ctx: &AiContext,
         _ai_state: &mut AiRuntimeState,
     ) -> Option<AiUpdateResult> {
-        // Wander only updates every 60 frames
-        if !self.frame_counter.is_multiple_of(60) {
+        // Wander only updates periodically to avoid chaotic movement
+        if !self.frame_counter.is_multiple_of(WANDER_UPDATE_FREQUENCY) {
             return None;
         }
 
         let current_position = entity.position;
-        let movement_step = (entity.attributes.speed * 5.0).round() as i32;
+        let movement_step = (entity.attributes.speed * WANDER_SPEED_MULTIPLIER).round() as i32;
         let (max_x, max_y) = ctx.max_position(entity.size);
 
         let random_direction = fastrand::u32(0..5);
@@ -301,12 +333,11 @@ impl BehaviorUpdate for IdleWanderHandler {
 
                 // Done waiting - start walking
                 let direction = AiSystem::random_cardinal_direction();
-                let tiles = fastrand::u32(1..=3);
-                let tile_size = 16;
+                let tiles = fastrand::u32(WANDER_MIN_TILES..=WANDER_MAX_TILES);
 
                 ai_state.wander_phase = WanderPhase::Walking {
                     direction,
-                    remaining_distance: (tiles * tile_size) as i32,
+                    remaining_distance: (tiles as i32) * TILE_SIZE_PX,
                 };
 
                 Some(AiUpdateResult {
@@ -370,7 +401,7 @@ impl IdleWanderHandler {
 
         // Transition to waiting
         ai_state.wander_phase = WanderPhase::Waiting;
-        ai_state.wait_frames_remaining = fastrand::u32(30..=180);
+        ai_state.wait_frames_remaining = fastrand::u32(IDLE_WAIT_MIN_FRAMES..=IDLE_WAIT_MAX_FRAMES);
 
         if can_move {
             Some(AiSystem::build_movement_result(
@@ -473,9 +504,8 @@ impl AiSystem {
 
         // Collect entities with active AI behaviors
         let ai_entities: Vec<_> = entity_manager
-            .active_entities()
-            .iter()
-            .filter_map(|&entity_id| {
+            .active_entities_iter()
+            .filter_map(|entity_id| {
                 // Skip player
                 if Some(entity_id) == player_id {
                     return None;
@@ -520,8 +550,8 @@ impl AiSystem {
         entity_id: EntityId,
         ctx: &AiContext,
     ) -> Option<AiUpdateResult> {
-        // Wander only updates every 60 frames to avoid chaotic movement
-        if !self.frame_counter.is_multiple_of(60) {
+        // Wander only updates periodically to avoid chaotic movement
+        if !self.frame_counter.is_multiple_of(WANDER_UPDATE_FREQUENCY) {
             return None;
         }
 
@@ -529,7 +559,7 @@ impl AiSystem {
         let current_position = entity.position;
 
         // Wander uses larger steps since it updates less frequently
-        let movement_step = (entity.attributes.speed * 5.0).round() as i32;
+        let movement_step = (entity.attributes.speed * WANDER_SPEED_MULTIPLIER).round() as i32;
         let (max_x, max_y) = ctx.max_position(entity.size);
 
         // Choose random direction: 0=up, 1=down, 2=left, 3=right, 4=stay
@@ -733,10 +763,9 @@ impl AiSystem {
         let entity_kind = entity.entity_kind;
 
         entity_manager
-            .active_entities()
-            .iter()
-            .filter(|&&other_id| other_id != entity_id)
-            .filter_map(|&other_id| {
+            .active_entities_iter()
+            .filter(|&other_id| other_id != entity_id)
+            .filter_map(|other_id| {
                 let other = entity_manager.get_entity(other_id)?;
                 // Must have same definition_name AND same entity_kind (excludes player, items, etc.)
                 let other_def = other.definition_name.as_ref()?;
@@ -821,7 +850,7 @@ impl AiSystem {
         mate: &crate::entity::Entity,
         entity_manager: &EntityManager,
     ) -> Option<IVec2> {
-        let tile_size = 16i32;
+        let tile_size = TILE_SIZE_PX;
         let size = entity.size;
         let offsets = [
             IVec2::new(tile_size, 0),  // Right
@@ -1015,12 +1044,11 @@ impl AiSystem {
 
         // Done waiting - start walking in a random direction
         let direction = Self::random_cardinal_direction();
-        let tiles = fastrand::u32(1..=3); // Walk 1-3 tiles
-        let tile_size = 16; // Standard tile size in pixels
+        let tiles = fastrand::u32(WANDER_MIN_TILES..=WANDER_MAX_TILES);
 
         state.wander_phase = WanderPhase::Walking {
             direction,
-            remaining_distance: (tiles * tile_size) as i32,
+            remaining_distance: (tiles as i32) * TILE_SIZE_PX,
         };
 
         // Return walking animation for this frame
@@ -1073,7 +1101,7 @@ impl AiSystem {
         }
 
         // Either blocked or finished walking - transition to waiting
-        let wait_frames = fastrand::u32(30..=180); // Wait 1-3 seconds at 60fps
+        let wait_frames = fastrand::u32(IDLE_WAIT_MIN_FRAMES..=IDLE_WAIT_MAX_FRAMES);
         state.wander_phase = WanderPhase::Waiting;
         state.wait_frames_remaining = wait_frames;
 

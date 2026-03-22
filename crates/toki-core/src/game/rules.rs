@@ -573,7 +573,7 @@ impl GameState {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> bool {
-        for entity_id in self.entity_manager.active_entities() {
+        for entity_id in self.entity_manager.active_entities_iter() {
             let Some(entity) = self.entity_manager.get_entity(entity_id) else {
                 continue;
             };
@@ -1098,7 +1098,7 @@ impl GameState {
         let tile_w = tilemap.tile_size.x;
         let tile_h = tilemap.tile_size.y;
 
-        for entity_id in self.entity_manager.active_entities() {
+        for entity_id in self.entity_manager.active_entities_iter() {
             let Some(entity) = self.entity_manager.get_entity(entity_id) else {
                 continue;
             };

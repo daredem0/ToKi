@@ -172,7 +172,7 @@ impl GameState {
         let mut static_sequence = 0_u32;
         let mut projectile_sequence = 0_u32;
 
-        for entity_id in self.entity_manager.active_entities() {
+        for entity_id in self.entity_manager.active_entities_iter() {
             let Some(entity) = self.entity_manager.get_entity(entity_id) else {
                 continue;
             };
@@ -293,7 +293,7 @@ impl GameState {
 
         let mut boxes = Vec::new();
 
-        for entity_id in self.entity_manager.active_entities() {
+        for entity_id in self.entity_manager.active_entities_iter() {
             if let Some(entity) = self.entity_manager.get_entity(entity_id) {
                 if let Some(collision_box) = &entity.collision_box {
                     let (world_pos, size) = collision_box.world_bounds(entity.position);

@@ -334,7 +334,7 @@ impl GameState {
         if let Some(active_scene) = self.scene_manager.active_scene_mut() {
             active_scene.entities.clear();
 
-            for entity_id in self.entity_manager.active_entities() {
+            for entity_id in self.entity_manager.active_entities_iter() {
                 if let Some(entity) = self.entity_manager.get_entity(entity_id) {
                     active_scene.entities.push(entity.clone());
                 }

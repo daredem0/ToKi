@@ -10,7 +10,6 @@ pub(crate) use crate::ui::sprite_editor::{
 
 
 /// Sprite editor state
-#[allow(dead_code)]
 pub struct SpriteEditorState {
     /// Dual canvas states (left and right)
     pub canvases: [CanvasState; 2],
@@ -26,7 +25,9 @@ pub struct SpriteEditorState {
     pub clipboard: Option<SpriteCanvas>,
     /// Current foreground color (shared across canvases)
     pub foreground_color: PixelColor,
-    /// Current background color used by eraser (shared across canvases)
+    /// Current background color used by eraser (shared across canvases).
+    /// TODO: Will be used when eraser tool respects background color setting.
+    #[allow(dead_code)]
     pub background_color: PixelColor,
     /// Brush size in pixels (shared across canvases)
     pub brush_size: u32,

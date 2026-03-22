@@ -21,7 +21,6 @@ pub enum SpriteEditorTool {
 
 /// Type of sprite asset being edited
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 pub enum SpriteAssetKind {
     /// Atlas-style tiles metadata (tiles with positions)
     TileAtlas,
@@ -38,8 +37,9 @@ pub struct PixelColor {
     pub a: u8,
 }
 
-#[allow(dead_code)]
 impl PixelColor {
+    /// Create a new color with explicit RGBA values.
+    #[allow(dead_code)] // API completeness - standard constructor
     pub const fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self { r, g, b, a }
     }
@@ -61,6 +61,8 @@ impl PixelColor {
         Self::rgb(0, 0, 0)
     }
 
+    /// White color constant.
+    #[allow(dead_code)] // API completeness - standard color constant
     pub const fn white() -> Self {
         Self::rgb(255, 255, 255)
     }
@@ -94,9 +96,10 @@ impl PixelColor {
     }
 }
 
-/// Actions that require warning confirmation
+/// Actions that require warning confirmation.
+/// TODO: Will be used when destructive action confirmation dialogs are implemented.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Future use - destructive action confirmation dialogs
 pub enum WarningAction {
     /// Clear the selected cell
     ClearCell(usize),
