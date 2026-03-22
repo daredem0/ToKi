@@ -86,6 +86,18 @@ fn editor_shortcut_action_ignores_non_ctrl_sequences() {
 }
 
 #[test]
+fn toggled_fullscreen_state_enters_borderless_fullscreen_when_windowed() {
+    let state = EditorApp::toggled_fullscreen_state(false);
+    assert!(matches!(state, Some(winit::window::Fullscreen::Borderless(None))));
+}
+
+#[test]
+fn toggled_fullscreen_state_exits_fullscreen_when_already_fullscreen() {
+    let state = EditorApp::toggled_fullscreen_state(true);
+    assert_eq!(state, None);
+}
+
+#[test]
 fn build_runtime_launch_args_includes_optional_map_and_splash_duration() {
     let args = EditorApp::build_runtime_launch_args(
         std::path::Path::new("/tmp/project"),

@@ -12,7 +12,7 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::ModifiersState;
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::{Window, WindowId};
+use winit::window::{Fullscreen, Window, WindowId};
 
 use crate::background_tasks::{
     BackgroundTaskManager, BackgroundTaskUpdate, ExportBundleJob, ValidateAssetsJob,
@@ -264,6 +264,19 @@ impl EditorApp {
         }
     }
 
+    fn toggled_fullscreen_state(is_currently_fullscreen: bool) -> Option<Fullscreen> {
+        if is_currently_fullscreen {
+            None
+        } else {
+            Some(Fullscreen::Borderless(None))
+        }
+    }
+
+    fn toggle_window_fullscreen(window: &Window) {
+        let next_state = Self::toggled_fullscreen_state(window.fullscreen().is_some());
+        window.set_fullscreen(next_state);
+    }
+
 }
 
 impl ApplicationHandler for EditorApp {
@@ -513,6 +526,16 @@ impl ApplicationHandler for EditorApp {
                         // Handle other editor keyboard shortcuts
                         match key_code {
                             KeyCode::Escape => event_loop.exit(),
+                            KeyCode::F11 => {
+                                if let Some(window) = &self.platform.window {
+                                    Self::toggle_window_fullscreen(window);
+                                    tracing::info!(
+                                        "Toggled editor fullscreen: {}",
+                                        window.fullscreen().is_some()
+                                    );
+                                    window.request_redraw();
+                                }
+                            }
                             KeyCode::F1 => {
                                 self.core.ui.visibility.show_hierarchy =
                                     !self.core.ui.visibility.show_hierarchy;
