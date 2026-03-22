@@ -41,7 +41,7 @@ pub(crate) use editor_ui_map_editor::{
 };
 pub(crate) use editor_ui_sprite_editor::{
     CanvasSide, DualCanvasLayout, PixelColor, ResizeAnchor, SpriteAssetKind, SpriteCanvas,
-    SpriteCanvasViewport, SpriteEditorState, SpriteEditorTool, SpriteSelection, WarningAction,
+    SpriteCanvasViewport, SpriteEditorState, SpriteEditorTool, SpriteSelection,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;

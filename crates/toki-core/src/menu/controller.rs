@@ -330,7 +330,6 @@ impl MenuController {
             .insert(screen_id.to_string(), selectable_indices[next_pos]);
     }
 
-    #[allow(dead_code)]
     fn first_selectable_index(&self, screen_id: &str) -> Option<usize> {
         self.screen_map.get(screen_id).and_then(|screen| {
             screen

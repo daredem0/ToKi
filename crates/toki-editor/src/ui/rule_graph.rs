@@ -358,63 +358,7 @@ impl RuleGraph {
             .then_some(format!("node:{node_id}"))
     }
 
-    /// Derive the pre-migration node key shape used by older persisted graph layouts.
-    ///
-    /// This remains intentionally supported so existing project metadata and migrated
-    /// editor config data can still resolve onto the current node ids.
-    fn legacy_stable_node_key(&self, node_id: RuleGraphNodeId) -> Option<String> {
-        let node_by_id = self
-            .nodes
-            .iter()
-            .map(|node| (node.id, node))
-            .collect::<HashMap<_, _>>();
-
-        for chain in &self.chains {
-            let Ok(sequence) = self.chain_node_sequence(chain.trigger_node_id) else {
-                continue;
-            };
-            if !sequence.contains(&node_id) {
-                continue;
-            }
-
-            let mut condition_index = 0_usize;
-            let mut action_index = 0_usize;
-            for current_node_id in sequence {
-                let node = node_by_id.get(&current_node_id)?;
-                match node.kind {
-                    RuleGraphNodeKind::Trigger(_) => {
-                        if current_node_id == node_id {
-                            return Some(format!("{}:trigger", chain.rule_id));
-                        }
-                    }
-                    RuleGraphNodeKind::Condition(_) => {
-                        if current_node_id == node_id {
-                            return Some(format!(
-                                "{}:condition:{}",
-                                chain.rule_id, condition_index
-                            ));
-                        }
-                        condition_index += 1;
-                    }
-                    RuleGraphNodeKind::Action(_) => {
-                        if current_node_id == node_id {
-                            return Some(format!("{}:action:{}", chain.rule_id, action_index));
-                        }
-                        action_index += 1;
-                    }
-                }
-            }
-        }
-
-        node_by_id
-            .contains_key(&node_id)
-            .then_some(format!("detached:{node_id}"))
-    }
-
-    /// Resolve a persisted node key to a live node id.
-    ///
-    /// Canonical `node:<id>` keys are preferred. Legacy chain-shaped keys remain supported
-    /// as a compatibility seam for older saved graph layout metadata.
+    /// Resolve a persisted canonical node key to a live node id.
     pub fn node_id_for_stable_key(&self, stable_key: &str) -> Option<RuleGraphNodeId> {
         if let Some(node_id) = stable_key.strip_prefix("node:") {
             let parsed_id = node_id.parse::<RuleGraphNodeId>().ok()?;
@@ -422,17 +366,7 @@ impl RuleGraph {
                 return Some(parsed_id);
             }
         }
-        if let Some(detached_id) = stable_key.strip_prefix("detached:") {
-            let parsed_id = detached_id.parse::<RuleGraphNodeId>().ok()?;
-            if self.nodes.iter().any(|node| node.id == parsed_id) {
-                return Some(parsed_id);
-            }
-        }
-        self.nodes.iter().find_map(|node| {
-            self.legacy_stable_node_key(node.id)
-                .filter(|candidate| candidate == stable_key)
-                .map(|_| node.id)
-        })
+        None
     }
 
     pub fn add_trigger_chain(&mut self) -> Result<String, RuleGraphEditError> {

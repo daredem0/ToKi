@@ -13,7 +13,6 @@ pub struct SpriteCanvas {
     pixels: Vec<u8>,
 }
 
-#[allow(dead_code)]
 impl SpriteCanvas {
     /// Create a new canvas filled with transparent pixels
     pub fn new(width: u32, height: u32) -> Self {
@@ -83,11 +82,6 @@ impl SpriteCanvas {
         &self.pixels
     }
 
-    /// Get mutable raw RGBA pixel data
-    pub fn pixels_mut(&mut self) -> &mut [u8] {
-        &mut self.pixels
-    }
-
     /// Fill a rectangle with a color
     pub fn fill_rect(&mut self, x: u32, y: u32, w: u32, h: u32, color: PixelColor) {
         let x_end = (x + w).min(self.width);
@@ -100,11 +94,13 @@ impl SpriteCanvas {
     }
 
     /// Clear entire canvas to transparent
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn clear(&mut self) {
         self.pixels.fill(0);
     }
 
     /// Clear entire canvas to a specific color
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn clear_to_color(&mut self, color: PixelColor) {
         let rgba = color.to_rgba_array();
         for chunk in self.pixels.chunks_exact_mut(4) {

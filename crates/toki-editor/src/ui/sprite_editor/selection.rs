@@ -9,7 +9,6 @@ pub struct SpriteSelection {
     pub height: u32,
 }
 
-#[allow(dead_code)]
 impl SpriteSelection {
     pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
         Self {
@@ -21,6 +20,7 @@ impl SpriteSelection {
     }
 
     /// Check if a pixel is within the selection
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn contains(&self, px: u32, py: u32) -> bool {
         px >= self.x && px < self.x + self.width && py >= self.y && py < self.y + self.height
     }

@@ -1,6 +1,6 @@
 //! Sprite editor dialog rendering.
 
-use crate::ui::editor_ui::{ResizeAnchor, SpriteAssetKind, SpriteEditorState, WarningAction};
+use crate::ui::editor_ui::{ResizeAnchor, SpriteAssetKind, SpriteEditorState};
 use crate::ui::EditorUI;
 
 /// Render all active dialogs.
@@ -29,9 +29,6 @@ pub fn render_dialogs(
     }
     if ui_state.sprite.show_delete_confirm {
         render_delete_confirm_dialog(ui_state, ctx, sprites_dir);
-    }
-    if ui_state.sprite.show_warning_dialog {
-        render_warning_dialog(ui_state, ctx);
     }
 }
 
@@ -193,43 +190,6 @@ fn render_save_dialog(
                 }
                 if ui.button("Cancel").clicked() {
                     ui_state.sprite.show_save_dialog = false;
-                }
-            });
-        });
-}
-
-fn render_warning_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
-    egui::Window::new("Warning")
-        .collapsible(false)
-        .resizable(false)
-        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-        .show(ctx, |ui| {
-            ui.label(&ui_state.sprite.warning_message);
-            ui.add_space(8.0);
-
-            ui.horizontal(|ui| {
-                if ui.button("Confirm").clicked() {
-                    if let Some(action) = ui_state.sprite.pending_warning_action.take() {
-                        match action {
-                            WarningAction::ClearCell(cell_idx) => {
-                                ui_state.sprite.active_mut().selected_cell = Some(cell_idx);
-                                ui_state.sprite.clear_selected_cell();
-                            }
-                            WarningAction::ChangeCellSize {
-                                new_width,
-                                new_height,
-                            } => {
-                                ui_state.sprite.active_mut().cell_size.x = new_width;
-                                ui_state.sprite.active_mut().cell_size.y = new_height;
-                                ui_state.sprite.active_mut().selected_cell = None;
-                            }
-                        }
-                    }
-                    ui_state.sprite.show_warning_dialog = false;
-                }
-                if ui.button("Cancel").clicked() {
-                    ui_state.sprite.pending_warning_action = None;
-                    ui_state.sprite.show_warning_dialog = false;
                 }
             });
         });

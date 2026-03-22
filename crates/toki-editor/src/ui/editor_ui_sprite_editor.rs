@@ -11,22 +11,13 @@ use super::EditorUI;
 pub(crate) use crate::ui::sprite_editor::{
     CanvasSide, CanvasState, DiscoveredSpriteAsset, DualCanvasLayout, PixelColor, ResizeAnchor,
     SpriteAssetKind, SpriteCanvas, SpriteCanvasViewport, SpriteEditCommand, SpriteEditorHistory,
-    SpriteEditorState, SpriteEditorTool, SpriteSelection, WarningAction,
+    SpriteEditorState, SpriteEditorTool, SpriteSelection,
 };
 
 impl EditorUI {
     /// Begin showing the new canvas dialog
     pub fn begin_new_sprite_canvas_dialog(&mut self) {
         self.sprite.show_new_canvas_dialog = true;
-    }
-
-    /// Submit new canvas creation request
-    #[allow(dead_code)]
-    pub fn submit_new_sprite_canvas(&mut self) {
-        let width = self.sprite.new_sprite_width.max(1);
-        let height = self.sprite.new_sprite_height.max(1);
-        self.sprite.new_canvas(width, height);
-        self.sprite.show_new_canvas_dialog = false;
     }
 
     /// Cancel new canvas dialog

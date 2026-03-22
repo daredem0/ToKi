@@ -413,7 +413,6 @@ impl InspectorSystem {
 
         let mut inspector_ctx = InspectorContext {
             ui_state,
-            ctx,
             game_state,
             project,
             config,

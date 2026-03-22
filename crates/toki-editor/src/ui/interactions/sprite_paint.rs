@@ -3,7 +3,6 @@ use glam::{IVec2, UVec2};
 
 pub struct SpritePaintInteraction;
 
-#[allow(dead_code)]
 impl SpritePaintInteraction {
     /// Calculate brush footprint bounds for a given center pixel position.
     /// Returns (start, end) where end is exclusive.
@@ -30,6 +29,7 @@ impl SpritePaintInteraction {
     }
 
     /// Paint a single pixel with a color.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn paint_pixel(canvas: &mut SpriteCanvas, pos: IVec2, color: PixelColor) -> bool {
         if pos.x < 0 || pos.y < 0 {
             return false;

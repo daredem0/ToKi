@@ -871,10 +871,6 @@ impl EditorApp {
 
 #[cfg(test)]
 impl EditorApp {
-    fn parse_legacy_graph_layout_key(key: &str) -> Option<(String, String, String)> {
-        graph_metadata::parse_legacy_graph_layout_key(key)
-    }
-
     fn load_preview_sprite_frame_static(
         entity_def_name: &str,
         project_path: &std::path::Path,

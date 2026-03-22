@@ -42,21 +42,13 @@ impl WindowRenderer {
     }
 
     /// Get reference to WGPU device (for viewport initialization)
-    #[allow(dead_code)] // Will be used for advanced WGPU integration
     pub fn device(&self) -> &wgpu::Device {
         &self.device
     }
 
     /// Get reference to WGPU queue (for viewport initialization)
-    #[allow(dead_code)] // Will be used for advanced WGPU integration
     pub fn queue(&self) -> &wgpu::Queue {
         &self.queue
-    }
-
-    /// Get current surface format (for viewport initialization)
-    #[allow(dead_code)] // Will be used for advanced WGPU integration
-    pub fn surface_format(&self) -> wgpu::TextureFormat {
-        self.surface_config.format
     }
 
     /// Get mutable reference to egui renderer (for viewport texture registration)

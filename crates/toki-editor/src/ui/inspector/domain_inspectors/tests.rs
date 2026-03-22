@@ -183,10 +183,8 @@ fn load_scene_music_choices_discovers_tracks_from_project_music_folder() {
 
     let project = Project::new("Demo".to_string(), project_root);
     let mut ui_state = EditorUI::new();
-    let context = egui::Context::default();
     let inspector_ctx = InspectorContext {
         ui_state: &mut ui_state,
-        ctx: &context,
         game_state: None,
         project: Some(&mut project.clone()),
         config: None,
@@ -199,13 +197,11 @@ fn load_scene_music_choices_discovers_tracks_from_project_music_folder() {
 #[test]
 fn load_scene_music_choices_keeps_current_track_even_if_not_discovered() {
     let mut ui_state = EditorUI::new();
-    let context = egui::Context::default();
     let temp_dir = tempfile::tempdir().expect("temp dir should exist");
     let project = Project::new("Demo".to_string(), temp_dir.path().to_path_buf());
     let mut project = project;
     let inspector_ctx = InspectorContext {
         ui_state: &mut ui_state,
-        ctx: &context,
         game_state: None,
         project: Some(&mut project),
         config: None,

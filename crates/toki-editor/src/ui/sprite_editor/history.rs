@@ -4,7 +4,6 @@ use super::canvas::SpriteCanvas;
 
 /// Undo/redo command for sprite editing
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct SpriteEditCommand {
     /// Canvas state before the edit
     pub before: SpriteCanvas,
@@ -21,7 +20,6 @@ pub struct SpriteEditorHistory {
     max_size: usize,
 }
 
-#[allow(dead_code)]
 impl SpriteEditorHistory {
     pub fn new(max_size: usize) -> Self {
         Self {
@@ -54,10 +52,12 @@ impl SpriteEditorHistory {
         Some(after)
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn can_undo(&self) -> bool {
         !self.undo_stack.is_empty()
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn can_redo(&self) -> bool {
         !self.redo_stack.is_empty()
     }

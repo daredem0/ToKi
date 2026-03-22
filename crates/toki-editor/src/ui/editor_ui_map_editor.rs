@@ -453,43 +453,36 @@ impl EditorUI {
     }
 
     #[cfg(test)]
-    #[allow(dead_code)]
     pub fn execute_command(&mut self, command: EditorCommand) -> bool {
         crate::editor_services::commands::execute(self, command)
     }
 
     #[cfg(test)]
-    #[allow(dead_code)]
     pub fn undo(&mut self) -> bool {
         crate::editor_services::commands::undo(self)
     }
 
     #[cfg(test)]
-    #[allow(dead_code)]
     pub fn undo_with_project(&mut self, project: &mut crate::project::Project) -> bool {
         crate::editor_services::commands::undo_with_project(self, project)
     }
 
     #[cfg(test)]
-    #[allow(dead_code)]
     pub fn redo(&mut self) -> bool {
         crate::editor_services::commands::redo(self)
     }
 
     #[cfg(test)]
-    #[allow(dead_code)]
     pub fn redo_with_project(&mut self, project: &mut crate::project::Project) -> bool {
         crate::editor_services::commands::redo_with_project(self, project)
     }
 
     #[cfg(test)]
-    #[allow(dead_code)]
     pub fn can_undo(&self) -> bool {
         crate::editor_services::commands::can_undo(self)
     }
 
     #[cfg(test)]
-    #[allow(dead_code)]
     pub fn can_redo(&self) -> bool {
         crate::editor_services::commands::can_redo(self)
     }

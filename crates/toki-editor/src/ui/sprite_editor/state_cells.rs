@@ -38,7 +38,6 @@ impl SpriteEditorState {
     }
 
     /// Swap the contents of two cells
-    #[allow(dead_code)]
     pub fn swap_cells(&mut self, cell_a: usize, cell_b: usize) -> bool {
         if cell_a == cell_b {
             return false;
@@ -78,7 +77,6 @@ impl SpriteEditorState {
     }
 
     /// Append a new row of empty cells to the bottom of the sheet
-    #[allow(dead_code)]
     pub fn append_row(&mut self) -> bool {
         if !self.is_sheet() {
             return false;
@@ -108,7 +106,6 @@ impl SpriteEditorState {
     }
 
     /// Append a new column of empty cells to the right of the sheet
-    #[allow(dead_code)]
     pub fn append_column(&mut self) -> bool {
         if !self.is_sheet() {
             return false;
@@ -138,7 +135,6 @@ impl SpriteEditorState {
     }
 
     /// Delete the selected cell and collapse remaining cells to fill the gap
-    #[allow(dead_code)]
     pub fn delete_cell_with_collapse(&mut self) -> bool {
         let cell_idx = match self.active().selected_cell {
             Some(idx) => idx,
@@ -216,7 +212,6 @@ impl SpriteEditorState {
     }
 
     /// Flip the entire canvas horizontally
-    #[allow(dead_code)]
     pub fn flip_horizontal(&mut self) -> bool {
         let cs = self.active_mut();
         let Some(canvas) = &cs.canvas else {
@@ -247,7 +242,6 @@ impl SpriteEditorState {
     }
 
     /// Flip the entire canvas vertically
-    #[allow(dead_code)]
     pub fn flip_vertical(&mut self) -> bool {
         let cs = self.active_mut();
         let Some(canvas) = &cs.canvas else {
@@ -278,7 +272,6 @@ impl SpriteEditorState {
     }
 
     /// Rotate the entire canvas 90° clockwise
-    #[allow(dead_code)]
     pub fn rotate_clockwise(&mut self) -> bool {
         let is_sheet = self.is_sheet();
         let cs = self.active_mut();
@@ -315,7 +308,6 @@ impl SpriteEditorState {
     }
 
     /// Rotate the entire canvas 90° counter-clockwise
-    #[allow(dead_code)]
     pub fn rotate_counter_clockwise(&mut self) -> bool {
         let is_sheet = self.is_sheet();
         let cs = self.active_mut();

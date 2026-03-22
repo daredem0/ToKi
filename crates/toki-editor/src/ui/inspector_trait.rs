@@ -6,12 +6,8 @@ use crate::project::Project;
 /// This bundles the arguments that would otherwise be passed individually.
 pub struct InspectorContext<'a> {
     pub ui_state: &'a mut EditorUI,
-    /// The egui context for the current frame.
-    #[allow(dead_code)] // Reserved for inspectors that need frame-level access
-    pub ctx: &'a egui::Context,
     pub game_state: Option<&'a toki_core::GameState>,
     /// The project for inspectors that need to modify project settings.
-    #[allow(dead_code)] // Reserved for project settings inspector
     pub project: Option<&'a mut Project>,
     pub config: Option<&'a EditorConfig>,
 }
@@ -25,7 +21,7 @@ pub trait Inspector {
 
     /// Returns a human-readable name for this inspector (for debugging/logging).
     /// Used primarily for testing and diagnostics.
-    #[allow(dead_code)] // Used in tests
+    #[cfg_attr(not(test), allow(dead_code))]
     fn name(&self) -> &'static str;
 }
 

@@ -99,18 +99,6 @@ impl InspectorSystem {
         )
     }
 
-    #[allow(dead_code)]
-    pub(in super::super) fn render_multi_entity_bool_row(
-        ui: &mut egui::Ui,
-        label: &str,
-        common_value: Option<bool>,
-        out_edit: &mut Option<bool>,
-        true_button: &str,
-        false_button: &str,
-    ) {
-        render_bool_toggle_row(ui, label, common_value, out_edit, true_button, false_button);
-    }
-
     pub(in super::super) fn collect_multi_entity_common_state(
         entities: &[&toki_core::entity::Entity],
     ) -> MultiEntityCommonState {

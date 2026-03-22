@@ -2,7 +2,7 @@
 
 use super::{
     CanvasSide, CanvasState, DiscoveredSpriteAsset, DualCanvasLayout, PixelColor, ResizeAnchor,
-    SpriteCanvas, SpriteEditorTool, WarningAction,
+    SpriteCanvas, SpriteEditorTool,
 };
 
 /// Sprite editor state
@@ -21,9 +21,6 @@ pub struct SpriteEditorState {
     pub clipboard: Option<SpriteCanvas>,
     /// Current foreground color (shared across canvases)
     pub foreground_color: PixelColor,
-    /// Current background color used by eraser (shared across canvases).
-    #[allow(dead_code)]
-    pub background_color: PixelColor,
     /// Brush size in pixels (shared across canvases)
     pub brush_size: u32,
     /// Recent colors palette (shared across canvases)
@@ -44,12 +41,6 @@ pub struct SpriteEditorState {
     pub new_canvas_is_sheet: bool,
     /// Show save sprite dialog
     pub show_save_dialog: bool,
-    /// Show confirmation dialog for risky operations
-    pub show_warning_dialog: bool,
-    /// Warning dialog message
-    pub warning_message: String,
-    /// Pending action after warning confirmation
-    pub pending_warning_action: Option<WarningAction>,
     /// Show the load sprite dialog
     pub show_load_dialog: bool,
     /// Discovered sprite assets in project
@@ -92,7 +83,6 @@ impl Default for SpriteEditorState {
             tool: SpriteEditorTool::Drag,
             clipboard: None,
             foreground_color: PixelColor::black(),
-            background_color: PixelColor::transparent(),
             brush_size: 1,
             recent_colors: Vec::new(),
             max_recent_colors: 16,
@@ -103,9 +93,6 @@ impl Default for SpriteEditorState {
             new_sheet_rows: 4,
             new_canvas_is_sheet: false,
             show_save_dialog: false,
-            show_warning_dialog: false,
-            warning_message: String::new(),
-            pending_warning_action: None,
             show_load_dialog: false,
             discovered_assets: Vec::new(),
             selected_asset_index: None,

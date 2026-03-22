@@ -579,23 +579,6 @@ fn node_id_for_stable_key_resolves_existing_node() {
 }
 
 #[test]
-fn node_id_for_stable_key_supports_legacy_chain_keys() {
-    let graph = RuleGraph::from_rule_set(&sample_rules());
-    let Some(trigger_id) = graph.node_id_for_stable_key("rule_spawn:trigger") else {
-        panic!("expected legacy trigger key to resolve");
-    };
-    let trigger_node = graph
-        .nodes
-        .iter()
-        .find(|node| node.id == trigger_id)
-        .expect("resolved node id should exist");
-    assert!(matches!(
-        trigger_node.kind,
-        super::RuleGraphNodeKind::Trigger(_)
-    ));
-}
-
-#[test]
 fn auto_layout_uses_minimum_spacing_between_nodes_and_chains() {
     let graph = RuleGraph::from_rule_set(&sample_rules());
 

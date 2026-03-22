@@ -59,9 +59,6 @@ impl EditorApp {
                     }
                 }
 
-                if let Some(project) = self.core.project_manager.current_project.as_mut() {
-                    graph_metadata::migrate_legacy_into_project(project);
-                }
                 graph_metadata::load_into_ui(
                     &mut self.core.ui,
                     self.core.project_manager.current_project.as_ref(),

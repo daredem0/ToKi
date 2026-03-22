@@ -39,7 +39,7 @@ pub struct PixelColor {
 
 impl PixelColor {
     /// Create a new color with explicit RGBA values.
-    #[allow(dead_code)] // API completeness - standard constructor
+    #[cfg_attr(not(test), allow(dead_code))]
     pub const fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self { r, g, b, a }
     }
@@ -62,7 +62,7 @@ impl PixelColor {
     }
 
     /// White color constant.
-    #[allow(dead_code)] // API completeness - standard color constant
+    #[cfg_attr(not(test), allow(dead_code))]
     pub const fn white() -> Self {
         Self::rgb(255, 255, 255)
     }
@@ -94,17 +94,6 @@ impl PixelColor {
             a: color.a(),
         }
     }
-}
-
-/// Actions that require warning confirmation.
-/// TODO: Will be used when destructive action confirmation dialogs are implemented.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)] // Future use - destructive action confirmation dialogs
-pub enum WarningAction {
-    /// Clear the selected cell
-    ClearCell(usize),
-    /// Change cell grid size (may cause data loss)
-    ChangeCellSize { new_width: u32, new_height: u32 },
 }
 
 /// Anchor position for canvas resize operations

@@ -176,9 +176,7 @@ struct App {
     last_tick_instant: Option<Instant>,
     asset_load_plan: RuntimeAssetLoadPlan,
     scene_transition: SceneTransitionController,
-    #[allow(dead_code)]
     decoded_project_cache: DecodedProjectCache,
-    #[allow(dead_code)]
     pack_mount: Option<tempfile::TempDir>,
 }
 

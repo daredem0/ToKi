@@ -47,16 +47,6 @@ fn resolve_scene_map_to_load_returns_none_when_scene_has_no_maps() {
 }
 
 #[test]
-fn parse_legacy_graph_layout_key_splits_project_scene_and_node() {
-    let key = "/tmp/project::Main Scene::rule_1:action:0";
-    let parsed = EditorApp::parse_legacy_graph_layout_key(key)
-        .expect("legacy graph layout key should parse");
-    assert_eq!(parsed.0, "/tmp/project");
-    assert_eq!(parsed.1, "Main Scene");
-    assert_eq!(parsed.2, "rule_1:action:0");
-}
-
-#[test]
 fn editor_shortcut_action_maps_ctrl_z_to_undo() {
     let action = EditorApp::editor_shortcut_action(
         &winit::keyboard::Key::Character("z".into()),

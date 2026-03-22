@@ -70,7 +70,7 @@ impl SpriteEditorState {
     }
 
     /// Create a new canvas filled with a color on the active canvas
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn new_canvas_filled(&mut self, width: u32, height: u32, color: PixelColor) {
         let cs = self.active_mut();
         cs.canvas = Some(SpriteCanvas::filled(width, height, color));
@@ -107,13 +107,6 @@ impl SpriteEditorState {
             return None;
         }
         Some((w / cs.cell_size.x, h / cs.cell_size.y))
-    }
-
-    /// Get the total number of cells in the sheet
-    #[allow(dead_code)]
-    pub fn total_cell_count(&self) -> Option<u32> {
-        let (cols, rows) = self.sheet_cell_count()?;
-        Some(cols * rows)
     }
 
     /// Get cell index from canvas position

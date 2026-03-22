@@ -24,13 +24,7 @@ impl Default for SpriteCanvasViewport {
     }
 }
 
-#[allow(dead_code)]
 impl SpriteCanvasViewport {
-    /// Create a new viewport with default settings
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Zoom in by one step (doubling)
     pub fn zoom_in(&mut self) {
         self.zoom = (self.zoom * 1.2).min(self.zoom_max);
@@ -39,11 +33,6 @@ impl SpriteCanvasViewport {
     /// Zoom out by one step
     pub fn zoom_out(&mut self) {
         self.zoom = (self.zoom / 1.2).max(self.zoom_min);
-    }
-
-    /// Set zoom level with clamping
-    pub fn set_zoom(&mut self, zoom: f32) {
-        self.zoom = zoom.clamp(self.zoom_min, self.zoom_max);
     }
 
     /// Pan by delta in screen pixels
@@ -63,6 +52,7 @@ impl SpriteCanvasViewport {
     }
 
     /// Convert canvas position to screen position
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn canvas_to_screen(
         &self,
         canvas_pos: glam::Vec2,
@@ -72,12 +62,4 @@ impl SpriteCanvasViewport {
         viewport_pos + glam::Vec2::new(viewport_rect.left(), viewport_rect.top())
     }
 
-    /// Get the visible canvas rect in canvas coordinates
-    pub fn visible_canvas_rect(&self, viewport_size: glam::Vec2) -> egui::Rect {
-        let size = viewport_size / self.zoom;
-        egui::Rect::from_min_size(
-            egui::pos2(self.pan.x, self.pan.y),
-            egui::vec2(size.x, size.y),
-        )
-    }
 }

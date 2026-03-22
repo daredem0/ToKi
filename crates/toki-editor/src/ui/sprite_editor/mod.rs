@@ -23,6 +23,5 @@ pub use selection::SpriteSelection;
 pub use state::SpriteEditorState;
 pub use types::{
     DiscoveredSpriteAsset, PixelColor, ResizeAnchor, SpriteAssetKind, SpriteEditorTool,
-    WarningAction,
 };
 pub use viewport::SpriteCanvasViewport;
