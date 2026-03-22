@@ -290,6 +290,88 @@ fn erase_connected_color_in_bounds_transparent_click_is_no_op() {
     ));
 }
 
+#[test]
+fn add_outline_in_bounds_adds_outline_around_clicked_sprite() {
+    let mut canvas = create_test_canvas(5, 5);
+    let sprite = PixelColor::rgb(200, 100, 50);
+    let outline = PixelColor::rgb(0, 0, 0);
+    canvas.set_pixel(2, 2, sprite);
+
+    assert!(SpritePaintInteraction::add_outline_in_bounds(
+        &mut canvas,
+        IVec2::new(2, 2),
+        outline,
+        (UVec2::ZERO, UVec2::new(5, 5)),
+    ));
+
+    for y in 1..=3 {
+        for x in 1..=3 {
+            let expected = if x == 2 && y == 2 { sprite } else { outline };
+            assert_eq!(canvas.get_pixel(x, y), Some(expected), "Pixel at ({x}, {y})");
+        }
+    }
+}
+
+#[test]
+fn add_outline_in_bounds_respects_tile_bounds() {
+    let mut canvas = create_test_canvas(6, 3);
+    let sprite = PixelColor::rgb(220, 50, 50);
+    let outline = PixelColor::rgb(10, 10, 10);
+    canvas.set_pixel(1, 1, sprite);
+    canvas.set_pixel(4, 1, sprite);
+
+    assert!(SpritePaintInteraction::add_outline_in_bounds(
+        &mut canvas,
+        IVec2::new(1, 1),
+        outline,
+        (UVec2::new(0, 0), UVec2::new(3, 3)),
+    ));
+
+    assert_eq!(canvas.get_pixel(0, 1), Some(outline));
+    assert_eq!(canvas.get_pixel(2, 1), Some(outline));
+    assert_eq!(canvas.get_pixel(3, 1), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(4, 1), Some(sprite));
+}
+
+#[test]
+fn add_outline_in_bounds_does_not_fill_internal_holes() {
+    let mut canvas = create_test_canvas(5, 5);
+    let sprite = PixelColor::rgb(120, 120, 120);
+    let outline = PixelColor::rgb(0, 0, 0);
+
+    for y in 1..=3 {
+        for x in 1..=3 {
+            if x == 2 && y == 2 {
+                continue;
+            }
+            canvas.set_pixel(x, y, sprite);
+        }
+    }
+
+    assert!(SpritePaintInteraction::add_outline_in_bounds(
+        &mut canvas,
+        IVec2::new(1, 1),
+        outline,
+        (UVec2::ZERO, UVec2::new(5, 5)),
+    ));
+
+    assert_eq!(canvas.get_pixel(2, 2), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(0, 0), Some(outline));
+    assert_eq!(canvas.get_pixel(4, 4), Some(outline));
+}
+
+#[test]
+fn add_outline_in_bounds_transparent_click_is_no_op() {
+    let mut canvas = create_test_canvas(4, 4);
+
+    assert!(!SpritePaintInteraction::add_outline_in_bounds(
+        &mut canvas,
+        IVec2::new(1, 1),
+        PixelColor::black(),
+        (UVec2::ZERO, UVec2::new(4, 4)),
+    ));
+}
+
 // ============================================================================
 // Draw Line Tests
 // ============================================================================

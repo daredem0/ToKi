@@ -61,6 +61,146 @@ impl SpritePaintInteraction {
         changed
     }
 
+    fn connected_opaque_region_in_bounds(
+        canvas: &SpriteCanvas,
+        start_pos: UVec2,
+        bounds: (UVec2, UVec2),
+    ) -> Option<Vec<bool>> {
+        if !Self::contains_pos(bounds, start_pos) {
+            return None;
+        }
+        let start_color = canvas.get_pixel(start_pos.x, start_pos.y)?;
+        if start_color.a == 0 {
+            return None;
+        }
+
+        let (start, end) = bounds;
+        let width = (end.x - start.x) as usize;
+        let height = (end.y - start.y) as usize;
+        let mut region = vec![false; width * height];
+        let mut stack = vec![(start_pos.x, start_pos.y)];
+
+        while let Some((x, y)) = stack.pop() {
+            if x < start.x || y < start.y || x >= end.x || y >= end.y {
+                continue;
+            }
+
+            let local_x = (x - start.x) as usize;
+            let local_y = (y - start.y) as usize;
+            let idx = local_y * width + local_x;
+            if region[idx] {
+                continue;
+            }
+
+            let Some(color) = canvas.get_pixel(x, y) else {
+                continue;
+            };
+            if color.a == 0 {
+                continue;
+            }
+
+            region[idx] = true;
+
+            for dy in -1i32..=1 {
+                for dx in -1i32..=1 {
+                    if dx == 0 && dy == 0 {
+                        continue;
+                    }
+                    let nx = x as i32 + dx;
+                    let ny = y as i32 + dy;
+                    if nx >= start.x as i32
+                        && ny >= start.y as i32
+                        && nx < end.x as i32
+                        && ny < end.y as i32
+                    {
+                        stack.push((nx as u32, ny as u32));
+                    }
+                }
+            }
+        }
+
+        Some(region)
+    }
+
+    fn outside_transparent_mask(
+        canvas: &SpriteCanvas,
+        bounds: (UVec2, UVec2),
+        opaque_region: &[bool],
+    ) -> Vec<bool> {
+        let (start, end) = bounds;
+        let width = (end.x - start.x) as usize;
+        let height = (end.y - start.y) as usize;
+        let mut outside = vec![false; width * height];
+        let mut stack = Vec::new();
+
+        let try_push = |x: u32, y: u32, outside: &mut Vec<bool>, stack: &mut Vec<(u32, u32)>| {
+            let local_x = (x - start.x) as usize;
+            let local_y = (y - start.y) as usize;
+            let idx = local_y * width + local_x;
+            if outside[idx] || opaque_region[idx] {
+                return;
+            }
+            let Some(color) = canvas.get_pixel(x, y) else {
+                return;
+            };
+            if color.a != 0 {
+                return;
+            }
+            outside[idx] = true;
+            stack.push((x, y));
+        };
+
+        for x in start.x..end.x {
+            try_push(x, start.y, &mut outside, &mut stack);
+            if end.y > start.y + 1 {
+                try_push(x, end.y - 1, &mut outside, &mut stack);
+            }
+        }
+        for y in start.y..end.y {
+            try_push(start.x, y, &mut outside, &mut stack);
+            if end.x > start.x + 1 {
+                try_push(end.x - 1, y, &mut outside, &mut stack);
+            }
+        }
+
+        while let Some((x, y)) = stack.pop() {
+            for dy in -1i32..=1 {
+                for dx in -1i32..=1 {
+                    if dx == 0 && dy == 0 {
+                        continue;
+                    }
+                    let nx = x as i32 + dx;
+                    let ny = y as i32 + dy;
+                    if nx < start.x as i32
+                        || ny < start.y as i32
+                        || nx >= end.x as i32
+                        || ny >= end.y as i32
+                    {
+                        continue;
+                    }
+                    let nx = nx as u32;
+                    let ny = ny as u32;
+                    let local_x = (nx - start.x) as usize;
+                    let local_y = (ny - start.y) as usize;
+                    let idx = local_y * width + local_x;
+                    if outside[idx] || opaque_region[idx] {
+                        continue;
+                    }
+                    let Some(color) = canvas.get_pixel(nx, ny) else {
+                        continue;
+                    };
+                    if color.a != 0 {
+                        continue;
+                    }
+                    outside[idx] = true;
+                    stack.push((nx, ny));
+                }
+            }
+        }
+
+        outside
+    }
+
     /// Calculate brush footprint bounds for a given center pixel position.
     /// Returns (start, end) where end is exclusive.
     pub fn brush_footprint_bounds(
@@ -170,6 +310,71 @@ impl SpritePaintInteraction {
             PixelColor::transparent(),
             bounds,
         )
+    }
+
+    /// Add an outline around the clicked connected sprite region, limited to the provided bounds.
+    /// Only transparent pixels connected to the outside of the bounds are outlined.
+    pub fn add_outline_in_bounds(
+        canvas: &mut SpriteCanvas,
+        start_pos: IVec2,
+        outline_color: PixelColor,
+        bounds: (UVec2, UVec2),
+    ) -> bool {
+        if start_pos.x < 0 || start_pos.y < 0 {
+            return false;
+        }
+        let start_pos = UVec2::new(start_pos.x as u32, start_pos.y as u32);
+        let Some(region) = Self::connected_opaque_region_in_bounds(canvas, start_pos, bounds) else {
+            return false;
+        };
+
+        let (start, end) = bounds;
+        let width = (end.x - start.x) as usize;
+        let outside = Self::outside_transparent_mask(canvas, bounds, &region);
+        let mut outline_pixels = Vec::new();
+
+        for y in start.y..end.y {
+            for x in start.x..end.x {
+                let local_x = (x - start.x) as usize;
+                let local_y = (y - start.y) as usize;
+                let idx = local_y * width + local_x;
+                if !region[idx] {
+                    continue;
+                }
+
+                for dy in -1i32..=1 {
+                    for dx in -1i32..=1 {
+                        if dx == 0 && dy == 0 {
+                            continue;
+                        }
+                        let nx = x as i32 + dx;
+                        let ny = y as i32 + dy;
+                        if nx < start.x as i32
+                            || ny < start.y as i32
+                            || nx >= end.x as i32
+                            || ny >= end.y as i32
+                        {
+                            continue;
+                        }
+                        let nx = nx as u32;
+                        let ny = ny as u32;
+                        let nlocal_x = (nx - start.x) as usize;
+                        let nlocal_y = (ny - start.y) as usize;
+                        let nidx = nlocal_y * width + nlocal_x;
+                        if region[nidx] || !outside[nidx] {
+                            continue;
+                        }
+                        outline_pixels.push((nx, ny));
+                    }
+                }
+            }
+        }
+
+        let mut changed = false;
+        for (x, y) in outline_pixels {
+            changed |= canvas.set_pixel(x, y, outline_color);
+        }
+        changed
     }
 
     /// Draw a line between two points using Bresenham's algorithm.

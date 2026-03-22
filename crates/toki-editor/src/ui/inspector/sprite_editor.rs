@@ -52,6 +52,11 @@ fn render_tool_palette(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             SpriteEditorTool::MagicErase,
             "Magic Erase",
         );
+        ui.selectable_value(
+            &mut ui_state.sprite.tool,
+            SpriteEditorTool::AddOutline,
+            "Add Outline",
+        );
     });
 }
 
@@ -88,6 +93,9 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         }
         SpriteEditorTool::MagicErase => {
             ui.label("Click to erase the connected color region inside the clicked tile.");
+        }
+        SpriteEditorTool::AddOutline => {
+            ui.label("Click a sprite to add an outline of the current color inside the clicked tile.");
         }
     }
 

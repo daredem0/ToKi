@@ -26,6 +26,7 @@ pub fn handle_tool_interaction(
         SpriteEditorTool::Select => handle_select_tool(ui_state, response, rect, ctx, canvas_pos),
         SpriteEditorTool::MagicWand => handle_magic_wand_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::MagicErase => handle_magic_erase_tool(ui_state, response, canvas_pos),
+        SpriteEditorTool::AddOutline => handle_add_outline_tool(ui_state, response, canvas_pos),
     }
 }
 
@@ -233,7 +234,7 @@ fn handle_magic_erase_tool(
         return;
     }
 
-    let Some(bounds) = magic_erase_bounds(ui_state, canvas_pos) else {
+    let Some(bounds) = clicked_tile_bounds(ui_state, canvas_pos) else {
         return;
     };
 
@@ -247,7 +248,36 @@ fn handle_magic_erase_tool(
     finish_paint_stroke(ui_state);
 }
 
-fn magic_erase_bounds(
+fn handle_add_outline_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    canvas_pos: glam::IVec2,
+) {
+    if !response.clicked() {
+        return;
+    }
+
+    let Some(bounds) = clicked_tile_bounds(ui_state, canvas_pos) else {
+        return;
+    };
+
+    start_paint_stroke(ui_state);
+    let outline_color = ui_state.sprite.foreground_color;
+    if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
+        if SpritePaintInteraction::add_outline_in_bounds(
+            canvas,
+            canvas_pos,
+            outline_color,
+            bounds,
+        ) {
+            ui_state.sprite.active_mut().dirty = true;
+            invalidate_canvas_texture(ui_state);
+        }
+    }
+    finish_paint_stroke(ui_state);
+}
+
+fn clicked_tile_bounds(
     ui_state: &EditorUI,
     canvas_pos: glam::IVec2,
 ) -> Option<(glam::UVec2, glam::UVec2)> {
@@ -327,6 +357,9 @@ pub fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
     }
     if ui.input(|i| i.key_pressed(egui::Key::K)) {
         ui_state.sprite.tool = MagicErase;
+    }
+    if ui.input(|i| i.key_pressed(egui::Key::O)) {
+        ui_state.sprite.tool = AddOutline;
     }
 
     // Brush size

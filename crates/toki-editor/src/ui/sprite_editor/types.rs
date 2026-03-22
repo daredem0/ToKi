@@ -19,6 +19,8 @@ pub enum SpriteEditorTool {
     MagicWand,
     /// Remove connected pixels of the clicked color within the clicked tile
     MagicErase,
+    /// Add an outline around the clicked connected sprite region within the clicked tile
+    AddOutline,
 }
 
 /// Type of sprite asset being edited
