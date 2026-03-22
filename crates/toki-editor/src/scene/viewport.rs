@@ -1,6 +1,6 @@
+use crate::editor_types::PlacementPreviewVisual;
 use crate::project::assets::{ObjectSheetAsset, SpriteAtlasAsset};
 use crate::project::ProjectAssets;
-use crate::ui::editor_ui::PlacementPreviewVisual;
 use anyhow::Result;
 use std::path::Path;
 use toki_core::assets::tilemap::TileMap;

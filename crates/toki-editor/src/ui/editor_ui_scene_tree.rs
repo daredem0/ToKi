@@ -1,4 +1,5 @@
 use super::EditorUI;
+use crate::editor_services::commands as editor_commands;
 use crate::ui::undo_redo::{EditorCommand, IndexedEntity};
 
 impl EditorUI {
@@ -392,7 +393,7 @@ impl EditorUI {
                 continue;
             };
 
-            let removed = self.execute_command(EditorCommand::remove_entities(
+            let removed = editor_commands::execute(self, EditorCommand::remove_entities(
                 scene_name.clone(),
                 vec![IndexedEntity { index, entity }],
             ));
@@ -423,7 +424,7 @@ impl EditorUI {
                 continue;
             }
 
-            if self.execute_command(EditorCommand::update_scene(
+            if editor_commands::execute(self, EditorCommand::update_scene(
                 scene_name.clone(),
                 before_scene,
                 after_scene,

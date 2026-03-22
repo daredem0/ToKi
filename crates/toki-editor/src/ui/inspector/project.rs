@@ -1,4 +1,5 @@
 use super::*;
+use crate::project::apply_project_settings_draft;
 
 impl InspectorSystem {
     pub(super) fn render_project_settings_panel(
@@ -239,88 +240,16 @@ impl InspectorSystem {
             });
         });
 
-        if changed && Self::apply_project_settings_draft(project, &draft) {
+        if changed && apply_project_settings_draft(project, &draft) {
             ui_state.set_title(&project.name);
         }
     }
 
+    #[cfg(test)]
     pub(super) fn apply_project_settings_draft(
         project: &mut Project,
         draft: &ProjectSettingsDraft,
     ) -> bool {
-        let trimmed_name = draft.name.trim();
-        let trimmed_version = draft.version.trim();
-
-        let mut changed = false;
-        if !trimmed_name.is_empty() && project.metadata.project.name != trimmed_name {
-            project.metadata.project.name = trimmed_name.to_string();
-            project.name = trimmed_name.to_string();
-            changed = true;
-        }
-        if !trimmed_version.is_empty() && project.metadata.project.version != trimmed_version {
-            project.metadata.project.version = trimmed_version.to_string();
-            changed = true;
-        }
-        if project.metadata.project.description != draft.description {
-            project.metadata.project.description = draft.description.clone();
-            changed = true;
-        }
-        if project.metadata.runtime.splash.duration_ms != draft.splash_duration_ms {
-            project.metadata.runtime.splash.duration_ms = draft.splash_duration_ms;
-            changed = true;
-        }
-        if project.metadata.runtime.display.show_entity_health_bars != draft.show_entity_health_bars
-        {
-            project.metadata.runtime.display.show_entity_health_bars =
-                draft.show_entity_health_bars;
-            changed = true;
-        }
-        if project.metadata.runtime.display.resolution_width != draft.resolution_width {
-            project.metadata.runtime.display.resolution_width = draft.resolution_width;
-            changed = true;
-        }
-        if project.metadata.runtime.display.resolution_height != draft.resolution_height {
-            project.metadata.runtime.display.resolution_height = draft.resolution_height;
-            changed = true;
-        }
-        if project.metadata.runtime.display.zoom_percent != draft.zoom_percent {
-            project.metadata.runtime.display.zoom_percent = draft.zoom_percent;
-            changed = true;
-        }
-        if project.metadata.runtime.display.vsync != draft.vsync {
-            project.metadata.runtime.display.vsync = draft.vsync;
-            changed = true;
-        }
-        if project.metadata.runtime.display.target_fps != draft.target_fps {
-            project.metadata.runtime.display.target_fps = draft.target_fps;
-            changed = true;
-        }
-        if project.metadata.runtime.display.timing_mode != draft.timing_mode {
-            project.metadata.runtime.display.timing_mode = draft.timing_mode;
-            changed = true;
-        }
-        if project.audio_config().master_percent != draft.master_mix_percent {
-            project.audio_config_mut().master_percent = draft.master_mix_percent;
-            changed = true;
-        }
-        if project.audio_config().music_percent != draft.music_mix_percent {
-            project.audio_config_mut().music_percent = draft.music_mix_percent;
-            changed = true;
-        }
-        if project.audio_config().movement_percent != draft.movement_mix_percent {
-            project.audio_config_mut().movement_percent = draft.movement_mix_percent;
-            changed = true;
-        }
-        if project.audio_config().collision_percent != draft.collision_mix_percent {
-            project.audio_config_mut().collision_percent = draft.collision_mix_percent;
-            changed = true;
-        }
-
-        if changed {
-            project.metadata.project.modified = Utc::now();
-            project.is_dirty = true;
-        }
-
-        changed
+        apply_project_settings_draft(project, draft)
     }
 }

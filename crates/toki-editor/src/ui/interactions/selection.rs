@@ -1,5 +1,6 @@
 use super::GridInteraction;
 use crate::config::EditorConfig;
+use crate::editor_services::commands as editor_commands;
 use crate::scene::SceneViewport;
 use crate::ui::editor_ui::{EntityMoveDragState, SceneAnchorMoveDragState};
 use crate::ui::undo_redo::{EditorCommand, EntityPosition};
@@ -286,7 +287,7 @@ impl SelectionInteraction {
                 .collect::<Vec<_>>();
             let moved_count = after_positions.len();
 
-            if ui_state.execute_command(EditorCommand::move_entities(
+            if editor_commands::execute(ui_state, EditorCommand::move_entities(
                 drag_state.scene_name.clone(),
                 before_positions,
                 after_positions,
@@ -391,7 +392,7 @@ impl SelectionInteraction {
         let mut after_scene = before_scene.clone();
         after_scene.anchors[anchor_index].position = drop_world_pos_i32;
 
-        if ui_state.execute_command(EditorCommand::update_scene(
+        if editor_commands::execute(ui_state, EditorCommand::update_scene(
             drag_state.scene_name.clone(),
             before_scene,
             after_scene,

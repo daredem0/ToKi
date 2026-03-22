@@ -1,4 +1,4 @@
-use crate::ui::rule_graph::RuleGraph;
+use crate::rule_graph::RuleGraph;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

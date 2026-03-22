@@ -1,4 +1,5 @@
 use super::EditorUI;
+use crate::editor_services::commands as editor_commands;
 use crate::ui::hierarchy::HierarchySystem;
 use crate::ui::undo_redo::EditorCommand;
 
@@ -207,7 +208,10 @@ impl EditorUI {
 
         match entity_def.create_entity(default_position, new_id) {
             Ok(entity) => {
-                if self.execute_command(EditorCommand::add_entity(scene_name.to_string(), entity)) {
+                if editor_commands::execute(
+                    self,
+                    EditorCommand::add_entity(scene_name.to_string(), entity),
+                ) {
                     tracing::info!(
                         "Successfully added entity '{}' (ID: {}) to scene '{}' at position ({}, {})",
                         entity_name,

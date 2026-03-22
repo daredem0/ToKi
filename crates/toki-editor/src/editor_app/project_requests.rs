@@ -1,4 +1,5 @@
 use super::*;
+use crate::editor_services::graph_metadata;
 
 impl EditorApp {
     pub(super) fn activate_loaded_project(
@@ -58,8 +59,13 @@ impl EditorApp {
                     }
                 }
 
-                self.migrate_legacy_graph_layouts_into_project();
-                self.sync_ui_graph_layouts_from_project();
+                if let Some(project) = self.core.project_manager.current_project.as_mut() {
+                    graph_metadata::migrate_legacy_into_project(project);
+                }
+                graph_metadata::load_into_ui(
+                    &mut self.core.ui,
+                    self.core.project_manager.current_project.as_ref(),
+                );
             }
             Err(error) => {
                 tracing::error!(
@@ -119,9 +125,7 @@ impl EditorApp {
         self.core.ui.project.save_project_requested = false;
 
         if let Some(project) = self.core.project_manager.current_project.as_mut() {
-            project.metadata.editor.graph_layouts = self.core.ui.export_graph_layouts_for_project();
-            project.metadata.editor.rule_graph_drafts =
-                self.core.ui.export_rule_graph_drafts_for_project();
+            graph_metadata::copy_ui_into_project(&self.core.ui, project);
         }
 
         let scenes = &self.core.ui.scenes;

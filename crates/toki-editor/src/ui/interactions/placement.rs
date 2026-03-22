@@ -1,5 +1,6 @@
 use super::GridInteraction;
 use crate::config::EditorConfig;
+use crate::editor_services::commands as editor_commands;
 use crate::scene::SceneViewport;
 use crate::ui::editor_ui::SceneAnchorPlacementDraft;
 use crate::ui::undo_redo::EditorCommand;
@@ -161,7 +162,7 @@ impl PlacementInteraction {
             facing: None,
         });
 
-        let changed = ui_state.execute_command(EditorCommand::update_scene(
+        let changed = editor_commands::execute(ui_state, EditorCommand::update_scene(
             active_scene_name.clone(),
             before_scene,
             after_scene,
@@ -278,7 +279,7 @@ impl PlacementInteraction {
 
         if can_place {
             let add_command = EditorCommand::add_entity(active_scene_name.clone(), entity);
-            let added = ui_state.execute_command(add_command);
+            let added = editor_commands::execute(ui_state, add_command);
             if !added {
                 tracing::warn!(
                     "Skipping placement for entity '{}' in scene '{}' because command application failed",

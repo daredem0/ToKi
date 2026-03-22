@@ -1,12 +1,17 @@
 use anyhow::Result;
 mod background_tasks;
 mod config;
+mod editor_services;
+mod editor_types;
 mod editor_app;
+mod editor_grid;
 mod fonts;
 mod logging;
 use logging::LogCapture;
 mod project;
 mod rendering;
+#[path = "ui/rule_graph.rs"]
+mod rule_graph;
 mod scene;
 mod ui;
 mod validation;

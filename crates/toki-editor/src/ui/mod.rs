@@ -7,8 +7,8 @@ pub mod inspector_trait;
 pub mod interactions;
 pub mod menus;
 pub mod panels;
-pub mod rule_graph;
 pub mod sprite_editor;
 pub mod undo_redo;
 
+pub(crate) use crate::rule_graph;
 pub use editor_ui::EditorUI;

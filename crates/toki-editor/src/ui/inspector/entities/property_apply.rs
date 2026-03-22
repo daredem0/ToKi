@@ -2,6 +2,7 @@
 
 use super::super::InspectorSystem;
 use super::types::EntityPropertyDraft;
+use crate::editor_services::commands as editor_commands;
 use crate::ui::editor_ui::EditorUI;
 use crate::ui::undo_redo::EditorCommand;
 use toki_core::entity::{ControlRole, EntityId};
@@ -97,7 +98,7 @@ impl InspectorSystem {
             return false;
         }
 
-        ui_state.execute_command(EditorCommand::update_entities(
+        editor_commands::execute(ui_state, EditorCommand::update_entities(
             active_scene_name,
             before_entities,
             after_entities,

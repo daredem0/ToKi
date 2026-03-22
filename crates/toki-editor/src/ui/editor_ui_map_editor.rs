@@ -1,4 +1,5 @@
-use super::{CenterPanelTab, EditorUI};
+use super::EditorUI;
+#[cfg(test)]
 use crate::ui::undo_redo::EditorCommand;
 use std::path::PathBuf;
 use toki_core::assets::tilemap::{MapObjectInstance, TileMap};
@@ -67,12 +68,12 @@ pub struct MapEditorHistory {
 }
 
 impl MapEditorHistory {
-    fn push(&mut self, command: MapEditorEditCommand) {
+    pub(crate) fn push(&mut self, command: MapEditorEditCommand) {
         self.undo_stack.push(command);
         self.redo_stack.clear();
     }
 
-    fn undo(&mut self, ui_state: &mut EditorUI) -> bool {
+    pub(crate) fn undo(&mut self, ui_state: &mut EditorUI) -> bool {
         let Some(command) = self.undo_stack.pop() else {
             return false;
         };
@@ -89,7 +90,7 @@ impl MapEditorHistory {
         }
     }
 
-    fn redo(&mut self, ui_state: &mut EditorUI) -> bool {
+    pub(crate) fn redo(&mut self, ui_state: &mut EditorUI) -> bool {
         let Some(command) = self.redo_stack.pop() else {
             return false;
         };
@@ -106,11 +107,11 @@ impl MapEditorHistory {
         }
     }
 
-    fn can_undo(&self) -> bool {
+    pub(crate) fn can_undo(&self) -> bool {
         !self.undo_stack.is_empty()
     }
 
-    fn can_redo(&self) -> bool {
+    pub(crate) fn can_redo(&self) -> bool {
         !self.redo_stack.is_empty()
     }
 
@@ -451,89 +452,46 @@ impl EditorUI {
         self.map.pending_tilemap_sync.take()
     }
 
+    #[cfg(test)]
+    #[allow(dead_code)]
     pub fn execute_command(&mut self, command: EditorCommand) -> bool {
-        let mut history = std::mem::take(&mut self.command_history);
-        let changed = history.execute(command, self, None);
-        self.command_history = history;
-        changed
+        crate::editor_services::commands::execute(self, command)
     }
 
-    pub fn execute_command_with_project(
-        &mut self,
-        project: &mut crate::project::Project,
-        command: EditorCommand,
-    ) -> bool {
-        let mut history = std::mem::take(&mut self.command_history);
-        let changed = history.execute(command, self, Some(project));
-        self.command_history = history;
-        changed
-    }
-
+    #[cfg(test)]
+    #[allow(dead_code)]
     pub fn undo(&mut self) -> bool {
-        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map.history.can_undo() {
-            let mut history = std::mem::take(&mut self.map.history);
-            let undone = history.undo(self);
-            self.map.history = history;
-            return undone;
-        }
-        let mut history = std::mem::take(&mut self.command_history);
-        let undone = history.undo(self, None);
-        self.command_history = history;
-        undone
+        crate::editor_services::commands::undo(self)
     }
 
+    #[cfg(test)]
+    #[allow(dead_code)]
     pub fn undo_with_project(&mut self, project: &mut crate::project::Project) -> bool {
-        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map.history.can_undo() {
-            let mut history = std::mem::take(&mut self.map.history);
-            let undone = history.undo(self);
-            self.map.history = history;
-            return undone;
-        }
-        let mut history = std::mem::take(&mut self.command_history);
-        let undone = history.undo(self, Some(project));
-        self.command_history = history;
-        undone
+        crate::editor_services::commands::undo_with_project(self, project)
     }
 
+    #[cfg(test)]
+    #[allow(dead_code)]
     pub fn redo(&mut self) -> bool {
-        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map.history.can_redo() {
-            let mut history = std::mem::take(&mut self.map.history);
-            let redone = history.redo(self);
-            self.map.history = history;
-            return redone;
-        }
-        let mut history = std::mem::take(&mut self.command_history);
-        let redone = history.redo(self, None);
-        self.command_history = history;
-        redone
+        crate::editor_services::commands::redo(self)
     }
 
+    #[cfg(test)]
+    #[allow(dead_code)]
     pub fn redo_with_project(&mut self, project: &mut crate::project::Project) -> bool {
-        if self.center_panel_tab == CenterPanelTab::MapEditor && self.map.history.can_redo() {
-            let mut history = std::mem::take(&mut self.map.history);
-            let redone = history.redo(self);
-            self.map.history = history;
-            return redone;
-        }
-        let mut history = std::mem::take(&mut self.command_history);
-        let redone = history.redo(self, Some(project));
-        self.command_history = history;
-        redone
+        crate::editor_services::commands::redo_with_project(self, project)
     }
 
+    #[cfg(test)]
+    #[allow(dead_code)]
     pub fn can_undo(&self) -> bool {
-        if self.center_panel_tab == CenterPanelTab::MapEditor {
-            self.map.history.can_undo()
-        } else {
-            self.command_history.can_undo()
-        }
+        crate::editor_services::commands::can_undo(self)
     }
 
+    #[cfg(test)]
+    #[allow(dead_code)]
     pub fn can_redo(&self) -> bool {
-        if self.center_panel_tab == CenterPanelTab::MapEditor {
-            self.map.history.can_redo()
-        } else {
-            self.command_history.can_redo()
-        }
+        crate::editor_services::commands::can_redo(self)
     }
+
 }

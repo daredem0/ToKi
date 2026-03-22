@@ -1,6 +1,7 @@
 //! Scene anchor inspector - spawn point editing.
 
 use super::super::super::inspector_trait::{Inspector, InspectorContext};
+use crate::editor_services::commands as editor_commands;
 use toki_core::scene::{SceneAnchorFacing, SceneAnchorKind};
 
 pub struct SceneAnchorInspector {
@@ -194,13 +195,14 @@ fn handle_anchor_delete(
 ) -> bool {
     let mut after_scene = before_scene.clone();
     after_scene.anchors.remove(anchor_index);
-    if ctx
-        .ui_state
-        .execute_command(crate::ui::undo_redo::EditorCommand::update_scene(
+    if editor_commands::execute(
+        ctx.ui_state,
+        crate::ui::undo_redo::EditorCommand::update_scene(
             scene_name.to_string(),
             before_scene,
             after_scene,
-        ))
+        ),
+    )
     {
         ctx.ui_state
             .set_selection(crate::ui::editor_ui::Selection::Scene(
@@ -221,13 +223,14 @@ fn handle_anchor_update(
 ) -> bool {
     let mut after_scene = before_scene.clone();
     after_scene.anchors[anchor_index] = edited_anchor.clone();
-    if ctx
-        .ui_state
-        .execute_command(crate::ui::undo_redo::EditorCommand::update_scene(
+    if editor_commands::execute(
+        ctx.ui_state,
+        crate::ui::undo_redo::EditorCommand::update_scene(
             scene_name.to_string(),
             before_scene,
             after_scene,
-        ))
+        ),
+    )
     {
         *anchor_id = edited_anchor.id.clone();
         ctx.ui_state

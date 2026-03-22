@@ -1,5 +1,5 @@
 use super::*;
-use crate::ui::editor_ui::PlacementPreviewVisual;
+use crate::editor_types::PlacementPreviewVisual;
 use toki_core::sprite_render::{
     collect_map_object_sprite_render_requests, format_sprite_resolve_failure, SpriteRenderOrigin,
 };

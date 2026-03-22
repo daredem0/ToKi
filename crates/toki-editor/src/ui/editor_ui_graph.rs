@@ -1,4 +1,5 @@
 use super::EditorUI;
+use crate::editor_services::commands as editor_commands;
 use crate::project::SceneGraphLayout;
 use crate::ui::rule_graph::RuleGraph;
 use crate::ui::undo_redo::EditorCommand;
@@ -112,7 +113,7 @@ impl EditorUI {
             data.pan,
             data.before_layout.clone(),
         );
-        self.execute_command(EditorCommand::update_scene_rules_graph(
+        editor_commands::execute(self, EditorCommand::update_scene_rules_graph(
             scene_name.to_string(),
             data.before_rule_set,
             data.after_rule_set,

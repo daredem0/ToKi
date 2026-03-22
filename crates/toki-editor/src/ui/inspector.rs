@@ -8,7 +8,7 @@ use super::editor_ui::{EditorUI, MapEditorTool, SceneRulesGraphCommandData, Sele
 use super::rule_graph::{RuleGraph, RuleGraphEdge, RuleGraphNodeKind};
 use crate::config::EditorConfig;
 use crate::project::Project;
-use chrono::Utc;
+pub(crate) use crate::project::ProjectSettingsDraft;
 use std::collections::HashMap;
 use toki_core::animation::AnimationState;
 use toki_core::assets::object_sheet::ObjectSheetMeta;
@@ -82,25 +82,6 @@ pub(super) struct EntityPropertyDraft {
     pub(super) attack_power_enabled: bool,
     pub(super) attack_power_value: i64,
     pub(super) collision: CollisionDraft,
-}
-
-#[derive(Debug, Clone)]
-struct ProjectSettingsDraft {
-    name: String,
-    version: String,
-    description: String,
-    splash_duration_ms: u64,
-    show_entity_health_bars: bool,
-    resolution_width: u32,
-    resolution_height: u32,
-    zoom_percent: u32,
-    vsync: bool,
-    target_fps: u32,
-    timing_mode: toki_core::TimingMode,
-    master_mix_percent: u8,
-    music_mix_percent: u8,
-    movement_mix_percent: u8,
-    collision_mix_percent: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -301,28 +282,6 @@ impl EntityPropertyDraft {
             attack_power_enabled,
             attack_power_value,
             collision,
-        }
-    }
-}
-
-impl ProjectSettingsDraft {
-    fn from_project(project: &Project) -> Self {
-        Self {
-            name: project.metadata.project.name.clone(),
-            version: project.metadata.project.version.clone(),
-            description: project.metadata.project.description.clone(),
-            splash_duration_ms: project.metadata.runtime.splash.duration_ms,
-            show_entity_health_bars: project.metadata.runtime.display.show_entity_health_bars,
-            resolution_width: project.metadata.runtime.display.resolution_width,
-            resolution_height: project.metadata.runtime.display.resolution_height,
-            zoom_percent: project.metadata.runtime.display.zoom_percent,
-            vsync: project.metadata.runtime.display.vsync,
-            target_fps: project.metadata.runtime.display.target_fps,
-            timing_mode: project.metadata.runtime.display.timing_mode,
-            master_mix_percent: project.audio_config().master_percent,
-            music_mix_percent: project.audio_config().music_percent,
-            movement_mix_percent: project.audio_config().movement_percent,
-            collision_mix_percent: project.audio_config().collision_percent,
         }
     }
 }

@@ -1,4 +1,5 @@
 use crate::config::EditorConfig;
+use crate::editor_services::commands as editor_commands;
 use crate::ui::editor_ui::EditorConfirmation;
 use crate::ui::inspector::build_delete_scene_command;
 
@@ -93,25 +94,28 @@ impl MenuSystem {
 
                 ui.menu_button("Edit", |ui| {
                     if ui
-                        .add_enabled(ui_state.can_undo(), egui::Button::new("Undo (Ctrl+Z)"))
+                        .add_enabled(
+                            editor_commands::can_undo(ui_state),
+                            egui::Button::new("Undo (Ctrl+Z)"),
+                        )
                         .clicked()
                         && project
                             .as_mut()
-                            .map(|project| ui_state.undo_with_project(project))
-                            .unwrap_or_else(|| ui_state.undo())
+                            .map(|project| editor_commands::undo_with_project(ui_state, project))
+                            .unwrap_or_else(|| editor_commands::undo(ui_state))
                     {
                         tracing::info!("Undo command applied");
                     }
                     if ui
                         .add_enabled(
-                            ui_state.can_redo(),
+                            editor_commands::can_redo(ui_state),
                             egui::Button::new("Redo (Ctrl+Y / Ctrl+Shift+Z)"),
                         )
                         .clicked()
                         && project
                             .as_mut()
-                            .map(|project| ui_state.redo_with_project(project))
-                            .unwrap_or_else(|| ui_state.redo())
+                            .map(|project| editor_commands::redo_with_project(ui_state, project))
+                            .unwrap_or_else(|| editor_commands::redo(ui_state))
                     {
                         tracing::info!("Redo command applied");
                     }
@@ -226,7 +230,7 @@ impl MenuSystem {
                     };
                     match build_delete_scene_command(ui_state, project, &scene_name) {
                         Ok(command) => {
-                            let _ = ui_state.execute_command_with_project(project, command);
+                            let _ = editor_commands::execute_with_project(ui_state, project, command);
                         }
                         Err(error) => {
                             tracing::error!(

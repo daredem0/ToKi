@@ -6,6 +6,7 @@ use super::scene_helpers::{
     render_background_music_editor, render_delete_scene_button, render_rules_editor_section,
     render_scene_actions, render_scene_anchors_list, render_scene_stats,
 };
+use crate::editor_services::commands as editor_commands;
 use toki_core::entity::ControlRole;
 use toki_core::scene::{SceneAnchorKind, ScenePlayerEntry};
 
@@ -182,12 +183,14 @@ impl SceneInspector {
         let before_scene = scene.clone();
         let mut after_scene = before_scene.clone();
         after_scene.player_entry = new_entry;
-        ctx.ui_state
-            .execute_command(crate::ui::undo_redo::EditorCommand::update_scene(
+        editor_commands::execute(
+            ctx.ui_state,
+            crate::ui::undo_redo::EditorCommand::update_scene(
                 scene_name.to_string(),
                 before_scene,
                 after_scene,
-            ))
+            ),
+        )
     }
 
     fn remove_player_entry(

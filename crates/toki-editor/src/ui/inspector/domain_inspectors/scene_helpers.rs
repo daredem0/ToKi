@@ -3,19 +3,22 @@
 use super::super::super::inspector_trait::InspectorContext;
 use super::scene::SceneInspector;
 use super::scene_commands::build_delete_scene_command;
+use crate::editor_services::commands as editor_commands;
+use crate::scene::view_models::SceneSummaryView;
 use crate::ui::editor_ui::EditorConfirmation;
 use crate::ui::inspector::InspectorSystem;
 use toki_core::scene::SceneAnchorKind;
 
 pub fn render_scene_stats(ui: &mut egui::Ui, scene: &toki_core::Scene) {
+    let summary = SceneSummaryView::from_scene(scene);
     ui.horizontal(|ui| {
         ui.label("Maps:");
-        ui.label(format!("{}", scene.maps.len()));
+        ui.label(format!("{}", summary.map_count));
     });
 
     ui.horizontal(|ui| {
         ui.label("Entities:");
-        ui.label(format!("{}", scene.entities.len()));
+        ui.label(format!("{}", summary.entity_count));
     });
 }
 
@@ -32,7 +35,7 @@ pub fn render_delete_scene_button(
             if let Some(project) = ctx.project.as_deref_mut() {
                 match build_delete_scene_command(ctx.ui_state, project, scene_name) {
                     Ok(command) => {
-                        let _ = ctx.ui_state.execute_command_with_project(project, command);
+                        let _ = editor_commands::execute_with_project(ctx.ui_state, project, command);
                     }
                     Err(error) => {
                         tracing::error!(
@@ -87,13 +90,14 @@ pub fn render_background_music_editor(
         let before_scene = scene.clone();
         let mut after_scene = before_scene.clone();
         after_scene.background_music_track_id = selected_background_music_track_id;
-        return ctx
-            .ui_state
-            .execute_command(crate::ui::undo_redo::EditorCommand::update_scene(
+        return editor_commands::execute(
+            ctx.ui_state,
+            crate::ui::undo_redo::EditorCommand::update_scene(
                 scene_name.to_string(),
                 before_scene,
                 after_scene,
-            ));
+            ),
+        );
     }
 
     false

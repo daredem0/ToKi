@@ -18,12 +18,17 @@ use crate::background_tasks::{
     BackgroundTaskManager, BackgroundTaskUpdate, ExportBundleJob, ValidateAssetsJob,
 };
 use crate::config::EditorConfig;
+use crate::editor_services::{commands as editor_commands, graph_metadata};
+use crate::editor_types::PlacementPreviewVisual;
 use crate::fonts::{load_project_fonts_into_egui, menu_font_family_choices};
 use crate::logging::LogCapture;
 use crate::project::ProjectAssets;
 use crate::project::{ProjectManager, ProjectTemplateKind};
 use crate::rendering::WindowRenderer;
-use crate::scene::viewport::{DragPreviewSprite, ViewportOverlayData};
+use crate::scene::overlays as scene_overlays;
+#[cfg(test)]
+use crate::scene::viewport::DragPreviewSprite;
+use crate::scene::viewport::ViewportOverlayData;
 use crate::scene::SceneViewport;
 use crate::ui::editor_ui::{CenterPanelTab, MapEditorDraft};
 use crate::ui::EditorUI;
@@ -34,8 +39,6 @@ mod background_tasks;
 mod map_editor;
 #[path = "editor_app/new_project.rs"]
 mod new_project;
-#[path = "editor_app/previews.rs"]
-mod previews;
 #[path = "editor_app/project_requests.rs"]
 mod project_requests;
 #[path = "editor_app/runtime.rs"]
@@ -69,10 +72,8 @@ pub(crate) struct EditorResourceCache {
     /// Caches which project's menu preview fonts have been registered with egui.
     pub menu_font_project_path: Option<PathBuf>,
     /// Caches preview visuals by project and entity definition name.
-    pub preview_sprite_frames: std::collections::HashMap<
-        (PathBuf, String),
-        Option<crate::ui::editor_ui::PlacementPreviewVisual>,
-    >,
+    pub preview_sprite_frames:
+        std::collections::HashMap<(PathBuf, String), Option<PlacementPreviewVisual>>,
 }
 
 /// Platform layer: window, renderer, and egui integration.
@@ -143,22 +144,6 @@ enum EditorShortcutAction {
 }
 
 impl EditorApp {
-    fn cached_preview_sprite_frame(
-        preview_sprite_frames: &mut std::collections::HashMap<
-            (PathBuf, String),
-            Option<crate::ui::editor_ui::PlacementPreviewVisual>,
-        >,
-        entity_def_name: &str,
-        project_path: &std::path::Path,
-        project_assets: &ProjectAssets,
-    ) -> Option<crate::ui::editor_ui::PlacementPreviewVisual> {
-        let cache_key = (project_path.to_path_buf(), entity_def_name.to_string());
-        let cached = preview_sprite_frames.entry(cache_key).or_insert_with(|| {
-            Self::load_preview_sprite_frame_static(entity_def_name, project_path, project_assets)
-        });
-        cached.clone()
-    }
-
     fn new(log_capture: Option<LogCapture>) -> Self {
         // Load or create config
         let config = EditorConfig::load().unwrap_or_else(|e| {
@@ -257,14 +242,6 @@ impl EditorApp {
         }
     }
 
-    fn parse_legacy_graph_layout_key(key: &str) -> Option<(String, String, String)> {
-        let mut parts = key.rsplitn(3, "::");
-        let node_key = parts.next()?.to_string();
-        let scene_name = parts.next()?.to_string();
-        let project_key = parts.next()?.to_string();
-        Some((project_key, scene_name, node_key))
-    }
-
     fn editor_shortcut_action(
         logical_key: &winit::keyboard::Key,
         modifiers: ModifiersState,
@@ -287,155 +264,6 @@ impl EditorApp {
         }
     }
 
-    fn sync_ui_graph_layouts_from_project(&mut self) {
-        let (graph_layouts, rule_graph_drafts) = self
-            .core
-            .project_manager
-            .current_project
-            .as_ref()
-            .map(|project| {
-                (
-                    project.metadata.editor.graph_layouts.clone(),
-                    project.metadata.editor.rule_graph_drafts.clone(),
-                )
-            })
-            .unwrap_or_default();
-        self.core.ui.load_graph_layouts_from_project(&graph_layouts);
-        self.core
-            .ui
-            .load_rule_graph_drafts_from_project(&rule_graph_drafts);
-    }
-
-    fn migrate_legacy_graph_layouts_into_project(&mut self) {
-        let Some(project) = self.core.project_manager.current_project.as_mut() else {
-            return;
-        };
-
-        let config_path = match std::env::current_dir() {
-            Ok(dir) => dir.join("toki_editor_config.json"),
-            Err(error) => {
-                tracing::warn!(
-                    "Cannot determine current directory for legacy graph layout migration: {}",
-                    error
-                );
-                return;
-            }
-        };
-
-        let raw_config = match std::fs::read_to_string(&config_path) {
-            Ok(raw_config) => raw_config,
-            Err(_) => return,
-        };
-        let mut config_json = match serde_json::from_str::<serde_json::Value>(&raw_config) {
-            Ok(json) => json,
-            Err(error) => {
-                tracing::warn!(
-                    "Failed to parse config for legacy graph layout migration: {}",
-                    error
-                );
-                return;
-            }
-        };
-        let Some(layouts_object) = config_json
-            .get("graph_layouts")
-            .and_then(|value| value.as_object())
-            .cloned()
-        else {
-            return;
-        };
-
-        let project_key = project.path.to_string_lossy().to_string();
-        let mut migrated_any = false;
-
-        for (key, value) in layouts_object {
-            let Some((entry_project_key, scene_name, node_key)) =
-                Self::parse_legacy_graph_layout_key(&key)
-            else {
-                continue;
-            };
-            let Some(position_values) = value.as_array() else {
-                continue;
-            };
-            if position_values.len() != 2 {
-                continue;
-            }
-            let Some(x) = position_values[0].as_f64() else {
-                continue;
-            };
-            let Some(y) = position_values[1].as_f64() else {
-                continue;
-            };
-            let position = [x as f32, y as f32];
-
-            if entry_project_key == project_key {
-                project
-                    .metadata
-                    .editor
-                    .graph_layouts
-                    .entry(scene_name)
-                    .or_default()
-                    .node_positions
-                    .insert(node_key, position);
-                migrated_any = true;
-            }
-        }
-
-        if migrated_any {
-            if let Err(error) = project.save_metadata() {
-                tracing::warn!(
-                    "Failed to persist migrated graph layout metadata: {}",
-                    error
-                );
-            }
-            tracing::info!(
-                "Migrated legacy scene graph layout entries from global config into project metadata"
-            );
-        }
-
-        if let Some(config_object) = config_json.as_object_mut() {
-            config_object.remove("graph_layouts");
-            match serde_json::to_string_pretty(&config_json) {
-                Ok(serialized) => {
-                    if let Err(error) = std::fs::write(&config_path, serialized) {
-                        tracing::warn!(
-                            "Failed to remove legacy graph layouts from config file: {}",
-                            error
-                        );
-                    }
-                }
-                Err(error) => {
-                    tracing::warn!(
-                        "Failed to serialize config after removing legacy graph layouts: {}",
-                        error
-                    );
-                }
-            }
-        }
-    }
-
-    fn persist_graph_layout_metadata_if_needed(&mut self, egui_ctx: &egui::Context) {
-        if !self.core.ui.is_graph_layout_dirty() {
-            return;
-        }
-        if egui_ctx.input(|input| input.pointer.any_down()) {
-            return;
-        }
-
-        let Some(project) = self.core.project_manager.current_project.as_mut() else {
-            return;
-        };
-
-        project.metadata.editor.graph_layouts = self.core.ui.export_graph_layouts_for_project();
-        project.metadata.editor.rule_graph_drafts =
-            self.core.ui.export_rule_graph_drafts_for_project();
-        match project.save_metadata() {
-            Ok(()) => self.core.ui.clear_graph_layout_dirty(),
-            Err(error) => tracing::warn!(
-                "Failed to persist scene graph layout to project metadata: {}",
-                error
-            ),
-        }
-    }
 }
 
 impl ApplicationHandler for EditorApp {
@@ -610,8 +438,13 @@ impl ApplicationHandler for EditorApp {
                                     .project_manager
                                     .current_project
                                     .as_mut()
-                                    .map(|project| self.core.ui.undo_with_project(project))
-                                    .unwrap_or_else(|| self.core.ui.undo());
+                                    .map(|project| {
+                                        editor_commands::undo_with_project(
+                                            &mut self.core.ui,
+                                            project,
+                                        )
+                                    })
+                                    .unwrap_or_else(|| editor_commands::undo(&mut self.core.ui));
                                 if undone {
                                     tracing::info!("Undo applied via Ctrl+Z");
                                 }
@@ -622,8 +455,13 @@ impl ApplicationHandler for EditorApp {
                                     .project_manager
                                     .current_project
                                     .as_mut()
-                                    .map(|project| self.core.ui.redo_with_project(project))
-                                    .unwrap_or_else(|| self.core.ui.redo());
+                                    .map(|project| {
+                                        editor_commands::redo_with_project(
+                                            &mut self.core.ui,
+                                            project,
+                                        )
+                                    })
+                                    .unwrap_or_else(|| editor_commands::redo(&mut self.core.ui));
                                 if redone {
                                     tracing::info!("Redo applied via Ctrl+Y/Ctrl+Shift+Z");
                                 }
@@ -771,7 +609,7 @@ impl EditorApp {
                 &project_path,
                 self.core.project_manager.get_project_assets(),
             ) {
-                let cached_frame = Self::cached_preview_sprite_frame(
+                let cached_frame = scene_overlays::cached_preview_sprite_frame(
                     &mut self.resources.preview_sprite_frames,
                     entity_def,
                     project_path.as_path(),
@@ -799,8 +637,10 @@ impl EditorApp {
             if let Some(project_assets) = self.core.project_manager.get_project_assets() {
                 match self.core.ui.center_panel_tab {
                     CenterPanelTab::SceneViewport => {
-                        let scene_player_overlay_sprites = Self::build_scene_player_overlay_sprites(
-                            &self.core.ui,
+                        let scene_player_overlay_sprites =
+                            scene_overlays::build_scene_player_overlay_sprites(
+                            self.core.ui.active_scene.as_deref(),
+                            &self.core.ui.scenes,
                             project_path.as_path(),
                             project_assets,
                             &mut self.resources.preview_sprite_frames,
@@ -827,11 +667,36 @@ impl EditorApp {
                                 None
                             };
 
-                            let anchor_overlay_lines = Self::build_scene_anchor_overlay_lines(
-                                &self.core.ui,
-                                scene_viewport.tilemap(),
-                                Some(&self.core.config),
-                            );
+                            let dragged_anchor = self
+                                .core
+                                .ui
+                                .placement
+                                .scene_anchor_move_drag
+                                .as_ref()
+                                .map(|drag| (drag.scene_name.as_str(), drag.anchor.id.as_str()));
+                            let anchor_overlay_lines =
+                                scene_overlays::build_scene_anchor_overlay_lines(
+                                    scene_overlays::SceneAnchorOverlayRequest {
+                                        active_scene_name: self.core.ui.active_scene.as_deref(),
+                                        scenes: &self.core.ui.scenes,
+                                        dragged_anchor,
+                                        preview_position: self.core.ui.placement.preview_position,
+                                        preview_valid: self
+                                            .core
+                                            .ui
+                                            .placement
+                                            .preview_valid
+                                            .unwrap_or(true),
+                                        draft_active: self
+                                            .core
+                                            .ui
+                                            .placement
+                                            .scene_anchor_draft()
+                                            .is_some(),
+                                    },
+                                    scene_viewport.tilemap(),
+                                    Some(&self.core.config),
+                                );
                             let drag_preview_sprites = self
                                 .core
                                 .ui
@@ -845,8 +710,9 @@ impl EditorApp {
                                             let terrain_atlas = tilemap.map(|_| {
                                                 scene_viewport.resources().get_terrain_atlas()
                                             });
-                                            Self::build_drag_preview_sprites(
-                                                drag,
+                                            scene_overlays::build_drag_preview_sprites(
+                                                &drag.dragged_entities,
+                                                drag.entity.position,
                                                 preview_position,
                                                 tilemap,
                                                 terrain_atlas,
@@ -952,7 +818,11 @@ impl EditorApp {
             tracing::error!("Render error: {e}");
         }
 
-        self.persist_graph_layout_metadata_if_needed(&egui_ctx);
+        graph_metadata::persist_if_dirty(
+            &mut self.core.ui,
+            self.core.project_manager.current_project.as_mut(),
+            &egui_ctx,
+        );
 
         // Request redraw if egui wants a repaint
         if egui_ctx.has_requested_repaint() {
@@ -996,6 +866,95 @@ impl EditorApp {
             }
             self.core.ui.sprite.needs_asset_rescan = false;
         }
+    }
+}
+
+#[cfg(test)]
+impl EditorApp {
+    fn parse_legacy_graph_layout_key(key: &str) -> Option<(String, String, String)> {
+        graph_metadata::parse_legacy_graph_layout_key(key)
+    }
+
+    fn load_preview_sprite_frame_static(
+        entity_def_name: &str,
+        project_path: &std::path::Path,
+        project_assets: &ProjectAssets,
+    ) -> Option<PlacementPreviewVisual> {
+        scene_overlays::load_preview_sprite_frame(entity_def_name, project_path, project_assets)
+    }
+
+    fn cached_preview_sprite_frame(
+        preview_sprite_frames: &mut std::collections::HashMap<
+            (PathBuf, String),
+            Option<PlacementPreviewVisual>,
+        >,
+        entity_def_name: &str,
+        project_path: &std::path::Path,
+        project_assets: &ProjectAssets,
+    ) -> Option<PlacementPreviewVisual> {
+        scene_overlays::cached_preview_sprite_frame(
+            preview_sprite_frames,
+            entity_def_name,
+            project_path,
+            project_assets,
+        )
+    }
+
+    fn build_scene_player_overlay_sprites(
+        ui_state: &crate::ui::EditorUI,
+        project_path: &std::path::Path,
+        project_assets: &ProjectAssets,
+        preview_cache: &mut std::collections::HashMap<
+            (PathBuf, String),
+            Option<PlacementPreviewVisual>,
+        >,
+    ) -> Vec<crate::scene::viewport::OverlaySpriteInstance> {
+        scene_overlays::build_scene_player_overlay_sprites(
+            ui_state.active_scene.as_deref(),
+            &ui_state.scenes,
+            project_path,
+            project_assets,
+            preview_cache,
+        )
+    }
+
+    fn build_scene_anchor_overlay_lines(
+        ui_state: &crate::ui::EditorUI,
+        tilemap: Option<&toki_core::assets::tilemap::TileMap>,
+        config: Option<&EditorConfig>,
+    ) -> Vec<crate::scene::viewport::OverlayLineInstance> {
+        let dragged_anchor = ui_state
+            .placement
+            .scene_anchor_move_drag
+            .as_ref()
+            .map(|drag| (drag.scene_name.as_str(), drag.anchor.id.as_str()));
+        scene_overlays::build_scene_anchor_overlay_lines(
+            scene_overlays::SceneAnchorOverlayRequest {
+                active_scene_name: ui_state.active_scene.as_deref(),
+                scenes: &ui_state.scenes,
+                dragged_anchor,
+                preview_position: ui_state.placement.preview_position,
+                preview_valid: ui_state.placement.preview_valid.unwrap_or(true),
+                draft_active: ui_state.placement.scene_anchor_draft().is_some(),
+            },
+            tilemap,
+            config,
+        )
+    }
+
+    fn build_drag_preview_sprites(
+        drag_state: &crate::ui::editor_ui::EntityMoveDragState,
+        preview_position: glam::Vec2,
+        tilemap: Option<&toki_core::assets::tilemap::TileMap>,
+        terrain_atlas: Option<&toki_core::assets::atlas::AtlasMeta>,
+    ) -> Vec<DragPreviewSprite> {
+        scene_overlays::build_drag_preview_sprites(
+            &drag_state.dragged_entities,
+            drag_state.entity.position,
+            preview_position,
+            tilemap,
+            terrain_atlas,
+        )
     }
 }
 

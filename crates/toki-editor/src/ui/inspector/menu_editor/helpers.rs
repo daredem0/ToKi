@@ -1,6 +1,7 @@
 //! Helper functions for menu editor operations.
 
 use super::*;
+use crate::editor_services::commands as editor_commands;
 
 impl InspectorSystem {
     pub(super) fn selected_menu_screen_index(project: &Project, screen_id: &str) -> Option<usize> {
@@ -156,7 +157,8 @@ impl InspectorSystem {
             return;
         }
 
-        ui_state.execute_command_with_project(
+        editor_commands::execute_with_project(
+            ui_state,
             project,
             EditorCommand::update_menu_settings(before_settings, after_settings),
         );

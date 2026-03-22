@@ -3,6 +3,7 @@ use super::menus::MenuSystem;
 use super::panels::PanelSystem;
 use super::rule_graph::RuleGraph;
 use super::undo_redo::UndoRedoHistory;
+use crate::editor_types::PlacementPreviewVisual;
 use crate::project::ProjectTemplateKind;
 use crate::project::SceneGraphLayout;
 use crate::scene::SceneViewport;
@@ -113,13 +114,6 @@ pub struct SceneAnchorMoveDragState {
 pub struct MarqueeSelectionState {
     pub start_screen: egui::Pos2,
     pub current_screen: egui::Pos2,
-}
-
-#[derive(Debug, Clone)]
-pub struct PlacementPreviewVisual {
-    pub frame: toki_core::sprite::SpriteFrame,
-    pub texture_path: Option<PathBuf>,
-    pub size: glam::UVec2,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -2,6 +2,7 @@
 
 use super::super::InspectorSystem;
 use super::types::{MultiEntityBatchEdit, MultiEntityCommonState};
+use crate::editor_services::commands as editor_commands;
 use crate::ui::editor_ui::EditorUI;
 use crate::ui::undo_redo::EditorCommand;
 use std::collections::HashSet;
@@ -182,7 +183,7 @@ impl InspectorSystem {
             return false;
         }
 
-        ui_state.execute_command(EditorCommand::update_entities(
+        editor_commands::execute(ui_state, EditorCommand::update_entities(
             scene_name.to_string(),
             before_entities,
             after_entities,
