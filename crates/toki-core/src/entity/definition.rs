@@ -18,6 +18,10 @@ fn default_hearing_radius() -> u32 {
     192
 }
 
+fn default_has_shadow() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityDefinition {
     pub name: String,
@@ -38,6 +42,8 @@ pub struct RenderingDef {
     pub size: [u32; 2],
     pub render_layer: i32,
     pub visible: bool,
+    #[serde(default = "default_has_shadow")]
+    pub has_shadow: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub static_object: Option<StaticObjectRenderDef>,
 }
@@ -283,6 +289,7 @@ impl EntityDefinition {
             speed: self.attributes.speed,
             solid: self.attributes.solid,
             visible: self.rendering.visible,
+            has_shadow: self.rendering.has_shadow,
             animation_controller,
             render_layer: self.rendering.render_layer,
             active: self.attributes.active,

@@ -9,6 +9,10 @@ pub type EntityId = u32;
 pub const HEALTH_STAT_ID: &str = "health";
 pub const ATTACK_POWER_STAT_ID: &str = "attack_power";
 
+const fn default_has_shadow() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PickupDef {
     pub item_id: String,
@@ -309,6 +313,9 @@ pub struct EntityAttributes {
 
     /// Whether this entity is rendered.
     pub visible: bool,
+    /// Whether this entity casts the stylized runtime ground shadow.
+    #[serde(default = "default_has_shadow")]
+    pub has_shadow: bool,
     /// Animation state machine for animated entities.
     pub animation_controller: Option<AnimationController>,
     /// Render order (lower layers drawn first, higher layers on top).
@@ -415,6 +422,7 @@ impl Default for EntityAttributes {
             speed: 2.0,
             solid: true,
             visible: true,
+            has_shadow: true,
             animation_controller: None,
             render_layer: 0,
             active: true,

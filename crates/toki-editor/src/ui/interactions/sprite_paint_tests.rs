@@ -372,6 +372,86 @@ fn add_outline_in_bounds_transparent_click_is_no_op() {
     ));
 }
 
+#[test]
+fn add_ground_shadow_in_bounds_projects_shadow_below_bottom_contour() {
+    let mut canvas = create_test_canvas(5, 5);
+    let sprite = PixelColor::rgb(200, 100, 50);
+    let shadow = PixelColor::rgb(20, 20, 20);
+    canvas.set_pixel(2, 1, sprite);
+    canvas.set_pixel(2, 2, sprite);
+
+    assert!(SpritePaintInteraction::add_ground_shadow_in_bounds(
+        &mut canvas,
+        IVec2::new(2, 1),
+        shadow,
+        (UVec2::ZERO, UVec2::new(5, 5)),
+    ));
+
+    assert_eq!(canvas.get_pixel(1, 3), Some(shadow));
+    assert_eq!(canvas.get_pixel(2, 3), Some(shadow));
+    assert_eq!(canvas.get_pixel(3, 3), Some(shadow));
+    assert_eq!(canvas.get_pixel(2, 2), Some(sprite));
+}
+
+#[test]
+fn add_ground_shadow_in_bounds_respects_tile_bounds() {
+    let mut canvas = create_test_canvas(6, 4);
+    let sprite = PixelColor::rgb(120, 120, 220);
+    let shadow = PixelColor::rgb(15, 15, 15);
+    canvas.set_pixel(1, 1, sprite);
+    canvas.set_pixel(4, 1, sprite);
+
+    assert!(SpritePaintInteraction::add_ground_shadow_in_bounds(
+        &mut canvas,
+        IVec2::new(1, 1),
+        shadow,
+        (UVec2::new(0, 0), UVec2::new(3, 4)),
+    ));
+
+    assert_eq!(canvas.get_pixel(0, 2), Some(shadow));
+    assert_eq!(canvas.get_pixel(1, 2), Some(shadow));
+    assert_eq!(canvas.get_pixel(2, 2), Some(shadow));
+    assert_eq!(canvas.get_pixel(3, 2), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(4, 1), Some(sprite));
+}
+
+#[test]
+fn add_ground_shadow_in_bounds_does_not_fill_internal_holes() {
+    let mut canvas = create_test_canvas(5, 5);
+    let sprite = PixelColor::rgb(180, 180, 180);
+    let shadow = PixelColor::rgb(0, 0, 0);
+
+    for y in 1..=3 {
+        for x in 1..=3 {
+            if x == 2 && y == 2 {
+                continue;
+            }
+            canvas.set_pixel(x, y, sprite);
+        }
+    }
+
+    assert!(SpritePaintInteraction::add_ground_shadow_in_bounds(
+        &mut canvas,
+        IVec2::new(1, 1),
+        shadow,
+        (UVec2::ZERO, UVec2::new(5, 5)),
+    ));
+
+    assert_eq!(canvas.get_pixel(2, 2), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn add_ground_shadow_in_bounds_transparent_click_is_no_op() {
+    let mut canvas = create_test_canvas(4, 4);
+
+    assert!(!SpritePaintInteraction::add_ground_shadow_in_bounds(
+        &mut canvas,
+        IVec2::new(1, 1),
+        PixelColor::black(),
+        (UVec2::ZERO, UVec2::new(4, 4)),
+    ));
+}
+
 // ============================================================================
 // Draw Line Tests
 // ============================================================================

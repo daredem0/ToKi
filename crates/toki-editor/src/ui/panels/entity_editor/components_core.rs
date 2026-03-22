@@ -68,6 +68,12 @@ pub fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             {
                 edit.mark_dirty();
             }
+            if ui
+                .checkbox(&mut edit.definition.rendering.has_shadow, "Has Shadow")
+                .changed()
+            {
+                edit.mark_dirty();
+            }
         });
 }
 

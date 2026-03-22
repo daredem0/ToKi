@@ -33,6 +33,7 @@ fn sample_entity_definition(name: &str, category: &str, size: [u32; 2]) -> Entit
             size,
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {

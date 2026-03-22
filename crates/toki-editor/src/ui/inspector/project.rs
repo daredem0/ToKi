@@ -86,6 +86,9 @@ impl InspectorSystem {
                     "Show Entity Health Bars",
                 )
                 .changed();
+            changed |= ui
+                .checkbox(&mut draft.show_ground_shadows, "Show Ground Shadows")
+                .changed();
 
             ui.separator();
             ui.label("Frame Rate");

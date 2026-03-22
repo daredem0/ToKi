@@ -21,6 +21,8 @@ pub enum SpriteEditorTool {
     MagicErase,
     /// Add an outline around the clicked connected sprite region within the clicked tile
     AddOutline,
+    /// Add a ground shadow below the clicked connected sprite region within the clicked tile
+    AddShadow,
 }
 
 /// Type of sprite asset being edited

@@ -36,6 +36,11 @@ impl<'a> WorldFramePresenter<'a> {
     pub(super) fn render_world_frame(&mut self) {
         self.rendering.clear_sprites();
         self.rendering.clear_text_items();
+        self.rendering.clear_world_underlay_shapes();
+        if self.display.show_ground_shadows {
+            self.render_ground_shadows();
+        }
+        self.rendering.finalize_world_underlay_shapes();
         self.render_world_sprites();
 
         self.rendering.clear_debug_shapes();
@@ -79,6 +84,18 @@ impl<'a> WorldFramePresenter<'a> {
         }
         for sprite in resolved {
             self.rendering.add_resolved_sprite(&sprite);
+        }
+    }
+
+    fn render_ground_shadows(&mut self) {
+        for shadow in self.game_system.get_entity_ground_shadows() {
+            self.rendering.add_filled_world_underlay_rect(
+                shadow.position.x,
+                shadow.position.y,
+                shadow.size.x,
+                shadow.size.y,
+                shadow.color,
+            );
         }
     }
 

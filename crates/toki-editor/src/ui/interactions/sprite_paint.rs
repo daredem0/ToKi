@@ -377,6 +377,87 @@ impl SpritePaintInteraction {
         changed
     }
 
+    /// Add a simple ground shadow under the clicked connected sprite region, limited to bounds.
+    /// The shadow is projected one pixel downward and spread one pixel horizontally.
+    /// Only transparent pixels connected to the outside are painted.
+    pub fn add_ground_shadow_in_bounds(
+        canvas: &mut SpriteCanvas,
+        start_pos: IVec2,
+        shadow_color: PixelColor,
+        bounds: (UVec2, UVec2),
+    ) -> bool {
+        if start_pos.x < 0 || start_pos.y < 0 {
+            return false;
+        }
+        let start_pos = UVec2::new(start_pos.x as u32, start_pos.y as u32);
+        let Some(region) = Self::connected_opaque_region_in_bounds(canvas, start_pos, bounds) else {
+            return false;
+        };
+
+        let (start, end) = bounds;
+        let width = (end.x - start.x) as usize;
+        let outside = Self::outside_transparent_mask(canvas, bounds, &region);
+        let mut bottom_by_col = vec![None; width];
+
+        for y in start.y..end.y {
+            for x in start.x..end.x {
+                let local_x = (x - start.x) as usize;
+                let local_y = (y - start.y) as usize;
+                let idx = local_y * width + local_x;
+                if region[idx] {
+                    bottom_by_col[local_x] = Some(y);
+                }
+            }
+        }
+
+        let mut targets = vec![false; region.len()];
+        for (local_x, bottom_y) in bottom_by_col.into_iter().enumerate() {
+            let Some(bottom_y) = bottom_y else {
+                continue;
+            };
+            let x = start.x + local_x as u32;
+            let shadow_y = bottom_y + 1;
+            if shadow_y >= end.y {
+                continue;
+            }
+
+            for shadow_x in [x.checked_sub(1), Some(x), x.checked_add(1)] {
+                let Some(shadow_x) = shadow_x else {
+                    continue;
+                };
+                if shadow_x < start.x || shadow_x >= end.x {
+                    continue;
+                }
+                let target_local_x = (shadow_x - start.x) as usize;
+                let target_local_y = (shadow_y - start.y) as usize;
+                let target_idx = target_local_y * width + target_local_x;
+                if region[target_idx] || !outside[target_idx] || targets[target_idx] {
+                    continue;
+                }
+                let Some(color) = canvas.get_pixel(shadow_x, shadow_y) else {
+                    continue;
+                };
+                if color.a != 0 {
+                    continue;
+                }
+                targets[target_idx] = true;
+            }
+        }
+
+        let mut changed = false;
+        for y in start.y..end.y {
+            for x in start.x..end.x {
+                let local_x = (x - start.x) as usize;
+                let local_y = (y - start.y) as usize;
+                let idx = local_y * width + local_x;
+                if targets[idx] {
+                    changed |= canvas.set_pixel(x, y, shadow_color);
+                }
+            }
+        }
+        changed
+    }
+
     /// Draw a line between two points using Bresenham's algorithm.
     pub fn draw_line(
         canvas: &mut SpriteCanvas,

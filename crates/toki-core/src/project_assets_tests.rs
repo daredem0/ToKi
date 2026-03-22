@@ -258,6 +258,7 @@ fn load_entity_definition_from_path_reads_definition_json() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: crate::entity::AttributesDef {

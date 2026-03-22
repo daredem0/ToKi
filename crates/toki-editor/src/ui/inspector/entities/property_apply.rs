@@ -138,6 +138,7 @@ impl InspectorSystem {
         changed |= set_if_changed(&mut entity.size, new_size);
 
         changed |= set_if_changed(&mut entity.attributes.visible, draft.visible);
+        changed |= set_if_changed(&mut entity.attributes.has_shadow, draft.has_shadow);
         changed |= set_if_changed(&mut entity.attributes.active, draft.active);
         changed |= set_if_changed(&mut entity.attributes.solid, draft.solid);
         changed |= set_if_changed(&mut entity.attributes.interactable, draft.interactable);
@@ -215,6 +216,10 @@ fn apply_rendering_fields(
     }
     if definition.rendering.visible != draft.visible {
         definition.rendering.visible = draft.visible;
+        changed = true;
+    }
+    if definition.rendering.has_shadow != draft.has_shadow {
+        definition.rendering.has_shadow = draft.has_shadow;
         changed = true;
     }
 

@@ -23,8 +23,10 @@ struct FakeBackend {
     tilemap_vertex_counts: Rc<RefCell<Vec<usize>>>,
     sprite_count: Rc<Cell<usize>>,
     text_count: Rc<Cell<usize>>,
+    world_underlay_rect_count: Rc<Cell<usize>>,
     debug_rect_count: Rc<Cell<usize>>,
     ui_rect_count: Rc<Cell<usize>>,
+    finalized_world_underlay: Rc<Cell<usize>>,
     finalized_debug: Rc<Cell<usize>>,
     finalized_ui: Rc<Cell<usize>>,
 }
@@ -114,6 +116,39 @@ impl RenderBackend for FakeBackend {
 
     fn add_text_item(&mut self, _text: TextItem) {
         self.text_count.set(self.text_count.get() + 1);
+    }
+
+    fn clear_world_underlay_shapes(&mut self) {
+        self.world_underlay_rect_count.set(0);
+    }
+
+    fn add_world_underlay_rect(
+        &mut self,
+        _x: f32,
+        _y: f32,
+        _width: f32,
+        _height: f32,
+        _color: [f32; 4],
+    ) {
+        self.world_underlay_rect_count
+            .set(self.world_underlay_rect_count.get() + 1);
+    }
+
+    fn add_filled_world_underlay_rect(
+        &mut self,
+        _x: f32,
+        _y: f32,
+        _width: f32,
+        _height: f32,
+        _color: [f32; 4],
+    ) {
+        self.world_underlay_rect_count
+            .set(self.world_underlay_rect_count.get() + 1);
+    }
+
+    fn finalize_world_underlay_shapes(&mut self) {
+        self.finalized_world_underlay
+            .set(self.finalized_world_underlay.get() + 1);
     }
 
     fn clear_debug_shapes(&mut self) {
@@ -296,6 +331,8 @@ fn backend_seam_dispatches_runtime_render_commands() {
     let tilemap_render_enabled = fake.tilemap_render_enabled.clone();
     let tilemap_counts = fake.tilemap_vertex_counts.clone();
     let text_count = fake.text_count.clone();
+    let world_underlay_rect_count = fake.world_underlay_rect_count.clone();
+    let world_underlay_finalize_counter = fake.finalized_world_underlay.clone();
     let debug_rect_count = fake.debug_rect_count.clone();
     let debug_finalize_counter = fake.finalized_debug.clone();
     let ui_rect_count = fake.ui_rect_count.clone();
@@ -346,6 +383,10 @@ fn backend_seam_dispatches_runtime_render_commands() {
         glam::Vec2::new(8.0, 8.0),
         TextStyle::default(),
     ));
+    rendering.clear_world_underlay_shapes();
+    rendering.add_world_underlay_rect(2.0, 3.0, 10.0, 2.0, [0.0, 0.0, 0.0, 0.25]);
+    rendering.add_filled_world_underlay_rect(3.0, 4.0, 8.0, 2.0, [0.0, 0.0, 0.0, 0.3]);
+    rendering.finalize_world_underlay_shapes();
     rendering.clear_debug_shapes();
     rendering.add_debug_rect(0.0, 0.0, 16.0, 16.0, [1.0, 0.0, 0.0, 1.0]);
     rendering.add_filled_debug_rect(1.0, 1.0, 14.0, 14.0, [0.0, 1.0, 0.0, 1.0]);
@@ -370,6 +411,8 @@ fn backend_seam_dispatches_runtime_render_commands() {
     assert!(tilemap_render_enabled.get());
     assert_eq!(tilemap_counts.borrow().as_slice(), &[2]);
     assert_eq!(text_count.get(), 1);
+    assert_eq!(world_underlay_rect_count.get(), 2);
+    assert_eq!(world_underlay_finalize_counter.get(), 1);
     assert_eq!(debug_rect_count.get(), 2);
     assert_eq!(debug_finalize_counter.get(), 1);
     assert_eq!(ui_rect_count.get(), 2);

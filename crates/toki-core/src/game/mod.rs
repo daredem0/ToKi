@@ -28,6 +28,7 @@ mod transition;
 mod rules_tests;
 
 // Re-export event types for external use
+pub use render_queries::GroundShadow;
 pub use rules::{
     CollisionEvent, DamageEvent, DeathEvent, InteractionEvent, InteractionSpatial,
     TileTransitionEvent,

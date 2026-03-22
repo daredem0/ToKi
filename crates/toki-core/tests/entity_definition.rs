@@ -12,6 +12,7 @@ fn test_entity_definition_create_entity_basic() {
             size: [16, 16],
             render_layer: 1,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -147,6 +148,7 @@ fn test_entity_definition_create_npc_entity() {
             size: [32, 32],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -296,6 +298,7 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
@@ -427,6 +430,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
             size: [16, 16],
             render_layer: 1,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -521,6 +525,7 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
             size: [16, 16],
             render_layer: 1,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -623,6 +628,7 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
@@ -691,6 +697,7 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
@@ -763,6 +770,7 @@ fn test_entity_definition_copies_authored_primary_projectile() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -844,6 +852,7 @@ fn test_entity_definition_copies_authored_pickup() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
@@ -919,6 +928,7 @@ fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type()
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -975,6 +985,7 @@ fn test_entity_definition_invalid_animation_state() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -1036,6 +1047,7 @@ fn test_entity_definition_invalid_loop_mode() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -1097,6 +1109,7 @@ fn test_entity_definition_serialization() {
             size: [8, 8],
             render_layer: -1,
             visible: false,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -1144,6 +1157,7 @@ fn test_entity_definition_serialization() {
     assert_eq!(entity_def.name, deserialized.name);
     assert_eq!(entity_def.display_name, deserialized.display_name);
     assert_eq!(entity_def.rendering.size, deserialized.rendering.size);
+    assert_eq!(entity_def.rendering.has_shadow, deserialized.rendering.has_shadow);
     assert_eq!(entity_def.attributes.speed, deserialized.attributes.speed);
     assert_eq!(entity_def.collision.enabled, deserialized.collision.enabled);
     assert_eq!(
@@ -1159,6 +1173,117 @@ fn test_entity_definition_serialization() {
 }
 
 #[test]
+fn entity_definition_rendering_defaults_has_shadow_to_true_when_missing() {
+    let entity_json = r#"
+{
+  "name": "shadow_default",
+  "display_name": "Shadow Default",
+  "description": "",
+  "rendering": {
+    "size": [16, 16],
+    "render_layer": 0,
+    "visible": true
+  },
+  "attributes": {
+    "health": null,
+    "stats": {},
+    "speed": 1.0,
+    "solid": true,
+    "active": true,
+    "can_move": true,
+    "interactable": false,
+    "interaction_reach": 0,
+    "ai_config": { "behavior": "none" },
+    "movement_profile": "none",
+    "has_inventory": false
+  },
+  "collision": {
+    "enabled": false,
+    "offset": [0, 0],
+    "size": [16, 16],
+    "trigger": false
+  },
+  "audio": {
+    "footstep_trigger_distance": 0.0,
+    "hearing_radius": 192,
+    "movement_sound_trigger": "distance",
+    "movement_sound": "",
+    "collision_sound": null
+  },
+  "animations": {
+    "atlas_name": "",
+    "clips": [],
+    "default_state": "idle"
+  },
+  "category": "npc",
+  "tags": []
+}
+"#;
+
+    let entity_def: EntityDefinition =
+        serde_json::from_str(entity_json).expect("entity should deserialize");
+
+    assert!(entity_def.rendering.has_shadow);
+}
+
+#[test]
+fn create_entity_copies_has_shadow_from_definition_rendering() {
+    let entity_def = EntityDefinition {
+        name: "no_shadow".to_string(),
+        display_name: "No Shadow".to_string(),
+        description: "".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+            has_shadow: false,
+            static_object: None,
+        },
+        attributes: AttributesDef {
+            health: None,
+            stats: std::collections::HashMap::new(),
+            speed: 1.0,
+            solid: true,
+            active: true,
+            can_move: true,
+            interactable: false,
+            interaction_reach: 0,
+            ai_config: AiConfig::default(),
+            movement_profile: MovementProfile::default(),
+            primary_projectile: None,
+            pickup: None,
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: false,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 0.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: "".to_string(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "".to_string(),
+            clips: vec![],
+            default_state: "idle".to_string(),
+        },
+        category: "npc".to_string(),
+        tags: vec![],
+    };
+
+    let entity = entity_def
+        .create_entity(glam::IVec2::new(0, 0), 1)
+        .expect("entity should be created");
+
+    assert!(!entity.attributes.has_shadow);
+}
+
+#[test]
 fn test_entity_definition_create_audio_component() {
     let entity_def = EntityDefinition {
         name: "audio_test".to_string(),
@@ -1168,6 +1293,7 @@ fn test_entity_definition_create_audio_component() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -1653,6 +1779,7 @@ fn test_entity_definition_with_position_based_animations() {
             size: [16, 16],
             render_layer: 1,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {

@@ -44,9 +44,17 @@ fn runtime_settings_defaults_match_engine_baseline() {
     assert_eq!(settings.audio.movement_percent, 100);
     assert_eq!(settings.audio.collision_percent, 100);
     assert!(!settings.display.show_entity_health_bars);
+    assert!(settings.display.show_ground_shadows);
     assert_eq!(settings.display.resolution_width, 160);
     assert_eq!(settings.display.resolution_height, 144);
     assert_eq!(settings.menu.pause_root_screen_id, "pause_menu");
+}
+
+#[test]
+fn runtime_display_settings_default_enable_ground_shadows() {
+    let display = RuntimeDisplaySettings::default();
+
+    assert!(display.show_ground_shadows);
 }
 
 #[test]

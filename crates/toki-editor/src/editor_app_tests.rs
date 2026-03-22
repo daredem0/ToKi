@@ -397,6 +397,7 @@ fn load_preview_sprite_frame_static_supports_object_sheet_backed_entities() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
@@ -490,6 +491,7 @@ fn build_scene_player_overlay_sprites_uses_scene_player_entry_spawn_point() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
                 object_name: "hero_idle".to_string(),
@@ -585,6 +587,7 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
                 size: [16, 16],
                 render_layer: 0,
                 visible: true,
+                has_shadow: true,
                 static_object: None,
             },
             attributes: AttributesDef {
@@ -714,6 +717,7 @@ fn build_scene_player_overlay_sprites_skips_when_scene_already_contains_authored
                 size: [16, 16],
                 render_layer: 0,
                 visible: true,
+                has_shadow: true,
                 static_object: Some(StaticObjectRenderDef {
                     sheet: "items".to_string(),
                     object_name: "hero_idle".to_string(),
@@ -823,6 +827,7 @@ fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk(
                 size: [16, 16],
                 render_layer: 0,
                 visible: true,
+                has_shadow: true,
                 static_object: Some(StaticObjectRenderDef {
                     sheet: "items".to_string(),
                     object_name: "hero_idle".to_string(),

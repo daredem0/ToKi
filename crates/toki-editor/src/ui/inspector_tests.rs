@@ -32,6 +32,7 @@ fn sample_entity_with_id(id: u32) -> toki_core::entity::Entity {
             speed: 3.0,
             solid: true,
             visible: true,
+            has_shadow: true,
             animation_controller: None,
             static_object_render: None,
             render_layer: 1,
@@ -87,6 +88,7 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
     draft.size_x = 0;
     draft.size_y = -5;
     draft.visible = false;
+    draft.has_shadow = false;
     draft.active = false;
     draft.solid = false;
     draft.can_move = false;
@@ -116,6 +118,7 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
     assert_eq!(entity.position, IVec2::new(100, 200));
     assert_eq!(entity.size, UVec2::new(1, 1));
     assert!(!entity.attributes.visible);
+    assert!(!entity.attributes.has_shadow);
     assert!(!entity.attributes.active);
     assert!(!entity.attributes.solid);
     assert!(!entity.attributes.can_move);
@@ -154,6 +157,64 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
 }
 
 #[test]
+fn apply_entity_property_draft_to_definition_updates_has_shadow() {
+    let mut definition = toki_core::entity::EntityDefinition {
+        name: "shadow_test".to_string(),
+        display_name: "Shadow Test".to_string(),
+        description: String::new(),
+        rendering: toki_core::entity::RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+            has_shadow: true,
+            static_object: None,
+        },
+        attributes: toki_core::entity::AttributesDef {
+            health: None,
+            stats: std::collections::HashMap::new(),
+            speed: 1.0,
+            solid: true,
+            active: true,
+            can_move: true,
+            interactable: false,
+            interaction_reach: 0,
+            ai_config: AiConfig::default(),
+            movement_profile: MovementProfile::default(),
+            primary_projectile: None,
+            pickup: None,
+            has_inventory: false,
+        },
+        collision: toki_core::entity::CollisionDef {
+            enabled: false,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: toki_core::entity::AudioDef {
+            footstep_trigger_distance: 0.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: String::new(),
+            collision_sound: None,
+        },
+        animations: toki_core::entity::AnimationsDef {
+            atlas_name: String::new(),
+            clips: vec![],
+            default_state: "idle".to_string(),
+        },
+        category: "npc".to_string(),
+        tags: vec![],
+    };
+    let mut draft = EntityPropertyDraft::from_entity_definition(&definition);
+    draft.has_shadow = false;
+
+    let changed = InspectorSystem::apply_entity_property_draft_to_definition(&mut definition, &draft);
+
+    assert!(changed);
+    assert!(!definition.rendering.has_shadow);
+}
+
+#[test]
 fn apply_entity_property_draft_disables_health_and_collision() {
     let mut entity = sample_entity_with_id(1);
     InspectorSystem::set_optional_runtime_stat(
@@ -186,6 +247,7 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
         description: "Updated description".to_string(),
         splash_duration_ms: 4500,
         show_entity_health_bars: true,
+        show_ground_shadows: false,
         resolution_width: 160,
         resolution_height: 144,
         zoom_percent: 100,
@@ -207,6 +269,7 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
     assert_eq!(project.metadata.project.description, "Updated description");
     assert_eq!(project.metadata.runtime.splash.duration_ms, 4500);
     assert!(project.metadata.runtime.display.show_entity_health_bars);
+    assert!(!project.metadata.runtime.display.show_ground_shadows);
     assert_eq!(project.metadata.runtime.audio.master_percent, 85);
     assert_eq!(project.metadata.runtime.audio.music_percent, 70);
     assert_eq!(project.metadata.runtime.audio.movement_percent, 55);
@@ -1027,6 +1090,7 @@ fn save_entity_definition_persists_audio_updates() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: toki_core::entity::AttributesDef {

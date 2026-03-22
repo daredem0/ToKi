@@ -15,6 +15,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -89,6 +90,7 @@ fn create_test_entity() -> Entity {
         speed: 5.0,
         solid: true,
         visible: true,
+        has_shadow: true,
         animation_controller: Some(controller),
         static_object_render: None,
         render_layer: 2,

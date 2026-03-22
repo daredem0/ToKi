@@ -42,6 +42,7 @@ pub fn create_default_definition(
             size: [32, 32],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {

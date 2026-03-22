@@ -67,6 +67,32 @@ pub trait RenderBackend: std::fmt::Debug {
     /// Add a text item to be rendered
     fn add_text_item(&mut self, text: TextItem);
 
+    /// Clear all world underlay shapes rendered below sprites.
+    fn clear_world_underlay_shapes(&mut self);
+
+    /// Add an outline rectangle to the world underlay lane.
+    fn add_world_underlay_rect(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        color: [f32; 4],
+    );
+
+    /// Add a filled rectangle to the world underlay lane.
+    fn add_filled_world_underlay_rect(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        color: [f32; 4],
+    );
+
+    /// Finalize world underlay shapes for rendering.
+    fn finalize_world_underlay_shapes(&mut self);
+
     /// Clear all debug shapes
     fn clear_debug_shapes(&mut self);
 

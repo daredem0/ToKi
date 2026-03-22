@@ -6,7 +6,7 @@ use toki_core::{
     assets::atlas::AtlasMeta,
     assets::tilemap::TileMap,
     entity::Entity,
-    game::{EntityHealthBar, InputAction},
+    game::{EntityHealthBar, GroundShadow, InputAction},
     scene::Scene,
     sprite::SpriteFrame,
     GameState, GameUpdateResult, InputKey,
@@ -135,6 +135,10 @@ impl GameManager {
 
     pub fn get_entity_health_bars(&self) -> Vec<EntityHealthBar> {
         self.game_state.get_entity_health_bars()
+    }
+
+    pub fn get_entity_ground_shadows(&self) -> Vec<GroundShadow> {
+        self.game_state.get_entity_ground_shadows()
     }
 
     /// Spawn an NPC that looks like the player

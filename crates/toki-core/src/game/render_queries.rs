@@ -8,6 +8,13 @@ use crate::sprite_render::{
 
 use super::{EntityHealthBar, GameState};
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct GroundShadow {
+    pub position: glam::Vec2,
+    pub size: glam::Vec2,
+    pub color: [f32; 4],
+}
+
 struct RenderQueryFacade<'a> {
     entity_manager: &'a EntityManager,
     player_id: Option<EntityId>,
@@ -176,6 +183,42 @@ impl<'a> RenderQueryFacade<'a> {
                     size: entity.size,
                     current: current.clamp(0, max),
                     max,
+                })
+            })
+            .collect()
+    }
+
+    fn entity_ground_shadows(&self) -> Vec<GroundShadow> {
+        self.entity_manager
+            .active_entities_iter()
+            .filter_map(|entity_id| {
+                let entity = self.entity_manager.get_entity(entity_id)?;
+                if !entity.attributes.visible || !entity.attributes.active {
+                    return None;
+                }
+                if !entity.attributes.has_shadow {
+                    return None;
+                }
+                if entity.attributes.projectile.is_some() {
+                    return None;
+                }
+                if entity.attributes.animation_controller.is_none()
+                    && entity.attributes.static_object_render.is_none()
+                {
+                    return None;
+                }
+
+                let sprite_width = entity.size.x as f32;
+                let sprite_height = entity.size.y as f32;
+                let shadow_width = (sprite_width * 0.75).round().max(6.0);
+                let shadow_height = (sprite_height * 0.18).round().clamp(2.0, 4.0);
+                let shadow_x = entity.position.x as f32 + (sprite_width - shadow_width) * 0.5;
+                let shadow_y = entity.position.y as f32 + sprite_height - shadow_height;
+
+                Some(GroundShadow {
+                    position: glam::Vec2::new(shadow_x, shadow_y),
+                    size: glam::Vec2::new(shadow_width, shadow_height),
+                    color: [0.0, 0.0, 0.0, 0.28],
                 })
             })
             .collect()
@@ -381,6 +424,11 @@ impl GameState {
         self.render_query_facade().entity_health_bars()
     }
 
+    /// Get world-space ground-shadow quads for visible, active renderable entities.
+    pub fn get_entity_ground_shadows(&self) -> Vec<GroundShadow> {
+        self.render_query_facade().entity_ground_shadows()
+    }
+
     pub fn get_sprite_render_requests(&self) -> Vec<SpriteRenderRequest> {
         self.render_query_facade().sprite_render_requests()
     }
@@ -436,8 +484,8 @@ impl GameState {
 
 #[cfg(test)]
 mod tests {
-    use super::RenderQueryFacade;
-    use crate::entity::{EntityManager, EntityStats};
+    use super::{GroundShadow, RenderQueryFacade};
+    use crate::entity::{EntityManager, EntityStats, StaticObjectRenderDef};
 
     #[test]
     fn health_bar_queries_filter_invisible_and_inactive_entities() {
@@ -482,5 +530,104 @@ mod tests {
         assert_eq!(bars[0].entity_id, visible_id);
         assert_ne!(bars[0].entity_id, hidden_id);
         assert_ne!(bars[0].entity_id, inactive_id);
+    }
+
+    #[test]
+    fn ground_shadow_queries_filter_non_renderable_entities() {
+        let mut entity_manager = EntityManager::new();
+        entity_manager.spawn_entity(
+            crate::entity::EntityKind::Npc,
+            glam::IVec2::new(10, 20),
+            glam::UVec2::new(16, 16),
+            crate::entity::EntityAttributes {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "crate".to_string(),
+                }),
+                ..crate::entity::EntityAttributes::default()
+            },
+        );
+        entity_manager.spawn_entity(
+            crate::entity::EntityKind::Npc,
+            glam::IVec2::new(30, 20),
+            glam::UVec2::new(16, 16),
+            crate::entity::EntityAttributes {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "hidden".to_string(),
+                }),
+                visible: false,
+                ..crate::entity::EntityAttributes::default()
+            },
+        );
+        entity_manager.spawn_entity(
+            crate::entity::EntityKind::Npc,
+            glam::IVec2::new(50, 20),
+            glam::UVec2::new(16, 16),
+            crate::entity::EntityAttributes {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "inactive".to_string(),
+                }),
+                has_shadow: false,
+                active: false,
+                ..crate::entity::EntityAttributes::default()
+            },
+        );
+        entity_manager.spawn_entity(
+            crate::entity::EntityKind::Projectile,
+            glam::IVec2::new(70, 20),
+            glam::UVec2::new(8, 8),
+            crate::entity::EntityAttributes {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "bullet".to_string(),
+                }),
+                projectile: Some(crate::entity::ProjectileState {
+                    sheet: "objects".to_string(),
+                    object_name: "bullet".to_string(),
+                    size: [8, 8],
+                    velocity: [1, 0],
+                    remaining_ticks: 10,
+                    damage: 1,
+                    owner_id: None,
+                }),
+                ..crate::entity::EntityAttributes::default()
+            },
+        );
+
+        let facade = RenderQueryFacade::new(&entity_manager, None, false);
+        let shadows = facade.entity_ground_shadows();
+
+        assert_eq!(shadows.len(), 1);
+    }
+
+    #[test]
+    fn ground_shadow_queries_project_flattened_shadow_at_entity_base() {
+        let mut entity_manager = EntityManager::new();
+        entity_manager.spawn_entity(
+            crate::entity::EntityKind::Npc,
+            glam::IVec2::new(10, 20),
+            glam::UVec2::new(16, 16),
+            crate::entity::EntityAttributes {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "crate".to_string(),
+                }),
+                ..crate::entity::EntityAttributes::default()
+            },
+        );
+
+        let facade = RenderQueryFacade::new(&entity_manager, None, false);
+        let shadows = facade.entity_ground_shadows();
+
+        assert_eq!(
+            shadows,
+            vec![GroundShadow {
+                position: glam::Vec2::new(12.0, 33.0),
+                size: glam::Vec2::new(12.0, 3.0),
+                color: [0.0, 0.0, 0.0, 0.28],
+            }]
+        );
     }
 }

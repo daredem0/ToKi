@@ -129,6 +129,7 @@ fn sprite_render_request_wrapper_exposes_object_sheet_backed_entities() {
             size: [16, 16],
             render_layer: 0,
             visible: true,
+            has_shadow: true,
             static_object: Some(toki_core::entity::StaticObjectRenderDef {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),

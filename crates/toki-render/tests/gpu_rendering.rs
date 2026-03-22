@@ -116,6 +116,7 @@ fn build_scene_data(visible_chunks: Vec<(u32, u32)>) -> SceneData {
             texture_path: None,
             flip_x: false,
         }],
+        underlay_shapes: vec![],
         debug_shapes: vec![
             DebugShape {
                 shape_type: DebugShapeType::Rectangle,

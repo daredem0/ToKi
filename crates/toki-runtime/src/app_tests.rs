@@ -45,6 +45,7 @@ fn write_player_definition(project_path: &std::path::Path, name: &str) {
             size: [16, 16],
             render_layer: 1,
             visible: true,
+            has_shadow: true,
             static_object: None,
         },
         attributes: AttributesDef {

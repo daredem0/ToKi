@@ -319,6 +319,44 @@ impl RenderingSystem {
         }
     }
 
+    pub fn clear_world_underlay_shapes(&mut self) {
+        if let Some(backend) = &mut self.backend {
+            backend.clear_world_underlay_shapes();
+        }
+    }
+
+    pub fn add_world_underlay_rect(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        color: [f32; 4],
+    ) {
+        if let Some(backend) = &mut self.backend {
+            backend.add_world_underlay_rect(x, y, width, height, color);
+        }
+    }
+
+    pub fn add_filled_world_underlay_rect(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        color: [f32; 4],
+    ) {
+        if let Some(backend) = &mut self.backend {
+            backend.add_filled_world_underlay_rect(x, y, width, height, color);
+        }
+    }
+
+    pub fn finalize_world_underlay_shapes(&mut self) {
+        if let Some(backend) = &mut self.backend {
+            backend.finalize_world_underlay_shapes();
+        }
+    }
+
     pub fn render_ui_composition(&mut self, composition: &UiComposition) {
         for block in &composition.blocks {
             if let Some(fill) = block.fill_color {

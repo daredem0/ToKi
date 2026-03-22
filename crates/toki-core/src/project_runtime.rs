@@ -102,6 +102,8 @@ impl Default for RuntimeAudioMixSettings {
 pub struct RuntimeDisplaySettings {
     #[serde(default)]
     pub show_entity_health_bars: bool,
+    #[serde(default = "default_show_ground_shadows")]
+    pub show_ground_shadows: bool,
     /// Viewport width in pixels (defaults to preset resolution)
     #[serde(default = "default_resolution_width")]
     pub resolution_width: u32,
@@ -126,6 +128,7 @@ impl Default for RuntimeDisplaySettings {
     fn default() -> Self {
         Self {
             show_entity_health_bars: false,
+            show_ground_shadows: default_show_ground_shadows(),
             resolution_width: default_resolution_width(),
             resolution_height: default_resolution_height(),
             zoom_percent: default_zoom_percent(),
@@ -207,6 +210,8 @@ pub struct RuntimeConfigDisplay {
     #[serde(default)]
     pub show_entity_health_bars: Option<bool>,
     #[serde(default)]
+    pub show_ground_shadows: Option<bool>,
+    #[serde(default)]
     pub resolution_width: Option<u32>,
     #[serde(default)]
     pub resolution_height: Option<u32>,
@@ -226,6 +231,10 @@ pub const fn default_runtime_splash_duration_ms() -> u64 {
 
 pub const fn default_runtime_audio_mix_percent() -> u8 {
     100
+}
+
+pub const fn default_show_ground_shadows() -> bool {
+    true
 }
 
 /// Default zoom level (100 = 1.0x, no zoom)

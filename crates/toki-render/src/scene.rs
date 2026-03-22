@@ -14,6 +14,7 @@ pub struct SceneData {
     pub texture_size: glam::UVec2,
     pub visible_chunks: Vec<(u32, u32)>,
     pub sprites: Vec<SpriteInstance>,
+    pub underlay_shapes: Vec<OverlayShape>,
     pub debug_shapes: Vec<DebugShape>,
     pub overlay_shapes: Vec<OverlayShape>,
 }
@@ -68,6 +69,7 @@ impl Default for SceneData {
             texture_size: glam::UVec2::new(256, 256),
             visible_chunks: Vec::new(),
             sprites: Vec::new(),
+            underlay_shapes: Vec::new(),
             debug_shapes: Vec::new(),
             overlay_shapes: Vec::new(),
         }
@@ -81,6 +83,7 @@ pub struct SceneRenderer {
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
     sprite_pipelines_by_texture: BTreeMap<std::path::PathBuf, SpritePipeline>,
+    underlay_pipeline: DebugPipeline,
     debug_pipeline: DebugPipeline,
     current_sprite_texture_path: Option<std::path::PathBuf>, // Cache current sprite texture
     current_projection: glam::Mat4,
@@ -124,6 +127,7 @@ impl SceneRenderer {
             )
         };
 
+        let underlay_pipeline = DebugPipeline::new(&device, surface_format);
         let debug_pipeline = DebugPipeline::new(&device, surface_format);
 
         tracing::info!("SceneRenderer created successfully");
@@ -134,6 +138,7 @@ impl SceneRenderer {
             tilemap_pipeline,
             sprite_pipeline,
             sprite_pipelines_by_texture: BTreeMap::new(),
+            underlay_pipeline,
             debug_pipeline,
             current_sprite_texture_path: sprite_texture_cache,
             current_projection: glam::Mat4::IDENTITY,
@@ -252,11 +257,11 @@ impl SceneRenderer {
         }
     }
 
-    fn add_overlay_shape_batch(&mut self, shapes: &[OverlayShape]) {
+    fn add_overlay_shape_batch_to(pipeline: &mut DebugPipeline, shapes: &[OverlayShape]) {
         for shape in shapes {
             match shape.shape_type {
                 OverlayShapeType::Rectangle => {
-                    self.debug_pipeline.add_rect(
+                    pipeline.add_rect(
                         shape.position.x,
                         shape.position.y,
                         shape.size.x,
@@ -266,8 +271,7 @@ impl SceneRenderer {
                 }
                 OverlayShapeType::Circle => {}
                 OverlayShapeType::Line { end, thickness } => {
-                    self.debug_pipeline
-                        .add_line(shape.position, end, thickness, shape.color);
+                    pipeline.add_line(shape.position, end, thickness, shape.color);
                 }
             }
         }
@@ -282,9 +286,10 @@ impl SceneRenderer {
     ) -> Result<(), RenderError> {
         tracing::trace!("Starting scene render with custom projection");
         tracing::trace!(
-            "Scene data - tilemap: {}, sprites: {}, debug_shapes: {}, overlay_shapes: {}",
+            "Scene data - tilemap: {}, sprites: {}, underlay_shapes: {}, debug_shapes: {}, overlay_shapes: {}",
             scene_data.tilemap.is_some(),
             scene_data.sprites.len(),
+            scene_data.underlay_shapes.len(),
             scene_data.debug_shapes.len(),
             scene_data.overlay_shapes.len()
         );
@@ -335,13 +340,17 @@ impl SceneRenderer {
 
         // Add debug shapes
         tracing::trace!(
-            "Adding {} debug shapes and {} overlay shapes to pipeline",
+            "Adding {} underlay shapes, {} debug shapes and {} overlay shapes to pipeline",
+            scene_data.underlay_shapes.len(),
             scene_data.debug_shapes.len(),
             scene_data.overlay_shapes.len()
         );
+        self.underlay_pipeline.clear();
+        Self::add_overlay_shape_batch_to(&mut self.underlay_pipeline, &scene_data.underlay_shapes);
+        self.underlay_pipeline.update_vertices(&self.device);
         self.debug_pipeline.clear();
         self.add_debug_shape_batch(&scene_data.debug_shapes);
-        self.add_overlay_shape_batch(&scene_data.overlay_shapes);
+        Self::add_overlay_shape_batch_to(&mut self.debug_pipeline, &scene_data.overlay_shapes);
 
         // Finalize debug shapes
         tracing::trace!("Finalizing debug shapes");
@@ -378,6 +387,8 @@ impl SceneRenderer {
             // Same pipeline calls for both runtime and editor!
             tracing::trace!("Rendering tilemap pipeline");
             self.tilemap_pipeline.render(&mut render_pass);
+            tracing::trace!("Rendering underlay pipeline");
+            self.underlay_pipeline.render(&mut render_pass);
             tracing::trace!("Rendering sprite pipeline");
             self.sprite_pipeline.render(&mut render_pass);
             for pipeline in self.sprite_pipelines_by_texture.values() {
@@ -403,9 +414,10 @@ impl SceneRenderer {
     ) -> Result<(), RenderError> {
         tracing::trace!("Starting scene render");
         tracing::trace!(
-            "Scene data - tilemap: {}, sprites: {}, debug_shapes: {}, overlay_shapes: {}",
+            "Scene data - tilemap: {}, sprites: {}, underlay_shapes: {}, debug_shapes: {}, overlay_shapes: {}",
             scene_data.tilemap.is_some(),
             scene_data.sprites.len(),
+            scene_data.underlay_shapes.len(),
             scene_data.debug_shapes.len(),
             scene_data.overlay_shapes.len()
         );
@@ -459,13 +471,17 @@ impl SceneRenderer {
 
         // Add debug shapes
         tracing::trace!(
-            "Adding {} debug shapes and {} overlay shapes to pipeline",
+            "Adding {} underlay shapes, {} debug shapes and {} overlay shapes to pipeline",
+            scene_data.underlay_shapes.len(),
             scene_data.debug_shapes.len(),
             scene_data.overlay_shapes.len()
         );
+        self.underlay_pipeline.clear();
+        Self::add_overlay_shape_batch_to(&mut self.underlay_pipeline, &scene_data.underlay_shapes);
+        self.underlay_pipeline.update_vertices(&self.device);
         self.debug_pipeline.clear();
         self.add_debug_shape_batch(&scene_data.debug_shapes);
-        self.add_overlay_shape_batch(&scene_data.overlay_shapes);
+        Self::add_overlay_shape_batch_to(&mut self.debug_pipeline, &scene_data.overlay_shapes);
 
         // Finalize debug shapes
         tracing::trace!("Finalizing debug shapes");
@@ -502,6 +518,8 @@ impl SceneRenderer {
             // Same pipeline calls for both runtime and editor!
             tracing::trace!("Rendering tilemap pipeline");
             self.tilemap_pipeline.render(&mut render_pass);
+            tracing::trace!("Rendering underlay pipeline");
+            self.underlay_pipeline.render(&mut render_pass);
             tracing::trace!("Rendering sprite pipeline");
             self.sprite_pipeline.render(&mut render_pass);
             for pipeline in self.sprite_pipelines_by_texture.values() {
@@ -536,6 +554,7 @@ impl SceneRenderer {
         self.tilemap_pipeline
             .update_projection(&self.queue, projection);
         self.update_sprite_projection(projection);
+        self.underlay_pipeline.update_camera(&self.queue, projection);
         self.debug_pipeline.update_camera(&self.queue, projection);
     }
 }

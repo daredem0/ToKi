@@ -35,6 +35,7 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
             speed: 2.0,
             solid: true,
             visible: true,
+            has_shadow: true,
             animation_controller: Some(controller),
             static_object_render: None,
             render_layer: 0,

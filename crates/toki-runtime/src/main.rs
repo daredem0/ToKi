@@ -182,6 +182,9 @@ fn apply_runtime_config(
         if let Some(show_entity_health_bars) = display.show_entity_health_bars {
             launch_options.display.show_entity_health_bars = show_entity_health_bars;
         }
+        if let Some(show_ground_shadows) = display.show_ground_shadows {
+            launch_options.display.show_ground_shadows = show_ground_shadows;
+        }
         if let Some(resolution_width) = display.resolution_width {
             launch_options.display.resolution_width = resolution_width;
         }
@@ -307,6 +310,7 @@ fn apply_project_runtime_settings_from_project_file_if_present(
     if should_apply_display {
         launch_options.display.show_entity_health_bars =
             metadata.runtime.display.show_entity_health_bars;
+        launch_options.display.show_ground_shadows = metadata.runtime.display.show_ground_shadows;
         launch_options.display.resolution_width = metadata.runtime.display.resolution_width;
         launch_options.display.resolution_height = metadata.runtime.display.resolution_height;
         launch_options.display.zoom_percent = metadata.runtime.display.zoom_percent;

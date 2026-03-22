@@ -26,6 +26,7 @@ pub struct GpuState {
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
     sprite_pipelines_by_texture: BTreeMap<PathBuf, SpritePipeline>,
+    world_underlay_pipeline: DebugPipeline,
     debug_pipeline: DebugPipeline,
     ui_rect_pipeline: DebugPipeline,
     ui_debug_pipeline: DebugPipeline,
@@ -139,6 +140,38 @@ impl GpuState {
         self.text_items.push(text);
     }
 
+    pub fn clear_world_underlay_shapes(&mut self) {
+        self.world_underlay_pipeline.clear();
+    }
+
+    pub fn add_world_underlay_rect(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        color: [f32; 4],
+    ) {
+        self.world_underlay_pipeline
+            .add_rect(x, y, width, height, color);
+    }
+
+    pub fn add_filled_world_underlay_rect(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        color: [f32; 4],
+    ) {
+        self.world_underlay_pipeline
+            .add_filled_rect(x, y, width, height, color);
+    }
+
+    pub fn finalize_world_underlay_shapes(&mut self) {
+        self.world_underlay_pipeline.update_vertices(&self.device);
+    }
+
     pub fn load_font_file(&mut self, path: &Path) -> Result<(), crate::RenderError> {
         self.text_renderer.load_font_file(path)
     }
@@ -209,6 +242,7 @@ impl GpuState {
         let sprite_pipeline =
             SpritePipeline::new(&device, &queue, config.format, default_texture_path());
 
+        let world_underlay_pipeline = DebugPipeline::new(&device, config.format);
         let debug_pipeline = DebugPipeline::new(&device, config.format);
         let ui_rect_pipeline = DebugPipeline::new(&device, config.format);
         let ui_debug_pipeline = DebugPipeline::new(&device, config.format);
@@ -222,6 +256,7 @@ impl GpuState {
             tilemap_pipeline,
             sprite_pipeline,
             sprite_pipelines_by_texture: BTreeMap::new(),
+            world_underlay_pipeline,
             debug_pipeline,
             ui_rect_pipeline,
             ui_debug_pipeline,
@@ -281,6 +316,7 @@ impl GpuState {
 
         let sprite_pipeline = SpritePipeline::new(&device, &queue, config.format, sprite_path);
 
+        let world_underlay_pipeline = DebugPipeline::new(&device, config.format);
         let debug_pipeline = DebugPipeline::new(&device, config.format);
         let ui_rect_pipeline = DebugPipeline::new(&device, config.format);
         let ui_debug_pipeline = DebugPipeline::new(&device, config.format);
@@ -294,6 +330,7 @@ impl GpuState {
             tilemap_pipeline,
             sprite_pipeline,
             sprite_pipelines_by_texture: BTreeMap::new(),
+            world_underlay_pipeline,
             debug_pipeline,
             ui_rect_pipeline,
             ui_debug_pipeline,
@@ -320,6 +357,7 @@ impl GpuState {
         for pipeline in self.sprite_pipelines_by_texture.values_mut() {
             pipeline.update_projection(&self.queue, mvp);
         }
+        self.world_underlay_pipeline.update_camera(&self.queue, mvp);
         self.debug_pipeline.update_camera(&self.queue, mvp);
     }
 
@@ -390,6 +428,8 @@ impl GpuState {
             if self.tilemap_render_enabled {
                 self.tilemap_pipeline.render(&mut render_pass);
             }
+
+            self.world_underlay_pipeline.render(&mut render_pass);
 
             // Render sprites on top
             self.sprite_pipeline.render(&mut render_pass);
@@ -527,6 +567,36 @@ impl crate::RenderBackend for GpuState {
 
     fn add_text_item(&mut self, text: TextItem) {
         GpuState::add_text_item(self, text);
+    }
+
+    fn clear_world_underlay_shapes(&mut self) {
+        GpuState::clear_world_underlay_shapes(self);
+    }
+
+    fn add_world_underlay_rect(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        color: [f32; 4],
+    ) {
+        GpuState::add_world_underlay_rect(self, x, y, width, height, color);
+    }
+
+    fn add_filled_world_underlay_rect(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        color: [f32; 4],
+    ) {
+        GpuState::add_filled_world_underlay_rect(self, x, y, width, height, color);
+    }
+
+    fn finalize_world_underlay_shapes(&mut self) {
+        GpuState::finalize_world_underlay_shapes(self);
     }
 
     fn clear_debug_shapes(&mut self) {

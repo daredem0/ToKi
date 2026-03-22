@@ -38,6 +38,7 @@ impl InspectorSystem {
         }
 
         changed |= ui.checkbox(&mut draft.visible, "Visible").changed();
+        changed |= ui.checkbox(&mut draft.has_shadow, "Has Shadow").changed();
         changed |= ui.checkbox(&mut draft.active, "Active").changed();
         changed |= ui.checkbox(&mut draft.solid, "Solid").changed();
         changed |= ui

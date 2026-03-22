@@ -9,6 +9,7 @@ pub struct ProjectSettingsDraft {
     pub description: String,
     pub splash_duration_ms: u64,
     pub show_entity_health_bars: bool,
+    pub show_ground_shadows: bool,
     pub resolution_width: u32,
     pub resolution_height: u32,
     pub zoom_percent: u32,
@@ -29,6 +30,7 @@ impl ProjectSettingsDraft {
             description: project.metadata.project.description.clone(),
             splash_duration_ms: project.metadata.runtime.splash.duration_ms,
             show_entity_health_bars: project.metadata.runtime.display.show_entity_health_bars,
+            show_ground_shadows: project.metadata.runtime.display.show_ground_shadows,
             resolution_width: project.metadata.runtime.display.resolution_width,
             resolution_height: project.metadata.runtime.display.resolution_height,
             zoom_percent: project.metadata.runtime.display.zoom_percent,
@@ -67,6 +69,10 @@ pub fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettin
     }
     if project.metadata.runtime.display.show_entity_health_bars != draft.show_entity_health_bars {
         project.metadata.runtime.display.show_entity_health_bars = draft.show_entity_health_bars;
+        changed = true;
+    }
+    if project.metadata.runtime.display.show_ground_shadows != draft.show_ground_shadows {
+        project.metadata.runtime.display.show_ground_shadows = draft.show_ground_shadows;
         changed = true;
     }
     if project.metadata.runtime.display.resolution_width != draft.resolution_width {
@@ -134,6 +140,7 @@ mod tests {
             description: "Updated description".to_string(),
             splash_duration_ms: 4500,
             show_entity_health_bars: true,
+            show_ground_shadows: false,
             resolution_width: 320,
             resolution_height: 240,
             zoom_percent: 200,
@@ -154,6 +161,7 @@ mod tests {
         assert_eq!(project.metadata.project.description, "Updated description");
         assert_eq!(project.metadata.runtime.splash.duration_ms, 4500);
         assert!(project.metadata.runtime.display.show_entity_health_bars);
+        assert!(!project.metadata.runtime.display.show_ground_shadows);
         assert_eq!(project.metadata.runtime.audio.master_percent, 85);
         assert_eq!(project.metadata.runtime.audio.music_percent, 70);
         assert_eq!(project.metadata.runtime.audio.movement_percent, 55);

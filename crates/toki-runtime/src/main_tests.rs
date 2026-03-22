@@ -140,6 +140,7 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
             }),
             display: Some(RuntimeConfigDisplay {
                 show_entity_health_bars: Some(true),
+                show_ground_shadows: Some(false),
                 resolution_width: None,
                 resolution_height: None,
                 zoom_percent: None,
@@ -161,6 +162,7 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
     assert_eq!(options.audio_mix.movement_percent, 45);
     assert_eq!(options.audio_mix.collision_percent, 25);
     assert!(options.display.show_entity_health_bars);
+    assert!(!options.display.show_ground_shadows);
     assert_eq!(options.menu, configured_menu);
 }
 
@@ -201,6 +203,7 @@ fn apply_runtime_config_keeps_existing_paths_and_scene_but_updates_splash_durati
             }),
             display: Some(RuntimeConfigDisplay {
                 show_entity_health_bars: Some(true),
+                show_ground_shadows: Some(false),
                 resolution_width: None,
                 resolution_height: None,
                 zoom_percent: None,
@@ -229,6 +232,7 @@ fn apply_runtime_config_keeps_existing_paths_and_scene_but_updates_splash_durati
     assert_eq!(options.audio_mix.movement_percent, 60);
     assert_eq!(options.audio_mix.collision_percent, 40);
     assert!(options.display.show_entity_health_bars);
+    assert!(!options.display.show_ground_shadows);
     assert_eq!(options.menu.pause_root_screen_id, "override");
 }
 
@@ -379,6 +383,7 @@ collision_percent = 31
 
 [runtime.display]
 show_entity_health_bars = true
+show_ground_shadows = false
 
 [runtime.menu]
 pause_root_screen_id = "custom_pause"
@@ -409,6 +414,7 @@ kind = "close_menu"
     assert_eq!(updated.audio_mix.movement_percent, 58);
     assert_eq!(updated.audio_mix.collision_percent, 31);
     assert!(updated.display.show_entity_health_bars);
+    assert!(!updated.display.show_ground_shadows);
     assert_eq!(updated.menu.pause_root_screen_id, "custom_pause");
     assert!(!updated.menu.gate_gameplay_when_open);
     assert_eq!(updated.menu.screens.len(), 1);
@@ -433,6 +439,7 @@ fn apply_project_runtime_settings_do_not_override_existing_launch_audio_mix() {
         },
         display: RuntimeDisplayOptions {
             show_entity_health_bars: false,
+            show_ground_shadows: true,
             resolution_width: 160,
             resolution_height: 144,
             zoom_percent: 100,
@@ -456,5 +463,6 @@ fn apply_project_runtime_settings_do_not_override_existing_launch_audio_mix() {
     assert_eq!(updated.audio_mix.movement_percent, 80);
     assert_eq!(updated.audio_mix.collision_percent, 70);
     assert!(updated.display.show_entity_health_bars);
+    assert!(updated.display.show_ground_shadows);
     assert_eq!(updated.menu.pause_root_screen_id, "cli_pause");
 }

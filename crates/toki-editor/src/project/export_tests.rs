@@ -55,6 +55,7 @@ fn export_hybrid_bundle_writes_runtime_and_pak_manifest() {
     project.metadata.runtime.audio.movement_percent = 40;
     project.metadata.runtime.audio.collision_percent = 25;
     project.metadata.runtime.display.show_entity_health_bars = true;
+    project.metadata.runtime.display.show_ground_shadows = false;
     let export_root = parent.join("exports");
     fs::create_dir_all(&export_root).expect("exports dir");
 
@@ -203,6 +204,13 @@ fn export_hybrid_bundle_writes_runtime_and_pak_manifest() {
             .as_ref()
             .and_then(|display| display.show_entity_health_bars),
         Some(true)
+    );
+    assert_eq!(
+        runtime_config
+            .display
+            .as_ref()
+            .and_then(|display| display.show_ground_shadows),
+        Some(false)
     );
     assert_eq!(
         runtime_config

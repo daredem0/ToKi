@@ -33,6 +33,7 @@ recent_files = []
     assert_eq!(metadata.runtime.audio.movement_percent, 100);
     assert_eq!(metadata.runtime.audio.collision_percent, 100);
     assert!(!metadata.runtime.display.show_entity_health_bars);
+    assert!(metadata.runtime.display.show_ground_shadows);
 }
 
 #[test]
@@ -44,6 +45,7 @@ fn runtime_settings_default_to_community_splash_duration() {
     assert_eq!(runtime.audio.movement_percent, 100);
     assert_eq!(runtime.audio.collision_percent, 100);
     assert!(!runtime.display.show_entity_health_bars);
+    assert!(runtime.display.show_ground_shadows);
     assert_eq!(runtime.menu.pause_root_screen_id, "pause_menu");
     assert!(runtime.menu.gate_gameplay_when_open);
     assert_eq!(runtime.menu.screens.len(), 2);
@@ -76,6 +78,7 @@ collision_percent = 40
 
 [runtime.display]
 show_entity_health_bars = true
+show_ground_shadows = false
 
 [runtime.menu]
 pause_root_screen_id = "pause_menu"
@@ -100,6 +103,7 @@ kind = "close_menu"
     assert_eq!(metadata.runtime.audio.movement_percent, 55);
     assert_eq!(metadata.runtime.audio.collision_percent, 40);
     assert!(metadata.runtime.display.show_entity_health_bars);
+    assert!(!metadata.runtime.display.show_ground_shadows);
     assert_eq!(metadata.runtime.menu.pause_root_screen_id, "pause_menu");
     assert_eq!(metadata.runtime.menu.screens.len(), 1);
 }
