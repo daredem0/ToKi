@@ -9,8 +9,8 @@ use super::canvas::invalidate_canvas_texture;
 pub fn handle_tool_interaction(
     ui_state: &mut EditorUI,
     response: &egui::Response,
-    _rect: egui::Rect,
-    _ctx: &egui::Context,
+    rect: egui::Rect,
+    ctx: &egui::Context,
 ) {
     let Some(canvas_pos) = ui_state.sprite.active().cursor_canvas_pos else {
         return;
@@ -23,7 +23,7 @@ pub fn handle_tool_interaction(
         SpriteEditorTool::Fill => handle_fill_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Eyedropper => handle_eyedropper_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Line => handle_line_tool(ui_state, response, canvas_pos),
-        SpriteEditorTool::Select => handle_select_tool(ui_state, response, canvas_pos),
+        SpriteEditorTool::Select => handle_select_tool(ui_state, response, rect, ctx, canvas_pos),
         SpriteEditorTool::MagicWand => handle_magic_wand_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::MagicErase => handle_magic_erase_tool(ui_state, response, canvas_pos),
     }
@@ -140,8 +140,20 @@ fn handle_line_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_p
     }
 }
 
-fn handle_select_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
-    if response.drag_started_by(egui::PointerButton::Primary) {
+fn handle_select_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    rect: egui::Rect,
+    ctx: &egui::Context,
+    canvas_pos: glam::IVec2,
+) {
+    let primary_pressed_in_rect = response.hovered()
+        && ctx.input(|input| input.pointer.primary_pressed())
+        && ctx
+            .input(|input| input.pointer.interact_pos())
+            .is_some_and(|pointer_pos| rect.contains(pointer_pos));
+
+    if primary_pressed_in_rect {
         tracing::info!("Select tool: drag started at {:?}", canvas_pos);
         ui_state.sprite.active_mut().selection_start_pos = Some(canvas_pos);
         ui_state.sprite.active_mut().selection = None;
@@ -262,8 +274,8 @@ fn magic_erase_bounds(
 fn create_selection(start: glam::IVec2, end: glam::IVec2) -> SpriteSelection {
     let x = start.x.min(end.x).max(0) as u32;
     let y = start.y.min(end.y).max(0) as u32;
-    let w = (start.x - end.x).unsigned_abs();
-    let h = (start.y - end.y).unsigned_abs();
+    let w = (start.x - end.x).unsigned_abs() + 1;
+    let h = (start.y - end.y).unsigned_abs() + 1;
     SpriteSelection::new(x, y, w, h)
 }
 
@@ -323,5 +335,31 @@ pub fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
     }
     if ui.input(|i| i.key_pressed(egui::Key::CloseBracket)) {
         ui_state.sprite.brush_size = (ui_state.sprite.brush_size + 1).min(32);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_selection_includes_both_start_and_end_pixels() {
+        let selection = create_selection(glam::IVec2::new(2, 3), glam::IVec2::new(5, 7));
+
+        assert_eq!(selection, SpriteSelection::new(2, 3, 4, 5));
+    }
+
+    #[test]
+    fn create_selection_is_inclusive_when_dragging_backwards() {
+        let selection = create_selection(glam::IVec2::new(5, 7), glam::IVec2::new(2, 3));
+
+        assert_eq!(selection, SpriteSelection::new(2, 3, 4, 5));
+    }
+
+    #[test]
+    fn create_selection_single_click_selects_one_pixel() {
+        let selection = create_selection(glam::IVec2::new(4, 6), glam::IVec2::new(4, 6));
+
+        assert_eq!(selection, SpriteSelection::new(4, 6, 1, 1));
     }
 }
