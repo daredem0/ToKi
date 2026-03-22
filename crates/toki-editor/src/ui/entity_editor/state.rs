@@ -37,6 +37,7 @@ pub struct EntityEditorState {
 }
 
 impl EntityEditorState {
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn new() -> Self {
         Self {
             browser_panel_width: 220.0,
@@ -60,7 +61,7 @@ impl EntityEditorState {
         self.entities.iter().find(|e| &e.name == name)
     }
 
-    /// Select an entity by name
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn select_entity(&mut self, name: &str) {
         if self.entities.iter().any(|e| e.name == name) {
             self.selected_entity = Some(name.to_string());
@@ -72,22 +73,6 @@ impl EntityEditorState {
         let name = def.name.clone();
         self.selected_entity = Some(name);
         self.edit_state = Some(EntityEditState::from_definition(def, file_path));
-    }
-
-    /// Clear the current edit state
-    pub fn clear_edit_state(&mut self) {
-        self.edit_state = None;
-    }
-
-    /// Clear selection
-    pub fn clear_selection(&mut self) {
-        self.selected_entity = None;
-        self.edit_state = None;
-    }
-
-    /// Get mutable reference to the edit state
-    pub fn edit_state_mut(&mut self) -> Option<&mut EntityEditState> {
-        self.edit_state.as_mut()
     }
 
     /// Get filtered entities based on current filter state
@@ -143,7 +128,13 @@ impl EntityEditorState {
         }
     }
 
-    /// Clear all state (when project changes)
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn clear_selection(&mut self) {
+        self.selected_entity = None;
+        self.edit_state = None;
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn clear(&mut self) {
         self.entities.clear();
         self.selected_entity = None;
@@ -154,4 +145,5 @@ impl EntityEditorState {
         self.entities_dir = None;
         self.needs_refresh = false;
     }
+
 }

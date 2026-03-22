@@ -109,7 +109,7 @@ impl EntityEditState {
         self.mark_dirty();
     }
 
-    /// Toggle collision component on/off
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn toggle_collision(&mut self) {
         self.toggles.collision_enabled = !self.toggles.collision_enabled;
         self.definition.collision.enabled = self.toggles.collision_enabled;
@@ -197,7 +197,7 @@ impl EntityEditState {
         }
     }
 
-    /// Check if a specific field has a validation error
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn has_error(&self, field: &str) -> bool {
         self.validation_errors.contains_key(field)
     }

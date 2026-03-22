@@ -20,6 +20,7 @@ pub struct NewEntityDialogState {
 }
 
 impl NewEntityDialogState {
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn new() -> Self {
         Self::default()
     }

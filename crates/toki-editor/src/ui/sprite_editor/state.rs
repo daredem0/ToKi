@@ -124,9 +124,3 @@ impl Default for SpriteEditorState {
         }
     }
 }
-
-impl SpriteEditorState {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}

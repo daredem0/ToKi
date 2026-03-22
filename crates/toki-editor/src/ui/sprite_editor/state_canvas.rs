@@ -63,6 +63,12 @@ impl SpriteEditorState {
         cs.original_cell_names = None;
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn close_canvas(&mut self) {
+        let cs = self.active_mut();
+        *cs = CanvasState::default();
+    }
+
     /// Create a new canvas filled with a color on the active canvas
     #[allow(dead_code)]
     pub fn new_canvas_filled(&mut self, width: u32, height: u32, color: PixelColor) {
@@ -152,28 +158,6 @@ impl SpriteEditorState {
         cs.cell_size = glam::UVec2::new(cell_width, cell_height);
         cs.show_cell_grid = true;
         cs.selected_cell = None;
-        cs.original_cell_names = None;
-    }
-
-    /// Mark the active canvas as dirty
-    pub fn mark_dirty(&mut self) {
-        self.active_mut().dirty = true;
-    }
-
-    /// Clear the dirty flag on the active canvas
-    pub fn clear_dirty(&mut self) {
-        self.active_mut().dirty = false;
-    }
-
-    /// Close the active canvas
-    pub fn close_canvas(&mut self) {
-        let cs = self.active_mut();
-        cs.canvas = None;
-        cs.active_sprite = None;
-        cs.dirty = false;
-        cs.history.clear();
-        cs.selection = None;
-        cs.canvas_texture = None;
         cs.original_cell_names = None;
     }
 

@@ -1,10 +1,5 @@
 // Animation editor state for the dedicated animation editor tab
 // Provides visual animation editing with preview playback
-//
-// Note: Some methods are currently only used in tests but will be used when
-// additional UI features (atlas texture rendering, full preview) are added.
-
-#![allow(dead_code)]
 
 use super::editor_ui_animation_authoring::{AnimationAuthoringState, AuthoredClip};
 use std::path::PathBuf;
@@ -68,12 +63,6 @@ pub struct AnimationPreviewState {
 }
 
 impl AnimationPreviewState {
-    pub fn new() -> Self {
-        Self {
-            playback: ClipPlayback::new(),
-        }
-    }
-
     /// Whether the animation is currently playing
     pub fn playing(&self) -> bool {
         self.playback.playing
@@ -94,29 +83,9 @@ impl AnimationPreviewState {
         self.playback.speed = speed;
     }
 
-    /// Whether playback has finished (for "once" mode)
-    pub fn is_finished(&self) -> bool {
-        self.playback.is_finished
-    }
-
-    /// Start playback
-    pub fn play(&mut self) {
-        self.playback.play();
-    }
-
-    /// Pause playback
-    pub fn pause(&mut self) {
-        self.playback.pause();
-    }
-
     /// Toggle play/pause
     pub fn toggle_playback(&mut self) {
         self.playback.toggle();
-    }
-
-    /// Reset to first frame
-    pub fn reset(&mut self) {
-        self.playback.reset();
     }
 
     /// Stop playback and reset
@@ -200,14 +169,9 @@ pub struct AnimationEditorState {
     pub preview_zoom: f32,
     /// Show grid overlay on preview
     pub show_grid: bool,
-    /// Dialog flags
-    pub show_load_dialog: bool,
     pub show_new_clip_dialog: bool,
     /// New clip state name input
     pub new_clip_state_input: String,
-    /// Discovered entity definitions for load dialog
-    pub discovered_entities: Vec<String>,
-
     // Panel layout sizes (draggable dividers)
     /// Width of the clip list panel (left)
     pub clip_list_width: f32,
@@ -260,10 +224,8 @@ impl Default for AnimationEditorState {
             atlas_viewport: AtlasViewport::default(),
             preview_zoom: 2.0,
             show_grid: true,
-            show_load_dialog: false,
             show_new_clip_dialog: false,
             new_clip_state_input: String::new(),
-            discovered_entities: Vec::new(),
             clip_list_width: 180.0,
             frame_sequence_width: 200.0,
             preview_height: 180.0,
@@ -273,10 +235,6 @@ impl Default for AnimationEditorState {
 }
 
 impl AnimationEditorState {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Load an entity definition for editing
     pub fn load_entity(
         &mut self,
@@ -287,15 +245,6 @@ impl AnimationEditorState {
         self.active_entity = Some(entity_name.to_string());
         self.entity_file_path = Some(file_path);
         self.authoring = authoring;
-        self.preview.stop();
-        self.clear_atlas_cache();
-    }
-
-    /// Unload the current entity
-    pub fn unload(&mut self) {
-        self.active_entity = None;
-        self.entity_file_path = None;
-        self.authoring = AnimationAuthoringState::default();
         self.preview.stop();
         self.clear_atlas_cache();
     }
@@ -329,13 +278,6 @@ impl AnimationEditorState {
     pub fn is_playing(&self) -> bool {
         self.preview.playing()
     }
-
-    /// Get current frame position in atlas
-    pub fn current_frame_position(&self) -> Option<[u32; 2]> {
-        let clip = self.selected_clip()?;
-        let frame = clip.frames.get(self.preview.current_frame())?;
-        Some(frame.position)
-    }
 }
 
 #[cfg(test)]
@@ -346,30 +288,30 @@ mod tests {
 
     #[test]
     fn preview_state_defaults_to_paused() {
-        let state = AnimationPreviewState::new();
+        let state = AnimationPreviewState::default();
         assert!(!state.playing());
         assert_eq!(state.current_frame(), 0);
         assert_eq!(state.speed(), 1.0);
     }
 
     #[test]
-    fn preview_play_starts_playback() {
-        let mut state = AnimationPreviewState::new();
-        state.play();
+    fn preview_toggle_starts_playback() {
+        let mut state = AnimationPreviewState::default();
+        state.toggle_playback();
         assert!(state.playing());
     }
 
     #[test]
-    fn preview_pause_stops_playback() {
-        let mut state = AnimationPreviewState::new();
-        state.play();
-        state.pause();
+    fn preview_toggle_stops_playback() {
+        let mut state = AnimationPreviewState::default();
+        state.toggle_playback();
+        state.toggle_playback();
         assert!(!state.playing());
     }
 
     #[test]
     fn preview_toggle_flips_playback() {
-        let mut state = AnimationPreviewState::new();
+        let mut state = AnimationPreviewState::default();
         assert!(!state.playing());
         state.toggle_playback();
         assert!(state.playing());
@@ -379,8 +321,8 @@ mod tests {
 
     #[test]
     fn preview_stop_resets_state() {
-        let mut state = AnimationPreviewState::new();
-        state.play();
+        let mut state = AnimationPreviewState::default();
+        state.toggle_playback();
         // Use go_to_frame to set position
         state.go_to_frame(5, 10);
         state.stop();
@@ -390,14 +332,14 @@ mod tests {
 
     #[test]
     fn preview_go_to_frame_sets_frame() {
-        let mut state = AnimationPreviewState::new();
+        let mut state = AnimationPreviewState::default();
         state.go_to_frame(3, 5);
         assert_eq!(state.current_frame(), 3);
     }
 
     #[test]
     fn preview_step_forward_wraps() {
-        let mut state = AnimationPreviewState::new();
+        let mut state = AnimationPreviewState::default();
         state.go_to_frame(2, 3);
         state.step_forward(3); // 3 frames total
         assert_eq!(state.current_frame(), 0); // wraps to 0
@@ -405,15 +347,15 @@ mod tests {
 
     #[test]
     fn preview_step_backward_wraps() {
-        let mut state = AnimationPreviewState::new();
+        let mut state = AnimationPreviewState::default();
         state.step_backward(3); // 3 frames total
         assert_eq!(state.current_frame(), 2); // wraps to last frame
     }
 
     #[test]
     fn preview_update_advances_frame_when_time_exceeds_duration() {
-        let mut state = AnimationPreviewState::new();
-        state.play();
+        let mut state = AnimationPreviewState::default();
+        state.toggle_playback();
 
         let mut clip = AuthoredClip::new("test");
         clip.add_frame(0, 0);
@@ -433,8 +375,8 @@ mod tests {
 
     #[test]
     fn preview_update_respects_loop_mode_once() {
-        let mut state = AnimationPreviewState::new();
-        state.play();
+        let mut state = AnimationPreviewState::default();
+        state.toggle_playback();
 
         let mut clip = AuthoredClip::new("test");
         clip.add_frame(0, 0);
@@ -444,7 +386,7 @@ mod tests {
 
         // Start at last frame
         state.go_to_frame(1, 2);
-        state.play(); // Re-play after go_to_frame
+        state.toggle_playback(); // Re-enable playback after go_to_frame
         state.update(0.2, &clip); // Should stop at last frame
 
         assert!(!state.playing()); // Playback should stop
@@ -453,8 +395,8 @@ mod tests {
 
     #[test]
     fn preview_update_loops_in_loop_mode() {
-        let mut state = AnimationPreviewState::new();
-        state.play();
+        let mut state = AnimationPreviewState::default();
+        state.toggle_playback();
 
         let mut clip = AuthoredClip::new("test");
         clip.add_frame(0, 0);
@@ -464,8 +406,7 @@ mod tests {
 
         // Start at last frame
         state.go_to_frame(1, 2);
-        state.play(); // Re-play after go_to_frame
-                      // 150ms: frame 1 completes (100ms), loops to frame 0, 50ms remaining
+        // 150ms: frame 1 completes (100ms), loops to frame 0, 50ms remaining
         state.update(0.15, &clip);
 
         assert!(state.playing());
@@ -474,8 +415,8 @@ mod tests {
 
     #[test]
     fn preview_update_applies_speed_multiplier() {
-        let mut state = AnimationPreviewState::new();
-        state.play();
+        let mut state = AnimationPreviewState::default();
+        state.toggle_playback();
         state.set_speed(2.0); // Double speed
 
         let mut clip = AuthoredClip::new("test");
@@ -491,8 +432,8 @@ mod tests {
 
     #[test]
     fn preview_ping_pong_mode_works() {
-        let mut state = AnimationPreviewState::new();
-        state.play();
+        let mut state = AnimationPreviewState::default();
+        state.toggle_playback();
 
         let mut clip = AuthoredClip::new("test");
         clip.add_frame(0, 0);
@@ -512,7 +453,7 @@ mod tests {
 
     #[test]
     fn editor_state_defaults() {
-        let state = AnimationEditorState::new();
+        let state = AnimationEditorState::default();
         assert!(state.active_entity.is_none());
         assert!(!state.has_entity());
         assert_eq!(state.preview_zoom, 2.0);
@@ -521,8 +462,8 @@ mod tests {
 
     #[test]
     fn editor_load_entity() {
-        let mut state = AnimationEditorState::new();
-        let authoring = AnimationAuthoringState::new();
+        let mut state = AnimationEditorState::default();
+        let authoring = AnimationAuthoringState::default();
 
         state.load_entity("test_entity", PathBuf::from("/test/path"), authoring);
 
@@ -532,21 +473,8 @@ mod tests {
     }
 
     #[test]
-    fn editor_unload_clears_state() {
-        let mut state = AnimationEditorState::new();
-        let authoring = AnimationAuthoringState::new();
-        state.load_entity("test", PathBuf::from("/test"), authoring);
-
-        state.unload();
-
-        assert!(!state.has_entity());
-        assert!(state.active_entity.is_none());
-        assert!(state.entity_file_path.is_none());
-    }
-
-    #[test]
     fn editor_frame_count_returns_clip_frames() {
-        let mut state = AnimationEditorState::new();
+        let mut state = AnimationEditorState::default();
         state.authoring.create_clip("test");
         state.authoring.add_frame_to_selected(0, 0);
         state.authoring.add_frame_to_selected(1, 0);
@@ -556,21 +484,11 @@ mod tests {
     }
 
     #[test]
-    fn editor_current_frame_position() {
-        let mut state = AnimationEditorState::new();
-        state.authoring.create_clip("test");
-        state.authoring.add_frame_to_selected(5, 3);
-
-        let pos = state.current_frame_position();
-        assert_eq!(pos, Some([5, 3]));
-    }
-
-    #[test]
     fn editor_is_playing_reflects_preview_state() {
-        let mut state = AnimationEditorState::new();
+        let mut state = AnimationEditorState::default();
         assert!(!state.is_playing());
 
-        state.preview.play();
+        state.preview.toggle_playback();
         assert!(state.is_playing());
     }
 }

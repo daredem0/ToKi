@@ -29,36 +29,6 @@ impl EntityCategory {
         EntityCategory::Decoration,
     ];
 
-    /// Display name for the category
-    pub fn display_name(&self) -> &'static str {
-        match self {
-            EntityCategory::Npc => "NPC",
-            EntityCategory::Enemy => "Enemy",
-            EntityCategory::Item => "Item",
-            EntityCategory::Prop => "Prop",
-            EntityCategory::Player => "Player",
-            EntityCategory::Trigger => "Trigger",
-            EntityCategory::Projectile => "Projectile",
-            EntityCategory::Decoration => "Decoration",
-        }
-    }
-
-    /// Convert from string (case-insensitive)
-    pub fn from_str(s: &str) -> Option<Self> {
-        let lower = s.trim().to_ascii_lowercase();
-        match lower.as_str() {
-            "npc" => Some(EntityCategory::Npc),
-            "enemy" => Some(EntityCategory::Enemy),
-            "item" | "items" => Some(EntityCategory::Item),
-            "prop" | "props" => Some(EntityCategory::Prop),
-            "player" => Some(EntityCategory::Player),
-            "trigger" | "triggers" => Some(EntityCategory::Trigger),
-            "projectile" | "projectiles" => Some(EntityCategory::Projectile),
-            "decoration" | "decorations" => Some(EntityCategory::Decoration),
-            _ => None,
-        }
-    }
-
     /// Convert to string for serialization
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -70,6 +40,21 @@ impl EntityCategory {
             EntityCategory::Trigger => "trigger",
             EntityCategory::Projectile => "projectile",
             EntityCategory::Decoration => "decoration",
+        }
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value.to_ascii_lowercase().as_str() {
+            "npc" => Some(EntityCategory::Npc),
+            "enemy" => Some(EntityCategory::Enemy),
+            "item" | "items" => Some(EntityCategory::Item),
+            "prop" => Some(EntityCategory::Prop),
+            "player" => Some(EntityCategory::Player),
+            "trigger" => Some(EntityCategory::Trigger),
+            "projectile" => Some(EntityCategory::Projectile),
+            "decoration" => Some(EntityCategory::Decoration),
+            _ => None,
         }
     }
 }
@@ -132,6 +117,7 @@ pub struct EntityBrowserFilter {
 }
 
 impl EntityBrowserFilter {
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn new() -> Self {
         Self::default()
     }

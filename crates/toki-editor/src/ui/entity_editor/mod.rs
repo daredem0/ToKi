@@ -3,8 +3,6 @@
 //! This module provides types and state for the entity definition editor tab,
 //! including the entity browser, filter system, and component editing.
 
-#![allow(dead_code)]
-
 mod defaults;
 mod dialogs;
 mod edit_state;

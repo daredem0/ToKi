@@ -33,7 +33,7 @@ impl ComponentToggles {
         !audio.movement_sound.is_empty() || audio.collision_sound.is_some()
     }
 
-    /// Count how many components are enabled
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn enabled_count(&self) -> usize {
         [
             self.health_enabled,
@@ -48,4 +48,5 @@ impl ComponentToggles {
         .filter(|&&b| b)
         .count()
     }
+
 }

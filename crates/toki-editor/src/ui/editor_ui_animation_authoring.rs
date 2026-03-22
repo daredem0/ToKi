@@ -4,8 +4,6 @@
 // Note: Some methods are currently only used in tests but will be used when
 // additional UI features (per-frame duration controls, cell grid picker) are added.
 
-#![allow(dead_code)]
-
 use serde::{Deserialize, Serialize};
 use toki_core::animation::LoopMode;
 use toki_core::entity::{AnimationClipDef, AnimationsDef};
@@ -27,6 +25,7 @@ impl AuthoredFrame {
         }
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn with_duration(column: u32, row: u32, duration_ms: f32) -> Self {
         Self {
             position: [column, row],
@@ -72,7 +71,7 @@ impl AuthoredClip {
         self.frames.push(AuthoredFrame::new(column, row));
     }
 
-    /// Add a frame with custom duration at the end
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn add_frame_with_duration(&mut self, column: u32, row: u32, duration_ms: f32) {
         self.frames
             .push(AuthoredFrame::with_duration(column, row, duration_ms));
@@ -102,7 +101,7 @@ impl AuthoredClip {
         true
     }
 
-    /// Set per-frame duration for a specific frame
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn set_frame_duration(&mut self, index: usize, duration_ms: Option<f32>) -> bool {
         if let Some(frame) = self.frames.get_mut(index) {
             frame.duration_ms = duration_ms;
@@ -112,7 +111,7 @@ impl AuthoredClip {
         }
     }
 
-    /// Get the effective duration for a frame (per-frame override or default)
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn effective_duration(&self, index: usize) -> Option<f32> {
         self.frames
             .get(index)
@@ -146,7 +145,7 @@ impl AuthoredClip {
             .unwrap_or(self.default_duration_ms)
     }
 
-    /// Clear all per-frame duration overrides
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn clear_per_frame_durations(&mut self) {
         for frame in &mut self.frames {
             frame.duration_ms = None;
@@ -182,7 +181,7 @@ impl AuthoredClip {
         }
     }
 
-    /// Create from an AnimationClipDef (for editing existing clips)
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn from_clip_def(def: &AnimationClipDef) -> Self {
         Self::from_clip_def_with_tile_lookup(def, None)
     }
@@ -260,11 +259,12 @@ pub struct AnimationAuthoringState {
 }
 
 impl AnimationAuthoringState {
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Load from an AnimationsDef (for editing existing entity animations)
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn from_animations_def(def: &AnimationsDef) -> Self {
         Self::from_animations_def_with_tile_lookup(def, None)
     }
@@ -391,7 +391,7 @@ impl AnimationAuthoringState {
         false
     }
 
-    /// Select the next frame in the sequence
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn select_next_frame(&mut self) -> bool {
         let Some(clip_idx) = self.selected_clip_index else {
             return false;
@@ -410,7 +410,7 @@ impl AnimationAuthoringState {
         true
     }
 
-    /// Select the previous frame in the sequence
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn select_prev_frame(&mut self) -> bool {
         let Some(clip_idx) = self.selected_clip_index else {
             return false;
@@ -429,7 +429,7 @@ impl AnimationAuthoringState {
         true
     }
 
-    /// Move the selected frame up (earlier in sequence)
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn move_selected_frame_up(&mut self) -> bool {
         let (clip_idx, frame_idx) = match (self.selected_clip_index, self.selected_frame_index) {
             (Some(c), Some(f)) if f > 0 => (c, f),
@@ -446,7 +446,7 @@ impl AnimationAuthoringState {
         false
     }
 
-    /// Move the selected frame down (later in sequence)
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn move_selected_frame_down(&mut self) -> bool {
         let (clip_idx, frame_idx) = match (self.selected_clip_index, self.selected_frame_index) {
             (Some(c), Some(f)) => (c, f),

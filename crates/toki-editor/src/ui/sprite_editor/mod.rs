@@ -3,8 +3,6 @@
 //! This module provides all the types and state needed for pixel-level sprite editing,
 //! including dual canvas support for side-by-side editing.
 
-#![allow(dead_code)]
-
 mod canvas;
 mod dual_canvas;
 mod history;
