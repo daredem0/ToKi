@@ -146,6 +146,18 @@ pub fn render_canvas_viewport(
         }
     }
 
+    // Draw hovered pixel highlight
+    let canvas_state = ui_state.sprite.canvas_state(render_side);
+    if let Some(canvas) = &canvas_state.canvas {
+        draw_hovered_pixel_highlight(
+            &painter,
+            rect,
+            &canvas_state.viewport,
+            canvas,
+            canvas_state.cursor_canvas_pos,
+        );
+    }
+
     // Draw selection rectangle
     let canvas_state = ui_state.sprite.canvas_state(render_side);
     if let Some(selection) = &canvas_state.selection {
@@ -465,6 +477,50 @@ fn draw_selection_rect(
     painter.rect_stroke(sel_rect, 0.0, stroke, egui::StrokeKind::Outside);
 }
 
+fn hovered_pixel_screen_rect(
+    rect: egui::Rect,
+    viewport: &SpriteCanvasViewport,
+    canvas: &SpriteCanvas,
+    cursor_canvas_pos: Option<glam::IVec2>,
+) -> Option<egui::Rect> {
+    let pos = cursor_canvas_pos?;
+    if pos.x < 0 || pos.y < 0 || pos.x >= canvas.width as i32 || pos.y >= canvas.height as i32 {
+        return None;
+    }
+
+    let zoom = viewport.zoom;
+    let pan = viewport.pan;
+    let min = egui::pos2(
+        rect.left() + (pos.x as f32 - pan.x) * zoom,
+        rect.top() + (pos.y as f32 - pan.y) * zoom,
+    );
+    let pixel_rect = egui::Rect::from_min_size(min, egui::vec2(zoom, zoom));
+    let clipped = pixel_rect.intersect(rect);
+    if clipped.is_positive() {
+        Some(clipped)
+    } else {
+        None
+    }
+}
+
+fn draw_hovered_pixel_highlight(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    viewport: &SpriteCanvasViewport,
+    canvas: &SpriteCanvas,
+    cursor_canvas_pos: Option<glam::IVec2>,
+) {
+    let Some(pixel_rect) = hovered_pixel_screen_rect(rect, viewport, canvas, cursor_canvas_pos)
+    else {
+        return;
+    };
+
+    let fill = egui::Color32::from_rgba_unmultiplied(90, 160, 255, 70);
+    let stroke = egui::Stroke::new(1.0, egui::Color32::from_rgba_unmultiplied(120, 190, 255, 220));
+    painter.rect_filled(pixel_rect, 0.0, fill);
+    painter.rect_stroke(pixel_rect, 0.0, stroke, egui::StrokeKind::Inside);
+}
+
 fn render_status_bar(ui: &mut egui::Ui, ui_state: &EditorUI) {
     ui.horizontal(|ui| {
         if let Some(pos) = ui_state.sprite.active().cursor_canvas_pos {
@@ -492,4 +548,38 @@ fn render_status_bar(ui: &mut egui::Ui, ui_state: &EditorUI) {
             ui.label("*Modified");
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hovered_pixel_screen_rect_returns_none_for_out_of_bounds_cursor() {
+        let rect = egui::Rect::from_min_size(egui::pos2(10.0, 20.0), egui::vec2(100.0, 100.0));
+        let viewport = SpriteCanvasViewport::default();
+        let canvas = SpriteCanvas::new(8, 8);
+
+        assert!(hovered_pixel_screen_rect(rect, &viewport, &canvas, Some(glam::IVec2::new(-1, 0))).is_none());
+        assert!(hovered_pixel_screen_rect(rect, &viewport, &canvas, Some(glam::IVec2::new(8, 0))).is_none());
+        assert!(hovered_pixel_screen_rect(rect, &viewport, &canvas, None).is_none());
+    }
+
+    #[test]
+    fn hovered_pixel_screen_rect_maps_canvas_pixel_to_screen_rect() {
+        let rect = egui::Rect::from_min_size(egui::pos2(10.0, 20.0), egui::vec2(200.0, 200.0));
+        let viewport = SpriteCanvasViewport {
+            zoom: 4.0,
+            pan: glam::Vec2::new(1.0, 2.0),
+            ..Default::default()
+        };
+        let canvas = SpriteCanvas::new(8, 8);
+
+        let pixel_rect =
+            hovered_pixel_screen_rect(rect, &viewport, &canvas, Some(glam::IVec2::new(3, 5)))
+                .unwrap();
+
+        assert_eq!(pixel_rect.min, egui::pos2(18.0, 32.0));
+        assert_eq!(pixel_rect.max, egui::pos2(22.0, 36.0));
+    }
 }
