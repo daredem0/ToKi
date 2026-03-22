@@ -25,6 +25,7 @@ pub fn handle_tool_interaction(
         SpriteEditorTool::Line => handle_line_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Select => handle_select_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::MagicWand => handle_magic_wand_tool(ui_state, response, canvas_pos),
+        SpriteEditorTool::MagicErase => handle_magic_erase_tool(ui_state, response, canvas_pos),
     }
 }
 
@@ -211,6 +212,53 @@ fn handle_magic_wand_tool(
     }
 }
 
+fn handle_magic_erase_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    canvas_pos: glam::IVec2,
+) {
+    if !response.clicked() {
+        return;
+    }
+
+    let Some(bounds) = magic_erase_bounds(ui_state, canvas_pos) else {
+        return;
+    };
+
+    start_paint_stroke(ui_state);
+    if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
+        if SpritePaintInteraction::erase_connected_color_in_bounds(canvas, canvas_pos, bounds) {
+            ui_state.sprite.active_mut().dirty = true;
+            invalidate_canvas_texture(ui_state);
+        }
+    }
+    finish_paint_stroke(ui_state);
+}
+
+fn magic_erase_bounds(
+    ui_state: &EditorUI,
+    canvas_pos: glam::IVec2,
+) -> Option<(glam::UVec2, glam::UVec2)> {
+    if canvas_pos.x < 0 || canvas_pos.y < 0 {
+        return None;
+    }
+
+    let x = canvas_pos.x as u32;
+    let y = canvas_pos.y as u32;
+
+    if ui_state.sprite.is_sheet() {
+        let cell_idx = ui_state.sprite.cell_at_position(x, y)?;
+        let (start_x, start_y, end_x, end_y) = ui_state.sprite.cell_bounds(cell_idx)?;
+        return Some((
+            glam::UVec2::new(start_x, start_y),
+            glam::UVec2::new(end_x, end_y),
+        ));
+    }
+
+    let (width, height) = ui_state.sprite.canvas_dimensions()?;
+    Some((glam::UVec2::ZERO, glam::UVec2::new(width, height)))
+}
+
 fn create_selection(start: glam::IVec2, end: glam::IVec2) -> SpriteSelection {
     let x = start.x.min(end.x).max(0) as u32;
     let y = start.y.min(end.y).max(0) as u32;
@@ -264,6 +312,9 @@ pub fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
     }
     if ui.input(|i| i.key_pressed(egui::Key::W)) {
         ui_state.sprite.tool = MagicWand;
+    }
+    if ui.input(|i| i.key_pressed(egui::Key::K)) {
+        ui_state.sprite.tool = MagicErase;
     }
 
     // Brush size

@@ -126,5 +126,6 @@ fn tool_label(tool: SpriteEditorTool) -> &'static str {
         SpriteEditorTool::Select => "Select",
         SpriteEditorTool::Line => "Line",
         SpriteEditorTool::MagicWand => "Magic Wand",
+        SpriteEditorTool::MagicErase => "Magic Erase",
     }
 }

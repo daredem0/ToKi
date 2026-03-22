@@ -17,6 +17,8 @@ pub enum SpriteEditorTool {
     Line,
     /// Magic wand: select all connected non-transparent pixels
     MagicWand,
+    /// Remove connected pixels of the clicked color within the clicked tile
+    MagicErase,
 }
 
 /// Type of sprite asset being edited

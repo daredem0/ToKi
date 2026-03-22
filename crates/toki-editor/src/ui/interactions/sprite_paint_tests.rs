@@ -227,6 +227,69 @@ fn flood_fill_out_of_bounds_returns_false() {
     ));
 }
 
+#[test]
+fn erase_connected_color_in_bounds_erases_only_connected_region() {
+    let mut canvas = SpriteCanvas::filled(4, 4, PixelColor::rgb(10, 20, 30));
+    let island = PixelColor::rgb(200, 10, 10);
+    canvas.set_pixel(1, 1, island);
+    canvas.set_pixel(2, 1, island);
+
+    assert!(SpritePaintInteraction::erase_connected_color_in_bounds(
+        &mut canvas,
+        IVec2::new(0, 0),
+        (UVec2::ZERO, UVec2::new(4, 4)),
+    ));
+
+    assert_eq!(canvas.get_pixel(0, 0), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(3, 3), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(1, 1), Some(island));
+    assert_eq!(canvas.get_pixel(2, 1), Some(island));
+}
+
+#[test]
+fn erase_connected_color_in_bounds_respects_tile_bounds() {
+    let background = PixelColor::rgb(40, 50, 60);
+    let mut canvas = SpriteCanvas::filled(4, 2, background);
+
+    assert!(SpritePaintInteraction::erase_connected_color_in_bounds(
+        &mut canvas,
+        IVec2::new(0, 0),
+        (UVec2::new(0, 0), UVec2::new(2, 2)),
+    ));
+
+    assert_eq!(canvas.get_pixel(0, 0), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(1, 1), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(2, 0), Some(background));
+    assert_eq!(canvas.get_pixel(3, 1), Some(background));
+}
+
+#[test]
+fn erase_connected_color_in_bounds_uses_exact_color_matching() {
+    let mut canvas = SpriteCanvas::filled(3, 3, PixelColor::rgb(5, 5, 5));
+    let different = PixelColor::rgb(5, 5, 6);
+    canvas.set_pixel(1, 0, different);
+
+    assert!(SpritePaintInteraction::erase_connected_color_in_bounds(
+        &mut canvas,
+        IVec2::new(0, 0),
+        (UVec2::ZERO, UVec2::new(3, 3)),
+    ));
+
+    assert_eq!(canvas.get_pixel(1, 0), Some(different));
+    assert_eq!(canvas.get_pixel(0, 0), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn erase_connected_color_in_bounds_transparent_click_is_no_op() {
+    let mut canvas = create_test_canvas(3, 3);
+
+    assert!(!SpritePaintInteraction::erase_connected_color_in_bounds(
+        &mut canvas,
+        IVec2::new(1, 1),
+        (UVec2::ZERO, UVec2::new(3, 3)),
+    ));
+}
+
 // ============================================================================
 // Draw Line Tests
 // ============================================================================

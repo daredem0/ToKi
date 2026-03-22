@@ -29,13 +29,13 @@ fn render_tool_palette(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             "Eraser",
         );
         ui.selectable_value(&mut ui_state.sprite.tool, SpriteEditorTool::Fill, "Fill");
-    });
-    ui.horizontal(|ui| {
         ui.selectable_value(
             &mut ui_state.sprite.tool,
             SpriteEditorTool::Eyedropper,
             "Eyedrop",
         );
+    });
+    ui.horizontal(|ui| {
         ui.selectable_value(
             &mut ui_state.sprite.tool,
             SpriteEditorTool::Select,
@@ -45,7 +45,12 @@ fn render_tool_palette(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         ui.selectable_value(
             &mut ui_state.sprite.tool,
             SpriteEditorTool::MagicWand,
-            "Magic",
+            "Magic Wand",
+        );
+        ui.selectable_value(
+            &mut ui_state.sprite.tool,
+            SpriteEditorTool::MagicErase,
+            "Magic Erase",
         );
     });
 }
@@ -80,6 +85,9 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         }
         SpriteEditorTool::MagicWand => {
             ui.label("Click to select connected sprite pixels.");
+        }
+        SpriteEditorTool::MagicErase => {
+            ui.label("Click to erase the connected color region inside the clicked tile.");
         }
     }
 

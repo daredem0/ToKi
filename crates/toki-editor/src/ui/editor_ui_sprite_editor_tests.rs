@@ -453,6 +453,18 @@ fn sprite_editor_state_undo_redo_integration() {
 }
 
 #[test]
+fn sprite_editor_state_push_undo_state_ignores_no_op_edits() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(4, 4);
+
+    let before = state.active().canvas.clone().unwrap();
+    state.push_undo_state(before);
+
+    assert!(!state.active().history.can_undo());
+    assert!(!state.undo());
+}
+
+#[test]
 fn sprite_editor_state_recent_colors() {
     let mut state = SpriteEditorState {
         max_recent_colors: 3,

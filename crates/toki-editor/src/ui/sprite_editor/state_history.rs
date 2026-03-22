@@ -7,6 +7,9 @@ impl SpriteEditorState {
     pub fn push_undo_state(&mut self, before: SpriteCanvas) {
         let cs = self.active_mut();
         if let Some(canvas) = &cs.canvas {
+            if *canvas == before {
+                return;
+            }
             cs.history.push(SpriteEditCommand {
                 before,
                 after: canvas.clone(),

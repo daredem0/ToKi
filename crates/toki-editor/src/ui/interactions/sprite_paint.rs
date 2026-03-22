@@ -4,6 +4,63 @@ use glam::{IVec2, UVec2};
 pub struct SpritePaintInteraction;
 
 impl SpritePaintInteraction {
+    fn contains_pos(bounds: (UVec2, UVec2), pos: UVec2) -> bool {
+        let (start, end) = bounds;
+        pos.x >= start.x && pos.y >= start.y && pos.x < end.x && pos.y < end.y
+    }
+
+    fn flood_replace_in_bounds(
+        canvas: &mut SpriteCanvas,
+        start_pos: UVec2,
+        target_color: PixelColor,
+        replacement_color: PixelColor,
+        bounds: (UVec2, UVec2),
+    ) -> bool {
+        if !Self::contains_pos(bounds, start_pos) {
+            return false;
+        }
+
+        if target_color == replacement_color {
+            return false;
+        }
+
+        let (start, end) = bounds;
+        let mut stack = vec![(start_pos.x, start_pos.y)];
+        let mut changed = false;
+
+        while let Some((x, y)) = stack.pop() {
+            if x < start.x || y < start.y || x >= end.x || y >= end.y {
+                continue;
+            }
+
+            let Some(current_color) = canvas.get_pixel(x, y) else {
+                continue;
+            };
+
+            if current_color != target_color {
+                continue;
+            }
+
+            canvas.set_pixel(x, y, replacement_color);
+            changed = true;
+
+            if x > start.x {
+                stack.push((x - 1, y));
+            }
+            if x + 1 < end.x {
+                stack.push((x + 1, y));
+            }
+            if y > start.y {
+                stack.push((x, y - 1));
+            }
+            if y + 1 < end.y {
+                stack.push((x, y + 1));
+            }
+        }
+
+        changed
+    }
+
     /// Calculate brush footprint bounds for a given center pixel position.
     /// Returns (start, end) where end is exclusive.
     pub fn brush_footprint_bounds(
@@ -75,43 +132,44 @@ impl SpritePaintInteraction {
         let Some(target_color) = canvas.get_pixel(start_x, start_y) else {
             return false;
         };
+        Self::flood_replace_in_bounds(
+            canvas,
+            UVec2::new(start_x, start_y),
+            target_color,
+            fill_color,
+            (UVec2::ZERO, UVec2::new(canvas.width, canvas.height)),
+        )
+    }
 
-        // Don't fill if already the same color
-        if target_color == fill_color {
+    /// Remove the 4-connected region of the clicked color, limited to the provided bounds.
+    /// Intended for tile-local background cleanup in sprite sheets.
+    pub fn erase_connected_color_in_bounds(
+        canvas: &mut SpriteCanvas,
+        start_pos: IVec2,
+        bounds: (UVec2, UVec2),
+    ) -> bool {
+        if start_pos.x < 0 || start_pos.y < 0 {
+            return false;
+        }
+        let start_pos = UVec2::new(start_pos.x as u32, start_pos.y as u32);
+        if !Self::contains_pos(bounds, start_pos) {
             return false;
         }
 
-        let mut stack = vec![(start_x, start_y)];
-        let mut changed = false;
-
-        while let Some((x, y)) = stack.pop() {
-            let Some(current_color) = canvas.get_pixel(x, y) else {
-                continue;
-            };
-
-            if current_color != target_color {
-                continue;
-            }
-
-            canvas.set_pixel(x, y, fill_color);
-            changed = true;
-
-            // Add neighbors (4-way connectivity)
-            if x > 0 {
-                stack.push((x - 1, y));
-            }
-            if x + 1 < canvas.width {
-                stack.push((x + 1, y));
-            }
-            if y > 0 {
-                stack.push((x, y - 1));
-            }
-            if y + 1 < canvas.height {
-                stack.push((x, y + 1));
-            }
+        let Some(target_color) = canvas.get_pixel(start_pos.x, start_pos.y) else {
+            return false;
+        };
+        if target_color.a == 0 {
+            return false;
         }
 
-        changed
+        Self::flood_replace_in_bounds(
+            canvas,
+            start_pos,
+            target_color,
+            PixelColor::transparent(),
+            bounds,
+        )
     }
 
     /// Draw a line between two points using Bresenham's algorithm.
