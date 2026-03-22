@@ -19,50 +19,43 @@ impl InspectorSystem {
 fn render_tool_palette(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     use super::super::editor_ui::SpriteEditorTool;
 
+    const TOOL_ROWS: &[&[(SpriteEditorTool, &str)]] = &[
+        &[
+            (SpriteEditorTool::Drag, "Drag"),
+            (SpriteEditorTool::Brush, "Brush"),
+            (SpriteEditorTool::Eraser, "Eraser"),
+        ],
+        &[
+            (SpriteEditorTool::Line, "Line"),
+            (SpriteEditorTool::Fill, "Fill"),
+            (SpriteEditorTool::Eyedropper, "Eyedrop"),
+        ],
+        &[
+            (SpriteEditorTool::Select, "Select"),
+            (SpriteEditorTool::MagicWand, "Magic Wand"),
+            (SpriteEditorTool::MagicErase, "Magic Erase"),
+        ],
+        &[
+            (SpriteEditorTool::AddOutline, "Add Outline"),
+            (SpriteEditorTool::AddShadow, "Add Shadow"),
+        ],
+    ];
+
     ui.label("Tool:");
-    ui.horizontal(|ui| {
-        ui.selectable_value(&mut ui_state.sprite.tool, SpriteEditorTool::Drag, "Drag");
-        ui.selectable_value(&mut ui_state.sprite.tool, SpriteEditorTool::Brush, "Brush");
-        ui.selectable_value(
-            &mut ui_state.sprite.tool,
-            SpriteEditorTool::Eraser,
-            "Eraser",
-        );
-        ui.selectable_value(&mut ui_state.sprite.tool, SpriteEditorTool::Fill, "Fill");
-        ui.selectable_value(
-            &mut ui_state.sprite.tool,
-            SpriteEditorTool::Eyedropper,
-            "Eyedrop",
-        );
-    });
-    ui.horizontal(|ui| {
-        ui.selectable_value(
-            &mut ui_state.sprite.tool,
-            SpriteEditorTool::Select,
-            "Select",
-        );
-        ui.selectable_value(&mut ui_state.sprite.tool, SpriteEditorTool::Line, "Line");
-        ui.selectable_value(
-            &mut ui_state.sprite.tool,
-            SpriteEditorTool::MagicWand,
-            "Magic Wand",
-        );
-        ui.selectable_value(
-            &mut ui_state.sprite.tool,
-            SpriteEditorTool::MagicErase,
-            "Magic Erase",
-        );
-        ui.selectable_value(
-            &mut ui_state.sprite.tool,
-            SpriteEditorTool::AddOutline,
-            "Add Outline",
-        );
-        ui.selectable_value(
-            &mut ui_state.sprite.tool,
-            SpriteEditorTool::AddShadow,
-            "Add Shadow",
-        );
-    });
+    egui::Grid::new("sprite_tool_palette_grid")
+        .num_columns(3)
+        .spacing([6.0, 6.0])
+        .show(ui, |ui| {
+            for row in TOOL_ROWS {
+                for &(tool, label) in *row {
+                    ui.selectable_value(&mut ui_state.sprite.tool, tool, label);
+                }
+                for _ in row.len()..3 {
+                    ui.label("");
+                }
+                ui.end_row();
+            }
+        });
 }
 
 fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
