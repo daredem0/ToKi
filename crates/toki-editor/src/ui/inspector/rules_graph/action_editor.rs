@@ -3,7 +3,6 @@
 use super::*;
 
 impl InspectorSystem {
-    #[expect(clippy::too_many_arguments)]
     pub(in super::super) fn render_rule_graph_action_editor(
         ui: &mut egui::Ui,
         scene_name: &str,

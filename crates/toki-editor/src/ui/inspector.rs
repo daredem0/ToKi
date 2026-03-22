@@ -6,11 +6,10 @@ use super::editor_domain::{
 };
 use super::editor_ui::{EditorUI, MapEditorTool, SceneRulesGraphCommandData, Selection};
 use super::rule_graph::{RuleGraph, RuleGraphEdge, RuleGraphNodeKind};
-use super::undo_redo::EditorCommand;
 use crate::config::EditorConfig;
-use crate::project::{Project, SceneGraphLayout};
+use crate::project::Project;
 use chrono::Utc;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use toki_core::animation::AnimationState;
 use toki_core::assets::object_sheet::ObjectSheetMeta;
 use toki_core::entity::EntityKind;

@@ -199,6 +199,7 @@ impl SpriteEditorState {
         Ok(())
     }
 
+    #[allow(clippy::type_complexity)]
     fn load_merge_images(&self) -> Result<(Vec<(u32, u32, Vec<u8>)>, u32, u32), String> {
         use toki_core::graphics::image::load_image_rgba8;
 

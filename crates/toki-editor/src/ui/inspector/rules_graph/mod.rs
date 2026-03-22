@@ -22,7 +22,7 @@ mod trigger_editor;
 
 use super::*;
 
-use context::{NodeActionResult, NodeEditParams, NodeEditorContext};
+use context::{NodeEditParams, NodeEditorContext};
 
 impl InspectorSystem {
     pub(in super::super) fn render_selected_rule_graph_node_editor(

@@ -166,6 +166,7 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_cell_grid(
     painter: &egui::Painter,
     rect: egui::Rect,
@@ -211,6 +212,7 @@ fn draw_cell_grid(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn highlight_clip_frames(
     ui_state: &EditorUI,
     painter: &egui::Painter,

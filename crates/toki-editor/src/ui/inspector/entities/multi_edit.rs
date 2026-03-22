@@ -98,6 +98,7 @@ impl InspectorSystem {
         )
     }
 
+    #[allow(dead_code)]
     pub(in super::super) fn render_multi_entity_bool_row(
         ui: &mut egui::Ui,
         label: &str,

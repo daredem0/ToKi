@@ -5,11 +5,11 @@ mod rules_flat;
 #[path = "rules_graph/mod.rs"]
 mod rules_graph;
 #[path = "rules_support.rs"]
-pub(self) mod rules_support;
+mod rules_support;
 
 // Re-export types needed by rules_graph submodules
-pub(self) use super::RuleAudioChoices;
-pub(self) use super::RuleValidationIssue;
+use super::RuleAudioChoices;
+use super::RuleValidationIssue;
 
 impl InspectorSystem {
     pub(super) fn render_scene_rules_editor(
