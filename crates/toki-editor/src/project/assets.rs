@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use toki_core::project_assets::{
-    classify_sprite_metadata_file, discover_audio_files, ProjectAudioFormat, SpriteMetadataFileKind,
+    classify_sprite_metadata_file, discover_audio_files,
+    load_entity_definition_from_path as load_entity_definition_from_project_path,
+    load_scene_from_path as load_scene_from_project_path, SpriteMetadataFileKind,
 };
 use toki_core::{entity::EntityDefinition, Scene};
 
@@ -20,10 +22,6 @@ pub struct ProjectAssets {
     pub sprite_atlases: HashMap<String, SpriteAtlasAsset>,
     /// Discovered object sheets
     pub object_sheets: HashMap<String, ObjectSheetAsset>,
-    /// Discovered music files
-    pub music: HashMap<String, AudioAsset>,
-    /// Discovered sound effects
-    pub sfx: HashMap<String, AudioAsset>,
     /// Discovered entity definitions
     pub entities: HashMap<String, EntityAsset>,
 }
@@ -35,14 +33,8 @@ pub enum ProjectAudioAssetKind {
 }
 
 /// Scene asset information.
-///
-/// The `name` field duplicates the HashMap key but makes the struct self-contained
-/// for potential serialization or when returned individually.
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields kept for self-contained struct (HashMap key duplicates name)
 pub struct SceneAsset {
-    /// Scene name (from filename)
-    pub name: String,
     /// Full path to scene file
     pub path: PathBuf,
     /// Scene data (loaded lazily)
@@ -51,52 +43,28 @@ pub struct SceneAsset {
 
 /// Tilemap asset information.
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields kept for self-contained struct (HashMap key duplicates name)
 pub struct TilemapAsset {
-    /// Tilemap name (from filename)
-    pub name: String,
     /// Full path to tilemap file
     pub path: PathBuf,
 }
 
 /// Sprite atlas asset information.
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields kept for self-contained struct (HashMap key duplicates name)
 pub struct SpriteAtlasAsset {
-    /// Atlas name (from filename)
-    pub name: String,
     /// Full path to atlas JSON file
     pub path: PathBuf,
 }
 
 /// Object sheet asset information.
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields kept for self-contained struct (HashMap key duplicates name)
 pub struct ObjectSheetAsset {
-    /// Object sheet name (from filename)
-    pub name: String,
     /// Full path to object sheet JSON file
     pub path: PathBuf,
 }
 
-/// Audio asset information.
-#[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields kept for self-contained struct (HashMap key duplicates name)
-pub struct AudioAsset {
-    /// Audio name (from filename)
-    pub name: String,
-    /// Full path to audio file
-    pub path: PathBuf,
-    /// Audio file format
-    pub format: ProjectAudioFormat,
-}
-
 /// Entity definition asset information.
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields kept for self-contained struct (HashMap key duplicates name)
 pub struct EntityAsset {
-    /// Entity name (from filename)
-    pub name: String,
     /// Full path to entity definition file
     pub path: PathBuf,
     /// Entity definition data (loaded lazily)
@@ -112,8 +80,6 @@ impl ProjectAssets {
             tilemaps: HashMap::new(),
             sprite_atlases: HashMap::new(),
             object_sheets: HashMap::new(),
-            music: HashMap::new(),
-            sfx: HashMap::new(),
             entities: HashMap::new(),
         }
     }
@@ -123,17 +89,14 @@ impl ProjectAssets {
         self.scan_scenes()?;
         self.scan_tilemaps()?;
         self.scan_sprite_atlases()?;
-        self.scan_audio()?;
         self.scan_entities()?;
 
         tracing::info!(
-            "Scanned project assets: {} scenes, {} tilemaps, {} atlases, {} object sheets, {} music, {} sfx, {} entities",
+            "Scanned project assets: {} scenes, {} tilemaps, {} atlases, {} object sheets, {} entities",
             self.scenes.len(),
             self.tilemaps.len(),
             self.sprite_atlases.len(),
             self.object_sheets.len(),
-            self.music.len(),
-            self.sfx.len(),
             self.entities.len()
         );
 
@@ -202,7 +165,6 @@ impl ProjectAssets {
             if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     let scene_asset = SceneAsset {
-                        name: stem.to_string(),
                         path: path.clone(),
                         scene: None, // Loaded lazily
                     };
@@ -233,7 +195,6 @@ impl ProjectAssets {
             if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     let tilemap_asset = TilemapAsset {
-                        name: stem.to_string(),
                         path: path.clone(),
                     };
 
@@ -265,7 +226,6 @@ impl ProjectAssets {
                     match classify_sprite_metadata_file(&path)? {
                         SpriteMetadataFileKind::Atlas => {
                             let atlas_asset = SpriteAtlasAsset {
-                                name: stem.to_string(),
                                 path: path.clone(),
                             };
 
@@ -274,7 +234,6 @@ impl ProjectAssets {
                         }
                         SpriteMetadataFileKind::ObjectSheet => {
                             let object_sheet_asset = ObjectSheetAsset {
-                                name: stem.to_string(),
                                 path: path.clone(),
                             };
 
@@ -292,49 +251,6 @@ impl ProjectAssets {
                     }
                 }
             }
-        }
-
-        Ok(())
-    }
-
-    /// Scan for audio files
-    fn scan_audio(&mut self) -> Result<()> {
-        // Scan music
-        let music_dir = self.project_path.join("assets/audio/music");
-        if music_dir.exists() {
-            tracing::info!("🔍 Scanning for music in {:?}", music_dir);
-            let mut music_assets = HashMap::new();
-            self.scan_audio_directory(&music_dir, &mut music_assets)?;
-            self.music = music_assets;
-        }
-
-        // Scan SFX
-        let sfx_dir = self.project_path.join("assets/audio/sfx");
-        if sfx_dir.exists() {
-            tracing::info!("🔍 Scanning for SFX in {:?}", sfx_dir);
-            let mut sfx_assets = HashMap::new();
-            self.scan_audio_directory(&sfx_dir, &mut sfx_assets)?;
-            self.sfx = sfx_assets;
-        }
-
-        Ok(())
-    }
-
-    /// Scan a specific audio directory
-    fn scan_audio_directory(
-        &self,
-        dir: &Path,
-        audio_map: &mut HashMap<String, AudioAsset>,
-    ) -> Result<()> {
-        for asset in discover_audio_files(dir)? {
-            let audio_asset = AudioAsset {
-                name: asset.name.clone(),
-                path: asset.path.clone(),
-                format: asset.format,
-            };
-
-            audio_map.insert(asset.name.clone(), audio_asset);
-            tracing::info!("🎵 Found audio file: '{}' at {:?}", asset.name, asset.path);
         }
 
         Ok(())
@@ -376,7 +292,6 @@ impl ProjectAssets {
             if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     let entity_asset = EntityAsset {
-                        name: stem.to_string(),
                         path: path.clone(),
                         definition: None, // Loaded lazily
                     };
@@ -394,11 +309,8 @@ impl ProjectAssets {
     pub fn load_scene(&mut self, scene_name: &str) -> Result<Option<Scene>> {
         if let Some(scene_asset) = self.scenes.get_mut(scene_name) {
             if scene_asset.scene.is_none() {
-                // Load scene from file
-                let json_data = fs::read_to_string(&scene_asset.path)?;
-                let scene: Scene = serde_json::from_str(&json_data).map_err(|e| {
-                    anyhow::anyhow!("Failed to parse scene '{}': {}", scene_name, e)
-                })?;
+                let scene = load_scene_from_project_path(&scene_asset.path)
+                    .map_err(|error| anyhow::anyhow!("Failed to load scene '{}': {}", scene_name, error))?;
 
                 scene_asset.scene = Some(scene.clone());
                 tracing::info!(
@@ -429,7 +341,6 @@ impl ProjectAssets {
                 scene_path
             );
             let scene_asset = SceneAsset {
-                name: scene.name.clone(),
                 path: scene_path,
                 scene: Some(scene.clone()),
             };
@@ -465,14 +376,6 @@ impl ProjectAssets {
         self.scenes.keys().cloned().collect()
     }
 
-    /// Get all tilemap names
-    /// Get all tilemap names.
-    /// Part of complete asset discovery API for future editor features.
-    #[allow(dead_code)] // API completeness - will be used when tilemap picker is implemented
-    pub fn get_tilemap_names(&self) -> Vec<String> {
-        self.tilemaps.keys().cloned().collect()
-    }
-
     /// Get all sprite atlas names
     #[cfg_attr(not(test), allow(dead_code))] // Used in tests
     pub fn get_sprite_atlas_names(&self) -> Vec<String> {
@@ -485,20 +388,6 @@ impl ProjectAssets {
         self.object_sheets.keys().cloned().collect()
     }
 
-    /// Get all music names.
-    /// Part of complete asset discovery API for future editor features.
-    #[allow(dead_code)] // API completeness - will be used when audio browser is implemented
-    pub fn get_music_names(&self) -> Vec<String> {
-        self.music.keys().cloned().collect()
-    }
-
-    /// Get all SFX names.
-    /// Part of complete asset discovery API for future editor features.
-    #[allow(dead_code)] // API completeness - will be used when audio browser is implemented
-    pub fn get_sfx_names(&self) -> Vec<String> {
-        self.sfx.keys().cloned().collect()
-    }
-
     /// Load an entity definition by name
     pub fn load_entity_definition(
         &mut self,
@@ -506,14 +395,12 @@ impl ProjectAssets {
     ) -> Result<Option<EntityDefinition>> {
         if let Some(entity_asset) = self.entities.get_mut(entity_name) {
             if entity_asset.definition.is_none() {
-                // Load entity definition from file
-                let json_data = fs::read_to_string(&entity_asset.path)?;
-                let definition: EntityDefinition =
-                    serde_json::from_str(&json_data).map_err(|e| {
+                let definition = load_entity_definition_from_project_path(&entity_asset.path)
+                    .map_err(|error| {
                         anyhow::anyhow!(
-                            "Failed to parse entity definition '{}': {}",
+                            "Failed to load entity definition '{}': {}",
                             entity_name,
-                            e
+                            error
                         )
                     })?;
 
@@ -532,29 +419,6 @@ impl ProjectAssets {
         }
     }
 
-    /// Get all entity definition names.
-    /// Used internally by `get_entities_by_category`.
-    pub fn get_entity_names(&self) -> Vec<String> {
-        self.entities.keys().cloned().collect()
-    }
-
-    /// Get entities by category for organization in the editor.
-    /// Part of complete asset discovery API for future editor features.
-    #[allow(dead_code)] // API completeness - will be used when entity browser groups by category
-    pub fn get_entities_by_category(&mut self) -> Result<HashMap<String, Vec<String>>> {
-        let mut categories = HashMap::new();
-
-        for entity_name in self.get_entity_names() {
-            if let Some(definition) = self.load_entity_definition(&entity_name)? {
-                categories
-                    .entry(definition.category)
-                    .or_insert_with(Vec::new)
-                    .push(entity_name);
-            }
-        }
-
-        Ok(categories)
-    }
 }
 
 #[cfg(test)]

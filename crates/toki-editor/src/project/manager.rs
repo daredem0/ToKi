@@ -191,21 +191,12 @@ impl ProjectManager {
         Ok(())
     }
 
-    /// Legacy method for backward compatibility
-    #[allow(dead_code)]
-    pub fn save_current_project_legacy(&mut self, _game_state: &GameState) -> Result<()> {
-        // For now, create a scene from the game state
-        let scene = Scene::new("main".to_string()); // TODO: Extract proper scene data
-        self.save_current_project(&[scene])
-    }
-
     /// Get asset manager for current project
     pub fn get_project_assets(&self) -> Option<&ProjectAssets> {
         self.project_assets.as_ref()
     }
 
     /// Get mutable asset manager for current project
-    #[allow(dead_code)]
     pub fn get_project_assets_mut(&mut self) -> Option<&mut ProjectAssets> {
         self.project_assets.as_mut()
     }

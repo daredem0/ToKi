@@ -1,8 +1,11 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
 use toki_core::entity::EntityDefinition;
+use toki_core::project_assets::{
+    load_entity_definition_from_path as load_entity_definition_from_project_path,
+    load_scene_from_path as load_scene_from_project_path,
+};
 use toki_core::AssetCache;
 use toki_core::Scene;
 use toki_render::RenderError;
@@ -90,11 +93,16 @@ pub struct DecodedProjectCache {
 impl DecodedProjectCache {
     pub fn load_scene_from_path(&mut self, scene_path: &Path) -> Result<Scene, String> {
         self.scenes.get_or_load(scene_path.to_path_buf(), |path| {
-            let json = fs::read_to_string(path).map_err(|error| {
-                format!("Could not read scene file '{}': {}", path.display(), error)
-            })?;
-            serde_json::from_str::<Scene>(&json).map_err(|error| {
-                format!("Could not parse scene file '{}': {}", path.display(), error)
+            load_scene_from_project_path(path).map_err(|error| match error {
+                toki_core::project_assets::ProjectAssetError::Io(error) => {
+                    format!("Could not read scene file '{}': {}", path.display(), error)
+                }
+                toki_core::project_assets::ProjectAssetError::Core(error) => {
+                    format!("Could not parse scene file '{}': {}", path.display(), error)
+                }
+                toki_core::project_assets::ProjectAssetError::Validation(error) => {
+                    format!("Could not load scene file '{}': {}", path.display(), error)
+                }
             })
         })
     }
@@ -134,8 +142,14 @@ impl DecodedProjectCache {
     ) -> Result<EntityDefinition, toki_core::CoreError> {
         self.entity_definitions
             .get_or_load(entity_definition_path.to_path_buf(), |path| {
-                let json = fs::read_to_string(path)?;
-                Ok(serde_json::from_str::<EntityDefinition>(&json)?)
+                load_entity_definition_from_project_path(path)
+                    .map_err(|error| match error {
+                        toki_core::project_assets::ProjectAssetError::Io(error) => error.into(),
+                        toki_core::project_assets::ProjectAssetError::Core(error) => error,
+                        toki_core::project_assets::ProjectAssetError::Validation(error) => {
+                            toki_core::CoreError::FileLoad(path.to_path_buf(), error)
+                        }
+                    })
             })
     }
 }

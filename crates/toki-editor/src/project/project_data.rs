@@ -7,7 +7,6 @@ use std::path::PathBuf;
 use toki_core::project_runtime::RuntimeSettings;
 
 /// Main project data structure
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Project {
     /// Project name
@@ -16,8 +15,6 @@ pub struct Project {
     pub path: PathBuf,
     /// Project metadata (saved to project.toml)
     pub metadata: ProjectMetadata,
-    /// Currently loaded scene data
-    pub current_scene: Option<String>,
     /// Whether project has unsaved changes
     pub is_dirty: bool,
 }
@@ -167,7 +164,6 @@ impl Project {
             name,
             path,
             metadata,
-            current_scene: Some("main".to_string()),
             is_dirty: false,
         }
     }
@@ -175,15 +171,6 @@ impl Project {
     /// Get the project.toml file path
     pub fn project_file_path(&self) -> PathBuf {
         self.path.join("project.toml")
-    }
-
-    /// Get the path to a specific scene file
-    #[allow(dead_code)]
-    pub fn scene_file_path(&self, scene_name: &str) -> Option<PathBuf> {
-        self.metadata
-            .scenes
-            .get(scene_name)
-            .map(|relative_path| self.path.join(relative_path))
     }
 
     /// Mark the project as saved

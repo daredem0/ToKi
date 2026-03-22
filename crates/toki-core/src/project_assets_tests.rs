@@ -1,7 +1,8 @@
 use crate::project_assets::{
     classify_sprite_metadata_file, discover_audio_files, discover_project_scene_paths,
-    discover_sprite_metadata, normalize_asset_name, resolve_project_resource_paths,
-    scene_file_path, tilemap_file_path, ProjectAudioFormat, SpriteMetadataFileKind,
+    discover_sprite_metadata, load_entity_definition_from_path, load_scene_from_path,
+    normalize_asset_name, resolve_project_resource_paths, scene_file_path, tilemap_file_path,
+    ProjectAudioFormat, SpriteMetadataFileKind,
 };
 use std::fs;
 
@@ -216,6 +217,100 @@ fn tilemap_file_path_returns_canonical_path() {
         path,
         project.join("assets").join("tilemaps").join("Level 1.json")
     );
+}
+
+#[test]
+fn load_scene_from_path_reads_scene_json() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let scene_path = tmp.path().join("Main Scene.json");
+    fs::write(
+        &scene_path,
+        r#"{
+  "name": "Main Scene",
+  "description": null,
+  "maps": [],
+  "entities": [],
+  "anchors": [],
+  "player_entry": null,
+  "rules": {
+    "chains": []
+  },
+  "camera_position": null,
+  "camera_scale": null,
+  "background_music_track_id": null
+}"#,
+    )
+    .expect("write scene");
+
+    let scene = load_scene_from_path(&scene_path).expect("load scene");
+    assert_eq!(scene.name, "Main Scene");
+}
+
+#[test]
+fn load_entity_definition_from_path_reads_definition_json() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let entity_path = tmp.path().join("slime.json");
+    let definition = crate::entity::EntityDefinition {
+        name: "slime".to_string(),
+        display_name: "Slime".to_string(),
+        description: String::new(),
+        rendering: crate::entity::RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+            static_object: None,
+        },
+        attributes: crate::entity::AttributesDef {
+            health: Some(1),
+            stats: std::collections::HashMap::new(),
+            speed: 1.0,
+            solid: true,
+            active: true,
+            can_move: true,
+            interactable: false,
+            interaction_reach: 0,
+            ai_config: crate::entity::AiConfig::default(),
+            movement_profile: crate::entity::MovementProfile::LegacyDefault,
+            primary_projectile: None,
+            pickup: None,
+            has_inventory: false,
+        },
+        collision: crate::entity::CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: crate::entity::AudioDef {
+            footstep_trigger_distance: 0.0,
+            hearing_radius: 192,
+            movement_sound_trigger: crate::entity::MovementSoundTrigger::Distance,
+            movement_sound: String::new(),
+            collision_sound: None,
+        },
+        animations: crate::entity::AnimationsDef {
+            atlas_name: "slimes".to_string(),
+            clips: vec![crate::entity::AnimationClipDef {
+                state: "idle".to_string(),
+                frame_tiles: vec!["slime/idle_0".to_string()],
+                frame_positions: None,
+                frame_duration_ms: 100.0,
+                frame_durations_ms: None,
+                loop_mode: "loop".to_string(),
+            }],
+            default_state: "idle".to_string(),
+        },
+        category: "enemy".to_string(),
+        tags: Vec::new(),
+    };
+    fs::write(
+        &entity_path,
+        serde_json::to_string_pretty(&definition).expect("serialize entity"),
+    )
+    .expect("write entity");
+
+    let definition = load_entity_definition_from_path(&entity_path).expect("load entity");
+    assert_eq!(definition.name, "slime");
 }
 
 #[test]

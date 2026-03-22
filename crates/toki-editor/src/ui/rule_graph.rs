@@ -358,6 +358,10 @@ impl RuleGraph {
             .then_some(format!("node:{node_id}"))
     }
 
+    /// Derive the pre-migration node key shape used by older persisted graph layouts.
+    ///
+    /// This remains intentionally supported so existing project metadata and migrated
+    /// editor config data can still resolve onto the current node ids.
     fn legacy_stable_node_key(&self, node_id: RuleGraphNodeId) -> Option<String> {
         let node_by_id = self
             .nodes
@@ -407,6 +411,10 @@ impl RuleGraph {
             .then_some(format!("detached:{node_id}"))
     }
 
+    /// Resolve a persisted node key to a live node id.
+    ///
+    /// Canonical `node:<id>` keys are preferred. Legacy chain-shaped keys remain supported
+    /// as a compatibility seam for older saved graph layout metadata.
     pub fn node_id_for_stable_key(&self, stable_key: &str) -> Option<RuleGraphNodeId> {
         if let Some(node_id) = stable_key.strip_prefix("node:") {
             let parsed_id = node_id.parse::<RuleGraphNodeId>().ok()?;

@@ -385,7 +385,7 @@ impl GameState {
         self.render_query_facade().sprite_render_requests()
     }
 
-    /// Get the current sprite frame for rendering with proper atlas lookup (legacy method for player)
+    /// Get the current player sprite frame for rendering with proper atlas lookup.
     pub fn current_sprite_frame(
         &self,
         atlas: &AtlasMeta,

@@ -142,7 +142,7 @@ impl GameManager {
         self.game_state.spawn_player_like_npc(position)
     }
 
-    /// Get the current sprite frame for rendering (legacy method for backwards compatibility)
+    /// Get the current player sprite frame for rendering.
     pub fn current_sprite_frame(
         &self,
         atlas: &AtlasMeta,
@@ -151,7 +151,7 @@ impl GameManager {
         self.game_state.current_sprite_frame(atlas, texture_size)
     }
 
-    /// Get player position for rendering (legacy method for backwards compatibility)
+    /// Get player position for rendering.
     pub fn player_position(&self) -> glam::IVec2 {
         self.game_state.player_position()
     }

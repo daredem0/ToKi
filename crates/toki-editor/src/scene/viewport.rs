@@ -447,27 +447,6 @@ impl SceneViewport {
         }
     }
 
-    /// Handle click events for entity selection
-    #[allow(dead_code)]
-    pub fn handle_click(
-        &mut self,
-        screen_pos: glam::Vec2,
-        _viewport_rect: egui::Rect,
-    ) -> Option<u32> {
-        if !self.is_initialized {
-            return None;
-        }
-
-        // TODO: Implement entity picking with unified renderer
-        // For now, clear any existing selection
-        tracing::info!(
-            "Click at ({:.2}, {:.2}) - entity picking not yet implemented",
-            screen_pos.x,
-            screen_pos.y
-        );
-        None
-    }
-
     /// Get reference to game state
     pub fn game_state(&self) -> &GameState {
         &self.game_state

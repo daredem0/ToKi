@@ -1,5 +1,6 @@
 use crate::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
 use crate::entity::EntityDefinition;
+use crate::scene::Scene;
 use crate::CoreError;
 use std::collections::HashMap;
 use std::fs;
@@ -167,6 +168,11 @@ pub fn discover_project_entity_definition_paths(
     project_path: &Path,
 ) -> Result<Vec<PathBuf>, ProjectAssetError> {
     find_json_files(&project_path.join("entities"))
+}
+
+pub fn load_scene_from_path(path: &Path) -> Result<Scene, ProjectAssetError> {
+    let json = fs::read_to_string(path)?;
+    Ok(serde_json::from_str::<Scene>(&json).map_err(CoreError::from)?)
 }
 
 pub fn load_entity_definition_from_path(
