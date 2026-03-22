@@ -141,6 +141,7 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
             display: Some(RuntimeConfigDisplay {
                 show_entity_health_bars: Some(true),
                 show_ground_shadows: Some(false),
+                indexed_palette_override: None,
                 resolution_width: None,
                 resolution_height: None,
                 zoom_percent: None,
@@ -204,6 +205,7 @@ fn apply_runtime_config_keeps_existing_paths_and_scene_but_updates_splash_durati
             display: Some(RuntimeConfigDisplay {
                 show_entity_health_bars: Some(true),
                 show_ground_shadows: Some(false),
+                indexed_palette_override: None,
                 resolution_width: None,
                 resolution_height: None,
                 zoom_percent: None,
@@ -440,6 +442,7 @@ fn apply_project_runtime_settings_do_not_override_existing_launch_audio_mix() {
         display: RuntimeDisplayOptions {
             show_entity_health_bars: false,
             show_ground_shadows: true,
+            indexed_palette_override: None,
             resolution_width: 160,
             resolution_height: 144,
             zoom_percent: 100,

@@ -74,6 +74,29 @@ pub fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             {
                 edit.mark_dirty();
             }
+            ui.horizontal(|ui| {
+                ui.label("Palette Override:");
+                if ui
+                    .text_edit_singleline(
+                        edit.definition
+                            .rendering
+                            .palette_override
+                            .get_or_insert_with(String::new),
+                    )
+                    .changed()
+                {
+                    if edit
+                        .definition
+                        .rendering
+                        .palette_override
+                        .as_deref()
+                        .is_some_and(|value| value.trim().is_empty())
+                    {
+                        edit.definition.rendering.palette_override = None;
+                    }
+                    edit.mark_dirty();
+                }
+            });
         });
 }
 

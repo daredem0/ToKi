@@ -4,9 +4,12 @@ use std::path::Path;
 use std::rc::Rc;
 use toki_core::fonts::find_font_files;
 use toki_core::graphics::image::DecodedImage;
+use toki_core::palette::Palette4;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::sprite::SpriteFrame;
-use toki_core::sprite_render::{ResolvedSpriteRenderInstance, SpriteRenderOrigin, SpriteSortKey};
+use toki_core::sprite_render::{
+    ResolvedSpriteRenderInstance, SpriteRenderMaterial, SpriteRenderOrigin, SpriteSortKey,
+};
 use toki_core::text::{TextItem, TextStyle};
 use toki_core::ui::{UiBlock, UiComposition, UiRect, UiTextBlock};
 use toki_render::RenderBackend;
@@ -17,6 +20,7 @@ struct FakeBackend {
     draw_calls: Rc<Cell<usize>>,
     resize_calls: Rc<Cell<usize>>,
     tilemap_texture_loads: Rc<RefCell<Vec<std::path::PathBuf>>>,
+    tilemap_texture_rgba8_loads: Rc<Cell<usize>>,
     sprite_texture_loads: Rc<RefCell<Vec<std::path::PathBuf>>>,
     sprite_texture_rgba8_loads: Rc<Cell<usize>>,
     tilemap_render_enabled: Rc<Cell<bool>>,
@@ -40,6 +44,15 @@ impl RenderBackend for FakeBackend {
         Ok(())
     }
 
+    fn load_tilemap_texture_rgba8(
+        &mut self,
+        _image: &DecodedImage,
+    ) -> Result<(), toki_render::RenderError> {
+        self.tilemap_texture_rgba8_loads
+            .set(self.tilemap_texture_rgba8_loads.get() + 1);
+        Ok(())
+    }
+
     fn load_sprite_texture(
         &mut self,
         texture_path: std::path::PathBuf,
@@ -55,6 +68,18 @@ impl RenderBackend for FakeBackend {
         self.sprite_texture_rgba8_loads
             .set(self.sprite_texture_rgba8_loads.get() + 1);
         Ok(())
+    }
+
+    fn add_sprite_with_texture_rgba8(
+        &mut self,
+        _texture_key: std::path::PathBuf,
+        _image: &DecodedImage,
+        _frame: SpriteFrame,
+        _position: glam::IVec2,
+        _size: glam::UVec2,
+        _flip_x: bool,
+    ) {
+        self.sprite_count.set(self.sprite_count.get() + 1);
     }
 
     fn load_font_file(
@@ -261,7 +286,64 @@ fn resolved_sprite_instances_submit_through_the_shared_rendering_entrypoint() {
         position: glam::IVec2::new(4, 6),
         size: glam::UVec2::new(16, 16),
         texture_path: Some(std::path::PathBuf::from("sprites/player.png")),
+        material: SpriteRenderMaterial::TrueColor,
         flip_x: true,
+    });
+
+    assert_eq!(sprite_count.get(), 1);
+}
+
+#[test]
+fn palette_indexed_resolved_sprites_use_rgba8_backend_path() {
+    let sprite_count = Rc::new(Cell::new(0));
+    let mut rendering = RenderingSystem::new();
+    let backend = FakeBackend {
+        sprite_count: sprite_count.clone(),
+        ..FakeBackend::default()
+    };
+    rendering.set_backend_for_tests(Box::new(backend));
+
+    let temp_dir = tempfile::tempdir().expect("temp dir");
+    let texture_path = temp_dir.path().join("indexed.png");
+    toki_core::graphics::image::save_image_rgba8(
+        &texture_path,
+        2,
+        2,
+        &[
+            0x00, 0x00, 0x00, 0xFF, //
+            0x55, 0x55, 0x55, 0xFF, //
+            0xAA, 0xAA, 0xAA, 0xFF, //
+            0xFF, 0xFF, 0xFF, 0xFF,
+        ],
+    )
+    .expect("indexed texture");
+
+    rendering.add_resolved_sprite(&ResolvedSpriteRenderInstance {
+        origin: SpriteRenderOrigin::AnimatedEntity(1),
+        sort_key: SpriteSortKey {
+            primary: 0,
+            secondary: 0,
+            sequence: 0,
+        },
+        frame: SpriteFrame {
+            u0: 0.0,
+            v0: 0.0,
+            u1: 1.0,
+            v1: 1.0,
+        },
+        position: glam::IVec2::new(4, 6),
+        size: glam::UVec2::new(16, 16),
+        texture_path: Some(texture_path),
+        material: SpriteRenderMaterial::PaletteIndexed {
+            palette_id: "gb_default".to_string(),
+            palette: Palette4::new([
+                [1, 2, 3, 255],
+                [4, 5, 6, 255],
+                [7, 8, 9, 255],
+                [10, 11, 12, 255],
+            ]),
+        },
+        flip_x: false,
     });
 
     assert_eq!(sprite_count.get(), 1);

@@ -138,6 +138,18 @@ impl InspectorSystem {
 
         changed |= set_if_changed(&mut entity.attributes.visible, draft.visible);
         changed |= set_if_changed(&mut entity.attributes.has_shadow, draft.has_shadow);
+        let runtime_palette_override = {
+            let trimmed = draft.palette_override.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        };
+        changed |= set_if_changed(
+            &mut entity.attributes.palette_override,
+            runtime_palette_override,
+        );
         changed |= set_if_changed(&mut entity.attributes.active, draft.active);
         changed |= set_if_changed(&mut entity.attributes.solid, draft.solid);
         changed |= set_if_changed(&mut entity.attributes.interactable, draft.interactable);
@@ -219,6 +231,18 @@ fn apply_rendering_fields(
     }
     if definition.rendering.has_shadow != draft.has_shadow {
         definition.rendering.has_shadow = draft.has_shadow;
+        changed = true;
+    }
+    let definition_palette_override = {
+        let trimmed = draft.palette_override.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    };
+    if definition.rendering.palette_override != definition_palette_override {
+        definition.rendering.palette_override = definition_palette_override;
         changed = true;
     }
 

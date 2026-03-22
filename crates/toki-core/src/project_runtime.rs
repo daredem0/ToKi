@@ -1,4 +1,7 @@
+use std::collections::BTreeMap;
+
 use crate::menu::MenuSettings;
+use crate::palette::Palette4;
 use serde::{Deserialize, Serialize};
 
 /// Controls how game logic timing is handled.
@@ -55,6 +58,8 @@ pub struct RuntimeSettings {
     pub splash: RuntimeSplashSettings,
     #[serde(default)]
     pub audio: RuntimeAudioMixSettings,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub palettes: BTreeMap<String, Palette4>,
     #[serde(default)]
     pub display: RuntimeDisplaySettings,
     #[serde(default)]
@@ -104,6 +109,8 @@ pub struct RuntimeDisplaySettings {
     pub show_entity_health_bars: bool,
     #[serde(default = "default_show_ground_shadows")]
     pub show_ground_shadows: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub indexed_palette_override: Option<String>,
     /// Viewport width in pixels (defaults to preset resolution)
     #[serde(default = "default_resolution_width")]
     pub resolution_width: u32,
@@ -129,6 +136,7 @@ impl Default for RuntimeDisplaySettings {
         Self {
             show_entity_health_bars: false,
             show_ground_shadows: default_show_ground_shadows(),
+            indexed_palette_override: None,
             resolution_width: default_resolution_width(),
             resolution_height: default_resolution_height(),
             zoom_percent: default_zoom_percent(),
@@ -211,6 +219,8 @@ pub struct RuntimeConfigDisplay {
     pub show_entity_health_bars: Option<bool>,
     #[serde(default)]
     pub show_ground_shadows: Option<bool>,
+    #[serde(default)]
+    pub indexed_palette_override: Option<String>,
     #[serde(default)]
     pub resolution_width: Option<u32>,
     #[serde(default)]

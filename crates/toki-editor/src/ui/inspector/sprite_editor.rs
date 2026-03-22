@@ -1,4 +1,7 @@
 use super::*;
+use toki_core::assets::atlas::ColorMode;
+use toki_core::palette::validate_indexed_rgba8;
+use crate::ui::sprite_editor::PixelColor;
 
 impl InspectorSystem {
     pub(super) fn render_sprite_editor_inspector(
@@ -103,6 +106,9 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     }
 
     ui.separator();
+    render_color_mode_controls(ui, ui_state);
+
+    ui.separator();
     render_color_picker(ui, ui_state);
 
     ui.separator();
@@ -117,6 +123,71 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     if ui_state.sprite.active().dirty {
         ui.separator();
         ui.label("Canvas has unsaved changes.");
+    }
+}
+
+fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    ui.label("Color Mode:");
+    egui::ComboBox::from_id_salt("sprite_editor_color_mode")
+        .selected_text(match ui_state.sprite.color_mode {
+            ColorMode::TrueColor => "TrueColor",
+            ColorMode::PaletteIndexed => "PaletteIndexed",
+        })
+        .show_ui(ui, |ui| {
+            ui.selectable_value(
+                &mut ui_state.sprite.color_mode,
+                ColorMode::TrueColor,
+                "TrueColor",
+            );
+            ui.selectable_value(
+                &mut ui_state.sprite.color_mode,
+                ColorMode::PaletteIndexed,
+                "PaletteIndexed",
+            );
+        });
+
+    if ui_state.sprite.color_mode == ColorMode::PaletteIndexed {
+        let mut palette_ids = ui_state
+            .project
+            .available_palettes
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        palette_ids.sort();
+
+        if ui_state.sprite.selected_palette_id.is_none() {
+            ui_state.sprite.selected_palette_id = palette_ids.first().cloned();
+        }
+
+        ui.horizontal(|ui| {
+            ui.label("Palette:");
+            egui::ComboBox::from_id_salt("sprite_editor_palette_id")
+                .selected_text(
+                    ui_state
+                        .sprite
+                        .selected_palette_id
+                        .as_deref()
+                        .unwrap_or("No palette"),
+                )
+                .show_ui(ui, |ui| {
+                    for palette_id in &palette_ids {
+                        if ui
+                            .selectable_value(
+                                &mut ui_state.sprite.selected_palette_id,
+                                Some(palette_id.clone()),
+                                palette_id,
+                            )
+                            .changed()
+                        {
+                            if let Some(palette) = ui_state.project.available_palettes.get(palette_id)
+                            {
+                                ui_state.sprite.foreground_color =
+                                    PixelColor::from_rgba_array(palette.colors[3]);
+                            }
+                        }
+                    }
+                });
+        });
     }
 }
 
@@ -150,6 +221,44 @@ fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 
     ui.label("Color:");
 
+    if ui_state.sprite.color_mode == ColorMode::PaletteIndexed {
+        if let Some(palette_id) = ui_state.sprite.selected_palette_id.clone() {
+            if let Some(palette) = ui_state.project.available_palettes.get(&palette_id) {
+                ui.horizontal_wrapped(|ui| {
+                    for color in palette.colors {
+                        let pixel_color = PixelColor::from_rgba_array(color);
+                        let is_selected = ui_state.sprite.foreground_color == pixel_color;
+                        let (rect, response) =
+                            ui.allocate_exact_size(egui::vec2(24.0, 24.0), egui::Sense::click());
+                        ui.painter().rect_filled(rect, 3.0, pixel_color.to_color32());
+                        ui.painter().rect_stroke(
+                            rect,
+                            3.0,
+                            egui::Stroke::new(
+                                if is_selected { 2.0 } else { 1.0 },
+                                if is_selected {
+                                    egui::Color32::WHITE
+                                } else {
+                                    egui::Color32::GRAY
+                                },
+                            ),
+                            egui::StrokeKind::Outside,
+                        );
+                        if response.clicked() {
+                            ui_state.sprite.foreground_color = pixel_color;
+                        }
+                    }
+                });
+                render_indexed_validation(ui, ui_state);
+                return;
+            }
+        }
+
+        ui.label("No palette available for indexed editing.");
+        render_indexed_validation(ui, ui_state);
+        return;
+    }
+
     // Convert to Color32 for egui color picker
     let mut color = ui_state.sprite.foreground_color.to_color32();
 
@@ -168,6 +277,29 @@ fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         ui.add_space(4.0);
         ui.label("Recent:");
         render_recent_colors(ui, ui_state);
+    }
+}
+
+fn render_indexed_validation(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    let Some(canvas) = ui_state.sprite.active().canvas.as_ref() else {
+        return;
+    };
+    let validation = validate_indexed_rgba8(canvas.pixels());
+    ui.add_space(4.0);
+    if validation.invalid_colors.is_empty() {
+        ui.label(format!(
+            "Indexed validation: OK ({} unique colors)",
+            validation.unique_color_count
+        ));
+    } else {
+        ui.colored_label(
+            egui::Color32::YELLOW,
+            format!(
+                "Indexed validation: {} invalid colors ({} unique colors)",
+                validation.invalid_colors.len(),
+                validation.unique_color_count
+            ),
+        );
     }
 }
 

@@ -1,8 +1,9 @@
 use super::{
     collect_map_object_sprite_render_requests, resolve_atlas_tile_frame,
     resolve_object_sheet_frame, resolve_sprite_render_request, resolve_sprite_render_requests,
-    sort_sprite_render_requests, ResolvedSpriteVisual, SpriteAssetResolver, SpriteRenderOrigin,
-    SpriteRenderRequest, SpriteRenderSize, SpriteResolveError, SpriteSortKey, SpriteVisualRef,
+    sort_sprite_render_requests, ResolvedSpriteVisual, SpriteAssetResolver, SpriteRenderMaterial,
+    SpriteRenderOrigin, SpriteRenderRequest, SpriteRenderSize, SpriteResolveError,
+    SpriteSortKey, SpriteVisualRef,
 };
 use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use crate::assets::object_sheet::{ObjectSheetMeta, ObjectSheetType, ObjectSpriteInfo};
@@ -18,6 +19,7 @@ impl SpriteAssetResolver for FakeResolver {
         &mut self,
         atlas_name: &str,
         tile_name: &str,
+        _palette_override: Option<&str>,
     ) -> Result<ResolvedSpriteVisual, SpriteResolveError> {
         if atlas_name == "missing" {
             return Err(SpriteResolveError::MissingAtlas {
@@ -40,6 +42,7 @@ impl SpriteAssetResolver for FakeResolver {
             },
             intrinsic_size: glam::UVec2::new(16, 16),
             texture_path: Some(PathBuf::from(format!("{atlas_name}.png"))),
+            material: SpriteRenderMaterial::TrueColor,
         })
     }
 
@@ -69,6 +72,7 @@ impl SpriteAssetResolver for FakeResolver {
             },
             intrinsic_size: glam::UVec2::new(24, 12),
             texture_path: Some(PathBuf::from(format!("{sheet_name}.png"))),
+            material: SpriteRenderMaterial::TrueColor,
         })
     }
 }
@@ -88,6 +92,7 @@ fn explicit_request_size_overrides_intrinsic_visual_size() {
         },
         position: glam::IVec2::new(10, 12),
         size: SpriteRenderSize::Explicit(glam::UVec2::new(32, 18)),
+        palette_override: None,
         flip_x: true,
     };
 
@@ -97,6 +102,7 @@ fn explicit_request_size_overrides_intrinsic_visual_size() {
     assert_eq!(resolved.size, glam::UVec2::new(32, 18));
     assert!(resolved.flip_x);
     assert_eq!(resolved.texture_path, Some(PathBuf::from("creatures.png")));
+    assert_eq!(resolved.material, SpriteRenderMaterial::TrueColor);
 }
 
 #[test]
@@ -118,6 +124,7 @@ fn intrinsic_request_size_uses_visual_intrinsic_size() {
         },
         position: glam::IVec2::new(24, 30),
         size: SpriteRenderSize::Intrinsic,
+        palette_override: None,
         flip_x: false,
     };
 
@@ -144,6 +151,7 @@ fn batch_resolution_collects_failures_without_stopping() {
             },
             position: glam::IVec2::ZERO,
             size: SpriteRenderSize::Explicit(glam::UVec2::new(16, 16)),
+            palette_override: None,
             flip_x: false,
         },
         SpriteRenderRequest {
@@ -159,6 +167,7 @@ fn batch_resolution_collects_failures_without_stopping() {
             },
             position: glam::IVec2::ZERO,
             size: SpriteRenderSize::Explicit(glam::UVec2::new(8, 8)),
+            palette_override: None,
             flip_x: false,
         },
     ];
@@ -221,6 +230,7 @@ fn sort_requests_orders_by_shared_sort_key() {
             },
             position: glam::IVec2::ZERO,
             size: SpriteRenderSize::Explicit(glam::UVec2::new(16, 16)),
+            palette_override: None,
             flip_x: false,
         },
         SpriteRenderRequest {
@@ -236,6 +246,7 @@ fn sort_requests_orders_by_shared_sort_key() {
             },
             position: glam::IVec2::ZERO,
             size: SpriteRenderSize::Explicit(glam::UVec2::new(16, 16)),
+            palette_override: None,
             flip_x: false,
         },
     ];

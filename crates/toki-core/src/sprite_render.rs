@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::object_sheet::ObjectSheetMeta;
+use crate::palette::Palette4;
 use crate::assets::tilemap::TileMap;
 use crate::entity::EntityId;
 use crate::sprite::SpriteFrame;
@@ -50,7 +51,14 @@ pub struct SpriteRenderRequest {
     pub visual: SpriteVisualRef,
     pub position: glam::IVec2,
     pub size: SpriteRenderSize,
+    pub palette_override: Option<String>,
     pub flip_x: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SpriteRenderMaterial {
+    TrueColor,
+    PaletteIndexed { palette_id: String, palette: Palette4 },
 }
 
 #[derive(Debug, Clone)]
@@ -58,6 +66,7 @@ pub struct ResolvedSpriteVisual {
     pub frame: SpriteFrame,
     pub intrinsic_size: glam::UVec2,
     pub texture_path: Option<PathBuf>,
+    pub material: SpriteRenderMaterial,
 }
 
 #[derive(Debug, Clone)]
@@ -68,6 +77,7 @@ pub struct ResolvedSpriteRenderInstance {
     pub position: glam::IVec2,
     pub size: glam::UVec2,
     pub texture_path: Option<PathBuf>,
+    pub material: SpriteRenderMaterial,
     pub flip_x: bool,
 }
 
@@ -105,6 +115,7 @@ pub trait SpriteAssetResolver {
         &mut self,
         atlas_name: &str,
         tile_name: &str,
+        palette_override: Option<&str>,
     ) -> Result<ResolvedSpriteVisual, SpriteResolveError>;
 
     fn resolve_object_sheet_object(
@@ -190,7 +201,11 @@ pub fn resolve_sprite_render_request(
         SpriteVisualRef::AtlasTile {
             atlas_name,
             tile_name,
-        } => resolver.resolve_atlas_tile(atlas_name, tile_name)?,
+        } => resolver.resolve_atlas_tile(
+            atlas_name,
+            tile_name,
+            request.palette_override.as_deref(),
+        )?,
         SpriteVisualRef::ObjectSheetObject {
             sheet_name,
             object_name,
@@ -207,6 +222,7 @@ pub fn resolve_sprite_render_request(
             SpriteRenderSize::Intrinsic => visual.intrinsic_size,
         },
         texture_path: visual.texture_path,
+        material: visual.material,
         flip_x: request.flip_x,
     })
 }
@@ -373,6 +389,7 @@ pub fn collect_map_object_sprite_render_requests(tilemap: &TileMap) -> Vec<Sprit
                 },
                 position: object.position.as_ivec2(),
                 size: SpriteRenderSize::Intrinsic,
+                palette_override: None,
                 flip_x: false,
             })
         })

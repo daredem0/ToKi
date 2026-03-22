@@ -314,6 +314,9 @@ pub struct EntityAttributes {
     /// Whether this entity casts the stylized runtime ground shadow.
     #[serde(default = "default_has_shadow")]
     pub has_shadow: bool,
+    /// Optional palette override for palette-indexed animated atlases.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub palette_override: Option<String>,
     /// Animation state machine for animated entities.
     pub animation_controller: Option<AnimationController>,
     /// Render order (lower layers drawn first, higher layers on top).
@@ -419,6 +422,7 @@ impl Default for EntityAttributes {
             solid: true,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             animation_controller: None,
             render_layer: 0,
             active: true,

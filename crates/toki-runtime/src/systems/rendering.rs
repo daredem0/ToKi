@@ -1,10 +1,12 @@
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use toki_core::fonts::find_font_files;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::math::projection::{calculate_projection, ProjectionParameter};
+use toki_core::palette::recolor_indexed_image;
 use toki_core::sprite::SpriteFrame;
-use toki_core::sprite_render::ResolvedSpriteRenderInstance;
+use toki_core::sprite_render::{ResolvedSpriteRenderInstance, SpriteRenderMaterial};
 use toki_core::text::TextItem;
 use toki_core::ui::UiComposition;
 use toki_render::{GpuState, RenderBackend};
@@ -20,6 +22,8 @@ pub struct RenderingSystem {
     projection_params: ProjectionParameter,
     loaded_tilemap_texture_path: Option<std::path::PathBuf>,
     loaded_sprite_texture_path: Option<std::path::PathBuf>,
+    decoded_sprite_images: BTreeMap<std::path::PathBuf, DecodedImage>,
+    recolored_sprite_images: BTreeMap<std::path::PathBuf, DecodedImage>,
 }
 
 impl Default for RenderingSystem {
@@ -41,6 +45,8 @@ impl RenderingSystem {
             },
             loaded_tilemap_texture_path: None,
             loaded_sprite_texture_path: None,
+            decoded_sprite_images: BTreeMap::new(),
+            recolored_sprite_images: BTreeMap::new(),
         }
     }
 
@@ -51,6 +57,8 @@ impl RenderingSystem {
             projection_params,
             loaded_tilemap_texture_path: None,
             loaded_sprite_texture_path: None,
+            decoded_sprite_images: BTreeMap::new(),
+            recolored_sprite_images: BTreeMap::new(),
         }
     }
 
@@ -67,6 +75,8 @@ impl RenderingSystem {
             },
             loaded_tilemap_texture_path: None,
             loaded_sprite_texture_path: None,
+            decoded_sprite_images: BTreeMap::new(),
+            recolored_sprite_images: BTreeMap::new(),
         }
     }
 
@@ -117,6 +127,21 @@ impl RenderingSystem {
         if let Some(backend) = &mut self.backend {
             backend.load_tilemap_texture(texture_path.clone())?;
             self.loaded_tilemap_texture_path = Some(texture_path);
+            Ok(())
+        } else {
+            Err(toki_render::RenderError::Other(
+                "GPU not initialized".to_string(),
+            ))
+        }
+    }
+
+    pub fn load_tilemap_texture_rgba8(
+        &mut self,
+        image: &DecodedImage,
+    ) -> Result<(), toki_render::RenderError> {
+        if let Some(backend) = &mut self.backend {
+            backend.load_tilemap_texture_rgba8(image)?;
+            self.loaded_tilemap_texture_path = None;
             Ok(())
         } else {
             Err(toki_render::RenderError::Other(
@@ -293,17 +318,97 @@ impl RenderingSystem {
         }
     }
 
-    pub fn add_resolved_sprite(&mut self, sprite: &ResolvedSpriteRenderInstance) {
-        if let Some(texture_path) = sprite.texture_path.clone() {
-            self.add_sprite_with_texture(
-                texture_path,
-                sprite.frame,
-                sprite.position,
-                sprite.size,
-                sprite.flip_x,
+    pub fn add_sprite_with_texture_rgba8(
+        &mut self,
+        texture_key: std::path::PathBuf,
+        image: &DecodedImage,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    ) {
+        if let Some(backend) = &mut self.backend {
+            backend.add_sprite_with_texture_rgba8(
+                texture_key,
+                image,
+                frame,
+                position,
+                size,
+                flip_x,
             );
-        } else {
-            self.add_sprite(sprite.frame, sprite.position, sprite.size, sprite.flip_x);
+        }
+    }
+
+    pub fn add_resolved_sprite(&mut self, sprite: &ResolvedSpriteRenderInstance) {
+        match (&sprite.texture_path, &sprite.material) {
+            (Some(texture_path), SpriteRenderMaterial::TrueColor) => {
+                self.add_sprite_with_texture(
+                    texture_path.clone(),
+                    sprite.frame,
+                    sprite.position,
+                    sprite.size,
+                    sprite.flip_x,
+                );
+            }
+            (
+                Some(texture_path),
+                SpriteRenderMaterial::PaletteIndexed {
+                    palette_id,
+                    palette,
+                },
+            ) => {
+                let texture_key =
+                    palette_texture_key(texture_path.as_path(), palette_id.as_str());
+                let image = if let Some(image) = self.recolored_sprite_images.get(&texture_key) {
+                    image.clone()
+                } else {
+                    let decoded = match self.decoded_sprite_images.get(texture_path) {
+                        Some(image) => image.clone(),
+                        None => match toki_core::graphics::image::load_image_rgba8(texture_path) {
+                            Ok(image) => {
+                                self.decoded_sprite_images
+                                    .insert(texture_path.clone(), image.clone());
+                                image
+                            }
+                            Err(error) => {
+                                tracing::warn!(
+                                    "Failed to decode indexed sprite texture '{}': {}",
+                                    texture_path.display(),
+                                    error
+                                );
+                                return;
+                            }
+                        },
+                    };
+                    let recolored = match recolor_indexed_image(&decoded, *palette) {
+                        Ok(image) => image,
+                        Err(error) => {
+                            tracing::warn!(
+                                "Indexed sprite texture '{}' failed validation for palette '{}': {}",
+                                texture_path.display(),
+                                palette_id,
+                                error
+                            );
+                            return;
+                        }
+                    };
+                    self.recolored_sprite_images
+                        .insert(texture_key.clone(), recolored.clone());
+                    recolored
+                };
+
+                self.add_sprite_with_texture_rgba8(
+                    texture_key,
+                    &image,
+                    sprite.frame,
+                    sprite.position,
+                    sprite.size,
+                    sprite.flip_x,
+                );
+            }
+            (None, _) => {
+                self.add_sprite(sprite.frame, sprite.position, sprite.size, sprite.flip_x);
+            }
         }
     }
 
@@ -437,6 +542,14 @@ impl RenderingSystem {
             backend.finalize_ui_shapes();
         }
     }
+}
+
+fn palette_texture_key(texture_path: &std::path::Path, palette_id: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(format!(
+        "__palette__/{}::{}",
+        palette_id,
+        texture_path.display()
+    ))
 }
 
 /// Helper function to find atlas files by name in a directory (only .json supported)

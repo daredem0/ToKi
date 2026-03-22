@@ -6,6 +6,7 @@ use super::{
 use std::fs;
 use std::path::PathBuf;
 use toki_core::assets::tilemap::TileMap;
+use toki_core::sprite_render::{SpriteAssetResolver, SpriteRenderMaterial};
 
 fn make_unique_temp_dir() -> std::path::PathBuf {
     let nanos = std::time::SystemTime::now()
@@ -33,6 +34,26 @@ fn write_minimal_atlas(path: &std::path::Path, image_name: &str) {
 }}"#
     );
     fs::write(path, content).expect("atlas write");
+}
+
+fn write_palette_indexed_atlas(path: &std::path::Path, image_name: &str, palette: &str) {
+    let content = format!(
+        r#"{{
+  "image": "{image_name}",
+  "tile_size": [16, 16],
+  "color_mode": "palette_indexed",
+  "palette": "{palette}",
+  "tiles": {{
+    "floor": {{
+      "position": [0, 0],
+      "properties": {{
+        "solid": false
+      }}
+    }}
+  }}
+}}"#
+    );
+    fs::write(path, content).expect("palette atlas write");
 }
 
 fn write_minimal_map(path: &std::path::Path, atlas_ref: &str) {
@@ -213,6 +234,31 @@ fn load_for_project_registers_sprite_atlas_by_filename_and_stem() {
         manager.get_sprite_texture_path("players.json"),
         Some(&sprites_dir.join("player.png"))
     );
+}
+
+#[test]
+fn resolve_atlas_tile_uses_palette_indexed_material_for_indexed_atlases() {
+    let project_dir = make_unique_temp_dir();
+    let sprites_dir = project_dir.join("assets").join("sprites");
+    let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+    fs::create_dir_all(&sprites_dir).expect("sprites dir");
+    fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+
+    write_palette_indexed_atlas(&sprites_dir.join("creatures.json"), "creatures.png", "sepia");
+    write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
+    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+
+    let mut manager = ResourceManager::load_for_project(&project_dir, Some("demo_map"))
+        .expect("project resources should load");
+
+    let resolved = manager
+        .resolve_atlas_tile("creatures", "floor", None)
+        .expect("indexed atlas tile should resolve");
+
+    assert!(matches!(
+        resolved.material,
+        SpriteRenderMaterial::PaletteIndexed { ref palette_id, .. } if palette_id == "sepia"
+    ));
 }
 
 #[test]

@@ -5,6 +5,8 @@ use crate::project_assets::{
     ProjectAudioFormat, SpriteMetadataFileKind,
 };
 use crate::assets::atlas::ColorMode;
+use crate::graphics::image::load_image_rgba8;
+use crate::palette::validate_indexed_rgba8;
 use std::fs;
 
 // ============================================================================
@@ -292,6 +294,7 @@ fn load_entity_definition_from_path_reads_definition_json() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: crate::entity::AttributesDef {
@@ -396,4 +399,79 @@ fn discover_project_scene_paths_includes_unlisted_scene_files_alongside_manifest
         discovered[1],
         ("Main".to_string(), project.join("scenes").join("Main.json"))
     );
+}
+
+#[test]
+fn example_testpalette_project_assets_parse_and_indexed_source_is_valid() {
+    let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("workspace root");
+    let project_root = workspace_root.join("example_projects").join("TestPalette");
+
+    let atlas = crate::assets::atlas::AtlasMeta::load_from_file(
+        project_root
+            .join("assets")
+            .join("sprites")
+            .join("indexed_demo.json"),
+    )
+    .expect("indexed atlas should parse");
+    assert_eq!(atlas.color_mode, ColorMode::PaletteIndexed);
+    assert_eq!(atlas.palette.as_deref(), Some("gb_default"));
+
+    let image = load_image_rgba8(
+        project_root
+            .join("assets")
+            .join("sprites")
+            .join("indexed_demo.png"),
+    )
+    .expect("indexed image should load");
+    let validation = validate_indexed_rgba8(&image.data);
+    assert!(
+        validation.is_valid(),
+        "indexed example should only use canonical shades, got invalid colors: {:?}",
+        validation.invalid_colors
+    );
+
+    let scene = load_scene_from_path(&project_root.join("scenes").join("Main Scene.json"))
+        .expect("scene should parse");
+    assert_eq!(scene.name, "Main Scene");
+    assert_eq!(scene.maps, vec!["palette_demo_map".to_string()]);
+    assert_eq!(scene.entities.len(), 2);
+    assert_eq!(
+        scene.player_entry.as_ref().map(|entry| entry.entity_definition_name.as_str()),
+        Some("palette_player")
+    );
+
+    let definition =
+        load_entity_definition_from_path(&project_root.join("entities").join("palette_player.json"))
+            .expect("palette player definition should parse");
+    assert_eq!(definition.animations.atlas_name, "indexed_demo.json");
+
+    let guide_definition =
+        load_entity_definition_from_path(&project_root.join("entities").join("palette_guide.json"))
+            .expect("palette guide definition should parse");
+    assert_eq!(
+        guide_definition.rendering.palette_override.as_deref(),
+        Some("night")
+    );
+
+    let truecolor_definition = load_entity_definition_from_path(
+        &project_root.join("entities").join("truecolor_flower.json"),
+    )
+    .expect("truecolor flower definition should parse");
+    assert_eq!(truecolor_definition.animations.atlas_name, "truecolor_demo.json");
+
+    let resolved = resolve_project_resource_paths(&project_root, Some("palette_demo_map"))
+        .expect("example project should resolve runtime resource paths");
+    assert_eq!(
+        resolved
+            .tilemap_path
+            .file_name()
+            .and_then(|name| name.to_str()),
+        Some("palette_demo_map.json")
+    );
+    assert!(resolved.terrain_atlas_path.ends_with("terrain.json"));
+    assert!(resolved.tilemap_texture_path.is_some());
+    assert!(resolved.sprite_texture_path.is_some());
 }

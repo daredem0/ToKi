@@ -103,6 +103,24 @@ impl InspectorSystem {
                 if let Some((tile_names, atlas, texture_path)) =
                     Self::load_map_editor_brush_source(ui_state, config)
                 {
+                    ui.horizontal(|ui| {
+                        ui.label("Atlas Mode:");
+                        ui.label(match atlas.color_mode {
+                            toki_core::assets::atlas::ColorMode::TrueColor => "TrueColor",
+                            toki_core::assets::atlas::ColorMode::PaletteIndexed => {
+                                "PaletteIndexed"
+                            }
+                        });
+                    });
+                    if atlas.is_palette_indexed() {
+                        ui.horizontal(|ui| {
+                            ui.label("Default Palette:");
+                            ui.label(atlas.palette.as_deref().unwrap_or("gb_default"));
+                        });
+                        ui.label(
+                            "Indexed atlas palette selection is controlled by atlas metadata or the project-wide indexed override.",
+                        );
+                    }
                     ui_state.sync_map_editor_brush_selection(&tile_names);
                     ui.horizontal(|ui| {
                         ui.label("Tile:");

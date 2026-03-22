@@ -1,13 +1,15 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
+use toki_core::palette::{resolve_palette, Palette4};
 pub use toki_core::project_assets::{
     classify_sprite_metadata_file, find_first_json_file, first_existing_path, normalize_asset_name,
     resolve_atlas_texture_path, resolve_object_sheet_texture_path, resolve_project_resource_paths,
     resolve_tilemap_atlas_path, ResolvedProjectResourcePaths, SpriteMetadataFileKind,
 };
+use toki_core::project_runtime::ProjectRuntimeMetadata;
 use toki_core::sprite_render::{
     resolve_atlas_tile_frame, resolve_object_sheet_frame, ResolvedSpriteVisual,
-    SpriteAssetResolver, SpriteResolveError,
+    SpriteAssetResolver, SpriteRenderMaterial, SpriteResolveError,
 };
 use toki_render::RenderError;
 
@@ -34,6 +36,8 @@ pub struct ResourceManager {
     object_sheets: ObjectSheetRegistry,
     object_texture_paths: ObjectTextureRegistry,
     tilemap: TileMap,
+    project_palettes: BTreeMap<String, Palette4>,
+    indexed_palette_override: Option<String>,
 }
 
 impl ResourceManager {
@@ -63,6 +67,8 @@ impl ResourceManager {
             object_sheets,
             object_texture_paths,
             tilemap,
+            project_palettes: BTreeMap::new(),
+            indexed_palette_override: None,
         })
     }
 
@@ -97,6 +103,15 @@ impl ResourceManager {
             &resolved_paths.object_sheet_paths,
             decoded_project_cache,
         )?;
+        let (project_palettes, indexed_palette_override) =
+            load_palette_settings(project_path).unwrap_or_else(|error| {
+                tracing::warn!(
+                    "Failed to load palette settings from '{}': {}",
+                    project_path.display(),
+                    error
+                );
+                (BTreeMap::new(), None)
+            });
 
         Ok((
             Self {
@@ -106,11 +121,14 @@ impl ResourceManager {
                 object_sheets,
                 object_texture_paths,
                 tilemap,
+                project_palettes,
+                indexed_palette_override,
             },
             resolved_paths,
         ))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn from_preloaded(
         terrain_atlas: AtlasMeta,
         sprite_atlases: SpriteAtlasRegistry,
@@ -118,6 +136,8 @@ impl ResourceManager {
         object_sheets: ObjectSheetRegistry,
         object_texture_paths: ObjectTextureRegistry,
         tilemap: TileMap,
+        project_palettes: BTreeMap<String, Palette4>,
+        indexed_palette_override: Option<String>,
     ) -> Self {
         Self {
             terrain_atlas,
@@ -126,6 +146,8 @@ impl ResourceManager {
             object_sheets,
             object_texture_paths,
             tilemap,
+            project_palettes,
+            indexed_palette_override,
         }
     }
 
@@ -196,6 +218,40 @@ impl ResourceManager {
     pub fn tilemap_tile_size(&self) -> glam::UVec2 {
         self.tilemap.tile_size
     }
+
+    pub fn project_palettes(&self) -> &BTreeMap<String, Palette4> {
+        &self.project_palettes
+    }
+
+    pub fn indexed_palette_override(&self) -> Option<&str> {
+        self.indexed_palette_override.as_deref()
+    }
+
+    pub fn set_indexed_palette_override(&mut self, palette_id: Option<String>) {
+        self.indexed_palette_override = palette_id;
+    }
+
+    pub fn resolve_indexed_palette(
+        &self,
+        atlas: &AtlasMeta,
+        palette_override: Option<&str>,
+    ) -> Result<(String, Palette4), SpriteResolveError> {
+        let palette_id = self
+            .indexed_palette_override
+            .as_deref()
+            .or(palette_override)
+            .or(atlas.palette.as_deref())
+            .unwrap_or("gb_default")
+            .to_string();
+        let palette = resolve_palette(&palette_id, &self.project_palettes).ok_or_else(|| {
+            SpriteResolveError::AssetLoadFailed {
+                asset_kind: "palette",
+                asset_name: palette_id.clone(),
+                message: "palette id could not be resolved".to_string(),
+            }
+        })?;
+        Ok((palette_id, palette))
+    }
 }
 
 impl SpriteAssetResolver for ResourceManager {
@@ -203,6 +259,7 @@ impl SpriteAssetResolver for ResourceManager {
         &mut self,
         atlas_name: &str,
         tile_name: &str,
+        palette_override: Option<&str>,
     ) -> Result<ResolvedSpriteVisual, SpriteResolveError> {
         let atlas =
             self.get_sprite_atlas(atlas_name)
@@ -210,11 +267,21 @@ impl SpriteAssetResolver for ResourceManager {
                     atlas_name: atlas_name.to_string(),
                 })?;
         let (frame, intrinsic_size) = resolve_atlas_tile_frame(atlas, atlas_name, tile_name)?;
+        let material = if atlas.is_palette_indexed() {
+            let (palette_id, palette) = self.resolve_indexed_palette(atlas, palette_override)?;
+            SpriteRenderMaterial::PaletteIndexed {
+                palette_id,
+                palette,
+            }
+        } else {
+            SpriteRenderMaterial::TrueColor
+        };
 
         Ok(ResolvedSpriteVisual {
             frame,
             intrinsic_size,
             texture_path: self.get_sprite_texture_path(atlas_name).cloned(),
+            material,
         })
     }
 
@@ -235,8 +302,26 @@ impl SpriteAssetResolver for ResourceManager {
             frame,
             intrinsic_size,
             texture_path: self.get_object_texture_path(sheet_name).cloned(),
+            material: SpriteRenderMaterial::TrueColor,
         })
     }
+}
+
+fn load_palette_settings(
+    project_path: &std::path::Path,
+) -> Result<(BTreeMap<String, Palette4>, Option<String>), String> {
+    let project_file = project_path.join("project.toml");
+    if !project_file.exists() {
+        return Ok((BTreeMap::new(), None));
+    }
+
+    let content = std::fs::read_to_string(&project_file).map_err(|error| error.to_string())?;
+    let metadata =
+        toml::from_str::<ProjectRuntimeMetadata>(&content).map_err(|error| error.to_string())?;
+    Ok((
+        metadata.runtime.palettes,
+        metadata.runtime.display.indexed_palette_override,
+    ))
 }
 
 fn register_sprite_atlas(

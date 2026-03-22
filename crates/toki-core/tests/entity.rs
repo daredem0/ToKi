@@ -12,6 +12,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: AttributesDef {

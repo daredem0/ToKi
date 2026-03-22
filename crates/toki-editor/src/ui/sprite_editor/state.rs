@@ -4,6 +4,7 @@ use super::{
     CanvasSide, CanvasState, DiscoveredSpriteAsset, DualCanvasLayout, PixelColor, ResizeAnchor,
     SpriteCanvas, SpriteEditorTool,
 };
+use toki_core::assets::atlas::ColorMode;
 
 /// Sprite editor state
 pub struct SpriteEditorState {
@@ -21,6 +22,10 @@ pub struct SpriteEditorState {
     pub clipboard: Option<SpriteCanvas>,
     /// Current foreground color (shared across canvases)
     pub foreground_color: PixelColor,
+    /// Current color interpretation mode for atlas authoring.
+    pub color_mode: ColorMode,
+    /// Selected palette id when authoring indexed atlas art.
+    pub selected_palette_id: Option<String>,
     /// Brush size in pixels (shared across canvases)
     pub brush_size: u32,
     /// Recent colors palette (shared across canvases)
@@ -83,6 +88,8 @@ impl Default for SpriteEditorState {
             tool: SpriteEditorTool::Drag,
             clipboard: None,
             foreground_color: PixelColor::black(),
+            color_mode: ColorMode::TrueColor,
+            selected_palette_id: None,
             brush_size: 1,
             recent_colors: Vec::new(),
             max_recent_colors: 16,

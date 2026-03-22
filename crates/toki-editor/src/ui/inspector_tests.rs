@@ -33,6 +33,7 @@ fn sample_entity_with_id(id: u32) -> toki_core::entity::Entity {
             solid: true,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             animation_controller: None,
             static_object_render: None,
             render_layer: 1,
@@ -167,6 +168,7 @@ fn apply_entity_property_draft_to_definition_updates_has_shadow() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: toki_core::entity::AttributesDef {
@@ -259,6 +261,8 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
         music_mix_percent: 70,
         movement_mix_percent: 55,
         collision_mix_percent: 35,
+        indexed_palette_override: None,
+        palettes: std::collections::BTreeMap::new(),
     };
 
     let changed = InspectorSystem::apply_project_settings_draft(&mut project, &draft);
@@ -1094,6 +1098,7 @@ fn save_entity_definition_persists_audio_updates() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: toki_core::entity::AttributesDef {

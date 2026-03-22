@@ -65,6 +65,7 @@ impl App {
                 &mut self.asset_load_plan,
                 &mut self.scene_transition,
                 &self.launch_options.audio_mix,
+                self.launch_options.display.indexed_palette_override.clone(),
                 content_root,
             );
             coordinator.queue_scene_switch_request(request);
@@ -82,6 +83,7 @@ impl App {
                 &mut self.asset_load_plan,
                 &mut self.scene_transition,
                 &self.launch_options.audio_mix,
+                self.launch_options.display.indexed_palette_override.clone(),
                 content_root,
             );
             coordinator.advance_scene_transition(transition_delta_ms);

@@ -15,11 +15,25 @@ pub trait RenderBackend: std::fmt::Debug {
     /// Load a tilemap texture from file
     fn load_tilemap_texture(&mut self, texture_path: PathBuf) -> Result<(), RenderError>;
 
+    /// Load a tilemap texture from raw RGBA8 image data
+    fn load_tilemap_texture_rgba8(&mut self, image: &DecodedImage) -> Result<(), RenderError>;
+
     /// Load a sprite texture from file
     fn load_sprite_texture(&mut self, texture_path: PathBuf) -> Result<(), RenderError>;
 
     /// Load a sprite texture from raw RGBA8 image data
     fn load_sprite_texture_rgba8(&mut self, image: &DecodedImage) -> Result<(), RenderError>;
+
+    /// Add a sprite using a cached RGBA8 texture identified by a synthetic texture key.
+    fn add_sprite_with_texture_rgba8(
+        &mut self,
+        texture_key: PathBuf,
+        image: &DecodedImage,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    );
 
     /// Load a font file for text rendering
     fn load_font_file(&mut self, font_path: PathBuf) -> Result<(), RenderError>;

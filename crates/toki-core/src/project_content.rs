@@ -48,6 +48,7 @@ mod tests {
                 render_layer: 1,
                 visible: true,
                 has_shadow: true,
+                palette_override: None,
                 static_object: None,
             },
             attributes: AttributesDef {

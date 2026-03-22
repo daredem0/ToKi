@@ -2,8 +2,8 @@ use super::*;
 use toki_core::project_assets::normalize_asset_name;
 use toki_core::sprite_render::{
     resolve_atlas_tile_frame, resolve_object_sheet_frame, resolve_sprite_render_requests,
-    ResolvedSpriteVisual, SpriteAssetResolver, SpriteRenderRequest, SpriteResolveError,
-    SpriteResolveFailure,
+    ResolvedSpriteVisual, SpriteAssetResolver, SpriteRenderMaterial, SpriteRenderRequest,
+    SpriteResolveError, SpriteResolveFailure,
 };
 
 struct ViewportSpriteResolver<'a, 'b> {
@@ -177,6 +177,7 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
         &mut self,
         atlas_name: &str,
         tile_name: &str,
+        _palette_override: Option<&str>,
     ) -> Result<ResolvedSpriteVisual, SpriteResolveError> {
         let atlas_name_clean = normalize_asset_name(atlas_name);
         let atlas_asset = self
@@ -203,6 +204,7 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
                 .path
                 .parent()
                 .map(|parent| parent.join(&atlas.image)),
+            material: SpriteRenderMaterial::TrueColor,
         })
     }
 
@@ -237,6 +239,7 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
                 .path
                 .parent()
                 .map(|parent| parent.join(&object_sheet.image)),
+            material: SpriteRenderMaterial::TrueColor,
         })
     }
 }

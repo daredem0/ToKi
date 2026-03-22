@@ -1,4 +1,6 @@
 use chrono::Utc;
+use std::collections::BTreeMap;
+use toki_core::palette::Palette4;
 
 use super::Project;
 
@@ -20,6 +22,8 @@ pub struct ProjectSettingsDraft {
     pub music_mix_percent: u8,
     pub movement_mix_percent: u8,
     pub collision_mix_percent: u8,
+    pub indexed_palette_override: Option<String>,
+    pub palettes: BTreeMap<String, Palette4>,
 }
 
 impl ProjectSettingsDraft {
@@ -41,6 +45,8 @@ impl ProjectSettingsDraft {
             music_mix_percent: project.metadata.runtime.audio.music_percent,
             movement_mix_percent: project.metadata.runtime.audio.movement_percent,
             collision_mix_percent: project.metadata.runtime.audio.collision_percent,
+            indexed_palette_override: project.metadata.runtime.display.indexed_palette_override.clone(),
+            palettes: project.metadata.runtime.palettes.clone(),
         }
     }
 }
@@ -73,6 +79,11 @@ pub fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettin
     }
     if project.metadata.runtime.display.show_ground_shadows != draft.show_ground_shadows {
         project.metadata.runtime.display.show_ground_shadows = draft.show_ground_shadows;
+        changed = true;
+    }
+    if project.metadata.runtime.display.indexed_palette_override != draft.indexed_palette_override {
+        project.metadata.runtime.display.indexed_palette_override =
+            draft.indexed_palette_override.clone();
         changed = true;
     }
     if project.metadata.runtime.display.resolution_width != draft.resolution_width {
@@ -115,6 +126,10 @@ pub fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettin
         project.audio_config_mut().collision_percent = draft.collision_mix_percent;
         changed = true;
     }
+    if project.metadata.runtime.palettes != draft.palettes {
+        project.metadata.runtime.palettes = draft.palettes.clone();
+        changed = true;
+    }
 
     if changed {
         project.metadata.project.modified = Utc::now();
@@ -151,6 +166,16 @@ mod tests {
             music_mix_percent: 70,
             movement_mix_percent: 55,
             collision_mix_percent: 35,
+            indexed_palette_override: Some("gb_swamp".to_string()),
+            palettes: BTreeMap::from([(
+                "gb_swamp".to_string(),
+                Palette4::new([
+                    [8, 24, 8, 255],
+                    [32, 72, 24, 255],
+                    [96, 144, 56, 255],
+                    [184, 216, 104, 255],
+                ]),
+            )]),
         };
 
         let changed = apply_project_settings_draft(&mut project, &draft);
@@ -162,6 +187,11 @@ mod tests {
         assert_eq!(project.metadata.runtime.splash.duration_ms, 4500);
         assert!(project.metadata.runtime.display.show_entity_health_bars);
         assert!(!project.metadata.runtime.display.show_ground_shadows);
+        assert_eq!(
+            project.metadata.runtime.display.indexed_palette_override.as_deref(),
+            Some("gb_swamp")
+        );
+        assert!(project.metadata.runtime.palettes.contains_key("gb_swamp"));
         assert_eq!(project.metadata.runtime.audio.master_percent, 85);
         assert_eq!(project.metadata.runtime.audio.music_percent, 70);
         assert_eq!(project.metadata.runtime.audio.movement_percent, 55);

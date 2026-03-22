@@ -8,6 +8,7 @@ use crate::editor_types::PlacementPreviewVisual;
 use crate::project::ProjectTemplateKind;
 use crate::project::SceneGraphLayout;
 use crate::scene::SceneViewport;
+use toki_core::palette::{builtin_palettes, Palette4};
 
 #[path = "editor_ui_animation_authoring.rs"]
 mod editor_ui_animation_authoring;
@@ -44,7 +45,7 @@ pub(crate) use editor_ui_sprite_editor::{
     CanvasSide, DualCanvasLayout, PixelColor, ResizeAnchor, SpriteAssetKind, SpriteCanvas,
     SpriteCanvasViewport, SpriteEditorState, SpriteEditorTool, SpriteSelection,
 };
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use toki_core::{
     assets::tilemap::TileMap,
@@ -185,6 +186,7 @@ pub struct ProjectEditorState {
     // Window state
     pub window_title: Option<String>,
     pub pending_confirmation: Option<EditorConfirmation>,
+    pub available_palettes: BTreeMap<String, Palette4>,
 }
 
 impl Default for ProjectEditorState {
@@ -209,6 +211,7 @@ impl Default for ProjectEditorState {
             cancel_background_task_requested: false,
             window_title: Some("No project open".to_string()),
             pending_confirmation: None,
+            available_palettes: builtin_palettes(),
         }
     }
 }
@@ -219,6 +222,12 @@ pub enum EditorConfirmation {
 }
 
 impl ProjectEditorState {
+    pub fn set_available_palettes(&mut self, project_palettes: &BTreeMap<String, Palette4>) {
+        let mut palettes = builtin_palettes();
+        palettes.extend(project_palettes.iter().map(|(id, palette)| (id.clone(), *palette)));
+        self.available_palettes = palettes;
+    }
+
     pub fn begin_new_project_dialog(
         &mut self,
         template: ProjectTemplateKind,

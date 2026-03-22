@@ -39,6 +39,7 @@ impl InspectorSystem {
 
         changed |= ui.checkbox(&mut draft.visible, "Visible").changed();
         changed |= ui.checkbox(&mut draft.has_shadow, "Has Shadow").changed();
+        changed |= render_palette_override_row(ui, draft);
         changed |= ui.checkbox(&mut draft.active, "Active").changed();
         changed |= ui.checkbox(&mut draft.solid, "Solid").changed();
         changed |= ui
@@ -100,6 +101,16 @@ impl InspectorSystem {
     ) -> bool {
         Self::render_entity_property_editor(ui, draft, config, false, false, "Entity Properties")
     }
+}
+
+fn render_palette_override_row(ui: &mut egui::Ui, draft: &mut EntityPropertyDraft) -> bool {
+    let mut changed = false;
+    ui.horizontal(|ui| {
+        ui.label("Palette Override:");
+        changed |= ui.text_edit_singleline(&mut draft.palette_override).changed();
+    });
+    ui.label("Optional. Ignored for true-color atlases.");
+    changed
 }
 
 fn render_position_row(ui: &mut egui::Ui, draft: &mut EntityPropertyDraft) -> bool {

@@ -13,6 +13,7 @@ fn test_entity_definition_create_entity_basic() {
             render_layer: 1,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -149,6 +150,7 @@ fn test_entity_definition_create_npc_entity() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -299,6 +301,7 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
@@ -431,6 +434,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
             render_layer: 1,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -526,6 +530,7 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
             render_layer: 1,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -629,6 +634,7 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
@@ -698,6 +704,7 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
@@ -771,6 +778,7 @@ fn test_entity_definition_copies_authored_primary_projectile() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -853,6 +861,7 @@ fn test_entity_definition_copies_authored_pickup() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
@@ -929,6 +938,7 @@ fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type()
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -986,6 +996,7 @@ fn test_entity_definition_invalid_animation_state() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -1048,6 +1059,7 @@ fn test_entity_definition_invalid_loop_mode() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -1110,6 +1122,7 @@ fn test_entity_definition_serialization() {
             render_layer: -1,
             visible: false,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -1240,6 +1253,7 @@ fn create_entity_copies_has_shadow_from_definition_rendering() {
             render_layer: 0,
             visible: true,
             has_shadow: false,
+            palette_override: None,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -1297,6 +1311,7 @@ fn test_entity_definition_create_audio_component() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: AttributesDef {
@@ -1783,6 +1798,7 @@ fn test_entity_definition_with_position_based_animations() {
             render_layer: 1,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: None,
         },
         attributes: AttributesDef {

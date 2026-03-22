@@ -16,6 +16,7 @@ pub use errors::CoreError;
 pub mod pack;
 pub mod project_assets;
 pub mod project_content;
+pub mod palette;
 pub mod project_runtime;
 pub use project_runtime::TimingMode;
 

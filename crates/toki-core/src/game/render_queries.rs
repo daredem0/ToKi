@@ -259,6 +259,7 @@ impl<'a> RenderQueryFacade<'a> {
                     },
                     position: entity.position,
                     size: SpriteRenderSize::Explicit(entity.size),
+                    palette_override: entity.attributes.palette_override.clone(),
                     flip_x: GameState::animation_state_flip_x(
                         animation_controller.current_clip_state,
                     ),
@@ -281,6 +282,7 @@ impl<'a> RenderQueryFacade<'a> {
                     },
                     position: entity.position,
                     size: SpriteRenderSize::Explicit(entity.size),
+                    palette_override: None,
                     flip_x: false,
                 });
                 static_sequence += 1;
@@ -301,6 +303,7 @@ impl<'a> RenderQueryFacade<'a> {
                     },
                     position: entity.position,
                     size: SpriteRenderSize::Explicit(entity.size),
+                    palette_override: None,
                     flip_x: false,
                 });
                 projectile_sequence += 1;

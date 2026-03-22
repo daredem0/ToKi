@@ -125,6 +125,36 @@ impl GpuState {
         pipeline.add_sprite(instance);
     }
 
+    pub fn add_sprite_with_texture_rgba8(
+        &mut self,
+        texture_key: PathBuf,
+        image: &DecodedImage,
+        frame: SpriteFrame,
+        pos: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    ) {
+        let instance = SpriteInstance {
+            frame,
+            position: pos.as_vec2(),
+            size: size.as_vec2(),
+            flip_x,
+        };
+        let pipeline = self
+            .sprite_pipelines_by_texture
+            .entry(texture_key)
+            .or_insert_with(|| {
+                SpritePipeline::from_rgba8(
+                    &self.device,
+                    &self.queue,
+                    self.config.format,
+                    image,
+                )
+            });
+        pipeline.update_projection(&self.queue, self.current_mvp);
+        pipeline.add_sprite(instance);
+    }
+
     pub fn clear_sprites(&mut self) {
         self.sprite_pipeline.clear_sprites();
         for pipeline in self.sprite_pipelines_by_texture.values_mut() {
@@ -275,6 +305,16 @@ impl GpuState {
         // Create new tilemap pipeline with the specified texture
         let new_pipeline =
             TilemapPipeline::new(&self.device, &self.queue, self.config.format, texture_path);
+        self.tilemap_pipeline = new_pipeline;
+        Ok(())
+    }
+
+    pub fn load_tilemap_texture_rgba8(
+        &mut self,
+        image: &DecodedImage,
+    ) -> Result<(), crate::RenderError> {
+        let new_pipeline =
+            TilemapPipeline::from_rgba8(&self.device, &self.queue, self.config.format, image);
         self.tilemap_pipeline = new_pipeline;
         Ok(())
     }
@@ -491,6 +531,13 @@ impl crate::RenderBackend for GpuState {
         GpuState::load_tilemap_texture(self, texture_path)
     }
 
+    fn load_tilemap_texture_rgba8(
+        &mut self,
+        image: &DecodedImage,
+    ) -> Result<(), crate::RenderError> {
+        GpuState::load_tilemap_texture_rgba8(self, image)
+    }
+
     fn load_sprite_texture(
         &mut self,
         texture_path: std::path::PathBuf,
@@ -503,6 +550,26 @@ impl crate::RenderBackend for GpuState {
         image: &DecodedImage,
     ) -> Result<(), crate::RenderError> {
         GpuState::load_sprite_texture_rgba8(self, image)
+    }
+
+    fn add_sprite_with_texture_rgba8(
+        &mut self,
+        texture_key: PathBuf,
+        image: &DecodedImage,
+        frame: SpriteFrame,
+        position: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    ) {
+        GpuState::add_sprite_with_texture_rgba8(
+            self,
+            texture_key,
+            image,
+            frame,
+            position,
+            size,
+            flip_x,
+        );
     }
 
     fn load_font_file(&mut self, font_path: std::path::PathBuf) -> Result<(), crate::RenderError> {

@@ -1,6 +1,7 @@
 use crate::errors::CoreError;
 use image::{ImageBuffer, Rgba};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DecodedImage {
     pub width: u32,
     pub height: u32,

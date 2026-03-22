@@ -170,6 +170,12 @@ impl<'a> StartupCoordinator<'a> {
             decoded_project_cache,
         )
         .map_err(|error| error.to_string())?;
+        let mut resources = resources;
+        if self.launch_options.display.indexed_palette_override.is_some() {
+            resources.set_indexed_palette_override(
+                self.launch_options.display.indexed_palette_override.clone(),
+            );
+        }
         let game_state = if let Some(scene_name) = self.launch_options.scene_name.as_deref() {
             App::game_state_from_project_content(
                 preloaded.scenes,
@@ -428,6 +434,7 @@ mod tests {
                 render_layer: 0,
                 visible: true,
                 has_shadow: true,
+                palette_override: None,
                 static_object: None,
             },
             attributes: AttributesDef {

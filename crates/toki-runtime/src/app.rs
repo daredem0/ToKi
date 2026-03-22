@@ -88,6 +88,7 @@ impl Default for RuntimeAudioMixOptions {
 pub struct RuntimeDisplayOptions {
     pub show_entity_health_bars: bool,
     pub show_ground_shadows: bool,
+    pub indexed_palette_override: Option<String>,
     pub resolution_width: u32,
     pub resolution_height: u32,
     /// Zoom level as percentage (100 = 1.0x, 200 = 2.0x, etc.)
@@ -107,6 +108,7 @@ impl Default for RuntimeDisplayOptions {
         Self {
             show_entity_health_bars: false,
             show_ground_shadows: toki_core::project_runtime::default_show_ground_shadows(),
+            indexed_palette_override: None,
             resolution_width: toki_core::project_runtime::default_resolution_width(),
             resolution_height: toki_core::project_runtime::default_resolution_height(),
             zoom_percent: toki_core::project_runtime::default_zoom_percent(),

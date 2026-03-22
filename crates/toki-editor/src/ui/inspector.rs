@@ -64,6 +64,7 @@ pub(super) struct EntityPropertyDraft {
     pub(super) size_y: i64,
     pub(super) visible: bool,
     pub(super) has_shadow: bool,
+    pub(super) palette_override: String,
     pub(super) active: bool,
     pub(super) solid: bool,
     pub(super) interactable: bool,
@@ -190,6 +191,7 @@ impl EntityPropertyDraft {
             size_y: entity.size.y as i64,
             visible: entity.attributes.visible,
             has_shadow: entity.attributes.has_shadow,
+            palette_override: entity.attributes.palette_override.clone().unwrap_or_default(),
             active: entity.attributes.active,
             solid: entity.attributes.solid,
             interactable: entity.attributes.interactable,
@@ -266,6 +268,11 @@ impl EntityPropertyDraft {
             size_y: definition.rendering.size[1] as i64,
             visible: definition.rendering.visible,
             has_shadow: definition.rendering.has_shadow,
+            palette_override: definition
+                .rendering
+                .palette_override
+                .clone()
+                .unwrap_or_default(),
             active: definition.attributes.active,
             solid: definition.attributes.solid,
             interactable: definition.attributes.interactable,

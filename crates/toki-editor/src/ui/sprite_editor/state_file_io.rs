@@ -20,6 +20,8 @@ impl SpriteEditorState {
         cs.selected_cell = None;
         cs.original_cell_names = None;
         cs.show_cell_grid = false;
+        self.color_mode = toki_core::assets::atlas::ColorMode::TrueColor;
+        self.selected_palette_id = None;
     }
 
     /// Open the save dialog
@@ -158,6 +160,8 @@ impl SpriteEditorState {
                 let is_sheet = meta.tiles.len() > 1;
                 let mut names: Vec<_> = meta.tiles.keys().cloned().collect();
                 names.sort();
+                self.color_mode = meta.color_mode;
+                self.selected_palette_id = meta.palette.clone();
                 (meta.tile_size, is_sheet, names)
             }
             SpriteAssetKind::ObjectSheet => {
@@ -166,6 +170,8 @@ impl SpriteEditorState {
                 let is_sheet = meta.objects.len() > 1;
                 let mut names: Vec<_> = meta.objects.keys().cloned().collect();
                 names.sort();
+                self.color_mode = toki_core::assets::atlas::ColorMode::TrueColor;
+                self.selected_palette_id = None;
                 (meta.tile_size, is_sheet, names)
             }
         };
@@ -327,7 +333,7 @@ impl SpriteEditorState {
 
         match kind {
             SpriteAssetKind::TileAtlas => {
-                let meta = if self.is_sheet() {
+                let mut meta = if self.is_sheet() {
                     let (cols, rows) = self.sheet_cell_count().unwrap_or((1, 1));
                     self.create_atlas_with_names(png_filename, cols, rows)
                 } else {
@@ -335,6 +341,12 @@ impl SpriteEditorState {
                         png_filename,
                         UVec2::new(canvas_width, canvas_height),
                     )
+                };
+                meta.color_mode = self.color_mode;
+                meta.palette = if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
+                    self.selected_palette_id.clone()
+                } else {
+                    None
                 };
                 meta.save_to_file(json_path)
                     .map_err(|e| format!("Failed to save metadata: {e}"))?;
@@ -387,8 +399,12 @@ impl SpriteEditorState {
         AtlasMeta {
             image: png_filename.into(),
             tile_size: cs.cell_size,
-            color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
-            palette: None,
+            color_mode: self.color_mode,
+            palette: if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
+                self.selected_palette_id.clone()
+            } else {
+                None
+            },
             tiles,
         }
     }

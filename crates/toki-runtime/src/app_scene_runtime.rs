@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
 use toki_core::events::SceneSwitchRequest;
+use toki_core::graphics::image::load_image_rgba8;
+use toki_core::palette::recolor_indexed_image;
 
 use crate::systems::{
     AudioManager, CameraManager, DecodedProjectCache, GameManager, RenderingSystem,
@@ -19,6 +21,7 @@ pub(super) struct SceneRuntimeCoordinator<'a> {
     asset_load_plan: &'a mut RuntimeAssetLoadPlan,
     scene_transition: &'a mut SceneTransitionController,
     audio_mix: &'a RuntimeAudioMixOptions,
+    indexed_palette_override: Option<String>,
     content_root: Option<PathBuf>,
 }
 
@@ -34,6 +37,7 @@ impl<'a> SceneRuntimeCoordinator<'a> {
         asset_load_plan: &'a mut RuntimeAssetLoadPlan,
         scene_transition: &'a mut SceneTransitionController,
         audio_mix: &'a RuntimeAudioMixOptions,
+        indexed_palette_override: Option<String>,
         content_root: Option<PathBuf>,
     ) -> Self {
         Self {
@@ -46,6 +50,7 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             asset_load_plan,
             scene_transition,
             audio_mix,
+            indexed_palette_override,
             content_root,
         }
     }
@@ -130,34 +135,13 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             ) {
                 Ok((resources, asset_load_plan)) => {
                     *self.resources = resources;
+                    if self.indexed_palette_override.is_some() {
+                        self.resources
+                            .set_indexed_palette_override(self.indexed_palette_override.clone());
+                    }
                     *self.asset_load_plan = asset_load_plan;
                     if self.rendering.has_gpu() {
-                        if let Some(tilemap_texture_path) =
-                            self.asset_load_plan.tilemap_texture_path.clone()
-                        {
-                            if let Err(error) =
-                                self.rendering.load_tilemap_texture(tilemap_texture_path)
-                            {
-                                tracing::warn!(
-                                    "Failed to reload tilemap texture for scene '{}': {}",
-                                    scene_name,
-                                    error
-                                );
-                            }
-                        }
-                        if let Some(sprite_texture_path) =
-                            self.asset_load_plan.sprite_texture_path.clone()
-                        {
-                            if let Err(error) =
-                                self.rendering.load_sprite_texture(sprite_texture_path)
-                            {
-                                tracing::warn!(
-                                    "Failed to reload sprite texture for scene '{}': {}",
-                                    scene_name,
-                                    error
-                                );
-                            }
-                        }
+                        self.reload_runtime_render_textures(scene_name);
                     }
                 }
                 Err(error) => {
@@ -201,5 +185,72 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             );
             self.rendering.update_tilemap_vertices(&verts);
         }
+    }
+
+    fn reload_runtime_render_textures(&mut self, scene_name: &str) {
+        if let Some(tilemap_texture_path) = self.asset_load_plan.tilemap_texture_path.clone() {
+            let terrain_atlas = self.resources.get_terrain_atlas();
+            let tilemap_result = if terrain_atlas.is_palette_indexed() {
+                match self.resources.resolve_indexed_palette(terrain_atlas, None) {
+                    Ok((palette_id, palette)) => match load_image_rgba8(&tilemap_texture_path) {
+                        Ok(image) => match recolor_indexed_image(&image, palette) {
+                            Ok(recolored) => self.rendering.load_tilemap_texture_rgba8(&recolored),
+                            Err(error) => Err(toki_render::RenderError::Other(format!(
+                                "Indexed tilemap texture '{}' failed validation for palette '{}': {}",
+                                tilemap_texture_path.display(),
+                                palette_id,
+                                error
+                            ))),
+                        },
+                        Err(error) => Err(toki_render::RenderError::Other(format!(
+                            "Failed to decode indexed tilemap texture '{}': {}",
+                            tilemap_texture_path.display(),
+                            error
+                        ))),
+                    },
+                    Err(error) => Err(toki_render::RenderError::Other(format!("{error:?}"))),
+                }
+            } else {
+                self.rendering.load_tilemap_texture(tilemap_texture_path.clone())
+            };
+
+            if let Err(error) = tilemap_result {
+                tracing::warn!(
+                    "Failed to reload tilemap texture for scene '{}': {}",
+                    scene_name,
+                    error
+                );
+            }
+        }
+
+        if let Some(sprite_texture_path) = self.asset_load_plan.sprite_texture_path.clone() {
+            if let Err(error) = self.rendering.load_sprite_texture(sprite_texture_path) {
+                tracing::warn!(
+                    "Failed to reload sprite texture for scene '{}': {}",
+                    scene_name,
+                    error
+                );
+            }
+        }
+    }
+}
+
+impl App {
+    pub(super) fn reload_runtime_render_textures(&mut self, scene_name: &str) {
+        let content_root = self.content_root_path().map(std::path::Path::to_path_buf);
+        SceneRuntimeCoordinator::new(
+            &mut self.game_system,
+            &mut self.camera_system,
+            &mut self.resources,
+            &mut self.rendering,
+            &mut self.audio_system,
+            &mut self.decoded_project_cache,
+            &mut self.asset_load_plan,
+            &mut self.scene_transition,
+            &self.launch_options.audio_mix,
+            self.launch_options.display.indexed_palette_override.clone(),
+            content_root,
+        )
+        .reload_runtime_render_textures(scene_name);
     }
 }

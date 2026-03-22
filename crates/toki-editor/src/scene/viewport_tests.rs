@@ -223,6 +223,7 @@ fn viewport_resolves_shared_sprite_render_requests_for_static_entities() {
             render_layer: 0,
             visible: true,
             has_shadow: true,
+            palette_override: None,
             static_object: Some(toki_core::entity::StaticObjectRenderDef {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),

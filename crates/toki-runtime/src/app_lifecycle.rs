@@ -174,7 +174,9 @@ impl ApplicationHandler for App {
         }
 
         if self.rendering.has_gpu() {
-            if let Some(content_root) = content_root.as_deref() {
+            if let Some(scene_name) = self.game_system.active_scene_name().map(str::to_string) {
+                self.reload_runtime_render_textures(&scene_name);
+            } else if let Some(content_root) = content_root.as_deref() {
                 if let Err(error) = self.rendering.load_project_textures(content_root) {
                     tracing::warn!(
                         "Failed to load project textures from '{}': {}",

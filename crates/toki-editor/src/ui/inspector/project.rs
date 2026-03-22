@@ -1,5 +1,6 @@
 use super::*;
 use crate::project::apply_project_settings_draft;
+use toki_core::palette::Palette4;
 
 impl InspectorSystem {
     pub(super) fn render_project_settings_panel(
@@ -224,6 +225,113 @@ impl InspectorSystem {
         });
 
         ui.separator();
+        ui.collapsing("Palettes", |ui| {
+            let mut palette_ids = ui_state
+                .project
+                .available_palettes
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>();
+            palette_ids.sort();
+
+            ui.horizontal(|ui| {
+                ui.label("Global Indexed Override:");
+                egui::ComboBox::from_id_salt("project_indexed_palette_override")
+                    .selected_text(
+                        draft
+                            .indexed_palette_override
+                            .as_deref()
+                            .unwrap_or("Atlas Default"),
+                    )
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.indexed_palette_override,
+                                None,
+                                "Atlas Default",
+                            )
+                            .changed();
+                        for palette_id in &palette_ids {
+                            changed |= ui
+                                .selectable_value(
+                                    &mut draft.indexed_palette_override,
+                                    Some(palette_id.clone()),
+                                    palette_id,
+                                )
+                                .changed();
+                        }
+                    });
+            });
+
+            ui.separator();
+            ui.label("Project Palettes:");
+            let mut remove_palette_id = None;
+            let palette_ids = draft.palettes.keys().cloned().collect::<Vec<_>>();
+            for palette_id in palette_ids {
+                let mut palette = draft
+                    .palettes
+                    .get(&palette_id)
+                    .copied()
+                    .unwrap_or(Palette4::new([[0, 0, 0, 255]; 4]));
+                ui.group(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(&palette_id);
+                        if ui.button("Remove").clicked() {
+                            remove_palette_id = Some(palette_id.clone());
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        for color in &mut palette.colors {
+                            let mut color32 = egui::Color32::from_rgba_unmultiplied(
+                                color[0], color[1], color[2], color[3],
+                            );
+                            if ui.color_edit_button_srgba(&mut color32).changed() {
+                                *color = [
+                                    color32.r(),
+                                    color32.g(),
+                                    color32.b(),
+                                    color32.a(),
+                                ];
+                                changed = true;
+                            }
+                        }
+                    });
+                });
+                if draft.palettes.get(&palette_id).copied() != Some(palette) {
+                    draft.palettes.insert(palette_id.clone(), palette);
+                }
+            }
+            if let Some(remove_palette_id) = remove_palette_id {
+                draft.palettes.remove(&remove_palette_id);
+                if draft.indexed_palette_override.as_deref() == Some(remove_palette_id.as_str()) {
+                    draft.indexed_palette_override = None;
+                }
+                changed = true;
+            }
+
+            if ui.button("Add Project Palette").clicked() {
+                let mut index = draft.palettes.len() + 1;
+                let palette_id = loop {
+                    let candidate = format!("custom_palette_{index}");
+                    if !draft.palettes.contains_key(&candidate) {
+                        break candidate;
+                    }
+                    index += 1;
+                };
+                draft.palettes.insert(
+                    palette_id,
+                    Palette4::new([
+                        [0x00, 0x00, 0x00, 0xFF],
+                        [0x55, 0x55, 0x55, 0xFF],
+                        [0xAA, 0xAA, 0xAA, 0xFF],
+                        [0xFF, 0xFF, 0xFF, 0xFF],
+                    ]),
+                );
+                changed = true;
+            }
+        });
+
+        ui.separator();
         ui.collapsing("Metadata", |ui| {
             ui.horizontal(|ui| {
                 ui.label("Created:");
@@ -245,6 +353,9 @@ impl InspectorSystem {
 
         if changed && apply_project_settings_draft(project, &draft) {
             ui_state.set_title(&project.name);
+            ui_state
+                .project
+                .set_available_palettes(&project.metadata.runtime.palettes);
         }
     }
 
