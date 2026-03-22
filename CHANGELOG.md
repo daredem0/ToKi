@@ -7,6 +7,41 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-03-22
+
+### Added
+- Added Magic Erase tool in Sprite Editor for tile-local background cleanup using flood-fill removal of connected same-color pixels.
+- Added pixel highlight under cursor in Sprite Editor for precise editing feedback.
+- Added F11 keyboard shortcut to toggle borderless fullscreen mode in the editor.
+- Added outline application function in Sprite Editor to add outlines to sprites.
+- Added optional ground shadow rendering with configurable oval shape for entities.
+
+### Changed
+- Structured SpriteEditor Tools in a grid.
+- Changed editor tab bar to be scrollable to handle many open tabs.
+- Changed ground shadow shape from circular to oval for more natural appearance.
+- Refactored entity data structure from legacy monolithic module to component-based format with explicit animation, collision, AI, interaction, and movement components.
+- Refactored AI system with `AiContext` and behavior handlers (Chase, Run, Wander) using a strategy pattern for cleaner flow.
+- Refactored inspector UI and rule graph editor into modular logic with extracted shared helpers.
+- Refactored AI and rules systems into focused submodules (behaviors, movement, context, events, commands, transitions, targeting, evaluation).
+- Refactored editor/runtime integration with clearer data flow for scene, project, and graph state handling.
+- Refactored runtime app into `WorldFramePresenter`, `SceneRuntimeCoordinator`, `StartupCoordinator`, and `StartupBundle` components.
+- Refactored runtime services by extracting dedicated modules for input, AI, and reactive rules.
+- Refactored stat effect handling into dedicated service with scene transition planner.
+- Refactored asset discovery and loading to use centralized shared helpers across editor and runtime.
+- Refactored `GameState` construction to use centralized project content initialization.
+- Refactored editor viewport math and interaction context into shared extracted modules.
+- Removed legacy entity module, rule-graph key migration, dead sprite-editor scaffolding, and broad `allow(dead_code)` annotations.
+- Removed legacy and unused code paths across project assets, editor state, and viewport interaction.
+
+### Fixed
+- Fixed Sprite Editor rectangle selection to correctly include both start and end pixels.
+- Fixed clippy warnings across the workspace.
+- Fixed code formatting across affected modules.
+
+### Docs
+- Clarified entity attribute groups and runtime field purpose in documentation.
+
 ## [0.2.0] - 2026-03-21
 
 ### Added
@@ -365,7 +400,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Fixed camera/map-bound movement and projection distortion on resize.
 - Improved tilemap upload strategy and window/surface resize handling.
 
-[Unreleased]: https://github.com/daredem0/ToKi/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/daredem0/ToKi/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/daredem0/ToKi/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/daredem0/ToKi/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/daredem0/ToKi/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/daredem0/ToKi/compare/v0.0.14...v0.1.0
