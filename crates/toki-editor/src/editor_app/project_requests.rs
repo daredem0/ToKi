@@ -2,6 +2,42 @@ use super::*;
 use crate::editor_services::graph_metadata;
 
 impl EditorApp {
+    pub(super) fn refresh_project_assets_after_rescan(&mut self) {
+        let project_palettes = self
+            .core
+            .project_manager
+            .get_project_assets_mut()
+            .and_then(|assets| assets.load_project_palettes().ok())
+            .unwrap_or_default();
+        self.core.ui.project.set_available_palettes(&project_palettes);
+
+        if let Some(current_project) = self.core.project_manager.current_project.as_ref() {
+            let indexed_palette_override = current_project
+                .metadata
+                .runtime
+                .display
+                .indexed_palette_override
+                .clone();
+            if let Some(viewport) = self.viewports.scene.as_mut() {
+                viewport.set_available_palettes(&self.core.ui.project.available_palettes);
+                viewport.set_indexed_palette_override(indexed_palette_override.clone());
+                viewport.clear_asset_caches();
+            }
+            if let Some(viewport) = self.viewports.map_editor.as_mut() {
+                viewport.set_available_palettes(&self.core.ui.project.available_palettes);
+                viewport.set_indexed_palette_override(indexed_palette_override);
+                viewport.clear_asset_caches();
+            }
+        }
+
+        self.resources.preview_sprite_frames.clear();
+
+        match self.core.project_manager.load_scenes() {
+            Ok(loaded_scenes) => self.core.ui.load_scenes_from_project(loaded_scenes),
+            Err(error) => tracing::error!("Failed to reload scenes after asset rescan: {}", error),
+        }
+    }
+
     pub(super) fn activate_loaded_project(
         &mut self,
         game_state: GameState,
@@ -60,6 +96,27 @@ impl EditorApp {
                 if let Some(project_name) = project_name {
                     self.core.ui.set_title(&project_name);
                     self.core.ui.project.set_available_palettes(&project_palettes);
+                }
+                let indexed_palette_override = self
+                    .core
+                    .project_manager
+                    .current_project
+                    .as_ref()
+                    .and_then(|project| {
+                        project
+                            .metadata
+                            .runtime
+                            .display
+                            .indexed_palette_override
+                            .clone()
+                    });
+                if let Some(viewport) = self.viewports.scene.as_mut() {
+                    viewport.set_available_palettes(&self.core.ui.project.available_palettes);
+                    viewport.set_indexed_palette_override(indexed_palette_override.clone());
+                }
+                if let Some(viewport) = self.viewports.map_editor.as_mut() {
+                    viewport.set_available_palettes(&self.core.ui.project.available_palettes);
+                    viewport.set_indexed_palette_override(indexed_palette_override.clone());
                 }
 
                 match self.core.project_manager.load_scenes() {
@@ -150,6 +207,18 @@ impl EditorApp {
         }
     }
 
+    pub(super) fn handle_reload_project_assets_request(&mut self) {
+        self.core.ui.project.reload_project_assets_requested = false;
+
+        if let Err(error) = self.core.project_manager.rescan_assets() {
+            tracing::error!("Failed to reload project assets: {}", error);
+            return;
+        }
+
+        tracing::info!("Reloaded project assets");
+        self.refresh_project_assets_after_rescan();
+    }
+
     pub(super) fn handle_init_project_request(&mut self) {
         self.core.ui.project.init_config_requested = false;
 
@@ -224,6 +293,10 @@ impl EditorApp {
 
         if self.core.ui.project.browse_for_project_requested {
             self.handle_browse_for_project_request();
+        }
+
+        if self.core.ui.project.reload_project_assets_requested {
+            self.handle_reload_project_assets_request();
         }
 
         if self.core.ui.project.save_project_requested {

@@ -4,6 +4,11 @@ use super::{
 };
 use crate::project::assets::ProjectAssets;
 use std::collections::HashMap;
+use toki_core::graphics::image::save_image_rgba8;
+use toki_core::palette::resolve_palette;
+use toki_core::sprite_render::{
+    SpriteRenderOrigin, SpriteRenderRequest, SpriteRenderSize, SpriteSortKey, SpriteVisualRef,
+};
 
 fn make_unique_temp_dir() -> std::path::PathBuf {
     let nanos = std::time::SystemTime::now()
@@ -289,6 +294,149 @@ fn viewport_resolves_shared_sprite_render_requests_for_static_entities() {
     assert_eq!(
         sprites[0].texture_path,
         Some(tmp.join("assets/sprites/items.png"))
+    );
+
+    std::fs::remove_dir_all(tmp).expect("temp dir cleanup should succeed");
+}
+
+#[test]
+fn viewport_recolors_palette_indexed_sprites_and_applies_palette_override() {
+    let tmp = make_unique_temp_dir();
+    let sprites_dir = tmp.join("assets").join("sprites");
+    std::fs::create_dir_all(&sprites_dir).expect("sprites dir should exist");
+
+    std::fs::write(
+        sprites_dir.join("creatures.json"),
+        serde_json::json!({
+            "image": "creatures.png",
+            "tile_size": [16, 16],
+            "color_mode": "palette_indexed",
+            "palette": "poison",
+            "tiles": {
+                "slime": {
+                    "position": [0, 0],
+                    "properties": { "solid": false, "trigger": false }
+                }
+            }
+        })
+        .to_string(),
+    )
+    .expect("atlas should be written");
+    let mut pixels = vec![0u8; 16 * 16 * 4];
+    pixels[0] = 0x00;
+    pixels[1] = 0x00;
+    pixels[2] = 0x00;
+    pixels[3] = 0xFF;
+    save_image_rgba8(sprites_dir.join("creatures.png"), 16, 16, &pixels)
+        .expect("indexed png should be written");
+    std::fs::write(
+        tmp.join("terrain.json"),
+        serde_json::json!({
+            "image": "assets/sprites/creatures.png",
+            "tile_size": [16, 16],
+            "tiles": {
+                "grass": {
+                    "position": [0, 0],
+                    "properties": { "solid": false, "trigger": false }
+                }
+            }
+        })
+        .to_string(),
+    )
+    .expect("terrain atlas should be written");
+    std::fs::write(
+        tmp.join("tilemap.json"),
+        serde_json::json!({
+            "size": [1, 1],
+            "tile_size": [16, 16],
+            "atlas": "terrain.json",
+            "tiles": ["grass"],
+            "objects": []
+        })
+        .to_string(),
+    )
+    .expect("tilemap should be written");
+
+    let mut project_assets = ProjectAssets::new(tmp.clone());
+    project_assets.scan_assets().expect("assets should scan");
+
+    let resources = toki_core::ResourceManager::load_with_paths(
+        &tmp.join("terrain.json"),
+        &sprites_dir.join("creatures.json"),
+        &tmp.join("tilemap.json"),
+    )
+    .expect("resources should load");
+    let mut viewport =
+        SceneViewport::with_game_state_and_resources_for_tests(toki_core::GameState::new_empty(), resources)
+            .expect("viewport should exist");
+    let mut palettes = toki_core::palette::builtin_palettes();
+    viewport.set_available_palettes(&palettes);
+
+    let request = SpriteRenderRequest {
+        origin: SpriteRenderOrigin::StaticEntity(1),
+        sort_key: SpriteSortKey {
+            primary: 0,
+            secondary: 0,
+            sequence: 0,
+        },
+        visual: SpriteVisualRef::AtlasTile {
+            atlas_name: "creatures".to_string(),
+            tile_name: "slime".to_string(),
+        },
+        position: glam::IVec2::ZERO,
+        size: SpriteRenderSize::Intrinsic,
+        palette_override: None,
+        flip_x: false,
+    };
+
+    let (default_sprites, default_failures) =
+        viewport.resolve_sprite_requests_into_instances(
+            &project_assets,
+            Some(&tmp),
+            std::slice::from_ref(&request),
+        );
+    assert!(default_failures.is_empty(), "unexpected failures: {default_failures:?}");
+    let poison = resolve_palette("poison", &palettes).expect("poison palette should exist");
+    assert_eq!(
+        default_sprites[0]
+            .texture_image
+            .as_ref()
+            .expect("indexed sprite should recolor")
+            .data[..4]
+            .to_vec(),
+        poison.color(0).to_vec()
+    );
+
+    palettes.insert(
+        "override_green".to_string(),
+        toki_core::palette::Palette4::new([
+            [1, 2, 3, 255],
+            [4, 5, 6, 255],
+            [7, 8, 9, 255],
+            [10, 11, 12, 255],
+        ]),
+    );
+    viewport.set_available_palettes(&palettes);
+    let mut override_request = request;
+    override_request.palette_override = Some("override_green".to_string());
+
+    let (override_sprites, override_failures) = viewport.resolve_sprite_requests_into_instances(
+        &project_assets,
+        Some(&tmp),
+        &[override_request],
+    );
+    assert!(
+        override_failures.is_empty(),
+        "unexpected failures: {override_failures:?}"
+    );
+    assert_eq!(
+        override_sprites[0]
+            .texture_image
+            .as_ref()
+            .expect("override should recolor")
+            .data[..4]
+            .to_vec(),
+        vec![1, 2, 3, 255]
     );
 
     std::fs::remove_dir_all(tmp).expect("temp dir cleanup should succeed");

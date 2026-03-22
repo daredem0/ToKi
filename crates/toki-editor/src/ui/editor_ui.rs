@@ -165,6 +165,7 @@ pub struct ProjectEditorState {
     pub new_top_down_project_requested: bool,
     pub open_project_requested: bool,
     pub browse_for_project_requested: bool,
+    pub reload_project_assets_requested: bool,
     pub save_project_requested: bool,
     pub export_project_requested: bool,
     pub play_scene_requested: bool,
@@ -196,6 +197,7 @@ impl Default for ProjectEditorState {
             new_top_down_project_requested: false,
             open_project_requested: false,
             browse_for_project_requested: false,
+            reload_project_assets_requested: false,
             save_project_requested: false,
             export_project_requested: false,
             play_scene_requested: false,
@@ -219,6 +221,7 @@ impl Default for ProjectEditorState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EditorConfirmation {
     DeleteScene { scene_name: String },
+    ExitEditor,
 }
 
 impl ProjectEditorState {

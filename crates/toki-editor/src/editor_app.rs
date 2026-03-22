@@ -31,6 +31,7 @@ use crate::scene::viewport::DragPreviewSprite;
 use crate::scene::viewport::ViewportOverlayData;
 use crate::scene::SceneViewport;
 use crate::ui::editor_ui::{CenterPanelTab, MapEditorDraft};
+use crate::ui::editor_ui::EditorConfirmation;
 use crate::ui::EditorUI;
 
 #[path = "editor_app/background_tasks.rs"]
@@ -262,6 +263,17 @@ impl EditorApp {
             "v" => Some(EditorShortcutAction::Paste),
             _ => None,
         }
+    }
+
+    fn handle_escape_key(&mut self) {
+        if self.core.ui.is_in_placement_mode() {
+            self.core.ui.exit_placement_mode();
+            tracing::info!("Exited placement mode via Escape");
+            return;
+        }
+
+        self.core.ui.project.pending_confirmation = Some(EditorConfirmation::ExitEditor);
+        tracing::info!("Escape requested editor exit confirmation");
     }
 
     fn toggled_fullscreen_state(is_currently_fullscreen: bool) -> Option<Fullscreen> {
@@ -524,7 +536,12 @@ impl ApplicationHandler for EditorApp {
                     if let PhysicalKey::Code(key_code) = event.physical_key {
                         // Handle other editor keyboard shortcuts
                         match key_code {
-                            KeyCode::Escape => event_loop.exit(),
+                            KeyCode::Escape => {
+                                self.handle_escape_key();
+                                if let Some(window) = &self.platform.window {
+                                    window.request_redraw();
+                                }
+                            }
                             KeyCode::F11 => {
                                 if let Some(window) = &self.platform.window {
                                     Self::toggle_window_fullscreen(window);
@@ -668,6 +685,21 @@ impl EditorApp {
                                 &mut self.resources.preview_sprite_frames,
                             );
                         if let Some(scene_viewport) = &mut self.viewports.scene {
+                            let indexed_palette_override = self
+                                .core
+                                .project_manager
+                                .current_project
+                                .as_ref()
+                                .and_then(|project| {
+                                    project
+                                        .metadata
+                                        .runtime
+                                        .display
+                                        .indexed_palette_override
+                                        .clone()
+                                });
+                            scene_viewport
+                                .set_indexed_palette_override(indexed_palette_override);
                             let placement_preview = if self.core.ui.is_in_placement_mode() {
                                 if self.core.ui.placement.entity_move_drag.is_none() {
                                     let is_valid =
@@ -760,6 +792,21 @@ impl EditorApp {
                     }
                     CenterPanelTab::MapEditor => {
                         if let Some(map_editor_viewport) = &mut self.viewports.map_editor {
+                            let indexed_palette_override = self
+                                .core
+                                .project_manager
+                                .current_project
+                                .as_ref()
+                                .and_then(|project| {
+                                    project
+                                        .metadata
+                                        .runtime
+                                        .display
+                                        .indexed_palette_override
+                                        .clone()
+                                });
+                            map_editor_viewport
+                                .set_indexed_palette_override(indexed_palette_override);
                             if let Err(e) = map_editor_viewport.render_to_texture(
                                 project_path.as_path(),
                                 project_assets,
@@ -882,6 +929,8 @@ impl EditorApp {
         if self.core.ui.sprite.needs_asset_rescan {
             if let Err(e) = self.core.project_manager.rescan_assets() {
                 tracing::error!("Failed to rescan assets: {}", e);
+            } else {
+                self.refresh_project_assets_after_rescan();
             }
             self.core.ui.sprite.needs_asset_rescan = false;
         }

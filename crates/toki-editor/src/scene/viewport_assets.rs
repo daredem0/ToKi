@@ -1,4 +1,6 @@
 use super::*;
+use toki_core::graphics::image::{load_image_rgba8, DecodedImage};
+use toki_core::palette::{recolor_indexed_image, resolve_palette, Palette4};
 use toki_core::project_assets::normalize_asset_name;
 use toki_core::sprite_render::{
     resolve_atlas_tile_frame, resolve_object_sheet_frame, resolve_sprite_render_requests,
@@ -13,6 +15,77 @@ struct ViewportSpriteResolver<'a, 'b> {
 }
 
 impl SceneViewport {
+    fn resolve_indexed_palette(
+        &self,
+        atlas: &AtlasMeta,
+        palette_override: Option<&str>,
+    ) -> Result<(String, Palette4), SpriteResolveError> {
+        for palette_id in [
+            self.indexed_palette_override.as_deref(),
+            palette_override,
+            atlas.palette.as_deref(),
+            Some("gb_default"),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if let Some(palette) = resolve_palette(palette_id, &self.available_palettes) {
+                return Ok((palette_id.to_string(), palette));
+            }
+        }
+
+        Err(SpriteResolveError::AssetLoadFailed {
+            asset_kind: "palette",
+            asset_name: self
+                .indexed_palette_override
+                .as_deref()
+                .or(palette_override)
+                .or(atlas.palette.as_deref())
+                .unwrap_or("gb_default")
+                .to_string(),
+            message: "palette id could not be resolved".to_string(),
+        })
+    }
+
+    fn decoded_sprite_image(&mut self, texture_path: &std::path::Path) -> Result<DecodedImage> {
+        if let Some(image) = self.decoded_sprite_images.get(texture_path) {
+            return Ok(image.clone());
+        }
+
+        let image = load_image_rgba8(texture_path)?;
+        self.decoded_sprite_images
+            .insert(texture_path.to_path_buf(), image.clone());
+        Ok(image)
+    }
+
+    fn recolored_sprite_image(
+        &mut self,
+        texture_path: &std::path::Path,
+        cache_key: &str,
+        palette: Palette4,
+    ) -> Result<DecodedImage, SpriteResolveError> {
+        if let Some(image) = self.recolored_sprite_images.get(cache_key) {
+            return Ok(image.clone());
+        }
+
+        let decoded = self
+            .decoded_sprite_image(texture_path)
+            .map_err(|error| SpriteResolveError::AssetLoadFailed {
+                asset_kind: "sprite_texture",
+                asset_name: texture_path.display().to_string(),
+                message: error.to_string(),
+            })?;
+        let recolored =
+            recolor_indexed_image(&decoded, palette).map_err(|error| SpriteResolveError::AssetLoadFailed {
+                asset_kind: "sprite_texture",
+                asset_name: texture_path.display().to_string(),
+                message: error.to_string(),
+            })?;
+        self.recolored_sprite_images
+            .insert(cache_key.to_string(), recolored.clone());
+        Ok(recolored)
+    }
+
     pub(super) fn load_atlas_for_tilemap(
         &mut self,
         atlas_name: &str,
@@ -133,17 +206,52 @@ impl SceneViewport {
             project_assets,
             project_path,
         };
-        let (resolved, failures) = resolve_sprite_render_requests(&mut resolver, requests);
-        let instances = resolved
-            .into_iter()
-            .map(|sprite| toki_render::SpriteInstance {
+        let (resolved, mut failures) = resolve_sprite_render_requests(&mut resolver, requests);
+        let mut instances = Vec::with_capacity(resolved.len());
+        for sprite in resolved {
+            let (texture_path, texture_image, texture_cache_key) = match sprite.material {
+                SpriteRenderMaterial::TrueColor => (sprite.texture_path, None, None),
+                SpriteRenderMaterial::PaletteIndexed {
+                    ref palette_id,
+                    palette,
+                } => {
+                    let Some(texture_path) = sprite.texture_path.clone() else {
+                        instances.push(toki_render::SpriteInstance {
+                            frame: sprite.frame,
+                            position: sprite.position,
+                            size: sprite.size,
+                            texture_path: None,
+                            texture_image: None,
+                            texture_cache_key: None,
+                            flip_x: sprite.flip_x,
+                        });
+                        continue;
+                    };
+
+                    let cache_key = format!("{}#palette={}", texture_path.display(), palette_id);
+                    match self.recolored_sprite_image(&texture_path, &cache_key, palette) {
+                        Ok(image) => (Some(texture_path), Some(image), Some(cache_key)),
+                        Err(error) => {
+                            failures.push(SpriteResolveFailure {
+                                origin: sprite.origin,
+                                error,
+                            });
+                            continue;
+                        }
+                    }
+                }
+            };
+
+            instances.push(toki_render::SpriteInstance {
                 frame: sprite.frame,
                 position: sprite.position,
                 size: sprite.size,
-                texture_path: sprite.texture_path,
+                texture_path,
+                texture_image,
+                texture_cache_key,
                 flip_x: sprite.flip_x,
-            })
-            .collect();
+            });
+        }
         (instances, failures)
     }
 
@@ -177,7 +285,7 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
         &mut self,
         atlas_name: &str,
         tile_name: &str,
-        _palette_override: Option<&str>,
+        palette_override: Option<&str>,
     ) -> Result<ResolvedSpriteVisual, SpriteResolveError> {
         let atlas_name_clean = normalize_asset_name(atlas_name);
         let atlas_asset = self
@@ -196,6 +304,17 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
                 message: error.to_string(),
             })?;
         let (frame, intrinsic_size) = resolve_atlas_tile_frame(&atlas, atlas_name, tile_name)?;
+        let material = if atlas.is_palette_indexed() {
+            let (palette_id, palette) = self
+                .viewport
+                .resolve_indexed_palette(&atlas, palette_override)?;
+            SpriteRenderMaterial::PaletteIndexed {
+                palette_id,
+                palette,
+            }
+        } else {
+            SpriteRenderMaterial::TrueColor
+        };
 
         Ok(ResolvedSpriteVisual {
             frame,
@@ -204,7 +323,7 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
                 .path
                 .parent()
                 .map(|parent| parent.join(&atlas.image)),
-            material: SpriteRenderMaterial::TrueColor,
+            material,
         })
     }
 

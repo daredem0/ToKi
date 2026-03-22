@@ -450,10 +450,8 @@ impl InspectorSystem {
                                         if let Some(description) =
                                             obj.get("description").and_then(|v| v.as_str())
                                         {
-                                            ui.horizontal(|ui| {
-                                                ui.label("Description:");
-                                                ui.label(description);
-                                            });
+                                            ui.label("Description:");
+                                            ui.add(egui::Label::new(description).wrap());
                                         }
 
                                         if let Some(entity_type) =

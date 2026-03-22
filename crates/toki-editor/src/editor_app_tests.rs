@@ -1,5 +1,6 @@
 use super::EditorApp;
 use crate::project::ProjectAssets;
+use crate::ui::editor_ui::EditorConfirmation;
 use crate::ui::editor_ui::{EntityMoveDragState, MapEditorDraft};
 use glam::{IVec2, UVec2, Vec2};
 use std::collections::HashMap;
@@ -83,6 +84,67 @@ fn editor_shortcut_action_ignores_non_ctrl_sequences() {
         ModifiersState::CONTROL,
     );
     assert_eq!(other_key, None);
+}
+
+#[test]
+fn escape_exits_placement_mode_before_requesting_editor_close() {
+    let mut app = EditorApp::new(None);
+    app.core.ui.enter_placement_mode("player".to_string());
+
+    app.handle_escape_key();
+
+    assert!(!app.core.ui.is_in_placement_mode());
+    assert!(app.core.ui.project.pending_confirmation.is_none());
+}
+
+#[test]
+fn escape_requests_exit_confirmation_when_not_in_placement_mode() {
+    let mut app = EditorApp::new(None);
+
+    app.handle_escape_key();
+
+    assert_eq!(
+        app.core.ui.project.pending_confirmation,
+        Some(EditorConfirmation::ExitEditor)
+    );
+}
+
+#[test]
+fn reload_project_assets_refreshes_available_palettes_and_scene_list() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should exist");
+    let project_path = temp_dir.path().to_path_buf();
+    fs::create_dir_all(project_path.join("palettes")).expect("palettes dir should exist");
+    fs::create_dir_all(project_path.join("scenes")).expect("scenes dir should exist");
+
+    let scene = Scene::new("ReloadedScene".to_string());
+    fs::write(
+        project_path.join("scenes").join("ReloadedScene.json"),
+        serde_json::to_string_pretty(&scene).expect("scene should serialize"),
+    )
+    .expect("scene should be written");
+    fs::write(
+        project_path.join("palettes").join("swamp.json"),
+        r#"{"colors":[[8,24,8,255],[32,72,24,255],[96,144,56,255],[184,216,104,255]]}"#,
+    )
+    .expect("palette should be written");
+
+    let mut app = EditorApp::new(None);
+    app.core.project_manager.current_project = Some(crate::project::Project::new(
+        "Reload Test".to_string(),
+        project_path.clone(),
+    ));
+    app.core.project_manager.project_assets = Some(ProjectAssets::new(project_path));
+
+    app.handle_reload_project_assets_request();
+
+    assert!(app.core.ui.project.available_palettes.contains_key("swamp"));
+    assert!(
+        app.core
+            .ui
+            .scenes
+            .iter()
+            .any(|scene| scene.name == "ReloadedScene")
+    );
 }
 
 #[test]

@@ -2,9 +2,12 @@ use crate::editor_types::PlacementPreviewVisual;
 use crate::project::assets::{ObjectSheetAsset, SpriteAtlasAsset};
 use crate::project::ProjectAssets;
 use anyhow::Result;
+use std::collections::BTreeMap;
 use std::path::Path;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta};
+use toki_core::graphics::image::DecodedImage;
+use toki_core::palette::{builtin_palettes, Palette4};
 use toki_core::project_runtime::{default_resolution_height, default_resolution_width};
 use toki_core::{Camera, GameState, ResourceManager};
 use toki_render::{OffscreenTarget, SceneData, SceneRenderer};
@@ -96,6 +99,10 @@ pub struct SceneViewport {
     loaded_sprite_atlases: std::collections::HashMap<String, toki_core::assets::atlas::AtlasMeta>,
     loaded_object_sheets:
         std::collections::HashMap<String, toki_core::assets::object_sheet::ObjectSheetMeta>,
+    decoded_sprite_images: std::collections::HashMap<std::path::PathBuf, DecodedImage>,
+    recolored_sprite_images: std::collections::HashMap<String, DecodedImage>,
+    available_palettes: BTreeMap<String, Palette4>,
+    indexed_palette_override: Option<String>,
 }
 
 impl SceneViewport {
@@ -189,6 +196,10 @@ impl SceneViewport {
             suppressed_entity_ids: std::collections::HashSet::new(),
             loaded_sprite_atlases: std::collections::HashMap::new(),
             loaded_object_sheets: std::collections::HashMap::new(),
+            decoded_sprite_images: std::collections::HashMap::new(),
+            recolored_sprite_images: std::collections::HashMap::new(),
+            available_palettes: builtin_palettes(),
+            indexed_palette_override: None,
         })
     }
 
@@ -560,6 +571,30 @@ impl SceneViewport {
     pub fn mark_dirty(&mut self) {
         tracing::trace!("Scene viewport marked dirty - will re-render on next frame");
         self.needs_render = true;
+    }
+
+    pub fn clear_asset_caches(&mut self) {
+        self.atlas_cache = None;
+        self.loaded_sprite_atlases.clear();
+        self.loaded_object_sheets.clear();
+        self.decoded_sprite_images.clear();
+        self.recolored_sprite_images.clear();
+        if let Some(scene_renderer) = &mut self.scene_renderer {
+            scene_renderer.clear_sprite_texture_cache();
+        }
+        self.mark_dirty();
+    }
+
+    pub fn set_available_palettes(&mut self, palettes: &BTreeMap<String, Palette4>) {
+        self.available_palettes = palettes.clone();
+        self.mark_dirty();
+    }
+
+    pub fn set_indexed_palette_override(&mut self, palette_id: Option<String>) {
+        if self.indexed_palette_override != palette_id {
+            self.indexed_palette_override = palette_id;
+            self.mark_dirty();
+        }
     }
 
     pub fn needs_render(&self) -> bool {

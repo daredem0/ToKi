@@ -4,6 +4,7 @@ use crate::{DebugPipeline, RenderError, RenderPipeline, SpritePipeline, TilemapP
 use std::collections::BTreeMap;
 use toki_core::assets::atlas::AtlasMeta;
 use toki_core::assets::tilemap::TileMap;
+use toki_core::graphics::image::DecodedImage;
 use toki_core::sprite::SpriteFrame;
 
 /// Data needed to render a scene
@@ -26,6 +27,8 @@ pub struct SpriteInstance {
     pub position: glam::IVec2,
     pub size: glam::UVec2,
     pub texture_path: Option<std::path::PathBuf>,
+    pub texture_image: Option<DecodedImage>,
+    pub texture_cache_key: Option<String>,
     pub flip_x: bool,
 }
 
@@ -82,7 +85,7 @@ pub struct SceneRenderer {
     queue: wgpu::Queue,
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
-    sprite_pipelines_by_texture: BTreeMap<std::path::PathBuf, SpritePipeline>,
+    sprite_pipelines_by_texture: BTreeMap<String, SpritePipeline>,
     underlay_pipeline: DebugPipeline,
     debug_pipeline: DebugPipeline,
     current_sprite_texture_path: Option<std::path::PathBuf>, // Cache current sprite texture
@@ -187,6 +190,10 @@ impl SceneRenderer {
         Ok(())
     }
 
+    pub fn clear_sprite_texture_cache(&mut self) {
+        self.sprite_pipelines_by_texture.clear();
+    }
+
     fn update_sprite_projection(&mut self, projection: glam::Mat4) {
         self.sprite_pipeline
             .update_projection(&self.queue, projection);
@@ -210,10 +217,41 @@ impl SceneRenderer {
             flip_x: sprite.flip_x,
         };
 
-        if let Some(texture_path) = &sprite.texture_path {
+        if let Some(image) = &sprite.texture_image {
+            let cache_key = sprite
+                .texture_cache_key
+                .clone()
+                .or_else(|| {
+                    sprite
+                        .texture_path
+                        .as_ref()
+                        .map(|path| path.to_string_lossy().to_string())
+                })
+                .unwrap_or_else(|| {
+                    format!(
+                        "__inline_rgba8_{}x{}_{}",
+                        image.width,
+                        image.height,
+                        self.sprite_pipelines_by_texture.len()
+                    )
+                });
             let pipeline = self
                 .sprite_pipelines_by_texture
-                .entry(texture_path.clone())
+                .entry(cache_key)
+                .or_insert_with(|| {
+                    SpritePipeline::from_rgba8(
+                        &self.device,
+                        &self.queue,
+                        wgpu::TextureFormat::Bgra8UnormSrgb,
+                        image,
+                    )
+                });
+            pipeline.update_projection(&self.queue, self.current_projection);
+            pipeline.add_sprite(render_instance);
+        } else if let Some(texture_path) = &sprite.texture_path {
+            let pipeline = self
+                .sprite_pipelines_by_texture
+                .entry(texture_path.to_string_lossy().to_string())
                 .or_insert_with(|| {
                     SpritePipeline::new(
                         &self.device,

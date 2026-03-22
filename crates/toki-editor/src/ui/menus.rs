@@ -57,6 +57,16 @@ impl MenuSystem {
                     }
                     if ui
                         .add_enabled(
+                            project.is_some(),
+                            egui::Button::new("Reload Project Assets"),
+                        )
+                        .clicked()
+                    {
+                        tracing::info!("Reload Project Assets clicked");
+                        ui_state.project.reload_project_assets_requested = true;
+                    }
+                    if ui
+                        .add_enabled(
                             ui_state.has_unsaved_map_editor_changes(),
                             egui::Button::new("Save Map"),
                         )
@@ -241,6 +251,38 @@ impl MenuSystem {
                             );
                         }
                     }
+                    ui_state.project.pending_confirmation = None;
+                }
+            }
+            EditorConfirmation::ExitEditor => {
+                let mut open = true;
+                let mut confirm_exit = false;
+                let mut cancel = false;
+                egui::Window::new("Exit Editor")
+                    .collapsible(false)
+                    .resizable(false)
+                    .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+                    .open(&mut open)
+                    .show(ctx, |ui| {
+                        ui.label("Do you really want to close the editor?");
+                        ui.add_space(8.0);
+                        ui.horizontal(|ui| {
+                            if ui.button("Yes").clicked() {
+                                confirm_exit = true;
+                            }
+                            if ui.button("No").clicked() {
+                                cancel = true;
+                            }
+                        });
+                    });
+
+                if !open || cancel {
+                    ui_state.project.pending_confirmation = None;
+                    return;
+                }
+
+                if confirm_exit {
+                    ui_state.visibility.should_exit = true;
                     ui_state.project.pending_confirmation = None;
                 }
             }

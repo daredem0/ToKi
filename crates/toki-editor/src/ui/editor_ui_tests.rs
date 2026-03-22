@@ -753,6 +753,7 @@ fn project_editor_state_defaults() {
     assert!(!ui.project.show_new_project_dialog);
     assert!(!ui.project.open_project_requested);
     assert!(!ui.project.browse_for_project_requested);
+    assert!(!ui.project.reload_project_assets_requested);
     assert!(!ui.project.save_project_requested);
     assert!(!ui.project.export_project_requested);
     assert!(!ui.project.play_scene_requested);
