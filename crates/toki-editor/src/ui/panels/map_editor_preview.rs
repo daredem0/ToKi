@@ -290,5 +290,4 @@ impl PanelSystem {
         ui_state.map.brush_preview_texture = Some(texture.clone());
         Some(texture)
     }
-
 }

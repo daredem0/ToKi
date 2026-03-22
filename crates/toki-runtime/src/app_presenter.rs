@@ -1,9 +1,9 @@
+use toki_core::game::GroundShadow;
 use toki_core::sprite_render::{
     collect_map_object_sprite_render_requests, format_sprite_resolve_failure,
     resolve_sprite_render_requests, sort_sprite_render_requests,
 };
 use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
-use toki_core::game::GroundShadow;
 
 use crate::systems::{GameManager, PerformanceMonitor, RenderingSystem, ResourceManager};
 
@@ -68,10 +68,9 @@ impl<'a> WorldFramePresenter<'a> {
                 weight: TextWeight::Bold,
                 ..TextStyle::default()
             };
-            let hud_text =
-                TextItem::new_screen(stats_line, glam::Vec2::new(8.0, 8.0), hud_style)
-                    .with_anchor(TextAnchor::TopLeft)
-                    .with_layer(1);
+            let hud_text = TextItem::new_screen(stats_line, glam::Vec2::new(8.0, 8.0), hud_style)
+                .with_anchor(TextAnchor::TopLeft)
+                .with_layer(1);
             self.rendering.add_text_item(hud_text);
         }
     }
@@ -199,7 +198,6 @@ impl<'a> WorldFramePresenter<'a> {
             );
         }
     }
-
 }
 
 fn ground_shadow_bands(shadow: &GroundShadow) -> Vec<GroundShadowBand> {

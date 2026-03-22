@@ -486,5 +486,4 @@ impl EditorUI {
     pub fn can_redo(&self) -> bool {
         crate::editor_services::commands::can_redo(self)
     }
-
 }

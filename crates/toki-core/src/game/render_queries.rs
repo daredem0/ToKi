@@ -407,7 +407,8 @@ impl GameState {
     }
 
     pub fn get_entity_current_atlas_name(&self, entity_id: EntityId) -> Option<String> {
-        self.render_query_facade().entity_current_atlas_name(entity_id)
+        self.render_query_facade()
+            .entity_current_atlas_name(entity_id)
     }
 
     pub fn get_entity_sprite_flip_x(&self, entity_id: EntityId) -> bool {

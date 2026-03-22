@@ -8,8 +8,8 @@ use super::editor_ui::{EditorUI, MapEditorTool, SceneRulesGraphCommandData, Sele
 use super::rule_graph::{RuleGraph, RuleGraphNodeKind};
 use crate::config::EditorConfig;
 use crate::project::Project;
-use crate::ui::panel_layout::SIDE_PANEL_DEFAULT_WIDTH;
 pub(crate) use crate::project::ProjectSettingsDraft;
+use crate::ui::panel_layout::SIDE_PANEL_DEFAULT_WIDTH;
 use std::collections::HashMap;
 use toki_core::assets::object_sheet::ObjectSheetMeta;
 use toki_core::entity::EntityKind;
@@ -359,15 +359,15 @@ impl InspectorSystem {
                 ui.separator();
 
                 egui::ScrollArea::vertical().show(ui, |ui| match ui_state.right_panel_tab {
-                        super::editor_ui::RightPanelTab::Inspector => {
-                            Self::render_selection_inspector_contents(
-                                ui_state, ui, ctx, game_state, project, config,
-                            );
-                        }
-                        super::editor_ui::RightPanelTab::Project => {
-                            Self::render_project_settings_panel(ui_state, ui, project, config);
-                        }
-                    });
+                    super::editor_ui::RightPanelTab::Inspector => {
+                        Self::render_selection_inspector_contents(
+                            ui_state, ui, ctx, game_state, project, config,
+                        );
+                    }
+                    super::editor_ui::RightPanelTab::Project => {
+                        Self::render_project_settings_panel(ui_state, ui, project, config);
+                    }
+                });
             });
     }
 

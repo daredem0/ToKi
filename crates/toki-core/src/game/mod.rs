@@ -10,8 +10,8 @@ use crate::events::{GameEvent, GameUpdateResult};
 use crate::rules::{RuleSet, RuleTrigger};
 use crate::scene_manager::SceneManager;
 
-mod animation;
 mod ai_runtime;
+mod animation;
 mod combat;
 mod input;
 mod input_state;
@@ -19,9 +19,9 @@ mod interaction;
 mod inventory;
 mod movement;
 mod render_queries;
-mod stat_effects;
 pub(crate) mod rules;
 mod scene;
+mod stat_effects;
 mod transition;
 
 #[cfg(test)]

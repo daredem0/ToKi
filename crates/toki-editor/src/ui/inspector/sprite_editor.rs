@@ -100,7 +100,9 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             ui.label("Click to erase the connected color region inside the clicked tile.");
         }
         SpriteEditorTool::AddOutline => {
-            ui.label("Click a sprite to add an outline of the current color inside the clicked tile.");
+            ui.label(
+                "Click a sprite to add an outline of the current color inside the clicked tile.",
+            );
         }
         SpriteEditorTool::AddShadow => {
             ui.label("Click a sprite to add a ground shadow of the current color inside the clicked tile.");

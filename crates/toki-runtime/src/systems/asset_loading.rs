@@ -142,14 +142,13 @@ impl DecodedProjectCache {
     ) -> Result<EntityDefinition, toki_core::CoreError> {
         self.entity_definitions
             .get_or_load(entity_definition_path.to_path_buf(), |path| {
-                load_entity_definition_from_project_path(path)
-                    .map_err(|error| match error {
-                        toki_core::project_assets::ProjectAssetError::Io(error) => error.into(),
-                        toki_core::project_assets::ProjectAssetError::Core(error) => error,
-                        toki_core::project_assets::ProjectAssetError::Validation(error) => {
-                            toki_core::CoreError::FileLoad(path.to_path_buf(), error)
-                        }
-                    })
+                load_entity_definition_from_project_path(path).map_err(|error| match error {
+                    toki_core::project_assets::ProjectAssetError::Io(error) => error.into(),
+                    toki_core::project_assets::ProjectAssetError::Core(error) => error,
+                    toki_core::project_assets::ProjectAssetError::Validation(error) => {
+                        toki_core::CoreError::FileLoad(path.to_path_buf(), error)
+                    }
+                })
             })
     }
 }

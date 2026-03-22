@@ -136,10 +136,7 @@ pub fn render_tab_strip<T: Copy + PartialEq>(
             let step = EditorTabStripState::button_scroll_step(viewport_width);
             let can_scroll_left = state.horizontal_offset > 0.0;
 
-            if ui
-                .add_enabled(can_scroll_left, Button::new("<"))
-                .clicked()
-            {
+            if ui.add_enabled(can_scroll_left, Button::new("<")).clicked() {
                 state.scroll_by(-step, total_width, viewport_width);
                 ui.ctx().request_repaint();
             }
@@ -185,10 +182,7 @@ pub fn render_tab_strip<T: Copy + PartialEq>(
             let step = EditorTabStripState::button_scroll_step(scroll_output.inner_rect.width());
             let can_scroll_right = state.horizontal_offset
                 < EditorTabStripState::max_offset(total_width, scroll_output.inner_rect.width());
-            if ui
-                .add_enabled(can_scroll_right, Button::new(">"))
-                .clicked()
-            {
+            if ui.add_enabled(can_scroll_right, Button::new(">")).clicked() {
                 state.scroll_by(step, total_width, scroll_output.inner_rect.width());
                 ui.ctx().request_repaint();
             }

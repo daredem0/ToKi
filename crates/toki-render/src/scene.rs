@@ -554,7 +554,8 @@ impl SceneRenderer {
         self.tilemap_pipeline
             .update_projection(&self.queue, projection);
         self.update_sprite_projection(projection);
-        self.underlay_pipeline.update_camera(&self.queue, projection);
+        self.underlay_pipeline
+            .update_camera(&self.queue, projection);
         self.debug_pipeline.update_camera(&self.queue, projection);
     }
 }

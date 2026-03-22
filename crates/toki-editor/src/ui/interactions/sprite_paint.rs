@@ -324,7 +324,8 @@ impl SpritePaintInteraction {
             return false;
         }
         let start_pos = UVec2::new(start_pos.x as u32, start_pos.y as u32);
-        let Some(region) = Self::connected_opaque_region_in_bounds(canvas, start_pos, bounds) else {
+        let Some(region) = Self::connected_opaque_region_in_bounds(canvas, start_pos, bounds)
+        else {
             return false;
         };
 
@@ -390,7 +391,8 @@ impl SpritePaintInteraction {
             return false;
         }
         let start_pos = UVec2::new(start_pos.x as u32, start_pos.y as u32);
-        let Some(region) = Self::connected_opaque_region_in_bounds(canvas, start_pos, bounds) else {
+        let Some(region) = Self::connected_opaque_region_in_bounds(canvas, start_pos, bounds)
+        else {
             return false;
         };
 

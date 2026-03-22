@@ -162,11 +162,10 @@ impl PlacementInteraction {
             facing: None,
         });
 
-        let changed = editor_commands::execute(ui_state, EditorCommand::update_scene(
-            active_scene_name.clone(),
-            before_scene,
-            after_scene,
-        ));
+        let changed = editor_commands::execute(
+            ui_state,
+            EditorCommand::update_scene(active_scene_name.clone(), before_scene, after_scene),
+        );
         if changed {
             ui_state.set_selection(crate::ui::editor_ui::Selection::SceneAnchor {
                 scene_name: active_scene_name,

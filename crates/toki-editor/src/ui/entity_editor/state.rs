@@ -145,5 +145,4 @@ impl EntityEditorState {
         self.entities_dir = None;
         self.needs_refresh = false;
     }
-
 }

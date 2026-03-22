@@ -2,10 +2,10 @@
 
 use crate::config::EditorConfig;
 use crate::project::SceneGraphLayout;
+use crate::rule_graph_ui::rule_graph_node_badges;
 use crate::ui::inspector::InspectorSystem;
 use crate::ui::rule_graph::RuleGraph;
 use crate::ui::EditorUI;
-use crate::rule_graph_ui::rule_graph_node_badges;
 
 use super::super::{RuleAudioChoices, RuleValidationIssue};
 

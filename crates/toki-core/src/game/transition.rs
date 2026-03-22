@@ -64,15 +64,15 @@ impl<'a> SceneTransitionPlanner<'a> {
                 Some(player_id)
             } else {
                 let (position, facing) = self.resolve_spawn_anchor(scene, spawn_point_id)?;
-                let definition =
-                    self.entity_definitions
-                        .get(&player_entry.entity_definition_name)
-                        .ok_or_else(|| {
-                            format!(
-                                "Scene '{}' references missing player entity definition '{}'",
-                                scene.name, player_entry.entity_definition_name
-                            )
-                        })?;
+                let definition = self
+                    .entity_definitions
+                    .get(&player_entry.entity_definition_name)
+                    .ok_or_else(|| {
+                        format!(
+                            "Scene '{}' references missing player entity definition '{}'",
+                            scene.name, player_entry.entity_definition_name
+                        )
+                    })?;
                 let player_id = entity_manager.spawn_from_definition(definition, position)?;
                 entity_manager.set_control_role(player_id, ControlRole::PlayerCharacter);
                 if let Some(player) = entity_manager.get_entity_mut(player_id) {
@@ -151,10 +151,7 @@ impl<'a> SceneTransitionPlanner<'a> {
         Self::reset_player_transient_state(player, anchor_facing);
     }
 
-    fn reset_player_transient_state(
-        player: &mut Entity,
-        anchor_facing: Option<SceneAnchorFacing>,
-    ) {
+    fn reset_player_transient_state(player: &mut Entity, anchor_facing: Option<SceneAnchorFacing>) {
         player.movement_accumulator = glam::Vec2::ZERO;
         if let Some(animation_controller) = player.attributes.animation_controller.as_mut() {
             let facing = anchor_facing

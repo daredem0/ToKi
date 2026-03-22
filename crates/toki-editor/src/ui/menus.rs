@@ -230,7 +230,8 @@ impl MenuSystem {
                     };
                     match build_delete_scene_command(ui_state, project, &scene_name) {
                         Ok(command) => {
-                            let _ = editor_commands::execute_with_project(ui_state, project, command);
+                            let _ =
+                                editor_commands::execute_with_project(ui_state, project, command);
                         }
                         Err(error) => {
                             tracing::error!(

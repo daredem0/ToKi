@@ -202,8 +202,7 @@ fn handle_anchor_delete(
             before_scene,
             after_scene,
         ),
-    )
-    {
+    ) {
         ctx.ui_state
             .set_selection(crate::ui::editor_ui::Selection::Scene(
                 scene_name.to_string(),
@@ -230,8 +229,7 @@ fn handle_anchor_update(
             before_scene,
             after_scene,
         ),
-    )
-    {
+    ) {
         *anchor_id = edited_anchor.id.clone();
         ctx.ui_state
             .set_selection(crate::ui::editor_ui::Selection::SceneAnchor {

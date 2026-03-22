@@ -77,8 +77,11 @@ pub fn load_preview_sprite_frame(
                 return None;
             }
         };
-        let texture_size = object_sheet.image_size().unwrap_or(glam::UVec2::new(16, 16));
-        let Some(uvs) = object_sheet.get_object_uvs(&static_object.object_name, texture_size) else {
+        let texture_size = object_sheet
+            .image_size()
+            .unwrap_or(glam::UVec2::new(16, 16));
+        let Some(uvs) = object_sheet.get_object_uvs(&static_object.object_name, texture_size)
+        else {
             tracing::warn!(
                 "Failed to get UV coordinates for object '{}' in preview",
                 static_object.object_name
@@ -112,7 +115,9 @@ pub fn load_preview_sprite_frame(
         }
     };
 
-    let sprite_texture_size = sprite_atlas.image_size().unwrap_or(glam::UVec2::new(64, 16));
+    let sprite_texture_size = sprite_atlas
+        .image_size()
+        .unwrap_or(glam::UVec2::new(64, 16));
 
     if let Some(clip_def) = entity_def.animations.clips.first() {
         if let Some(first_tile_name) = clip_def.frame_tiles.first() {
@@ -214,9 +219,12 @@ pub fn build_scene_anchor_overlay_lines(
     let mut lines = Vec::new();
 
     for anchor in &scene.anchors {
-        if request.dragged_anchor.is_some_and(|(scene_name, anchor_id)| {
-            scene_name == scene.name && anchor_id == anchor.id
-        }) {
+        if request
+            .dragged_anchor
+            .is_some_and(|(scene_name, anchor_id)| {
+                scene_name == scene.name && anchor_id == anchor.id
+            })
+        {
             continue;
         }
         lines.extend(scene_anchor_cross_lines(
@@ -276,12 +284,14 @@ pub fn build_drag_preview_sprites(
         .map(|entity| {
             let world_position = entity.position + delta;
             let is_valid = match (tilemap, terrain_atlas) {
-                (Some(tilemap), Some(terrain_atlas)) => toki_core::collision::can_entity_move_to_position(
-                    entity,
-                    world_position,
-                    tilemap,
-                    terrain_atlas,
-                ),
+                (Some(tilemap), Some(terrain_atlas)) => {
+                    toki_core::collision::can_entity_move_to_position(
+                        entity,
+                        world_position,
+                        tilemap,
+                        terrain_atlas,
+                    )
+                }
                 _ => true,
             };
 

@@ -208,7 +208,8 @@ fn apply_entity_property_draft_to_definition_updates_has_shadow() {
     let mut draft = EntityPropertyDraft::from_entity_definition(&definition);
     draft.has_shadow = false;
 
-    let changed = InspectorSystem::apply_entity_property_draft_to_definition(&mut definition, &draft);
+    let changed =
+        InspectorSystem::apply_entity_property_draft_to_definition(&mut definition, &draft);
 
     assert!(changed);
     assert!(!definition.rendering.has_shadow);

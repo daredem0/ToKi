@@ -276,7 +276,6 @@ impl EditorApp {
         let next_state = Self::toggled_fullscreen_state(window.fullscreen().is_some());
         window.set_fullscreen(next_state);
     }
-
 }
 
 impl ApplicationHandler for EditorApp {
@@ -662,12 +661,12 @@ impl EditorApp {
                     CenterPanelTab::SceneViewport => {
                         let scene_player_overlay_sprites =
                             scene_overlays::build_scene_player_overlay_sprites(
-                            self.core.ui.active_scene.as_deref(),
-                            &self.core.ui.scenes,
-                            project_path.as_path(),
-                            project_assets,
-                            &mut self.resources.preview_sprite_frames,
-                        );
+                                self.core.ui.active_scene.as_deref(),
+                                &self.core.ui.scenes,
+                                project_path.as_path(),
+                                project_assets,
+                                &mut self.resources.preview_sprite_frames,
+                            );
                         if let Some(scene_viewport) = &mut self.viewports.scene {
                             let placement_preview = if self.core.ui.is_in_placement_mode() {
                                 if self.core.ui.placement.entity_move_drag.is_none() {
@@ -690,13 +689,10 @@ impl EditorApp {
                                 None
                             };
 
-                            let dragged_anchor = self
-                                .core
-                                .ui
-                                .placement
-                                .scene_anchor_move_drag
-                                .as_ref()
-                                .map(|drag| (drag.scene_name.as_str(), drag.anchor.id.as_str()));
+                            let dragged_anchor =
+                                self.core.ui.placement.scene_anchor_move_drag.as_ref().map(
+                                    |drag| (drag.scene_name.as_str(), drag.anchor.id.as_str()),
+                                );
                             let anchor_overlay_lines =
                                 scene_overlays::build_scene_anchor_overlay_lines(
                                     scene_overlays::SceneAnchorOverlayRequest {

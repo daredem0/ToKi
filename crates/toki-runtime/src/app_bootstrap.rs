@@ -127,8 +127,8 @@ impl<'a> StartupCoordinator<'a> {
                     map_name: self.launch_options.map_name.clone(),
                     tilemap_texture_path: None,
                     sprite_texture_path: None,
-                    preloaded_sfx_names:
-                        crate::systems::asset_loading::common_preloaded_sfx_names(),
+                    preloaded_sfx_names: crate::systems::asset_loading::common_preloaded_sfx_names(
+                    ),
                     stream_music: true,
                 },
                 decoded_project_cache,
@@ -160,10 +160,8 @@ impl<'a> StartupCoordinator<'a> {
         let project_path = startup_root.root_path.clone();
         let preloaded =
             self.preload_project_content(&project_path, error_policy, decoded_project_cache)?;
-        let scene = self.resolve_startup_scene(
-            &preloaded.scenes,
-            self.launch_options.scene_name.as_deref(),
-        );
+        let scene = self
+            .resolve_startup_scene(&preloaded.scenes, self.launch_options.scene_name.as_deref());
         let map_name = self.resolve_startup_map_name(scene.as_ref());
         let (resources, asset_load_plan) = App::load_project_resources_with_cache(
             &project_path,
@@ -197,31 +195,14 @@ impl<'a> StartupCoordinator<'a> {
         error_policy: StartupErrorPolicy,
         decoded_project_cache: &mut DecodedProjectCache,
     ) -> Result<PreloadedProjectContent, String> {
-        let scenes = match App::load_all_project_scenes_with_cache(project_path, decoded_project_cache)
-        {
-            Ok(scenes) => scenes,
-            Err(error) => match error_policy {
-                StartupErrorPolicy::Strict => return Err(error),
-                StartupErrorPolicy::Lenient => {
-                    tracing::error!(
-                        "Failed to preload project scenes from '{}': {}",
-                        project_path.display(),
-                        error
-                    );
-                    Vec::new()
-                }
-            },
-        };
-
-        let entity_definitions =
-            match App::load_project_entity_definitions_with_cache(project_path, decoded_project_cache)
-            {
-                Ok(definitions) => definitions,
+        let scenes =
+            match App::load_all_project_scenes_with_cache(project_path, decoded_project_cache) {
+                Ok(scenes) => scenes,
                 Err(error) => match error_policy {
                     StartupErrorPolicy::Strict => return Err(error),
                     StartupErrorPolicy::Lenient => {
                         tracing::error!(
-                            "Failed to preload entity definitions from '{}': {}",
+                            "Failed to preload project scenes from '{}': {}",
                             project_path.display(),
                             error
                         );
@@ -229,6 +210,24 @@ impl<'a> StartupCoordinator<'a> {
                     }
                 },
             };
+
+        let entity_definitions = match App::load_project_entity_definitions_with_cache(
+            project_path,
+            decoded_project_cache,
+        ) {
+            Ok(definitions) => definitions,
+            Err(error) => match error_policy {
+                StartupErrorPolicy::Strict => return Err(error),
+                StartupErrorPolicy::Lenient => {
+                    tracing::error!(
+                        "Failed to preload entity definitions from '{}': {}",
+                        project_path.display(),
+                        error
+                    );
+                    Vec::new()
+                }
+            },
+        };
 
         Ok(PreloadedProjectContent {
             scenes,
@@ -246,9 +245,10 @@ impl<'a> StartupCoordinator<'a> {
     }
 
     fn resolve_startup_map_name(&self, scene: Option<&Scene>) -> Option<String> {
-        self.launch_options.map_name.clone().or_else(|| {
-            scene.and_then(|loaded_scene| loaded_scene.maps.first().cloned())
-        })
+        self.launch_options
+            .map_name
+            .clone()
+            .or_else(|| scene.and_then(|loaded_scene| loaded_scene.maps.first().cloned()))
     }
 }
 
@@ -412,8 +412,8 @@ mod tests {
     use super::*;
     use std::fs;
     use toki_core::entity::{
-        AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
-        MovementProfile, MovementSoundTrigger, RenderingDef,
+        AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition, MovementProfile,
+        MovementSoundTrigger, RenderingDef,
     };
 
     fn write_minimal_entity_definition(project_path: &Path, name: &str) {

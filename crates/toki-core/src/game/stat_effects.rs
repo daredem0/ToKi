@@ -71,12 +71,7 @@ impl<'a> StatEffectService<'a> {
         }
     }
 
-    pub(super) fn remove_inventory_item(
-        &mut self,
-        entity_id: EntityId,
-        item_id: &str,
-        count: u32,
-    ) {
+    pub(super) fn remove_inventory_item(&mut self, entity_id: EntityId, item_id: &str, count: u32) {
         let Some(entity) = self.entity_manager.get_entity_mut(entity_id) else {
             return;
         };

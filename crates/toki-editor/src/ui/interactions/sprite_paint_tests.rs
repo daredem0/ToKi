@@ -307,7 +307,11 @@ fn add_outline_in_bounds_adds_outline_around_clicked_sprite() {
     for y in 1..=3 {
         for x in 1..=3 {
             let expected = if x == 2 && y == 2 { sprite } else { outline };
-            assert_eq!(canvas.get_pixel(x, y), Some(expected), "Pixel at ({x}, {y})");
+            assert_eq!(
+                canvas.get_pixel(x, y),
+                Some(expected),
+                "Pixel at ({x}, {y})"
+            );
         }
     }
 }

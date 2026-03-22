@@ -265,12 +265,8 @@ fn handle_add_outline_tool(
     start_paint_stroke(ui_state);
     let outline_color = ui_state.sprite.foreground_color;
     if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
-        if SpritePaintInteraction::add_outline_in_bounds(
-            canvas,
-            canvas_pos,
-            outline_color,
-            bounds,
-        ) {
+        if SpritePaintInteraction::add_outline_in_bounds(canvas, canvas_pos, outline_color, bounds)
+        {
             ui_state.sprite.active_mut().dirty = true;
             invalidate_canvas_texture(ui_state);
         }

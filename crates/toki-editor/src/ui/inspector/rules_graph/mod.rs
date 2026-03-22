@@ -104,12 +104,8 @@ impl InspectorSystem {
             node_id,
             RuleGraphSummaryStyle::Detailed,
         );
-        let (ops_mutated, ops_error) = process_pending_operations(
-            &mut graph,
-            node_id,
-            &action_result,
-            pending_disconnect,
-        );
+        let (ops_mutated, ops_error) =
+            process_pending_operations(&mut graph, node_id, &action_result, pending_disconnect);
         graph_mutated |= ops_mutated;
 
         if let Some(message) = ops_error {

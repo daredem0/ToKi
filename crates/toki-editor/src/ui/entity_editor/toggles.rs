@@ -48,5 +48,4 @@ impl ComponentToggles {
         .filter(|&&b| b)
         .count()
     }
-
 }

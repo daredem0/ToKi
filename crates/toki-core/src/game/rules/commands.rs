@@ -64,10 +64,12 @@ impl GameState {
                     );
                 }
                 RuleCommand::DamageEntity { entity_id, amount } => {
-                    self.stat_effect_service().queue_damage(entity_id, amount, None);
+                    self.stat_effect_service()
+                        .queue_damage(entity_id, amount, None);
                 }
                 RuleCommand::HealEntity { entity_id, amount } => {
-                    self.stat_effect_service().queue_capped_heal(entity_id, amount);
+                    self.stat_effect_service()
+                        .queue_capped_heal(entity_id, amount);
                 }
                 RuleCommand::AddInventoryItem {
                     entity_id,

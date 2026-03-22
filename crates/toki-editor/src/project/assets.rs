@@ -194,9 +194,7 @@ impl ProjectAssets {
 
             if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                    let tilemap_asset = TilemapAsset {
-                        path: path.clone(),
-                    };
+                    let tilemap_asset = TilemapAsset { path: path.clone() };
 
                     self.tilemaps.insert(stem.to_string(), tilemap_asset);
                     tracing::info!("🗺️ Found tilemap file: '{}' at {:?}", stem, path);
@@ -225,17 +223,13 @@ impl ProjectAssets {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     match classify_sprite_metadata_file(&path)? {
                         SpriteMetadataFileKind::Atlas => {
-                            let atlas_asset = SpriteAtlasAsset {
-                                path: path.clone(),
-                            };
+                            let atlas_asset = SpriteAtlasAsset { path: path.clone() };
 
                             self.sprite_atlases.insert(stem.to_string(), atlas_asset);
                             tracing::info!("🎨 Found sprite atlas file: '{}' at {:?}", stem, path);
                         }
                         SpriteMetadataFileKind::ObjectSheet => {
-                            let object_sheet_asset = ObjectSheetAsset {
-                                path: path.clone(),
-                            };
+                            let object_sheet_asset = ObjectSheetAsset { path: path.clone() };
 
                             self.object_sheets
                                 .insert(stem.to_string(), object_sheet_asset);
@@ -259,7 +253,10 @@ impl ProjectAssets {
     fn discover_audio_names_in_dir(dir: &Path) -> Vec<String> {
         match discover_audio_files(dir) {
             Ok(assets) => {
-                let mut names = assets.into_iter().map(|asset| asset.name).collect::<Vec<_>>();
+                let mut names = assets
+                    .into_iter()
+                    .map(|asset| asset.name)
+                    .collect::<Vec<_>>();
                 names.sort();
                 names.dedup();
                 names
@@ -309,8 +306,9 @@ impl ProjectAssets {
     pub fn load_scene(&mut self, scene_name: &str) -> Result<Option<Scene>> {
         if let Some(scene_asset) = self.scenes.get_mut(scene_name) {
             if scene_asset.scene.is_none() {
-                let scene = load_scene_from_project_path(&scene_asset.path)
-                    .map_err(|error| anyhow::anyhow!("Failed to load scene '{}': {}", scene_name, error))?;
+                let scene = load_scene_from_project_path(&scene_asset.path).map_err(|error| {
+                    anyhow::anyhow!("Failed to load scene '{}': {}", scene_name, error)
+                })?;
 
                 scene_asset.scene = Some(scene.clone());
                 tracing::info!(
@@ -418,7 +416,6 @@ impl ProjectAssets {
             Ok(None)
         }
     }
-
 }
 
 #[cfg(test)]

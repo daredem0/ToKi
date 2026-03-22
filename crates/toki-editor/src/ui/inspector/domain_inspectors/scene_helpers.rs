@@ -35,7 +35,8 @@ pub fn render_delete_scene_button(
             if let Some(project) = ctx.project.as_deref_mut() {
                 match build_delete_scene_command(ctx.ui_state, project, scene_name) {
                     Ok(command) => {
-                        let _ = editor_commands::execute_with_project(ctx.ui_state, project, command);
+                        let _ =
+                            editor_commands::execute_with_project(ctx.ui_state, project, command);
                     }
                     Err(error) => {
                         tracing::error!(

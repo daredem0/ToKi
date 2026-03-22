@@ -1,7 +1,7 @@
 use super::ProjectManager;
 use crate::project::ProjectTemplateKind;
-use crate::ui::interactions::MapPaintInteraction;
 use crate::rule_graph::RuleGraph;
+use crate::ui::interactions::MapPaintInteraction;
 use jsonschema::JSONSchema;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};

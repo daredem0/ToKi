@@ -291,12 +291,7 @@ impl PanelSystem {
             MapEditorTool::Drag => {
                 if response.clicked() {
                     if let Some(selected_object_index) =
-                        Self::handle_map_editor_object_select(
-                            ui,
-                            viewport,
-                            &response,
-                            display_rect,
-                        )
+                        Self::handle_map_editor_object_select(ui, viewport, &response, display_rect)
                     {
                         if let Some(tilemap) = viewport.tilemap() {
                             if let Some(object) = tilemap.objects.get(selected_object_index) {

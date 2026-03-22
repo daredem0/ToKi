@@ -61,5 +61,4 @@ impl SpriteCanvasViewport {
         let viewport_pos = (canvas_pos - self.pan) * self.zoom;
         viewport_pos + glam::Vec2::new(viewport_rect.left(), viewport_rect.top())
     }
-
 }

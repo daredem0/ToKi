@@ -1157,7 +1157,10 @@ fn test_entity_definition_serialization() {
     assert_eq!(entity_def.name, deserialized.name);
     assert_eq!(entity_def.display_name, deserialized.display_name);
     assert_eq!(entity_def.rendering.size, deserialized.rendering.size);
-    assert_eq!(entity_def.rendering.has_shadow, deserialized.rendering.has_shadow);
+    assert_eq!(
+        entity_def.rendering.has_shadow,
+        deserialized.rendering.has_shadow
+    );
     assert_eq!(entity_def.attributes.speed, deserialized.attributes.speed);
     assert_eq!(entity_def.collision.enabled, deserialized.collision.enabled);
     assert_eq!(

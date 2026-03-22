@@ -516,7 +516,10 @@ fn draw_hovered_pixel_highlight(
     };
 
     let fill = egui::Color32::from_rgba_unmultiplied(90, 160, 255, 70);
-    let stroke = egui::Stroke::new(1.0, egui::Color32::from_rgba_unmultiplied(120, 190, 255, 220));
+    let stroke = egui::Stroke::new(
+        1.0,
+        egui::Color32::from_rgba_unmultiplied(120, 190, 255, 220),
+    );
     painter.rect_filled(pixel_rect, 0.0, fill);
     painter.rect_stroke(pixel_rect, 0.0, stroke, egui::StrokeKind::Inside);
 }
@@ -560,8 +563,14 @@ mod tests {
         let viewport = SpriteCanvasViewport::default();
         let canvas = SpriteCanvas::new(8, 8);
 
-        assert!(hovered_pixel_screen_rect(rect, &viewport, &canvas, Some(glam::IVec2::new(-1, 0))).is_none());
-        assert!(hovered_pixel_screen_rect(rect, &viewport, &canvas, Some(glam::IVec2::new(8, 0))).is_none());
+        assert!(
+            hovered_pixel_screen_rect(rect, &viewport, &canvas, Some(glam::IVec2::new(-1, 0)))
+                .is_none()
+        );
+        assert!(
+            hovered_pixel_screen_rect(rect, &viewport, &canvas, Some(glam::IVec2::new(8, 0)))
+                .is_none()
+        );
         assert!(hovered_pixel_screen_rect(rect, &viewport, &canvas, None).is_none());
     }
 

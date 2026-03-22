@@ -29,10 +29,7 @@ impl<'a> AiRuntimeApplier<'a> {
         }
     }
 
-    pub(super) fn apply_updates(
-        &mut self,
-        ai_updates: Vec<AiUpdateResult>,
-    ) -> AiRuntimeEffects {
+    pub(super) fn apply_updates(&mut self, ai_updates: Vec<AiUpdateResult>) -> AiRuntimeEffects {
         let mut effects = AiRuntimeEffects::default();
         for ai_result in ai_updates {
             self.apply_result(ai_result, &mut effects);
@@ -68,8 +65,9 @@ impl<'a> AiRuntimeApplier<'a> {
                     .entity_manager
                     .clone_entity(*source_entity_id, spawn_request.position)
                     .ok_or_else(|| format!("Source entity {} not found", source_entity_id)),
-                SpawnMode::FromDefinition { definition_name } => self
-                    .spawn_entity_from_definition_name(definition_name, spawn_request.position),
+                SpawnMode::FromDefinition { definition_name } => {
+                    self.spawn_entity_from_definition_name(definition_name, spawn_request.position)
+                }
             };
 
             match spawn_result {
@@ -133,7 +131,10 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::ai::{AiSpawnRequest, AiSystem, AiUpdateResult, SpawnMode};
-    use crate::entity::{AiConfig, AttributesDef, AudioDef, CollisionDef, EntityDefinition, EntityManager, MovementProfile, MovementSoundTrigger, RenderingDef};
+    use crate::entity::{
+        AiConfig, AttributesDef, AudioDef, CollisionDef, EntityDefinition, EntityManager,
+        MovementProfile, MovementSoundTrigger, RenderingDef,
+    };
 
     use super::AiRuntimeApplier;
 

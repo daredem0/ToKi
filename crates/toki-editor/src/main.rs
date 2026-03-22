@@ -1,12 +1,12 @@
 use anyhow::Result;
 mod background_tasks;
 mod config;
+mod editor_app;
+mod editor_grid;
 mod editor_services;
 mod editor_tab_strip;
 mod editor_types;
 mod editor_viewport;
-mod editor_app;
-mod editor_grid;
 mod fonts;
 mod logging;
 use logging::LogCapture;

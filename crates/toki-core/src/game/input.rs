@@ -72,12 +72,14 @@ impl GameState {
 
     /// Handle profile-scoped action press events.
     pub fn handle_profile_action_press(&mut self, profile: MovementProfile, action: InputAction) {
-        self.input_state.handle_profile_action_press(profile, action);
+        self.input_state
+            .handle_profile_action_press(profile, action);
     }
 
     /// Handle profile-scoped action release events.
     pub fn handle_profile_action_release(&mut self, profile: MovementProfile, action: InputAction) {
-        self.input_state.handle_profile_action_release(profile, action);
+        self.input_state
+            .handle_profile_action_release(profile, action);
     }
 
     pub(super) fn take_pending_profile_actions(

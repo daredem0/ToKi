@@ -296,7 +296,6 @@ pub struct EntityAttributes {
     // ═══════════════════════════════════════════════════════════════════════════
     // Core Gameplay
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Legacy health field. Prefer using `stats.current(HEALTH_STAT_ID)` instead.
     pub health: Option<u32>,
     /// Entity statistics (health, attack power, custom stats).
@@ -310,7 +309,6 @@ pub struct EntityAttributes {
     // ═══════════════════════════════════════════════════════════════════════════
     // Rendering
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Whether this entity is rendered.
     pub visible: bool,
     /// Whether this entity casts the stylized runtime ground shadow.
@@ -327,7 +325,6 @@ pub struct EntityAttributes {
     // ═══════════════════════════════════════════════════════════════════════════
     // Behavior
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Whether this entity participates in game logic updates.
     pub active: bool,
     /// Whether this entity can be moved (by player input or AI).
@@ -350,7 +347,6 @@ pub struct EntityAttributes {
     // These are candidate for extraction to EntityManager component storage
     // (similar to audio_components pattern).
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Projectile definition for entities that can shoot.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub primary_projectile: Option<PrimaryProjectileDef>,

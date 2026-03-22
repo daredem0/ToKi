@@ -393,10 +393,13 @@ impl EditorUI {
                 continue;
             };
 
-            let removed = editor_commands::execute(self, EditorCommand::remove_entities(
-                scene_name.clone(),
-                vec![IndexedEntity { index, entity }],
-            ));
+            let removed = editor_commands::execute(
+                self,
+                EditorCommand::remove_entities(
+                    scene_name.clone(),
+                    vec![IndexedEntity { index, entity }],
+                ),
+            );
             if removed {
                 tracing::info!("Removed entity {} from scene {}", entity_id, scene_name);
 
@@ -424,11 +427,10 @@ impl EditorUI {
                 continue;
             }
 
-            if editor_commands::execute(self, EditorCommand::update_scene(
-                scene_name.clone(),
-                before_scene,
-                after_scene,
-            )) {
+            if editor_commands::execute(
+                self,
+                EditorCommand::update_scene(scene_name.clone(), before_scene, after_scene),
+            ) {
                 tracing::info!(
                     "Removed spawnpoint '{}' from scene {}",
                     anchor_id,

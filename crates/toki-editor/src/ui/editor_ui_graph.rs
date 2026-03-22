@@ -113,15 +113,18 @@ impl EditorUI {
             data.pan,
             data.before_layout.clone(),
         );
-        editor_commands::execute(self, EditorCommand::update_scene_rules_graph(
-            scene_name.to_string(),
-            data.before_rule_set,
-            data.after_rule_set,
-            data.before_graph,
-            Some(data.after_graph),
-            data.before_layout,
-            Some(after_layout),
-        ))
+        editor_commands::execute(
+            self,
+            EditorCommand::update_scene_rules_graph(
+                scene_name.to_string(),
+                data.before_rule_set,
+                data.after_rule_set,
+                data.before_graph,
+                Some(data.after_graph),
+                data.before_layout,
+                Some(after_layout),
+            ),
+        )
     }
 
     pub fn sync_rule_graph_with_rule_set(&mut self, scene_name: &str, rule_set: &RuleSet) {

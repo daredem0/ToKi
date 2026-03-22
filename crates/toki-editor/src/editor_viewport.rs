@@ -211,7 +211,8 @@ mod tests {
 
     #[test]
     fn world_to_tile_coords_uses_euclidean_division() {
-        let tile = EditorViewportContext::world_to_tile_coords(IVec2::new(-1, 17), UVec2::new(16, 16));
+        let tile =
+            EditorViewportContext::world_to_tile_coords(IVec2::new(-1, 17), UVec2::new(16, 16));
         assert_eq!(tile, IVec2::new(-1, 1));
     }
 }

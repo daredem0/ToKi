@@ -287,11 +287,14 @@ impl SelectionInteraction {
                 .collect::<Vec<_>>();
             let moved_count = after_positions.len();
 
-            if editor_commands::execute(ui_state, EditorCommand::move_entities(
-                drag_state.scene_name.clone(),
-                before_positions,
-                after_positions,
-            )) {
+            if editor_commands::execute(
+                ui_state,
+                EditorCommand::move_entities(
+                    drag_state.scene_name.clone(),
+                    before_positions,
+                    after_positions,
+                ),
+            ) {
                 ui_state.scene_content_changed = true;
                 if drag_state.dragged_entities.len() == 1 {
                     ui_state.set_single_entity_selection(drag_state.entity.id);
@@ -392,11 +395,10 @@ impl SelectionInteraction {
         let mut after_scene = before_scene.clone();
         after_scene.anchors[anchor_index].position = drop_world_pos_i32;
 
-        if editor_commands::execute(ui_state, EditorCommand::update_scene(
-            drag_state.scene_name.clone(),
-            before_scene,
-            after_scene,
-        )) {
+        if editor_commands::execute(
+            ui_state,
+            EditorCommand::update_scene(drag_state.scene_name.clone(), before_scene, after_scene),
+        ) {
             ui_state.set_selection(crate::ui::editor_ui::Selection::SceneAnchor {
                 scene_name: drag_state.scene_name.clone(),
                 anchor_id: drag_state.anchor.id.clone(),

@@ -1,7 +1,7 @@
 use super::*;
 use crate::project::ProjectAssets;
-use toki_core::project_content::build_game_state_from_scene;
 use toki_core::project_assets::tilemap_file_path;
+use toki_core::project_content::build_game_state_from_scene;
 
 impl EditorApp {
     pub(super) fn resolve_scene_map_to_load(

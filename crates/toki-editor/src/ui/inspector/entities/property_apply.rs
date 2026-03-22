@@ -98,11 +98,10 @@ impl InspectorSystem {
             return false;
         }
 
-        editor_commands::execute(ui_state, EditorCommand::update_entities(
-            active_scene_name,
-            before_entities,
-            after_entities,
-        ))
+        editor_commands::execute(
+            ui_state,
+            EditorCommand::update_entities(active_scene_name, before_entities, after_entities),
+        )
     }
 
     pub(in super::super) fn apply_entity_property_draft(

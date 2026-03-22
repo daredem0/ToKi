@@ -251,7 +251,9 @@ struct PlayerEntryContext {
 impl PlayerEntryContext {
     fn new(scene: &toki_core::Scene, project: Option<&crate::project::Project>) -> Self {
         let entity_defs = project
-            .map(|p| crate::project::ProjectAssets::discover_project_entity_definition_names(&p.path))
+            .map(|p| {
+                crate::project::ProjectAssets::discover_project_entity_definition_names(&p.path)
+            })
             .unwrap_or_default();
         let spawn_points = scene
             .anchors

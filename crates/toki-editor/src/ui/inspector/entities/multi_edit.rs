@@ -171,11 +171,10 @@ impl InspectorSystem {
             return false;
         }
 
-        editor_commands::execute(ui_state, EditorCommand::update_entities(
-            scene_name.to_string(),
-            before_entities,
-            after_entities,
-        ))
+        editor_commands::execute(
+            ui_state,
+            EditorCommand::update_entities(scene_name.to_string(), before_entities, after_entities),
+        )
     }
 
     pub(in super::super) fn apply_multi_entity_batch_edit_to_entity(

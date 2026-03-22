@@ -110,7 +110,8 @@ impl InspectorSystem {
     }
 
     pub(in super::super) fn add_condition(rule: &mut Rule, condition_kind: RuleConditionKind) {
-        rule.conditions.push(shared_default_rule_condition(condition_kind));
+        rule.conditions
+            .push(shared_default_rule_condition(condition_kind));
     }
 
     pub(in super::super) fn remove_condition(rule: &mut Rule, condition_index: usize) -> bool {

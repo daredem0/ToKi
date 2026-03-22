@@ -78,7 +78,10 @@ pub fn rule_graph_node_label(
                     format!("Trigger {}", rule_graph_trigger_summary(*trigger, style))
                 }
                 RuleGraphNodeKind::Condition(condition) => {
-                    format!("Condition {}", rule_graph_condition_summary(condition, style))
+                    format!(
+                        "Condition {}",
+                        rule_graph_condition_summary(condition, style)
+                    )
                 }
                 RuleGraphNodeKind::Action(action) => {
                     format!("Action {}", rule_graph_action_summary(action, style))
@@ -150,18 +153,34 @@ pub fn rule_graph_condition_summary(
             ),
         },
         RuleCondition::HealthBelow { target, threshold } => {
-            format!("HealthBelow({}, {})", rule_graph_target_summary(*target), threshold)
+            format!(
+                "HealthBelow({}, {})",
+                rule_graph_target_summary(*target),
+                threshold
+            )
         }
         RuleCondition::HealthAbove { target, threshold } => {
-            format!("HealthAbove({}, {})", rule_graph_target_summary(*target), threshold)
+            format!(
+                "HealthAbove({}, {})",
+                rule_graph_target_summary(*target),
+                threshold
+            )
         }
         RuleCondition::TriggerOtherIsPlayer => "TriggerOtherIsPlayer".to_string(),
         RuleCondition::EntityIsKind { target, kind } => {
-            format!("EntityIsKind({}, {:?})", rule_graph_target_summary(*target), kind)
+            format!(
+                "EntityIsKind({}, {:?})",
+                rule_graph_target_summary(*target),
+                kind
+            )
         }
         RuleCondition::TriggerOtherIsKind { kind } => format!("TriggerOtherIsKind({:?})", kind),
         RuleCondition::EntityHasTag { target, tag } => {
-            format!("EntityHasTag({}, {})", rule_graph_target_summary(*target), tag)
+            format!(
+                "EntityHasTag({}, {})",
+                rule_graph_target_summary(*target),
+                tag
+            )
         }
         RuleCondition::TriggerOtherHasTag { tag } => format!("TriggerOtherHasTag({})", tag),
         RuleCondition::HasInventoryItem {
@@ -188,7 +207,11 @@ pub fn rule_graph_action_summary(action: &RuleAction, style: RuleGraphSummarySty
             RuleGraphSummaryStyle::Detailed => format!(
                 "PlaySound({}, {})",
                 rule_sound_channel_label(*channel),
-                if sound_id.is_empty() { "<empty>" } else { sound_id }
+                if sound_id.is_empty() {
+                    "<empty>"
+                } else {
+                    sound_id
+                }
             ),
         },
         RuleAction::PlayMusic { track_id } => {
@@ -200,7 +223,11 @@ pub fn rule_graph_action_summary(action: &RuleAction, style: RuleGraphSummarySty
             format!("PlayMusic({track})")
         }
         RuleAction::PlayAnimation { target, state } => {
-            format!("PlayAnimation({}, {:?})", rule_graph_target_summary(*target), state)
+            format!(
+                "PlayAnimation({}, {:?})",
+                rule_graph_target_summary(*target),
+                state
+            )
         }
         RuleAction::SetVelocity { target, velocity } => match style {
             RuleGraphSummaryStyle::Compact => format!(
@@ -224,7 +251,10 @@ pub fn rule_graph_action_summary(action: &RuleAction, style: RuleGraphSummarySty
                 format!("Spawn({:?}, {}, {})", entity_type, position[0], position[1])
             }
             RuleGraphSummaryStyle::Detailed => {
-                format!("Spawn({:?}, [{}, {}])", entity_type, position[0], position[1])
+                format!(
+                    "Spawn({:?}, [{}, {}])",
+                    entity_type, position[0], position[1]
+                )
             }
         },
         RuleAction::DestroySelf { target } => {
@@ -249,10 +279,18 @@ pub fn rule_graph_action_summary(action: &RuleAction, style: RuleGraphSummarySty
             format!("SwitchScene({scene} -> {spawn})")
         }
         RuleAction::DamageEntity { target, amount } => {
-            format!("DamageEntity({}, {})", rule_graph_target_summary(*target), amount)
+            format!(
+                "DamageEntity({}, {})",
+                rule_graph_target_summary(*target),
+                amount
+            )
         }
         RuleAction::HealEntity { target, amount } => {
-            format!("HealEntity({}, {})", rule_graph_target_summary(*target), amount)
+            format!(
+                "HealEntity({}, {})",
+                rule_graph_target_summary(*target),
+                amount
+            )
         }
         RuleAction::AddInventoryItem {
             target,
@@ -289,7 +327,11 @@ pub fn rule_graph_action_summary(action: &RuleAction, style: RuleGraphSummarySty
             )
         }
         RuleAction::SetEntityActive { target, active } => {
-            format!("SetActive({}, {})", rule_graph_target_summary(*target), active)
+            format!(
+                "SetActive({}, {})",
+                rule_graph_target_summary(*target),
+                active
+            )
         }
         RuleAction::TeleportEntity {
             target,
@@ -378,8 +420,7 @@ pub fn render_node_action_buttons(
                 }
                 if ui
                     .add(
-                        egui::Button::new("Delete Node")
-                            .fill(egui::Color32::from_rgb(120, 30, 30)),
+                        egui::Button::new("Delete Node").fill(egui::Color32::from_rgb(120, 30, 30)),
                     )
                     .clicked()
                 {
@@ -448,26 +489,28 @@ pub fn render_connections_list(
     }
 
     let mut pending_disconnect = None;
-    egui::ScrollArea::vertical().max_height(220.0).show(ui, |ui| {
-        render_edge_list(
-            ui,
-            graph,
-            node_badges,
-            &outgoing,
-            true,
-            &mut pending_disconnect,
-            style,
-        );
-        render_edge_list(
-            ui,
-            graph,
-            node_badges,
-            &incoming,
-            false,
-            &mut pending_disconnect,
-            style,
-        );
-    });
+    egui::ScrollArea::vertical()
+        .max_height(220.0)
+        .show(ui, |ui| {
+            render_edge_list(
+                ui,
+                graph,
+                node_badges,
+                &outgoing,
+                true,
+                &mut pending_disconnect,
+                style,
+            );
+            render_edge_list(
+                ui,
+                graph,
+                node_badges,
+                &incoming,
+                false,
+                &mut pending_disconnect,
+                style,
+            );
+        });
     pending_disconnect
 }
 
