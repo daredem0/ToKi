@@ -6,7 +6,7 @@ use crate::project_assets::{
     SpriteMetadataFileKind,
 };
 use crate::assets::atlas::ColorMode;
-use crate::graphics::image::load_image_rgba8;
+use crate::graphics::image::{load_image_rgba8, save_image_rgba8};
 use crate::palette::{save_palette_asset_to_path, validate_indexed_rgba8, Palette4};
 use std::fs;
 
@@ -446,12 +446,476 @@ fn discover_project_scene_paths_includes_unlisted_scene_files_alongside_manifest
 }
 
 #[test]
-fn example_testpalette_project_assets_parse_and_indexed_source_is_valid() {
-    let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(2)
-        .expect("workspace root");
-    let project_root = workspace_root.join("example_projects").join("TestPalette");
+fn palette_demo_project_assets_parse_and_indexed_source_is_valid() {
+    let temp_dir = tempfile::tempdir().expect("tempdir");
+    let project_root = temp_dir.path();
+    fs::create_dir_all(project_root.join("assets").join("sprites")).expect("sprites dir");
+    fs::create_dir_all(project_root.join("assets").join("tilemaps")).expect("tilemaps dir");
+    fs::create_dir_all(project_root.join("assets").join("audio")).expect("audio dir");
+    fs::create_dir_all(project_root.join("entities")).expect("entities dir");
+    fs::create_dir_all(project_root.join("palettes")).expect("palettes dir");
+    fs::create_dir_all(project_root.join("scenes")).expect("scenes dir");
+
+    fs::write(
+        project_root.join("project.toml"),
+        r#"[project]
+name = "TestPalette"
+version = "1.0.0"
+created = "2026-03-22T20:30:00Z"
+modified = "2026-03-22T21:29:07.851765198Z"
+toki_editor_version = "0.1.0"
+description = "Minimal palette-indexed rendering example."
+
+[scenes]
+"Main Scene" = "scenes/Main Scene.json"
+
+[assets]
+sprites = "assets/sprites/"
+tilemaps = "assets/tilemaps/"
+audio = "assets/audio/"
+
+[runtime.display]
+indexed_palette_override = "gb_default"
+"#,
+    )
+    .expect("project metadata write");
+
+    save_palette_asset_to_path(
+        &project_root.join("palettes").join("sunset.json"),
+        Palette4::new([
+            [36, 18, 18, 255],
+            [120, 52, 36, 255],
+            [224, 120, 56, 255],
+            [255, 220, 140, 255],
+        ]),
+    )
+    .expect("palette write");
+
+    fs::write(
+        project_root
+            .join("assets")
+            .join("sprites")
+            .join("indexed_demo.json"),
+        r#"{
+  "image": "indexed_demo.png",
+  "tile_size": [16, 16],
+  "color_mode": "palette_indexed",
+  "palette": "gb_default",
+  "tiles": {
+    "hero/idle": {
+      "position": [0, 0],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "guide/idle": {
+      "position": [0, 0],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    }
+  }
+}"#,
+    )
+    .expect("indexed atlas");
+    fs::write(
+        project_root
+            .join("assets")
+            .join("sprites")
+            .join("truecolor_demo.json"),
+        r#"{
+  "image": "truecolor_demo.png",
+  "tile_size": [16, 16],
+  "color_mode": "truecolor",
+  "tiles": {
+    "flower/idle": {
+      "position": [0, 0],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    }
+  }
+}"#,
+    )
+    .expect("truecolor atlas");
+    fs::write(
+        project_root
+            .join("assets")
+            .join("tilemaps")
+            .join("terrain.json"),
+        r#"{
+  "image": "terrain.png",
+  "tile_size": [16, 16],
+  "tiles": {
+    "grass": {
+      "position": [0, 0],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    }
+  }
+}"#,
+    )
+    .expect("terrain atlas");
+    fs::write(
+        project_root
+            .join("assets")
+            .join("tilemaps")
+            .join("palette_demo_map.json"),
+        r#"{
+  "size": [10, 9],
+  "tile_size": [16, 16],
+  "atlas": "terrain.json",
+  "tiles": [
+    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
+    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
+    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
+    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
+    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
+    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
+    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
+    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass",
+    "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass"
+  ]
+}"#,
+    )
+    .expect("tilemap");
+    fs::write(
+        project_root.join("entities").join("palette_player.json"),
+        r#"{
+  "name": "palette_player",
+  "display_name": "Palette Player",
+  "description": "Indexed player sprite using the atlas default palette.",
+  "rendering": {
+    "size": [16, 16],
+    "render_layer": 1,
+    "visible": true,
+    "has_shadow": true
+  },
+  "attributes": {
+    "health": 10,
+    "stats": { "health": 10 },
+    "speed": 0.0,
+    "solid": false,
+    "active": true,
+    "can_move": false,
+    "interactable": false,
+    "interaction_reach": 0,
+    "ai_config": { "behavior": "none", "detection_radius": 0 },
+    "movement_profile": "none",
+    "has_inventory": false
+  },
+  "collision": {
+    "enabled": false,
+    "offset": [0, 0],
+    "size": [16, 16],
+    "trigger": false
+  },
+  "audio": {
+    "footstep_trigger_distance": 16.0,
+    "hearing_radius": 192,
+    "movement_sound_trigger": "distance",
+    "movement_sound": "",
+    "collision_sound": null
+  },
+  "animations": {
+    "atlas_name": "indexed_demo.json",
+    "clips": [
+      {
+        "state": "idle",
+        "frame_tiles": ["hero/idle"],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      }
+    ],
+    "default_state": "idle"
+  },
+  "category": "human",
+  "tags": ["palette_demo", "player"]
+}"#,
+    )
+    .expect("palette player definition");
+    fs::write(
+        project_root.join("entities").join("palette_guide.json"),
+        r#"{
+  "name": "palette_guide",
+  "display_name": "Palette Guide",
+  "description": "Indexed NPC using a per-definition palette override.",
+  "rendering": {
+    "size": [16, 16],
+    "render_layer": 1,
+    "visible": true,
+    "has_shadow": true,
+    "palette_override": "night"
+  },
+  "attributes": {
+    "health": 10,
+    "stats": { "health": 10 },
+    "speed": 0.0,
+    "solid": false,
+    "active": true,
+    "can_move": false,
+    "interactable": false,
+    "interaction_reach": 0,
+    "ai_config": { "behavior": "none", "detection_radius": 0 },
+    "movement_profile": "none",
+    "has_inventory": false
+  },
+  "collision": {
+    "enabled": false,
+    "offset": [0, 0],
+    "size": [16, 16],
+    "trigger": false
+  },
+  "audio": {
+    "footstep_trigger_distance": 16.0,
+    "hearing_radius": 192,
+    "movement_sound_trigger": "distance",
+    "movement_sound": "",
+    "collision_sound": null
+  },
+  "animations": {
+    "atlas_name": "indexed_demo.json",
+    "clips": [
+      {
+        "state": "idle",
+        "frame_tiles": ["guide/idle"],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      }
+    ],
+    "default_state": "idle"
+  },
+  "category": "human",
+  "tags": ["palette_demo", "guide"]
+}"#,
+    )
+    .expect("palette guide definition");
+    fs::write(
+        project_root.join("entities").join("truecolor_flower.json"),
+        r#"{
+  "name": "truecolor_flower",
+  "display_name": "Flower",
+  "description": "True-color control sprite unaffected by indexed palette overrides.",
+  "rendering": {
+    "size": [16, 16],
+    "render_layer": 1,
+    "visible": true,
+    "has_shadow": true
+  },
+  "attributes": {
+    "health": null,
+    "speed": 0.0,
+    "solid": false,
+    "active": true,
+    "can_move": false,
+    "interactable": false,
+    "interaction_reach": 0,
+    "ai_config": { "behavior": "none", "detection_radius": 0 },
+    "movement_profile": "none",
+    "has_inventory": false
+  },
+  "collision": {
+    "enabled": false,
+    "offset": [0, 0],
+    "size": [16, 16],
+    "trigger": false
+  },
+  "audio": {
+    "footstep_trigger_distance": 16.0,
+    "hearing_radius": 192,
+    "movement_sound_trigger": "distance",
+    "movement_sound": "",
+    "collision_sound": null
+  },
+  "animations": {
+    "atlas_name": "truecolor_demo.json",
+    "clips": [
+      {
+        "state": "idle",
+        "frame_tiles": ["flower/idle"],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      }
+    ],
+    "default_state": "idle"
+  },
+  "category": "flora",
+  "tags": ["palette_demo", "truecolor_control"]
+}"#,
+    )
+    .expect("truecolor definition");
+    fs::write(
+        project_root.join("scenes").join("Main Scene.json"),
+        r#"{
+  "name": "Main Scene",
+  "description": "Palette rendering demo scene.",
+  "maps": ["palette_demo_map"],
+  "entities": [
+    {
+      "id": 2,
+      "position": [72, 64],
+      "size": [16, 16],
+      "entity_kind": "Npc",
+      "category": "palette_demo",
+      "definition_name": "palette_guide",
+      "control_role": "none",
+      "audio": {
+        "footstep_trigger_distance": 16.0,
+        "hearing_radius": 192,
+        "movement_sound_trigger": "distance",
+        "movement_sound": null,
+        "collision_sound": null
+      },
+      "attributes": {
+        "health": 10,
+        "stats": { "base": { "health": 10 }, "current": { "health": 10 } },
+        "speed": 0.0,
+        "solid": false,
+        "visible": true,
+        "has_shadow": true,
+        "palette_override": "night",
+        "animation_controller": {
+          "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "indexed_demo.json",
+              "frame_tile_names": ["guide/idle"],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            }
+          },
+          "current_clip_state": "Idle",
+          "current_frame_index": 0,
+          "frame_timer": 0.0,
+          "is_finished": false
+        },
+        "render_layer": 1,
+        "active": true,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": { "behavior": "none", "detection_radius": 0 },
+        "movement_profile": "none",
+        "has_inventory": false
+      },
+      "collision_box": null,
+      "tags": ["palette_demo", "indexed_override"]
+    },
+    {
+      "id": 3,
+      "position": [112, 64],
+      "size": [16, 16],
+      "entity_kind": "Decoration",
+      "category": "palette_demo",
+      "definition_name": "truecolor_flower",
+      "control_role": "none",
+      "audio": {
+        "footstep_trigger_distance": 16.0,
+        "hearing_radius": 192,
+        "movement_sound_trigger": "distance",
+        "movement_sound": null,
+        "collision_sound": null
+      },
+      "attributes": {
+        "health": null,
+        "speed": 0.0,
+        "solid": false,
+        "visible": true,
+        "has_shadow": true,
+        "animation_controller": {
+          "clips": {
+            "Idle": {
+              "state": "Idle",
+              "atlas_name": "truecolor_demo.json",
+              "frame_tile_names": ["flower/idle"],
+              "frame_duration_ms": 300.0,
+              "loop_mode": "Loop"
+            }
+          },
+          "current_clip_state": "Idle",
+          "current_frame_index": 0,
+          "frame_timer": 0.0,
+          "is_finished": false
+        },
+        "render_layer": 1,
+        "active": true,
+        "can_move": false,
+        "interactable": false,
+        "interaction_reach": 0,
+        "ai_config": { "behavior": "none", "detection_radius": 0 },
+        "movement_profile": "none",
+        "has_inventory": false
+      },
+      "collision_box": null,
+      "tags": ["palette_demo", "truecolor_control"]
+    }
+  ],
+  "rules": { "rules": [] },
+  "camera_position": null,
+  "camera_scale": null,
+  "background_music_track_id": null,
+  "anchors": [
+    {
+      "id": "spawn_a",
+      "kind": "SpawnPoint",
+      "position": [32, 64],
+      "facing": "Down"
+    }
+  ],
+  "player_entry": {
+    "entity_definition_name": "palette_player",
+    "spawn_point_id": "spawn_a"
+  }
+}"#,
+    )
+    .expect("scene");
+
+    save_image_rgba8(
+        project_root
+            .join("assets")
+            .join("sprites")
+            .join("indexed_demo.png"),
+        16,
+        16,
+        &[
+            0x00, 0x00, 0x00, 0xFF, 0x55, 0x55, 0x55, 0xFF, 0xAA, 0xAA, 0xAA, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x55, 0x55, 0x55, 0xFF, 0xAA, 0xAA,
+            0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x55, 0x55, 0x55,
+            0xFF, 0xAA, 0xAA, 0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0xFF,
+            0x55, 0x55, 0x55, 0xFF, 0xAA, 0xAA, 0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        ]
+        .repeat(16),
+    )
+    .expect("indexed png");
+    save_image_rgba8(
+        project_root
+            .join("assets")
+            .join("sprites")
+            .join("truecolor_demo.png"),
+        16,
+        16,
+        &[[255, 64, 96, 255], [96, 200, 96, 255], [255, 220, 64, 255], [255, 255, 255, 255]]
+            .concat()
+            .repeat(16 * 16 / 4),
+    )
+    .expect("truecolor png");
+    save_image_rgba8(
+        project_root
+            .join("assets")
+            .join("tilemaps")
+            .join("terrain.png"),
+        16,
+        16,
+        &[[32, 160, 64, 255], [48, 184, 80, 255], [32, 160, 64, 255], [48, 184, 80, 255]]
+            .concat()
+            .repeat(16 * 16 / 4),
+    )
+    .expect("terrain png");
 
     let atlas = crate::assets::atlas::AtlasMeta::load_from_file(
         project_root
@@ -491,6 +955,9 @@ fn example_testpalette_project_assets_parse_and_indexed_source_is_valid() {
         load_entity_definition_from_path(&project_root.join("entities").join("palette_player.json"))
             .expect("palette player definition should parse");
     assert_eq!(definition.animations.atlas_name, "indexed_demo.json");
+
+    let project_palettes = load_project_palettes(project_root).expect("project palettes");
+    assert!(project_palettes.contains_key("sunset"));
 
     let guide_definition =
         load_entity_definition_from_path(&project_root.join("entities").join("palette_guide.json"))
