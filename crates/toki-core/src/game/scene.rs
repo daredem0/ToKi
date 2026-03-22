@@ -1,3 +1,4 @@
+use super::input_state::InputRuntimeState;
 use super::transition::SceneTransitionPlanner;
 use super::{GameState, RuleRuntimeState};
 use crate::ai::AiSystem;
@@ -6,7 +7,7 @@ use crate::rules::RuleSet;
 use crate::scene::Scene;
 use crate::scene_manager::SceneManager;
 use crate::sprite::SpriteInstance;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 impl GameState {
     /// Create a new GameState with the given player sprite
@@ -27,10 +28,7 @@ impl GameState {
             entity_manager,
             entity_definitions: HashMap::new(),
             player_id: Some(player_id),
-            keys_held: HashSet::new(),
-            profile_keys_held: HashMap::new(),
-            profile_actions_held: HashMap::new(),
-            pending_profile_actions: HashMap::new(),
+            input_state: InputRuntimeState::default(),
             debug_collision_rendering: false,
             ai_system: AiSystem::new(),
             rules: RuleSet::default(),
@@ -47,10 +45,7 @@ impl GameState {
             entity_manager: EntityManager::new(),
             entity_definitions: HashMap::new(),
             player_id: None,
-            keys_held: HashSet::new(),
-            profile_keys_held: HashMap::new(),
-            profile_actions_held: HashMap::new(),
-            pending_profile_actions: HashMap::new(),
+            input_state: InputRuntimeState::default(),
             debug_collision_rendering: false,
             ai_system: AiSystem::new(),
             rules: RuleSet::default(),

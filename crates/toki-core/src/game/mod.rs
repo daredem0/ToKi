@@ -1,8 +1,8 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::ai::{AiSystem, SpawnMode};
+use crate::ai::AiSystem;
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::entity::{Entity, EntityDefinition, EntityId, EntityManager, MovementProfile};
@@ -11,8 +11,10 @@ use crate::rules::{RuleSet, RuleTrigger};
 use crate::scene_manager::SceneManager;
 
 mod animation;
+mod ai_runtime;
 mod combat;
 mod input;
+mod input_state;
 mod interaction;
 mod inventory;
 mod movement;
@@ -106,21 +108,9 @@ pub struct GameState {
     /// Player entity ID for quick access
     player_id: Option<EntityId>,
 
-    /// Currently held input keys
+    /// Runtime input bookkeeping for keys, per-profile movement, and debounced actions.
     #[serde(default)]
-    keys_held: HashSet<InputKey>,
-
-    /// Runtime-held movement input scoped by movement profile.
-    #[serde(skip, default)]
-    profile_keys_held: HashMap<MovementProfile, HashSet<InputKey>>,
-
-    /// Held profile-scoped action buttons used to debounce edge-triggered actions.
-    #[serde(skip, default)]
-    profile_actions_held: HashMap<MovementProfile, HashSet<InputAction>>,
-
-    /// Pending one-shot profile-scoped action requests to be consumed during update.
-    #[serde(skip, default)]
-    pending_profile_actions: HashMap<MovementProfile, HashSet<InputAction>>,
+    input_state: InputRuntimeState,
 
     /// Debug rendering flags
     #[serde(default)]
@@ -147,8 +137,9 @@ pub struct GameState {
     pending_despawns: Vec<EntityId>,
 }
 
-use stat_effects::StatChangeRequest;
+use input_state::InputRuntimeState;
 use rules::RuleRuntimeState;
+use stat_effects::StatChangeRequest;
 
 impl GameState {
     fn effective_movement_profile(entity: &Entity) -> MovementProfile {
@@ -242,49 +233,8 @@ impl GameState {
         // Detect tile transitions after all movement is complete
         self.detect_tile_transitions(tilemap);
 
-        let mut reactive_rule_commands = Vec::new();
-        if result.player_moved {
-            self.collect_rule_commands_for_trigger(
-                RuleTrigger::OnPlayerMove,
-                &mut reactive_rule_commands,
-            );
-        }
-
-        // Fire collision triggers with context for each collision event
-        {
-            let collision_events = std::mem::take(&mut self.rule_runtime.frame_collisions);
-            for event in collision_events {
-                self.collect_rule_commands_for_collision(&event, &mut reactive_rule_commands);
-            }
-
-            // Fire damage triggers with context for each damage event
-            let damage_events = std::mem::take(&mut self.rule_runtime.frame_damage_events);
-            for event in damage_events {
-                self.collect_rule_commands_for_damage(&event, &mut reactive_rule_commands);
-            }
-
-            // Fire death triggers with context for each death event
-            let death_events = std::mem::take(&mut self.rule_runtime.frame_death_events);
-            for event in death_events {
-                self.collect_rule_commands_for_death(&event, &mut reactive_rule_commands);
-            }
-
-            // Fire interact triggers with context for each interaction event
-            let interaction_events = std::mem::take(&mut self.rule_runtime.frame_interactions);
-            for event in &interaction_events {
-                self.collect_rule_commands_for_interaction(event, &mut reactive_rule_commands);
-            }
-
-            // Fire tile transition triggers
-            self.collect_rule_commands_for_tile_transitions(tilemap, &mut reactive_rule_commands);
-        }
-
-        if self.any_entity_overlaps_trigger_tile(tilemap, atlas) {
-            self.collect_rule_commands_for_trigger(
-                RuleTrigger::OnTrigger,
-                &mut reactive_rule_commands,
-            );
-        }
+        let reactive_rule_commands =
+            self.collect_reactive_rule_commands(result.player_moved, tilemap, atlas);
         let (mut reactive_animations, reactive_scene_switch) =
             self.apply_rule_commands(reactive_rule_commands, &mut result, tilemap);
         if pending_scene_switch.is_none() {
@@ -392,8 +342,8 @@ impl GameState {
         // Detect tile transitions after all movement is complete
         self.detect_tile_transitions(tilemap);
 
-        let mut reactive_rule_commands: Vec<rules::RuleCommand> = Vec::new();
-        self.collect_reactive_rule_commands(&result, tilemap, atlas, &mut reactive_rule_commands);
+        let reactive_rule_commands =
+            self.collect_reactive_rule_commands(result.player_moved, tilemap, atlas);
         let (mut reactive_animations, reactive_scene_switch) =
             self.apply_rule_commands(reactive_rule_commands, &mut result, tilemap);
         if pending_scene_switch.is_none() {
@@ -454,53 +404,6 @@ impl GameState {
         }
     }
 
-    /// Collect reactive rule commands based on game events this frame.
-    fn collect_reactive_rule_commands(
-        &mut self,
-        result: &GameUpdateResult<AudioEvent>,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
-        reactive_rule_commands: &mut Vec<rules::RuleCommand>,
-    ) {
-        if result.player_moved {
-            self.collect_rule_commands_for_trigger(
-                RuleTrigger::OnPlayerMove,
-                reactive_rule_commands,
-            );
-        }
-
-        // Fire collision triggers with context for each collision event
-        let collision_events = std::mem::take(&mut self.rule_runtime.frame_collisions);
-        for event in collision_events {
-            self.collect_rule_commands_for_collision(&event, reactive_rule_commands);
-        }
-
-        // Fire damage triggers with context for each damage event
-        let damage_events = std::mem::take(&mut self.rule_runtime.frame_damage_events);
-        for event in damage_events {
-            self.collect_rule_commands_for_damage(&event, reactive_rule_commands);
-        }
-
-        // Fire death triggers with context for each death event
-        let death_events = std::mem::take(&mut self.rule_runtime.frame_death_events);
-        for event in death_events {
-            self.collect_rule_commands_for_death(&event, reactive_rule_commands);
-        }
-
-        // Fire interact triggers with context for each interaction event
-        let interaction_events = std::mem::take(&mut self.rule_runtime.frame_interactions);
-        for event in &interaction_events {
-            self.collect_rule_commands_for_interaction(event, reactive_rule_commands);
-        }
-
-        // Fire tile transition triggers
-        self.collect_rule_commands_for_tile_transitions(tilemap, reactive_rule_commands);
-
-        if self.any_entity_overlaps_trigger_tile(tilemap, atlas) {
-            self.collect_rule_commands_for_trigger(RuleTrigger::OnTrigger, reactive_rule_commands);
-        }
-    }
-
     /// Update NPC AI using the AI system
     fn update_npc_ai(
         &mut self,
@@ -516,98 +419,9 @@ impl GameState {
             tilemap,
             atlas,
         );
-
-        for ai_result in ai_updates {
-            self.apply_ai_result(ai_result, result);
+        let effects = self.ai_runtime_applier().apply_updates(ai_updates);
+        for (entity_id, movement_distance) in effects.movement_audio {
+            self.emit_entity_movement_audio(entity_id, movement_distance, result);
         }
-    }
-
-    fn apply_ai_result(
-        &mut self,
-        ai_result: crate::ai::AiUpdateResult,
-        result: &mut GameUpdateResult<AudioEvent>,
-    ) {
-        if let Some(new_position) = ai_result.new_position {
-            if let Some(entity) = self.entity_manager.get_entity_mut(ai_result.entity_id) {
-                entity.position = new_position;
-            }
-            if ai_result.movement_distance > 0.0 {
-                self.emit_entity_movement_audio(
-                    ai_result.entity_id,
-                    ai_result.movement_distance,
-                    result,
-                );
-            }
-        }
-
-        if let Some(animation) = ai_result.new_animation {
-            if let Some(entity) = self.entity_manager.get_entity_mut(ai_result.entity_id) {
-                if let Some(controller) = &mut entity.attributes.animation_controller {
-                    if controller.current_clip_state != animation {
-                        controller.play(animation);
-                    }
-                }
-            }
-        }
-
-        // Handle spawn requests from AI (e.g., RunAndMultiply)
-        if let Some(spawn_request) = ai_result.spawn_request {
-            let spawn_result = match &spawn_request.mode {
-                SpawnMode::Clone { source_entity_id } => self
-                    .entity_manager
-                    .clone_entity(*source_entity_id, spawn_request.position)
-                    .ok_or_else(|| format!("Source entity {} not found", source_entity_id)),
-                SpawnMode::FromDefinition { definition_name } => {
-                    self.spawn_entity_from_definition_name(definition_name, spawn_request.position)
-                }
-            };
-
-            match spawn_result {
-                Ok(new_entity_id) => {
-                    // Log the spawned entity's configuration for debugging
-                    if let Some(entity) = self.entity_manager.get_entity(new_entity_id) {
-                        tracing::debug!(
-                            entity_id = new_entity_id,
-                            definition_name = ?entity.definition_name,
-                            position = ?entity.position,
-                            ai_behavior = ?entity.attributes.ai_config.behavior,
-                            detection_radius = entity.attributes.ai_config.detection_radius,
-                            solid = entity.attributes.solid,
-                            speed = entity.attributes.speed,
-                            "AI spawn: child entity configuration"
-                        );
-                    }
-
-                    // Set up separation state for the spawned entity
-                    if !spawn_request.parent_entity_ids.is_empty() {
-                        self.ai_system.enter_separation_state(
-                            new_entity_id,
-                            spawn_request.parent_entity_ids,
-                            spawn_request.separation_distance,
-                        );
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, "AI spawn request failed");
-                }
-            }
-        }
-    }
-
-    /// Spawn an entity from a definition name at the given position.
-    /// This is a reusable method for spawning entities programmatically.
-    pub fn spawn_entity_from_definition_name(
-        &mut self,
-        definition_name: &str,
-        position: glam::IVec2,
-    ) -> Result<EntityId, String> {
-        let definition = self
-            .entity_definitions
-            .get(definition_name)
-            .ok_or_else(|| format!("Entity definition '{}' not found", definition_name))?
-            .clone();
-
-        self.entity_manager
-            .spawn_from_definition(&definition, position)
     }
 }

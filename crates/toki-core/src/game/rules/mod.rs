@@ -32,6 +32,7 @@ mod animations;
 mod collectors;
 mod commands;
 mod evaluation;
+mod reactive;
 mod spawning;
 mod target;
 mod tiles;

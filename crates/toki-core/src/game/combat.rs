@@ -366,7 +366,7 @@ impl GameState {
     }
 
     pub(super) fn process_profile_actions(&mut self) {
-        let pending_actions = std::mem::take(&mut self.pending_profile_actions);
+        let pending_actions = self.take_pending_profile_actions();
         if pending_actions.is_empty() {
             return;
         }
