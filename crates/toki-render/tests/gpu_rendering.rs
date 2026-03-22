@@ -96,6 +96,8 @@ fn build_scene_data(visible_chunks: Vec<(u32, u32)>) -> SceneData {
     let atlas = AtlasMeta {
         image: PathBuf::from("terrain.png"),
         tile_size: UVec2::new(16, 16),
+        color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
+        palette: None,
         tiles: atlas_tiles,
     };
 

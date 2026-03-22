@@ -271,6 +271,8 @@ fn resolve_atlas_tile_frame_returns_frame_and_intrinsic_size() {
     let atlas = AtlasMeta {
         image: PathBuf::from("creatures.png"),
         tile_size: glam::UVec2::new(16, 16),
+        color_mode: crate::assets::atlas::ColorMode::TrueColor,
+        palette: None,
         tiles,
     };
 
@@ -289,6 +291,8 @@ fn resolve_atlas_tile_frame_returns_error_for_missing_tile() {
     let atlas = AtlasMeta {
         image: PathBuf::from("creatures.png"),
         tile_size: glam::UVec2::new(16, 16),
+        color_mode: crate::assets::atlas::ColorMode::TrueColor,
+        palette: None,
         tiles: std::collections::HashMap::new(),
     };
 

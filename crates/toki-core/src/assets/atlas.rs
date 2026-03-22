@@ -33,12 +33,25 @@ pub struct TileInfo {
     pub properties: TileProperties,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ColorMode {
+    #[serde(rename = "palette_indexed")]
+    PaletteIndexed,
+    #[default]
+    #[serde(rename = "truecolor")]
+    TrueColor,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AtlasMeta {
     #[serde(with = "pathbuf_as_string")]
     pub image: PathBuf,
 
     pub tile_size: UVec2,
+    #[serde(default)]
+    pub color_mode: ColorMode,
+    #[serde(default)]
+    pub palette: Option<String>,
     pub tiles: HashMap<String, TileInfo>,
 }
 
@@ -47,6 +60,10 @@ impl AtlasMeta {
         let content = fs::read_to_string(path)?;
         let meta = serde_json::from_str::<AtlasMeta>(&content)?;
         Ok(meta)
+    }
+
+    pub fn is_palette_indexed(&self) -> bool {
+        self.color_mode == ColorMode::PaletteIndexed
     }
 
     pub fn image_size(&self) -> Option<UVec2> {
@@ -112,6 +129,8 @@ impl AtlasMeta {
         Self {
             image: image_filename.into(),
             tile_size,
+            color_mode: ColorMode::TrueColor,
+            palette: None,
             tiles,
         }
     }
@@ -139,6 +158,8 @@ impl AtlasMeta {
         Self {
             image: image_filename.into(),
             tile_size,
+            color_mode: ColorMode::TrueColor,
+            palette: None,
             tiles,
         }
     }

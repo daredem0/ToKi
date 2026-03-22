@@ -620,6 +620,8 @@ fn test_atlas() -> AtlasMeta {
     AtlasMeta {
         image: PathBuf::from("terrain.png"),
         tile_size: glam::UVec2::new(16, 16),
+        color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
+        palette: None,
         tiles,
     }
 }

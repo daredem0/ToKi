@@ -387,6 +387,8 @@ impl SpriteEditorState {
         AtlasMeta {
             image: png_filename.into(),
             tile_size: cs.cell_size,
+            color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
+            palette: None,
             tiles,
         }
     }

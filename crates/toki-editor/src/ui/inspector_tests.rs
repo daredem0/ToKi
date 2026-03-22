@@ -1051,6 +1051,8 @@ fn selected_map_editor_tile_metadata_reads_solid_and_trigger_flags() {
     let atlas = toki_core::assets::atlas::AtlasMeta {
         image: std::path::PathBuf::from("terrain.png"),
         tile_size: UVec2::new(8, 8),
+        color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
+        palette: None,
         tiles,
     };
 

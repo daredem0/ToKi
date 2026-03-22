@@ -4,6 +4,7 @@ use crate::project_assets::{
     normalize_asset_name, resolve_project_resource_paths, scene_file_path, tilemap_file_path,
     ProjectAudioFormat, SpriteMetadataFileKind,
 };
+use crate::assets::atlas::ColorMode;
 use std::fs;
 
 // ============================================================================
@@ -79,6 +80,38 @@ fn classify_sprite_metadata_file_distinguishes_atlases_and_object_sheets() {
         classify_sprite_metadata_file(&object_sheet_path).expect("classify object sheet"),
         SpriteMetadataFileKind::ObjectSheet
     );
+}
+
+#[test]
+fn classify_sprite_metadata_file_accepts_palette_indexed_atlas_metadata() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let atlas_path = tmp.path().join("players.json");
+
+    fs::write(
+        &atlas_path,
+        r#"{
+            "image": "players.png",
+            "tile_size": [16, 16],
+            "color_mode": "palette_indexed",
+            "palette": "gb_default",
+            "tiles": {
+                "idle": {
+                    "position": [0, 0],
+                    "properties": { "solid": false, "trigger": false }
+                }
+            }
+        }"#,
+    )
+    .expect("write atlas");
+
+    assert_eq!(
+        classify_sprite_metadata_file(&atlas_path).expect("classify atlas"),
+        SpriteMetadataFileKind::Atlas
+    );
+
+    let parsed = crate::assets::atlas::AtlasMeta::load_from_file(&atlas_path).expect("load atlas");
+    assert_eq!(parsed.color_mode, ColorMode::PaletteIndexed);
+    assert_eq!(parsed.palette.as_deref(), Some("gb_default"));
 }
 
 #[test]

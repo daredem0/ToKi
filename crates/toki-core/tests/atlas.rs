@@ -1,7 +1,7 @@
 use glam::UVec2;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
+use toki_core::assets::atlas::{AtlasMeta, ColorMode, TileInfo, TileProperties};
 use toki_core::CoreError;
 
 #[test]
@@ -20,6 +20,55 @@ fn atlas_load_nonexistent_file_returns_error() {
         CoreError::Io(_) => {} // Expected
         other => panic!("Expected IO error, got: {:?}", other),
     }
+}
+
+#[test]
+fn atlas_deserialization_defaults_to_truecolor_when_color_fields_are_absent() {
+    let atlas: AtlasMeta = serde_json::from_str(
+        r#"{
+            "image": "players.png",
+            "tile_size": [16, 16],
+            "tiles": {
+                "idle": {
+                    "position": [0, 0],
+                    "properties": {
+                        "solid": false,
+                        "trigger": false
+                    }
+                }
+            }
+        }"#,
+    )
+    .expect("atlas should deserialize");
+
+    assert_eq!(atlas.color_mode, ColorMode::TrueColor);
+    assert_eq!(atlas.palette, None);
+}
+
+#[test]
+fn atlas_deserialization_preserves_palette_indexed_metadata() {
+    let atlas: AtlasMeta = serde_json::from_str(
+        r#"{
+            "image": "players.png",
+            "tile_size": [16, 16],
+            "color_mode": "palette_indexed",
+            "palette": "gb_default",
+            "tiles": {
+                "idle": {
+                    "position": [0, 0],
+                    "properties": {
+                        "solid": false,
+                        "trigger": false
+                    }
+                }
+            }
+        }"#,
+    )
+    .expect("atlas should deserialize");
+
+    assert_eq!(atlas.color_mode, ColorMode::PaletteIndexed);
+    assert_eq!(atlas.palette.as_deref(), Some("gb_default"));
+    assert!(atlas.is_palette_indexed());
 }
 
 #[test]
@@ -60,6 +109,8 @@ fn atlas_image_size_with_scattered_tiles() {
     let atlas = AtlasMeta {
         image: PathBuf::from("test.png"),
         tile_size: UVec2::new(8, 8),
+        color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
+        palette: None,
         tiles,
     };
 
@@ -73,6 +124,8 @@ fn atlas_image_size_empty_atlas() {
     let atlas = AtlasMeta {
         image: PathBuf::from("test.png"),
         tile_size: UVec2::new(16, 16),
+        color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
+        palette: None,
         tiles: HashMap::new(),
     };
 
@@ -94,6 +147,8 @@ fn atlas_get_tile_rect_with_different_tile_sizes() {
     let atlas = AtlasMeta {
         image: PathBuf::from("test.png"),
         tile_size: UVec2::new(32, 24),
+        color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
+        palette: None,
         tiles,
     };
 
@@ -147,6 +202,8 @@ fn atlas_with_special_characters_in_tile_names() {
     let atlas = AtlasMeta {
         image: PathBuf::from("test.png"),
         tile_size: UVec2::new(16, 16),
+        color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
+        palette: None,
         tiles,
     };
 
@@ -244,6 +301,8 @@ fn create_test_atlas() -> AtlasMeta {
     AtlasMeta {
         image: PathBuf::from("test_texture.png"),
         tile_size: UVec2::new(16, 16),
+        color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
+        palette: None,
         tiles,
     }
 }

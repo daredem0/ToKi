@@ -17,6 +17,16 @@
       "maxItems": 2,
       "description": "Size of each tile [width, height] in pixels"
     },
+    "color_mode": {
+      "type": "string",
+      "enum": ["palette_indexed", "truecolor"],
+      "description": "How the atlas image should be interpreted during rendering"
+    },
+    "palette": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Default palette id for palette-indexed atlases"
+    },
     "tiles": {
       "type": "object",
       "patternProperties": {
