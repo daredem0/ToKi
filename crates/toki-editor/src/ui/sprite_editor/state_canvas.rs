@@ -39,6 +39,12 @@ impl SpriteEditorState {
         self.active_canvas = side;
     }
 
+    pub fn invalidate_all_canvas_textures(&mut self) {
+        for canvas in &mut self.canvases {
+            canvas.canvas_texture = None;
+        }
+    }
+
     /// Cycle through layout modes
     pub fn cycle_layout(&mut self) {
         self.layout = match self.layout {

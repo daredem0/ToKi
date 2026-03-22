@@ -39,6 +39,29 @@ fn pixel_color_to_array_roundtrip() {
     assert_eq!(color, restored);
 }
 
+#[test]
+fn canonical_indexed_color_returns_expected_shades() {
+    assert_eq!(canonical_indexed_color(0), PixelColor::rgb(0x00, 0x00, 0x00));
+    assert_eq!(canonical_indexed_color(1), PixelColor::rgb(0x55, 0x55, 0x55));
+    assert_eq!(canonical_indexed_color(2), PixelColor::rgb(0xAA, 0xAA, 0xAA));
+    assert_eq!(canonical_indexed_color(3), PixelColor::rgb(0xFF, 0xFF, 0xFF));
+}
+
+#[test]
+fn indexed_slot_for_authored_color_matches_palette_display_colors() {
+    let palette = toki_core::palette::Palette4::new([
+        [10, 20, 30, 255],
+        [40, 50, 60, 255],
+        [70, 80, 90, 255],
+        [100, 110, 120, 255],
+    ]);
+
+    assert_eq!(
+        indexed_slot_for_authored_color(PixelColor::rgb(70, 80, 90), Some(palette)),
+        Some(2)
+    );
+}
+
 // ============================================================================
 // SpriteCanvas Tests
 // ============================================================================

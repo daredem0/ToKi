@@ -9,8 +9,9 @@ use super::EditorUI;
 // Re-export types from sprite_editor module for backward compatibility
 #[allow(unused_imports)]
 pub(crate) use crate::ui::sprite_editor::{
-    CanvasSide, CanvasState, DiscoveredSpriteAsset, DualCanvasLayout, PixelColor, ResizeAnchor,
-    SpriteAssetKind, SpriteCanvas, SpriteCanvasViewport, SpriteEditCommand, SpriteEditorHistory,
+    canonical_indexed_color, indexed_slot_for_authored_color, CanvasSide, CanvasState,
+    DiscoveredSpriteAsset, DualCanvasLayout, PixelColor, ResizeAnchor, SpriteAssetKind,
+    SpriteCanvas, SpriteCanvasViewport, SpriteEditCommand, SpriteEditorHistory,
     SpriteEditorState, SpriteEditorTool, SpriteSelection,
 };
 

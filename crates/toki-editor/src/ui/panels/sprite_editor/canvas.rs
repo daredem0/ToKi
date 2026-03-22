@@ -1,7 +1,10 @@
 //! Canvas rendering and drawing operations.
 
 use crate::ui::editor_ui::{CanvasSide, SpriteCanvas, SpriteCanvasViewport, SpriteSelection};
+use crate::ui::sprite_editor::preview_indexed_color;
 use crate::ui::EditorUI;
+use toki_core::assets::atlas::ColorMode;
+use toki_core::palette::Palette4;
 
 use super::shortcuts::handle_undo_redo_shortcuts;
 use super::tools::{handle_tool_interaction, handle_tool_shortcuts};
@@ -211,9 +214,19 @@ pub fn ensure_canvas_texture_for_side(
         return;
     };
 
+    let display_pixels = canvas_display_pixels(
+        canvas,
+        ui_state.sprite.color_mode,
+        ui_state
+            .sprite
+            .selected_palette_id
+            .as_ref()
+            .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
+            .copied(),
+    );
     let color_image = egui::ColorImage::from_rgba_unmultiplied(
         [canvas.width as usize, canvas.height as usize],
-        canvas.pixels(),
+        &display_pixels,
     );
 
     let texture_name = match side {
@@ -231,6 +244,30 @@ pub fn invalidate_canvas_texture(ui_state: &mut EditorUI) {
 
 pub fn invalidate_canvas_texture_for_side(ui_state: &mut EditorUI, side: CanvasSide) {
     ui_state.sprite.canvas_state_mut(side).canvas_texture = None;
+}
+
+fn canvas_display_pixels(
+    canvas: &SpriteCanvas,
+    color_mode: ColorMode,
+    palette: Option<Palette4>,
+) -> Vec<u8> {
+    if color_mode != ColorMode::PaletteIndexed {
+        return canvas.pixels().to_vec();
+    }
+
+    let Some(palette) = palette else {
+        return canvas.pixels().to_vec();
+    };
+
+    let mut pixels = canvas.pixels().to_vec();
+    for rgba in pixels.chunks_exact_mut(4) {
+        let display = preview_indexed_color(
+            crate::ui::editor_ui::PixelColor::from_rgba_array([rgba[0], rgba[1], rgba[2], rgba[3]]),
+            palette,
+        );
+        rgba.copy_from_slice(&display.to_rgba_array());
+    }
+    pixels
 }
 
 fn draw_canvas_with_checkerboard(
@@ -556,6 +593,7 @@ fn render_status_bar(ui: &mut egui::Ui, ui_state: &EditorUI) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ui::editor_ui::PixelColor;
 
     #[test]
     fn hovered_pixel_screen_rect_returns_none_for_out_of_bounds_cursor() {
@@ -590,5 +628,35 @@ mod tests {
 
         assert_eq!(pixel_rect.min, egui::pos2(18.0, 32.0));
         assert_eq!(pixel_rect.max, egui::pos2(22.0, 36.0));
+    }
+
+    #[test]
+    fn canvas_display_pixels_recolors_canonical_indexed_shades_with_selected_palette() {
+        let canvas = SpriteCanvas::from_rgba(
+            2,
+            1,
+            vec![0x00, 0x00, 0x00, 0xFF, 0xAA, 0xAA, 0xAA, 0x80],
+        )
+        .unwrap();
+        let palette = Palette4::new([
+            [10, 20, 30, 255],
+            [40, 50, 60, 255],
+            [70, 80, 90, 255],
+            [100, 110, 120, 255],
+        ]);
+
+        let pixels = canvas_display_pixels(&canvas, ColorMode::PaletteIndexed, Some(palette));
+
+        assert_eq!(pixels, vec![10, 20, 30, 255, 70, 80, 90, 128]);
+    }
+
+    #[test]
+    fn canvas_display_pixels_leaves_noncanonical_indexed_pixels_unchanged() {
+        let canvas = SpriteCanvas::filled(1, 1, PixelColor::rgb(12, 34, 56));
+        let palette = Palette4::new([[1, 2, 3, 255]; 4]);
+
+        let pixels = canvas_display_pixels(&canvas, ColorMode::PaletteIndexed, Some(palette));
+
+        assert_eq!(pixels, canvas.pixels());
     }
 }

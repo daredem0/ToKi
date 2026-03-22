@@ -3,6 +3,7 @@
 //! Contains fundamental types like colors, tools, and asset kinds.
 
 use std::path::PathBuf;
+use toki_core::palette::Palette4;
 
 /// Tool for sprite/pixel editing operations
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -100,6 +101,60 @@ impl PixelColor {
             a: color.a(),
         }
     }
+}
+
+pub const fn canonical_indexed_color(slot: usize) -> PixelColor {
+    match slot {
+        0 => PixelColor::rgb(0x00, 0x00, 0x00),
+        1 => PixelColor::rgb(0x55, 0x55, 0x55),
+        2 => PixelColor::rgb(0xAA, 0xAA, 0xAA),
+        _ => PixelColor::rgb(0xFF, 0xFF, 0xFF),
+    }
+}
+
+pub fn indexed_slot_for_canonical_color(color: PixelColor) -> Option<usize> {
+    if color.a == 0 {
+        return None;
+    }
+
+    match [color.r, color.g, color.b] {
+        [0x00, 0x00, 0x00] => Some(0),
+        [0x55, 0x55, 0x55] => Some(1),
+        [0xAA, 0xAA, 0xAA] => Some(2),
+        [0xFF, 0xFF, 0xFF] => Some(3),
+        _ => None,
+    }
+}
+
+pub fn indexed_slot_for_authored_color(
+    color: PixelColor,
+    palette: Option<Palette4>,
+) -> Option<usize> {
+    indexed_slot_for_canonical_color(color).or_else(|| {
+        palette.and_then(|palette| {
+            palette.colors.iter().position(|candidate| {
+                color.a != 0
+                    && [color.r, color.g, color.b] == [candidate[0], candidate[1], candidate[2]]
+            })
+        })
+    })
+}
+
+pub fn preview_indexed_color(color: PixelColor, palette: Palette4) -> PixelColor {
+    if color.a == 0 {
+        return PixelColor::transparent();
+    }
+
+    let Some(slot) = indexed_slot_for_canonical_color(color) else {
+        return color;
+    };
+    let target = palette.colors[slot];
+    PixelColor::new(
+        target[0],
+        target[1],
+        target[2],
+        ((color.a as u16 * target[3] as u16) / 255) as u8,
+    )
 }
 
 /// Anchor position for canvas resize operations

@@ -1,8 +1,8 @@
 //! File I/O operations for SpriteEditorState.
 
 use super::{
-    DiscoveredSpriteAsset, PixelColor, SpriteAssetKind, SpriteCanvas, SpriteCanvasViewport,
-    SpriteEditorState,
+    canonical_indexed_color, DiscoveredSpriteAsset, PixelColor, SpriteAssetKind, SpriteCanvas,
+    SpriteCanvasViewport, SpriteEditorState,
 };
 
 impl SpriteEditorState {
@@ -162,6 +162,9 @@ impl SpriteEditorState {
                 names.sort();
                 self.color_mode = meta.color_mode;
                 self.selected_palette_id = meta.palette.clone();
+                if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
+                    self.foreground_color = canonical_indexed_color(3);
+                }
                 (meta.tile_size, is_sheet, names)
             }
             SpriteAssetKind::ObjectSheet => {

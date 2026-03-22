@@ -2,7 +2,10 @@
 
 use crate::ui::editor_ui::{SpriteEditorTool, SpriteSelection};
 use crate::ui::interactions::SpritePaintInteraction;
+use crate::ui::sprite_editor::{canonical_indexed_color, indexed_slot_for_authored_color};
 use crate::ui::EditorUI;
+use toki_core::assets::atlas::ColorMode;
+use toki_core::palette::Palette4;
 
 use super::canvas::invalidate_canvas_texture;
 
@@ -57,7 +60,11 @@ fn handle_brush_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_
     }
 
     if response.dragged_by(egui::PointerButton::Primary) || response.clicked() {
-        let color = ui_state.sprite.foreground_color;
+        let color = effective_paint_color(
+            ui_state.sprite.color_mode,
+            ui_state.sprite.foreground_color,
+            selected_palette(ui_state),
+        );
         let brush_size = ui_state.sprite.brush_size;
         if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
             if SpritePaintInteraction::paint_brush(canvas, canvas_pos, color, brush_size) {
@@ -95,7 +102,11 @@ fn handle_eraser_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas
 fn handle_fill_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
     if response.clicked() {
         start_paint_stroke(ui_state);
-        let color = ui_state.sprite.foreground_color;
+        let color = effective_paint_color(
+            ui_state.sprite.color_mode,
+            ui_state.sprite.foreground_color,
+            selected_palette(ui_state),
+        );
         if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
             if SpritePaintInteraction::flood_fill(canvas, canvas_pos, color) {
                 ui_state.sprite.active_mut().dirty = true;
@@ -114,8 +125,16 @@ fn handle_eyedropper_tool(
     if response.clicked() {
         if let Some(canvas) = &ui_state.sprite.active().canvas {
             if let Some(color) = SpritePaintInteraction::pick_color(canvas, canvas_pos) {
-                ui_state.sprite.foreground_color = color;
-                ui_state.sprite.add_recent_color(color);
+                if ui_state.sprite.color_mode == ColorMode::PaletteIndexed {
+                    if let Some(slot) =
+                        indexed_slot_for_authored_color(color, selected_palette(ui_state))
+                    {
+                        ui_state.sprite.foreground_color = canonical_indexed_color(slot);
+                    }
+                } else {
+                    ui_state.sprite.foreground_color = color;
+                    ui_state.sprite.add_recent_color(color);
+                }
             }
         }
     }
@@ -128,7 +147,11 @@ fn handle_line_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_p
     }
 
     if response.drag_stopped_by(egui::PointerButton::Primary) {
-        let color = ui_state.sprite.foreground_color;
+        let color = effective_paint_color(
+            ui_state.sprite.color_mode,
+            ui_state.sprite.foreground_color,
+            selected_palette(ui_state),
+        );
         let brush_size = ui_state.sprite.brush_size;
         if let Some(start) = ui_state.sprite.active_mut().line_start_pos.take() {
             if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
@@ -263,7 +286,11 @@ fn handle_add_outline_tool(
     };
 
     start_paint_stroke(ui_state);
-    let outline_color = ui_state.sprite.foreground_color;
+    let outline_color = effective_paint_color(
+        ui_state.sprite.color_mode,
+        ui_state.sprite.foreground_color,
+        selected_palette(ui_state),
+    );
     if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
         if SpritePaintInteraction::add_outline_in_bounds(canvas, canvas_pos, outline_color, bounds)
         {
@@ -288,7 +315,11 @@ fn handle_add_shadow_tool(
     };
 
     start_paint_stroke(ui_state);
-    let shadow_color = ui_state.sprite.foreground_color;
+    let shadow_color = effective_paint_color(
+        ui_state.sprite.color_mode,
+        ui_state.sprite.foreground_color,
+        selected_palette(ui_state),
+    );
     if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
         if SpritePaintInteraction::add_ground_shadow_in_bounds(
             canvas,
@@ -354,6 +385,29 @@ fn finish_paint_stroke(ui_state: &mut EditorUI) {
     }
 }
 
+fn selected_palette(ui_state: &EditorUI) -> Option<Palette4> {
+    ui_state
+        .sprite
+        .selected_palette_id
+        .as_ref()
+        .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
+        .copied()
+}
+
+fn effective_paint_color(
+    color_mode: ColorMode,
+    foreground_color: crate::ui::editor_ui::PixelColor,
+    palette: Option<Palette4>,
+) -> crate::ui::editor_ui::PixelColor {
+    if color_mode != ColorMode::PaletteIndexed {
+        return foreground_color;
+    }
+
+    indexed_slot_for_authored_color(foreground_color, palette)
+        .map(canonical_indexed_color)
+        .unwrap_or_else(|| canonical_indexed_color(3))
+}
+
 pub fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
     use SpriteEditorTool::*;
 
@@ -403,6 +457,8 @@ pub fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ui::editor_ui::PixelColor;
+    use toki_core::palette::Palette4;
 
     #[test]
     fn create_selection_includes_both_start_and_end_pixels() {
@@ -423,5 +479,38 @@ mod tests {
         let selection = create_selection(glam::IVec2::new(4, 6), glam::IVec2::new(4, 6));
 
         assert_eq!(selection, SpriteSelection::new(4, 6, 1, 1));
+    }
+
+    #[test]
+    fn effective_paint_color_keeps_truecolor_values() {
+        let color = PixelColor::rgb(12, 34, 56);
+        assert_eq!(effective_paint_color(ColorMode::TrueColor, color, None), color);
+    }
+
+    #[test]
+    fn effective_paint_color_maps_palette_display_color_back_to_canonical_slot() {
+        let palette = Palette4::new([
+            [10, 20, 30, 255],
+            [40, 50, 60, 255],
+            [70, 80, 90, 255],
+            [100, 110, 120, 255],
+        ]);
+
+        assert_eq!(
+            effective_paint_color(
+                ColorMode::PaletteIndexed,
+                PixelColor::rgb(70, 80, 90),
+                Some(palette),
+            ),
+            canonical_indexed_color(2)
+        );
+    }
+
+    #[test]
+    fn effective_paint_color_defaults_to_white_slot_for_invalid_indexed_color() {
+        assert_eq!(
+            effective_paint_color(ColorMode::PaletteIndexed, PixelColor::rgb(1, 2, 3), None),
+            canonical_indexed_color(3)
+        );
     }
 }

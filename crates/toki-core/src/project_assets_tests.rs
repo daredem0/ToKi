@@ -973,7 +973,7 @@ indexed_palette_override = "gb_default"
     .expect("truecolor flower definition should parse");
     assert_eq!(truecolor_definition.animations.atlas_name, "truecolor_demo.json");
 
-    let resolved = resolve_project_resource_paths(&project_root, Some("palette_demo_map"))
+    let resolved = resolve_project_resource_paths(project_root, Some("palette_demo_map"))
         .expect("example project should resolve runtime resource paths");
     assert_eq!(
         resolved
