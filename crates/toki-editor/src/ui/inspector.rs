@@ -25,10 +25,13 @@ use toki_core::rules::{
 
 mod animation_editor;
 mod assets;
+#[path = "inspector/domain_inspectors/mod.rs"]
 mod domain_inspectors;
+#[path = "inspector/entities/mod.rs"]
 mod entities;
 mod entity_editor;
 mod map_editor;
+#[path = "inspector/menu_editor/mod.rs"]
 mod menu_editor;
 mod project;
 mod rules;
@@ -41,45 +44,45 @@ pub struct InspectorSystem;
 
 /// Value object grouping collision-related entity properties
 #[derive(Debug, Clone)]
-pub struct CollisionDraft {
-    pub enabled: bool,
-    pub offset_x: i32,
-    pub offset_y: i32,
-    pub size_x: i64,
-    pub size_y: i64,
-    pub trigger: bool,
+pub(super) struct CollisionDraft {
+    pub(super) enabled: bool,
+    pub(super) offset_x: i32,
+    pub(super) offset_y: i32,
+    pub(super) size_x: i64,
+    pub(super) size_y: i64,
+    pub(super) trigger: bool,
 }
 
 #[derive(Debug, Clone)]
-struct EntityPropertyDraft {
-    category: String,
-    static_object_sheet: Option<String>,
-    static_object_name: Option<String>,
-    control_role: ControlRole,
-    position_x: i32,
-    position_y: i32,
-    size_x: i64,
-    size_y: i64,
-    visible: bool,
-    active: bool,
-    solid: bool,
-    interactable: bool,
-    interaction_reach: u32,
-    can_move: bool,
-    ai_config: AiConfig,
-    movement_profile: MovementProfile,
-    movement_sound_trigger: MovementSoundTrigger,
-    footstep_trigger_distance: f32,
-    hearing_radius: u32,
-    movement_sound: String,
-    has_inventory: bool,
-    speed: f64,
-    render_layer: i32,
-    health_enabled: bool,
-    health_value: i64,
-    attack_power_enabled: bool,
-    attack_power_value: i64,
-    collision: CollisionDraft,
+pub(super) struct EntityPropertyDraft {
+    pub(super) category: String,
+    pub(super) static_object_sheet: Option<String>,
+    pub(super) static_object_name: Option<String>,
+    pub(super) control_role: ControlRole,
+    pub(super) position_x: i32,
+    pub(super) position_y: i32,
+    pub(super) size_x: i64,
+    pub(super) size_y: i64,
+    pub(super) visible: bool,
+    pub(super) active: bool,
+    pub(super) solid: bool,
+    pub(super) interactable: bool,
+    pub(super) interaction_reach: u32,
+    pub(super) can_move: bool,
+    pub(super) ai_config: AiConfig,
+    pub(super) movement_profile: MovementProfile,
+    pub(super) movement_sound_trigger: MovementSoundTrigger,
+    pub(super) footstep_trigger_distance: f32,
+    pub(super) hearing_radius: u32,
+    pub(super) movement_sound: String,
+    pub(super) has_inventory: bool,
+    pub(super) speed: f64,
+    pub(super) render_layer: i32,
+    pub(super) health_enabled: bool,
+    pub(super) health_value: i64,
+    pub(super) attack_power_enabled: bool,
+    pub(super) attack_power_value: i64,
+    pub(super) collision: CollisionDraft,
 }
 
 #[derive(Debug, Clone)]
@@ -102,24 +105,24 @@ struct ProjectSettingsDraft {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-struct MultiEntityCommonState {
-    visible: Option<bool>,
-    active: Option<bool>,
-    collision_enabled: Option<bool>,
-    render_layer: Option<i32>,
+pub(super) struct MultiEntityCommonState {
+    pub(super) visible: Option<bool>,
+    pub(super) active: Option<bool>,
+    pub(super) collision_enabled: Option<bool>,
+    pub(super) render_layer: Option<i32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-struct MultiEntityBatchEdit {
-    set_visible: Option<bool>,
-    set_active: Option<bool>,
-    set_collision_enabled: Option<bool>,
-    set_render_layer: Option<i32>,
-    position_delta: Option<glam::IVec2>,
+pub(super) struct MultiEntityBatchEdit {
+    pub(super) set_visible: Option<bool>,
+    pub(super) set_active: Option<bool>,
+    pub(super) set_collision_enabled: Option<bool>,
+    pub(super) set_render_layer: Option<i32>,
+    pub(super) position_delta: Option<glam::IVec2>,
 }
 
 impl MultiEntityBatchEdit {
-    fn is_noop(self) -> bool {
+    pub(super) fn is_noop(self) -> bool {
         self.set_visible.is_none()
             && self.set_active.is_none()
             && self.set_collision_enabled.is_none()
@@ -325,7 +328,7 @@ impl ProjectSettingsDraft {
     }
 }
 
-fn ai_behavior_label(ai_behavior: AiBehavior) -> &'static str {
+pub(super) fn ai_behavior_label(ai_behavior: AiBehavior) -> &'static str {
     match ai_behavior {
         AiBehavior::None => "None",
         AiBehavior::Wander => "Wander",
@@ -335,21 +338,21 @@ fn ai_behavior_label(ai_behavior: AiBehavior) -> &'static str {
     }
 }
 
-fn ai_behavior_needs_detection_radius(behavior: AiBehavior) -> bool {
+pub(super) fn ai_behavior_needs_detection_radius(behavior: AiBehavior) -> bool {
     matches!(
         behavior,
         AiBehavior::Chase | AiBehavior::Run | AiBehavior::RunAndMultiply
     )
 }
 
-fn control_role_label(control_role: ControlRole) -> &'static str {
+pub(super) fn control_role_label(control_role: ControlRole) -> &'static str {
     match control_role {
         ControlRole::LegacyDefault | ControlRole::None => "None",
         ControlRole::PlayerCharacter => "Player Character",
     }
 }
 
-fn movement_profile_label(
+pub(super) fn movement_profile_label(
     control_role: ControlRole,
     movement_profile: MovementProfile,
 ) -> &'static str {
@@ -360,7 +363,7 @@ fn movement_profile_label(
     }
 }
 
-fn movement_sound_trigger_label(trigger: MovementSoundTrigger) -> &'static str {
+pub(super) fn movement_sound_trigger_label(trigger: MovementSoundTrigger) -> &'static str {
     match trigger {
         MovementSoundTrigger::Distance => "Distance",
         MovementSoundTrigger::AnimationLoop => "Animation Loop",

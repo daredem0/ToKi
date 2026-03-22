@@ -1,5 +1,6 @@
 pub mod editor_domain;
 pub mod editor_ui;
+pub mod entity_editor;
 pub mod hierarchy;
 pub mod inspector;
 pub mod inspector_trait;

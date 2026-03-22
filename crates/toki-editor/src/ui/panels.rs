@@ -19,7 +19,9 @@ use toki_core::rules::{
     RuleTrigger,
 };
 
+#[path = "panels/animation_editor/mod.rs"]
 mod animation_editor;
+#[path = "panels/entity_editor/mod.rs"]
 mod entity_editor;
 mod map_editor;
 mod map_editor_interactions;
