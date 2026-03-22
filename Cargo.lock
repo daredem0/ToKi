@@ -4453,7 +4453,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "toki-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "blake3",
  "bytemuck",
@@ -4474,7 +4474,7 @@ dependencies = [
 
 [[package]]
 name = "toki-editor"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4501,7 +4501,7 @@ dependencies = [
 
 [[package]]
 name = "toki-render"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "bytemuck",
  "egui",
@@ -4519,7 +4519,7 @@ dependencies = [
 
 [[package]]
 name = "toki-runtime"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "glam",
@@ -4537,7 +4537,7 @@ dependencies = [
 
 [[package]]
 name = "toki-schemas"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "jsonschema",
  "serde_json",

@@ -19,8 +19,8 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.99"
-toki-render = { path = "../toki-render", version = "0.2.0" }
-toki-core   = { path = "../toki-core", version = "0.2.0" }
+toki-render = { path = "../toki-render", version = "0.2.1" }
+toki-core   = { path = "../toki-core", version = "0.2.1" }
 winit = { version = "0.30.12", features = ["x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita", "rwh_05"] }
 glam  = "0.30.5"
 kira = "0.10"
