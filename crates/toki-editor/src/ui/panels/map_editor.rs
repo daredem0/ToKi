@@ -1,4 +1,5 @@
 use super::*;
+use crate::editor_viewport::EditorViewportContext;
 use crate::ui::editor_ui::MapEditorTool;
 use crate::ui::EditorUI;
 
@@ -184,6 +185,15 @@ impl PanelSystem {
 
         let (rect, response) =
             ui.allocate_exact_size(available_size, egui::Sense::click_and_drag());
+        let (camera_position, camera_scale) = viewport.camera_state();
+        let viewport_ctx = EditorViewportContext::new(
+            rect,
+            viewport.viewport_size(),
+            viewport.sizing_mode() == crate::scene::viewport::ViewportSizingMode::Responsive,
+            camera_position,
+            camera_scale,
+        );
+        let display_rect = viewport_ctx.display_rect();
 
         match ui_state.map.tool {
             MapEditorTool::Drag => {
@@ -194,13 +204,18 @@ impl PanelSystem {
                             ui_state,
                             viewport,
                             drag_start_pos,
-                            rect,
+                            display_rect,
                         );
                     }
                 }
 
                 if ui_state.is_map_object_move_drag_active() {
-                    Self::handle_map_editor_object_drag_update(ui, ui_state, viewport, rect);
+                    Self::handle_map_editor_object_drag_update(
+                        ui,
+                        ui_state,
+                        viewport,
+                        display_rect,
+                    );
                     if response.drag_stopped()
                         && Self::handle_map_editor_object_drag_release(ui_state, viewport)
                     {
@@ -256,15 +271,32 @@ impl PanelSystem {
             Self::paint_viewport_grid_overlay(ui, rect, viewport, cfg);
         }
         if let Some(project_path) = project_path.as_deref() {
-            Self::paint_map_editor_brush_preview(ui, ui_state, viewport, rect, project_path);
-            Self::paint_map_editor_object_preview(ui, ui_state, viewport, rect, project_path);
+            Self::paint_map_editor_brush_preview(
+                ui,
+                ui_state,
+                viewport,
+                &viewport_ctx,
+                project_path,
+            );
+            Self::paint_map_editor_object_preview(
+                ui,
+                ui_state,
+                viewport,
+                &viewport_ctx,
+                project_path,
+            );
         }
 
         match ui_state.map.tool {
             MapEditorTool::Drag => {
                 if response.clicked() {
                     if let Some(selected_object_index) =
-                        Self::handle_map_editor_object_select(ui, viewport, &response, rect)
+                        Self::handle_map_editor_object_select(
+                            ui,
+                            viewport,
+                            &response,
+                            display_rect,
+                        )
                     {
                         if let Some(tilemap) = viewport.tilemap() {
                             if let Some(object) = tilemap.objects.get(selected_object_index) {
@@ -277,7 +309,7 @@ impl PanelSystem {
                             ui,
                             viewport,
                             &response,
-                            rect,
+                            display_rect,
                             project_path,
                         ) {
                             ui_state.map.selected_tile_info = tile_info;
@@ -302,7 +334,7 @@ impl PanelSystem {
                         ui_state,
                         viewport,
                         &response,
-                        rect,
+                        display_rect,
                         &selected_tile,
                         ui_state.map.brush_size_tiles,
                     ) {
@@ -325,7 +357,7 @@ impl PanelSystem {
             }
             MapEditorTool::PickTile => {
                 if let Some(tile_name) =
-                    Self::handle_map_editor_tile_pick(ui, viewport, &response, rect)
+                    Self::handle_map_editor_tile_pick(ui, viewport, &response, display_rect)
                 {
                     ui_state.pick_map_editor_tile(tile_name);
                 }
@@ -336,14 +368,20 @@ impl PanelSystem {
                     ui_state,
                     viewport,
                     &response,
-                    rect,
+                    display_rect,
                     project_path.as_deref(),
                 ) {
                     ui_state.mark_map_editor_dirty();
                 }
             }
             MapEditorTool::DeleteObject => {
-                if Self::handle_map_editor_object_delete(ui, ui_state, viewport, &response, rect) {
+                if Self::handle_map_editor_object_delete(
+                    ui,
+                    ui_state,
+                    viewport,
+                    &response,
+                    display_rect,
+                ) {
                     ui_state.mark_map_editor_dirty();
                 }
             }

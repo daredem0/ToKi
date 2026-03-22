@@ -1,4 +1,5 @@
 use super::{GraphValidationFixCommand, PanelSystem};
+use crate::editor_viewport::{compute_display_rect, EditorViewportContext};
 use crate::ui::rule_graph::RuleGraph;
 use std::collections::HashMap;
 use toki_core::rules::{
@@ -109,7 +110,7 @@ fn grid_world_lines_emits_step_aligned_lines_inside_range() {
 #[test]
 fn compute_viewport_display_rect_keeps_aspect_and_centers() {
     let outer = egui::Rect::from_min_size(egui::Pos2::new(0.0, 0.0), egui::vec2(320.0, 144.0));
-    let display = PanelSystem::compute_viewport_display_rect(outer, (160, 144), false);
+    let display = compute_display_rect(outer, (160, 144), false);
     assert_eq!(display.width(), 160.0);
     assert_eq!(display.height(), 144.0);
     assert_eq!(display.left(), 80.0);
@@ -119,22 +120,22 @@ fn compute_viewport_display_rect_keeps_aspect_and_centers() {
 #[test]
 fn compute_viewport_display_rect_uses_full_rect_for_responsive_viewports() {
     let outer = egui::Rect::from_min_size(egui::Pos2::new(10.0, 20.0), egui::vec2(640.0, 360.0));
-    let display = PanelSystem::compute_viewport_display_rect(outer, (640, 360), true);
+    let display = compute_display_rect(outer, (640, 360), true);
     assert_eq!(display, outer);
 }
 
 #[test]
 fn map_editor_tile_screen_rect_maps_tile_bounds_through_camera_scale() {
-    let display = egui::Rect::from_min_size(egui::Pos2::new(0.0, 0.0), egui::vec2(160.0, 144.0));
-    let tile_rect = PanelSystem::map_editor_tile_screen_rect(
-        display,
+    let viewport_ctx = EditorViewportContext::new(
+        egui::Rect::from_min_size(egui::Pos2::new(0.0, 0.0), egui::vec2(160.0, 144.0)),
         (160, 144),
+        true,
         glam::IVec2::ZERO,
         1.0,
-        glam::UVec2::new(16, 16),
-        glam::UVec2::new(1, 2),
-    )
-    .expect("tile screen rect should be computed");
+    );
+    let tile_rect = viewport_ctx
+        .tile_screen_rect(glam::UVec2::new(16, 16), glam::UVec2::new(1, 2))
+        .expect("tile screen rect should be computed");
 
     assert_eq!(tile_rect.min, egui::pos2(16.0, 32.0));
     assert_eq!(tile_rect.max, egui::pos2(32.0, 48.0));

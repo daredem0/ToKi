@@ -1,4 +1,5 @@
 use super::*;
+use crate::editor_viewport::EditorViewportContext;
 use crate::ui::EditorUI;
 
 impl PanelSystem {
@@ -45,13 +46,17 @@ impl PanelSystem {
             available_size,
             egui::Sense::click_and_drag().union(egui::Sense::hover()),
         );
-        let display_rect = viewport.display_rect_in(rect);
+        let (camera_position, camera_scale) = viewport.camera_state();
+        let viewport_ctx = EditorViewportContext::new(
+            rect,
+            viewport.viewport_size(),
+            viewport.sizing_mode() == crate::scene::viewport::ViewportSizingMode::Responsive,
+            camera_position,
+            camera_scale,
+        );
+        let display_rect = viewport_ctx.display_rect();
 
-        if let Some(pointer_pos) = response
-            .hover_pos()
-            .filter(|pos| display_rect.contains(*pos))
-        {
-            let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, display_rect);
+        if let Some(world_pos) = viewport_ctx.hover_world_from_response(&response) {
             ui_state.remember_viewport_cursor_world_position(world_pos);
         }
 
@@ -62,7 +67,9 @@ impl PanelSystem {
         let ctrl_pressed = ui.input(|i| i.modifiers.ctrl);
         if response.drag_started() {
             if let Some(drag_start_pos) = response.interact_pointer_pos() {
-                if ctrl_pressed && !ui_state.is_in_placement_mode() {
+                if !viewport_ctx.contains_screen_pos(drag_start_pos) {
+                    viewport.stop_camera_drag();
+                } else if ctrl_pressed && !ui_state.is_in_placement_mode() {
                     SelectionInteraction::handle_marquee_drag_start(ui_state, drag_start_pos);
                     viewport.stop_camera_drag();
                 } else {
@@ -123,7 +130,9 @@ impl PanelSystem {
 
         if response.clicked() {
             if let Some(click_pos) = response.hover_pos() {
-                if ui_state.is_in_placement_mode() {
+                if !viewport_ctx.contains_screen_pos(click_pos) {
+                    // Ignore clicks in the letterboxed area.
+                } else if ui_state.is_in_placement_mode() {
                     PlacementInteraction::handle_click(
                         ui_state,
                         viewport,

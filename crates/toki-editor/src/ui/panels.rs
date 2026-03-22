@@ -22,6 +22,7 @@ use super::interactions::{
 };
 use super::rule_graph::{RuleGraph, RuleGraphError, RuleGraphNodeKind};
 use crate::config::EditorConfig;
+use crate::editor_viewport::EditorViewportContext;
 use crate::scene::SceneViewport;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
@@ -101,9 +102,8 @@ impl PanelSystem {
     ) -> String {
         match cursor_world {
             Some(pos) if show_tiles => {
-                let tile_x = pos.x.div_euclid(grid_size.x.max(1) as i32);
-                let tile_y = pos.y.div_euclid(grid_size.y.max(1) as i32);
-                format!("Cursor: {}, {}", tile_x, tile_y)
+                let tile = EditorViewportContext::world_to_tile_coords(pos, grid_size);
+                format!("Cursor: {}, {}", tile.x, tile.y)
             }
             Some(pos) => format!("Cursor: {}, {}", pos.x, pos.y),
             None => "Cursor: -, -".to_string(),
@@ -239,39 +239,8 @@ impl PanelSystem {
         lines
     }
 
-    fn compute_viewport_display_rect(
-        outer_rect: egui::Rect,
-        viewport_size: (u32, u32),
-        responsive: bool,
-    ) -> egui::Rect {
-        if responsive {
-            return outer_rect;
-        }
-
-        let viewport_aspect = viewport_size.0 as f32 / viewport_size.1 as f32;
-        let available_size = outer_rect.size();
-        let available_aspect = available_size.x / available_size.y;
-
-        let display_size = if available_aspect > viewport_aspect {
-            egui::Vec2::new(available_size.y * viewport_aspect, available_size.y)
-        } else {
-            egui::Vec2::new(available_size.x, available_size.x / viewport_aspect)
-        };
-        let offset = (available_size - display_size) * 0.5;
-        egui::Rect::from_min_size(outer_rect.min + offset, display_size)
-    }
-
     fn effective_grid_size(viewport: &SceneViewport, config: &EditorConfig) -> glam::UVec2 {
-        viewport.tilemap().map_or_else(
-            || {
-                glam::UVec2::new(
-                    config.editor_settings.grid.grid_size[0],
-                    config.editor_settings.grid.grid_size[1],
-                )
-                .max(glam::UVec2::ONE)
-            },
-            |tilemap| tilemap.tile_size.max(glam::UVec2::ONE),
-        )
+        EditorViewportContext::effective_grid_size(viewport.tilemap(), Some(config))
     }
 
     fn paint_viewport_grid_overlay(
@@ -285,12 +254,15 @@ impl PanelSystem {
         }
 
         let (viewport_width, viewport_height) = viewport.viewport_size();
-        let display_rect = Self::compute_viewport_display_rect(
+        let (camera_position, camera_scale) = viewport.camera_state();
+        let viewport_ctx = EditorViewportContext::new(
             outer_rect,
             (viewport_width, viewport_height),
             viewport.sizing_mode() == crate::scene::viewport::ViewportSizingMode::Responsive,
+            camera_position,
+            camera_scale,
         );
-        let (camera_position, camera_scale) = viewport.camera_state();
+        let display_rect = viewport_ctx.display_rect();
         let grid_size = Self::effective_grid_size(viewport, config);
 
         let world_min_x = camera_position.x;

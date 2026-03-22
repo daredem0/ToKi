@@ -3,6 +3,7 @@ mod background_tasks;
 mod config;
 mod editor_services;
 mod editor_types;
+mod editor_viewport;
 mod editor_app;
 mod editor_grid;
 mod fonts;

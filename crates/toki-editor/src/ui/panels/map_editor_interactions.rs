@@ -80,6 +80,9 @@ impl PanelSystem {
         let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {
             return false;
         };
+        if !rect.contains(pointer_pos) {
+            return false;
+        }
 
         let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
         let Some(tilemap) = viewport.tilemap_mut() else {
@@ -149,6 +152,9 @@ impl PanelSystem {
         let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {
             return false;
         };
+        if !rect.contains(pointer_pos) {
+            return false;
+        }
         let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
         let Some(tilemap) = viewport.tilemap_mut() else {
             return false;
@@ -209,6 +215,9 @@ impl PanelSystem {
         let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {
             return false;
         };
+        if !rect.contains(pointer_pos) {
+            return false;
+        }
         let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
         let Some(tilemap) = viewport.tilemap_mut() else {
             return false;
@@ -242,6 +251,9 @@ impl PanelSystem {
         }
 
         let pointer_pos = ui.input(|input| input.pointer.interact_pos())?;
+        if !rect.contains(pointer_pos) {
+            return None;
+        }
         let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
         let tilemap = viewport.tilemap()?;
         MapObjectInteraction::object_index_at_world(tilemap, world_pos)
@@ -286,6 +298,9 @@ impl PanelSystem {
         let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {
             return;
         };
+        if !rect.contains(pointer_pos) {
+            return;
+        }
         let world_pos =
             viewport.screen_to_world_pos_raw(pointer_pos, rect) - drag_state.grab_offset;
         let Some(tilemap) = viewport.tilemap_mut() else {
@@ -335,6 +350,9 @@ impl PanelSystem {
         let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {
             return Some(None);
         };
+        if !rect.contains(pointer_pos) {
+            return Some(None);
+        }
         let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
         let Some(tilemap) = viewport.tilemap() else {
             return Some(None);
@@ -377,6 +395,9 @@ impl PanelSystem {
         }
 
         let pointer_pos = ui.input(|input| input.pointer.interact_pos())?;
+        if !rect.contains(pointer_pos) {
+            return None;
+        }
         let world_pos = viewport.screen_to_world_pos_raw(pointer_pos, rect);
         let tilemap = viewport.tilemap()?;
         let tile_pos = MapPaintInteraction::tile_position_at_world(tilemap, world_pos)?;
