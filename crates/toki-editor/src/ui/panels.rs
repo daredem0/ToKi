@@ -1,6 +1,19 @@
 use super::editor_domain::{
-    animation_state_label, animation_state_options, RuleActionEditorKind as GraphActionKind,
-    RuleConditionEditorKind as GraphConditionKind, RuleTriggerEditorKind as GraphTriggerKind,
+    animation_state_label, animation_state_options,
+    default_rule_action as shared_default_rule_action,
+    default_rule_condition as shared_default_rule_condition,
+    default_rule_trigger as shared_default_rule_trigger,
+    rule_action_kind as shared_rule_action_kind,
+    rule_action_kind_label as shared_rule_action_kind_label,
+    rule_condition_kind as shared_rule_condition_kind,
+    rule_condition_kind_label as shared_rule_condition_kind_label,
+    rule_key_label as shared_rule_key_label,
+    rule_sound_channel_label as shared_rule_sound_channel_label,
+    rule_target_label as shared_rule_target_label,
+    rule_trigger_kind as shared_rule_trigger_kind,
+    rule_trigger_kind_label as shared_rule_trigger_kind_label,
+    RuleActionEditorKind as GraphActionKind, RuleConditionEditorKind as GraphConditionKind,
+    RuleTriggerEditorKind as GraphTriggerKind,
 };
 use super::editor_ui::{CenterPanelTab, SceneRulesGraphCommandData, Selection};
 use super::interactions::{
@@ -11,7 +24,6 @@ use super::rule_graph::{RuleGraph, RuleGraphError, RuleGraphNodeKind};
 use crate::config::EditorConfig;
 use crate::scene::SceneViewport;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use toki_core::animation::AnimationState;
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
 use toki_core::entity::EntityKind;
 use toki_core::rules::{

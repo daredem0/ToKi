@@ -353,8 +353,9 @@ impl InspectorSystem {
                                     });
 
                                     let mut movement_sound_options =
-                                        Self::discover_audio_asset_names(
-                                            project_path.join("assets/audio/sfx").as_path(),
+                                        crate::project::ProjectAssets::discover_project_audio_names(
+                                            project_path,
+                                            crate::project::assets::ProjectAudioAssetKind::Sfx,
                                         );
                                     if !definition.audio.movement_sound.trim().is_empty()
                                         && !movement_sound_options

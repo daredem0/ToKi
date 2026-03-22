@@ -1,4 +1,19 @@
 use super::*;
+use crate::project::assets::ProjectAudioAssetKind;
+use crate::ui::editor_domain::{
+    default_rule_action as shared_default_rule_action,
+    default_rule_condition as shared_default_rule_condition,
+    default_rule_trigger as shared_default_rule_trigger,
+    rule_action_kind as shared_rule_action_kind,
+    rule_action_kind_label as shared_rule_action_kind_label,
+    rule_condition_kind as shared_rule_condition_kind,
+    rule_condition_kind_label as shared_rule_condition_kind_label,
+    rule_key_label as shared_rule_key_label,
+    rule_sound_channel_label as shared_rule_sound_channel_label,
+    rule_spawn_entity_type_label as shared_rule_spawn_entity_type_label,
+    rule_trigger_kind as shared_rule_trigger_kind,
+    rule_trigger_kind_label as shared_rule_trigger_kind_label,
+};
 
 impl InspectorSystem {
     pub(in super::super) fn next_rule_id(rule_set: &RuleSet) -> String {
@@ -91,12 +106,11 @@ impl InspectorSystem {
     }
 
     pub(in super::super) fn add_action(rule: &mut Rule, action_kind: RuleActionKind) {
-        rule.actions.push(Self::default_action(action_kind));
+        rule.actions.push(shared_default_rule_action(action_kind));
     }
 
     pub(in super::super) fn add_condition(rule: &mut Rule, condition_kind: RuleConditionKind) {
-        rule.conditions
-            .push(Self::default_condition(condition_kind));
+        rule.conditions.push(shared_default_rule_condition(condition_kind));
     }
 
     pub(in super::super) fn remove_condition(rule: &mut Rule, condition_index: usize) -> bool {
@@ -114,7 +128,7 @@ impl InspectorSystem {
         condition: &mut RuleCondition,
         condition_kind: RuleConditionKind,
     ) {
-        *condition = Self::default_condition(condition_kind);
+        *condition = shared_default_rule_condition(condition_kind);
     }
 
     pub(in super::super) fn remove_action(rule: &mut Rule, action_index: usize) -> bool {
@@ -129,7 +143,7 @@ impl InspectorSystem {
         action: &mut RuleAction,
         action_kind: RuleActionKind,
     ) {
-        *action = Self::default_action(action_kind);
+        *action = shared_default_rule_action(action_kind);
     }
 
     pub(in super::super) fn validate_rule_set(rule_set: &RuleSet) -> Vec<RuleValidationIssue> {
@@ -447,261 +461,48 @@ impl InspectorSystem {
         changed
     }
 
-    pub(in super::super) fn default_action(action_kind: RuleActionKind) -> RuleAction {
-        match action_kind {
-            RuleActionKind::PlaySound => RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "sfx_placeholder".to_string(),
-            },
-            RuleActionKind::PlayMusic => RuleAction::PlayMusic {
-                track_id: "music_placeholder".to_string(),
-            },
-            RuleActionKind::PlayAnimation => RuleAction::PlayAnimation {
-                target: RuleTarget::Player,
-                state: AnimationState::Idle,
-            },
-            RuleActionKind::SetVelocity => RuleAction::SetVelocity {
-                target: RuleTarget::Player,
-                velocity: [0, 0],
-            },
-            RuleActionKind::Spawn => RuleAction::Spawn {
-                entity_type: RuleSpawnEntityType::Npc,
-                position: [0, 0],
-            },
-            RuleActionKind::DestroySelf => RuleAction::DestroySelf {
-                target: RuleTarget::Player,
-            },
-            RuleActionKind::SwitchScene => RuleAction::SwitchScene {
-                scene_name: String::new(),
-                spawn_point_id: String::new(),
-            },
-            RuleActionKind::DamageEntity => RuleAction::DamageEntity {
-                target: RuleTarget::Player,
-                amount: 10,
-            },
-            RuleActionKind::HealEntity => RuleAction::HealEntity {
-                target: RuleTarget::Player,
-                amount: 10,
-            },
-            RuleActionKind::AddInventoryItem => RuleAction::AddInventoryItem {
-                target: RuleTarget::Player,
-                item_id: String::new(),
-                count: 1,
-            },
-            RuleActionKind::RemoveInventoryItem => RuleAction::RemoveInventoryItem {
-                target: RuleTarget::Player,
-                item_id: String::new(),
-                count: 1,
-            },
-            RuleActionKind::SetEntityActive => RuleAction::SetEntityActive {
-                target: RuleTarget::Player,
-                active: false,
-            },
-            RuleActionKind::TeleportEntity => RuleAction::TeleportEntity {
-                target: RuleTarget::Player,
-                tile_x: 0,
-                tile_y: 0,
-            },
-        }
-    }
-
-    pub(in super::super) fn default_condition(condition_kind: RuleConditionKind) -> RuleCondition {
-        match condition_kind {
-            RuleConditionKind::Always => RuleCondition::Always,
-            RuleConditionKind::TargetExists => RuleCondition::TargetExists {
-                target: RuleTarget::Player,
-            },
-            RuleConditionKind::KeyHeld => RuleCondition::KeyHeld { key: RuleKey::Up },
-            RuleConditionKind::EntityActive => RuleCondition::EntityActive {
-                target: RuleTarget::Player,
-                is_active: true,
-            },
-            RuleConditionKind::HealthBelow => RuleCondition::HealthBelow {
-                target: RuleTarget::Player,
-                threshold: 50,
-            },
-            RuleConditionKind::HealthAbove => RuleCondition::HealthAbove {
-                target: RuleTarget::Player,
-                threshold: 50,
-            },
-            RuleConditionKind::TriggerOtherIsPlayer => RuleCondition::TriggerOtherIsPlayer,
-            RuleConditionKind::EntityIsKind => RuleCondition::EntityIsKind {
-                target: RuleTarget::Player,
-                kind: toki_core::entity::EntityKind::Player,
-            },
-            RuleConditionKind::TriggerOtherIsKind => RuleCondition::TriggerOtherIsKind {
-                kind: toki_core::entity::EntityKind::Npc,
-            },
-            RuleConditionKind::EntityHasTag => RuleCondition::EntityHasTag {
-                target: RuleTarget::Player,
-                tag: String::new(),
-            },
-            RuleConditionKind::TriggerOtherHasTag => {
-                RuleCondition::TriggerOtherHasTag { tag: String::new() }
-            }
-            RuleConditionKind::HasInventoryItem => RuleCondition::HasInventoryItem {
-                target: RuleTarget::Player,
-                item_id: String::new(),
-                min_count: 1,
-            },
-        }
-    }
-
     pub(in super::super) fn condition_kind(condition: &RuleCondition) -> RuleConditionKind {
-        match condition {
-            RuleCondition::Always => RuleConditionKind::Always,
-            RuleCondition::TargetExists { .. } => RuleConditionKind::TargetExists,
-            RuleCondition::KeyHeld { .. } => RuleConditionKind::KeyHeld,
-            RuleCondition::EntityActive { .. } => RuleConditionKind::EntityActive,
-            RuleCondition::HealthBelow { .. } => RuleConditionKind::HealthBelow,
-            RuleCondition::HealthAbove { .. } => RuleConditionKind::HealthAbove,
-            RuleCondition::TriggerOtherIsPlayer => RuleConditionKind::TriggerOtherIsPlayer,
-            RuleCondition::EntityIsKind { .. } => RuleConditionKind::EntityIsKind,
-            RuleCondition::TriggerOtherIsKind { .. } => RuleConditionKind::TriggerOtherIsKind,
-            RuleCondition::EntityHasTag { .. } => RuleConditionKind::EntityHasTag,
-            RuleCondition::TriggerOtherHasTag { .. } => RuleConditionKind::TriggerOtherHasTag,
-            RuleCondition::HasInventoryItem { .. } => RuleConditionKind::HasInventoryItem,
-        }
+        shared_rule_condition_kind(condition)
     }
 
     pub(in super::super) fn condition_kind_label(
         condition_kind: RuleConditionKind,
     ) -> &'static str {
-        match condition_kind {
-            RuleConditionKind::Always => "Always",
-            RuleConditionKind::TargetExists => "TargetExists",
-            RuleConditionKind::KeyHeld => "KeyHeld",
-            RuleConditionKind::EntityActive => "EntityActive",
-            RuleConditionKind::HealthBelow => "HealthBelow",
-            RuleConditionKind::HealthAbove => "HealthAbove",
-            RuleConditionKind::TriggerOtherIsPlayer => "TriggerOtherIsPlayer",
-            RuleConditionKind::EntityIsKind => "EntityIsKind",
-            RuleConditionKind::TriggerOtherIsKind => "TriggerOtherIsKind",
-            RuleConditionKind::EntityHasTag => "EntityHasTag",
-            RuleConditionKind::TriggerOtherHasTag => "TriggerOtherHasTag",
-            RuleConditionKind::HasInventoryItem => "HasInventoryItem",
-        }
+        shared_rule_condition_kind_label(condition_kind)
     }
 
     pub(in super::super) fn action_kind(action: &RuleAction) -> RuleActionKind {
-        match action {
-            RuleAction::PlaySound { .. } => RuleActionKind::PlaySound,
-            RuleAction::PlayMusic { .. } => RuleActionKind::PlayMusic,
-            RuleAction::PlayAnimation { .. } => RuleActionKind::PlayAnimation,
-            RuleAction::SetVelocity { .. } => RuleActionKind::SetVelocity,
-            RuleAction::Spawn { .. } => RuleActionKind::Spawn,
-            RuleAction::DestroySelf { .. } => RuleActionKind::DestroySelf,
-            RuleAction::SwitchScene { .. } => RuleActionKind::SwitchScene,
-            RuleAction::DamageEntity { .. } => RuleActionKind::DamageEntity,
-            RuleAction::HealEntity { .. } => RuleActionKind::HealEntity,
-            RuleAction::AddInventoryItem { .. } => RuleActionKind::AddInventoryItem,
-            RuleAction::RemoveInventoryItem { .. } => RuleActionKind::RemoveInventoryItem,
-            RuleAction::SetEntityActive { .. } => RuleActionKind::SetEntityActive,
-            RuleAction::TeleportEntity { .. } => RuleActionKind::TeleportEntity,
-        }
+        shared_rule_action_kind(action)
     }
 
     pub(in super::super) fn action_kind_label(action_kind: RuleActionKind) -> &'static str {
-        match action_kind {
-            RuleActionKind::PlaySound => "PlaySound",
-            RuleActionKind::PlayMusic => "PlayMusic",
-            RuleActionKind::PlayAnimation => "PlayAnimation",
-            RuleActionKind::SetVelocity => "SetVelocity",
-            RuleActionKind::Spawn => "Spawn",
-            RuleActionKind::DestroySelf => "DestroySelf",
-            RuleActionKind::SwitchScene => "SwitchScene",
-            RuleActionKind::DamageEntity => "DamageEntity",
-            RuleActionKind::HealEntity => "HealEntity",
-            RuleActionKind::AddInventoryItem => "AddInventoryItem",
-            RuleActionKind::RemoveInventoryItem => "RemoveInventoryItem",
-            RuleActionKind::SetEntityActive => "SetEntityActive",
-            RuleActionKind::TeleportEntity => "TeleportEntity",
-        }
+        shared_rule_action_kind_label(action_kind)
     }
 
     pub(in super::super) fn spawn_entity_type_label(
         entity_type: RuleSpawnEntityType,
     ) -> &'static str {
-        match entity_type {
-            RuleSpawnEntityType::PlayerLikeNpc => "PlayerLikeNpc",
-            RuleSpawnEntityType::Npc => "Npc",
-            RuleSpawnEntityType::Item => "Item",
-            RuleSpawnEntityType::Decoration => "Decoration",
-            RuleSpawnEntityType::Trigger => "Trigger",
-        }
+        shared_rule_spawn_entity_type_label(entity_type)
     }
 
     pub(in super::super) fn sound_channel_label(channel: RuleSoundChannel) -> &'static str {
-        match channel {
-            RuleSoundChannel::Movement => "Movement",
-            RuleSoundChannel::Collision => "Collision",
-        }
+        shared_rule_sound_channel_label(channel)
     }
 
     pub(in super::super) fn trigger_kind(trigger: &RuleTrigger) -> RuleTriggerKind {
-        match trigger {
-            RuleTrigger::OnStart => RuleTriggerKind::Start,
-            RuleTrigger::OnUpdate => RuleTriggerKind::Update,
-            RuleTrigger::OnPlayerMove => RuleTriggerKind::PlayerMove,
-            RuleTrigger::OnKey { .. } => RuleTriggerKind::Key,
-            RuleTrigger::OnCollision { .. } => RuleTriggerKind::Collision,
-            RuleTrigger::OnDamaged { .. } => RuleTriggerKind::Damaged,
-            RuleTrigger::OnDeath { .. } => RuleTriggerKind::Death,
-            RuleTrigger::OnTrigger => RuleTriggerKind::Trigger,
-            RuleTrigger::OnInteract { .. } => RuleTriggerKind::Interact,
-            RuleTrigger::OnTileEnter { .. } => RuleTriggerKind::TileEnter,
-            RuleTrigger::OnTileExit { .. } => RuleTriggerKind::TileExit,
-        }
+        shared_rule_trigger_kind(trigger)
     }
 
     pub(in super::super) fn trigger_kind_label(kind: RuleTriggerKind) -> &'static str {
-        match kind {
-            RuleTriggerKind::Start => "OnStart",
-            RuleTriggerKind::Update => "OnUpdate",
-            RuleTriggerKind::PlayerMove => "OnPlayerMove",
-            RuleTriggerKind::Key => "OnKey",
-            RuleTriggerKind::Collision => "OnCollision",
-            RuleTriggerKind::Damaged => "OnDamaged",
-            RuleTriggerKind::Death => "OnDeath",
-            RuleTriggerKind::Trigger => "OnTrigger",
-            RuleTriggerKind::Interact => "OnInteract",
-            RuleTriggerKind::TileEnter => "OnTileEnter",
-            RuleTriggerKind::TileExit => "OnTileExit",
-        }
+        shared_rule_trigger_kind_label(kind)
     }
 
     pub(in super::super) fn set_rule_trigger_kind(rule: &mut Rule, kind: RuleTriggerKind) {
-        rule.trigger = match kind {
-            RuleTriggerKind::Start => RuleTrigger::OnStart,
-            RuleTriggerKind::Update => RuleTrigger::OnUpdate,
-            RuleTriggerKind::PlayerMove => RuleTrigger::OnPlayerMove,
-            RuleTriggerKind::Key => RuleTrigger::OnKey { key: RuleKey::Up },
-            RuleTriggerKind::Collision => RuleTrigger::OnCollision { entity: None },
-            RuleTriggerKind::Damaged => RuleTrigger::OnDamaged { entity: None },
-            RuleTriggerKind::Death => RuleTrigger::OnDeath { entity: None },
-            RuleTriggerKind::Trigger => RuleTrigger::OnTrigger,
-            RuleTriggerKind::Interact => RuleTrigger::OnInteract {
-                mode: toki_core::rules::InteractionMode::default(),
-                entity: None,
-            },
-            RuleTriggerKind::TileEnter => RuleTrigger::OnTileEnter { x: 0, y: 0 },
-            RuleTriggerKind::TileExit => RuleTrigger::OnTileExit { x: 0, y: 0 },
-        };
+        rule.trigger = shared_default_rule_trigger(kind);
     }
 
     pub(in super::super) fn rule_key_label(key: RuleKey) -> &'static str {
-        match key {
-            RuleKey::Up => "Up",
-            RuleKey::Down => "Down",
-            RuleKey::Left => "Left",
-            RuleKey::Right => "Right",
-            RuleKey::DebugToggle => "DebugToggle",
-            RuleKey::Interact => "Interact",
-            RuleKey::AttackPrimary => "AttackPrimary",
-            RuleKey::AttackSecondary => "AttackSecondary",
-            RuleKey::Inventory => "Inventory",
-            RuleKey::Pause => "Pause",
-        }
+        shared_rule_key_label(key)
     }
 
     pub(in super::super) fn load_rule_audio_choices(
@@ -712,9 +513,13 @@ impl InspectorSystem {
         };
 
         RuleAudioChoices {
-            sfx: Self::discover_audio_asset_names(project_path.join("assets/audio/sfx").as_path()),
-            music: Self::discover_audio_asset_names(
-                project_path.join("assets/audio/music").as_path(),
+            sfx: crate::project::ProjectAssets::discover_project_audio_names(
+                project_path,
+                ProjectAudioAssetKind::Sfx,
+            ),
+            music: crate::project::ProjectAssets::discover_project_audio_names(
+                project_path,
+                ProjectAudioAssetKind::Music,
             ),
         }
     }

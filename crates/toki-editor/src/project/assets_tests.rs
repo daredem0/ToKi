@@ -1,4 +1,4 @@
-use super::ProjectAssets;
+use super::{ProjectAssets, ProjectAudioAssetKind};
 use std::fs;
 use tempfile::tempdir;
 
@@ -71,4 +71,36 @@ fn scan_assets_skips_unknown_sprite_metadata_files() {
 
     assert!(assets.sprite_atlases.is_empty());
     assert!(assets.object_sheets.is_empty());
+}
+
+#[test]
+fn discover_project_audio_names_reads_supported_audio_files() {
+    let temp_dir = tempdir().expect("temp dir should be created");
+    let music_dir = temp_dir.path().join("assets/audio/music");
+    fs::create_dir_all(&music_dir).expect("music dir should be created");
+
+    fs::write(music_dir.join("battle_theme.ogg"), "x").expect("ogg file write");
+    fs::write(music_dir.join("ambience.mp3"), "x").expect("mp3 file write");
+    fs::write(music_dir.join("impact.wav"), "x").expect("wav file write");
+    fs::write(music_dir.join("ignore.txt"), "x").expect("txt file write");
+    fs::create_dir(music_dir.join("sub")).expect("subdir create");
+    fs::write(music_dir.join("sub").join("nested.ogg"), "x").expect("nested write");
+
+    let names =
+        ProjectAssets::discover_project_audio_names(temp_dir.path(), ProjectAudioAssetKind::Music);
+    assert_eq!(names, vec!["ambience", "battle_theme", "impact"]);
+}
+
+#[test]
+fn discover_project_entity_definition_names_reads_json_files() {
+    let temp_dir = tempdir().expect("temp dir should be created");
+    let entities_dir = temp_dir.path().join("entities");
+    fs::create_dir_all(&entities_dir).expect("entities dir should be created");
+
+    fs::write(entities_dir.join("player.json"), "{}").expect("player write");
+    fs::write(entities_dir.join("slime.json"), "{}").expect("slime write");
+    fs::write(entities_dir.join("notes.txt"), "x").expect("txt write");
+
+    let names = ProjectAssets::discover_project_entity_definition_names(temp_dir.path());
+    assert_eq!(names, vec!["player", "slime"]);
 }

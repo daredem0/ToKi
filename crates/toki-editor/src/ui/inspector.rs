@@ -10,7 +10,6 @@ use crate::config::EditorConfig;
 use crate::project::Project;
 pub(crate) use crate::project::ProjectSettingsDraft;
 use std::collections::HashMap;
-use toki_core::animation::AnimationState;
 use toki_core::assets::object_sheet::ObjectSheetMeta;
 use toki_core::entity::EntityKind;
 use toki_core::entity::{
@@ -421,63 +420,6 @@ impl InspectorSystem {
         };
 
         inspector.render(ui, &mut inspector_ctx);
-    }
-
-    fn discover_audio_asset_names(dir: &std::path::Path) -> Vec<String> {
-        if !dir.exists() {
-            return Vec::new();
-        }
-
-        let mut names = Vec::new();
-        if let Ok(entries) = std::fs::read_dir(dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if !path.is_file() {
-                    continue;
-                }
-                let Some(extension) = path.extension().and_then(|ext| ext.to_str()) else {
-                    continue;
-                };
-                let supported = matches!(
-                    extension.to_ascii_lowercase().as_str(),
-                    "ogg" | "wav" | "mp3"
-                );
-                if !supported {
-                    continue;
-                }
-                if let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) {
-                    names.push(stem.to_string());
-                }
-            }
-        }
-
-        names.sort();
-        names.dedup();
-        names
-    }
-
-    fn discover_entity_definition_names(dir: &std::path::Path) -> Vec<String> {
-        if !dir.exists() {
-            return Vec::new();
-        }
-
-        let mut names = Vec::new();
-        if let Ok(entries) = std::fs::read_dir(dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if !path.is_file() || path.extension().and_then(|ext| ext.to_str()) != Some("json")
-                {
-                    continue;
-                }
-                if let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) {
-                    names.push(stem.to_string());
-                }
-            }
-        }
-
-        names.sort();
-        names.dedup();
-        names
     }
 
     fn save_entity_definition(

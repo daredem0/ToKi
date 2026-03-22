@@ -365,8 +365,9 @@ fn render_movement_sound_dropdown(
         let mut sfx_names = config
             .and_then(|cfg: &EditorConfig| cfg.current_project_path())
             .map(|project_path: &PathBuf| {
-                InspectorSystem::discover_audio_asset_names(
-                    project_path.join("assets/audio/sfx").as_path(),
+                crate::project::ProjectAssets::discover_project_audio_names(
+                    project_path,
+                    crate::project::assets::ProjectAudioAssetKind::Sfx,
                 )
             })
             .unwrap_or_default();

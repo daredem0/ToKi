@@ -28,6 +28,12 @@ pub struct ProjectAssets {
     pub entities: HashMap<String, EntityAsset>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectAudioAssetKind {
+    Music,
+    Sfx,
+}
+
 /// Scene asset information.
 ///
 /// The `name` field duplicates the HashMap key but makes the struct self-contained
@@ -132,6 +138,51 @@ impl ProjectAssets {
         );
 
         Ok(())
+    }
+
+    pub fn discover_project_audio_names(
+        project_path: &Path,
+        kind: ProjectAudioAssetKind,
+    ) -> Vec<String> {
+        let dir = match kind {
+            ProjectAudioAssetKind::Music => project_path.join("assets/audio/music"),
+            ProjectAudioAssetKind::Sfx => project_path.join("assets/audio/sfx"),
+        };
+        Self::discover_audio_names_in_dir(&dir)
+    }
+
+    pub fn discover_project_entity_definition_names(project_path: &Path) -> Vec<String> {
+        let dir = project_path.join("entities");
+        if !dir.exists() {
+            return Vec::new();
+        }
+
+        let mut names = match fs::read_dir(&dir) {
+            Ok(entries) => entries
+                .flatten()
+                .map(|entry| entry.path())
+                .filter(|path| {
+                    path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("json")
+                })
+                .filter_map(|path| {
+                    path.file_stem()
+                        .and_then(|stem| stem.to_str())
+                        .map(str::to_string)
+                })
+                .collect::<Vec<_>>(),
+            Err(error) => {
+                tracing::warn!(
+                    "Failed to read entity definitions from '{}': {}",
+                    dir.display(),
+                    error
+                );
+                Vec::new()
+            }
+        };
+
+        names.sort();
+        names.dedup();
+        names
     }
 
     /// Scan for scene files
@@ -287,6 +338,25 @@ impl ProjectAssets {
         }
 
         Ok(())
+    }
+
+    fn discover_audio_names_in_dir(dir: &Path) -> Vec<String> {
+        match discover_audio_files(dir) {
+            Ok(assets) => {
+                let mut names = assets.into_iter().map(|asset| asset.name).collect::<Vec<_>>();
+                names.sort();
+                names.dedup();
+                names
+            }
+            Err(error) => {
+                tracing::warn!(
+                    "Failed to discover audio assets from '{}': {}",
+                    dir.display(),
+                    error
+                );
+                Vec::new()
+            }
+        }
     }
 
     /// Scan for entity definition files

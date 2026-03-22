@@ -1,7 +1,6 @@
 //! Scene inspector - scene properties, music, anchors, and player entry editing.
 
 use super::super::super::inspector_trait::{Inspector, InspectorContext};
-use super::super::InspectorSystem;
 use super::scene_helpers::{
     render_background_music_editor, render_delete_scene_button, render_rules_editor_section,
     render_scene_actions, render_scene_anchors_list, render_scene_stats,
@@ -35,8 +34,9 @@ impl SceneInspector {
 
         let mut choices = project_path
             .map(|path| {
-                InspectorSystem::discover_audio_asset_names(
-                    path.join("assets/audio/music").as_path(),
+                crate::project::ProjectAssets::discover_project_audio_names(
+                    &path,
+                    crate::project::assets::ProjectAudioAssetKind::Music,
                 )
             })
             .unwrap_or_default();
@@ -251,9 +251,7 @@ struct PlayerEntryContext {
 impl PlayerEntryContext {
     fn new(scene: &toki_core::Scene, project: Option<&crate::project::Project>) -> Self {
         let entity_defs = project
-            .map(|p| {
-                InspectorSystem::discover_entity_definition_names(p.path.join("entities").as_path())
-            })
+            .map(|p| crate::project::ProjectAssets::discover_project_entity_definition_names(&p.path))
             .unwrap_or_default();
         let spawn_points = scene
             .anchors

@@ -171,255 +171,60 @@ impl PanelSystem {
     }
 
     pub(super) fn key_label(key: RuleKey) -> &'static str {
-        match key {
-            RuleKey::Up => "Up",
-            RuleKey::Down => "Down",
-            RuleKey::Left => "Left",
-            RuleKey::Right => "Right",
-            RuleKey::DebugToggle => "DebugToggle",
-            RuleKey::Interact => "Interact",
-            RuleKey::AttackPrimary => "AttackPrimary",
-            RuleKey::AttackSecondary => "AttackSecondary",
-            RuleKey::Inventory => "Inventory",
-            RuleKey::Pause => "Pause",
-        }
+        shared_rule_key_label(key)
     }
 
     pub(super) fn sound_channel_label(channel: RuleSoundChannel) -> &'static str {
-        match channel {
-            RuleSoundChannel::Movement => "Movement",
-            RuleSoundChannel::Collision => "Collision",
-        }
+        shared_rule_sound_channel_label(channel)
     }
 
     pub(super) fn target_label(target: RuleTarget) -> String {
-        match target {
-            RuleTarget::Player => "Player".to_string(),
-            RuleTarget::Entity(entity_id) => format!("Entity({})", entity_id),
-            RuleTarget::RuleOwner => "RuleOwner".to_string(),
-            RuleTarget::TriggerSelf => "TriggerSelf".to_string(),
-            RuleTarget::TriggerOther => "TriggerOther".to_string(),
-        }
+        shared_rule_target_label(target)
     }
 
     pub(super) fn graph_trigger_kind(trigger: RuleTrigger) -> GraphTriggerKind {
-        match trigger {
-            RuleTrigger::OnStart => GraphTriggerKind::Start,
-            RuleTrigger::OnUpdate => GraphTriggerKind::Update,
-            RuleTrigger::OnPlayerMove => GraphTriggerKind::PlayerMove,
-            RuleTrigger::OnKey { .. } => GraphTriggerKind::Key,
-            RuleTrigger::OnCollision { .. } => GraphTriggerKind::Collision,
-            RuleTrigger::OnDamaged { .. } => GraphTriggerKind::Damaged,
-            RuleTrigger::OnDeath { .. } => GraphTriggerKind::Death,
-            RuleTrigger::OnTrigger => GraphTriggerKind::Trigger,
-            RuleTrigger::OnInteract { .. } => GraphTriggerKind::Interact,
-            RuleTrigger::OnTileEnter { .. } => GraphTriggerKind::TileEnter,
-            RuleTrigger::OnTileExit { .. } => GraphTriggerKind::TileExit,
-        }
+        shared_rule_trigger_kind(&trigger)
     }
 
     pub(super) fn graph_trigger_kind_label(kind: GraphTriggerKind) -> &'static str {
-        match kind {
-            GraphTriggerKind::Start => "OnStart",
-            GraphTriggerKind::Update => "OnUpdate",
-            GraphTriggerKind::PlayerMove => "OnPlayerMove",
-            GraphTriggerKind::Key => "OnKey",
-            GraphTriggerKind::Collision => "OnCollision",
-            GraphTriggerKind::Damaged => "OnDamaged",
-            GraphTriggerKind::Death => "OnDeath",
-            GraphTriggerKind::Trigger => "OnTrigger",
-            GraphTriggerKind::Interact => "OnInteract",
-            GraphTriggerKind::TileEnter => "OnTileEnter",
-            GraphTriggerKind::TileExit => "OnTileExit",
-        }
+        shared_rule_trigger_kind_label(kind)
     }
 
     pub(super) fn graph_default_trigger(kind: GraphTriggerKind) -> RuleTrigger {
-        match kind {
-            GraphTriggerKind::Start => RuleTrigger::OnStart,
-            GraphTriggerKind::Update => RuleTrigger::OnUpdate,
-            GraphTriggerKind::PlayerMove => RuleTrigger::OnPlayerMove,
-            GraphTriggerKind::Key => RuleTrigger::OnKey { key: RuleKey::Up },
-            GraphTriggerKind::Collision => RuleTrigger::OnCollision { entity: None },
-            GraphTriggerKind::Damaged => RuleTrigger::OnDamaged { entity: None },
-            GraphTriggerKind::Death => RuleTrigger::OnDeath { entity: None },
-            GraphTriggerKind::Trigger => RuleTrigger::OnTrigger,
-            GraphTriggerKind::Interact => RuleTrigger::OnInteract {
-                mode: toki_core::rules::InteractionMode::default(),
-                entity: None,
-            },
-            GraphTriggerKind::TileEnter => RuleTrigger::OnTileEnter { x: 0, y: 0 },
-            GraphTriggerKind::TileExit => RuleTrigger::OnTileExit { x: 0, y: 0 },
-        }
+        shared_default_rule_trigger(kind)
     }
 
     pub(super) fn graph_condition_kind(condition: &RuleCondition) -> GraphConditionKind {
-        match condition {
-            RuleCondition::Always => GraphConditionKind::Always,
-            RuleCondition::TargetExists { .. } => GraphConditionKind::TargetExists,
-            RuleCondition::KeyHeld { .. } => GraphConditionKind::KeyHeld,
-            RuleCondition::EntityActive { .. } => GraphConditionKind::EntityActive,
-            RuleCondition::HealthBelow { .. } => GraphConditionKind::HealthBelow,
-            RuleCondition::HealthAbove { .. } => GraphConditionKind::HealthAbove,
-            RuleCondition::TriggerOtherIsPlayer => GraphConditionKind::TriggerOtherIsPlayer,
-            RuleCondition::EntityIsKind { .. } => GraphConditionKind::EntityIsKind,
-            RuleCondition::TriggerOtherIsKind { .. } => GraphConditionKind::TriggerOtherIsKind,
-            RuleCondition::EntityHasTag { .. } => GraphConditionKind::EntityHasTag,
-            RuleCondition::TriggerOtherHasTag { .. } => GraphConditionKind::TriggerOtherHasTag,
-            RuleCondition::HasInventoryItem { .. } => GraphConditionKind::HasInventoryItem,
-        }
+        shared_rule_condition_kind(condition)
     }
 
     pub(super) fn graph_condition_kind_label(kind: GraphConditionKind) -> &'static str {
-        match kind {
-            GraphConditionKind::Always => "Always",
-            GraphConditionKind::TargetExists => "TargetExists",
-            GraphConditionKind::KeyHeld => "KeyHeld",
-            GraphConditionKind::EntityActive => "EntityActive",
-            GraphConditionKind::HealthBelow => "HealthBelow",
-            GraphConditionKind::HealthAbove => "HealthAbove",
-            GraphConditionKind::TriggerOtherIsPlayer => "TriggerOtherIsPlayer",
-            GraphConditionKind::EntityIsKind => "EntityIsKind",
-            GraphConditionKind::TriggerOtherIsKind => "TriggerOtherIsKind",
-            GraphConditionKind::EntityHasTag => "EntityHasTag",
-            GraphConditionKind::TriggerOtherHasTag => "TriggerOtherHasTag",
-            GraphConditionKind::HasInventoryItem => "HasInventoryItem",
-        }
+        shared_rule_condition_kind_label(kind)
     }
 
     pub(super) fn graph_default_condition(kind: GraphConditionKind) -> RuleCondition {
-        match kind {
-            GraphConditionKind::Always => RuleCondition::Always,
-            GraphConditionKind::TargetExists => RuleCondition::TargetExists {
-                target: RuleTarget::Player,
-            },
-            GraphConditionKind::KeyHeld => RuleCondition::KeyHeld { key: RuleKey::Up },
-            GraphConditionKind::EntityActive => RuleCondition::EntityActive {
-                target: RuleTarget::Player,
-                is_active: true,
-            },
-            GraphConditionKind::HealthBelow => RuleCondition::HealthBelow {
-                target: RuleTarget::Player,
-                threshold: 50,
-            },
-            GraphConditionKind::HealthAbove => RuleCondition::HealthAbove {
-                target: RuleTarget::Player,
-                threshold: 50,
-            },
-            GraphConditionKind::TriggerOtherIsPlayer => RuleCondition::TriggerOtherIsPlayer,
-            GraphConditionKind::EntityIsKind => RuleCondition::EntityIsKind {
-                target: RuleTarget::Player,
-                kind: toki_core::entity::EntityKind::Player,
-            },
-            GraphConditionKind::TriggerOtherIsKind => RuleCondition::TriggerOtherIsKind {
-                kind: toki_core::entity::EntityKind::Npc,
-            },
-            GraphConditionKind::EntityHasTag => RuleCondition::EntityHasTag {
-                target: RuleTarget::Player,
-                tag: String::new(),
-            },
-            GraphConditionKind::TriggerOtherHasTag => {
-                RuleCondition::TriggerOtherHasTag { tag: String::new() }
-            }
-            GraphConditionKind::HasInventoryItem => RuleCondition::HasInventoryItem {
-                target: RuleTarget::Player,
-                item_id: String::new(),
-                min_count: 1,
-            },
-        }
+        shared_default_rule_condition(kind)
     }
 
     pub(super) fn graph_action_kind(action: &RuleAction) -> GraphActionKind {
-        match action {
-            RuleAction::PlaySound { .. } => GraphActionKind::PlaySound,
-            RuleAction::PlayMusic { .. } => GraphActionKind::PlayMusic,
-            RuleAction::PlayAnimation { .. } => GraphActionKind::PlayAnimation,
-            RuleAction::SetVelocity { .. } => GraphActionKind::SetVelocity,
-            RuleAction::Spawn { .. } => GraphActionKind::Spawn,
-            RuleAction::DestroySelf { .. } => GraphActionKind::DestroySelf,
-            RuleAction::SwitchScene { .. } => GraphActionKind::SwitchScene,
-            RuleAction::DamageEntity { .. } => GraphActionKind::DamageEntity,
-            RuleAction::HealEntity { .. } => GraphActionKind::HealEntity,
-            RuleAction::AddInventoryItem { .. } => GraphActionKind::AddInventoryItem,
-            RuleAction::RemoveInventoryItem { .. } => GraphActionKind::RemoveInventoryItem,
-            RuleAction::SetEntityActive { .. } => GraphActionKind::SetEntityActive,
-            RuleAction::TeleportEntity { .. } => GraphActionKind::TeleportEntity,
-        }
+        shared_rule_action_kind(action)
     }
 
     pub(super) fn graph_action_kind_label(kind: GraphActionKind) -> &'static str {
-        match kind {
-            GraphActionKind::PlaySound => "PlaySound",
-            GraphActionKind::PlayMusic => "PlayMusic",
-            GraphActionKind::PlayAnimation => "PlayAnimation",
-            GraphActionKind::SetVelocity => "SetVelocity",
-            GraphActionKind::Spawn => "Spawn",
-            GraphActionKind::DestroySelf => "DestroySelf",
-            GraphActionKind::SwitchScene => "SwitchScene",
-            GraphActionKind::DamageEntity => "DamageEntity",
-            GraphActionKind::HealEntity => "HealEntity",
-            GraphActionKind::AddInventoryItem => "AddInventoryItem",
-            GraphActionKind::RemoveInventoryItem => "RemoveInventoryItem",
-            GraphActionKind::SetEntityActive => "SetEntityActive",
-            GraphActionKind::TeleportEntity => "TeleportEntity",
-        }
+        shared_rule_action_kind_label(kind)
     }
 
     pub(super) fn graph_default_action(kind: GraphActionKind) -> RuleAction {
         match kind {
-            GraphActionKind::PlaySound => RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "sfx_placeholder".to_string(),
-            },
-            GraphActionKind::PlayMusic => RuleAction::PlayMusic {
-                track_id: "music_placeholder".to_string(),
-            },
-            GraphActionKind::PlayAnimation => RuleAction::PlayAnimation {
-                target: RuleTarget::Player,
-                state: AnimationState::Idle,
-            },
-            GraphActionKind::SetVelocity => RuleAction::SetVelocity {
-                target: RuleTarget::Player,
-                velocity: [0, 0],
-            },
-            GraphActionKind::Spawn => RuleAction::Spawn {
-                entity_type: RuleSpawnEntityType::Npc,
-                position: [0, 0],
-            },
-            GraphActionKind::DestroySelf => RuleAction::DestroySelf {
-                target: RuleTarget::Player,
-            },
-            GraphActionKind::SwitchScene => RuleAction::SwitchScene {
-                scene_name: String::new(),
-                spawn_point_id: String::new(),
-            },
             GraphActionKind::DamageEntity => RuleAction::DamageEntity {
                 target: RuleTarget::TriggerOther,
                 amount: 10,
-            },
-            GraphActionKind::HealEntity => RuleAction::HealEntity {
-                target: RuleTarget::Player,
-                amount: 10,
-            },
-            GraphActionKind::AddInventoryItem => RuleAction::AddInventoryItem {
-                target: RuleTarget::Player,
-                item_id: String::new(),
-                count: 1,
-            },
-            GraphActionKind::RemoveInventoryItem => RuleAction::RemoveInventoryItem {
-                target: RuleTarget::Player,
-                item_id: String::new(),
-                count: 1,
             },
             GraphActionKind::SetEntityActive => RuleAction::SetEntityActive {
                 target: RuleTarget::TriggerOther,
                 active: false,
             },
-            GraphActionKind::TeleportEntity => RuleAction::TeleportEntity {
-                target: RuleTarget::Player,
-                tile_x: 0,
-                tile_y: 0,
-            },
+            _ => shared_default_rule_action(kind),
         }
     }
 

@@ -972,20 +972,6 @@ fn validate_rule_set_for_scene_reports_invalid_switch_scene_targets() {
 }
 
 #[test]
-fn discover_audio_asset_names_reads_supported_audio_files() {
-    let temp_dir = tempfile::tempdir().expect("temp dir should be created");
-    fs::write(temp_dir.path().join("battle_theme.ogg"), "x").expect("ogg file write");
-    fs::write(temp_dir.path().join("ambience.mp3"), "x").expect("mp3 file write");
-    fs::write(temp_dir.path().join("impact.wav"), "x").expect("wav file write");
-    fs::write(temp_dir.path().join("ignore.txt"), "x").expect("txt file write");
-    fs::create_dir(temp_dir.path().join("sub")).expect("subdir create");
-    fs::write(temp_dir.path().join("sub").join("nested.ogg"), "x").expect("nested write");
-
-    let names = InspectorSystem::discover_audio_asset_names(temp_dir.path());
-    assert_eq!(names, vec!["ambience", "battle_theme", "impact"]);
-}
-
-#[test]
 fn selected_map_editor_tile_metadata_reads_solid_and_trigger_flags() {
     let mut tiles = std::collections::HashMap::new();
     tiles.insert(
