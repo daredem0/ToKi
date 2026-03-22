@@ -23,6 +23,7 @@ mod preview;
 mod separators;
 mod toolbar;
 
+use crate::editor_sprite_preview::resolve_indexed_preview_palette;
 use crate::project::Project;
 use crate::ui::editor_ui::Selection;
 use crate::ui::EditorUI;
@@ -39,6 +40,7 @@ pub fn render_animation_editor(
 
     // Check if an entity definition is selected and load it
     sync_with_selection(ui_state, project_path.as_deref());
+    sync_preview_palette(ui_state);
 
     // Handle new clip dialog
     if ui_state.animation.show_new_clip_dialog {
@@ -80,6 +82,25 @@ fn sync_with_selection(ui_state: &mut EditorUI, project_path: Option<&Path>) {
 
     // Load the entity
     io::load_entity(ui_state, project_path, &entity_name);
+}
+
+fn sync_preview_palette(ui_state: &mut EditorUI) {
+    let resolved = resolve_indexed_preview_palette(
+        ui_state.animation.atlas_color_mode,
+        &ui_state.project.available_palettes,
+        ui_state.project.indexed_palette_override.as_deref(),
+        ui_state.animation.atlas_entity_palette_override.as_deref(),
+        ui_state.animation.atlas_default_palette.as_deref(),
+    )
+    .ok()
+    .flatten()
+    .map(|(palette_id, _)| palette_id);
+
+    if ui_state.animation.atlas_palette_id != resolved {
+        ui_state.animation.atlas_palette_id = resolved;
+        ui_state.animation.atlas_texture = None;
+        ui_state.animation.atlas_texture_cache_key = None;
+    }
 }
 
 fn render_no_entity_message(ui: &mut egui::Ui) {

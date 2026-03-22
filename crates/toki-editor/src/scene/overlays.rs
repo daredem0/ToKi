@@ -1,10 +1,15 @@
 use crate::config::EditorConfig;
+use crate::editor_sprite_preview::{
+    load_texture_preview_image, texture_preview_cache_key,
+};
 use crate::editor_grid::GridInteraction;
 use crate::editor_types::PlacementPreviewVisual;
 use crate::project::ProjectAssets;
 use crate::scene::viewport::{DragPreviewSprite, OverlayLineInstance, OverlaySpriteInstance};
+use std::collections::BTreeMap;
 use toki_core::assets::tilemap::TileMap;
 use toki_core::entity::{ControlRole, Entity};
+use toki_core::palette::Palette4;
 use toki_core::project_assets::normalize_asset_name;
 use toki_core::Scene;
 
@@ -19,16 +24,28 @@ pub struct SceneAnchorOverlayRequest<'a> {
 
 pub fn cached_preview_sprite_frame(
     preview_sprite_frames: &mut std::collections::HashMap<
-        (std::path::PathBuf, String),
+        (std::path::PathBuf, String, Option<String>),
         Option<PlacementPreviewVisual>,
     >,
     entity_def_name: &str,
     project_path: &std::path::Path,
     project_assets: &ProjectAssets,
+    available_palettes: &BTreeMap<String, Palette4>,
+    indexed_palette_override: Option<&str>,
 ) -> Option<PlacementPreviewVisual> {
-    let cache_key = (project_path.to_path_buf(), entity_def_name.to_string());
+    let cache_key = (
+        project_path.to_path_buf(),
+        entity_def_name.to_string(),
+        indexed_palette_override.map(str::to_string),
+    );
     let cached = preview_sprite_frames.entry(cache_key).or_insert_with(|| {
-        load_preview_sprite_frame(entity_def_name, project_path, project_assets)
+        load_preview_sprite_frame(
+            entity_def_name,
+            project_path,
+            project_assets,
+            available_palettes,
+            indexed_palette_override,
+        )
     });
     cached.clone()
 }
@@ -37,6 +54,8 @@ pub fn load_preview_sprite_frame(
     entity_def_name: &str,
     project_path: &std::path::Path,
     project_assets: &ProjectAssets,
+    available_palettes: &BTreeMap<String, Palette4>,
+    indexed_palette_override: Option<&str>,
 ) -> Option<PlacementPreviewVisual> {
     tracing::info!(
         "Loading preview sprite frame for entity '{}' (one-time cache)",
@@ -100,6 +119,8 @@ pub fn load_preview_sprite_frame(
                 .path
                 .parent()
                 .map(|parent| parent.join(&object_sheet.image)),
+            texture_image: None,
+            texture_cache_key: None,
             size: glam::UVec2::new(entity_def.rendering.size[0], entity_def.rendering.size[1]),
         });
     }
@@ -122,6 +143,42 @@ pub fn load_preview_sprite_frame(
     if let Some(clip_def) = entity_def.animations.clips.first() {
         if let Some(first_tile_name) = clip_def.frame_tiles.first() {
             if let Some(uvs) = sprite_atlas.get_tile_uvs(first_tile_name, sprite_texture_size) {
+                let texture_path = atlas_asset
+                    .path
+                    .parent()
+                    .map(|parent| parent.join(&sprite_atlas.image));
+                let (texture_image, texture_cache_key) = if let Some(texture_path) =
+                    texture_path.as_ref()
+                {
+                    match load_texture_preview_image(
+                        texture_path,
+                        sprite_atlas.color_mode,
+                        available_palettes,
+                        indexed_palette_override,
+                        entity_def.rendering.palette_override.as_deref(),
+                        sprite_atlas.palette.as_deref(),
+                    ) {
+                        Ok((image, palette_id)) if sprite_atlas.is_palette_indexed() => (
+                            Some(image),
+                            Some(texture_preview_cache_key(
+                                texture_path,
+                                sprite_atlas.color_mode,
+                                palette_id.as_deref(),
+                            )),
+                        ),
+                        Ok((_image, _)) => (None, None),
+                        Err(error) => {
+                            tracing::warn!(
+                                "Failed to recolor indexed preview sprite for '{}': {}",
+                                entity_def_name,
+                                error
+                            );
+                            (None, None)
+                        }
+                    }
+                } else {
+                    (None, None)
+                };
                 return Some(PlacementPreviewVisual {
                     frame: toki_core::sprite::SpriteFrame {
                         u0: uvs[0],
@@ -129,10 +186,9 @@ pub fn load_preview_sprite_frame(
                         u1: uvs[2],
                         v1: uvs[3],
                     },
-                    texture_path: atlas_asset
-                        .path
-                        .parent()
-                        .map(|parent| parent.join(&sprite_atlas.image)),
+                    texture_path,
+                    texture_image,
+                    texture_cache_key,
                     size: glam::UVec2::new(
                         entity_def.rendering.size[0],
                         entity_def.rendering.size[1],
@@ -160,9 +216,11 @@ pub fn build_scene_player_overlay_sprites(
     project_path: &std::path::Path,
     project_assets: &ProjectAssets,
     preview_cache: &mut std::collections::HashMap<
-        (std::path::PathBuf, String),
+        (std::path::PathBuf, String, Option<String>),
         Option<PlacementPreviewVisual>,
     >,
+    available_palettes: &BTreeMap<String, Palette4>,
+    indexed_palette_override: Option<&str>,
 ) -> Vec<OverlaySpriteInstance> {
     let Some(active_scene_name) = active_scene_name else {
         return Vec::new();
@@ -190,6 +248,8 @@ pub fn build_scene_player_overlay_sprites(
         &player_entry.entity_definition_name,
         project_path,
         project_assets,
+        available_palettes,
+        indexed_palette_override,
     ) else {
         return Vec::new();
     };

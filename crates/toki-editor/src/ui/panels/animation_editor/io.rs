@@ -4,6 +4,15 @@ use crate::ui::editor_ui::AnimationAuthoringState;
 use crate::ui::EditorUI;
 use std::path::{Path, PathBuf};
 
+type AtlasPreviewInfo = (
+    glam::UVec2,
+    PathBuf,
+    toki_core::assets::atlas::ColorMode,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+);
+
 pub fn load_entity(ui_state: &mut EditorUI, project_path: &Path, entity_name: &str) {
     let file_path = project_path
         .join("entities")
@@ -24,7 +33,11 @@ pub fn load_entity(ui_state: &mut EditorUI, project_path: &Path, entity_name: &s
     // Load the atlas to get tile name to position mapping and metadata
     let atlas_name = &definition.animations.atlas_name;
     let tile_lookup = load_atlas_tile_lookup(project_path, atlas_name);
-    let atlas_info = load_atlas_info(project_path, atlas_name);
+    let atlas_info = load_atlas_info(
+        project_path,
+        atlas_name,
+        definition.rendering.palette_override.as_deref(),
+    );
 
     let authoring = AnimationAuthoringState::from_animations_def_with_tile_lookup(
         &definition.animations,
@@ -36,16 +49,24 @@ pub fn load_entity(ui_state: &mut EditorUI, project_path: &Path, entity_name: &s
         .load_entity(entity_name, file_path, authoring);
 
     // Store atlas metadata for canvas rendering
-    if let Some((cell_size, png_path)) = atlas_info {
+    if let Some((cell_size, png_path, color_mode, palette_id, entity_palette_override, atlas_default_palette)) = atlas_info {
         ui_state.animation.atlas_cell_size = Some((cell_size.x, cell_size.y));
         ui_state.animation.atlas_texture_path = Some(png_path);
+        ui_state.animation.atlas_color_mode = color_mode;
+        ui_state.animation.atlas_palette_id = palette_id;
+        ui_state.animation.atlas_entity_palette_override = entity_palette_override;
+        ui_state.animation.atlas_default_palette = atlas_default_palette;
     }
 
     tracing::info!("Loaded entity for animation editing: {}", entity_name);
 }
 
 /// Load atlas metadata and return cell size and PNG path
-fn load_atlas_info(project_path: &Path, atlas_name: &str) -> Option<(glam::UVec2, PathBuf)> {
+fn load_atlas_info(
+    project_path: &Path,
+    atlas_name: &str,
+    palette_override: Option<&str>,
+) -> Option<AtlasPreviewInfo> {
     if atlas_name.is_empty() {
         return None;
     }
@@ -66,7 +87,18 @@ fn load_atlas_info(project_path: &Path, atlas_name: &str) -> Option<(glam::UVec2
     // Get PNG path relative to atlas JSON
     let png_path = atlas_path.parent()?.join(&atlas.image);
 
-    Some((atlas.tile_size, png_path))
+    let effective_palette_id = palette_override
+        .map(str::to_string)
+        .or_else(|| atlas.palette.clone());
+
+    Some((
+        atlas.tile_size,
+        png_path,
+        atlas.color_mode,
+        effective_palette_id,
+        palette_override.map(str::to_string),
+        atlas.palette.clone(),
+    ))
 }
 
 /// Load an atlas file and extract the tile name to position mapping

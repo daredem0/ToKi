@@ -188,6 +188,7 @@ pub struct ProjectEditorState {
     pub window_title: Option<String>,
     pub pending_confirmation: Option<EditorConfirmation>,
     pub available_palettes: BTreeMap<String, Palette4>,
+    pub indexed_palette_override: Option<String>,
 }
 
 impl Default for ProjectEditorState {
@@ -214,6 +215,7 @@ impl Default for ProjectEditorState {
             window_title: Some("No project open".to_string()),
             pending_confirmation: None,
             available_palettes: builtin_palettes(),
+            indexed_palette_override: None,
         }
     }
 }

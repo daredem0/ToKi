@@ -1,6 +1,7 @@
 use super::*;
+use crate::editor_sprite_preview::resolve_indexed_preview_palette;
 use toki_core::graphics::image::{load_image_rgba8, DecodedImage};
-use toki_core::palette::{recolor_indexed_image, resolve_palette, Palette4};
+use toki_core::palette::{recolor_indexed_image, Palette4};
 use toki_core::project_assets::normalize_asset_name;
 use toki_core::sprite_render::{
     resolve_atlas_tile_frame, resolve_object_sheet_frame, resolve_sprite_render_requests,
@@ -15,38 +16,6 @@ struct ViewportSpriteResolver<'a, 'b> {
 }
 
 impl SceneViewport {
-    fn resolve_indexed_palette(
-        &self,
-        atlas: &AtlasMeta,
-        palette_override: Option<&str>,
-    ) -> Result<(String, Palette4), SpriteResolveError> {
-        for palette_id in [
-            self.indexed_palette_override.as_deref(),
-            palette_override,
-            atlas.palette.as_deref(),
-            Some("gb_default"),
-        ]
-        .into_iter()
-        .flatten()
-        {
-            if let Some(palette) = resolve_palette(palette_id, &self.available_palettes) {
-                return Ok((palette_id.to_string(), palette));
-            }
-        }
-
-        Err(SpriteResolveError::AssetLoadFailed {
-            asset_kind: "palette",
-            asset_name: self
-                .indexed_palette_override
-                .as_deref()
-                .or(palette_override)
-                .or(atlas.palette.as_deref())
-                .unwrap_or("gb_default")
-                .to_string(),
-            message: "palette id could not be resolved".to_string(),
-        })
-    }
-
     fn decoded_sprite_image(&mut self, texture_path: &std::path::Path) -> Result<DecodedImage> {
         if let Some(image) = self.decoded_sprite_images.get(texture_path) {
             return Ok(image.clone());
@@ -305,9 +274,28 @@ impl SpriteAssetResolver for ViewportSpriteResolver<'_, '_> {
             })?;
         let (frame, intrinsic_size) = resolve_atlas_tile_frame(&atlas, atlas_name, tile_name)?;
         let material = if atlas.is_palette_indexed() {
-            let (palette_id, palette) = self
-                .viewport
-                .resolve_indexed_palette(&atlas, palette_override)?;
+            let Some((palette_id, palette)) = resolve_indexed_preview_palette(
+                atlas.color_mode,
+                &self.viewport.available_palettes,
+                self.viewport.indexed_palette_override.as_deref(),
+                palette_override,
+                atlas.palette.as_deref(),
+            )
+            .map_err(|message| SpriteResolveError::AssetLoadFailed {
+                asset_kind: "palette",
+                asset_name: self
+                    .viewport
+                    .indexed_palette_override
+                    .as_deref()
+                    .or(palette_override)
+                    .or(atlas.palette.as_deref())
+                    .unwrap_or("gb_default")
+                    .to_string(),
+                message,
+            })?
+            else {
+                unreachable!("palette indexed atlas must resolve to a palette");
+            };
             SpriteRenderMaterial::PaletteIndexed {
                 palette_id,
                 palette,

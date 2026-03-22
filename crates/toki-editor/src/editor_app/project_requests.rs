@@ -18,6 +18,7 @@ impl EditorApp {
                 .display
                 .indexed_palette_override
                 .clone();
+            self.core.ui.project.indexed_palette_override = indexed_palette_override.clone();
             if let Some(viewport) = self.viewports.scene.as_mut() {
                 viewport.set_available_palettes(&self.core.ui.project.available_palettes);
                 viewport.set_indexed_palette_override(indexed_palette_override.clone());
@@ -110,6 +111,7 @@ impl EditorApp {
                             .indexed_palette_override
                             .clone()
                     });
+                self.core.ui.project.indexed_palette_override = indexed_palette_override.clone();
                 if let Some(viewport) = self.viewports.scene.as_mut() {
                     viewport.set_available_palettes(&self.core.ui.project.available_palettes);
                     viewport.set_indexed_palette_override(indexed_palette_override.clone());

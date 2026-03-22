@@ -74,7 +74,7 @@ pub(crate) struct EditorResourceCache {
     pub menu_font_project_path: Option<PathBuf>,
     /// Caches preview visuals by project and entity definition name.
     pub preview_sprite_frames:
-        std::collections::HashMap<(PathBuf, String), Option<PlacementPreviewVisual>>,
+        std::collections::HashMap<(PathBuf, String, Option<String>), Option<PlacementPreviewVisual>>,
 }
 
 /// Platform layer: window, renderer, and egui integration.
@@ -648,11 +648,26 @@ impl EditorApp {
                 &project_path,
                 self.core.project_manager.get_project_assets(),
             ) {
+                let indexed_palette_override = self
+                    .core
+                    .project_manager
+                    .current_project
+                    .as_ref()
+                    .and_then(|project| {
+                        project
+                            .metadata
+                            .runtime
+                            .display
+                            .indexed_palette_override
+                            .as_deref()
+                    });
                 let cached_frame = scene_overlays::cached_preview_sprite_frame(
                     &mut self.resources.preview_sprite_frames,
                     entity_def,
                     project_path.as_path(),
                     project_assets,
+                    &self.core.ui.project.available_palettes,
+                    indexed_palette_override,
                 );
                 self.core.ui.placement.preview_cached_frame = cached_frame;
             }
@@ -662,6 +677,20 @@ impl EditorApp {
             Some(egui) => egui,
             None => return, // Not initialized yet
         };
+
+        self.core.ui.project.indexed_palette_override = self
+            .core
+            .project_manager
+            .current_project
+            .as_ref()
+            .and_then(|project| {
+                project
+                    .metadata
+                    .runtime
+                    .display
+                    .indexed_palette_override
+                    .clone()
+            });
 
         // Prepare egui input
         let raw_input = egui_winit.take_egui_input(&window);
@@ -683,6 +712,19 @@ impl EditorApp {
                                 project_path.as_path(),
                                 project_assets,
                                 &mut self.resources.preview_sprite_frames,
+                                &self.core.ui.project.available_palettes,
+                                self.core
+                                    .project_manager
+                                    .current_project
+                                    .as_ref()
+                                    .and_then(|project| {
+                                        project
+                                            .metadata
+                                            .runtime
+                                            .display
+                                            .indexed_palette_override
+                                            .as_deref()
+                                    }),
                             );
                         if let Some(scene_viewport) = &mut self.viewports.scene {
                             let indexed_palette_override = self
@@ -944,23 +986,32 @@ impl EditorApp {
         project_path: &std::path::Path,
         project_assets: &ProjectAssets,
     ) -> Option<PlacementPreviewVisual> {
-        scene_overlays::load_preview_sprite_frame(entity_def_name, project_path, project_assets)
+        scene_overlays::load_preview_sprite_frame(
+            entity_def_name,
+            project_path,
+            project_assets,
+            &toki_core::palette::builtin_palettes(),
+            None,
+        )
     }
 
     fn cached_preview_sprite_frame(
         preview_sprite_frames: &mut std::collections::HashMap<
-            (PathBuf, String),
+            (PathBuf, String, Option<String>),
             Option<PlacementPreviewVisual>,
         >,
         entity_def_name: &str,
         project_path: &std::path::Path,
         project_assets: &ProjectAssets,
+        indexed_palette_override: Option<&str>,
     ) -> Option<PlacementPreviewVisual> {
         scene_overlays::cached_preview_sprite_frame(
             preview_sprite_frames,
             entity_def_name,
             project_path,
             project_assets,
+            &toki_core::palette::builtin_palettes(),
+            indexed_palette_override,
         )
     }
 
@@ -969,7 +1020,7 @@ impl EditorApp {
         project_path: &std::path::Path,
         project_assets: &ProjectAssets,
         preview_cache: &mut std::collections::HashMap<
-            (PathBuf, String),
+            (PathBuf, String, Option<String>),
             Option<PlacementPreviewVisual>,
         >,
     ) -> Vec<crate::scene::viewport::OverlaySpriteInstance> {
@@ -979,6 +1030,8 @@ impl EditorApp {
             project_path,
             project_assets,
             preview_cache,
+            &ui_state.project.available_palettes,
+            None,
         )
     }
 

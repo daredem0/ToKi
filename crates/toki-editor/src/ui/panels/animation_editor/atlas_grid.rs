@@ -1,5 +1,6 @@
 //! Atlas grid for frame selection.
 
+use crate::editor_sprite_preview::{load_texture_preview_image, texture_preview_cache_key};
 use crate::ui::EditorUI;
 
 pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::Context) {
@@ -320,25 +321,41 @@ fn handle_cell_interaction(
 
 /// Ensure the atlas texture is loaded
 fn ensure_atlas_texture(ui_state: &mut EditorUI, ctx: &egui::Context) {
-    // Check if already loaded
-    if ui_state.animation.atlas_texture.is_some() {
-        return;
-    }
-
     let Some(png_path) = &ui_state.animation.atlas_texture_path else {
         return;
     };
 
-    // Load the PNG
-    let Ok(decoded) = toki_core::graphics::image::load_image_rgba8(png_path) else {
-        tracing::error!("Failed to load atlas PNG: {:?}", png_path);
+    let cache_key = texture_preview_cache_key(
+        png_path,
+        ui_state.animation.atlas_color_mode,
+        ui_state.animation.atlas_palette_id.as_deref(),
+    );
+    if ui_state.animation.atlas_texture.is_some()
+        && ui_state.animation.atlas_texture_cache_key.as_deref() == Some(cache_key.as_str())
+    {
+        return;
+    }
+
+    let Ok((decoded, palette_id)) = load_texture_preview_image(
+        png_path,
+        ui_state.animation.atlas_color_mode,
+        &ui_state.project.available_palettes,
+        ui_state.project.indexed_palette_override.as_deref(),
+        ui_state.animation.atlas_entity_palette_override.as_deref(),
+        ui_state.animation.atlas_default_palette.as_deref(),
+    ) else {
+        tracing::error!("Failed to load animation atlas preview image: {:?}", png_path);
         return;
     };
 
-    // Store image dimensions
     ui_state.animation.atlas_image_size = Some((decoded.width, decoded.height));
+    ui_state.animation.atlas_texture_cache_key =
+        Some(texture_preview_cache_key(
+            png_path,
+            ui_state.animation.atlas_color_mode,
+            palette_id.as_deref(),
+        ));
 
-    // Create texture
     let color_image = egui::ColorImage::from_rgba_unmultiplied(
         [decoded.width as usize, decoded.height as usize],
         &decoded.data,
@@ -352,4 +369,66 @@ fn ensure_atlas_texture(ui_state: &mut EditorUI, ctx: &egui::Context) {
     ui_state.animation.atlas_texture = Some(texture);
 
     tracing::info!("Loaded atlas texture: {}x{}", decoded.width, decoded.height);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use toki_core::graphics::image::save_image_rgba8;
+    use toki_core::palette::resolve_palette;
+
+    #[test]
+    fn load_animation_atlas_preview_image_recolors_palette_indexed_atlas() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should exist");
+        let png_path = temp_dir.path().join("atlas.png");
+        save_image_rgba8(
+            &png_path,
+            1,
+            1,
+            &[0x00, 0x00, 0x00, 0xFF],
+        )
+        .expect("png should be written");
+
+        let palettes = toki_core::palette::builtin_palettes();
+        let (image, palette_id) = load_texture_preview_image(
+            &png_path,
+            toki_core::assets::atlas::ColorMode::PaletteIndexed,
+            &palettes,
+            None,
+            Some("poison"),
+            None,
+        )
+        .expect("preview image should load");
+
+        assert_eq!(palette_id.as_deref(), Some("poison"));
+        let poison = resolve_palette("poison", &palettes).expect("poison palette should exist");
+        assert_eq!(image.data[..4].to_vec(), poison.color(0).to_vec());
+    }
+
+    #[test]
+    fn load_animation_atlas_preview_image_keeps_truecolor_pixels() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should exist");
+        let png_path = temp_dir.path().join("atlas.png");
+        save_image_rgba8(
+            &png_path,
+            1,
+            1,
+            &[1, 2, 3, 255],
+        )
+        .expect("png should be written");
+
+        let palettes = toki_core::palette::builtin_palettes();
+        let (image, palette_id) = load_texture_preview_image(
+            &png_path,
+            toki_core::assets::atlas::ColorMode::TrueColor,
+            &palettes,
+            None,
+            Some("poison"),
+            None,
+        )
+        .expect("preview image should load");
+
+        assert_eq!(palette_id, None);
+        assert_eq!(image.data[..4].to_vec(), vec![1, 2, 3, 255]);
+    }
 }

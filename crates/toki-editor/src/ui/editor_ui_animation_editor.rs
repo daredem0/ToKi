@@ -3,6 +3,7 @@
 
 use super::editor_ui_animation_authoring::{AnimationAuthoringState, AuthoredClip};
 use std::path::PathBuf;
+use toki_core::assets::atlas::ColorMode;
 use toki_core::animation::ClipPlayback;
 
 /// Viewport state for the atlas canvas view
@@ -157,12 +158,22 @@ pub struct AnimationEditorState {
     pub atlas_texture: Option<egui::TextureHandle>,
     /// Cached atlas texture path (to detect changes)
     pub atlas_texture_path: Option<PathBuf>,
+    /// Cache key for the currently loaded atlas preview texture
+    pub atlas_texture_cache_key: Option<String>,
     /// Atlas image dimensions (width, height in pixels)
     pub atlas_image_size: Option<(u32, u32)>,
     /// Atlas grid dimensions (columns, rows)
     pub atlas_grid_size: Option<(u32, u32)>,
     /// Cell size in the atlas (width, height in pixels)
     pub atlas_cell_size: Option<(u32, u32)>,
+    /// Atlas color mode for preview rendering
+    pub atlas_color_mode: ColorMode,
+    /// Effective palette id for indexed atlas preview rendering
+    pub atlas_palette_id: Option<String>,
+    /// Entity-level palette override for the loaded animation entity
+    pub atlas_entity_palette_override: Option<String>,
+    /// Atlas default palette from atlas metadata
+    pub atlas_default_palette: Option<String>,
     /// Viewport for the atlas canvas view
     pub atlas_viewport: AtlasViewport,
     /// Preview zoom level
@@ -195,9 +206,17 @@ impl std::fmt::Debug for AnimationEditorState {
                 &self.atlas_texture.as_ref().map(|_| "TextureHandle"),
             )
             .field("atlas_texture_path", &self.atlas_texture_path)
+            .field("atlas_texture_cache_key", &self.atlas_texture_cache_key)
             .field("atlas_image_size", &self.atlas_image_size)
             .field("atlas_grid_size", &self.atlas_grid_size)
             .field("atlas_cell_size", &self.atlas_cell_size)
+            .field("atlas_color_mode", &self.atlas_color_mode)
+            .field("atlas_palette_id", &self.atlas_palette_id)
+            .field(
+                "atlas_entity_palette_override",
+                &self.atlas_entity_palette_override,
+            )
+            .field("atlas_default_palette", &self.atlas_default_palette)
             .field("atlas_viewport", &self.atlas_viewport)
             .field("preview_zoom", &self.preview_zoom)
             .field("show_grid", &self.show_grid)
@@ -218,9 +237,14 @@ impl Default for AnimationEditorState {
             preview: AnimationPreviewState::default(),
             atlas_texture: None,
             atlas_texture_path: None,
+            atlas_texture_cache_key: None,
             atlas_image_size: None,
             atlas_grid_size: None,
             atlas_cell_size: None,
+            atlas_color_mode: ColorMode::TrueColor,
+            atlas_palette_id: None,
+            atlas_entity_palette_override: None,
+            atlas_default_palette: None,
             atlas_viewport: AtlasViewport::default(),
             preview_zoom: 2.0,
             show_grid: true,
@@ -258,9 +282,14 @@ impl AnimationEditorState {
     pub fn clear_atlas_cache(&mut self) {
         self.atlas_texture = None;
         self.atlas_texture_path = None;
+        self.atlas_texture_cache_key = None;
         self.atlas_image_size = None;
         self.atlas_grid_size = None;
         self.atlas_cell_size = None;
+        self.atlas_color_mode = ColorMode::TrueColor;
+        self.atlas_palette_id = None;
+        self.atlas_entity_palette_override = None;
+        self.atlas_default_palette = None;
         self.atlas_viewport = AtlasViewport::default();
     }
 
@@ -470,6 +499,10 @@ mod tests {
         assert!(state.has_entity());
         assert_eq!(state.active_entity, Some("test_entity".to_string()));
         assert_eq!(state.entity_file_path, Some(PathBuf::from("/test/path")));
+        assert_eq!(state.atlas_color_mode, ColorMode::TrueColor);
+        assert_eq!(state.atlas_palette_id, None);
+        assert_eq!(state.atlas_entity_palette_override, None);
+        assert_eq!(state.atlas_default_palette, None);
     }
 
     #[test]

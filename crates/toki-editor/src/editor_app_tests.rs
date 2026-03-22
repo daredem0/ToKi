@@ -956,6 +956,7 @@ fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk(
         "player",
         &project_path,
         &project_assets,
+        None,
     )
     .expect("first cached load should succeed");
 
@@ -967,6 +968,7 @@ fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk(
         "player",
         &project_path,
         &project_assets,
+        None,
     )
     .expect("cached preview should still be returned");
 

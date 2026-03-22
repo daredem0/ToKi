@@ -191,8 +191,8 @@ impl SceneViewport {
             position: render_position_i32,
             size: cached_visual.size,
             texture_path: cached_visual.texture_path,
-            texture_image: None,
-            texture_cache_key: None,
+            texture_image: cached_visual.texture_image,
+            texture_cache_key: cached_visual.texture_cache_key,
             flip_x: false,
         };
 
@@ -288,8 +288,8 @@ impl SceneViewport {
                 position: sprite.world_position,
                 size: sprite.visual.size,
                 texture_path: sprite.visual.texture_path.clone(),
-                texture_image: None,
-                texture_cache_key: None,
+                texture_image: sprite.visual.texture_image.clone(),
+                texture_cache_key: sprite.visual.texture_cache_key.clone(),
                 flip_x: false,
             });
         }
