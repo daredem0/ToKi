@@ -1,9 +1,13 @@
 use super::*;
-use crate::animation::{AnimationClip, AnimationController, LoopMode};
+use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use crate::assets::tilemap::TileMap;
 use crate::collision::CollisionBox;
-use crate::entity::{AiConfig, ControlRole, Entity, EntityAttributes, EntityKind};
+use crate::entity::{
+    AiBehavior, AiConfig, ControlRole, Entity, EntityAttributes, EntityId, EntityKind,
+    EntityManager,
+};
+use glam::{IVec2, UVec2};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -339,7 +343,7 @@ fn ai_system_creates_with_empty_state() {
 #[test]
 fn ai_system_reset_clears_all_state() {
     let mut ai_system = AiSystem::new();
-    ai_system.frame_counter = 100;
+    ai_system.set_frame_counter(100);
     ai_system.get_or_create_state(1);
     ai_system.get_or_create_state(2);
 
@@ -435,7 +439,7 @@ fn ai_system_only_updates_wander_entities() {
     entity_manager.add_existing_entity(idle_npc);
 
     // Fast forward to update frame
-    ai_system.frame_counter = 59;
+    ai_system.set_frame_counter(59);
     let results = ai_system.update(
         &entity_manager,
         None,
@@ -462,7 +466,7 @@ fn ai_system_wander_entity_moves_or_stays() {
     entity_manager.add_existing_entity(npc);
 
     // Fast forward to update frame
-    ai_system.frame_counter = 59;
+    ai_system.set_frame_counter(59);
     let results = ai_system.update(
         &entity_manager,
         None,
@@ -518,7 +522,7 @@ fn ai_system_chase_moves_toward_player_when_in_radius() {
     entity_manager.add_existing_entity(chaser);
 
     // Fast forward to update frame
-    ai_system.frame_counter = 59;
+    ai_system.set_frame_counter(59);
     let results = ai_system.update(
         &entity_manager,
         entity_manager.get_player_id(),
@@ -617,7 +621,7 @@ fn ai_system_chase_closes_distance_to_player() {
     let initial_distance = ((100 - 60) as f32).hypot((100 - 60) as f32);
 
     // Fast forward to update frame
-    ai_system.frame_counter = 59;
+    ai_system.set_frame_counter(59);
     let results = ai_system.update(
         &entity_manager,
         entity_manager.get_player_id(),
@@ -661,7 +665,7 @@ fn ai_system_run_moves_away_from_player_when_in_radius() {
     entity_manager.add_existing_entity(runner);
 
     // Fast forward to update frame
-    ai_system.frame_counter = 59;
+    ai_system.set_frame_counter(59);
     let results = ai_system.update(
         &entity_manager,
         entity_manager.get_player_id(),
@@ -754,7 +758,7 @@ fn ai_system_run_increases_distance_from_player() {
     let initial_distance = ((120 - 100) as f32).hypot((120 - 100) as f32);
 
     // Fast forward to update frame
-    ai_system.frame_counter = 59;
+    ai_system.set_frame_counter(59);
     let results = ai_system.update(
         &entity_manager,
         entity_manager.get_player_id(),
@@ -798,7 +802,7 @@ fn ai_system_chase_respects_world_bounds() {
     entity_manager.add_existing_entity(chaser);
 
     // Fast forward to update frame
-    ai_system.frame_counter = 59;
+    ai_system.set_frame_counter(59);
     let results = ai_system.update(
         &entity_manager,
         entity_manager.get_player_id(),
@@ -841,7 +845,7 @@ fn ai_system_run_respects_world_bounds() {
     entity_manager.add_existing_entity(runner);
 
     // Fast forward to update frame
-    ai_system.frame_counter = 59;
+    ai_system.set_frame_counter(59);
     let results = ai_system.update(
         &entity_manager,
         entity_manager.get_player_id(),
@@ -1013,7 +1017,7 @@ fn ai_system_chase_wanders_when_player_outside_radius() {
     entity_manager.add_existing_entity(chaser);
 
     // Advance to wander update frame (every 30 frames for idle wandering)
-    ai_system.frame_counter = 29;
+    ai_system.set_frame_counter(29);
     let results = ai_system.update(
         &entity_manager,
         entity_manager.get_player_id(),
@@ -1051,7 +1055,7 @@ fn ai_system_run_wanders_when_player_outside_radius() {
     entity_manager.add_existing_entity(runner);
 
     // Advance to wander update frame (every 30 frames for idle wandering)
-    ai_system.frame_counter = 29;
+    ai_system.set_frame_counter(29);
     let results = ai_system.update(
         &entity_manager,
         entity_manager.get_player_id(),
@@ -1120,7 +1124,7 @@ fn ai_system_chase_transitions_from_wander_to_chase() {
     entity_manager.add_existing_entity(chaser);
 
     // First update - wandering (player outside)
-    ai_system.frame_counter = 29;
+    ai_system.set_frame_counter(29);
     let results = ai_system.update(
         &entity_manager,
         entity_manager.get_player_id(),

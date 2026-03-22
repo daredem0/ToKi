@@ -17,11 +17,17 @@ mod interaction;
 mod inventory;
 mod movement;
 mod render_queries;
-mod rules;
+pub(crate) mod rules;
 mod scene;
 
 #[cfg(test)]
 mod rules_tests;
+
+// Re-export event types for external use
+pub use rules::{
+    CollisionEvent, DamageEvent, DeathEvent, InteractionEvent, InteractionSpatial,
+    TileTransitionEvent,
+};
 
 /// Default timestep in milliseconds for fixed 60 FPS game logic.
 /// Used as the baseline for delta time scaling.
