@@ -268,11 +268,16 @@ impl EntityDefinition {
         }
     }
 
-    fn build_attributes(&self, animation_controller: Option<AnimationController>) -> EntityAttributes {
+    fn build_attributes(
+        &self,
+        animation_controller: Option<AnimationController>,
+    ) -> EntityAttributes {
         let stats = self.build_stats();
         let mut attributes = EntityAttributes {
             health: self.attributes.health.or_else(|| {
-                stats.base(HEALTH_STAT_ID).and_then(|v| u32::try_from(v).ok())
+                stats
+                    .base(HEALTH_STAT_ID)
+                    .and_then(|v| u32::try_from(v).ok())
             }),
             stats,
             speed: self.attributes.speed,
@@ -332,7 +337,10 @@ impl EntityDefinition {
             Some(movement_sound.to_string())
         };
 
-        let collision_sound = self.audio.collision_sound.as_ref()
+        let collision_sound = self
+            .audio
+            .collision_sound
+            .as_ref()
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .map(ToString::to_string);

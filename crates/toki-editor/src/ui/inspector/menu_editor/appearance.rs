@@ -16,10 +16,17 @@ impl InspectorSystem {
                 } else {
                     ui_state.menu_preview_font_families.clone()
                 };
-                ctx.changed |=
-                    Self::render_font_family_combo(ui, &mut ctx.appearance.font_family, &font_choices);
-                ctx.changed |=
-                    Self::render_drag_value(ui, "Font Size", &mut ctx.appearance.font_size_px, 8..=64);
+                ctx.changed |= Self::render_font_family_combo(
+                    ui,
+                    &mut ctx.appearance.font_family,
+                    &font_choices,
+                );
+                ctx.changed |= Self::render_drag_value(
+                    ui,
+                    "Font Size",
+                    &mut ctx.appearance.font_size_px,
+                    8..=64,
+                );
             });
     }
 
@@ -139,7 +146,10 @@ impl InspectorSystem {
         changed
     }
 
-    pub(super) fn render_border_style_combo(ui: &mut egui::Ui, style: &mut MenuBorderStyle) -> bool {
+    pub(super) fn render_border_style_combo(
+        ui: &mut egui::Ui,
+        style: &mut MenuBorderStyle,
+    ) -> bool {
         let mut selected = *style;
         egui::ComboBox::from_label("Border Style")
             .selected_text(match selected {

@@ -97,7 +97,10 @@ impl EntitySummary {
         }
         let query_lower = query.to_ascii_lowercase();
         self.name.to_ascii_lowercase().contains(&query_lower)
-            || self.display_name.to_ascii_lowercase().contains(&query_lower)
+            || self
+                .display_name
+                .to_ascii_lowercase()
+                .contains(&query_lower)
     }
 
     /// Check if this entity matches a category filter

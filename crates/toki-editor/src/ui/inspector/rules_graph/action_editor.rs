@@ -39,14 +39,8 @@ impl InspectorSystem {
             changed = true;
         }
 
-        changed |= Self::render_action_parameters(
-            ui,
-            scene_name,
-            node_key,
-            action,
-            audio_choices,
-            scenes,
-        );
+        changed |=
+            Self::render_action_parameters(ui, scene_name, node_key, action, audio_choices, scenes);
 
         changed
     }
@@ -60,9 +54,14 @@ impl InspectorSystem {
         scenes: &[toki_core::Scene],
     ) -> bool {
         match action {
-            RuleAction::PlaySound { channel, sound_id } => {
-                Self::render_play_sound_params(ui, scene_name, node_key, channel, sound_id, audio_choices)
-            }
+            RuleAction::PlaySound { channel, sound_id } => Self::render_play_sound_params(
+                ui,
+                scene_name,
+                node_key,
+                channel,
+                sound_id,
+                audio_choices,
+            ),
             RuleAction::PlayMusic { track_id } => {
                 Self::render_play_music_params(ui, scene_name, node_key, track_id, audio_choices)
             }
@@ -76,13 +75,11 @@ impl InspectorSystem {
                 entity_type,
                 position,
             } => Self::render_spawn_params(ui, scene_name, node_key, entity_type, position),
-            RuleAction::DestroySelf { target } => {
-                Self::render_rule_target_editor_with_salt(
-                    ui,
-                    &format!("graph_node_destroy_target_{}_{}", scene_name, node_key),
-                    target,
-                )
-            }
+            RuleAction::DestroySelf { target } => Self::render_rule_target_editor_with_salt(
+                ui,
+                &format!("graph_node_destroy_target_{}_{}", scene_name, node_key),
+                target,
+            ),
             RuleAction::SwitchScene {
                 scene_name: scene,
                 spawn_point_id,
@@ -103,12 +100,16 @@ impl InspectorSystem {
                 target,
                 item_id,
                 count,
-            } => Self::render_inventory_params(ui, scene_name, node_key, target, item_id, count, "add_inv"),
+            } => Self::render_inventory_params(
+                ui, scene_name, node_key, target, item_id, count, "add_inv",
+            ),
             RuleAction::RemoveInventoryItem {
                 target,
                 item_id,
                 count,
-            } => Self::render_inventory_params(ui, scene_name, node_key, target, item_id, count, "rem_inv"),
+            } => Self::render_inventory_params(
+                ui, scene_name, node_key, target, item_id, count, "rem_inv",
+            ),
             RuleAction::SetEntityActive { target, active } => {
                 Self::render_set_active_params(ui, scene_name, node_key, target, active)
             }
@@ -139,11 +140,7 @@ impl InspectorSystem {
             .show_ui(ui, |ui| {
                 for candidate in RuleSoundChannel::iter() {
                     changed |= ui
-                        .selectable_value(
-                            channel,
-                            candidate,
-                            Self::sound_channel_label(candidate),
-                        )
+                        .selectable_value(channel, candidate, Self::sound_channel_label(candidate))
                         .changed();
                 }
             });

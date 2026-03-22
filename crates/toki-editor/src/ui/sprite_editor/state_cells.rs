@@ -1,8 +1,6 @@
 //! Cell operations and canvas transforms for SpriteEditorState.
 
-use super::{
-    PixelColor, ResizeAnchor, SpriteCanvas, SpriteEditCommand, SpriteEditorState,
-};
+use super::{PixelColor, ResizeAnchor, SpriteCanvas, SpriteEditCommand, SpriteEditorState};
 
 impl SpriteEditorState {
     /// Clear the selected cell to transparent pixels

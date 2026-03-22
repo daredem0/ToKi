@@ -10,8 +10,14 @@ use std::path::PathBuf;
 fn category_from_str_handles_common_cases() {
     assert_eq!(EntityCategory::from_str("npc"), Some(EntityCategory::Npc));
     assert_eq!(EntityCategory::from_str("NPC"), Some(EntityCategory::Npc));
-    assert_eq!(EntityCategory::from_str("enemy"), Some(EntityCategory::Enemy));
-    assert_eq!(EntityCategory::from_str("items"), Some(EntityCategory::Item));
+    assert_eq!(
+        EntityCategory::from_str("enemy"),
+        Some(EntityCategory::Enemy)
+    );
+    assert_eq!(
+        EntityCategory::from_str("items"),
+        Some(EntityCategory::Item)
+    );
     assert_eq!(EntityCategory::from_str("unknown"), None);
 }
 
@@ -28,7 +34,12 @@ fn category_all_contains_all_variants() {
 
 // === EntitySummary Tests ===
 
-fn make_test_summary(name: &str, display_name: &str, category: &str, tags: Vec<&str>) -> EntitySummary {
+fn make_test_summary(
+    name: &str,
+    display_name: &str,
+    category: &str,
+    tags: Vec<&str>,
+) -> EntitySummary {
     EntitySummary {
         name: name.to_string(),
         display_name: display_name.to_string(),
@@ -219,7 +230,11 @@ fn new_dialog_validate_rejects_duplicate_name() {
 
     let existing = vec!["goblin".to_string(), "orc".to_string()];
     assert!(!dialog.validate(&existing));
-    assert!(dialog.error_message.as_ref().unwrap().contains("already exists"));
+    assert!(dialog
+        .error_message
+        .as_ref()
+        .unwrap()
+        .contains("already exists"));
 }
 
 #[test]
@@ -246,7 +261,9 @@ fn editor_state_new_defaults() {
 #[test]
 fn editor_state_select_entity() {
     let mut state = EntityEditorState::new();
-    state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
+    state
+        .entities
+        .push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
 
     state.select_entity("goblin");
     assert!(state.has_entity());
@@ -263,7 +280,9 @@ fn editor_state_select_nonexistent_entity_does_nothing() {
 #[test]
 fn editor_state_clear_selection() {
     let mut state = EntityEditorState::new();
-    state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
+    state
+        .entities
+        .push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
     let def = create_default_definition("goblin", "Goblin", "enemy");
     state.load_for_editing(def, PathBuf::from("/test/goblin.json"));
 
@@ -275,8 +294,18 @@ fn editor_state_clear_selection() {
 #[test]
 fn editor_state_filtered_entities() {
     let mut state = EntityEditorState::new();
-    state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec!["hostile"]));
-    state.entities.push(make_test_summary("villager", "Villager", "npc", vec!["friendly"]));
+    state.entities.push(make_test_summary(
+        "goblin",
+        "Goblin",
+        "enemy",
+        vec!["hostile"],
+    ));
+    state.entities.push(make_test_summary(
+        "villager",
+        "Villager",
+        "npc",
+        vec!["friendly"],
+    ));
 
     assert_eq!(state.filtered_entities().len(), 2);
 
@@ -289,8 +318,18 @@ fn editor_state_filtered_entities() {
 #[test]
 fn editor_state_all_tags() {
     let mut state = EntityEditorState::new();
-    state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec!["hostile", "forest"]));
-    state.entities.push(make_test_summary("orc", "Orc", "enemy", vec!["hostile", "mountain"]));
+    state.entities.push(make_test_summary(
+        "goblin",
+        "Goblin",
+        "enemy",
+        vec!["hostile", "forest"],
+    ));
+    state.entities.push(make_test_summary(
+        "orc",
+        "Orc",
+        "enemy",
+        vec!["hostile", "mountain"],
+    ));
 
     let tags = state.all_tags();
     assert_eq!(tags.len(), 3);
@@ -312,8 +351,12 @@ fn editor_state_add_entity() {
 #[test]
 fn editor_state_remove_entity() {
     let mut state = EntityEditorState::new();
-    state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
-    state.entities.push(make_test_summary("orc", "Orc", "enemy", vec![]));
+    state
+        .entities
+        .push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
+    state
+        .entities
+        .push(make_test_summary("orc", "Orc", "enemy", vec![]));
     state.selected_entity = Some("goblin".to_string());
 
     assert!(state.remove_entity("goblin"));
@@ -326,8 +369,12 @@ fn editor_state_remove_entity() {
 #[test]
 fn editor_state_remove_entity_preserves_other_selection() {
     let mut state = EntityEditorState::new();
-    state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
-    state.entities.push(make_test_summary("orc", "Orc", "enemy", vec![]));
+    state
+        .entities
+        .push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
+    state
+        .entities
+        .push(make_test_summary("orc", "Orc", "enemy", vec![]));
     state.selected_entity = Some("orc".to_string());
 
     state.remove_entity("goblin");
@@ -337,7 +384,9 @@ fn editor_state_remove_entity_preserves_other_selection() {
 #[test]
 fn editor_state_clear() {
     let mut state = EntityEditorState::new();
-    state.entities.push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
+    state
+        .entities
+        .push(make_test_summary("goblin", "Goblin", "enemy", vec![]));
     let def = create_default_definition("goblin", "Goblin", "enemy");
     state.load_for_editing(def, PathBuf::from("/test/goblin.json"));
     state.filter.search_query = "test".to_string();
@@ -523,16 +572,25 @@ fn edit_state_toggle_ai() {
     use toki_core::entity::AiBehavior;
     let mut state = make_edit_state();
     assert!(!state.toggles.ai_enabled);
-    assert_eq!(state.definition.attributes.ai_config.behavior, AiBehavior::None);
+    assert_eq!(
+        state.definition.attributes.ai_config.behavior,
+        AiBehavior::None
+    );
 
     state.toggle_ai();
     assert!(state.toggles.ai_enabled);
-    assert_eq!(state.definition.attributes.ai_config.behavior, AiBehavior::Wander);
+    assert_eq!(
+        state.definition.attributes.ai_config.behavior,
+        AiBehavior::Wander
+    );
     assert_eq!(state.definition.attributes.ai_config.detection_radius, 128);
 
     state.toggle_ai();
     assert!(!state.toggles.ai_enabled);
-    assert_eq!(state.definition.attributes.ai_config.behavior, AiBehavior::None);
+    assert_eq!(
+        state.definition.attributes.ai_config.behavior,
+        AiBehavior::None
+    );
 }
 
 #[test]

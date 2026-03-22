@@ -249,8 +249,13 @@ impl AiSystem {
             if let Some(mate_entity) = ctx.entity_manager.get_entity(mate_id) {
                 let directions =
                     compute_directions_toward(entity.position, mate_entity.position, movement_step);
-                let result =
-                    try_movement_with_fallback(entity, entity_id, entity.position, &directions, ctx);
+                let result = try_movement_with_fallback(
+                    entity,
+                    entity_id,
+                    entity.position,
+                    &directions,
+                    ctx,
+                );
                 if result.as_ref().is_some_and(|r| r.new_position.is_some()) {
                     return result;
                 }
@@ -270,8 +275,7 @@ impl AiSystem {
     ) -> Option<AiUpdateResult> {
         let target = ctx.entity_manager.get_entity(target_id)?;
         let movement_step = entity.attributes.speed.round() as i32;
-        let directions =
-            compute_directions_toward(entity.position, target.position, movement_step);
+        let directions = compute_directions_toward(entity.position, target.position, movement_step);
 
         try_movement_with_fallback(entity, entity_id, entity.position, &directions, ctx)
     }

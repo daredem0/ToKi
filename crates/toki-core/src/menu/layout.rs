@@ -1,8 +1,8 @@
 //! Menu layout building.
 
 use super::types::{
-    MenuAppearance, MenuBorderStyle, MenuDialogLayout, MenuDialogView, MenuEntryLayout,
-    MenuLayout, MenuLayoutBlock, MenuRect, MenuView, MenuVisualMetrics,
+    MenuAppearance, MenuBorderStyle, MenuDialogLayout, MenuDialogView, MenuEntryLayout, MenuLayout,
+    MenuLayoutBlock, MenuRect, MenuView, MenuVisualMetrics,
 };
 use super::utilities::menu_visual_metrics;
 

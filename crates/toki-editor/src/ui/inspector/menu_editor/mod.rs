@@ -137,11 +137,7 @@ impl InspectorSystem {
         Self::render_screens_dialogs_headers(ui, ui_state, project);
     }
 
-    fn render_runtime_menu_header(
-        ui: &mut egui::Ui,
-        project: &mut Project,
-        screen_ids: &[String],
-    ) {
+    fn render_runtime_menu_header(ui: &mut egui::Ui, project: &mut Project, screen_ids: &[String]) {
         egui::CollapsingHeader::new("Runtime Menu Settings")
             .default_open(false)
             .show(ui, |ui| {

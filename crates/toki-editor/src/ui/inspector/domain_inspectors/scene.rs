@@ -182,13 +182,12 @@ impl SceneInspector {
         let before_scene = scene.clone();
         let mut after_scene = before_scene.clone();
         after_scene.player_entry = new_entry;
-        ctx.ui_state.execute_command(
-            crate::ui::undo_redo::EditorCommand::update_scene(
+        ctx.ui_state
+            .execute_command(crate::ui::undo_redo::EditorCommand::update_scene(
                 scene_name.to_string(),
                 before_scene,
                 after_scene,
-            ),
-        )
+            ))
     }
 
     fn remove_player_entry(
@@ -201,9 +200,10 @@ impl SceneInspector {
                 ctx.ui_state.selection,
                 Some(crate::ui::editor_ui::Selection::ScenePlayerEntry(ref s)) if s == scene_name
             ) {
-                ctx.ui_state.set_selection(crate::ui::editor_ui::Selection::Scene(
-                    scene_name.to_string(),
-                ));
+                ctx.ui_state
+                    .set_selection(crate::ui::editor_ui::Selection::Scene(
+                        scene_name.to_string(),
+                    ));
             }
             return true;
         }

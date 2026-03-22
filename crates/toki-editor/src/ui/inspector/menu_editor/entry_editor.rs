@@ -44,7 +44,14 @@ impl InspectorSystem {
                 Self::render_entry_action_buttons(ui, ui_state, project, screen_index, item_index);
 
                 ui.separator();
-                Self::render_entry_type_combo(ui, ui_state, project, screen_index, item_index, &mut item_kind);
+                Self::render_entry_type_combo(
+                    ui,
+                    ui_state,
+                    project,
+                    screen_index,
+                    item_index,
+                    &mut item_kind,
+                );
 
                 ui.separator();
                 let (ch, validation) = Self::render_entry_fields(
@@ -262,8 +269,11 @@ impl InspectorSystem {
         if ui.text_edit_singleline(empty_text).changed() {
             changed = true;
         }
-        changed |=
-            Self::render_menu_border_override_editor(ui, "Entry Border Style", border_style_override);
+        changed |= Self::render_menu_border_override_editor(
+            ui,
+            "Entry Border Style",
+            border_style_override,
+        );
 
         changed
     }

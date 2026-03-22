@@ -4,7 +4,9 @@ use crate::text::{TextAnchor, TextStyle, TextWeight};
 use crate::ui::{UiBlock, UiComposition, UiTextBlock};
 
 use super::types::{MenuAppearance, MenuDialogLayout, MenuLayout};
-use super::utilities::{apply_menu_opacity, menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba};
+use super::utilities::{
+    apply_menu_opacity, menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba,
+};
 
 /// Composes a menu UI from layout data.
 pub fn compose_menu_ui(layout: &MenuLayout, appearance: &MenuAppearance) -> UiComposition {

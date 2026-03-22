@@ -67,33 +67,35 @@ fn render_player_entity_definition(
         .join(format!("{}.json", player_entry.entity_definition_name));
 
     match std::fs::read_to_string(&entity_file) {
-        Ok(content) => match serde_json::from_str::<toki_core::entity::EntityDefinition>(&content) {
-            Ok(mut definition) => {
-                let mut draft =
-                    super::super::EntityPropertyDraft::from_entity_definition(&definition);
-                if InspectorSystem::render_entity_definition_property_editor(ui, &mut draft, ctx.config)
-                    && InspectorSystem::apply_entity_property_draft_to_definition(
+        Ok(content) => {
+            match serde_json::from_str::<toki_core::entity::EntityDefinition>(&content) {
+                Ok(mut definition) => {
+                    let mut draft =
+                        super::super::EntityPropertyDraft::from_entity_definition(&definition);
+                    if InspectorSystem::render_entity_definition_property_editor(
+                        ui, &mut draft, ctx.config,
+                    ) && InspectorSystem::apply_entity_property_draft_to_definition(
                         &mut definition,
                         &draft,
-                    )
-                {
-                    if let Err(err) =
-                        InspectorSystem::save_entity_definition(&definition, &entity_file)
-                    {
-                        ui.colored_label(egui::Color32::RED, err);
-                    } else {
-                        ctx.ui_state.scene_content_changed = true;
-                        return true;
+                    ) {
+                        if let Err(err) =
+                            InspectorSystem::save_entity_definition(&definition, &entity_file)
+                        {
+                            ui.colored_label(egui::Color32::RED, err);
+                        } else {
+                            ctx.ui_state.scene_content_changed = true;
+                            return true;
+                        }
                     }
                 }
+                Err(err) => {
+                    ui.colored_label(
+                        egui::Color32::RED,
+                        format!("Failed to parse entity definition: {err}"),
+                    );
+                }
             }
-            Err(err) => {
-                ui.colored_label(
-                    egui::Color32::RED,
-                    format!("Failed to parse entity definition: {err}"),
-                );
-            }
-        },
+        }
         Err(err) => {
             ui.colored_label(
                 egui::Color32::RED,

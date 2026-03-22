@@ -132,10 +132,29 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
     );
 
     // Draw cell grid overlay
-    draw_cell_grid(&painter, rect, canvas_screen_min, canvas_screen_max, cell_w, cell_h, cols, rows, zoom);
+    draw_cell_grid(
+        &painter,
+        rect,
+        canvas_screen_min,
+        canvas_screen_max,
+        cell_w,
+        cell_h,
+        cols,
+        rows,
+        zoom,
+    );
 
     // Highlight cells that are in the current clip
-    highlight_clip_frames(ui_state, &painter, canvas_screen_min, cell_w, cell_h, cols, rows, zoom);
+    highlight_clip_frames(
+        ui_state,
+        &painter,
+        canvas_screen_min,
+        cell_w,
+        cell_h,
+        cols,
+        rows,
+        zoom,
+    );
 
     // Highlight hovered cell and handle clicks
     let add_frame = handle_cell_interaction(

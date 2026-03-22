@@ -186,7 +186,11 @@ pub fn render_empty_canvas_slot(
     });
 }
 
-pub fn ensure_canvas_texture_for_side(ui_state: &mut EditorUI, ctx: &egui::Context, side: CanvasSide) {
+pub fn ensure_canvas_texture_for_side(
+    ui_state: &mut EditorUI,
+    ctx: &egui::Context,
+    side: CanvasSide,
+) {
     if ui_state.sprite.canvas_state(side).canvas_texture.is_some() {
         return;
     }

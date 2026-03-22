@@ -83,10 +83,7 @@ impl InspectorSystem {
                 if other.id == entity_id {
                     continue;
                 }
-                if matches!(
-                    other.effective_control_role(),
-                    ControlRole::PlayerCharacter
-                ) {
+                if matches!(other.effective_control_role(), ControlRole::PlayerCharacter) {
                     let mut demoted = other.clone();
                     demoted.control_role = ControlRole::None;
                     before_entities.push(other.clone());
@@ -384,8 +381,7 @@ fn apply_entity_collision(
 
     if draft.collision.enabled {
         if entity.collision_box.is_none() {
-            entity.collision_box =
-                Some(toki_core::collision::CollisionBox::solid_box(entity.size));
+            entity.collision_box = Some(toki_core::collision::CollisionBox::solid_box(entity.size));
             changed = true;
         }
 

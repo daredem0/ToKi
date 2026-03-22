@@ -40,7 +40,9 @@ impl InspectorSystem {
         changed |= ui.checkbox(&mut draft.visible, "Visible").changed();
         changed |= ui.checkbox(&mut draft.active, "Active").changed();
         changed |= ui.checkbox(&mut draft.solid, "Solid").changed();
-        changed |= ui.checkbox(&mut draft.interactable, "Interactable").changed();
+        changed |= ui
+            .checkbox(&mut draft.interactable, "Interactable")
+            .changed();
 
         if draft.interactable {
             changed |= render_interaction_reach_row(ui, draft);
@@ -57,7 +59,9 @@ impl InspectorSystem {
             }
         }
 
-        changed |= ui.checkbox(&mut draft.has_inventory, "Has Inventory").changed();
+        changed |= ui
+            .checkbox(&mut draft.has_inventory, "Has Inventory")
+            .changed();
 
         if !is_static_item {
             ui.separator();

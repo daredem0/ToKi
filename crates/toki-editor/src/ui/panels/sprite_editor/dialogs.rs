@@ -1,8 +1,6 @@
 //! Sprite editor dialog rendering.
 
-use crate::ui::editor_ui::{
-    ResizeAnchor, SpriteAssetKind, SpriteEditorState, WarningAction,
-};
+use crate::ui::editor_ui::{ResizeAnchor, SpriteAssetKind, SpriteEditorState, WarningAction};
 use crate::ui::EditorUI;
 
 /// Render all active dialogs.

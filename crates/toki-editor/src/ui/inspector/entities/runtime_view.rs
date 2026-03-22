@@ -1,7 +1,10 @@
 //! Read-only runtime entity view for inspector.
 
 use super::super::InspectorSystem;
-use super::helpers::{ai_behavior_label, ai_behavior_needs_detection_radius, control_role_label, movement_profile_label};
+use super::helpers::{
+    ai_behavior_label, ai_behavior_needs_detection_radius, control_role_label,
+    movement_profile_label,
+};
 use super::property_apply::ATTACK_POWER_STAT_ID;
 use toki_core::entity::EntityId;
 

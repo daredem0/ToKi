@@ -9,8 +9,8 @@ use crate::assets::tilemap::TileMap;
 use crate::entity::{EntityId, HEALTH_STAT_ID};
 use crate::events::GameUpdateResult;
 
-use crate::game::combat::StatChangeRequest;
 use super::{AudioEvent, GameState, PendingSceneSwitch, RuleCommand};
+use crate::game::combat::StatChangeRequest;
 
 impl GameState {
     pub(in crate::game) fn apply_rule_commands(
@@ -58,7 +58,11 @@ impl GameState {
                     scene_name,
                     spawn_point_id,
                 } => {
-                    self.apply_switch_scene(&scene_name, &spawn_point_id, &mut pending_scene_switch);
+                    self.apply_switch_scene(
+                        &scene_name,
+                        &spawn_point_id,
+                        &mut pending_scene_switch,
+                    );
                 }
                 RuleCommand::DamageEntity { entity_id, amount } => {
                     self.apply_damage_entity(entity_id, amount);

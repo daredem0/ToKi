@@ -59,8 +59,7 @@ impl MenuController {
 
     pub fn open(&mut self) {
         if self.stack.is_empty() {
-            self.stack
-                .push(self.settings.pause_root_screen_id.clone());
+            self.stack.push(self.settings.pause_root_screen_id.clone());
         }
     }
 
@@ -72,8 +71,7 @@ impl MenuController {
     /// Opens the pause root menu screen.
     pub fn open_pause_root(&mut self) {
         self.stack.clear();
-        self.stack
-            .push(self.settings.pause_root_screen_id.clone());
+        self.stack.push(self.settings.pause_root_screen_id.clone());
         self.active_dialog = None;
     }
 

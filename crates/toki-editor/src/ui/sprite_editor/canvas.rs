@@ -189,7 +189,11 @@ impl SpriteCanvas {
     /// Uses 8-connectivity (includes diagonals) for better sprite selection.
     /// Returns the bounding box (x, y, width, height) of all connected pixels,
     /// or None if the starting pixel is transparent or out of bounds.
-    pub fn find_connected_sprite(&self, start_x: u32, start_y: u32) -> Option<(u32, u32, u32, u32)> {
+    pub fn find_connected_sprite(
+        &self,
+        start_x: u32,
+        start_y: u32,
+    ) -> Option<(u32, u32, u32, u32)> {
         // Check bounds
         if start_x >= self.width || start_y >= self.height {
             return None;

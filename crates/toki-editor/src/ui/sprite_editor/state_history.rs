@@ -1,8 +1,6 @@
 //! Undo/redo and clipboard operations for SpriteEditorState.
 
-use super::{
-    CanvasSide, SpriteCanvas, SpriteEditCommand, SpriteEditorState,
-};
+use super::{CanvasSide, SpriteCanvas, SpriteEditCommand, SpriteEditorState};
 
 impl SpriteEditorState {
     /// Push current canvas state for undo

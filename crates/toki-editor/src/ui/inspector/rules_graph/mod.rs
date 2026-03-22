@@ -32,8 +32,7 @@ impl InspectorSystem {
         node_key: &str,
         config: Option<&EditorConfig>,
     ) -> bool {
-        let Some((mut graph, ctx)) =
-            NodeEditorContext::new(ui_state, scene_name, node_key, config)
+        let Some((mut graph, ctx)) = NodeEditorContext::new(ui_state, scene_name, node_key, config)
         else {
             ui.label("Scene not found.");
             return false;
@@ -47,7 +46,11 @@ impl InspectorSystem {
             return false;
         };
 
-        let Some(node_kind) = graph.nodes.iter().find(|n| n.id == node_id).map(|n| n.kind.clone())
+        let Some(node_kind) = graph
+            .nodes
+            .iter()
+            .find(|n| n.id == node_id)
+            .map(|n| n.kind.clone())
         else {
             ui.colored_label(
                 egui::Color32::from_rgb(255, 120, 120),
@@ -83,8 +86,12 @@ impl InspectorSystem {
         ui.separator();
         let pending_disconnect =
             Self::render_connections_list(ui, &graph, &ctx.node_badges, node_id);
-        let (ops_mutated, ops_error) =
-            Self::process_pending_operations(&mut graph, node_id, &action_result, pending_disconnect);
+        let (ops_mutated, ops_error) = Self::process_pending_operations(
+            &mut graph,
+            node_id,
+            &action_result,
+            pending_disconnect,
+        );
         graph_mutated |= ops_mutated;
 
         if let Some(message) = ops_error {

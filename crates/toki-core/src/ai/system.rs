@@ -117,12 +117,18 @@ impl AiSystem {
 
         let random_direction = fastrand::u32(0..5);
         let new_position = match random_direction {
-            0 => IVec2::new(current_position.x, (current_position.y - movement_step).max(0)),
+            0 => IVec2::new(
+                current_position.x,
+                (current_position.y - movement_step).max(0),
+            ),
             1 => IVec2::new(
                 current_position.x,
                 (current_position.y + movement_step).min(max_y),
             ),
-            2 => IVec2::new((current_position.x - movement_step).max(0), current_position.y),
+            2 => IVec2::new(
+                (current_position.x - movement_step).max(0),
+                current_position.y,
+            ),
             3 => IVec2::new(
                 (current_position.x + movement_step).min(max_x),
                 current_position.y,

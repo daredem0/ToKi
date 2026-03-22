@@ -245,7 +245,14 @@ impl SpriteEditorState {
             let offset_x = (cell_w - img_w) / 2;
             let offset_y = (cell_h - img_h) / 2;
 
-            copy_image_to_canvas(&mut canvas, data, *img_w, *img_h, start_x + offset_x, start_y + offset_y);
+            copy_image_to_canvas(
+                &mut canvas,
+                data,
+                *img_w,
+                *img_h,
+                start_x + offset_x,
+                start_y + offset_y,
+            );
         }
 
         canvas
@@ -287,7 +294,14 @@ impl SpriteEditorState {
         )
         .map_err(|e| format!("Failed to save PNG: {e}"))?;
 
-        self.save_metadata(&json_path, &png_filename, &name, save_asset_kind, canvas_width, canvas_height)?;
+        self.save_metadata(
+            &json_path,
+            &png_filename,
+            &name,
+            save_asset_kind,
+            canvas_width,
+            canvas_height,
+        )?;
 
         let cs = self.active_mut();
         cs.active_sprite = Some(json_path.to_string_lossy().to_string());
@@ -317,7 +331,10 @@ impl SpriteEditorState {
                     let (cols, rows) = self.sheet_cell_count().unwrap_or((1, 1));
                     self.create_atlas_with_names(png_filename, cols, rows)
                 } else {
-                    AtlasMeta::new_single_tile(png_filename, UVec2::new(canvas_width, canvas_height))
+                    AtlasMeta::new_single_tile(
+                        png_filename,
+                        UVec2::new(canvas_width, canvas_height),
+                    )
                 };
                 meta.save_to_file(json_path)
                     .map_err(|e| format!("Failed to save metadata: {e}"))?;
@@ -430,7 +447,11 @@ impl SpriteEditorState {
         let canvas = SpriteCanvas::from_rgba(decoded.width, decoded.height, decoded.data)
             .ok_or_else(|| "Failed to create canvas from image data".to_string())?;
 
-        let save_name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("imported").to_string();
+        let save_name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("imported")
+            .to_string();
         let cell_size = glam::UVec2::new(decoded.width, decoded.height);
         self.reset_canvas_state(canvas, true);
         let cs = self.active_mut();

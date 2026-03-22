@@ -231,12 +231,7 @@ fn commit_rules_change(
 
     let before_graph = ctx.ui_state.rule_graph_for_scene(scene_name).cloned();
     let after_graph = RuleGraph::from_rule_set(&edited_rules);
-    let before_layout = ctx
-        .ui_state
-        .graph
-        .layouts_by_scene
-        .get(scene_name)
-        .cloned();
+    let before_layout = ctx.ui_state.graph.layouts_by_scene.get(scene_name).cloned();
     let (zoom, pan) = ctx.ui_state.graph_view_for_scene(scene_name);
     let _ = ctx.ui_state.execute_scene_rules_graph_command(
         scene_name,

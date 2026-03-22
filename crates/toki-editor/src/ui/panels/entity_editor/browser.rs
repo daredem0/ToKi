@@ -6,7 +6,11 @@ use std::path::Path;
 
 use super::io::load_entity_definition;
 
-pub fn render_entity_browser(ui: &mut egui::Ui, ui_state: &mut EditorUI, _project_path: Option<&Path>) {
+pub fn render_entity_browser(
+    ui: &mut egui::Ui,
+    ui_state: &mut EditorUI,
+    _project_path: Option<&Path>,
+) {
     render_search_box(ui, ui_state);
     render_category_filter(ui, ui_state);
     render_clear_filters_button(ui, ui_state);
@@ -18,7 +22,8 @@ pub fn render_entity_browser(ui: &mut egui::Ui, ui_state: &mut EditorUI, _projec
 
     ui.label(format!("Entities: {}", entity_count));
 
-    let (select_entity, duplicate_entity, delete_entity) = render_entity_list(ui, ui_state, &filtered);
+    let (select_entity, duplicate_entity, delete_entity) =
+        render_entity_list(ui, ui_state, &filtered);
 
     handle_deferred_actions(ui_state, select_entity, duplicate_entity, delete_entity);
 }

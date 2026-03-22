@@ -97,9 +97,7 @@ fn collision_rules_fire_for_matching_trigger() {
     let entity_b = spawn_test_entity(&mut game_state);
 
     let rule = create_test_rule("collision_rule", RuleTrigger::OnCollision { entity: None });
-    game_state.set_rules(RuleSet {
-        rules: vec![rule],
-    });
+    game_state.set_rules(RuleSet { rules: vec![rule] });
 
     let event = CollisionEvent {
         entity_a,
@@ -149,9 +147,7 @@ fn collision_rules_skip_disabled_rules() {
     let entity_b = spawn_test_entity(&mut game_state);
 
     let rule = create_disabled_rule("disabled", RuleTrigger::OnCollision { entity: None });
-    game_state.set_rules(RuleSet {
-        rules: vec![rule],
-    });
+    game_state.set_rules(RuleSet { rules: vec![rule] });
 
     let event = CollisionEvent {
         entity_a,
@@ -170,9 +166,7 @@ fn collision_rules_fire_once_rules_only_once() {
     let entity_b = spawn_test_entity(&mut game_state);
 
     let rule = create_once_rule("once_rule", RuleTrigger::OnCollision { entity: None });
-    game_state.set_rules(RuleSet {
-        rules: vec![rule],
-    });
+    game_state.set_rules(RuleSet { rules: vec![rule] });
 
     let event = CollisionEvent {
         entity_a,
@@ -237,9 +231,7 @@ fn damage_rules_fire_for_matching_trigger() {
     let attacker = spawn_test_entity(&mut game_state);
 
     let rule = create_test_rule("damage_rule", RuleTrigger::OnDamaged { entity: None });
-    game_state.set_rules(RuleSet {
-        rules: vec![rule],
-    });
+    game_state.set_rules(RuleSet { rules: vec![rule] });
 
     let event = DamageEvent {
         victim,
@@ -324,9 +316,7 @@ fn death_rules_fire_for_matching_trigger() {
     let attacker = spawn_test_entity(&mut game_state);
 
     let rule = create_test_rule("death_rule", RuleTrigger::OnDeath { entity: None });
-    game_state.set_rules(RuleSet {
-        rules: vec![rule],
-    });
+    game_state.set_rules(RuleSet { rules: vec![rule] });
 
     let event = DeathEvent {
         victim,
@@ -416,9 +406,7 @@ fn interaction_rules_fire_for_matching_trigger() {
             entity: None,
         },
     );
-    game_state.set_rules(RuleSet {
-        rules: vec![rule],
-    });
+    game_state.set_rules(RuleSet { rules: vec![rule] });
 
     let event = InteractionEvent {
         interactor,
@@ -494,9 +482,7 @@ fn collision_provides_trigger_context() {
             sound_id: "context_sound".to_string(),
         }],
     };
-    game_state.set_rules(RuleSet {
-        rules: vec![rule],
-    });
+    game_state.set_rules(RuleSet { rules: vec![rule] });
 
     // Collision where entity_b (player) is the "other" - should fire
     let event = CollisionEvent {
@@ -537,9 +523,7 @@ fn damage_provides_trigger_context() {
             sound_id: "player_attacked".to_string(),
         }],
     };
-    game_state.set_rules(RuleSet {
-        rules: vec![rule],
-    });
+    game_state.set_rules(RuleSet { rules: vec![rule] });
 
     // Damage where attacker is player - should fire
     let event = DamageEvent {
@@ -609,9 +593,7 @@ fn trigger_self_resolves_in_collision_context() {
             target: RuleTarget::TriggerSelf,
         }],
     };
-    game_state.set_rules(RuleSet {
-        rules: vec![rule],
-    });
+    game_state.set_rules(RuleSet { rules: vec![rule] });
 
     let event = CollisionEvent {
         entity_a,
@@ -645,9 +627,7 @@ fn trigger_other_resolves_in_collision_context() {
             target: RuleTarget::TriggerOther,
         }],
     };
-    game_state.set_rules(RuleSet {
-        rules: vec![rule],
-    });
+    game_state.set_rules(RuleSet { rules: vec![rule] });
 
     let event = CollisionEvent {
         entity_a,

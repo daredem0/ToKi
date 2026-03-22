@@ -92,12 +92,18 @@ impl EntityEditorState {
 
     /// Get filtered entities based on current filter state
     pub fn filtered_entities(&self) -> Vec<&EntitySummary> {
-        self.entities.iter().filter(|e| self.filter.matches(e)).collect()
+        self.entities
+            .iter()
+            .filter(|e| self.filter.matches(e))
+            .collect()
     }
 
     /// Get all unique tags from loaded entities
     pub fn all_tags(&self) -> HashSet<String> {
-        self.entities.iter().flat_map(|e| e.tags.iter().cloned()).collect()
+        self.entities
+            .iter()
+            .flat_map(|e| e.tags.iter().cloned())
+            .collect()
     }
 
     /// Get all unique categories from loaded entities

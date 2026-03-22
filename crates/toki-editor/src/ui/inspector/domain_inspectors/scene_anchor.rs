@@ -41,9 +41,19 @@ impl Inspector for SceneAnchorInspector {
         let mut delete_requested = false;
 
         changed |= render_anchor_id_editor(ui, &mut edited_anchor.id);
-        changed |= render_anchor_kind_editor(ui, &self.scene_name, &self.anchor_id, &mut edited_anchor.kind);
+        changed |= render_anchor_kind_editor(
+            ui,
+            &self.scene_name,
+            &self.anchor_id,
+            &mut edited_anchor.kind,
+        );
         changed |= render_anchor_position_editor(ui, &mut edited_anchor.position);
-        changed |= render_anchor_facing_editor(ui, &self.scene_name, &self.anchor_id, &mut edited_anchor.facing);
+        changed |= render_anchor_facing_editor(
+            ui,
+            &self.scene_name,
+            &self.anchor_id,
+            &mut edited_anchor.facing,
+        );
 
         if has_duplicate_anchor_id(&before_scene.anchors, anchor_index, &edited_anchor.id) {
             ui.colored_label(
@@ -62,7 +72,14 @@ impl Inspector for SceneAnchorInspector {
         }
 
         if changed {
-            return handle_anchor_update(ctx, &self.scene_name, before_scene, anchor_index, edited_anchor, &mut self.anchor_id);
+            return handle_anchor_update(
+                ctx,
+                &self.scene_name,
+                before_scene,
+                anchor_index,
+                edited_anchor,
+                &mut self.anchor_id,
+            );
         }
 
         false

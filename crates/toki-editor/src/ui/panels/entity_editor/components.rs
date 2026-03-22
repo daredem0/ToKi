@@ -44,10 +44,7 @@ fn render_collision_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     }
 }
 
-fn render_collision_settings(
-    ui: &mut egui::Ui,
-    edit: &mut crate::ui::editor_ui::EntityEditState,
-) {
+fn render_collision_settings(ui: &mut egui::Ui, edit: &mut crate::ui::editor_ui::EntityEditState) {
     // Offset
     ui.horizontal(|ui| {
         ui.label("Offset:");
@@ -394,8 +391,15 @@ fn render_audio_settings(
             .collision_sound
             .clone()
             .unwrap_or_default();
-        if render_sfx_dropdown(ui, "collision_sound", &mut sound, available_sfx, &mut edit.dirty) {
-            edit.definition.audio.collision_sound = if sound.is_empty() { None } else { Some(sound) };
+        if render_sfx_dropdown(
+            ui,
+            "collision_sound",
+            &mut sound,
+            available_sfx,
+            &mut edit.dirty,
+        ) {
+            edit.definition.audio.collision_sound =
+                if sound.is_empty() { None } else { Some(sound) };
         }
     });
 

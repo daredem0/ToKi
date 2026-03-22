@@ -7,7 +7,9 @@ use tracing::debug;
 use crate::entity::EntityId;
 use crate::rules::{RuleTarget, RuleTrigger, TriggerContext};
 
-use super::events::{CollisionEvent, DamageEvent, DeathEvent, InteractionEvent, InteractionSpatial};
+use super::events::{
+    CollisionEvent, DamageEvent, DeathEvent, InteractionEvent, InteractionSpatial,
+};
 use super::{GameState, RuleCommand};
 
 impl GameState {

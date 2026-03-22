@@ -107,9 +107,9 @@ impl EntityBuilder {
 
     /// Build the entity.
     pub fn build(self) -> Entity {
-        let category = self.category.unwrap_or_else(|| {
-            Self::default_category_for_kind(&self.entity_kind).to_string()
-        });
+        let category = self
+            .category
+            .unwrap_or_else(|| Self::default_category_for_kind(&self.entity_kind).to_string());
 
         Entity {
             id: self.id,
@@ -145,8 +145,9 @@ mod tests {
 
     #[test]
     fn builder_creates_entity_with_required_fields() {
-        let entity = EntityBuilder::new(1, IVec2::new(100, 200), UVec2::new(32, 32), EntityKind::Npc)
-            .build();
+        let entity =
+            EntityBuilder::new(1, IVec2::new(100, 200), UVec2::new(32, 32), EntityKind::Npc)
+                .build();
 
         assert_eq!(entity.id, 1);
         assert_eq!(entity.position, IVec2::new(100, 200));

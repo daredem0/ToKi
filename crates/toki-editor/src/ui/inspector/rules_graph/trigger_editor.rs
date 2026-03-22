@@ -180,7 +180,11 @@ impl InspectorSystem {
             ui.label(label);
             let mut int_val = *value as i32;
             if ui
-                .add(egui::DragValue::new(&mut int_val).speed(1.0).range(0..=9999))
+                .add(
+                    egui::DragValue::new(&mut int_val)
+                        .speed(1.0)
+                        .range(0..=9999),
+                )
                 .changed()
             {
                 *value = int_val.max(0) as u32;
