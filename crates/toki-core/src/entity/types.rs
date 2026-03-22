@@ -278,45 +278,87 @@ impl MovementProfile {
     }
 }
 
+/// Runtime attributes for an entity instance.
+///
+/// This struct bundles gameplay, rendering, and behavior data for entities.
+/// Fields are organized into logical groups:
+///
+/// - **Core Gameplay**: Stats, speed, collision properties
+/// - **Rendering**: Visibility, animation, render order
+/// - **Behavior**: Movement, AI, interaction capabilities
+/// - **Optional Components**: Projectiles, inventory, pickups (future: extract to ECS)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityAttributes {
-    // Core gameplay
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Core Gameplay
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Legacy health field. Prefer using `stats.current(HEALTH_STAT_ID)` instead.
     pub health: Option<u32>,
+    /// Entity statistics (health, attack power, custom stats).
     #[serde(default, skip_serializing_if = "EntityStats::is_empty")]
     pub stats: EntityStats,
-    pub speed: f32,  // Movement speed in pixels per tick
-    pub solid: bool, // Can we collide with other entities
+    /// Movement speed in pixels per tick.
+    pub speed: f32,
+    /// Whether this entity blocks movement of other solid entities.
+    pub solid: bool,
 
+    // ═══════════════════════════════════════════════════════════════════════════
     // Rendering
-    pub visible: bool, // Can we be seen by the player
-    pub animation_controller: Option<AnimationController>, // takes care of all animations of the entity
-    pub render_layer: i32,                                 // lower layers are drawn first
+    // ═══════════════════════════════════════════════════════════════════════════
 
-    // Behavior flags
-    pub active: bool,
-    pub can_move: bool, // Can we be moved by the player
-    #[serde(default)]
-    pub interactable: bool, // Can player interact with this entity
-    #[serde(default)]
-    pub interaction_reach: u32, // Extra pixels of reach for interaction (0 = must overlap)
-    #[serde(default)]
-    pub ai_config: AiConfig,
-    #[serde(default)]
-    pub movement_profile: MovementProfile,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub primary_projectile: Option<PrimaryProjectileDef>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub projectile: Option<ProjectileState>,
+    /// Whether this entity is rendered.
+    pub visible: bool,
+    /// Animation state machine for animated entities.
+    pub animation_controller: Option<AnimationController>,
+    /// Render order (lower layers drawn first, higher layers on top).
+    pub render_layer: i32,
+    /// Static sprite reference for non-animated entities.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub static_object_render: Option<StaticObjectRenderDef>,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Behavior
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Whether this entity participates in game logic updates.
+    pub active: bool,
+    /// Whether this entity can be moved (by player input or AI).
+    pub can_move: bool,
+    /// Whether player can interact with this entity (e.g., talk, pick up).
+    #[serde(default)]
+    pub interactable: bool,
+    /// Extra pixels of reach for interaction (0 = must overlap collision boxes).
+    #[serde(default)]
+    pub interaction_reach: u32,
+    /// AI behavior configuration (wander, chase, run, etc.).
+    #[serde(default)]
+    pub ai_config: AiConfig,
+    /// Movement input handling (player WASD, AI-controlled, none).
+    #[serde(default)]
+    pub movement_profile: MovementProfile,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Optional Components
+    // These are candidate for extraction to EntityManager component storage
+    // (similar to audio_components pattern).
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Projectile definition for entities that can shoot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_projectile: Option<PrimaryProjectileDef>,
+    /// Active projectile state (for projectile entities themselves).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projectile: Option<ProjectileState>,
+    /// Item pickup definition (for collectible items).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pickup: Option<PickupDef>,
+    /// Inventory contents (for entities that can carry items).
     #[serde(default, skip_serializing_if = "Inventory::is_empty")]
     pub inventory: Inventory,
-
-    // Extended attributes for entity definitions
+    /// Whether this entity type supports inventory (authoring flag).
     #[serde(default)]
-    pub has_inventory: bool, // Can this entity carry items
+    pub has_inventory: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
