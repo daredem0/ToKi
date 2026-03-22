@@ -5,22 +5,23 @@
 //! # Module Structure
 //!
 //! - `context`: Editor context and helper structs
-//! - `summaries`: Summary generation for node display
+//! - shared crate-level `rule_graph_ui`: summary generation and connection handling
 //! - `shared_editors`: Common editor widgets (target, key, etc.)
 //! - `trigger_editor`: Trigger node editing
 //! - `condition_editor`: Condition node editing
 //! - `action_editor`: Action node editing
-//! - `connections`: Connection management UI
 
 mod action_editor;
 mod condition_editor;
-mod connections;
 mod context;
 mod shared_editors;
-mod summaries;
 mod trigger_editor;
 
 use super::*;
+use crate::rule_graph_ui::{
+    build_connectable_nodes, collect_connection_ids, process_pending_operations,
+    render_connections_list, render_node_action_buttons, RuleGraphSummaryStyle,
+};
 
 use context::{NodeEditParams, NodeEditorContext};
 
@@ -68,13 +69,25 @@ impl InspectorSystem {
             Self::render_node_kind_editor(ui, ui_state, &params, &node_kind, &mut graph, &ctx);
 
         ui.separator();
-        let (outgoing_ids, incoming_ids) = Self::collect_connection_ids(&graph, node_id);
-        let connectable_to =
-            Self::build_connectable_nodes(&graph, &ctx.node_badges, node_id, &outgoing_ids, false);
-        let connectable_from =
-            Self::build_connectable_nodes(&graph, &ctx.node_badges, node_id, &incoming_ids, true);
+        let (outgoing_ids, incoming_ids) = collect_connection_ids(&graph, node_id);
+        let connectable_to = build_connectable_nodes(
+            &graph,
+            &ctx.node_badges,
+            node_id,
+            &outgoing_ids,
+            false,
+            RuleGraphSummaryStyle::Detailed,
+        );
+        let connectable_from = build_connectable_nodes(
+            &graph,
+            &ctx.node_badges,
+            node_id,
+            &incoming_ids,
+            true,
+            RuleGraphSummaryStyle::Detailed,
+        );
 
-        let action_result = Self::render_node_action_buttons(
+        let action_result = render_node_action_buttons(
             ui,
             scene_name,
             node_id,
@@ -84,9 +97,14 @@ impl InspectorSystem {
         );
 
         ui.separator();
-        let pending_disconnect =
-            Self::render_connections_list(ui, &graph, &ctx.node_badges, node_id);
-        let (ops_mutated, ops_error) = Self::process_pending_operations(
+        let pending_disconnect = render_connections_list(
+            ui,
+            &graph,
+            &ctx.node_badges,
+            node_id,
+            RuleGraphSummaryStyle::Detailed,
+        );
+        let (ops_mutated, ops_error) = process_pending_operations(
             &mut graph,
             node_id,
             &action_result,

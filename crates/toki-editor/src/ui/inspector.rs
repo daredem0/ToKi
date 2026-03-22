@@ -5,7 +5,7 @@ use super::editor_domain::{
     RuleConditionEditorKind as RuleConditionKind, RuleTriggerEditorKind as RuleTriggerKind,
 };
 use super::editor_ui::{EditorUI, MapEditorTool, SceneRulesGraphCommandData, Selection};
-use super::rule_graph::{RuleGraph, RuleGraphEdge, RuleGraphNodeKind};
+use super::rule_graph::{RuleGraph, RuleGraphNodeKind};
 use crate::config::EditorConfig;
 use crate::project::Project;
 pub(crate) use crate::project::ProjectSettingsDraft;

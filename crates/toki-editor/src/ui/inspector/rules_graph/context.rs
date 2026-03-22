@@ -1,23 +1,13 @@
 //! Context and helper structs for rule graph node editing.
 
-use std::collections::HashMap;
-
 use crate::config::EditorConfig;
 use crate::project::SceneGraphLayout;
+use crate::ui::inspector::InspectorSystem;
 use crate::ui::rule_graph::RuleGraph;
 use crate::ui::EditorUI;
+use crate::rule_graph_ui::rule_graph_node_badges;
 
 use super::super::{RuleAudioChoices, RuleValidationIssue};
-use super::InspectorSystem;
-
-/// Result of node action button interactions.
-#[derive(Default)]
-pub(super) struct NodeActionResult {
-    pub mutated: bool,
-    pub error: Option<String>,
-    pub pending_connect_from: Option<u64>,
-    pub pending_connect_to: Option<u64>,
-}
 
 /// Parameters for node editing operations.
 pub(super) struct NodeEditParams<'a> {
@@ -32,7 +22,7 @@ pub(super) struct NodeEditorContext {
     pub before_rules: toki_core::rules::RuleSet,
     pub before_graph: Option<RuleGraph>,
     pub before_layout: Option<SceneGraphLayout>,
-    pub node_badges: HashMap<u64, String>,
+    pub node_badges: std::collections::HashMap<u64, String>,
     pub audio_choices: RuleAudioChoices,
     pub validation_issues: Vec<RuleValidationIssue>,
 }
@@ -57,7 +47,7 @@ impl NodeEditorContext {
             .rule_graph_for_scene(scene_name)
             .cloned()
             .unwrap_or_else(|| RuleGraph::from_rule_set(&scene_rules));
-        let node_badges = InspectorSystem::rule_graph_node_badges(&graph);
+        let node_badges = rule_graph_node_badges(&graph);
         let audio_choices = InspectorSystem::load_rule_audio_choices(config);
         let validation_issues = InspectorSystem::validate_rule_set(&scene_rules);
 

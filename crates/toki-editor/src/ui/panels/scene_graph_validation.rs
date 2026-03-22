@@ -1,4 +1,8 @@
 use super::*;
+use crate::rule_graph_ui::{
+    rule_graph_node_badges as shared_rule_graph_node_badges,
+    rule_graph_node_label as shared_rule_graph_node_label, RuleGraphSummaryStyle,
+};
 
 impl PanelSystem {
     pub(super) fn rule_graph_node_label(
@@ -6,47 +10,11 @@ impl PanelSystem {
         node_badges: &HashMap<u64, String>,
         node_id: u64,
     ) -> Option<String> {
-        let node = graph.nodes.iter().find(|node| node.id == node_id)?;
-        let badge = node_badges
-            .get(&node_id)
-            .cloned()
-            .unwrap_or_else(|| "?".to_string());
-        Some(format!(
-            "{}: {}",
-            badge,
-            Self::rule_graph_node_kind_compact_label(&node.kind)
-        ))
+        shared_rule_graph_node_label(graph, node_badges, node_id, RuleGraphSummaryStyle::Compact)
     }
 
     pub(super) fn rule_graph_node_badges(graph: &RuleGraph) -> HashMap<u64, String> {
-        let mut node_ids = graph.nodes.iter().map(|node| node.id).collect::<Vec<_>>();
-        node_ids.sort_unstable();
-
-        let mut trigger_index = 0usize;
-        let mut condition_index = 0usize;
-        let mut action_index = 0usize;
-        let mut badges = HashMap::new();
-        for node_id in node_ids {
-            let Some(node) = graph.nodes.iter().find(|candidate| candidate.id == node_id) else {
-                continue;
-            };
-            let badge = match node.kind {
-                RuleGraphNodeKind::Trigger(_) => {
-                    trigger_index += 1;
-                    format!("T{}", trigger_index)
-                }
-                RuleGraphNodeKind::Condition(_) => {
-                    condition_index += 1;
-                    format!("C{}", condition_index)
-                }
-                RuleGraphNodeKind::Action(_) => {
-                    action_index += 1;
-                    format!("A{}", action_index)
-                }
-            };
-            badges.insert(node_id, badge);
-        }
-        badges
+        shared_rule_graph_node_badges(graph)
     }
 
     pub(super) fn collect_graph_validation_issues(

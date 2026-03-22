@@ -1,185 +1,24 @@
 use super::*;
+use crate::rule_graph_ui::{
+    rule_graph_action_summary, rule_graph_condition_summary, rule_graph_trigger_summary,
+    RuleGraphSummaryStyle,
+};
 
 impl PanelSystem {
     pub(super) fn trigger_summary(trigger: RuleTrigger) -> String {
-        match trigger {
-            RuleTrigger::OnStart => "OnStart".to_string(),
-            RuleTrigger::OnUpdate => "OnUpdate".to_string(),
-            RuleTrigger::OnPlayerMove => "OnPlayerMove".to_string(),
-            RuleTrigger::OnKey { key } => format!("OnKey({})", Self::key_label(key)),
-            RuleTrigger::OnCollision { entity: None } => "OnCollision".to_string(),
-            RuleTrigger::OnCollision {
-                entity: Some(target),
-            } => {
-                format!("OnCollision({})", Self::target_label(target))
-            }
-            RuleTrigger::OnDamaged { entity: None } => "OnDamaged".to_string(),
-            RuleTrigger::OnDamaged {
-                entity: Some(target),
-            } => {
-                format!("OnDamaged({})", Self::target_label(target))
-            }
-            RuleTrigger::OnDeath { entity: None } => "OnDeath".to_string(),
-            RuleTrigger::OnDeath {
-                entity: Some(target),
-            } => {
-                format!("OnDeath({})", Self::target_label(target))
-            }
-            RuleTrigger::OnTrigger => "OnTrigger".to_string(),
-            RuleTrigger::OnInteract { entity: None, .. } => "OnInteract".to_string(),
-            RuleTrigger::OnInteract {
-                entity: Some(target),
-                ..
-            } => {
-                format!("OnInteract({})", Self::target_label(target))
-            }
-            RuleTrigger::OnTileEnter { x, y } => format!("OnTileEnter({}, {})", x, y),
-            RuleTrigger::OnTileExit { x, y } => format!("OnTileExit({}, {})", x, y),
-        }
+        rule_graph_trigger_summary(trigger, RuleGraphSummaryStyle::Compact)
     }
 
     pub(super) fn condition_summary(condition: &RuleCondition) -> String {
-        match condition {
-            RuleCondition::Always => "Always".to_string(),
-            RuleCondition::TargetExists { target } => {
-                format!("TargetExists({})", Self::target_label(*target))
-            }
-            RuleCondition::KeyHeld { key } => format!("KeyHeld({})", Self::key_label(*key)),
-            RuleCondition::EntityActive { target, is_active } => {
-                format!(
-                    "EntityActive({}, active={})",
-                    Self::target_label(*target),
-                    is_active
-                )
-            }
-            RuleCondition::HealthBelow { target, threshold } => {
-                format!(
-                    "HealthBelow({}, {})",
-                    Self::target_label(*target),
-                    threshold
-                )
-            }
-            RuleCondition::HealthAbove { target, threshold } => {
-                format!(
-                    "HealthAbove({}, {})",
-                    Self::target_label(*target),
-                    threshold
-                )
-            }
-            RuleCondition::TriggerOtherIsPlayer => "TriggerOtherIsPlayer".to_string(),
-            RuleCondition::EntityIsKind { target, kind } => {
-                format!("EntityIsKind({}, {:?})", Self::target_label(*target), kind)
-            }
-            RuleCondition::TriggerOtherIsKind { kind } => {
-                format!("TriggerOtherIsKind({:?})", kind)
-            }
-            RuleCondition::EntityHasTag { target, tag } => {
-                format!("EntityHasTag({}, {})", Self::target_label(*target), tag)
-            }
-            RuleCondition::TriggerOtherHasTag { tag } => {
-                format!("TriggerOtherHasTag({})", tag)
-            }
-            RuleCondition::HasInventoryItem {
-                target,
-                item_id,
-                min_count,
-            } => {
-                format!(
-                    "HasInventoryItem({}, {}, {})",
-                    Self::target_label(*target),
-                    item_id,
-                    min_count
-                )
-            }
-        }
+        rule_graph_condition_summary(condition, RuleGraphSummaryStyle::Compact)
     }
 
     pub(super) fn action_summary(action: &RuleAction) -> String {
-        match action {
-            RuleAction::PlaySound { channel, sound_id } => {
-                format!(
-                    "PlaySound({}, {})",
-                    Self::sound_channel_label(*channel),
-                    sound_id
-                )
-            }
-            RuleAction::PlayMusic { track_id } => format!("PlayMusic({})", track_id),
-            RuleAction::PlayAnimation { target, state } => {
-                format!(
-                    "PlayAnimation({}, {:?})",
-                    Self::target_label(*target),
-                    state
-                )
-            }
-            RuleAction::SetVelocity { target, velocity } => format!(
-                "SetVelocity({}, {}, {})",
-                Self::target_label(*target),
-                velocity[0],
-                velocity[1]
-            ),
-            RuleAction::Spawn {
-                entity_type,
-                position,
-            } => format!("Spawn({:?}, {}, {})", entity_type, position[0], position[1]),
-            RuleAction::DestroySelf { target } => {
-                format!("DestroySelf({})", Self::target_label(*target))
-            }
-            RuleAction::SwitchScene {
-                scene_name,
-                spawn_point_id,
-            } => format!("SwitchScene({} -> {})", scene_name, spawn_point_id),
-            RuleAction::DamageEntity { target, amount } => {
-                format!("DamageEntity({}, {})", Self::target_label(*target), amount)
-            }
-            RuleAction::HealEntity { target, amount } => {
-                format!("HealEntity({}, {})", Self::target_label(*target), amount)
-            }
-            RuleAction::AddInventoryItem {
-                target,
-                item_id,
-                count,
-            } => format!(
-                "AddItem({}, {}, {})",
-                Self::target_label(*target),
-                item_id,
-                count
-            ),
-            RuleAction::RemoveInventoryItem {
-                target,
-                item_id,
-                count,
-            } => format!(
-                "RemoveItem({}, {}, {})",
-                Self::target_label(*target),
-                item_id,
-                count
-            ),
-            RuleAction::SetEntityActive { target, active } => {
-                format!("SetActive({}, {})", Self::target_label(*target), active)
-            }
-            RuleAction::TeleportEntity {
-                target,
-                tile_x,
-                tile_y,
-            } => format!(
-                "Teleport({}, tile[{}, {}])",
-                Self::target_label(*target),
-                tile_x,
-                tile_y
-            ),
-        }
+        rule_graph_action_summary(action, RuleGraphSummaryStyle::Compact)
     }
 
     pub(super) fn key_label(key: RuleKey) -> &'static str {
         shared_rule_key_label(key)
-    }
-
-    pub(super) fn sound_channel_label(channel: RuleSoundChannel) -> &'static str {
-        shared_rule_sound_channel_label(channel)
-    }
-
-    pub(super) fn target_label(target: RuleTarget) -> String {
-        shared_rule_target_label(target)
     }
 
     pub(super) fn graph_trigger_kind(trigger: RuleTrigger) -> GraphTriggerKind {

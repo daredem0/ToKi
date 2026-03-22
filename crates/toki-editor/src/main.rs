@@ -13,6 +13,7 @@ mod project;
 mod rendering;
 #[path = "ui/rule_graph.rs"]
 mod rule_graph;
+mod rule_graph_ui;
 mod scene;
 mod ui;
 mod validation;

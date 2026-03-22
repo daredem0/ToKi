@@ -8,8 +8,6 @@ use super::editor_domain::{
     rule_condition_kind as shared_rule_condition_kind,
     rule_condition_kind_label as shared_rule_condition_kind_label,
     rule_key_label as shared_rule_key_label,
-    rule_sound_channel_label as shared_rule_sound_channel_label,
-    rule_target_label as shared_rule_target_label,
     rule_trigger_kind as shared_rule_trigger_kind,
     rule_trigger_kind_label as shared_rule_trigger_kind_label,
     RuleActionEditorKind as GraphActionKind, RuleConditionEditorKind as GraphConditionKind,
