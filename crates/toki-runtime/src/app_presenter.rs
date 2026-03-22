@@ -3,10 +3,18 @@ use toki_core::sprite_render::{
     resolve_sprite_render_requests, sort_sprite_render_requests,
 };
 use toki_core::text::{TextAnchor, TextItem, TextStyle, TextWeight};
+use toki_core::game::GroundShadow;
 
 use crate::systems::{GameManager, PerformanceMonitor, RenderingSystem, ResourceManager};
 
 use super::{RuntimeDisplayOptions, SceneTransitionController};
+
+#[derive(Debug, Clone, PartialEq)]
+struct GroundShadowBand {
+    position: glam::Vec2,
+    size: glam::Vec2,
+    color: [f32; 4],
+}
 
 pub(super) struct WorldFramePresenter<'a> {
     game_system: &'a GameManager,
@@ -89,13 +97,15 @@ impl<'a> WorldFramePresenter<'a> {
 
     fn render_ground_shadows(&mut self) {
         for shadow in self.game_system.get_entity_ground_shadows() {
-            self.rendering.add_filled_world_underlay_rect(
-                shadow.position.x,
-                shadow.position.y,
-                shadow.size.x,
-                shadow.size.y,
-                shadow.color,
-            );
+            for band in ground_shadow_bands(&shadow) {
+                self.rendering.add_filled_world_underlay_rect(
+                    band.position.x,
+                    band.position.y,
+                    band.size.x,
+                    band.size.y,
+                    band.color,
+                );
+            }
         }
     }
 
@@ -192,6 +202,39 @@ impl<'a> WorldFramePresenter<'a> {
 
 }
 
+fn ground_shadow_bands(shadow: &GroundShadow) -> Vec<GroundShadowBand> {
+    let band_count = if shadow.size.y >= 5.0 { 7 } else { 5 };
+    let mut bands = Vec::with_capacity(band_count);
+    let band_height = (shadow.size.y / band_count as f32).max(0.5);
+    let center_x = shadow.position.x + shadow.size.x * 0.5;
+    let mut current_y = shadow.position.y + 1.0;
+
+    for index in 0..band_count {
+        let normalized = if band_count == 1 {
+            0.0
+        } else {
+            (index as f32 / (band_count - 1) as f32) * 2.0 - 1.0
+        };
+        let distance = normalized.abs();
+        let width_scale = (1.0 - 0.34 * distance.powf(1.55)).clamp(0.60, 1.0);
+        let alpha_scale = (1.0 - 0.18 * distance.powf(1.35)).clamp(0.76, 1.0);
+        let band_width = (shadow.size.x * width_scale).round().max(2.0);
+        let band_x = center_x - band_width * 0.5;
+        let mut color = shadow.color;
+        color[3] *= alpha_scale;
+
+        bands.push(GroundShadowBand {
+            position: glam::Vec2::new(band_x, current_y),
+            size: glam::Vec2::new(band_width, band_height),
+            color,
+        });
+
+        current_y += band_height;
+    }
+
+    bands
+}
+
 pub(super) fn health_bar_fill_color(fill_ratio: f32) -> [f32; 4] {
     if fill_ratio > 0.6 {
         [0.2, 0.85, 0.25, 0.95]
@@ -223,12 +266,58 @@ pub(super) fn render_scene_transition_overlay(
 
 #[cfg(test)]
 mod tests {
-    use super::health_bar_fill_color;
+    use super::{ground_shadow_bands, health_bar_fill_color};
+    use toki_core::game::GroundShadow;
 
     #[test]
     fn health_bar_fill_color_uses_expected_thresholds() {
         assert_eq!(health_bar_fill_color(0.8), [0.2, 0.85, 0.25, 0.95]);
         assert_eq!(health_bar_fill_color(0.5), [0.95, 0.8, 0.2, 0.95]);
         assert_eq!(health_bar_fill_color(0.1), [0.9, 0.2, 0.2, 0.95]);
+    }
+
+    #[test]
+    fn ground_shadow_bands_create_center_widest_oval_shape() {
+        let bands = ground_shadow_bands(&GroundShadow {
+            position: glam::Vec2::new(12.0, 33.0),
+            size: glam::Vec2::new(12.0, 3.0),
+            color: [0.0, 0.0, 0.0, 0.28],
+        });
+
+        assert_eq!(bands.len(), 5);
+        let center_band = &bands[2];
+        assert_eq!(center_band.size.x, 12.0);
+        assert!((bands[0].position.y - 34.0).abs() < 0.001);
+        assert!(bands[0].size.x < bands[1].size.x);
+        assert!(bands[1].size.x < center_band.size.x);
+        assert_eq!(bands[0].size.x, bands[4].size.x);
+        assert_eq!(bands[1].size.x, bands[3].size.x);
+        assert!(bands[0].color[3] < bands[1].color[3]);
+        assert!(bands[1].color[3] < center_band.color[3]);
+        let total_height: f32 = bands.iter().map(|band| band.size.y).sum();
+        assert!((total_height - 3.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn ground_shadow_bands_use_more_rows_for_taller_shadows() {
+        let bands = ground_shadow_bands(&GroundShadow {
+            position: glam::Vec2::new(20.0, 40.0),
+            size: glam::Vec2::new(20.0, 5.0),
+            color: [0.0, 0.0, 0.0, 0.3],
+        });
+
+        assert_eq!(bands.len(), 7);
+        assert!((bands[0].position.y - 41.0).abs() < 0.001);
+        let total_height: f32 = bands.iter().map(|band| band.size.y).sum();
+        assert!((total_height - 5.0).abs() < 0.001);
+        let center_band = &bands[3];
+        assert_eq!(center_band.size.x, 20.0);
+        assert!(bands[0].size.x < center_band.size.x);
+        assert!(bands[6].size.x < center_band.size.x);
+        assert!(bands[1].size.x <= bands[2].size.x);
+        assert!(bands[4].size.x >= bands[5].size.x);
+        assert_eq!(bands[0].size.x, bands[6].size.x);
+        assert_eq!(bands[1].size.x, bands[5].size.x);
+        assert_eq!(bands[2].size.x, bands[4].size.x);
     }
 }
