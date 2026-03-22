@@ -12,9 +12,17 @@ use crate::systems::{DecodedProjectCache, ResourceManager, RuntimeAssetLoadPlan}
 
 use super::{App, RuntimeLaunchOptions};
 
-impl App {
-    pub(super) fn build_startup_state(
-        launch_options: &RuntimeLaunchOptions,
+struct StartupBundle {
+    resources: ResourceManager,
+    game_state: GameState,
+    pack_mount: Option<tempfile::TempDir>,
+    asset_load_plan: RuntimeAssetLoadPlan,
+    decoded_project_cache: DecodedProjectCache,
+}
+
+impl StartupBundle {
+    fn into_parts(
+        self,
     ) -> (
         ResourceManager,
         GameState,
@@ -22,22 +30,40 @@ impl App {
         RuntimeAssetLoadPlan,
         DecodedProjectCache,
     ) {
-        if let Some(pack_path) = &launch_options.pack_path {
-            return Self::build_startup_state_from_pack(launch_options, pack_path).unwrap_or_else(
-                |error| {
-                    panic!(
-                        "Failed to initialize runtime from pack '{}': {}",
-                        pack_path.display(),
-                        error
-                    )
-                },
-            );
+        (
+            self.resources,
+            self.game_state,
+            self.pack_mount,
+            self.asset_load_plan,
+            self.decoded_project_cache,
+        )
+    }
+}
+
+struct StartupCoordinator<'a> {
+    launch_options: &'a RuntimeLaunchOptions,
+}
+
+impl<'a> StartupCoordinator<'a> {
+    fn new(launch_options: &'a RuntimeLaunchOptions) -> Self {
+        Self { launch_options }
+    }
+
+    fn build(&self) -> StartupBundle {
+        if let Some(pack_path) = &self.launch_options.pack_path {
+            return self.build_from_pack(pack_path).unwrap_or_else(|error| {
+                panic!(
+                    "Failed to initialize runtime from pack '{}': {}",
+                    pack_path.display(),
+                    error
+                )
+            });
         }
 
         let mut decoded_project_cache = DecodedProjectCache::default();
-        if let Some(project_path) = &launch_options.project_path {
+        if let Some(project_path) = &self.launch_options.project_path {
             let scenes =
-                Self::load_all_project_scenes_with_cache(project_path, &mut decoded_project_cache)
+                App::load_all_project_scenes_with_cache(project_path, &mut decoded_project_cache)
                     .unwrap_or_else(|error| {
                         tracing::error!(
                             "Failed to preload project scenes from '{}': {}",
@@ -46,7 +72,7 @@ impl App {
                         );
                         Vec::new()
                     });
-            let entity_definitions = Self::load_project_entity_definitions_with_cache(
+            let entity_definitions = App::load_project_entity_definitions_with_cache(
                 project_path,
                 &mut decoded_project_cache,
             )
@@ -58,43 +84,43 @@ impl App {
                 );
                 Vec::new()
             });
-            let scene = launch_options.scene_name.as_deref().and_then(|scene_name| {
+            let scene = self.launch_options.scene_name.as_deref().and_then(|scene_name| {
                 scenes
                     .iter()
                     .find(|scene| scene.name == scene_name)
                     .cloned()
             });
 
-            let map_name = launch_options.map_name.clone().or_else(|| {
+            let map_name = self.launch_options.map_name.clone().or_else(|| {
                 scene
                     .as_ref()
                     .and_then(|loaded_scene| loaded_scene.maps.first().cloned())
             });
 
-            match Self::load_project_resources_with_cache(
+            match App::load_project_resources_with_cache(
                 project_path,
-                launch_options.scene_name.as_deref(),
+                self.launch_options.scene_name.as_deref(),
                 map_name.as_deref(),
                 &mut decoded_project_cache,
             ) {
                 Ok((resources, asset_load_plan)) => {
-                    let game_state = if let Some(scene_name) = launch_options.scene_name.as_deref()
-                    {
-                        Self::game_state_from_project_content(
-                            scenes.clone(),
-                            entity_definitions.clone(),
-                            scene_name,
-                        )
-                    } else {
-                        Self::fallback_game_state()
-                    };
-                    return (
+                    let game_state =
+                        if let Some(scene_name) = self.launch_options.scene_name.as_deref() {
+                            App::game_state_from_project_content(
+                                scenes.clone(),
+                                entity_definitions.clone(),
+                                scene_name,
+                            )
+                        } else {
+                            App::fallback_game_state()
+                        };
+                    return StartupBundle {
                         resources,
                         game_state,
-                        None,
+                        pack_mount: None,
                         asset_load_plan,
                         decoded_project_cache,
-                    );
+                    };
                 }
                 Err(error) => {
                     tracing::error!(
@@ -107,27 +133,85 @@ impl App {
         }
 
         match ResourceManager::load_all() {
-            Ok(resources) => (
+            Ok(resources) => StartupBundle {
                 resources,
-                Self::fallback_game_state(),
-                None,
-                RuntimeAssetLoadPlan {
-                    scene_name: launch_options.scene_name.clone(),
-                    map_name: launch_options.map_name.clone(),
+                game_state: App::fallback_game_state(),
+                pack_mount: None,
+                asset_load_plan: RuntimeAssetLoadPlan {
+                    scene_name: self.launch_options.scene_name.clone(),
+                    map_name: self.launch_options.map_name.clone(),
                     tilemap_texture_path: None,
                     sprite_texture_path: None,
-                    preloaded_sfx_names: crate::systems::asset_loading::common_preloaded_sfx_names(
-                    ),
+                    preloaded_sfx_names:
+                        crate::systems::asset_loading::common_preloaded_sfx_names(),
                     stream_music: true,
                 },
                 decoded_project_cache,
-            ),
+            },
             Err(error) => {
                 panic!("Failed to initialize runtime resources: {error}");
             }
         }
     }
 
+    fn build_from_pack(&self, pack_path: &Path) -> anyhow::Result<StartupBundle> {
+        let mount = crate::pack::extract_pak_to_tempdir(pack_path)?;
+        let mount_path = mount.path().to_path_buf();
+        let mut decoded_project_cache = DecodedProjectCache::default();
+        let scenes =
+            App::load_all_project_scenes_with_cache(&mount_path, &mut decoded_project_cache)
+                .map_err(anyhow::Error::msg)?;
+        let entity_definitions = App::load_project_entity_definitions_with_cache(
+            &mount_path,
+            &mut decoded_project_cache,
+        )
+        .map_err(anyhow::Error::msg)?;
+        let scene = self.launch_options.scene_name.as_deref().and_then(|scene_name| {
+            scenes
+                .iter()
+                .find(|scene| scene.name == scene_name)
+                .cloned()
+        });
+        let map_name = self.launch_options.map_name.clone().or_else(|| {
+            scene
+                .as_ref()
+                .and_then(|loaded_scene| loaded_scene.maps.first().cloned())
+        });
+        let (resources, asset_load_plan) = App::load_project_resources_with_cache(
+            &mount_path,
+            self.launch_options.scene_name.as_deref(),
+            map_name.as_deref(),
+            &mut decoded_project_cache,
+        )?;
+        let game_state = if let Some(scene_name) = self.launch_options.scene_name.as_deref() {
+            App::game_state_from_project_content(scenes, entity_definitions, scene_name)
+        } else {
+            App::fallback_game_state()
+        };
+        Ok(StartupBundle {
+            resources,
+            game_state,
+            pack_mount: Some(mount),
+            asset_load_plan,
+            decoded_project_cache,
+        })
+    }
+}
+
+impl App {
+    pub(super) fn build_startup_state(
+        launch_options: &RuntimeLaunchOptions,
+    ) -> (
+        ResourceManager,
+        GameState,
+        Option<tempfile::TempDir>,
+        RuntimeAssetLoadPlan,
+        DecodedProjectCache,
+    ) {
+        StartupCoordinator::new(launch_options).build().into_parts()
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn build_startup_state_from_pack(
         launch_options: &RuntimeLaunchOptions,
         pack_path: &Path,
@@ -138,46 +222,9 @@ impl App {
         RuntimeAssetLoadPlan,
         DecodedProjectCache,
     )> {
-        let mount = crate::pack::extract_pak_to_tempdir(pack_path)?;
-        let mount_path = mount.path().to_path_buf();
-        let mut decoded_project_cache = DecodedProjectCache::default();
-        let scenes =
-            Self::load_all_project_scenes_with_cache(&mount_path, &mut decoded_project_cache)
-                .map_err(anyhow::Error::msg)?;
-        let entity_definitions = Self::load_project_entity_definitions_with_cache(
-            &mount_path,
-            &mut decoded_project_cache,
-        )
-        .map_err(anyhow::Error::msg)?;
-        let scene = launch_options.scene_name.as_deref().and_then(|scene_name| {
-            scenes
-                .iter()
-                .find(|scene| scene.name == scene_name)
-                .cloned()
-        });
-        let map_name = launch_options.map_name.clone().or_else(|| {
-            scene
-                .as_ref()
-                .and_then(|loaded_scene| loaded_scene.maps.first().cloned())
-        });
-        let (resources, asset_load_plan) = Self::load_project_resources_with_cache(
-            &mount_path,
-            launch_options.scene_name.as_deref(),
-            map_name.as_deref(),
-            &mut decoded_project_cache,
-        )?;
-        let game_state = if let Some(scene_name) = launch_options.scene_name.as_deref() {
-            Self::game_state_from_project_content(scenes, entity_definitions, scene_name)
-        } else {
-            Self::fallback_game_state()
-        };
-        Ok((
-            resources,
-            game_state,
-            Some(mount),
-            asset_load_plan,
-            decoded_project_cache,
-        ))
+        Ok(StartupCoordinator::new(launch_options)
+            .build_from_pack(pack_path)?
+            .into_parts())
     }
 
     pub(super) fn load_project_resources_with_cache(

@@ -33,6 +33,10 @@ const COMMUNITY_SPLASH_LOGO_PNG: &[u8] = include_bytes!("../../../assets/TokiLog
 mod app_bootstrap;
 #[path = "app_lifecycle.rs"]
 mod app_lifecycle;
+#[path = "app_presenter.rs"]
+mod app_presenter;
+#[path = "app_scene_runtime.rs"]
+mod app_scene_runtime;
 #[path = "app_splash.rs"]
 mod app_splash;
 #[path = "app_tick.rs"]
