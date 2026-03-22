@@ -62,6 +62,18 @@ fn indexed_slot_for_authored_color_matches_palette_display_colors() {
     );
 }
 
+#[test]
+fn nearest_palette_slot_prefers_closest_palette_color() {
+    let palette = toki_core::palette::Palette4::new([
+        [0, 0, 0, 255],
+        [32, 32, 32, 255],
+        [128, 128, 128, 255],
+        [255, 255, 255, 255],
+    ]);
+
+    assert_eq!(nearest_palette_slot(PixelColor::rgb(120, 130, 125), palette), 2);
+}
+
 // ============================================================================
 // SpriteCanvas Tests
 // ============================================================================
@@ -488,6 +500,61 @@ fn sprite_editor_state_push_undo_state_ignores_no_op_edits() {
 }
 
 #[test]
+fn sprite_editor_state_convert_active_canvas_to_palette_maps_pixels_and_records_undo() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(2, 1);
+    let palette = toki_core::palette::Palette4::new([
+        [0, 0, 0, 255],
+        [64, 64, 64, 255],
+        [128, 128, 128, 255],
+        [255, 255, 255, 255],
+    ]);
+
+    let canvas = state.active_mut().canvas.as_mut().unwrap();
+    canvas.set_pixel(0, 0, PixelColor::rgb(70, 70, 70));
+    canvas.set_pixel(1, 0, PixelColor::new(250, 250, 250, 128));
+
+    assert!(state.convert_active_canvas_to_palette(palette));
+    assert_eq!(
+        state.active().canvas.as_ref().unwrap().get_pixel(0, 0),
+        Some(canonical_indexed_color(1))
+    );
+    assert_eq!(
+        state.active().canvas.as_ref().unwrap().get_pixel(1, 0),
+        Some(PixelColor::new(0xFF, 0xFF, 0xFF, 128))
+    );
+    assert!(state.active().history.can_undo());
+
+    assert!(state.undo());
+    assert_eq!(
+        state.active().canvas.as_ref().unwrap().get_pixel(0, 0),
+        Some(PixelColor::rgb(70, 70, 70))
+    );
+}
+
+#[test]
+fn sprite_editor_state_convert_active_canvas_to_palette_is_no_op_when_already_canonical() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(1, 1);
+    let palette = toki_core::palette::Palette4::new([
+        [10, 20, 30, 255],
+        [40, 50, 60, 255],
+        [70, 80, 90, 255],
+        [100, 110, 120, 255],
+    ]);
+
+    state
+        .active_mut()
+        .canvas
+        .as_mut()
+        .unwrap()
+        .set_pixel(0, 0, canonical_indexed_color(2));
+
+    assert!(!state.convert_active_canvas_to_palette(palette));
+    assert!(!state.active().history.can_undo());
+}
+
+#[test]
 fn sprite_editor_state_recent_colors() {
     let mut state = SpriteEditorState {
         max_recent_colors: 3,
@@ -747,6 +814,259 @@ fn sprite_editor_state_load_sprite_asset() {
     assert_eq!(state.active().cell_size.x, 8);
     assert_eq!(state.active().cell_size.y, 8);
     assert_eq!(state.active().save_asset_name, "sprite");
+}
+
+#[test]
+fn sprite_editor_state_load_palette_indexed_asset_reads_mode_and_palette() {
+    use tempfile::tempdir;
+    use toki_core::assets::atlas::ColorMode;
+
+    let temp = tempdir().unwrap();
+
+    let json_content = r#"{
+        "image": "sprite.png",
+        "tile_size": [8, 8],
+        "color_mode": "palette_indexed",
+        "palette": "sepia",
+        "tiles": {
+            "tile_0": { "position": [0, 0], "properties": { "solid": false } }
+        }
+    }"#;
+    std::fs::write(temp.path().join("sprite.json"), json_content).unwrap();
+    create_test_png(
+        &temp.path().join("sprite.png"),
+        8,
+        8,
+        &vec![128u8; 8 * 8 * 4],
+    );
+
+    let mut state = SpriteEditorState::default();
+    let assets = SpriteEditorState::scan_sprite_assets(temp.path());
+
+    state.load_sprite_asset(&assets[0]).unwrap();
+
+    assert_eq!(state.color_mode, ColorMode::PaletteIndexed);
+    assert_eq!(state.selected_palette_id.as_deref(), Some("sepia"));
+}
+
+#[test]
+fn sprite_editor_state_sync_palette_selection_keeps_valid_loaded_palette() {
+    let mut state = SpriteEditorState {
+        color_mode: toki_core::assets::atlas::ColorMode::PaletteIndexed,
+        selected_palette_id: Some("sepia".to_string()),
+        ..Default::default()
+    };
+
+    let palettes = std::collections::BTreeMap::from([
+        ("gb_default".to_string(), toki_core::palette::builtin_palettes()["gb_default"]),
+        ("sepia".to_string(), toki_core::palette::builtin_palettes()["sepia"]),
+    ]);
+
+    state.sync_palette_selection(&palettes);
+
+    assert_eq!(state.selected_palette_id.as_deref(), Some("sepia"));
+}
+
+#[test]
+fn sprite_editor_state_sync_palette_selection_falls_back_to_first_available_palette() {
+    let mut state = SpriteEditorState {
+        color_mode: toki_core::assets::atlas::ColorMode::PaletteIndexed,
+        selected_palette_id: Some("missing".to_string()),
+        ..Default::default()
+    };
+
+    let palettes = std::collections::BTreeMap::from([
+        ("gb_default".to_string(), toki_core::palette::builtin_palettes()["gb_default"]),
+        ("sepia".to_string(), toki_core::palette::builtin_palettes()["sepia"]),
+    ]);
+
+    state.sync_palette_selection(&palettes);
+
+    assert_eq!(state.selected_palette_id.as_deref(), Some("gb_default"));
+}
+
+#[test]
+fn sprite_editor_state_save_current_atlas_preserves_existing_tile_metadata() {
+    use tempfile::tempdir;
+    use toki_core::assets::atlas::AtlasMeta;
+
+    let temp = tempdir().unwrap();
+
+    let json_content = r#"{
+        "image": "sprite.png",
+        "tile_size": [8, 8],
+        "tiles": {
+            "idle_0": { "position": [0, 0], "properties": { "solid": true, "trigger": false } },
+            "idle_1": { "position": [1, 0], "properties": { "solid": false, "trigger": true } }
+        }
+    }"#;
+    std::fs::write(temp.path().join("sprite.json"), json_content).unwrap();
+    create_test_png(
+        &temp.path().join("sprite.png"),
+        16,
+        8,
+        &vec![128u8; 16 * 8 * 4],
+    );
+
+    let mut state = SpriteEditorState::default();
+    let assets = SpriteEditorState::scan_sprite_assets(temp.path());
+    state.load_sprite_asset(&assets[0]).unwrap();
+    assert!(state.append_column());
+    state.color_mode = toki_core::assets::atlas::ColorMode::PaletteIndexed;
+    state.selected_palette_id = Some("gb_default".to_string());
+
+    state.save_current_asset().unwrap();
+
+    let saved = AtlasMeta::load_from_file(temp.path().join("sprite.json")).unwrap();
+    assert_eq!(saved.color_mode, toki_core::assets::atlas::ColorMode::PaletteIndexed);
+    assert_eq!(saved.palette.as_deref(), Some("gb_default"));
+
+    let idle_0 = saved.tiles.get("idle_0").unwrap();
+    assert_eq!(idle_0.position, glam::UVec2::new(0, 0));
+    assert!(idle_0.properties.solid);
+    assert!(!idle_0.properties.trigger);
+
+    let idle_1 = saved.tiles.get("idle_1").unwrap();
+    assert_eq!(idle_1.position, glam::UVec2::new(1, 0));
+    assert!(!idle_1.properties.solid);
+    assert!(idle_1.properties.trigger);
+
+    let added = saved.tiles.get("tile_2").unwrap();
+    assert_eq!(added.position, glam::UVec2::new(2, 0));
+    assert_eq!(
+        added.properties,
+        toki_core::assets::atlas::TileProperties::default()
+    );
+}
+
+#[test]
+fn sprite_editor_state_save_current_atlas_preserves_all_aliases_for_same_cell() {
+    use tempfile::tempdir;
+    use toki_core::assets::atlas::AtlasMeta;
+
+    let temp = tempdir().unwrap();
+
+    let json_content = r#"{
+        "image": "sprite.png",
+        "tile_size": [8, 8],
+        "tiles": {
+            "slime/idle_a": { "position": [0, 0], "properties": { "solid": false, "trigger": false } },
+            "slime/walk_a": { "position": [0, 0], "properties": { "solid": false, "trigger": false } },
+            "slime/idle_b": { "position": [1, 0], "properties": { "solid": false, "trigger": false } },
+            "slime/walk_b": { "position": [1, 0], "properties": { "solid": false, "trigger": false } }
+        }
+    }"#;
+    std::fs::write(temp.path().join("sprite.json"), json_content).unwrap();
+    create_test_png(
+        &temp.path().join("sprite.png"),
+        16,
+        8,
+        &vec![128u8; 16 * 8 * 4],
+    );
+
+    let mut state = SpriteEditorState::default();
+    let assets = SpriteEditorState::scan_sprite_assets(temp.path());
+    state.load_sprite_asset(&assets[0]).unwrap();
+
+    state.save_current_asset().unwrap();
+
+    let saved = AtlasMeta::load_from_file(temp.path().join("sprite.json")).unwrap();
+    assert_eq!(saved.tiles.len(), 4);
+    assert_eq!(
+        saved.tiles.get("slime/idle_a").unwrap().position,
+        glam::UVec2::new(0, 0)
+    );
+    assert_eq!(
+        saved.tiles.get("slime/walk_a").unwrap().position,
+        glam::UVec2::new(0, 0)
+    );
+    assert_eq!(
+        saved.tiles.get("slime/idle_b").unwrap().position,
+        glam::UVec2::new(1, 0)
+    );
+    assert_eq!(
+        saved.tiles.get("slime/walk_b").unwrap().position,
+        glam::UVec2::new(1, 0)
+    );
+}
+
+#[test]
+fn sprite_editor_state_save_current_atlas_preserves_remaining_tile_names_after_collapse() {
+    use tempfile::tempdir;
+    use toki_core::assets::atlas::AtlasMeta;
+
+    let temp = tempdir().unwrap();
+
+    let json_content = r#"{
+        "image": "sprite.png",
+        "tile_size": [8, 8],
+        "tiles": {
+            "walk_0": { "position": [0, 0], "properties": { "solid": true, "trigger": false } },
+            "walk_1": { "position": [1, 0], "properties": { "solid": false, "trigger": true } }
+        }
+    }"#;
+    std::fs::write(temp.path().join("sprite.json"), json_content).unwrap();
+    create_test_png(
+        &temp.path().join("sprite.png"),
+        16,
+        8,
+        &vec![128u8; 16 * 8 * 4],
+    );
+
+    let mut state = SpriteEditorState::default();
+    let assets = SpriteEditorState::scan_sprite_assets(temp.path());
+    state.load_sprite_asset(&assets[0]).unwrap();
+    state.active_mut().selected_cell = Some(0);
+    assert!(state.delete_cell_with_collapse());
+
+    state.save_current_asset().unwrap();
+
+    let saved = AtlasMeta::load_from_file(temp.path().join("sprite.json")).unwrap();
+    assert!(!saved.tiles.contains_key("walk_0"));
+    let moved = saved.tiles.get("walk_1").unwrap();
+    assert_eq!(moved.position, glam::UVec2::new(0, 0));
+    assert!(!moved.properties.solid);
+    assert!(moved.properties.trigger);
+}
+
+#[test]
+fn sprite_editor_state_save_current_object_sheet_preserves_existing_object_names() {
+    use tempfile::tempdir;
+    use toki_core::assets::object_sheet::ObjectSheetMeta;
+
+    let temp = tempdir().unwrap();
+
+    let json_content = r#"{
+        "sheet_type": "objects",
+        "image": "objects.png",
+        "tile_size": [8, 8],
+        "objects": {
+            "torch": { "position": [0, 0], "size_tiles": [1, 1] },
+            "barrel": { "position": [1, 0], "size_tiles": [1, 1] }
+        }
+    }"#;
+    std::fs::write(temp.path().join("objects.json"), json_content).unwrap();
+    create_test_png(
+        &temp.path().join("objects.png"),
+        16,
+        8,
+        &vec![64u8; 16 * 8 * 4],
+    );
+
+    let mut state = SpriteEditorState::default();
+    let assets = SpriteEditorState::scan_sprite_assets(temp.path());
+    state.load_sprite_asset(&assets[0]).unwrap();
+    assert!(state.append_column());
+
+    state.save_current_asset().unwrap();
+
+    let saved = ObjectSheetMeta::load_from_file(temp.path().join("objects.json")).unwrap();
+    assert_eq!(saved.objects.get("torch").unwrap().position, glam::UVec2::new(0, 0));
+    assert_eq!(saved.objects.get("barrel").unwrap().position, glam::UVec2::new(1, 0));
+    assert_eq!(
+        saved.objects.get("object_2").unwrap().position,
+        glam::UVec2::new(2, 0)
+    );
 }
 
 // ============================================================================

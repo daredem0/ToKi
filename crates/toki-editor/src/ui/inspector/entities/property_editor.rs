@@ -7,13 +7,16 @@ use super::helpers::{
 };
 use super::types::EntityPropertyDraft;
 use crate::config::EditorConfig;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
+use toki_core::palette::Palette4;
 use toki_core::entity::{AiBehavior, ControlRole, MovementProfile, MovementSoundTrigger};
 
 impl InspectorSystem {
     pub(in super::super) fn render_entity_property_editor(
         ui: &mut egui::Ui,
         draft: &mut EntityPropertyDraft,
+        available_palettes: &BTreeMap<String, Palette4>,
         config: Option<&EditorConfig>,
         show_position: bool,
         allow_control_role_edit: bool,
@@ -39,7 +42,7 @@ impl InspectorSystem {
 
         changed |= ui.checkbox(&mut draft.visible, "Visible").changed();
         changed |= ui.checkbox(&mut draft.has_shadow, "Has Shadow").changed();
-        changed |= render_palette_override_row(ui, draft);
+        changed |= render_palette_override_row(ui, draft, available_palettes);
         changed |= ui.checkbox(&mut draft.active, "Active").changed();
         changed |= ui.checkbox(&mut draft.solid, "Solid").changed();
         changed |= ui
@@ -82,11 +85,13 @@ impl InspectorSystem {
     pub(in super::super) fn render_scene_entity_editor(
         ui: &mut egui::Ui,
         draft: &mut EntityPropertyDraft,
+        available_palettes: &BTreeMap<String, Palette4>,
         config: Option<&EditorConfig>,
     ) -> bool {
         Self::render_entity_property_editor(
             ui,
             draft,
+            available_palettes,
             config,
             true,
             true,
@@ -97,17 +102,49 @@ impl InspectorSystem {
     pub(in super::super) fn render_entity_definition_property_editor(
         ui: &mut egui::Ui,
         draft: &mut EntityPropertyDraft,
+        available_palettes: &BTreeMap<String, Palette4>,
         config: Option<&EditorConfig>,
     ) -> bool {
-        Self::render_entity_property_editor(ui, draft, config, false, false, "Entity Properties")
+        Self::render_entity_property_editor(
+            ui,
+            draft,
+            available_palettes,
+            config,
+            false,
+            false,
+            "Entity Properties",
+        )
     }
 }
 
-fn render_palette_override_row(ui: &mut egui::Ui, draft: &mut EntityPropertyDraft) -> bool {
+fn render_palette_override_row(
+    ui: &mut egui::Ui,
+    draft: &mut EntityPropertyDraft,
+    available_palettes: &BTreeMap<String, Palette4>,
+) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
         ui.label("Palette Override:");
-        changed |= ui.text_edit_singleline(&mut draft.palette_override).changed();
+        egui::ComboBox::from_id_salt("entity_palette_override")
+            .selected_text(if draft.palette_override.trim().is_empty() {
+                "None"
+            } else {
+                draft.palette_override.as_str()
+            })
+            .show_ui(ui, |ui| {
+                changed |= ui
+                    .selectable_value(&mut draft.palette_override, String::new(), "None")
+                    .changed();
+                for palette_id in available_palettes.keys() {
+                    changed |= ui
+                        .selectable_value(
+                            &mut draft.palette_override,
+                            palette_id.clone(),
+                            palette_id,
+                        )
+                        .changed();
+                }
+            });
     });
     ui.label("Optional. Ignored for true-color atlases.");
     changed

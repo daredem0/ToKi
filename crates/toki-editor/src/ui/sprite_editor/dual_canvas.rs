@@ -89,8 +89,8 @@ pub struct CanvasState {
     pub save_asset_name: String,
     /// Save dialog: asset type (atlas vs object sheet)
     pub save_asset_kind: SpriteAssetKind,
-    /// Original tile/object names from loaded asset (for preserving names on re-save)
-    pub original_cell_names: Option<Vec<String>>,
+    /// Original tile/object aliases from loaded asset, grouped by cell index
+    pub original_cell_aliases: Option<Vec<Vec<String>>>,
     /// Swap target cell index (for cell reordering UI)
     pub swap_target_cell: u32,
 }
@@ -117,7 +117,7 @@ impl Default for CanvasState {
             is_painting: false,
             save_asset_name: String::new(),
             save_asset_kind: SpriteAssetKind::ObjectSheet,
-            original_cell_names: None,
+            original_cell_aliases: None,
             swap_target_cell: 0,
         }
     }

@@ -255,6 +255,10 @@ fn render_load_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                         let asset = ui_state.sprite.discovered_assets[idx].clone();
                         if let Err(e) = ui_state.sprite.load_sprite_asset(&asset) {
                             tracing::error!("Failed to load sprite: {}", e);
+                        } else {
+                            ui_state
+                                .sprite
+                                .sync_palette_selection(&ui_state.project.available_palettes);
                         }
                     }
                 }

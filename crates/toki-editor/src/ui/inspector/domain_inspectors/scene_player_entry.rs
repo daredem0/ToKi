@@ -73,7 +73,10 @@ fn render_player_entity_definition(
                     let mut draft =
                         super::super::EntityPropertyDraft::from_entity_definition(&definition);
                     if InspectorSystem::render_entity_definition_property_editor(
-                        ui, &mut draft, ctx.config,
+                        ui,
+                        &mut draft,
+                        &ctx.ui_state.project.available_palettes,
+                        ctx.config,
                     ) && InspectorSystem::apply_entity_property_draft_to_definition(
                         &mut definition,
                         &draft,

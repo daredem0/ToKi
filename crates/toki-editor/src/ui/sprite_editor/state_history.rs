@@ -1,6 +1,10 @@
 //! Undo/redo and clipboard operations for SpriteEditorState.
 
-use super::{CanvasSide, SpriteCanvas, SpriteEditCommand, SpriteEditorState};
+use super::{
+    canonical_indexed_color, nearest_palette_slot, preview_indexed_color, CanvasSide, SpriteCanvas,
+    SpriteEditCommand, SpriteEditorState,
+};
+use toki_core::palette::Palette4;
 
 impl SpriteEditorState {
     /// Push current canvas state for undo
@@ -95,6 +99,46 @@ impl SpriteEditorState {
             .history
             .push(SpriteEditCommand { before, after });
         true
+    }
+
+    pub fn convert_active_canvas_to_palette(&mut self, palette: Palette4) -> bool {
+        let before = match self.active().canvas.clone() {
+            Some(canvas) => canvas,
+            None => return false,
+        };
+
+        let mut changed = false;
+        if let Some(canvas) = &mut self.active_mut().canvas {
+            for y in 0..canvas.height {
+                for x in 0..canvas.width {
+                    let Some(color) = canvas.get_pixel(x, y) else {
+                        continue;
+                    };
+                    if color.a == 0 {
+                        continue;
+                    }
+
+                    let visible = preview_indexed_color(color, palette);
+                    let slot = nearest_palette_slot(visible, palette);
+                    let mut canonical = canonical_indexed_color(slot);
+                    canonical.a = color.a;
+                    if canonical != color {
+                        canvas.set_pixel(x, y, canonical);
+                        changed = true;
+                    }
+                }
+            }
+        }
+
+        if changed {
+            let cs = self.active_mut();
+            cs.dirty = true;
+            cs.canvas_texture = None;
+            self.push_undo_state(before);
+            true
+        } else {
+            false
+        }
     }
 
     /// Prepare clipboard for pasting: scale if needed and calculate position.

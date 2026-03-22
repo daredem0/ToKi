@@ -18,7 +18,7 @@ impl SpriteEditorState {
         cs.canvas_texture = None;
         cs.viewport = SpriteCanvasViewport::default();
         cs.selected_cell = None;
-        cs.original_cell_names = None;
+        cs.original_cell_aliases = None;
         cs.show_cell_grid = false;
         self.color_mode = toki_core::assets::atlas::ColorMode::TrueColor;
         self.selected_palette_id = None;
@@ -153,39 +153,55 @@ impl SpriteEditorState {
         let canvas = SpriteCanvas::from_rgba(decoded.width, decoded.height, decoded.data)
             .ok_or_else(|| "Failed to create canvas from image data".to_string())?;
 
-        let (cell_size, is_sheet, original_names) = match asset.kind {
+        let (cell_size, is_sheet, original_aliases, color_mode, selected_palette_id) = match asset.kind {
             SpriteAssetKind::TileAtlas => {
                 let meta = AtlasMeta::load_from_file(&asset.json_path)
                     .map_err(|e| format!("Failed to load atlas metadata: {e}"))?;
                 let is_sheet = meta.tiles.len() > 1;
-                let mut names: Vec<_> = meta.tiles.keys().cloned().collect();
-                names.sort();
-                self.color_mode = meta.color_mode;
-                self.selected_palette_id = meta.palette.clone();
-                if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
-                    self.foreground_color = canonical_indexed_color(3);
-                }
-                (meta.tile_size, is_sheet, names)
+                let aliases = ordered_atlas_aliases(
+                    &meta,
+                    decoded.width / meta.tile_size.x.max(1),
+                    decoded.height / meta.tile_size.y.max(1),
+                );
+                (
+                    meta.tile_size,
+                    is_sheet,
+                    aliases,
+                    meta.color_mode,
+                    meta.palette.clone(),
+                )
             }
             SpriteAssetKind::ObjectSheet => {
                 let meta = ObjectSheetMeta::load_from_file(&asset.json_path)
                     .map_err(|e| format!("Failed to load object sheet metadata: {e}"))?;
                 let is_sheet = meta.objects.len() > 1;
-                let mut names: Vec<_> = meta.objects.keys().cloned().collect();
-                names.sort();
-                self.color_mode = toki_core::assets::atlas::ColorMode::TrueColor;
-                self.selected_palette_id = None;
-                (meta.tile_size, is_sheet, names)
+                let aliases = ordered_object_aliases(
+                    &meta,
+                    decoded.width / meta.tile_size.x.max(1),
+                    decoded.height / meta.tile_size.y.max(1),
+                );
+                (
+                    meta.tile_size,
+                    is_sheet,
+                    aliases,
+                    toki_core::assets::atlas::ColorMode::TrueColor,
+                    None,
+                )
             }
         };
 
         self.reset_canvas_state(canvas, false);
+        self.color_mode = color_mode;
+        self.selected_palette_id = selected_palette_id;
+        if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
+            self.foreground_color = canonical_indexed_color(3);
+        }
         let cs = self.active_mut();
         cs.active_sprite = Some(asset.json_path.to_string_lossy().to_string());
         cs.asset_kind = Some(asset.kind);
         cs.save_asset_name = asset.name.clone();
         cs.save_asset_kind = asset.kind;
-        cs.original_cell_names = Some(original_names);
+        cs.original_cell_aliases = Some(original_aliases);
         cs.cell_size = cell_size;
         cs.show_cell_grid = is_sheet;
         self.show_load_dialog = false;
@@ -287,33 +303,100 @@ impl SpriteEditorState {
 
         let name = name.to_string();
         let png_filename = format!("{name}.png");
-        let json_filename = format!("{name}.json");
         let png_path = sprites_dir.join(&png_filename);
-        let json_path = sprites_dir.join(&json_filename);
+        let json_path = sprites_dir.join(format!("{name}.json"));
         let save_asset_kind = cs.save_asset_kind;
         let canvas_width = canvas.width;
         let canvas_height = canvas.height;
         let pixels = canvas.pixels().to_vec();
+        let source_metadata_path = cs.active_sprite.clone();
 
-        toki_core::graphics::image::save_image_rgba8(
-            &png_path,
-            canvas_width,
-            canvas_height,
-            &pixels,
-        )
-        .map_err(|e| format!("Failed to save PNG: {e}"))?;
-
-        self.save_metadata(
+        self.save_asset_to_paths(
             &json_path,
+            &png_path,
             &png_filename,
             &name,
             save_asset_kind,
             canvas_width,
             canvas_height,
+            &pixels,
+            source_metadata_path.as_deref().map(std::path::Path::new),
+        )
+    }
+
+    /// Save the current canvas back to its existing sprite asset paths.
+    pub fn save_current_asset(&mut self) -> Result<(), String> {
+        let (canvas_width, canvas_height, pixels, active_sprite, save_asset_kind) = {
+            let cs = self.active();
+            let canvas = cs.canvas.as_ref().ok_or("No canvas to save")?;
+            (
+                canvas.width,
+                canvas.height,
+                canvas.pixels().to_vec(),
+                cs.active_sprite
+                    .clone()
+                    .ok_or_else(|| "No existing sprite asset to save".to_string())?,
+                cs.asset_kind
+                    .ok_or_else(|| "Missing existing sprite asset kind".to_string())?,
+            )
+        };
+        let json_path = std::path::PathBuf::from(active_sprite);
+        let name = json_path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or("sprite")
+            .to_string();
+        let png_filename = self.resolve_existing_png_filename(&json_path, save_asset_kind);
+        let png_path = json_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .join(&png_filename);
+
+        self.save_asset_to_paths(
+            &json_path,
+            &png_path,
+            &png_filename,
+            &name,
+            save_asset_kind,
+            canvas_width,
+            canvas_height,
+            &pixels,
+            Some(&json_path),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn save_asset_to_paths(
+        &mut self,
+        json_path: &std::path::Path,
+        png_path: &std::path::Path,
+        png_filename: &str,
+        name: &str,
+        kind: SpriteAssetKind,
+        canvas_width: u32,
+        canvas_height: u32,
+        pixels: &[u8],
+        source_metadata_path: Option<&std::path::Path>,
+    ) -> Result<(), String> {
+        toki_core::graphics::image::save_image_rgba8(png_path, canvas_width, canvas_height, pixels)
+            .map_err(|e| format!("Failed to save PNG: {e}"))?;
+
+        self.save_metadata(
+            json_path,
+            png_filename,
+            kind,
+            glam::UVec2::new(canvas_width, canvas_height),
+            source_metadata_path,
         )?;
+        let saved_aliases =
+            self.read_saved_cell_aliases(json_path, kind, canvas_width, canvas_height);
 
         let cs = self.active_mut();
         cs.active_sprite = Some(json_path.to_string_lossy().to_string());
+        cs.asset_kind = Some(kind);
+        cs.save_asset_name = name.to_string();
+        cs.save_asset_kind = kind;
+        cs.original_cell_aliases = saved_aliases;
         cs.dirty = false;
         self.show_save_dialog = false;
         self.needs_asset_rescan = true;
@@ -325,28 +408,38 @@ impl SpriteEditorState {
         &self,
         json_path: &std::path::Path,
         png_filename: &str,
-        name: &str,
         kind: SpriteAssetKind,
-        canvas_width: u32,
-        canvas_height: u32,
+        canvas_size: glam::UVec2,
+        source_metadata_path: Option<&std::path::Path>,
     ) -> Result<(), String> {
-        use glam::UVec2;
-        use toki_core::assets::atlas::AtlasMeta;
-        use toki_core::assets::object_sheet::ObjectSheetMeta;
-
         match kind {
             SpriteAssetKind::TileAtlas => {
                 let mut meta = if self.is_sheet() {
                     let (cols, rows) = self.sheet_cell_count().unwrap_or((1, 1));
-                    self.create_atlas_with_names(png_filename, cols, rows)
-                } else {
-                    AtlasMeta::new_single_tile(
+                    self.create_atlas_with_names(
                         png_filename,
-                        UVec2::new(canvas_width, canvas_height),
+                        cols,
+                        rows,
+                        source_metadata_path,
                     )
+                } else {
+                    self.create_atlas_with_names(png_filename, 1, 1, source_metadata_path)
                 };
+                meta.tile_size = glam::UVec2::new(
+                    if self.is_sheet() {
+                        self.active().cell_size.x
+                    } else {
+                        canvas_size.x
+                    },
+                    if self.is_sheet() {
+                        self.active().cell_size.y
+                    } else {
+                        canvas_size.y
+                    },
+                );
                 meta.color_mode = self.color_mode;
-                meta.palette = if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
+                meta.palette =
+                    if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
                     self.selected_palette_id.clone()
                 } else {
                     None
@@ -357,13 +450,14 @@ impl SpriteEditorState {
             SpriteAssetKind::ObjectSheet => {
                 let meta = if self.is_sheet() {
                     let (cols, rows) = self.sheet_cell_count().unwrap_or((1, 1));
-                    self.create_object_sheet_with_names(png_filename, cols, rows)
-                } else {
-                    ObjectSheetMeta::new_single_object(
+                    self.create_object_sheet_with_names(
                         png_filename,
-                        name,
-                        UVec2::new(canvas_width, canvas_height),
+                        cols,
+                        rows,
+                        source_metadata_path,
                     )
+                } else {
+                    self.create_object_sheet_with_names(png_filename, 1, 1, source_metadata_path)
                 };
                 meta.save_to_file(json_path)
                     .map_err(|e| format!("Failed to save metadata: {e}"))?;
@@ -377,25 +471,36 @@ impl SpriteEditorState {
         png_filename: &str,
         cols: u32,
         rows: u32,
+        source_metadata_path: Option<&std::path::Path>,
     ) -> toki_core::assets::atlas::AtlasMeta {
         use std::collections::HashMap;
-        use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
+        use toki_core::assets::atlas::{AtlasMeta, TileInfo};
 
         let cs = self.active();
-        let total_cells = (cols * rows) as usize;
+        let existing_meta = source_metadata_path
+            .and_then(|path| AtlasMeta::load_from_file(path).ok())
+            .filter(|_| cs.asset_kind == Some(SpriteAssetKind::TileAtlas));
+        let mut used_names = std::collections::HashSet::new();
         let mut tiles = HashMap::new();
 
         for row in 0..rows {
             for col in 0..cols {
                 let index = (row * cols + col) as usize;
-                let name = self.get_cell_name(index, total_cells, "tile");
-                tiles.insert(
-                    name,
-                    TileInfo {
-                        position: glam::UVec2::new(col, row),
-                        properties: TileProperties::default(),
-                    },
-                );
+                let aliases = self.get_cell_aliases(index, "tile", &mut used_names);
+                for alias in aliases {
+                    let properties = existing_meta
+                        .as_ref()
+                        .and_then(|meta| meta.tiles.get(&alias))
+                        .map(|tile| tile.properties.clone())
+                        .unwrap_or_default();
+                    tiles.insert(
+                        alias,
+                        TileInfo {
+                            position: glam::UVec2::new(col, row),
+                            properties,
+                        },
+                    );
+                }
             }
         }
 
@@ -417,23 +522,44 @@ impl SpriteEditorState {
         png_filename: &str,
         cols: u32,
         rows: u32,
+        source_metadata_path: Option<&std::path::Path>,
     ) -> toki_core::assets::object_sheet::ObjectSheetMeta {
         use std::collections::HashMap;
         use toki_core::assets::object_sheet::{ObjectSheetMeta, ObjectSheetType, ObjectSpriteInfo};
 
         let cs = self.active();
-        let total_cells = (cols * rows) as usize;
+        let existing_meta = source_metadata_path
+            .and_then(|path| ObjectSheetMeta::load_from_file(path).ok())
+            .filter(|_| cs.asset_kind == Some(SpriteAssetKind::ObjectSheet));
+        let mut used_names = std::collections::HashSet::new();
         let mut objects = HashMap::new();
 
         for row in 0..rows {
             for col in 0..cols {
                 let index = (row * cols + col) as usize;
-                let name = self.get_cell_name(index, total_cells, "object");
+                let aliases = self.get_cell_aliases(index, "object", &mut used_names);
+                let name = aliases.into_iter().next().unwrap_or_else(|| {
+                    unreachable!("get_cell_aliases always returns at least one alias")
+                });
+                let object_info = existing_meta
+                    .as_ref()
+                    .and_then(|meta| meta.objects.get(&name))
+                    .cloned()
+                    .filter(|object| {
+                        object.position.x < cols
+                            && object.position.y < rows
+                            && object.position.x + object.size_tiles.x <= cols
+                            && object.position.y + object.size_tiles.y <= rows
+                    })
+                    .unwrap_or(ObjectSpriteInfo {
+                        position: glam::UVec2::new(col, row),
+                        size_tiles: glam::UVec2::ONE,
+                    });
                 objects.insert(
                     name,
                     ObjectSpriteInfo {
                         position: glam::UVec2::new(col, row),
-                        size_tiles: glam::UVec2::ONE,
+                        ..object_info
                     },
                 );
             }
@@ -447,16 +573,31 @@ impl SpriteEditorState {
         }
     }
 
-    fn get_cell_name(&self, index: usize, total_cells: usize, prefix: &str) -> String {
+    fn get_cell_aliases(
+        &self,
+        index: usize,
+        prefix: &str,
+        used_names: &mut std::collections::HashSet<String>,
+    ) -> Vec<String> {
         let cs = self.active();
-        if let Some(ref names) = cs.original_cell_names {
-            if names.len() == total_cells {
-                if let Some(name) = names.get(index) {
-                    return name.clone();
+        if let Some(ref aliases) = cs.original_cell_aliases {
+            if let Some(cell_aliases) = aliases.get(index) {
+                let filtered = cell_aliases
+                    .iter()
+                    .filter_map(|alias| {
+                        if used_names.insert(alias.clone()) {
+                            Some(alias.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                if !filtered.is_empty() {
+                    return filtered;
                 }
             }
         }
-        format!("{}_{}", prefix, index)
+        vec![self.generate_unique_cell_name(index, prefix, used_names)]
     }
 
     /// Import an external image file into the active canvas
@@ -498,6 +639,87 @@ impl SpriteEditorState {
     }
 }
 
+impl SpriteEditorState {
+    fn resolve_existing_png_filename(
+        &self,
+        json_path: &std::path::Path,
+        kind: SpriteAssetKind,
+    ) -> String {
+        let fallback = format!(
+            "{}.png",
+            json_path
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .unwrap_or("sprite")
+        );
+        match kind {
+            SpriteAssetKind::TileAtlas => toki_core::assets::atlas::AtlasMeta::load_from_file(json_path)
+                .ok()
+                .and_then(|meta| {
+                    meta.image
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .map(str::to_string)
+                })
+                .unwrap_or(fallback),
+            SpriteAssetKind::ObjectSheet => {
+                toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(json_path)
+                    .ok()
+                    .and_then(|meta| {
+                        meta.image
+                            .file_name()
+                            .and_then(|name| name.to_str())
+                            .map(str::to_string)
+                    })
+                    .unwrap_or(fallback)
+            }
+        }
+    }
+
+    fn read_saved_cell_aliases(
+        &self,
+        json_path: &std::path::Path,
+        kind: SpriteAssetKind,
+        canvas_width: u32,
+        canvas_height: u32,
+    ) -> Option<Vec<Vec<String>>> {
+        match kind {
+            SpriteAssetKind::TileAtlas => toki_core::assets::atlas::AtlasMeta::load_from_file(json_path)
+                .ok()
+                .map(|meta| {
+                    let cols = (canvas_width / meta.tile_size.x.max(1)).max(1);
+                    let rows = (canvas_height / meta.tile_size.y.max(1)).max(1);
+                    ordered_atlas_aliases(&meta, cols, rows)
+                }),
+            SpriteAssetKind::ObjectSheet => {
+                toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(json_path)
+                    .ok()
+                    .map(|meta| {
+                        let cols = (canvas_width / meta.tile_size.x.max(1)).max(1);
+                        let rows = (canvas_height / meta.tile_size.y.max(1)).max(1);
+                        ordered_object_aliases(&meta, cols, rows)
+                    })
+            }
+        }
+    }
+
+    fn generate_unique_cell_name(
+        &self,
+        index: usize,
+        prefix: &str,
+        used_names: &mut std::collections::HashSet<String>,
+    ) -> String {
+        let mut candidate_index = index;
+        loop {
+            let candidate = format!("{}_{}", prefix, candidate_index);
+            if used_names.insert(candidate.clone()) {
+                return candidate;
+            }
+            candidate_index += 1;
+        }
+    }
+}
+
 /// Classify a directory entry as a JSON sprite asset
 fn classify_json_entry(
     entry: &std::fs::DirEntry,
@@ -517,6 +739,50 @@ fn classify_json_entry(
         return None;
     }
     Some((path, stem, png_path))
+}
+
+fn ordered_atlas_aliases(
+    meta: &toki_core::assets::atlas::AtlasMeta,
+    cols: u32,
+    rows: u32,
+) -> Vec<Vec<String>> {
+    let total_cells = (cols * rows) as usize;
+    let mut ordered = vec![Vec::new(); total_cells];
+    for (name, tile) in &meta.tiles {
+        let index = (tile.position.y * cols + tile.position.x) as usize;
+        if index < ordered.len() {
+            ordered[index].push(name.clone());
+        }
+    }
+    for aliases in &mut ordered {
+        aliases.sort();
+    }
+    while ordered.last().is_some_and(|aliases| aliases.is_empty()) {
+        ordered.pop();
+    }
+    ordered
+}
+
+fn ordered_object_aliases(
+    meta: &toki_core::assets::object_sheet::ObjectSheetMeta,
+    cols: u32,
+    rows: u32,
+) -> Vec<Vec<String>> {
+    let total_cells = (cols * rows) as usize;
+    let mut ordered = vec![Vec::new(); total_cells];
+    for (name, object) in &meta.objects {
+        let index = (object.position.y * cols + object.position.x) as usize;
+        if index < ordered.len() {
+            ordered[index].push(name.clone());
+        }
+    }
+    for aliases in &mut ordered {
+        aliases.sort();
+    }
+    while ordered.last().is_some_and(|aliases| aliases.is_empty()) {
+        ordered.pop();
+    }
+    ordered
 }
 
 /// Copy image data to canvas at specified position

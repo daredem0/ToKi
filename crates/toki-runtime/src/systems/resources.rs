@@ -237,21 +237,31 @@ impl ResourceManager {
         atlas: &AtlasMeta,
         palette_override: Option<&str>,
     ) -> Result<(String, Palette4), SpriteResolveError> {
-        let palette_id = self
-            .indexed_palette_override
-            .as_deref()
-            .or(palette_override)
-            .or(atlas.palette.as_deref())
-            .unwrap_or("gb_default")
-            .to_string();
-        let palette = resolve_palette(&palette_id, &self.project_palettes).ok_or_else(|| {
-            SpriteResolveError::AssetLoadFailed {
-                asset_kind: "palette",
-                asset_name: palette_id.clone(),
-                message: "palette id could not be resolved".to_string(),
+        for palette_id in [
+            self.indexed_palette_override.as_deref(),
+            palette_override,
+            atlas.palette.as_deref(),
+            Some("gb_default"),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if let Some(palette) = resolve_palette(palette_id, &self.project_palettes) {
+                return Ok((palette_id.to_string(), palette));
             }
-        })?;
-        Ok((palette_id, palette))
+        }
+
+        Err(SpriteResolveError::AssetLoadFailed {
+            asset_kind: "palette",
+            asset_name: self
+                .indexed_palette_override
+                .as_deref()
+                .or(palette_override)
+                .or(atlas.palette.as_deref())
+                .unwrap_or("gb_default")
+                .to_string(),
+            message: "palette id could not be resolved".to_string(),
+        })
     }
 }
 

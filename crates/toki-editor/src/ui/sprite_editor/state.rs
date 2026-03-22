@@ -2,9 +2,11 @@
 
 use super::{
     CanvasSide, CanvasState, DiscoveredSpriteAsset, DualCanvasLayout, PixelColor, ResizeAnchor,
-    SpriteCanvas, SpriteEditorTool,
+    SpriteCanvas, SpriteEditorTool, canonical_indexed_color, indexed_slot_for_authored_color,
 };
+use std::collections::BTreeMap;
 use toki_core::assets::atlas::ColorMode;
+use toki_core::palette::Palette4;
 
 /// Sprite editor state
 pub struct SpriteEditorState {
@@ -115,6 +117,33 @@ impl Default for SpriteEditorState {
             show_delete_confirm: false,
             delete_asset_name: String::new(),
             needs_asset_rescan: false,
+        }
+    }
+}
+
+impl SpriteEditorState {
+    pub fn sync_palette_selection(&mut self, available_palettes: &BTreeMap<String, Palette4>) {
+        if self.color_mode != ColorMode::PaletteIndexed {
+            self.selected_palette_id = None;
+            return;
+        }
+
+        if self
+            .selected_palette_id
+            .as_ref()
+            .is_none_or(|palette_id| !available_palettes.contains_key(palette_id))
+        {
+            self.selected_palette_id = available_palettes.keys().next().cloned();
+        }
+
+        let selected_palette = self
+            .selected_palette_id
+            .as_ref()
+            .and_then(|palette_id| available_palettes.get(palette_id))
+            .copied();
+
+        if indexed_slot_for_authored_color(self.foreground_color, selected_palette).is_none() {
+            self.foreground_color = canonical_indexed_color(3);
         }
     }
 }

@@ -157,6 +157,22 @@ pub fn preview_indexed_color(color: PixelColor, palette: Palette4) -> PixelColor
     )
 }
 
+pub fn nearest_palette_slot(color: PixelColor, palette: Palette4) -> usize {
+    let [r, g, b, _a] = color.to_rgba_array();
+    palette
+        .colors
+        .iter()
+        .enumerate()
+        .min_by_key(|(_, candidate)| {
+            let dr = r as i32 - candidate[0] as i32;
+            let dg = g as i32 - candidate[1] as i32;
+            let db = b as i32 - candidate[2] as i32;
+            dr * dr + dg * dg + db * db
+        })
+        .map(|(slot, _)| slot)
+        .unwrap_or(3)
+}
+
 /// Anchor position for canvas resize operations
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ResizeAnchor {

@@ -66,7 +66,7 @@ impl SpriteEditorState {
         cs.selection = None;
         cs.canvas_texture = None;
         cs.viewport = SpriteCanvasViewport::default();
-        cs.original_cell_names = None;
+        cs.original_cell_aliases = None;
     }
 
     #[cfg_attr(not(test), allow(dead_code))]
@@ -86,7 +86,7 @@ impl SpriteEditorState {
         cs.selection = None;
         cs.canvas_texture = None;
         cs.viewport = SpriteCanvasViewport::default();
-        cs.original_cell_names = None;
+        cs.original_cell_aliases = None;
     }
 
     /// Check if there's an active canvas being edited
@@ -157,7 +157,7 @@ impl SpriteEditorState {
         cs.cell_size = glam::UVec2::new(cell_width, cell_height);
         cs.show_cell_grid = true;
         cs.selected_cell = None;
-        cs.original_cell_names = None;
+        cs.original_cell_aliases = None;
     }
 
     /// Add a color to recent colors palette

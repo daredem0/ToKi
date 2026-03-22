@@ -35,7 +35,12 @@ impl Inspector for EntityInspector {
                 InspectorSystem::find_selected_scene_entity(ctx.ui_state, self.entity_id)
             {
                 let mut draft = super::super::EntityPropertyDraft::from_entity(&scene_entity);
-                if InspectorSystem::render_scene_entity_editor(ui, &mut draft, ctx.config) {
+                if InspectorSystem::render_scene_entity_editor(
+                    ui,
+                    &mut draft,
+                    &ctx.ui_state.project.available_palettes,
+                    ctx.config,
+                ) {
                     entity_changed = InspectorSystem::apply_entity_property_draft_with_undo(
                         ctx.ui_state,
                         self.entity_id,

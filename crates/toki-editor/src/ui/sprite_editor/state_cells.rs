@@ -71,6 +71,11 @@ impl SpriteEditorState {
             before,
             after: canvas.clone(),
         });
+        if let Some(aliases) = &mut cs.original_cell_aliases {
+            if cell_a < aliases.len() && cell_b < aliases.len() {
+                aliases.swap(cell_a, cell_b);
+            }
+        }
         cs.dirty = true;
         cs.canvas_texture = None;
         true
@@ -197,6 +202,11 @@ impl SpriteEditorState {
             before,
             after: canvas.clone(),
         });
+        if let Some(aliases) = &mut cs.original_cell_aliases {
+            if cell_idx < aliases.len() {
+                aliases.remove(cell_idx);
+            }
+        }
 
         if cell_idx >= total_cells - 1 {
             cs.selected_cell = if total_cells > 1 {

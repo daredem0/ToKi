@@ -262,6 +262,61 @@ fn resolve_atlas_tile_uses_palette_indexed_material_for_indexed_atlases() {
 }
 
 #[test]
+fn resolve_indexed_palette_falls_back_when_entity_override_is_invalid() {
+    let project_dir = make_unique_temp_dir();
+    let sprites_dir = project_dir.join("assets").join("sprites");
+    let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+    fs::create_dir_all(&sprites_dir).expect("sprites dir");
+    fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+
+    write_palette_indexed_atlas(&sprites_dir.join("creatures.json"), "creatures.png", "sepia");
+    write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
+    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+
+    let mut manager = ResourceManager::load_for_project(&project_dir, Some("demo_map"))
+        .expect("project resources should load");
+
+    let resolved = manager
+        .resolve_atlas_tile("creatures", "floor", Some("missing_palette"))
+        .expect("indexed atlas tile should fall back to atlas palette");
+
+    assert!(matches!(
+        resolved.material,
+        SpriteRenderMaterial::PaletteIndexed { ref palette_id, .. } if palette_id == "sepia"
+    ));
+}
+
+#[test]
+fn resolve_indexed_palette_falls_back_to_builtin_default_when_all_ids_are_invalid() {
+    let project_dir = make_unique_temp_dir();
+    let sprites_dir = project_dir.join("assets").join("sprites");
+    let tilemaps_dir = project_dir.join("assets").join("tilemaps");
+    fs::create_dir_all(&sprites_dir).expect("sprites dir");
+    fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
+
+    write_palette_indexed_atlas(
+        &sprites_dir.join("creatures.json"),
+        "creatures.png",
+        "missing_atlas_palette",
+    );
+    write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
+    write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
+
+    let mut manager = ResourceManager::load_for_project(&project_dir, Some("demo_map"))
+        .expect("project resources should load");
+    manager.set_indexed_palette_override(Some("missing_global_palette".to_string()));
+
+    let resolved = manager
+        .resolve_atlas_tile("creatures", "floor", Some("missing_entity_palette"))
+        .expect("indexed atlas tile should fall back to built-in default palette");
+
+    assert!(matches!(
+        resolved.material,
+        SpriteRenderMaterial::PaletteIndexed { ref palette_id, .. } if palette_id == "gb_default"
+    ));
+}
+
+#[test]
 fn resolve_project_resource_paths_returns_expected_texture_paths() {
     let project_dir = make_unique_temp_dir();
     let sprites_dir = project_dir.join("assets").join("sprites");

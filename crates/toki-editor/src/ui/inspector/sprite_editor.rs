@@ -155,17 +155,15 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     }
 
     if ui_state.sprite.color_mode == ColorMode::PaletteIndexed {
-        let mut palette_ids = ui_state
+        ui_state
+            .sprite
+            .sync_palette_selection(&ui_state.project.available_palettes);
+        let palette_ids = ui_state
             .project
             .available_palettes
             .keys()
             .cloned()
             .collect::<Vec<_>>();
-        palette_ids.sort();
-
-        if ui_state.sprite.selected_palette_id.is_none() {
-            ui_state.sprite.selected_palette_id = palette_ids.first().cloned();
-        }
 
         let previous_palette_id = ui_state.sprite.selected_palette_id.clone();
 
@@ -194,11 +192,42 @@ fn render_color_mode_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         if previous_palette_id != ui_state.sprite.selected_palette_id {
             ui_state.sprite.invalidate_all_canvas_textures();
         }
+
+        if ui_state.sprite.has_canvas() {
+            let can_convert = ui_state
+                .sprite
+                .selected_palette_id
+                .as_ref()
+                .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
+                .is_some();
+            let response = ui
+                .add_enabled(can_convert, egui::Button::new("Convert To Palette"))
+                .on_hover_text(
+                    "Maps all non-transparent pixels to the nearest color slot of the selected palette.",
+                );
+            if response.clicked() {
+                if let Some(palette) = ui_state
+                    .sprite
+                    .selected_palette_id
+                    .as_ref()
+                    .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
+                    .copied()
+                {
+                    ui_state.sprite.convert_active_canvas_to_palette(palette);
+                }
+            }
+        }
     }
 }
 
 fn render_save_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.label("Asset:");
+
+    if ui_state.sprite.active().active_sprite.is_some() && ui.button("Save").clicked() {
+        if let Err(e) = ui_state.sprite.save_current_asset() {
+            tracing::error!("Failed to save sprite: {}", e);
+        }
+    }
 
     if ui.button("Save As...").clicked() {
         ui_state.sprite.begin_save_dialog();
