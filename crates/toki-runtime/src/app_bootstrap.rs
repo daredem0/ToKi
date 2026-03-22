@@ -5,6 +5,10 @@ use toki_core::project_assets::{
     discover_project_entity_definition_paths, discover_project_scene_paths, first_existing_path,
     resolve_project_scene_path,
 };
+use toki_core::project_content::{
+    build_game_state_from_project_content as shared_build_game_state_from_project_content,
+    build_game_state_from_scene as shared_build_game_state_from_scene,
+};
 use toki_core::{GameState, Scene};
 use toki_render::RenderError;
 
@@ -342,17 +346,17 @@ impl App {
     #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn game_state_from_scene(scene: Scene) -> GameState {
         let scene_name = scene.name.clone();
-        let mut game_state = GameState::new_empty();
-        game_state.add_scene(scene);
-        if let Err(error) = game_state.load_scene(&scene_name) {
-            tracing::error!(
-                "Failed to load startup scene '{}' into game state: {}",
-                scene_name,
-                error
-            );
-            return Self::fallback_game_state();
+        match shared_build_game_state_from_scene(scene, std::iter::empty()) {
+            Ok(game_state) => game_state,
+            Err(error) => {
+                tracing::error!(
+                    "Failed to load startup scene '{}' into game state: {}",
+                    scene_name,
+                    error
+                );
+                Self::fallback_game_state()
+            }
         }
-        game_state
     }
 
     pub(super) fn game_state_from_project_content(
@@ -360,22 +364,21 @@ impl App {
         entity_definitions: Vec<EntityDefinition>,
         startup_scene_name: &str,
     ) -> GameState {
-        let mut game_state = GameState::new_empty();
-        for definition in entity_definitions {
-            game_state.add_entity_definition(definition);
+        match shared_build_game_state_from_project_content(
+            scenes,
+            entity_definitions,
+            startup_scene_name,
+        ) {
+            Ok(game_state) => game_state,
+            Err(error) => {
+                tracing::error!(
+                    "Failed to load startup scene '{}' into game state: {}",
+                    startup_scene_name,
+                    error
+                );
+                Self::fallback_game_state()
+            }
         }
-        for scene in scenes {
-            game_state.add_scene(scene);
-        }
-        if let Err(error) = game_state.load_scene(startup_scene_name) {
-            tracing::error!(
-                "Failed to load startup scene '{}' into game state: {}",
-                startup_scene_name,
-                error
-            );
-            return Self::fallback_game_state();
-        }
-        game_state
     }
 
     pub(super) fn fallback_game_state() -> GameState {

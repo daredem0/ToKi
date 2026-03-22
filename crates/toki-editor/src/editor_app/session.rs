@@ -1,5 +1,6 @@
 use super::*;
 use crate::project::ProjectAssets;
+use toki_core::project_content::build_game_state_from_scene;
 use toki_core::project_assets::tilemap_file_path;
 
 impl EditorApp {
@@ -100,7 +101,7 @@ impl EditorApp {
         scene: &toki_core::Scene,
         project_assets: Option<&mut ProjectAssets>,
     ) -> Result<toki_core::GameState, String> {
-        let mut game_state = toki_core::GameState::new_empty();
+        let mut entity_definitions = Vec::new();
 
         if let Some(player_entry) = scene.player_entry.as_ref() {
             let project_assets = project_assets.ok_or_else(|| {
@@ -123,12 +124,10 @@ impl EditorApp {
                         scene.name, player_entry.entity_definition_name
                     )
                 })?;
-            game_state.add_entity_definition(definition);
+            entity_definitions.push(definition);
         }
 
-        game_state.add_scene(scene.clone());
-        game_state.load_scene(&scene.name)?;
-        Ok(game_state)
+        build_game_state_from_scene(scene.clone(), entity_definitions)
     }
 
     pub(super) fn load_scene_into_gamestate(
