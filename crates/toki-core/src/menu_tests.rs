@@ -206,6 +206,46 @@ fn menu_controller_returns_emit_event_command_for_generic_ui_event_action() {
 }
 
 #[test]
+fn menu_controller_returns_runtime_settings_commands_for_builtin_settings_actions() {
+    let settings = MenuSettings {
+        pause_root_screen_id: "pause_menu".to_string(),
+        gate_gameplay_when_open: true,
+        appearance: Default::default(),
+        screens: vec![MenuScreenDefinition {
+            id: "pause_menu".to_string(),
+            title: "Paused".to_string(),
+            title_border_style_override: None,
+            items: vec![
+                MenuItemDefinition::Button {
+                    text: "Audio".to_string(),
+                    border_style_override: None,
+                    action: UiAction::OpenAudioSettings,
+                },
+                MenuItemDefinition::Button {
+                    text: "Graphics".to_string(),
+                    border_style_override: None,
+                    action: UiAction::OpenGraphicsSettings,
+                },
+            ],
+        }],
+        dialogs: Vec::new(),
+    };
+
+    let mut controller = MenuController::new(settings);
+    controller.open_pause_root();
+
+    assert_eq!(
+        controller.handle_input(MenuInput::Confirm),
+        Some(UiCommand::OpenAudioSettings)
+    );
+    controller.handle_input(MenuInput::Down);
+    assert_eq!(
+        controller.handle_input(MenuInput::Confirm),
+        Some(UiCommand::OpenGraphicsSettings)
+    );
+}
+
+#[test]
 fn menu_settings_default_includes_appearance_defaults() {
     let settings = MenuSettings::default();
 

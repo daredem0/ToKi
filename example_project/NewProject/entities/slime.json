@@ -8,15 +8,23 @@
       16
     ],
     "render_layer": 0,
-    "visible": true
+    "visible": true,
+    "has_shadow": true,
+    "palette_override": ""
   },
   "attributes": {
     "health": 50,
-    "speed": 1,
+    "speed": 1.0,
     "solid": true,
     "active": true,
     "can_move": false,
-    "ai_behavior": "wander",
+    "interactable": false,
+    "interaction_reach": 0,
+    "ai_config": {
+      "behavior": "wander",
+      "detection_radius": 0
+    },
+    "movement_profile": "legacy_default",
     "has_inventory": false
   },
   "collision": {
@@ -33,16 +41,19 @@
   },
   "audio": {
     "footstep_trigger_distance": 16.0,
-    "movement_sound": "sfx_slime_bounce"
+    "hearing_radius": 192,
+    "movement_sound_trigger": "distance",
+    "movement_sound": "sfx_slime_bounce",
+    "collision_sound": null
   },
   "animations": {
-    "atlas_name": "creatures.json",
+    "atlas_name": "creatures_palette4.json",
     "clips": [
       {
         "state": "idle",
         "frame_tiles": [
-          "slime/idle_0",
-          "slime/idle_1"
+          "slime/idle_a",
+          "slime/idle_b"
         ],
         "frame_duration_ms": 300.0,
         "loop_mode": "loop"
@@ -50,10 +61,90 @@
       {
         "state": "walk",
         "frame_tiles": [
-          "slime/walk_0",
-          "slime/walk_1",
-          "slime/walk_2",
-          "slime/walk_3"
+          "slime/walk_a",
+          "slime/walk_b",
+          "slime/walk_c",
+          "slime/walk_d"
+        ],
+        "frame_duration_ms": 150.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "idle_down",
+        "frame_tiles": [
+          "slime/idle_down_a",
+          "slime/idle_down_b"
+        ],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "idle_up",
+        "frame_tiles": [
+          "slime/idle_up_a",
+          "slime/idle_up_b"
+        ],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "idle_left",
+        "frame_tiles": [
+          "slime/idle_left_a",
+          "slime/idle_left_b"
+        ],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "idle_right",
+        "frame_tiles": [
+          "slime/idle_right_a",
+          "slime/idle_right_b"
+        ],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_down",
+        "frame_tiles": [
+          "slime/walk_down_a",
+          "slime/walk_down_b",
+          "slime/walk_down_c",
+          "slime/walk_down_d"
+        ],
+        "frame_duration_ms": 150.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_up",
+        "frame_tiles": [
+          "slime/walk_up_a",
+          "slime/walk_up_b",
+          "slime/walk_up_c",
+          "slime/walk_up_d"
+        ],
+        "frame_duration_ms": 150.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_left",
+        "frame_tiles": [
+          "slime/walk_left_a",
+          "slime/walk_left_b",
+          "slime/walk_left_c",
+          "slime/walk_left_d"
+        ],
+        "frame_duration_ms": 150.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_right",
+        "frame_tiles": [
+          "slime/walk_right_a",
+          "slime/walk_right_b",
+          "slime/walk_right_c",
+          "slime/walk_right_d"
         ],
         "frame_duration_ms": 150.0,
         "loop_mode": "loop"

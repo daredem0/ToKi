@@ -199,6 +199,7 @@ impl MenuController {
                 self.move_selection(&current_screen_id, 1);
                 None
             }
+            MenuInput::Left | MenuInput::Right => None,
             MenuInput::Confirm => self.confirm_current_selection(&current_screen_id),
             MenuInput::Back => {
                 self.go_back();
@@ -209,7 +210,7 @@ impl MenuController {
 
     fn handle_dialog_input(&mut self, input: MenuInput) -> Option<UiCommand> {
         match input {
-            MenuInput::Up | MenuInput::Down => {
+            MenuInput::Up | MenuInput::Down | MenuInput::Left | MenuInput::Right => {
                 if let Some(active_dialog) = &mut self.active_dialog {
                     active_dialog.confirm_selected = !active_dialog.confirm_selected;
                 }
@@ -295,6 +296,8 @@ impl MenuController {
                 None
             }
             UiAction::ExitRuntime => Some(UiCommand::ExitRuntime),
+            UiAction::OpenAudioSettings => Some(UiCommand::OpenAudioSettings),
+            UiAction::OpenGraphicsSettings => Some(UiCommand::OpenGraphicsSettings),
             UiAction::EmitEvent { event_id } => Some(UiCommand::EmitEvent {
                 event_id: event_id.clone(),
             }),

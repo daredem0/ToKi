@@ -97,6 +97,106 @@ impl InspectorSystem {
                 .changed();
 
             ui.separator();
+            ui.label("Post Process");
+            ui.horizontal(|ui| {
+                ui.label("Mode:");
+                let current_label = match draft.post_process_mode {
+                    toki_core::project_runtime::PostProcessMode::None => "None",
+                    toki_core::project_runtime::PostProcessMode::Tint => "Tint",
+                    toki_core::project_runtime::PostProcessMode::Quantize4 => "Quantize 4",
+                    toki_core::project_runtime::PostProcessMode::GbPalette => "GB Preset",
+                };
+                egui::ComboBox::from_id_salt("project_post_process_mode")
+                    .selected_text(current_label)
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.post_process_mode,
+                                toki_core::project_runtime::PostProcessMode::None,
+                                "None",
+                            )
+                            .changed();
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.post_process_mode,
+                                toki_core::project_runtime::PostProcessMode::Tint,
+                                "Tint",
+                            )
+                            .changed();
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.post_process_mode,
+                                toki_core::project_runtime::PostProcessMode::Quantize4,
+                                "Quantize 4",
+                            )
+                            .changed();
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.post_process_mode,
+                                toki_core::project_runtime::PostProcessMode::GbPalette,
+                                "GB Preset",
+                            )
+                            .changed();
+                    });
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Tint Color:");
+                let mut color32 = egui::Color32::from_rgba_unmultiplied(
+                    draft.post_process_tint_color[0],
+                    draft.post_process_tint_color[1],
+                    draft.post_process_tint_color[2],
+                    draft.post_process_tint_color[3],
+                );
+                if ui.color_edit_button_srgba(&mut color32).changed() {
+                    draft.post_process_tint_color =
+                        [color32.r(), color32.g(), color32.b(), color32.a()];
+                    changed = true;
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Tint Strength:");
+                changed |= ui
+                    .add(
+                        egui::Slider::new(&mut draft.post_process_tint_strength_percent, 0..=100)
+                            .suffix("%"),
+                    )
+                    .changed();
+            });
+            ui.horizontal(|ui| {
+                let mut palette_ids = ui_state
+                    .project
+                    .available_palettes
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>();
+                palette_ids.sort();
+                ui.label("Quantize Palette:");
+                egui::ComboBox::from_id_salt("project_quantize_palette")
+                    .selected_text(draft.post_process_quantize_palette_id.clone())
+                    .show_ui(ui, |ui| {
+                        for palette_id in &palette_ids {
+                            changed |= ui
+                                .selectable_value(
+                                    &mut draft.post_process_quantize_palette_id,
+                                    palette_id.clone(),
+                                    palette_id,
+                                )
+                                .changed();
+                        }
+                    });
+            });
+            ui.horizontal(|ui| {
+                ui.label("GB Contrast:");
+                changed |= ui
+                    .add(
+                        egui::Slider::new(&mut draft.post_process_gb_contrast_percent, -100..=100)
+                            .suffix("%"),
+                    )
+                    .changed();
+            });
+
+            ui.separator();
             ui.label("Frame Rate");
             changed |= ui.checkbox(&mut draft.vsync, "VSync").changed();
 

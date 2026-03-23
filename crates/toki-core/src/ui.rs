@@ -70,6 +70,8 @@ pub enum UiAction {
     Back,
     #[serde(alias = "exit_game")]
     ExitRuntime,
+    OpenAudioSettings,
+    OpenGraphicsSettings,
     EmitEvent {
         event_id: String,
     },
@@ -78,6 +80,8 @@ pub enum UiAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UiCommand {
     ExitRuntime,
+    OpenAudioSettings,
+    OpenGraphicsSettings,
     EmitEvent { event_id: String },
 }
 

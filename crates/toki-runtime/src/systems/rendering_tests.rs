@@ -6,6 +6,7 @@ use toki_core::fonts::find_font_files;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::palette::Palette4;
 use toki_core::graphics::vertex::QuadVertex;
+use toki_core::project_runtime::{PostProcessMode, ResolvedPostProcessSettings};
 use toki_core::sprite::SpriteFrame;
 use toki_core::sprite_render::{
     ResolvedSpriteRenderInstance, SpriteRenderMaterial, SpriteRenderOrigin, SpriteSortKey,
@@ -17,6 +18,7 @@ use toki_render::RenderBackend;
 #[derive(Default, Debug)]
 struct FakeBackend {
     projection_updates: Rc<Cell<usize>>,
+    post_process_updates: Rc<Cell<usize>>,
     draw_calls: Rc<Cell<usize>>,
     resize_calls: Rc<Cell<usize>>,
     tilemap_texture_loads: Rc<RefCell<Vec<std::path::PathBuf>>>,
@@ -92,6 +94,11 @@ impl RenderBackend for FakeBackend {
     fn update_projection(&mut self, _mvp: glam::Mat4) {
         self.projection_updates
             .set(self.projection_updates.get() + 1);
+    }
+
+    fn set_post_process_settings(&mut self, _settings: ResolvedPostProcessSettings) {
+        self.post_process_updates
+            .set(self.post_process_updates.get() + 1);
     }
 
     fn set_tilemap_render_enabled(&mut self, enabled: bool) {
@@ -258,6 +265,24 @@ fn rendering_system_defaults_and_no_gpu_error_paths() {
         sprite_err.to_string().contains("GPU not initialized"),
         "unexpected error: {sprite_err}"
     );
+}
+
+#[test]
+fn rendering_system_forwards_post_process_settings_to_backend() {
+    let mut rendering = RenderingSystem::new();
+    let backend = FakeBackend::default();
+    let updates = backend.post_process_updates.clone();
+    rendering.set_backend_for_tests(Box::new(backend));
+
+    rendering.set_post_process_settings(ResolvedPostProcessSettings {
+        mode: PostProcessMode::Tint,
+        tint_color: [10, 20, 30, 255],
+        tint_strength_percent: 50,
+        quantize_palette: Palette4::new([[0, 0, 0, 255]; 4]),
+        gb_contrast_percent: 0,
+    });
+
+    assert_eq!(updates.get(), 1);
 }
 
 #[test]

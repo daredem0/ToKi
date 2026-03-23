@@ -6,8 +6,8 @@ use super::{
 use std::path::PathBuf;
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, MenuSettings, UiAction};
 use toki_core::project_runtime::{
-    RuntimeConfigAudio, RuntimeConfigDisplay, RuntimeConfigFile, RuntimeConfigPack,
-    RuntimeConfigSplash, RuntimeConfigStartup,
+    PostProcessMode, RuntimeConfigAudio, RuntimeConfigDisplay, RuntimeConfigFile,
+    RuntimeConfigPack, RuntimeConfigSplash, RuntimeConfigStartup, RuntimePostProcessSettings,
 };
 use toki_runtime::{RuntimeAudioMixOptions, RuntimeDisplayOptions, RuntimeLaunchOptions};
 
@@ -142,6 +142,13 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
                 show_entity_health_bars: Some(true),
                 show_ground_shadows: Some(false),
                 indexed_palette_override: None,
+                post_process: Some(RuntimePostProcessSettings {
+                    mode: PostProcessMode::Tint,
+                    tint_color: [10, 20, 30, 255],
+                    tint_strength_percent: 45,
+                    quantize_palette_id: "sepia".to_string(),
+                    gb_contrast_percent: 8,
+                }),
                 resolution_width: None,
                 resolution_height: None,
                 zoom_percent: None,
@@ -164,6 +171,10 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
     assert_eq!(options.audio_mix.collision_percent, 25);
     assert!(options.display.show_entity_health_bars);
     assert!(!options.display.show_ground_shadows);
+    assert_eq!(options.display.post_process.mode, PostProcessMode::Tint);
+    assert_eq!(options.display.post_process.tint_color, [10, 20, 30, 255]);
+    assert_eq!(options.display.post_process.tint_strength_percent, 45);
+    assert_eq!(options.display.post_process.quantize_palette_id, "sepia");
     assert_eq!(options.menu, configured_menu);
 }
 
@@ -206,6 +217,7 @@ fn apply_runtime_config_keeps_existing_paths_and_scene_but_updates_splash_durati
                 show_entity_health_bars: Some(true),
                 show_ground_shadows: Some(false),
                 indexed_palette_override: None,
+                post_process: None,
                 resolution_width: None,
                 resolution_height: None,
                 zoom_percent: None,
@@ -443,6 +455,7 @@ fn apply_project_runtime_settings_do_not_override_existing_launch_audio_mix() {
             show_entity_health_bars: false,
             show_ground_shadows: true,
             indexed_palette_override: None,
+            post_process: toki_core::project_runtime::RuntimePostProcessSettings::default(),
             resolution_width: 160,
             resolution_height: 144,
             zoom_percent: 100,

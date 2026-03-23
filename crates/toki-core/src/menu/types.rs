@@ -236,6 +236,8 @@ pub enum MenuListSource {
 pub enum MenuInput {
     Up,
     Down,
+    Left,
+    Right,
     Confirm,
     Back,
 }

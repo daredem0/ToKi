@@ -5,6 +5,7 @@ use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::math::projection::{calculate_projection, ProjectionParameter};
 use toki_core::palette::recolor_indexed_image;
+use toki_core::project_runtime::ResolvedPostProcessSettings;
 use toki_core::sprite::SpriteFrame;
 use toki_core::sprite_render::{ResolvedSpriteRenderInstance, SpriteRenderMaterial};
 use toki_core::text::TextItem;
@@ -247,6 +248,12 @@ impl RenderingSystem {
         let projection = self.calculate_projection();
         if let Some(backend) = &mut self.backend {
             backend.update_projection(projection * view_matrix);
+        }
+    }
+
+    pub fn set_post_process_settings(&mut self, settings: ResolvedPostProcessSettings) {
+        if let Some(backend) = &mut self.backend {
+            backend.set_post_process_settings(settings);
         }
     }
 

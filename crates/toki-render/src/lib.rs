@@ -14,7 +14,8 @@ pub use backend::RenderBackend;
 pub use errors::RenderError;
 pub use gpu::GpuState;
 pub use pipelines::{
-    debug::DebugPipeline, sprite::SpritePipeline, tilemap::TilemapPipeline, RenderPipeline,
+    debug::DebugPipeline, post_process::PostProcessPipeline, sprite::SpritePipeline,
+    tilemap::TilemapPipeline, RenderPipeline,
 };
 pub use scene::{
     DebugShape, DebugShapeType, OverlayShape, OverlayShapeType, SceneData, SceneRenderer,

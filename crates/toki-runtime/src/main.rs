@@ -188,6 +188,9 @@ fn apply_runtime_config(
         if display.indexed_palette_override.is_some() {
             launch_options.display.indexed_palette_override = display.indexed_palette_override;
         }
+        if let Some(post_process) = display.post_process {
+            launch_options.display.post_process = post_process;
+        }
         if let Some(resolution_width) = display.resolution_width {
             launch_options.display.resolution_width = resolution_width;
         }
@@ -316,6 +319,7 @@ fn apply_project_runtime_settings_from_project_file_if_present(
         launch_options.display.show_ground_shadows = metadata.runtime.display.show_ground_shadows;
         launch_options.display.indexed_palette_override =
             metadata.runtime.display.indexed_palette_override.clone();
+        launch_options.display.post_process = metadata.runtime.display.post_process.clone();
         launch_options.display.resolution_width = metadata.runtime.display.resolution_width;
         launch_options.display.resolution_height = metadata.runtime.display.resolution_height;
         launch_options.display.zoom_percent = metadata.runtime.display.zoom_percent;

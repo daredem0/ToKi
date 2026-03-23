@@ -16,10 +16,14 @@ impl App {
 
     pub(super) fn open_pause_menu(&mut self) {
         self.menu_system.open_pause_root();
+        self.runtime_overlay = None;
         self.game_system.clear_runtime_inputs();
     }
 
     pub(super) fn handle_menu_input(&mut self, input: MenuInput) {
+        if self.handle_runtime_overlay_input(input) {
+            return;
+        }
         if let Some(command) = self.menu_system.handle_input(input) {
             self.apply_menu_command(command);
         }
@@ -45,6 +49,10 @@ impl App {
             });
         let appearance = self.menu_system.settings().appearance.clone();
 
+        if self.render_runtime_settings_overlay(&appearance, viewport) {
+            return;
+        }
+
         let dialog_view = self.menu_system.current_dialog_view();
         let should_hide_main_menu = dialog_view.as_ref().is_some_and(|d| d.hide_main_menu);
 
@@ -65,6 +73,7 @@ impl App {
         apply_menu_command(
             &mut self.exit_requested,
             &mut self.pending_ui_events,
+            &mut self.runtime_overlay,
             command,
         );
     }
@@ -73,11 +82,18 @@ impl App {
 fn apply_menu_command(
     exit_requested: &mut bool,
     pending_ui_events: &mut Vec<String>,
+    runtime_overlay: &mut Option<super::RuntimeMenuOverlay>,
     command: UiCommand,
 ) {
     match command {
         UiCommand::ExitRuntime => {
             *exit_requested = true;
+        }
+        UiCommand::OpenAudioSettings => {
+            *runtime_overlay = Some(super::RuntimeMenuOverlay::audio());
+        }
+        UiCommand::OpenGraphicsSettings => {
+            *runtime_overlay = Some(super::RuntimeMenuOverlay::graphics());
         }
         UiCommand::EmitEvent { event_id } => pending_ui_events.push(event_id),
     }
@@ -109,10 +125,12 @@ mod tests {
     fn exit_runtime_menu_command_sets_exit_requested_flag() {
         let mut exit_requested = false;
         let mut pending_ui_events = Vec::new();
+        let mut runtime_overlay = None;
 
         apply_menu_command(
             &mut exit_requested,
             &mut pending_ui_events,
+            &mut runtime_overlay,
             UiCommand::ExitRuntime,
         );
 
@@ -124,10 +142,12 @@ mod tests {
     fn emit_event_menu_command_is_queued_for_runtime_consumers() {
         let mut exit_requested = false;
         let mut pending_ui_events = Vec::new();
+        let mut runtime_overlay = None;
 
         apply_menu_command(
             &mut exit_requested,
             &mut pending_ui_events,
+            &mut runtime_overlay,
             UiCommand::EmitEvent {
                 event_id: "start_game".to_string(),
             },
@@ -135,6 +155,22 @@ mod tests {
 
         assert!(!exit_requested);
         assert_eq!(pending_ui_events, vec!["start_game".to_string()]);
+    }
+
+    #[test]
+    fn open_graphics_settings_menu_command_activates_overlay() {
+        let mut exit_requested = false;
+        let mut pending_ui_events = Vec::new();
+        let mut runtime_overlay = None;
+
+        apply_menu_command(
+            &mut exit_requested,
+            &mut pending_ui_events,
+            &mut runtime_overlay,
+            UiCommand::OpenGraphicsSettings,
+        );
+
+        assert_eq!(runtime_overlay, Some(super::super::RuntimeMenuOverlay::graphics()));
     }
 
     #[test]

@@ -6,6 +6,7 @@ use std::time::Instant;
 
 use toki_core::camera::{Camera, CameraController, CameraMode};
 use toki_core::menu::{MenuController, MenuSettings};
+use toki_core::project_runtime::RuntimePostProcessSettings;
 use toki_core::TimingSystem;
 use toki_render::RenderError;
 
@@ -35,6 +36,8 @@ mod app_bootstrap;
 mod app_lifecycle;
 #[path = "app_presenter.rs"]
 mod app_presenter;
+#[path = "app_runtime_settings.rs"]
+mod app_runtime_settings;
 #[path = "app_scene_runtime.rs"]
 mod app_scene_runtime;
 #[path = "app_splash.rs"]
@@ -47,6 +50,7 @@ mod app_transition;
 mod runtime_menu;
 
 use app_splash::{ResolvedSplashConfig, SplashPolicy};
+use app_runtime_settings::RuntimeMenuOverlay;
 use app_transition::SceneTransitionController;
 use toki_core::project_assets::first_existing_path;
 
@@ -89,6 +93,7 @@ pub struct RuntimeDisplayOptions {
     pub show_entity_health_bars: bool,
     pub show_ground_shadows: bool,
     pub indexed_palette_override: Option<String>,
+    pub post_process: RuntimePostProcessSettings,
     pub resolution_width: u32,
     pub resolution_height: u32,
     /// Zoom level as percentage (100 = 1.0x, 200 = 2.0x, etc.)
@@ -109,6 +114,7 @@ impl Default for RuntimeDisplayOptions {
             show_entity_health_bars: false,
             show_ground_shadows: toki_core::project_runtime::default_show_ground_shadows(),
             indexed_palette_override: None,
+            post_process: RuntimePostProcessSettings::default(),
             resolution_width: toki_core::project_runtime::default_resolution_width(),
             resolution_height: toki_core::project_runtime::default_resolution_height(),
             zoom_percent: toki_core::project_runtime::default_zoom_percent(),
@@ -174,6 +180,7 @@ struct App {
     splash_started_at: Option<Instant>,
     splash_logo_loaded: bool,
     post_splash_sprite_texture_path: Option<PathBuf>,
+    runtime_overlay: Option<RuntimeMenuOverlay>,
     exit_requested: bool,
     pending_ui_events: Vec<String>,
     /// Last tick instant for delta time calculation in delta timing mode
@@ -185,6 +192,15 @@ struct App {
 }
 
 impl App {
+    fn resolved_post_process_settings(
+        &self,
+    ) -> toki_core::project_runtime::ResolvedPostProcessSettings {
+        self.launch_options
+            .display
+            .post_process
+            .resolve(self.resources.project_palettes())
+    }
+
     fn content_root_path(&self) -> Option<&std::path::Path> {
         self.pack_mount
             .as_ref()
@@ -288,6 +304,7 @@ impl App {
             splash_started_at: None,
             splash_logo_loaded: false,
             post_splash_sprite_texture_path: None,
+            runtime_overlay: None,
             exit_requested: false,
             pending_ui_events: Vec::new(),
             last_tick_instant: None,

@@ -294,7 +294,9 @@ impl InspectorSystem {
                 ui.selectable_value(&mut action_kind, 2, "Open Surface");
                 ui.selectable_value(&mut action_kind, 3, "Back");
                 ui.selectable_value(&mut action_kind, 4, "Exit Runtime");
-                ui.selectable_value(&mut action_kind, 5, "Emit Event");
+                ui.selectable_value(&mut action_kind, 5, "Open Audio Settings");
+                ui.selectable_value(&mut action_kind, 6, "Open Graphics Settings");
+                ui.selectable_value(&mut action_kind, 7, "Emit Event");
             });
 
         changed |= Self::apply_action_kind_change(ui, action, action_kind, available_surface_ids);
@@ -308,7 +310,9 @@ impl InspectorSystem {
             UiAction::OpenSurface { .. } => 2,
             UiAction::Back => 3,
             UiAction::ExitRuntime => 4,
-            UiAction::EmitEvent { .. } => 5,
+            UiAction::OpenAudioSettings => 5,
+            UiAction::OpenGraphicsSettings => 6,
+            UiAction::EmitEvent { .. } => 7,
         }
     }
 
@@ -319,6 +323,8 @@ impl InspectorSystem {
             2 => "Open Surface",
             3 => "Back",
             4 => "Exit Runtime",
+            5 => "Open Audio Settings",
+            6 => "Open Graphics Settings",
             _ => "Emit Event",
         }
     }
@@ -363,6 +369,14 @@ impl InspectorSystem {
             }
             4 if *action != UiAction::ExitRuntime => {
                 *action = UiAction::ExitRuntime;
+                changed = true;
+            }
+            5 if *action != UiAction::OpenAudioSettings => {
+                *action = UiAction::OpenAudioSettings;
+                changed = true;
+            }
+            6 if *action != UiAction::OpenGraphicsSettings => {
+                *action = UiAction::OpenGraphicsSettings;
                 changed = true;
             }
             _ => {

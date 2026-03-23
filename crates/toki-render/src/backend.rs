@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
+use toki_core::project_runtime::ResolvedPostProcessSettings;
 use toki_core::sprite::SpriteFrame;
 use toki_core::text::TextItem;
 
@@ -40,6 +41,9 @@ pub trait RenderBackend: std::fmt::Debug {
 
     /// Update the projection/view matrix
     fn update_projection(&mut self, mvp: glam::Mat4);
+
+    /// Update runtime post-process settings.
+    fn set_post_process_settings(&mut self, settings: ResolvedPostProcessSettings);
 
     /// Enable or disable tilemap rendering
     fn set_tilemap_render_enabled(&mut self, enabled: bool);

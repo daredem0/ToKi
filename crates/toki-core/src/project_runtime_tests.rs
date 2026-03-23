@@ -1,6 +1,6 @@
 use crate::project_runtime::{
-    ProjectPreset, ProjectRuntimeMetadata, RuntimeConfigFile, RuntimeDisplaySettings,
-    RuntimeSettings,
+    PostProcessMode, ProjectPreset, ProjectRuntimeMetadata, RuntimeConfigFile,
+    RuntimeDisplaySettings, RuntimePostProcessSettings, RuntimeSettings,
 };
 
 #[test]
@@ -46,6 +46,8 @@ fn runtime_settings_defaults_match_engine_baseline() {
     assert!(!settings.display.show_entity_health_bars);
     assert!(settings.display.show_ground_shadows);
     assert_eq!(settings.display.indexed_palette_override, None);
+    assert_eq!(settings.display.post_process.mode, PostProcessMode::None);
+    assert_eq!(settings.display.post_process.quantize_palette_id, "gray");
     assert_eq!(settings.display.resolution_width, 160);
     assert_eq!(settings.display.resolution_height, 144);
     assert_eq!(settings.menu.pause_root_screen_id, "pause_menu");
@@ -80,6 +82,43 @@ fn runtime_metadata_supports_global_indexed_palette_override() {
         metadata.runtime.display.indexed_palette_override.as_deref(),
         Some("gb_swamp")
     );
+}
+
+#[test]
+fn runtime_metadata_supports_post_process_settings() {
+    let metadata: ProjectRuntimeMetadata = toml::from_str(
+        r#"
+        [runtime.display.post_process]
+        mode = "tint"
+        tint_color = [12, 34, 56, 255]
+        tint_strength_percent = 70
+        quantize_palette_id = "poison"
+        gb_contrast_percent = 18
+        "#,
+    )
+    .expect("runtime metadata should deserialize");
+
+    assert_eq!(metadata.runtime.display.post_process.mode, PostProcessMode::Tint);
+    assert_eq!(metadata.runtime.display.post_process.tint_color, [12, 34, 56, 255]);
+    assert_eq!(metadata.runtime.display.post_process.tint_strength_percent, 70);
+    assert_eq!(metadata.runtime.display.post_process.quantize_palette_id, "poison");
+    assert_eq!(metadata.runtime.display.post_process.gb_contrast_percent, 18);
+}
+
+#[test]
+fn runtime_post_process_settings_resolve_quantize_palette_from_registry() {
+    let settings = RuntimePostProcessSettings {
+        mode: PostProcessMode::Quantize4,
+        tint_color: [0, 0, 0, 255],
+        tint_strength_percent: 10,
+        quantize_palette_id: "night".to_string(),
+        gb_contrast_percent: 0,
+    };
+
+    let resolved = settings.resolve(&std::collections::BTreeMap::new());
+
+    assert_eq!(resolved.mode, PostProcessMode::Quantize4);
+    assert_eq!(resolved.quantize_palette.colors[0], [0x10, 0x18, 0x2B, 0xFF]);
 }
 
 #[test]

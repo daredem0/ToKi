@@ -1,4 +1,5 @@
 pub mod debug;
+pub mod post_process;
 pub mod sprite;
 pub mod tilemap;
 

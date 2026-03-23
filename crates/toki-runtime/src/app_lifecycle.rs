@@ -49,6 +49,12 @@ impl App {
                     KeyCode::ArrowDown | KeyCode::KeyS if self.is_menu_open() => {
                         self.handle_menu_input(MenuInput::Down);
                     }
+                    KeyCode::ArrowLeft | KeyCode::KeyA if self.is_menu_open() => {
+                        self.handle_menu_input(MenuInput::Left);
+                    }
+                    KeyCode::ArrowRight | KeyCode::KeyD if self.is_menu_open() => {
+                        self.handle_menu_input(MenuInput::Right);
+                    }
                     KeyCode::Enter | KeyCode::Space if self.is_menu_open() => {
                         self.handle_menu_input(MenuInput::Confirm);
                     }
@@ -202,6 +208,8 @@ impl ApplicationHandler for App {
 
         let view = self.camera_system.view_matrix();
         self.rendering.update_projection(view);
+        self.rendering
+            .set_post_process_settings(self.resolved_post_process_settings());
 
         self.platform.request_redraw();
         self.refresh_tilemap_vertices_for_current_camera();

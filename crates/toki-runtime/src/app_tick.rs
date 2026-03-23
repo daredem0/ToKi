@@ -101,6 +101,8 @@ impl App {
         let cam_changed = self.camera_system.update(&runtime, world_bounds) || player_moved;
 
         if self.rendering.has_gpu() {
+            self.rendering
+                .set_post_process_settings(self.resolved_post_process_settings());
             if cam_changed {
                 let view = self.camera_system.view_matrix();
                 self.rendering.update_projection(view);

@@ -1,4 +1,5 @@
 use chrono::Utc;
+use toki_core::project_runtime::PostProcessMode;
 
 use super::Project;
 
@@ -21,6 +22,11 @@ pub struct ProjectSettingsDraft {
     pub movement_mix_percent: u8,
     pub collision_mix_percent: u8,
     pub indexed_palette_override: Option<String>,
+    pub post_process_mode: PostProcessMode,
+    pub post_process_tint_color: [u8; 4],
+    pub post_process_tint_strength_percent: u8,
+    pub post_process_quantize_palette_id: String,
+    pub post_process_gb_contrast_percent: i16,
 }
 
 impl ProjectSettingsDraft {
@@ -43,6 +49,27 @@ impl ProjectSettingsDraft {
             movement_mix_percent: project.metadata.runtime.audio.movement_percent,
             collision_mix_percent: project.metadata.runtime.audio.collision_percent,
             indexed_palette_override: project.metadata.runtime.display.indexed_palette_override.clone(),
+            post_process_mode: project.metadata.runtime.display.post_process.mode,
+            post_process_tint_color: project.metadata.runtime.display.post_process.tint_color,
+            post_process_tint_strength_percent: project
+                .metadata
+                .runtime
+                .display
+                .post_process
+                .tint_strength_percent,
+            post_process_quantize_palette_id: project
+                .metadata
+                .runtime
+                .display
+                .post_process
+                .quantize_palette_id
+                .clone(),
+            post_process_gb_contrast_percent: project
+                .metadata
+                .runtime
+                .display
+                .post_process
+                .gb_contrast_percent,
         }
     }
 }
@@ -80,6 +107,35 @@ pub fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettin
     if project.metadata.runtime.display.indexed_palette_override != draft.indexed_palette_override {
         project.metadata.runtime.display.indexed_palette_override =
             draft.indexed_palette_override.clone();
+        changed = true;
+    }
+    if project.metadata.runtime.display.post_process.mode != draft.post_process_mode {
+        project.metadata.runtime.display.post_process.mode = draft.post_process_mode;
+        changed = true;
+    }
+    if project.metadata.runtime.display.post_process.tint_color != draft.post_process_tint_color {
+        project.metadata.runtime.display.post_process.tint_color = draft.post_process_tint_color;
+        changed = true;
+    }
+    if project.metadata.runtime.display.post_process.tint_strength_percent
+        != draft.post_process_tint_strength_percent
+    {
+        project.metadata.runtime.display.post_process.tint_strength_percent =
+            draft.post_process_tint_strength_percent;
+        changed = true;
+    }
+    if project.metadata.runtime.display.post_process.quantize_palette_id
+        != draft.post_process_quantize_palette_id
+    {
+        project.metadata.runtime.display.post_process.quantize_palette_id =
+            draft.post_process_quantize_palette_id.clone();
+        changed = true;
+    }
+    if project.metadata.runtime.display.post_process.gb_contrast_percent
+        != draft.post_process_gb_contrast_percent
+    {
+        project.metadata.runtime.display.post_process.gb_contrast_percent =
+            draft.post_process_gb_contrast_percent;
         changed = true;
     }
     if project.metadata.runtime.display.resolution_width != draft.resolution_width {
@@ -158,6 +214,11 @@ mod tests {
             movement_mix_percent: 55,
             collision_mix_percent: 35,
             indexed_palette_override: Some("gb_swamp".to_string()),
+            post_process_mode: PostProcessMode::Tint,
+            post_process_tint_color: [12, 34, 56, 255],
+            post_process_tint_strength_percent: 65,
+            post_process_quantize_palette_id: "poison".to_string(),
+            post_process_gb_contrast_percent: 12,
         };
 
         let changed = apply_project_settings_draft(&mut project, &draft);
@@ -177,6 +238,26 @@ mod tests {
         assert_eq!(project.metadata.runtime.audio.music_percent, 70);
         assert_eq!(project.metadata.runtime.audio.movement_percent, 55);
         assert_eq!(project.metadata.runtime.audio.collision_percent, 35);
+        assert_eq!(
+            project.metadata.runtime.display.post_process.mode,
+            PostProcessMode::Tint
+        );
+        assert_eq!(
+            project.metadata.runtime.display.post_process.tint_color,
+            [12, 34, 56, 255]
+        );
+        assert_eq!(
+            project.metadata.runtime.display.post_process.tint_strength_percent,
+            65
+        );
+        assert_eq!(
+            project.metadata.runtime.display.post_process.quantize_palette_id,
+            "poison"
+        );
+        assert_eq!(
+            project.metadata.runtime.display.post_process.gb_contrast_percent,
+            12
+        );
         assert!(project.is_dirty);
         assert!(project.metadata.project.modified >= original_modified);
     }

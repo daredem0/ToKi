@@ -1,5 +1,7 @@
 use crate::menu::MenuSettings;
+use crate::palette::{resolve_palette, Palette4};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// Controls how game logic timing is handled.
 ///
@@ -61,6 +63,72 @@ pub struct RuntimeSettings {
     pub menu: MenuSettings,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PostProcessMode {
+    #[default]
+    None,
+    Tint,
+    Quantize4,
+    GbPalette,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResolvedPostProcessSettings {
+    pub mode: PostProcessMode,
+    pub tint_color: [u8; 4],
+    pub tint_strength_percent: u8,
+    pub quantize_palette: Palette4,
+    pub gb_contrast_percent: i16,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimePostProcessSettings {
+    #[serde(default)]
+    pub mode: PostProcessMode,
+    #[serde(default = "default_post_process_tint_color")]
+    pub tint_color: [u8; 4],
+    #[serde(default = "default_post_process_tint_strength_percent")]
+    pub tint_strength_percent: u8,
+    #[serde(default = "default_post_process_quantize_palette_id")]
+    pub quantize_palette_id: String,
+    #[serde(default = "default_post_process_gb_contrast_percent")]
+    pub gb_contrast_percent: i16,
+}
+
+impl Default for RuntimePostProcessSettings {
+    fn default() -> Self {
+        Self {
+            mode: PostProcessMode::default(),
+            tint_color: default_post_process_tint_color(),
+            tint_strength_percent: default_post_process_tint_strength_percent(),
+            quantize_palette_id: default_post_process_quantize_palette_id(),
+            gb_contrast_percent: default_post_process_gb_contrast_percent(),
+        }
+    }
+}
+
+impl RuntimePostProcessSettings {
+    pub fn resolve(&self, project_palettes: &BTreeMap<String, Palette4>) -> ResolvedPostProcessSettings {
+        let quantize_palette = resolve_palette(&self.quantize_palette_id, project_palettes)
+            .or_else(|| resolve_palette("gray", project_palettes))
+            .unwrap_or(Palette4::new([
+                [0x11, 0x11, 0x11, 0xFF],
+                [0x55, 0x55, 0x55, 0xFF],
+                [0xAA, 0xAA, 0xAA, 0xFF],
+                [0xF0, 0xF0, 0xF0, 0xFF],
+            ]));
+
+        ResolvedPostProcessSettings {
+            mode: self.mode,
+            tint_color: self.tint_color,
+            tint_strength_percent: self.tint_strength_percent.min(100),
+            quantize_palette,
+            gb_contrast_percent: self.gb_contrast_percent.clamp(-100, 100),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimeSplashSettings {
     #[serde(default = "default_runtime_splash_duration_ms")]
@@ -106,6 +174,8 @@ pub struct RuntimeDisplaySettings {
     pub show_ground_shadows: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub indexed_palette_override: Option<String>,
+    #[serde(default)]
+    pub post_process: RuntimePostProcessSettings,
     /// Viewport width in pixels (defaults to preset resolution)
     #[serde(default = "default_resolution_width")]
     pub resolution_width: u32,
@@ -132,6 +202,7 @@ impl Default for RuntimeDisplaySettings {
             show_entity_health_bars: false,
             show_ground_shadows: default_show_ground_shadows(),
             indexed_palette_override: None,
+            post_process: RuntimePostProcessSettings::default(),
             resolution_width: default_resolution_width(),
             resolution_height: default_resolution_height(),
             zoom_percent: default_zoom_percent(),
@@ -217,6 +288,8 @@ pub struct RuntimeConfigDisplay {
     #[serde(default)]
     pub indexed_palette_override: Option<String>,
     #[serde(default)]
+    pub post_process: Option<RuntimePostProcessSettings>,
+    #[serde(default)]
     pub resolution_width: Option<u32>,
     #[serde(default)]
     pub resolution_height: Option<u32>,
@@ -236,6 +309,22 @@ pub const fn default_runtime_splash_duration_ms() -> u64 {
 
 pub const fn default_runtime_audio_mix_percent() -> u8 {
     100
+}
+
+pub const fn default_post_process_tint_color() -> [u8; 4] {
+    [32, 64, 96, 255]
+}
+
+pub const fn default_post_process_tint_strength_percent() -> u8 {
+    35
+}
+
+pub fn default_post_process_quantize_palette_id() -> String {
+    "gray".to_string()
+}
+
+pub const fn default_post_process_gb_contrast_percent() -> i16 {
+    0
 }
 
 pub const fn default_show_ground_shadows() -> bool {

@@ -1,0 +1,311 @@
+{
+  "image": "creatures_palette4.png",
+  "tile_size": [
+    16,
+    16
+  ],
+  "color_mode": "palette_indexed",
+  "palette": "poison",
+  "tiles": {
+    "slime/idle_right_b": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/idle_right_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_left_b": {
+      "position": [
+        1,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_down_d": {
+      "position": [
+        3,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_d": {
+      "position": [
+        3,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/idle_left_b": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_left_c": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_up_b": {
+      "position": [
+        1,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_right_c": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/idle_left_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_up_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_down_b": {
+      "position": [
+        1,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_right_b": {
+      "position": [
+        1,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/idle_up_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/idle_up_b": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_up_c": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_right_d": {
+      "position": [
+        3,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_left_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_up_d": {
+      "position": [
+        3,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/idle_down_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_down_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/idle_down_b": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_down_c": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_left_d": {
+      "position": [
+        3,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_b": {
+      "position": [
+        1,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_c": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/walk_right_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/idle_b": {
+      "position": [
+        2,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    },
+    "slime/idle_a": {
+      "position": [
+        0,
+        0
+      ],
+      "properties": {
+        "solid": false,
+        "trigger": false
+      }
+    }
+  }
+}

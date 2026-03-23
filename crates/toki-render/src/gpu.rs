@@ -7,14 +7,17 @@ use winit::window::Window;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
 use toki_core::math::projection::screen_space_projection;
+use toki_core::project_runtime::{PostProcessMode, ResolvedPostProcessSettings};
 use toki_core::sprite::SpriteFrame;
 use toki_core::text::TextItem;
 
+use crate::targets::{OffscreenTarget, RenderTarget};
 use crate::pipelines::sprite::SpriteInstance;
 use crate::pipelines::RenderPipeline;
 use crate::wgpu_utils::create_device_and_surface;
 use crate::{
-    DebugPipeline, GlyphonTextRenderer, SpritePipeline, TextBackgroundRect, TilemapPipeline,
+    DebugPipeline, GlyphonTextRenderer, PostProcessPipeline, SpritePipeline,
+    TextBackgroundRect, TilemapPipeline,
 };
 
 #[allow(dead_code)]
@@ -30,6 +33,9 @@ pub struct GpuState {
     debug_pipeline: DebugPipeline,
     ui_rect_pipeline: DebugPipeline,
     ui_debug_pipeline: DebugPipeline,
+    post_process_pipeline: PostProcessPipeline,
+    post_process_target: Option<OffscreenTarget>,
+    post_process_settings: ResolvedPostProcessSettings,
     text_renderer: GlyphonTextRenderer,
     text_items: Vec<TextItem>,
     tilemap_render_enabled: bool,
@@ -41,6 +47,7 @@ impl std::fmt::Debug for GpuState {
         f.debug_struct("GpuState")
             .field("config", &self.config)
             .field("tilemap_render_enabled", &self.tilemap_render_enabled)
+            .field("post_process_mode", &self.post_process_settings.mode)
             .field("text_items_len", &self.text_items.len())
             .finish_non_exhaustive()
     }
@@ -52,6 +59,75 @@ fn default_texture_path() -> PathBuf {
 }
 
 impl GpuState {
+    fn default_post_process_settings() -> ResolvedPostProcessSettings {
+        ResolvedPostProcessSettings {
+            mode: PostProcessMode::None,
+            tint_color: [0, 0, 0, 255],
+            tint_strength_percent: 0,
+            quantize_palette: toki_core::palette::Palette4::new([
+                [0x11, 0x11, 0x11, 0xFF],
+                [0x55, 0x55, 0x55, 0xFF],
+                [0xAA, 0xAA, 0xAA, 0xFF],
+                [0xF0, 0xF0, 0xF0, 0xFF],
+            ]),
+            gb_contrast_percent: 0,
+        }
+    }
+
+    fn ensure_post_process_target(&mut self) -> Result<(), crate::RenderError> {
+        let size = (self.config.width.max(1), self.config.height.max(1));
+        let target = self.post_process_target.get_or_insert(
+            OffscreenTarget::new(self.device.clone(), size, self.config.format)?
+        );
+        target.resize(size)?;
+        self.post_process_pipeline
+            .update_source_texture(&self.device, target.get_render_view()?);
+        Ok(())
+    }
+
+    fn render_scene_to_view(&mut self, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Render Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+
+        render_pass.set_viewport(
+            0.0,
+            0.0,
+            self.config.width as f32,
+            self.config.height as f32,
+            0.0,
+            1.0,
+        );
+
+        if self.tilemap_render_enabled {
+            self.tilemap_pipeline.render(&mut render_pass);
+        }
+
+        self.world_underlay_pipeline.render(&mut render_pass);
+        self.sprite_pipeline.render(&mut render_pass);
+        for pipeline in self.sprite_pipelines_by_texture.values() {
+            pipeline.render(&mut render_pass);
+        }
+        self.debug_pipeline.render(&mut render_pass);
+        self.ui_rect_pipeline.render(&mut render_pass);
+        self.ui_debug_pipeline.render(&mut render_pass);
+
+        if let Err(error) = self.text_renderer.render(&mut render_pass) {
+            tracing::warn!("Failed to render text layer: {error}");
+        }
+    }
+
     pub fn add_sprite(&mut self, frame: SpriteFrame, pos: glam::IVec2, size: glam::UVec2) {
         let instance = SpriteInstance {
             frame,
@@ -260,6 +336,14 @@ impl GpuState {
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
+            if let Some(target) = &mut self.post_process_target {
+                if let Err(error) = target.resize((new_size.width, new_size.height)) {
+                    tracing::warn!("Failed to resize post-process target: {error}");
+                } else if let Ok(view) = target.get_render_view() {
+                    self.post_process_pipeline
+                        .update_source_texture(&self.device, view);
+                }
+            }
         }
     }
 
@@ -276,6 +360,7 @@ impl GpuState {
         let debug_pipeline = DebugPipeline::new(&device, config.format);
         let ui_rect_pipeline = DebugPipeline::new(&device, config.format);
         let ui_debug_pipeline = DebugPipeline::new(&device, config.format);
+        let post_process_pipeline = PostProcessPipeline::new(&device, config.format);
         let text_renderer = GlyphonTextRenderer::new(&device, &queue, config.format);
 
         Self {
@@ -290,6 +375,9 @@ impl GpuState {
             debug_pipeline,
             ui_rect_pipeline,
             ui_debug_pipeline,
+            post_process_pipeline,
+            post_process_target: None,
+            post_process_settings: Self::default_post_process_settings(),
             text_renderer,
             text_items: Vec::new(),
             tilemap_render_enabled: true,
@@ -360,6 +448,7 @@ impl GpuState {
         let debug_pipeline = DebugPipeline::new(&device, config.format);
         let ui_rect_pipeline = DebugPipeline::new(&device, config.format);
         let ui_debug_pipeline = DebugPipeline::new(&device, config.format);
+        let post_process_pipeline = PostProcessPipeline::new(&device, config.format);
         let text_renderer = GlyphonTextRenderer::new(&device, &queue, config.format);
 
         Ok(Self {
@@ -374,6 +463,9 @@ impl GpuState {
             debug_pipeline,
             ui_rect_pipeline,
             ui_debug_pipeline,
+            post_process_pipeline,
+            post_process_target: None,
+            post_process_settings: Self::default_post_process_settings(),
             text_renderer,
             text_items: Vec::new(),
             tilemap_render_enabled: true,
@@ -383,6 +475,10 @@ impl GpuState {
 
     pub fn set_tilemap_render_enabled(&mut self, enabled: bool) {
         self.tilemap_render_enabled = enabled;
+    }
+
+    pub fn set_post_process_settings(&mut self, settings: ResolvedPostProcessSettings) {
+        self.post_process_settings = settings;
     }
 
     pub fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
@@ -439,9 +535,21 @@ impl GpuState {
                 label: Some("Render Encoder"),
             });
 
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
+        if self.post_process_settings.mode == PostProcessMode::None {
+            self.render_scene_to_view(&mut encoder, &view);
+        } else if let Err(error) = self.ensure_post_process_target() {
+            tracing::warn!("Failed to prepare post-process target: {error}");
+            self.render_scene_to_view(&mut encoder, &view);
+        } else if let Some(target) = &mut self.post_process_target {
+            self.post_process_pipeline
+                .update_settings(&self.queue, self.post_process_settings);
+            let target_view = target
+                .get_render_view()
+                .expect("post-process target render view must exist")
+                .clone();
+            self.render_scene_to_view(&mut encoder, &target_view);
+            let mut post_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Post Process Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
@@ -454,41 +562,7 @@ impl GpuState {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-
-            render_pass.set_viewport(
-                0.0,
-                0.0,
-                self.config.width as f32,
-                self.config.height as f32,
-                0.0,
-                1.0,
-            );
-
-            // Render tilemap first (background)
-            if self.tilemap_render_enabled {
-                self.tilemap_pipeline.render(&mut render_pass);
-            }
-
-            self.world_underlay_pipeline.render(&mut render_pass);
-
-            // Render sprites on top
-            self.sprite_pipeline.render(&mut render_pass);
-            for pipeline in self.sprite_pipelines_by_texture.values() {
-                pipeline.render(&mut render_pass);
-            }
-
-            // Render debug shapes last (on top of everything)
-            self.debug_pipeline.render(&mut render_pass);
-
-            // Render generic runtime UI rectangles in screen-space above world debug overlays.
-            self.ui_rect_pipeline.render(&mut render_pass);
-
-            // Render UI background rectangles for text boxes in screen-space.
-            self.ui_debug_pipeline.render(&mut render_pass);
-
-            if let Err(error) = self.text_renderer.render(&mut render_pass) {
-                tracing::warn!("Failed to render text layer: {error}");
-            }
+            self.post_process_pipeline.render(&mut post_pass);
         }
 
         self.queue.submit(Some(encoder.finish()));
@@ -582,6 +656,10 @@ impl crate::RenderBackend for GpuState {
 
     fn set_tilemap_render_enabled(&mut self, enabled: bool) {
         GpuState::set_tilemap_render_enabled(self, enabled);
+    }
+
+    fn set_post_process_settings(&mut self, settings: ResolvedPostProcessSettings) {
+        GpuState::set_post_process_settings(self, settings);
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
