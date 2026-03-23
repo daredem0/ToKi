@@ -87,23 +87,27 @@ pub fn create_texture_bindgroup_from_rgba8(
 }
 pub fn create_device_and_surface(
     window: Arc<Window>,
+    vsync: bool,
 ) -> (
     wgpu::Device,
     wgpu::Queue,
     Surface<'static>,
     SurfaceConfiguration,
+    Vec<wgpu::PresentMode>,
 ) {
-    pollster::block_on(create_device_and_surface_async(window))
+    pollster::block_on(create_device_and_surface_async(window, vsync))
 }
 
 /// Async version of WGPU setup for better integration with modern async runtimes
 pub async fn create_device_and_surface_async(
     window: Arc<Window>,
+    vsync: bool,
 ) -> (
     wgpu::Device,
     wgpu::Queue,
     Surface<'static>,
     SurfaceConfiguration,
+    Vec<wgpu::PresentMode>,
 ) {
     // Create wgpu instance with better defaults
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
@@ -151,19 +155,7 @@ pub async fn create_device_and_surface_async(
         .copied()
         .unwrap_or(surface_caps.formats[0]);
 
-    // Choose VSync for frame rate limiting and lower CPU usage
-    let present_mode = surface_caps
-        .present_modes
-        .iter()
-        .find(|&&mode| mode == wgpu::PresentMode::Fifo) // VSync (60 FPS cap)
-        .or_else(|| {
-            surface_caps
-                .present_modes
-                .iter()
-                .find(|&&mode| mode == wgpu::PresentMode::FifoRelaxed)
-        }) // Adaptive VSync
-        .copied()
-        .unwrap_or(surface_caps.present_modes[0]); // Fallback to first available
+    let present_mode = choose_present_mode(&surface_caps.present_modes, vsync);
 
     tracing::info!(
         "Using present mode: {:?} (available: {:?})",
@@ -183,7 +175,41 @@ pub async fn create_device_and_surface_async(
     };
 
     surface.configure(&device, &config);
-    (device, queue, surface, config)
+    (device, queue, surface, config, surface_caps.present_modes.clone())
+}
+
+pub fn choose_present_mode(
+    present_modes: &[wgpu::PresentMode],
+    vsync: bool,
+) -> wgpu::PresentMode {
+    if vsync {
+        present_modes
+            .iter()
+            .find(|&&mode| mode == wgpu::PresentMode::Fifo)
+            .or_else(|| {
+                present_modes
+                    .iter()
+                    .find(|&&mode| mode == wgpu::PresentMode::FifoRelaxed)
+            })
+            .copied()
+            .unwrap_or(present_modes[0])
+    } else {
+        present_modes
+            .iter()
+            .find(|&&mode| mode == wgpu::PresentMode::Immediate)
+            .or_else(|| {
+                present_modes
+                    .iter()
+                    .find(|&&mode| mode == wgpu::PresentMode::Mailbox)
+            })
+            .or_else(|| {
+                present_modes
+                    .iter()
+                    .find(|&&mode| mode == wgpu::PresentMode::AutoNoVsync)
+            })
+            .copied()
+            .unwrap_or(present_modes[0])
+    }
 }
 
 pub fn create_shader_module(device: &wgpu::Device) -> wgpu::ShaderModule {

@@ -14,7 +14,7 @@ use toki_core::text::TextItem;
 use crate::targets::{OffscreenTarget, RenderTarget};
 use crate::pipelines::sprite::SpriteInstance;
 use crate::pipelines::RenderPipeline;
-use crate::wgpu_utils::create_device_and_surface;
+use crate::wgpu_utils::{choose_present_mode, create_device_and_surface};
 use crate::{
     DebugPipeline, GlyphonTextRenderer, PostProcessPipeline, SpritePipeline,
     TextBackgroundRect, TilemapPipeline,
@@ -24,6 +24,7 @@ use crate::{
 pub struct GpuState {
     surface: Surface<'static>,
     config: SurfaceConfiguration,
+    supported_present_modes: Vec<wgpu::PresentMode>,
     device: Device,
     queue: Queue,
     tilemap_pipeline: TilemapPipeline,
@@ -351,8 +352,9 @@ impl GpuState {
         }
     }
 
-    pub fn new(window: Arc<Window>) -> Self {
-        let (device, queue, surface, config) = create_device_and_surface(Arc::clone(&window));
+    pub fn new(window: Arc<Window>, vsync: bool) -> Self {
+        let (device, queue, surface, config, supported_present_modes) =
+            create_device_and_surface(Arc::clone(&window), vsync);
 
         let tilemap_pipeline =
             TilemapPipeline::new(&device, &queue, config.format, default_texture_path());
@@ -370,6 +372,7 @@ impl GpuState {
         Self {
             surface,
             config,
+            supported_present_modes,
             device,
             queue,
             tilemap_pipeline,
@@ -435,10 +438,12 @@ impl GpuState {
     /// Create GpuState and immediately load specific textures (for editor use)
     pub fn new_with_textures(
         window: Arc<Window>,
+        vsync: bool,
         tilemap_texture: Option<PathBuf>,
         sprite_texture: Option<PathBuf>,
     ) -> Result<Self, crate::RenderError> {
-        let (device, queue, surface, config) = create_device_and_surface(Arc::clone(&window));
+        let (device, queue, surface, config, supported_present_modes) =
+            create_device_and_surface(Arc::clone(&window), vsync);
 
         // Use provided textures; otherwise fall back to a generated 1x1 white texture.
         let tilemap_path = tilemap_texture.unwrap_or_else(default_texture_path);
@@ -458,6 +463,7 @@ impl GpuState {
         Ok(Self {
             surface,
             config,
+            supported_present_modes,
             device,
             queue,
             tilemap_pipeline,
@@ -483,6 +489,14 @@ impl GpuState {
 
     pub fn set_post_process_settings(&mut self, settings: ResolvedPostProcessSettings) {
         self.post_process_settings = settings;
+    }
+
+    pub fn set_vsync(&mut self, enabled: bool) {
+        let next_mode = choose_present_mode(&self.supported_present_modes, enabled);
+        if self.config.present_mode != next_mode {
+            self.config.present_mode = next_mode;
+            self.surface.configure(&self.device, &self.config);
+        }
     }
 
     pub fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
@@ -664,6 +678,10 @@ impl crate::RenderBackend for GpuState {
 
     fn set_post_process_settings(&mut self, settings: ResolvedPostProcessSettings) {
         GpuState::set_post_process_settings(self, settings);
+    }
+
+    fn set_vsync(&mut self, enabled: bool) {
+        GpuState::set_vsync(self, enabled);
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {

@@ -45,6 +45,9 @@ pub trait RenderBackend: std::fmt::Debug {
     /// Update runtime post-process settings.
     fn set_post_process_settings(&mut self, settings: ResolvedPostProcessSettings);
 
+    /// Enable or disable vsync by reconfiguring the surface present mode when supported.
+    fn set_vsync(&mut self, enabled: bool);
+
     /// Enable or disable tilemap rendering
     fn set_tilemap_render_enabled(&mut self, enabled: bool);
 

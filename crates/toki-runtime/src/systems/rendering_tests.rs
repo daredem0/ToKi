@@ -101,6 +101,8 @@ impl RenderBackend for FakeBackend {
             .set(self.post_process_updates.get() + 1);
     }
 
+    fn set_vsync(&mut self, _enabled: bool) {}
+
     fn set_tilemap_render_enabled(&mut self, enabled: bool) {
         self.tilemap_render_enabled.set(enabled);
     }

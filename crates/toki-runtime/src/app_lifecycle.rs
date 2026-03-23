@@ -160,6 +160,7 @@ impl ApplicationHandler for App {
         if let Some(window) = self.platform.window_for_gpu() {
             if let Err(error) = self.rendering.initialize_gpu_with_textures(
                 window.clone(),
+                self.launch_options.display.vsync,
                 self.asset_load_plan.tilemap_texture_path.clone(),
                 self.asset_load_plan.sprite_texture_path.clone(),
             ) {
@@ -172,7 +173,7 @@ impl ApplicationHandler for App {
                 } else {
                     tracing::error!("Failed to initialize GPU with runtime asset plan: {error}");
                 }
-                self.rendering.initialize_gpu(window);
+                self.rendering.initialize_gpu(window, self.launch_options.display.vsync);
             } else {
                 self.post_splash_sprite_texture_path =
                     self.asset_load_plan.sprite_texture_path.clone();

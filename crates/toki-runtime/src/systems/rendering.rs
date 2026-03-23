@@ -93,8 +93,8 @@ impl RenderingSystem {
     }
 
     /// Initialize GPU state with the given window (uses default textures)
-    pub fn initialize_gpu(&mut self, window: Arc<Window>) {
-        let gpu = GpuState::new(window);
+    pub fn initialize_gpu(&mut self, window: Arc<Window>, vsync: bool) {
+        let gpu = GpuState::new(window, vsync);
         self.backend = Some(Box::new(gpu));
     }
 
@@ -107,10 +107,11 @@ impl RenderingSystem {
     pub fn initialize_gpu_with_textures(
         &mut self,
         window: Arc<Window>,
+        vsync: bool,
         tilemap_texture: Option<std::path::PathBuf>,
         sprite_texture: Option<std::path::PathBuf>,
     ) -> Result<(), toki_render::RenderError> {
-        let gpu = GpuState::new_with_textures(window, tilemap_texture, sprite_texture)?;
+        let gpu = GpuState::new_with_textures(window, vsync, tilemap_texture, sprite_texture)?;
         self.loaded_tilemap_texture_path = None;
         self.loaded_sprite_texture_path = None;
         self.backend = Some(Box::new(gpu));
@@ -254,6 +255,12 @@ impl RenderingSystem {
     pub fn set_post_process_settings(&mut self, settings: ResolvedPostProcessSettings) {
         if let Some(backend) = &mut self.backend {
             backend.set_post_process_settings(settings);
+        }
+    }
+
+    pub fn set_vsync(&mut self, enabled: bool) {
+        if let Some(backend) = &mut self.backend {
+            backend.set_vsync(enabled);
         }
     }
 
