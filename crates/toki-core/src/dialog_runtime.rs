@@ -111,7 +111,7 @@ impl DialogController {
             .unwrap_or_else(|| dialog.title.clone());
         let entries = match &node.kind {
             DialogNodeKind::Line { next_node_id, .. } => {
-                line_entries(dialog.allow_cancel, next_node_id.is_some())
+                line_entries(dialog.allow_cancel, next_node_id.is_some(), active.selected_index)
             }
             DialogNodeKind::Choice { choices, .. } => {
                 let choice_entries = choices
@@ -136,7 +136,9 @@ impl DialogController {
                     choice_entries.collect()
                 }
             }
-            DialogNodeKind::End { .. } => line_entries(dialog.allow_cancel, false),
+            DialogNodeKind::End { .. } => {
+                line_entries(dialog.allow_cancel, false, active.selected_index)
+            }
             DialogNodeKind::Branch { .. } => Vec::new(),
         };
 
@@ -213,8 +215,23 @@ impl DialogController {
                 }
             },
             DialogNodeKind::Line { next_node_id, .. } => match input {
+                MenuInput::Up | MenuInput::Left => {
+                    cycle_binary_selection(active, dialog.allow_cancel, -1);
+                    DialogAdvanceResult::None
+                }
+                MenuInput::Down | MenuInput::Right => {
+                    cycle_binary_selection(active, dialog.allow_cancel, 1);
+                    DialogAdvanceResult::None
+                }
                 MenuInput::Confirm => {
-                    if let Some(next) = next_node_id.clone() {
+                    if dialog.allow_cancel && active.selected_index == 1 {
+                        let completion = DialogCompletion {
+                            dialog_id: active.dialog_id.clone(),
+                            outcome_id: None,
+                        };
+                        self.active = None;
+                        DialogAdvanceResult::Closed(completion)
+                    } else if let Some(next) = next_node_id.clone() {
                         active.current_node_id = next;
                         active.selected_index = 0;
                         self.resolve_branches(game_state);
@@ -239,6 +256,22 @@ impl DialogController {
                 _ => DialogAdvanceResult::None,
             },
             DialogNodeKind::End { outcome_id, .. } => match input {
+                MenuInput::Up | MenuInput::Left => {
+                    cycle_binary_selection(active, dialog.allow_cancel, -1);
+                    DialogAdvanceResult::None
+                }
+                MenuInput::Down | MenuInput::Right => {
+                    cycle_binary_selection(active, dialog.allow_cancel, 1);
+                    DialogAdvanceResult::None
+                }
+                MenuInput::Confirm if dialog.allow_cancel && active.selected_index == 1 => {
+                    let completion = DialogCompletion {
+                        dialog_id: active.dialog_id.clone(),
+                        outcome_id: None,
+                    };
+                    self.active = None;
+                    DialogAdvanceResult::Closed(completion)
+                }
                 MenuInput::Confirm | MenuInput::Back if dialog.allow_cancel || matches!(input, MenuInput::Confirm) => {
                     let completion = DialogCompletion {
                         dialog_id: active.dialog_id.clone(),
@@ -254,6 +287,18 @@ impl DialogController {
                 DialogAdvanceResult::None
             }
         }
+    }
+
+    pub fn activate_entry(
+        &mut self,
+        entry_index: usize,
+        game_state: &GameState,
+    ) -> DialogAdvanceResult {
+        let Some(active) = self.active.as_mut() else {
+            return DialogAdvanceResult::None;
+        };
+        active.selected_index = entry_index;
+        self.handle_input(MenuInput::Confirm, game_state)
     }
 
     fn resolve_branches(&mut self, game_state: &GameState) {
@@ -348,26 +393,40 @@ fn resolve_dialog_target(
     }
 }
 
-fn line_entries(allow_cancel: bool, has_next: bool) -> Vec<MenuViewEntry> {
+fn line_entries(allow_cancel: bool, has_next: bool, selected_index: usize) -> Vec<MenuViewEntry> {
     let mut entries = vec![MenuViewEntry {
         text: if has_next {
             "Continue".to_string()
         } else {
             "Close".to_string()
         },
-        selected: true,
+        selected: selected_index == 0,
         selectable: true,
         border_style_override: None,
     }];
     if allow_cancel {
         entries.push(MenuViewEntry {
             text: "Cancel".to_string(),
-            selected: false,
+            selected: selected_index == 1,
             selectable: true,
             border_style_override: None,
         });
     }
     entries
+}
+
+fn cycle_binary_selection(active: &mut ActiveDialogState, allow_cancel: bool, direction: i32) {
+    if !allow_cancel {
+        active.selected_index = 0;
+        return;
+    }
+
+    let total = 2usize;
+    if direction < 0 {
+        active.selected_index = (active.selected_index + total - 1) % total;
+    } else {
+        active.selected_index = (active.selected_index + 1) % total;
+    }
 }
 
 #[cfg(test)]
@@ -492,6 +551,27 @@ mod tests {
             DialogAdvanceResult::Closed(DialogCompletion {
                 dialog_id: "choices".to_string(),
                 outcome_id: Some("beta".to_string()),
+            })
+        );
+    }
+
+    #[test]
+    fn line_dialog_navigation_can_select_cancel() {
+        let game_state = GameState::new_empty();
+        let mut controller = DialogController::new(vec![simple_dialog()]);
+        controller
+            .start_dialog(&game_state, "intro", DialogRuntimeContext::default())
+            .expect("dialog should start");
+
+        controller.handle_input(MenuInput::Right, &game_state);
+        let view = controller.current_view().expect("view");
+        assert!(view.entries[1].selected);
+
+        assert_eq!(
+            controller.handle_input(MenuInput::Confirm, &game_state),
+            DialogAdvanceResult::Closed(DialogCompletion {
+                dialog_id: "intro".to_string(),
+                outcome_id: None,
             })
         );
     }

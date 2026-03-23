@@ -105,6 +105,8 @@ impl InspectorSystem {
                     &mut ctx.appearance.footer_spacing_px,
                     0..=128,
                 );
+                ctx.changed |=
+                    Self::render_dialog_position_combo(ui, &mut ctx.appearance.dialog_position);
             });
     }
 
@@ -162,6 +164,31 @@ impl InspectorSystem {
             });
         if selected != *style {
             *style = selected;
+            return true;
+        }
+        false
+    }
+
+    fn render_dialog_position_combo(
+        ui: &mut egui::Ui,
+        position: &mut MenuDialogPosition,
+    ) -> bool {
+        let mut selected = *position;
+        egui::ComboBox::from_label("Dialog Position")
+            .selected_text(match selected {
+                MenuDialogPosition::Top => "Top",
+                MenuDialogPosition::Bottom => "Bottom",
+                MenuDialogPosition::Left => "Left",
+                MenuDialogPosition::Right => "Right",
+            })
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut selected, MenuDialogPosition::Top, "Top");
+                ui.selectable_value(&mut selected, MenuDialogPosition::Bottom, "Bottom");
+                ui.selectable_value(&mut selected, MenuDialogPosition::Left, "Left");
+                ui.selectable_value(&mut selected, MenuDialogPosition::Right, "Right");
+            });
+        if selected != *position {
+            *position = selected;
             return true;
         }
         false

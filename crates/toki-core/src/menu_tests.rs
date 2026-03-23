@@ -2,8 +2,8 @@ use super::{
     apply_menu_opacity, build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui,
     menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba, menu_visual_metrics,
     InventoryEntry, MenuAppearance, MenuBorderStyle, MenuController, MenuDialogDefinition,
-    MenuInput, MenuItemDefinition, MenuListSource, MenuScreenDefinition, MenuSettings, MenuView,
-    MenuViewEntry, UiAction, UiCommand,
+    MenuDialogPosition, MenuInput, MenuItemDefinition, MenuListSource, MenuScreenDefinition,
+    MenuSettings, MenuView, MenuViewEntry, UiAction, UiCommand,
 };
 
 #[test]
@@ -551,4 +551,85 @@ fn compose_dialog_ui_builds_generic_blocks_for_dialog_overlay() {
             .content,
         "> Exit"
     );
+}
+
+#[test]
+fn menu_dialog_activation_by_entry_index_triggers_matching_action() {
+    let settings = MenuSettings {
+        pause_root_screen_id: "pause_menu".to_string(),
+        gate_gameplay_when_open: true,
+        appearance: MenuAppearance::default(),
+        screens: vec![MenuScreenDefinition {
+            id: "pause_menu".to_string(),
+            title: "Paused".to_string(),
+            title_border_style_override: None,
+            items: vec![MenuItemDefinition::Button {
+                text: "Exit".to_string(),
+                border_style_override: None,
+                action: UiAction::OpenSurface {
+                    surface_id: "exit_confirm".to_string(),
+                },
+            }],
+        }],
+        dialogs: vec![MenuDialogDefinition {
+            id: "exit_confirm".to_string(),
+            title: "Exit Game?".to_string(),
+            body: "Unsaved progress may be lost.".to_string(),
+            confirm_text: "Exit".to_string(),
+            cancel_text: "Cancel".to_string(),
+            confirm_action: UiAction::ExitRuntime,
+            cancel_action: UiAction::CloseSurface,
+            hide_main_menu: false,
+        }],
+    };
+    let mut controller = MenuController::new(settings);
+    controller.open_pause_root();
+    controller.handle_input(MenuInput::Confirm);
+
+    assert_eq!(controller.activate_dialog_entry(1), None);
+    assert!(controller.current_dialog_view().is_none());
+}
+
+#[test]
+fn build_dialog_layout_places_bottom_dialogs_near_bottom_edge() {
+    let top_layout = build_dialog_layout(
+        &super::MenuDialogView {
+            dialog_id: "exit_confirm".to_string(),
+            title: "Exit Game?".to_string(),
+            body: "Unsaved progress may be lost.".to_string(),
+            entries: vec![super::MenuViewEntry {
+                text: "Exit".to_string(),
+                selected: true,
+                selectable: true,
+                border_style_override: None,
+            }],
+            hide_main_menu: false,
+        },
+        &MenuAppearance::default(),
+        glam::Vec2::new(640.0, 360.0),
+    );
+
+    let appearance = MenuAppearance {
+        dialog_position: MenuDialogPosition::Bottom,
+        ..MenuAppearance::default()
+    };
+    let layout = build_dialog_layout(
+        &super::MenuDialogView {
+            dialog_id: "exit_confirm".to_string(),
+            title: "Exit Game?".to_string(),
+            body: "Unsaved progress may be lost.".to_string(),
+            entries: vec![super::MenuViewEntry {
+                text: "Exit".to_string(),
+                selected: true,
+                selectable: true,
+                border_style_override: None,
+            }],
+            hide_main_menu: false,
+        },
+        &appearance,
+        glam::Vec2::new(640.0, 360.0),
+    );
+
+    assert!(layout.panel.y > top_layout.panel.y);
+    assert!(layout.panel.y + layout.panel.height > 340.0);
 }

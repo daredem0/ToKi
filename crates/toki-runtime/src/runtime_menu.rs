@@ -1,5 +1,6 @@
 use toki_core::menu::{
-    build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui, MenuInput,
+    build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui, MenuDialogLayout,
+    MenuInput,
 };
 use toki_core::ui::UiCommand;
 use toki_core::DialogStartRequest;
@@ -38,6 +39,50 @@ impl App {
         }
     }
 
+    pub(super) fn handle_menu_pointer_click(&mut self, position: glam::Vec2) -> bool {
+        let viewport = self
+            .platform
+            .inner_size()
+            .map(|size| glam::Vec2::new(size.width as f32, size.height as f32))
+            .unwrap_or_else(|| {
+                let size = self.camera_system.viewport_size();
+                glam::Vec2::new(size.x as f32, size.y as f32)
+            });
+
+        if self.dialog_system.is_open() {
+            let Some(dialog_view) = self.dialog_system.current_view() else {
+                return false;
+            };
+            let appearance = narrative_dialog_appearance(&self.launch_options).clone();
+            let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
+            if let Some(entry_index) = dialog_entry_at_position(&layout, position) {
+                let result = self
+                    .dialog_system
+                    .activate_entry(entry_index, &self.game_system.game_state);
+                self.apply_dialog_advance_result(result);
+                return true;
+            }
+            return false;
+        }
+
+        if self.runtime_overlay.is_some() || !self.menu_system.is_open() {
+            return false;
+        }
+
+        let Some(dialog_view) = self.menu_system.current_dialog_view() else {
+            return false;
+        };
+        let appearance = self.menu_system.settings().appearance.clone();
+        let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
+        if let Some(entry_index) = dialog_entry_at_position(&layout, position) {
+            if let Some(command) = self.menu_system.activate_dialog_entry(entry_index) {
+                self.apply_menu_command(command);
+            }
+            return true;
+        }
+        false
+    }
+
     pub(super) fn apply_dialog_start_request(&mut self, request: DialogStartRequest) {
         if let Err(error) = self
             .dialog_system
@@ -59,19 +104,23 @@ impl App {
             return false;
         }
 
-        match self
+        let result = self
             .dialog_system
-            .handle_input(input, &self.game_system.game_state)
-        {
-            toki_core::dialog_runtime::DialogAdvanceResult::None => {}
-            toki_core::dialog_runtime::DialogAdvanceResult::Closed(completion) => {
-                if let Some(outcome_id) = completion.outcome_id.as_deref() {
-                    self.game_system
-                        .record_dialog_completion(&completion.dialog_id, outcome_id);
-                }
+            .handle_input(input, &self.game_system.game_state);
+        self.apply_dialog_advance_result(result);
+        true
+    }
+
+    fn apply_dialog_advance_result(
+        &mut self,
+        result: toki_core::dialog_runtime::DialogAdvanceResult,
+    ) {
+        if let toki_core::dialog_runtime::DialogAdvanceResult::Closed(completion) = result {
+            if let Some(outcome_id) = completion.outcome_id.as_deref() {
+                self.game_system
+                    .record_dialog_completion(&completion.dialog_id, outcome_id);
             }
         }
-        true
     }
 
     pub(super) fn render_runtime_menu_overlay(&mut self) {
@@ -167,6 +216,15 @@ fn narrative_dialog_appearance(
     launch_options: &super::RuntimeLaunchOptions,
 ) -> &toki_core::menu::MenuAppearance {
     &launch_options.dialog_appearance
+}
+
+fn dialog_entry_at_position(layout: &MenuDialogLayout, position: glam::Vec2) -> Option<usize> {
+    layout.entries.iter().position(|entry| {
+        position.x >= entry.rect.x
+            && position.x <= entry.rect.x + entry.rect.width
+            && position.y >= entry.rect.y
+            && position.y <= entry.rect.y + entry.rect.height
+    })
 }
 
 #[cfg(test)]
@@ -300,5 +358,52 @@ mod tests {
             narrative_dialog_appearance(&launch_options).border_color_hex,
             "#112233"
         );
+    }
+
+    #[test]
+    fn dialog_entry_hit_testing_uses_rendered_entry_rects() {
+        let layout = MenuDialogLayout {
+            panel: toki_core::ui::UiRect {
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 100.0,
+            },
+            title: toki_core::menu::MenuLayoutBlock {
+                rect: toki_core::ui::UiRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 100.0,
+                    height: 10.0,
+                },
+                text: String::new(),
+                border_style: toki_core::menu::MenuBorderStyle::Square,
+            },
+            body: toki_core::menu::MenuLayoutBlock {
+                rect: toki_core::ui::UiRect {
+                    x: 0.0,
+                    y: 10.0,
+                    width: 100.0,
+                    height: 10.0,
+                },
+                text: String::new(),
+                border_style: toki_core::menu::MenuBorderStyle::Square,
+            },
+            entries: vec![toki_core::menu::MenuEntryLayout {
+                rect: toki_core::ui::UiRect {
+                    x: 10.0,
+                    y: 30.0,
+                    width: 80.0,
+                    height: 16.0,
+                },
+                text: "Ok".to_string(),
+                selected: true,
+                selectable: true,
+                border_style: toki_core::menu::MenuBorderStyle::Square,
+            }],
+        };
+
+        assert_eq!(dialog_entry_at_position(&layout, glam::Vec2::new(20.0, 35.0)), Some(0));
+        assert_eq!(dialog_entry_at_position(&layout, glam::Vec2::new(5.0, 5.0)), None);
     }
 }

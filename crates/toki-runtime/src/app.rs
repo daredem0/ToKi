@@ -193,6 +193,7 @@ struct App {
     scene_transition: SceneTransitionController,
     decoded_project_cache: DecodedProjectCache,
     pack_mount: Option<tempfile::TempDir>,
+    cursor_position: Option<glam::Vec2>,
 }
 
 impl App {
@@ -318,6 +319,7 @@ impl App {
             scene_transition,
             decoded_project_cache,
             pack_mount,
+            cursor_position: None,
         }
     }
 }

@@ -3,7 +3,7 @@ use std::time::Instant;
 use toki_core::menu::MenuInput;
 use toki_core::serialization::{load_game, save_game};
 use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
+use winit::event::{ElementState, MouseButton, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::WindowId;
@@ -12,7 +12,6 @@ use super::App;
 
 impl App {
     fn handle_keyboard_input_event(&mut self, event: winit::event::KeyEvent) {
-        use winit::event::ElementState;
         if let PhysicalKey::Code(keycode) = event.physical_key {
             match event.state {
                 ElementState::Pressed => match keycode {
@@ -313,6 +312,22 @@ impl ApplicationHandler for App {
                 if self.exit_requested {
                     tracing::info!("Menu requested runtime exit; stopping");
                     event_loop.exit();
+                }
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                self.cursor_position = Some(glam::Vec2::new(position.x as f32, position.y as f32));
+            }
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Left,
+                ..
+            } => {
+                if let Some(cursor_position) = self.cursor_position {
+                    self.handle_menu_pointer_click(cursor_position);
+                    if self.exit_requested {
+                        tracing::info!("Menu requested runtime exit; stopping");
+                        event_loop.exit();
+                    }
                 }
             }
             WindowEvent::CloseRequested => {

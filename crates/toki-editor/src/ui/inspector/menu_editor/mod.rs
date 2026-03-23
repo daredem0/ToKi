@@ -22,8 +22,8 @@ use super::{EditorUI, InspectorSystem, Selection};
 use crate::project::Project;
 use crate::ui::undo_redo::EditorCommand;
 use toki_core::menu::{
-    MenuAppearance, MenuBorderStyle, MenuDialogDefinition, MenuItemDefinition, MenuListSource,
-    MenuScreenDefinition, MenuSettings, UiAction,
+    MenuAppearance, MenuBorderStyle, MenuDialogDefinition, MenuDialogPosition,
+    MenuItemDefinition, MenuListSource, MenuScreenDefinition, MenuSettings, UiAction,
 };
 
 /// Context for editing menu appearance settings

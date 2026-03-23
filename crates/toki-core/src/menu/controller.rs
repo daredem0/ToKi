@@ -219,6 +219,12 @@ impl MenuController {
         }
     }
 
+    pub fn activate_dialog_entry(&mut self, entry_index: usize) -> Option<UiCommand> {
+        let active_dialog = self.active_dialog.as_mut()?;
+        active_dialog.selected_index = entry_index.min(1);
+        self.handle_dialog_input(MenuInput::Confirm)
+    }
+
     fn handle_dialog_input(&mut self, input: MenuInput) -> Option<UiCommand> {
         match input {
             MenuInput::Up | MenuInput::Down | MenuInput::Left | MenuInput::Right => {

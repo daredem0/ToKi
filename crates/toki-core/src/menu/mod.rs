@@ -32,9 +32,9 @@ pub use controller::MenuController;
 pub use layout::{build_dialog_layout, build_menu_layout};
 pub use types::{
     InventoryEntry, MenuAppearance, MenuBorderStyle, MenuDialogDefinition, MenuDialogLayout,
-    MenuDialogView, MenuEntryLayout, MenuInput, MenuItemDefinition, MenuLayout, MenuLayoutBlock,
-    MenuListSource, MenuRect, MenuScreenDefinition, MenuSettings, MenuView, MenuViewEntry,
-    MenuVisualMetrics,
+    MenuDialogPosition, MenuDialogView, MenuEntryLayout, MenuInput, MenuItemDefinition,
+    MenuLayout, MenuLayoutBlock, MenuListSource, MenuRect, MenuScreenDefinition, MenuSettings,
+    MenuView, MenuViewEntry, MenuVisualMetrics,
 };
 pub use utilities::{
     apply_menu_opacity, menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba,

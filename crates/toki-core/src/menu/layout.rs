@@ -1,8 +1,8 @@
 //! Menu layout building.
 
 use super::types::{
-    MenuAppearance, MenuBorderStyle, MenuDialogLayout, MenuDialogView, MenuEntryLayout, MenuLayout,
-    MenuLayoutBlock, MenuRect, MenuView, MenuVisualMetrics,
+    MenuAppearance, MenuBorderStyle, MenuDialogLayout, MenuDialogPosition, MenuDialogView,
+    MenuEntryLayout, MenuLayout, MenuLayoutBlock, MenuRect, MenuView, MenuVisualMetrics,
 };
 use super::utilities::menu_visual_metrics;
 
@@ -88,37 +88,26 @@ pub fn build_dialog_layout(
     let metrics = menu_visual_metrics();
     let panel_width = (viewport.x * (appearance.menu_width_percent.clamp(20, 100) as f32 / 100.0))
         .clamp(160.0, (viewport.x - 16.0).max(160.0));
-    let content_x = (viewport.x - panel_width) * 0.5 + metrics.panel_inner_margin_px;
     let content_width = (panel_width - metrics.panel_inner_margin_px * 2.0).max(1.0);
     let title_height = appearance.font_size_px as f32
         + metrics.title_size_delta_px
         + metrics.title_padding_px.y * 2.0;
-    let title_rect = MenuRect {
-        x: content_x,
-        y: viewport.y * 0.18,
-        width: content_width,
-        height: title_height,
-    };
+    let local_title_y = metrics.panel_inner_margin_px;
     let body_height =
         ((appearance.font_size_px as f32 * 3.2).max(40.0)) + metrics.entry_padding_px.y * 2.0;
-    let body_rect = MenuRect {
-        x: content_x,
-        y: title_rect.y + title_rect.height + appearance.title_spacing_px as f32,
-        width: content_width,
-        height: body_height,
-    };
+    let local_body_y = local_title_y + title_height + appearance.title_spacing_px as f32;
     let entry_height = appearance.font_size_px as f32 + metrics.entry_padding_px.y * 2.0;
-    let entries_start_y = body_rect.y + body_rect.height + appearance.footer_spacing_px as f32;
+    let entries_start_y = local_body_y + body_height + appearance.footer_spacing_px as f32;
     let entries = view
         .entries
         .iter()
         .enumerate()
         .map(|(index, entry)| MenuEntryLayout {
             rect: MenuRect {
-                x: content_x,
                 y: entries_start_y
                     + index as f32
                         * (entry_height + appearance.button_spacing_px as f32),
+                x: 0.0,
                 width: content_width,
                 height: entry_height,
             },
@@ -133,15 +122,38 @@ pub fn build_dialog_layout(
     let entries_bottom = entries
         .last()
         .map(|entry| entry.rect.y + entry.rect.height)
-        .unwrap_or(body_rect.y + body_rect.height);
-    let panel = MenuRect {
-        x: (viewport.x - panel_width) * 0.5,
-        y: (title_rect.y - metrics.panel_inner_margin_px).max(8.0),
-        width: panel_width,
-        height: (entries_bottom - title_rect.y)
-            + metrics.panel_inner_margin_px * 2.0
-            + appearance.title_spacing_px as f32,
+        .unwrap_or(local_body_y + body_height);
+    let panel_height = (entries_bottom - local_title_y)
+        + metrics.panel_inner_margin_px * 2.0
+        + appearance.title_spacing_px as f32;
+    let panel = dialog_panel_rect(
+        appearance.dialog_position,
+        panel_width,
+        panel_height,
+        viewport,
+        &metrics,
+    );
+    let content_x = panel.x + metrics.panel_inner_margin_px;
+    let title_rect = MenuRect {
+        x: content_x,
+        y: panel.y + local_title_y,
+        width: content_width,
+        height: title_height,
     };
+    let body_rect = MenuRect {
+        x: content_x,
+        y: panel.y + local_body_y,
+        width: content_width,
+        height: body_height,
+    };
+    let entries = entries
+        .into_iter()
+        .map(|mut entry| {
+            entry.rect.x = content_x;
+            entry.rect.y += panel.y;
+            entry
+        })
+        .collect::<Vec<_>>();
 
     MenuDialogLayout {
         panel,
@@ -156,6 +168,36 @@ pub fn build_dialog_layout(
             border_style: appearance.border_style,
         },
         entries,
+    }
+}
+
+fn dialog_panel_rect(
+    position: MenuDialogPosition,
+    panel_width: f32,
+    panel_height: f32,
+    viewport: glam::Vec2,
+    metrics: &MenuVisualMetrics,
+) -> MenuRect {
+    let margin = 8.0f32;
+    let centered_x = (viewport.x - panel_width) * 0.5;
+    let centered_y = (viewport.y - panel_height) * 0.5;
+    let top_y = margin.max(metrics.title_top_y_px - metrics.panel_inner_margin_px);
+
+    let (x, y) = match position {
+        MenuDialogPosition::Top => (centered_x, top_y),
+        MenuDialogPosition::Bottom => (centered_x, (viewport.y - panel_height - margin).max(margin)),
+        MenuDialogPosition::Left => (margin, centered_y.max(margin)),
+        MenuDialogPosition::Right => (
+            (viewport.x - panel_width - margin).max(margin),
+            centered_y.max(margin),
+        ),
+    };
+
+    MenuRect {
+        x,
+        y,
+        width: panel_width,
+        height: panel_height,
     }
 }
 

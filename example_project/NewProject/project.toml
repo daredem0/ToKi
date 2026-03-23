@@ -2,7 +2,7 @@
 name = "TopDownBundle"
 version = "1.0.0"
 created = "2025-08-28T20:32:34.920817717Z"
-modified = "2026-03-23T19:06:29.020702556Z"
+modified = "2026-03-23T20:33:28.691653045Z"
 toki_editor_version = "0.1.0"
 description = ""
 
@@ -79,6 +79,7 @@ footer_text = """
           Esc: Back   
 Enter/Space: Select"""
 border_style = "square"
+dialog_position = "top"
 
 [[runtime.menu.screens]]
 id = "pause_menu"
@@ -153,6 +154,27 @@ kind = "exit_runtime"
 [runtime.menu.dialogs.cancel_action]
 kind = "close_surface"
 
+[runtime.dialog_appearance]
+font_family = "Mono"
+font_size_px = 14
+menu_width_percent = 60
+menu_height_percent = 60
+title_spacing_px = 6
+button_spacing_px = 6
+footer_spacing_px = 6
+opacity_percent = 100
+border_color_hex = "#000000"
+text_color_hex = "#000000"
+menu_background_color_hex = "#FFFFFF"
+menu_background_transparent = false
+title_background_color_hex = "#FFFFFF"
+title_background_transparent = false
+entry_background_color_hex = "#FFFFFF"
+entry_background_transparent = false
+footer_text = "Esc: Back   Enter/Space: Select"
+border_style = "square"
+dialog_position = "top"
+
 [editor]
 recent_files = []
 
@@ -166,81 +188,81 @@ pan = [
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
-"node:4" = [
+"node:1" = [
     60.0,
-    112.0,
+    64.0,
+]
+"node:16" = [
+    60.0,
+    304.0,
+]
+"node:11" = [
+    584.375,
+    208.0,
+]
+"node:17" = [
+    483.578125,
+    304.0,
 ]
 "node:2" = [
     469.625,
     64.0,
 ]
-"node:18" = [
-    259.625,
-    304.0,
+"node:8" = [
+    615.984375,
+    160.0,
 ]
 "node:7" = [
     60.0,
     160.0,
 ]
-"node:8" = [
-    615.984375,
-    160.0,
+"node:5" = [
+    488.640625,
+    112.0,
 ]
-"node:12" = [
-    293.71875,
+"node:10" = [
+    60.0,
     208.0,
 ]
 "node:15" = [
     262.625,
     256.0,
 ]
-"node:9" = [
-    318.65625,
-    160.0,
-]
-"node:1" = [
+"node:4" = [
     60.0,
-    64.0,
+    112.0,
 ]
-"node:11" = [
-    584.375,
+"node:12" = [
+    293.71875,
     208.0,
-]
-"node:14" = [
-    522.25,
-    256.0,
-]
-"node:13" = [
-    60.0,
-    256.0,
-]
-"node:6" = [
-    244.359375,
-    112.0,
-]
-"node:16" = [
-    60.0,
-    304.0,
-]
-"node:19" = [
-    758.296875,
-    64.0,
-]
-"node:5" = [
-    488.640625,
-    112.0,
 ]
 "node:3" = [
     246.0,
     64.0,
 ]
-"node:17" = [
-    483.578125,
+"node:13" = [
+    60.0,
+    256.0,
+]
+"node:19" = [
+    758.296875,
+    64.0,
+]
+"node:14" = [
+    522.25,
+    256.0,
+]
+"node:18" = [
+    259.625,
     304.0,
 ]
-"node:10" = [
-    60.0,
-    208.0,
+"node:6" = [
+    244.359375,
+    112.0,
+]
+"node:9" = [
+    318.65625,
+    160.0,
 ]
 
 [editor.graph_layouts."Scene 2"]
@@ -255,10 +277,6 @@ pan = [
     800.0,
     50.0,
 ]
-"node:1" = [
-    60.0,
-    50.0,
-]
 "node:3" = [
     430.0,
     50.0,
@@ -266,6 +284,10 @@ pan = [
 "node:4" = [
     656.8824462890625,
     177.01071166992188,
+]
+"node:1" = [
+    60.0,
+    50.0,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]

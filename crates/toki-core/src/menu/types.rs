@@ -78,6 +78,8 @@ pub struct MenuAppearance {
     pub footer_text: String,
     #[serde(default)]
     pub border_style: MenuBorderStyle,
+    #[serde(default)]
+    pub dialog_position: MenuDialogPosition,
 }
 
 impl Default for MenuAppearance {
@@ -101,6 +103,7 @@ impl Default for MenuAppearance {
             entry_background_transparent: false,
             footer_text: default_menu_footer_text(),
             border_style: MenuBorderStyle::default(),
+            dialog_position: MenuDialogPosition::default(),
         }
     }
 }
@@ -176,6 +179,16 @@ pub enum MenuBorderStyle {
     None,
     #[default]
     Square,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum MenuDialogPosition {
+    #[default]
+    Top,
+    Bottom,
+    Left,
+    Right,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
