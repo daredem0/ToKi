@@ -2,11 +2,11 @@ use std::collections::BTreeSet;
 
 use toki_core::menu::{
     build_menu_layout, compose_menu_ui, menu_hex_color_rgba, MenuAppearance, MenuEntryLayout,
-    MenuInput, MenuView, MenuViewEntry,
+    MenuInput, MenuLayout, MenuView, MenuViewEntry,
 };
 use toki_core::palette::builtin_palettes;
 use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy};
-use toki_core::ui::{UiBlock, UiComposition};
+use toki_core::ui::{UiBlock, UiComposition, UiRect};
 
 use super::App;
 use crate::systems::FrameLimiter;
@@ -39,6 +39,18 @@ struct RuntimeOverlayEntry {
     value_text: String,
     slider_percent: Option<u8>,
     selected: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct RuntimeOverlayPresentation {
+    layout: MenuLayout,
+    entries: Vec<RuntimeOverlayEntry>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RuntimeOverlayHitTarget {
+    Entry(usize),
+    Slider { entry_index: usize, percent: u8 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,6 +93,7 @@ impl App {
 
         if should_close {
             self.runtime_overlay = None;
+            self.runtime_overlay_slider_drag = None;
         }
         true
     }
@@ -90,40 +103,127 @@ impl App {
         appearance: &MenuAppearance,
         viewport: glam::Vec2,
     ) -> bool {
-        let Some(overlay) = self.runtime_overlay.clone() else {
+        let Some(presentation) = self.runtime_overlay_presentation(appearance, viewport) else {
+            return false;
+        };
+        let composition = compose_runtime_settings_ui(
+            &presentation.layout.entries,
+            &presentation.entries,
+            &presentation.layout,
+            appearance,
+        );
+        self.rendering.render_ui_composition(&composition);
+        true
+    }
+
+    pub(super) fn handle_runtime_overlay_pointer_hover(
+        &mut self,
+        position: glam::Vec2,
+        viewport: glam::Vec2,
+    ) -> bool {
+        let appearance = self.menu_system.settings().appearance.clone();
+        let Some(presentation) = self.runtime_overlay_presentation(&appearance, viewport) else {
+            return false;
+        };
+        let Some(target) = runtime_overlay_hit_target_at_position(
+            &presentation.layout.entries,
+            &presentation.entries,
+            position,
+        ) else {
+            return false;
+        };
+        self.select_runtime_overlay_entry(match target {
+            RuntimeOverlayHitTarget::Entry(entry_index)
+            | RuntimeOverlayHitTarget::Slider {
+                entry_index,
+                ..
+            } => entry_index,
+        });
+        true
+    }
+
+    pub(super) fn handle_runtime_overlay_pointer_click(
+        &mut self,
+        position: glam::Vec2,
+        viewport: glam::Vec2,
+    ) -> bool {
+        let appearance = self.menu_system.settings().appearance.clone();
+        let Some(presentation) = self.runtime_overlay_presentation(&appearance, viewport) else {
+            return false;
+        };
+        let Some(target) = runtime_overlay_hit_target_at_position(
+            &presentation.layout.entries,
+            &presentation.entries,
+            position,
+        ) else {
             return false;
         };
 
-        let (title, entries) = match overlay {
-            RuntimeMenuOverlay::Audio { selected_index } => (
-                "Audio Settings".to_string(),
-                self.audio_overlay_entries(selected_index),
-            ),
-            RuntimeMenuOverlay::Graphics { selected_index } => (
-                "Graphics Settings".to_string(),
-                self.graphics_overlay_entries(selected_index),
-            ),
-        };
+        match target {
+            RuntimeOverlayHitTarget::Entry(entry_index) => {
+                self.select_runtime_overlay_entry(entry_index);
+                let should_close = match self.runtime_overlay.clone() {
+                    Some(RuntimeMenuOverlay::Audio { .. }) => {
+                        self.handle_audio_overlay_input(MenuInput::Confirm)
+                    }
+                    Some(RuntimeMenuOverlay::Graphics { .. }) => {
+                        self.handle_graphics_overlay_input(MenuInput::Confirm)
+                    }
+                    None => false,
+                };
+                if should_close {
+                    self.runtime_overlay = None;
+                }
+            }
+            RuntimeOverlayHitTarget::Slider {
+                entry_index,
+                percent,
+            } => {
+                self.select_runtime_overlay_entry(entry_index);
+                self.runtime_overlay_slider_drag = Some(entry_index);
+                self.set_runtime_overlay_slider_percent(entry_index, percent);
+            }
+        }
 
-        let view = MenuView {
-            screen_id: "__runtime_settings__".to_string(),
-            title,
-            title_border_style_override: None,
-            entries: entries
-                .iter()
-                .map(|entry| MenuViewEntry {
-                    text: format!("{}: {}", entry.label, entry.value_text),
-                    selected: entry.selected,
-                    selectable: true,
-                    border_style_override: None,
-                })
-                .collect(),
-        };
-
-        let layout = build_menu_layout(&view, appearance, viewport);
-        let composition = compose_runtime_settings_ui(&layout.entries, &entries, &layout, appearance);
-        self.rendering.render_ui_composition(&composition);
         true
+    }
+
+    pub(super) fn handle_runtime_overlay_pointer_drag(
+        &mut self,
+        position: glam::Vec2,
+        viewport: glam::Vec2,
+    ) -> bool {
+        let Some(entry_index) = self.runtime_overlay_slider_drag else {
+            return false;
+        };
+        let appearance = self.menu_system.settings().appearance.clone();
+        let Some(presentation) = self.runtime_overlay_presentation(&appearance, viewport) else {
+            self.runtime_overlay_slider_drag = None;
+            return false;
+        };
+        let Some((layout_entry, overlay_entry)) = presentation
+            .layout
+            .entries
+            .get(entry_index)
+            .zip(presentation.entries.get(entry_index))
+        else {
+            self.runtime_overlay_slider_drag = None;
+            return false;
+        };
+        let Some(slider_rect) = runtime_overlay_slider_rect(layout_entry, overlay_entry) else {
+            self.runtime_overlay_slider_drag = None;
+            return false;
+        };
+        self.select_runtime_overlay_entry(entry_index);
+        self.set_runtime_overlay_slider_percent(
+            entry_index,
+            slider_percent_from_position(slider_rect, position.x),
+        );
+        true
+    }
+
+    pub(super) fn clear_runtime_overlay_pointer_drag(&mut self) {
+        self.runtime_overlay_slider_drag = None;
     }
 
     fn audio_overlay_entries(&self, selected_index: usize) -> Vec<RuntimeOverlayEntry> {
@@ -531,6 +631,129 @@ impl App {
         self.rendering
             .set_post_process_settings(self.resolved_post_process_settings());
     }
+
+    fn runtime_overlay_presentation(
+        &self,
+        appearance: &MenuAppearance,
+        viewport: glam::Vec2,
+    ) -> Option<RuntimeOverlayPresentation> {
+        let overlay = self.runtime_overlay.clone()?;
+        let (title, entries) = match overlay {
+            RuntimeMenuOverlay::Audio { selected_index } => (
+                "Audio Settings".to_string(),
+                self.audio_overlay_entries(selected_index),
+            ),
+            RuntimeMenuOverlay::Graphics { selected_index } => (
+                "Graphics Settings".to_string(),
+                self.graphics_overlay_entries(selected_index),
+            ),
+        };
+
+        let view = MenuView {
+            screen_id: "__runtime_settings__".to_string(),
+            title,
+            title_border_style_override: None,
+            entries: entries
+                .iter()
+                .map(|entry| MenuViewEntry {
+                    text: format!("{}: {}", entry.label, entry.value_text),
+                    selected: entry.selected,
+                    selectable: true,
+                    border_style_override: None,
+                })
+                .collect(),
+        };
+
+        Some(RuntimeOverlayPresentation {
+            layout: build_menu_layout(&view, appearance, viewport),
+            entries,
+        })
+    }
+
+    fn select_runtime_overlay_entry(&mut self, entry_index: usize) {
+        match self.runtime_overlay.as_mut() {
+            Some(RuntimeMenuOverlay::Audio { selected_index })
+            | Some(RuntimeMenuOverlay::Graphics { selected_index }) => {
+                *selected_index = entry_index;
+            }
+            None => {}
+        }
+    }
+
+    fn set_runtime_overlay_slider_percent(&mut self, entry_index: usize, percent: u8) {
+        match self.runtime_overlay {
+            Some(RuntimeMenuOverlay::Audio { .. }) => {
+                self.set_audio_slider_percent(entry_index, percent)
+            }
+            Some(RuntimeMenuOverlay::Graphics { .. }) => {
+                self.set_graphics_slider_percent(entry_index, percent)
+            }
+            None => {}
+        }
+    }
+
+    fn set_audio_slider_percent(&mut self, entry_index: usize, percent: u8) {
+        match entry_index {
+            0 => self.launch_options.audio_mix.master_percent = percent.min(100),
+            1 => self.launch_options.audio_mix.music_percent = percent.min(100),
+            2 => self.launch_options.audio_mix.movement_percent = percent.min(100),
+            3 => self.launch_options.audio_mix.collision_percent = percent.min(100),
+            _ => return,
+        }
+        self.adjust_audio_setting(entry_index, 0);
+    }
+
+    fn set_graphics_slider_percent(&mut self, entry_index: usize, percent: u8) {
+        let entries = self.graphics_entries_with_keys(entry_index);
+        let Some((selected_key, _)) = entries.get(entry_index) else {
+            return;
+        };
+
+        match *selected_key {
+            GraphicsSettingKey::TargetFps => {
+                self.launch_options.display.target_fps = slider_to_target_fps(percent);
+                if !self.launch_options.display.vsync {
+                    self.rebuild_frame_timing_settings();
+                }
+            }
+            GraphicsSettingKey::Brightness => {
+                self.launch_options.display.post_process.brightness_percent =
+                    (percent as i16 * 2 - 100).clamp(-100, 100);
+            }
+            GraphicsSettingKey::Saturation => {
+                self.launch_options.display.post_process.saturation_percent =
+                    (percent as u16 * 2).min(200) as u8;
+            }
+            GraphicsSettingKey::TintStrength => {
+                self.launch_options.display.post_process.tint_strength_percent = percent.min(100);
+            }
+            GraphicsSettingKey::TintRed => {
+                self.launch_options.display.post_process.tint_color[0] = percent_to_channel(percent);
+            }
+            GraphicsSettingKey::TintGreen => {
+                self.launch_options.display.post_process.tint_color[1] = percent_to_channel(percent);
+            }
+            GraphicsSettingKey::TintBlue => {
+                self.launch_options.display.post_process.tint_color[2] = percent_to_channel(percent);
+            }
+            GraphicsSettingKey::GbContrast => {
+                self.launch_options.display.post_process.gb_contrast_percent =
+                    (percent as i16 * 2 - 100).clamp(-100, 100);
+            }
+            GraphicsSettingKey::VignetteStrength => {
+                self.launch_options.display.post_process.vignette_strength_percent =
+                    percent.min(100);
+            }
+            GraphicsSettingKey::Vsync
+            | GraphicsSettingKey::PostProcessMode
+            | GraphicsSettingKey::QuantizeStrategy
+            | GraphicsSettingKey::QuantizePalette
+            | GraphicsSettingKey::Back => return,
+        }
+
+        self.rendering
+            .set_post_process_settings(self.resolved_post_process_settings());
+    }
 }
 
 fn compose_runtime_settings_ui(
@@ -580,6 +803,53 @@ fn compose_runtime_settings_ui(
     composition
 }
 
+fn runtime_overlay_hit_target_at_position(
+    layout_entries: &[MenuEntryLayout],
+    overlay_entries: &[RuntimeOverlayEntry],
+    position: glam::Vec2,
+) -> Option<RuntimeOverlayHitTarget> {
+    for (entry_index, (layout_entry, overlay_entry)) in
+        layout_entries.iter().zip(overlay_entries.iter()).enumerate()
+    {
+        if let Some(slider_rect) = runtime_overlay_slider_rect(layout_entry, overlay_entry) {
+            if rect_contains(slider_rect, position) {
+                return Some(RuntimeOverlayHitTarget::Slider {
+                    entry_index,
+                    percent: slider_percent_from_position(slider_rect, position.x),
+                });
+            }
+        }
+        if rect_contains(layout_entry.rect, position) {
+            return Some(RuntimeOverlayHitTarget::Entry(entry_index));
+        }
+    }
+    None
+}
+
+fn runtime_overlay_slider_rect(
+    layout_entry: &MenuEntryLayout,
+    overlay_entry: &RuntimeOverlayEntry,
+) -> Option<UiRect> {
+    overlay_entry.slider_percent?;
+    Some(UiRect {
+        x: layout_entry.rect.x + layout_entry.rect.width * 0.56,
+        y: layout_entry.rect.y + layout_entry.rect.height - 10.0,
+        width: layout_entry.rect.width * 0.28,
+        height: 8.0,
+    })
+}
+
+fn rect_contains(rect: UiRect, position: glam::Vec2) -> bool {
+    position.x >= rect.x
+        && position.x <= rect.x + rect.width
+        && position.y >= rect.y
+        && position.y <= rect.y + rect.height
+}
+
+fn slider_percent_from_position(rect: UiRect, x: f32) -> u8 {
+    (((x - rect.x) / rect.width.max(1.0)).clamp(0.0, 1.0) * 100.0).round() as u8
+}
+
 fn available_palette_ids(resources: &crate::systems::ResourceManager) -> Vec<String> {
     let mut ids = BTreeSet::new();
     for id in builtin_palettes().into_keys() {
@@ -625,6 +895,14 @@ fn target_fps_to_slider(fps: u32) -> u8 {
     }
 }
 
+fn slider_to_target_fps(percent: u8) -> u32 {
+    const TARGET_FPS_OPTIONS: [u32; 7] = [0, 30, 45, 60, 90, 120, 144];
+    let index = (((percent as f32 / 100.0) * (TARGET_FPS_OPTIONS.len() as f32 - 1.0)).round()
+        as usize)
+        .min(TARGET_FPS_OPTIONS.len() - 1);
+    TARGET_FPS_OPTIONS[index]
+}
+
 fn fps_label(fps: u32) -> String {
     if fps == 0 {
         "Unlimited".to_string()
@@ -643,6 +921,10 @@ fn on_off_label(value: bool) -> &'static str {
 
 fn channel_to_percent(value: u8) -> u8 {
     ((value as u16 * 100) / 255) as u8
+}
+
+fn percent_to_channel(value: u8) -> u8 {
+    ((value as u16 * 255) / 100) as u8
 }
 
 fn cycle_post_process_mode(mode: PostProcessMode, direction: i32) -> PostProcessMode {
@@ -703,9 +985,13 @@ mod tests {
     use super::{
         adjust_channel, adjust_percent, channel_to_percent, cycle_post_process_mode,
         cycle_quantize_strategy, cycle_string, cycle_target_fps, fps_label, on_off_label,
-        quantize_strategy_label, target_fps_to_slider, RuntimeMenuOverlay,
+        quantize_strategy_label, rect_contains, runtime_overlay_hit_target_at_position,
+        runtime_overlay_slider_rect, slider_percent_from_position, slider_to_target_fps,
+        target_fps_to_slider, RuntimeMenuOverlay, RuntimeOverlayEntry, RuntimeOverlayHitTarget,
     };
     use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy};
+    use toki_core::ui::UiRect;
+    use toki_core::menu::{MenuBorderStyle, MenuEntryLayout};
 
     #[test]
     fn percent_adjustment_clamps_to_zero_and_hundred() {
@@ -795,6 +1081,13 @@ mod tests {
     }
 
     #[test]
+    fn slider_to_target_fps_maps_extremes_and_midpoints() {
+        assert_eq!(slider_to_target_fps(0), 0);
+        assert_eq!(slider_to_target_fps(100), 144);
+        assert_eq!(slider_to_target_fps(42), 60);
+    }
+
+    #[test]
     fn on_off_label_is_human_readable() {
         assert_eq!(on_off_label(true), "On");
         assert_eq!(on_off_label(false), "Off");
@@ -807,5 +1100,56 @@ mod tests {
             RuntimeMenuOverlay::graphics(),
             RuntimeMenuOverlay::Graphics { selected_index: 0 }
         );
+    }
+
+    #[test]
+    fn slider_rect_and_hit_target_detect_slider_before_entry_body() {
+        let layout_entry = MenuEntryLayout {
+            rect: UiRect {
+                x: 10.0,
+                y: 20.0,
+                width: 100.0,
+                height: 20.0,
+            },
+            text: "Master: 50%".to_string(),
+            selected: true,
+            selectable: true,
+            border_style: MenuBorderStyle::Square,
+        };
+        let overlay_entry = RuntimeOverlayEntry {
+            label: "Master".to_string(),
+            value_text: "50%".to_string(),
+            slider_percent: Some(50),
+            selected: true,
+        };
+        let slider_rect = runtime_overlay_slider_rect(&layout_entry, &overlay_entry).expect("slider");
+        assert!(rect_contains(
+            slider_rect,
+            glam::Vec2::new(slider_rect.x + 1.0, slider_rect.y + 1.0)
+        ));
+        assert_eq!(
+            runtime_overlay_hit_target_at_position(
+                &[layout_entry],
+                &[overlay_entry],
+                glam::Vec2::new(slider_rect.x + slider_rect.width * 0.75, slider_rect.y + 2.0),
+            ),
+            Some(RuntimeOverlayHitTarget::Slider {
+                entry_index: 0,
+                percent: 75,
+            })
+        );
+    }
+
+    #[test]
+    fn slider_percent_from_position_clamps_to_bounds() {
+        let rect = UiRect {
+            x: 20.0,
+            y: 10.0,
+            width: 80.0,
+            height: 8.0,
+        };
+        assert_eq!(slider_percent_from_position(rect, 20.0), 0);
+        assert_eq!(slider_percent_from_position(rect, 60.0), 50);
+        assert_eq!(slider_percent_from_position(rect, 120.0), 100);
     }
 }

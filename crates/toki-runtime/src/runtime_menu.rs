@@ -53,6 +53,10 @@ impl App {
                 glam::Vec2::new(size.x as f32, size.y as f32)
             });
 
+        if self.runtime_overlay.is_some() {
+            return self.handle_runtime_overlay_pointer_click(position, viewport);
+        }
+
         if self.dialog_system.is_open() {
             let Some(dialog_view) = self.dialog_system.current_view() else {
                 return false;
@@ -112,6 +116,10 @@ impl App {
                 glam::Vec2::new(size.x as f32, size.y as f32)
             });
 
+        if self.runtime_overlay.is_some() {
+            return self.handle_runtime_overlay_pointer_hover(position, viewport);
+        }
+
         if self.dialog_system.is_open() {
             let Some(dialog_view) = self.dialog_system.current_view() else {
                 return false;
@@ -147,6 +155,22 @@ impl App {
         let layout = build_menu_layout(&menu_view, &appearance, viewport);
         menu_entry_at_position(&layout, position)
             .is_some_and(|entry_index| self.menu_system.select_screen_view_entry(&inventory, entry_index))
+    }
+
+    pub(super) fn handle_menu_pointer_drag(&mut self, position: glam::Vec2) -> bool {
+        let viewport = self
+            .platform
+            .inner_size()
+            .map(|size| glam::Vec2::new(size.width as f32, size.height as f32))
+            .unwrap_or_else(|| {
+                let size = self.camera_system.viewport_size();
+                glam::Vec2::new(size.x as f32, size.y as f32)
+            });
+        self.handle_runtime_overlay_pointer_drag(position, viewport)
+    }
+
+    pub(super) fn clear_menu_pointer_drag(&mut self) {
+        self.clear_runtime_overlay_pointer_drag();
     }
 
     pub(super) fn apply_dialog_start_request(&mut self, request: DialogStartRequest) {

@@ -194,6 +194,8 @@ struct App {
     decoded_project_cache: DecodedProjectCache,
     pack_mount: Option<tempfile::TempDir>,
     cursor_position: Option<glam::Vec2>,
+    left_mouse_down: bool,
+    runtime_overlay_slider_drag: Option<usize>,
 }
 
 impl App {
@@ -320,6 +322,8 @@ impl App {
             decoded_project_cache,
             pack_mount,
             cursor_position: None,
+            left_mouse_down: false,
+            runtime_overlay_slider_drag: None,
         }
     }
 }

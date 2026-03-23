@@ -316,6 +316,9 @@ impl ApplicationHandler for App {
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.cursor_position = Some(glam::Vec2::new(position.x as f32, position.y as f32));
+                if self.left_mouse_down {
+                    self.handle_menu_pointer_drag(glam::Vec2::new(position.x as f32, position.y as f32));
+                }
                 self.handle_menu_pointer_hover(
                     glam::Vec2::new(position.x as f32, position.y as f32),
                 );
@@ -325,6 +328,7 @@ impl ApplicationHandler for App {
                 button: MouseButton::Left,
                 ..
             } => {
+                self.left_mouse_down = true;
                 if let Some(cursor_position) = self.cursor_position {
                     self.handle_menu_pointer_click(cursor_position);
                     if self.exit_requested {
@@ -332,6 +336,14 @@ impl ApplicationHandler for App {
                         event_loop.exit();
                     }
                 }
+            }
+            WindowEvent::MouseInput {
+                state: ElementState::Released,
+                button: MouseButton::Left,
+                ..
+            } => {
+                self.left_mouse_down = false;
+                self.clear_menu_pointer_drag();
             }
             WindowEvent::CloseRequested => {
                 tracing::info!("Close was requested; stopping");
