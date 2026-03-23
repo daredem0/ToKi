@@ -286,7 +286,13 @@ fn apply_project_runtime_settings_from_project_file_if_present(
     let should_apply_audio = launch_options.audio_mix == RuntimeAudioMixOptions::default();
     let should_apply_display = launch_options.display == RuntimeDisplayOptions::default();
     let should_apply_menu = launch_options.menu == MenuSettings::default();
-    if !should_apply_audio && !should_apply_display && !should_apply_menu {
+    let should_apply_dialog_appearance =
+        launch_options.dialog_appearance == toki_core::menu::MenuAppearance::default();
+    if !should_apply_audio
+        && !should_apply_display
+        && !should_apply_menu
+        && !should_apply_dialog_appearance
+    {
         return launch_options;
     }
 
@@ -330,6 +336,9 @@ fn apply_project_runtime_settings_from_project_file_if_present(
     }
     if should_apply_menu {
         launch_options.menu = metadata.runtime.menu;
+    }
+    if should_apply_dialog_appearance {
+        launch_options.dialog_appearance = metadata.runtime.dialog_appearance;
     }
     launch_options
 }

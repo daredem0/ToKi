@@ -24,6 +24,7 @@ use toki_core::rules::{
 
 mod animation_editor;
 mod assets;
+mod dialog_editor;
 #[path = "inspector/domain_inspectors/mod.rs"]
 mod domain_inspectors;
 #[path = "inspector/entities/mod.rs"]
@@ -345,6 +346,7 @@ impl InspectorSystem {
         ctx: &egui::Context,
         game_state: Option<&toki_core::GameState>,
         project: Option<&mut Project>,
+        project_assets: Option<&mut crate::project::ProjectAssets>,
         config: Option<&EditorConfig>,
     ) {
         egui::SidePanel::right("inspector_panel")
@@ -368,7 +370,7 @@ impl InspectorSystem {
                 egui::ScrollArea::vertical().show(ui, |ui| match ui_state.right_panel_tab {
                     super::editor_ui::RightPanelTab::Inspector => {
                         Self::render_selection_inspector_contents(
-                            ui_state, ui, ctx, game_state, project, config,
+                            ui_state, ui, ctx, game_state, project, project_assets, config,
                         );
                     }
                     super::editor_ui::RightPanelTab::Project => {
@@ -384,6 +386,7 @@ impl InspectorSystem {
         ctx: &egui::Context,
         game_state: Option<&toki_core::GameState>,
         project: Option<&mut Project>,
+        project_assets: Option<&mut crate::project::ProjectAssets>,
         config: Option<&EditorConfig>,
     ) {
         // Handle special editor modes first
@@ -394,6 +397,11 @@ impl InspectorSystem {
 
         if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::MenuEditor {
             Self::render_menu_editor_inspector(ui_state, ui, project);
+            return;
+        }
+
+        if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::DialogEditor {
+            Self::render_dialog_editor_inspector(ui_state, ui, project, project_assets);
             return;
         }
 

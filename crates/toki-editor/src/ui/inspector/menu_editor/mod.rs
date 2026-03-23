@@ -67,6 +67,25 @@ impl MenuEditorItemKind {
 }
 
 impl InspectorSystem {
+    pub(super) fn render_menu_appearance_editor(
+        ui_state: &EditorUI,
+        ui: &mut egui::Ui,
+        appearance: &mut MenuAppearance,
+    ) -> bool {
+        let mut ctx = AppearanceEditContext::new(appearance);
+        Self::render_typography_header(ui, ui_state, &mut ctx);
+        Self::render_layout_header(ui, &mut ctx);
+        Self::render_style_header(ui, &mut ctx);
+        Self::render_backgrounds_header(ui, &mut ctx);
+        Self::render_footer_header(ui, &mut ctx);
+
+        if ctx.changed {
+            *appearance = ctx.appearance;
+        }
+
+        ctx.changed
+    }
+
     pub(in super::super) fn render_menu_editor_inspector(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
@@ -122,16 +141,11 @@ impl InspectorSystem {
 
         Self::render_runtime_menu_header(ui, project, &available_screen_ids);
 
-        let mut ctx = AppearanceEditContext::new(&project.metadata.runtime.menu.appearance);
-        Self::render_typography_header(ui, ui_state, &mut ctx);
-        Self::render_layout_header(ui, &mut ctx);
-        Self::render_style_header(ui, &mut ctx);
-        Self::render_backgrounds_header(ui, &mut ctx);
-        Self::render_footer_header(ui, &mut ctx);
-
-        if ctx.changed {
-            project.metadata.runtime.menu.appearance = ctx.appearance;
-        }
+        Self::render_menu_appearance_editor(
+            ui_state,
+            ui,
+            &mut project.metadata.runtime.menu.appearance,
+        );
         Self::commit_menu_settings_change(ui_state, project, before_settings);
 
         Self::render_screens_dialogs_headers(ui, ui_state, project);

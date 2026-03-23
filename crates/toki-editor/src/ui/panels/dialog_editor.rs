@@ -1,5 +1,5 @@
 use crate::project::ProjectAssets;
-use crate::ui::editor_ui::{DialogEditorState, EditorUI};
+use crate::ui::editor_ui::{sync_dialog_registry, EditorUI};
 use egui::Ui;
 use toki_core::dialog::{
     DialogBranch, DialogChoice, DialogCondition, DialogConditionTarget, DialogNode, DialogNodeKind,
@@ -34,63 +34,7 @@ pub(super) fn render_dialog_editor(
     };
 
     sync_dialog_registry(ui_state, project_assets);
-
-    ui.columns(2, |columns| {
-        render_dialog_sidebar(&mut columns[0], ui_state, project_assets);
-        render_dialog_main(&mut columns[1], ui_state, project_assets);
-    });
-}
-
-fn sync_dialog_registry(ui_state: &mut EditorUI, project_assets: &mut ProjectAssets) {
-    let dialog_names = project_assets.get_dialog_names();
-    if ui_state.dialog.draft.is_none()
-        && ui_state.dialog.selected_dialog_id.is_none()
-        && !dialog_names.is_empty()
-    {
-        if let Ok(Some(dialog)) = project_assets.load_dialog(&dialog_names[0]) {
-            ui_state.dialog.load_dialog(dialog);
-        }
-    }
-
-    let dialogs = dialog_names
-        .iter()
-        .filter_map(|dialog_id| project_assets.load_dialog(dialog_id).ok().flatten())
-        .collect::<Vec<_>>();
-    ui_state
-        .project
-        .set_available_dialogs(&DialogEditorState::collect_available_dialogs(&dialogs));
-}
-
-fn render_dialog_sidebar(
-    ui: &mut Ui,
-    ui_state: &mut EditorUI,
-    project_assets: &mut ProjectAssets,
-) {
-    ui.heading("Dialogs");
-    if ui.button("New Dialog").clicked() {
-        let existing = project_assets.get_dialog_names();
-        ui_state.dialog = DialogEditorState::new_dialog(&existing);
-    }
-
-    let dialog_names = project_assets.get_dialog_names();
-    egui::ScrollArea::vertical().show(ui, |ui| {
-        for dialog_id in dialog_names {
-            let is_selected = ui_state.dialog.selected_dialog_id.as_deref() == Some(&dialog_id);
-            if ui.selectable_label(is_selected, &dialog_id).clicked() {
-                match project_assets.load_dialog(&dialog_id) {
-                    Ok(Some(dialog)) => ui_state.dialog.load_dialog(dialog),
-                    Ok(None) => {
-                        ui_state.dialog.status_message =
-                            Some(format!("Dialog '{dialog_id}' no longer exists"));
-                    }
-                    Err(error) => {
-                        ui_state.dialog.status_message =
-                            Some(format!("Failed to load dialog '{dialog_id}': {error}"));
-                    }
-                }
-            }
-        }
-    });
+    render_dialog_main(ui, ui_state, project_assets);
 }
 
 fn render_dialog_main(

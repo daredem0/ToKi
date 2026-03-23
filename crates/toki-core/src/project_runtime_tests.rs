@@ -2,6 +2,7 @@ use crate::project_runtime::{
     PostProcessMode, ProjectPreset, ProjectRuntimeMetadata, QuantizeStrategy, RuntimeConfigFile,
     RuntimeDisplaySettings, RuntimePostProcessSettings, RuntimeSettings,
 };
+use crate::menu::MenuAppearance;
 
 #[test]
 fn project_preset_topdown_returns_gameboy_resolution() {
@@ -59,6 +60,7 @@ fn runtime_settings_defaults_match_engine_baseline() {
     assert_eq!(settings.display.resolution_width, 160);
     assert_eq!(settings.display.resolution_height, 144);
     assert_eq!(settings.menu.pause_root_screen_id, "pause_menu");
+    assert_eq!(settings.dialog_appearance, MenuAppearance::default());
 }
 
 #[test]
@@ -129,6 +131,23 @@ fn runtime_metadata_supports_post_process_settings() {
     assert_eq!(metadata.runtime.display.post_process.gb_contrast_percent, 18);
     assert_eq!(metadata.runtime.display.post_process.vignette_strength_percent, 72);
     assert!(metadata.runtime.scene_persistence);
+}
+
+#[test]
+fn runtime_metadata_supports_dedicated_dialog_appearance() {
+    let metadata: ProjectRuntimeMetadata = toml::from_str(
+        r##"
+        [runtime.dialog_appearance]
+        font_family = "Mono"
+        border_color_hex = "#112233"
+        menu_width_percent = 72
+        "##,
+    )
+    .expect("runtime metadata should deserialize");
+
+    assert_eq!(metadata.runtime.dialog_appearance.font_family, "Mono");
+    assert_eq!(metadata.runtime.dialog_appearance.border_color_hex, "#112233");
+    assert_eq!(metadata.runtime.dialog_appearance.menu_width_percent, 72);
 }
 
 #[test]

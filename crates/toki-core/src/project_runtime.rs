@@ -1,4 +1,4 @@
-use crate::menu::MenuSettings;
+use crate::menu::{MenuAppearance, MenuSettings};
 use crate::palette::{resolve_palette, Palette4};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -63,6 +63,8 @@ pub struct RuntimeSettings {
     pub display: RuntimeDisplaySettings,
     #[serde(default)]
     pub menu: MenuSettings,
+    #[serde(default)]
+    pub dialog_appearance: MenuAppearance,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]

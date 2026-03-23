@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use toki_core::camera::{Camera, CameraController, CameraMode};
 use toki_core::dialog_runtime::DialogController;
-use toki_core::menu::{MenuController, MenuSettings};
+use toki_core::menu::{MenuAppearance, MenuController, MenuSettings};
 use toki_core::project_runtime::RuntimePostProcessSettings;
 use toki_core::TimingSystem;
 use toki_render::RenderError;
@@ -158,6 +158,7 @@ pub struct RuntimeLaunchOptions {
     pub display: RuntimeDisplayOptions,
     pub transition: RuntimeTransitionOptions,
     pub menu: MenuSettings,
+    pub dialog_appearance: MenuAppearance,
 }
 
 #[derive(Debug)]

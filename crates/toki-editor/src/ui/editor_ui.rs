@@ -35,7 +35,7 @@ mod editor_ui_sprite_editor;
 
 pub(crate) use editor_ui_animation_authoring::AnimationAuthoringState;
 pub(crate) use editor_ui_animation_editor::AnimationEditorState;
-pub(crate) use editor_ui_dialog_editor::DialogEditorState;
+pub(crate) use editor_ui_dialog_editor::{sync_dialog_registry, DialogEditorState};
 pub(crate) use editor_ui_entity_editor::{
     create_default_definition, EntityCategory, EntityEditState, EntityEditorState, EntitySummary,
 };
@@ -789,7 +789,7 @@ impl EditorUI {
         scene_viewport: Option<&mut SceneViewport>,
         map_editor_viewport: Option<&mut SceneViewport>,
         mut project: Option<&mut crate::project::Project>,
-        project_assets: Option<&mut crate::project::ProjectAssets>,
+        mut project_assets: Option<&mut crate::project::ProjectAssets>,
         available_map_names: Option<Vec<String>>,
         config: Option<&mut crate::config::EditorConfig>,
         log_capture: Option<&crate::logging::LogCapture>,
@@ -823,6 +823,7 @@ impl EditorUI {
                 ctx,
                 game_state,
                 project.as_deref_mut(),
+                project_assets.as_deref_mut(),
                 config_readonly,
             );
         }

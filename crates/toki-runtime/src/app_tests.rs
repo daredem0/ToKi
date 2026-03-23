@@ -336,6 +336,7 @@ fn resolve_post_splash_sprite_texture_path_prefers_project_creatures_texture() {
         display: RuntimeDisplayOptions::default(),
         transition: Default::default(),
         menu: MenuSettings::default(),
+        dialog_appearance: Default::default(),
     };
 
     let resolved = App::resolve_post_splash_sprite_texture_path(&options, None);
@@ -372,6 +373,7 @@ fn resolve_post_splash_sprite_texture_path_prefers_content_root_over_project_pat
         display: RuntimeDisplayOptions::default(),
         transition: Default::default(),
         menu: MenuSettings::default(),
+        dialog_appearance: Default::default(),
     };
 
     let resolved = App::resolve_post_splash_sprite_texture_path(&options, Some(&mount_dir));
@@ -438,6 +440,7 @@ fn build_startup_state_loads_resources_and_scene_from_pack_mount() {
         display: RuntimeDisplayOptions::default(),
         transition: Default::default(),
         menu: MenuSettings::default(),
+        dialog_appearance: Default::default(),
     };
 
     let (resources, game_state, _dialogs, pack_mount, asset_load_plan, _) =
@@ -553,6 +556,7 @@ fn build_startup_state_uses_scene_player_entry_and_preloads_all_scenes() {
         display: RuntimeDisplayOptions::default(),
         transition: Default::default(),
         menu: MenuSettings::default(),
+        dialog_appearance: Default::default(),
     };
 
     let (_resources, game_state, _dialogs, _pack_mount, asset_load_plan, _) =
@@ -661,6 +665,7 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
         display: RuntimeDisplayOptions::default(),
         transition: Default::default(),
         menu: MenuSettings::default(),
+        dialog_appearance: Default::default(),
     };
 
     let (_resources, game_state, _dialogs, _mount, asset_load_plan, _) =
@@ -822,6 +827,7 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
             fade_duration_ms: 100,
         },
         menu: MenuSettings::default(),
+        dialog_appearance: Default::default(),
     };
     let (resources, mut game_state, _dialogs, _mount, _asset_load_plan, _) =
         App::build_startup_state(&launch_options);
@@ -909,6 +915,7 @@ fn build_startup_state_from_pack_returns_error_when_required_assets_are_missing(
         display: RuntimeDisplayOptions::default(),
         transition: Default::default(),
         menu: MenuSettings::default(),
+        dialog_appearance: Default::default(),
     };
 
     let error = App::build_startup_state_from_pack(&launch_options, &pack_path)

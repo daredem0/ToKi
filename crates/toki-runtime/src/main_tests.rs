@@ -4,7 +4,7 @@ use super::{
     load_runtime_config_from_candidates, option_value, parse_launch_options,
 };
 use std::path::PathBuf;
-use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, MenuSettings, UiAction};
+use toki_core::menu::{MenuAppearance, MenuItemDefinition, MenuScreenDefinition, MenuSettings, UiAction};
 use toki_core::project_runtime::{
     PostProcessMode, QuantizeStrategy, RuntimeConfigAudio, RuntimeConfigDisplay, RuntimeConfigFile,
     RuntimeConfigPack, RuntimeConfigSplash, RuntimeConfigStartup, RuntimePostProcessSettings,
@@ -493,4 +493,34 @@ fn apply_project_runtime_settings_do_not_override_existing_launch_audio_mix() {
     assert!(updated.display.show_entity_health_bars);
     assert!(updated.display.show_ground_shadows);
     assert_eq!(updated.menu.pause_root_screen_id, "cli_pause");
+}
+
+#[test]
+fn apply_project_runtime_settings_loads_dedicated_dialog_appearance() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    std::fs::write(
+        dir.path().join("project.toml"),
+        r##"
+        [runtime.dialog_appearance]
+        font_family = "Mono"
+        border_color_hex = "#112233"
+        "##,
+    )
+    .expect("project");
+
+    let updated = apply_project_runtime_settings_from_project_file_if_present(
+        RuntimeLaunchOptions {
+            project_path: Some(dir.path().to_path_buf()),
+            ..RuntimeLaunchOptions::default()
+        },
+    );
+
+    assert_eq!(
+        updated.dialog_appearance,
+        MenuAppearance {
+            font_family: "Mono".to_string(),
+            border_color_hex: "#112233".to_string(),
+            ..MenuAppearance::default()
+        }
+    );
 }

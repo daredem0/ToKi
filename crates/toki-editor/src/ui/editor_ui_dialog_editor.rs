@@ -1,5 +1,7 @@
+use crate::project::ProjectAssets;
 use std::collections::BTreeMap;
 
+use super::EditorUI;
 use toki_core::dialog::{DialogNode, DialogNodeKind, DialogTree};
 
 #[derive(Debug, Clone, Default)]
@@ -82,6 +84,26 @@ impl DialogEditorState {
             })
             .collect()
     }
+}
+
+pub(crate) fn sync_dialog_registry(ui_state: &mut EditorUI, project_assets: &mut ProjectAssets) {
+    let dialog_names = project_assets.get_dialog_names();
+    if ui_state.dialog.draft.is_none()
+        && ui_state.dialog.selected_dialog_id.is_none()
+        && !dialog_names.is_empty()
+    {
+        if let Ok(Some(dialog)) = project_assets.load_dialog(&dialog_names[0]) {
+            ui_state.dialog.load_dialog(dialog);
+        }
+    }
+
+    let dialogs = dialog_names
+        .iter()
+        .filter_map(|dialog_id| project_assets.load_dialog(dialog_id).ok().flatten())
+        .collect::<Vec<_>>();
+    ui_state
+        .project
+        .set_available_dialogs(&DialogEditorState::collect_available_dialogs(&dialogs));
 }
 
 fn unique_dialog_id(existing_dialog_ids: &[String]) -> String {

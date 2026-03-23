@@ -87,7 +87,7 @@ impl App {
                     let size = self.camera_system.viewport_size();
                     glam::Vec2::new(size.x as f32, size.y as f32)
                 });
-            let appearance = self.menu_system.settings().appearance.clone();
+            let appearance = narrative_dialog_appearance(&self.launch_options).clone();
             let dialog_layout = build_dialog_layout(&dialog_view, &appearance, viewport);
             let dialog_composition = compose_dialog_ui(&dialog_layout, &appearance);
             self.rendering.render_ui_composition(&dialog_composition);
@@ -161,6 +161,12 @@ fn apply_menu_command(
         }
         UiCommand::EmitEvent { event_id } => pending_ui_events.push(event_id),
     }
+}
+
+fn narrative_dialog_appearance(
+    launch_options: &super::RuntimeLaunchOptions,
+) -> &toki_core::menu::MenuAppearance {
+    &launch_options.dialog_appearance
 }
 
 #[cfg(test)]
@@ -281,6 +287,18 @@ mod tests {
         assert_eq!(
             menu_fill_color_rgba("#112233", false, 50),
             Some([17.0 / 255.0, 34.0 / 255.0, 51.0 / 255.0, 0.5])
+        );
+    }
+
+    #[test]
+    fn narrative_dialogs_use_dedicated_dialog_appearance() {
+        let mut launch_options = super::super::RuntimeLaunchOptions::default();
+        launch_options.menu.appearance.border_color_hex = "#AABBCC".to_string();
+        launch_options.dialog_appearance.border_color_hex = "#112233".to_string();
+
+        assert_eq!(
+            narrative_dialog_appearance(&launch_options).border_color_hex,
+            "#112233"
         );
     }
 }
