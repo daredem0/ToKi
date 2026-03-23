@@ -5,7 +5,7 @@ use toki_core::menu::{
     MenuInput, MenuView, MenuViewEntry,
 };
 use toki_core::palette::builtin_palettes;
-use toki_core::project_runtime::PostProcessMode;
+use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy};
 use toki_core::ui::{UiBlock, UiComposition};
 
 use super::App;
@@ -141,46 +141,52 @@ impl App {
                 selected: selected_index == 0,
             },
             RuntimeOverlayEntry {
+                label: "Quantize Strategy".to_string(),
+                value_text: quantize_strategy_label(post.quantize_strategy).to_string(),
+                slider_percent: None,
+                selected: selected_index == 1,
+            },
+            RuntimeOverlayEntry {
                 label: "Tint Strength".to_string(),
                 value_text: format!("{}%", post.tint_strength_percent),
                 slider_percent: Some(post.tint_strength_percent),
-                selected: selected_index == 1,
+                selected: selected_index == 2,
             },
             RuntimeOverlayEntry {
                 label: "Tint Red".to_string(),
                 value_text: post.tint_color[0].to_string(),
                 slider_percent: Some(channel_to_percent(post.tint_color[0])),
-                selected: selected_index == 2,
+                selected: selected_index == 3,
             },
             RuntimeOverlayEntry {
                 label: "Tint Green".to_string(),
                 value_text: post.tint_color[1].to_string(),
                 slider_percent: Some(channel_to_percent(post.tint_color[1])),
-                selected: selected_index == 3,
+                selected: selected_index == 4,
             },
             RuntimeOverlayEntry {
                 label: "Tint Blue".to_string(),
                 value_text: post.tint_color[2].to_string(),
                 slider_percent: Some(channel_to_percent(post.tint_color[2])),
-                selected: selected_index == 4,
+                selected: selected_index == 5,
             },
             RuntimeOverlayEntry {
                 label: "Quantize Palette".to_string(),
                 value_text: post.quantize_palette_id.clone(),
                 slider_percent: None,
-                selected: selected_index == 5,
+                selected: selected_index == 6,
             },
             RuntimeOverlayEntry {
                 label: "GB Contrast".to_string(),
                 value_text: format!("{}%", post.gb_contrast_percent),
                 slider_percent: Some(((post.gb_contrast_percent + 100) / 2) as u8),
-                selected: selected_index == 6,
+                selected: selected_index == 7,
             },
             RuntimeOverlayEntry {
                 label: "Back".to_string(),
                 value_text: "Close".to_string(),
                 slider_percent: None,
-                selected: selected_index == 7,
+                selected: selected_index == 8,
             },
         ]
     }
@@ -228,7 +234,7 @@ impl App {
 
         let next_selected = match input {
             MenuInput::Up => Some(selected_index.saturating_sub(1)),
-            MenuInput::Down => Some((selected_index + 1).min(7)),
+            MenuInput::Down => Some((selected_index + 1).min(8)),
             _ => None,
         };
         if let Some(next_selected) = next_selected {
@@ -244,7 +250,7 @@ impl App {
         match input {
             MenuInput::Left => self.adjust_graphics_setting(selected_index, -1),
             MenuInput::Right | MenuInput::Confirm => {
-                if selected_index == 7 && matches!(input, MenuInput::Confirm) {
+                if selected_index == 8 && matches!(input, MenuInput::Confirm) {
                     return true;
                 }
                 self.adjust_graphics_setting(selected_index, 1);
@@ -287,23 +293,29 @@ impl App {
                 self.launch_options.display.post_process.mode =
                     cycle_post_process_mode(self.launch_options.display.post_process.mode, direction);
             }
-            1 => adjust_percent(
+            1 => {
+                self.launch_options.display.post_process.quantize_strategy = cycle_quantize_strategy(
+                    self.launch_options.display.post_process.quantize_strategy,
+                    direction,
+                );
+            }
+            2 => adjust_percent(
                 &mut self.launch_options.display.post_process.tint_strength_percent,
                 (SETTING_STEP_PERCENT as i16) * direction as i16,
             ),
-            2 => adjust_channel(
+            3 => adjust_channel(
                 &mut self.launch_options.display.post_process.tint_color[0],
                 TINT_CHANNEL_STEP as i16 * direction as i16,
             ),
-            3 => adjust_channel(
+            4 => adjust_channel(
                 &mut self.launch_options.display.post_process.tint_color[1],
                 TINT_CHANNEL_STEP as i16 * direction as i16,
             ),
-            4 => adjust_channel(
+            5 => adjust_channel(
                 &mut self.launch_options.display.post_process.tint_color[2],
                 TINT_CHANNEL_STEP as i16 * direction as i16,
             ),
-            5 => {
+            6 => {
                 let palette_ids = available_palette_ids(&self.resources);
                 if !palette_ids.is_empty() {
                     cycle_string(
@@ -313,7 +325,7 @@ impl App {
                     );
                 }
             }
-            6 => {
+            7 => {
                 let next = self.launch_options.display.post_process.gb_contrast_percent
                     + GB_CONTRAST_STEP * direction as i16;
                 self.launch_options.display.post_process.gb_contrast_percent = next.clamp(-100, 100);
@@ -426,13 +438,30 @@ fn post_process_mode_label(mode: PostProcessMode) -> &'static str {
     }
 }
 
+fn quantize_strategy_label(strategy: QuantizeStrategy) -> &'static str {
+    match strategy {
+        QuantizeStrategy::Luminance => "Luminance",
+        QuantizeStrategy::RgbDistance => "RGB Distance",
+    }
+}
+
+fn cycle_quantize_strategy(strategy: QuantizeStrategy, direction: i32) -> QuantizeStrategy {
+    let strategies = [QuantizeStrategy::Luminance, QuantizeStrategy::RgbDistance];
+    let current_index = strategies
+        .iter()
+        .position(|candidate| *candidate == strategy)
+        .unwrap_or(0) as i32;
+    let next_index = (current_index + direction).rem_euclid(strategies.len() as i32) as usize;
+    strategies[next_index]
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        adjust_channel, adjust_percent, channel_to_percent, cycle_post_process_mode, cycle_string,
-        RuntimeMenuOverlay,
+        adjust_channel, adjust_percent, channel_to_percent, cycle_post_process_mode,
+        cycle_quantize_strategy, cycle_string, quantize_strategy_label, RuntimeMenuOverlay,
     };
-    use toki_core::project_runtime::PostProcessMode;
+    use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy};
 
     #[test]
     fn percent_adjustment_clamps_to_zero_and_hundred() {
@@ -468,6 +497,27 @@ mod tests {
         assert_eq!(
             cycle_post_process_mode(PostProcessMode::GbPalette, 1),
             PostProcessMode::None
+        );
+    }
+
+    #[test]
+    fn quantize_strategy_cycle_wraps_in_both_directions() {
+        assert_eq!(
+            cycle_quantize_strategy(QuantizeStrategy::Luminance, -1),
+            QuantizeStrategy::RgbDistance
+        );
+        assert_eq!(
+            cycle_quantize_strategy(QuantizeStrategy::RgbDistance, 1),
+            QuantizeStrategy::Luminance
+        );
+    }
+
+    #[test]
+    fn quantize_strategy_label_matches_ui_text() {
+        assert_eq!(quantize_strategy_label(QuantizeStrategy::Luminance), "Luminance");
+        assert_eq!(
+            quantize_strategy_label(QuantizeStrategy::RgbDistance),
+            "RGB Distance"
         );
     }
 

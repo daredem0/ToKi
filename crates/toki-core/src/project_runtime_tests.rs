@@ -1,5 +1,5 @@
 use crate::project_runtime::{
-    PostProcessMode, ProjectPreset, ProjectRuntimeMetadata, RuntimeConfigFile,
+    PostProcessMode, ProjectPreset, ProjectRuntimeMetadata, QuantizeStrategy, RuntimeConfigFile,
     RuntimeDisplaySettings, RuntimePostProcessSettings, RuntimeSettings,
 };
 
@@ -47,6 +47,10 @@ fn runtime_settings_defaults_match_engine_baseline() {
     assert!(settings.display.show_ground_shadows);
     assert_eq!(settings.display.indexed_palette_override, None);
     assert_eq!(settings.display.post_process.mode, PostProcessMode::None);
+    assert_eq!(
+        settings.display.post_process.quantize_strategy,
+        QuantizeStrategy::Luminance
+    );
     assert_eq!(settings.display.post_process.quantize_palette_id, "gray");
     assert_eq!(settings.display.resolution_width, 160);
     assert_eq!(settings.display.resolution_height, 144);
@@ -90,6 +94,7 @@ fn runtime_metadata_supports_post_process_settings() {
         r#"
         [runtime.display.post_process]
         mode = "tint"
+        quantize_strategy = "rgb_distance"
         tint_color = [12, 34, 56, 255]
         tint_strength_percent = 70
         quantize_palette_id = "poison"
@@ -99,6 +104,10 @@ fn runtime_metadata_supports_post_process_settings() {
     .expect("runtime metadata should deserialize");
 
     assert_eq!(metadata.runtime.display.post_process.mode, PostProcessMode::Tint);
+    assert_eq!(
+        metadata.runtime.display.post_process.quantize_strategy,
+        QuantizeStrategy::RgbDistance
+    );
     assert_eq!(metadata.runtime.display.post_process.tint_color, [12, 34, 56, 255]);
     assert_eq!(metadata.runtime.display.post_process.tint_strength_percent, 70);
     assert_eq!(metadata.runtime.display.post_process.quantize_palette_id, "poison");
@@ -109,6 +118,7 @@ fn runtime_metadata_supports_post_process_settings() {
 fn runtime_post_process_settings_resolve_quantize_palette_from_registry() {
     let settings = RuntimePostProcessSettings {
         mode: PostProcessMode::Quantize4,
+        quantize_strategy: QuantizeStrategy::Luminance,
         tint_color: [0, 0, 0, 255],
         tint_strength_percent: 10,
         quantize_palette_id: "night".to_string(),

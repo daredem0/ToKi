@@ -263,6 +263,7 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
         collision_mix_percent: 35,
         indexed_palette_override: None,
         post_process_mode: toki_core::project_runtime::PostProcessMode::None,
+        post_process_quantize_strategy: toki_core::project_runtime::QuantizeStrategy::Luminance,
         post_process_tint_color: [32, 64, 96, 255],
         post_process_tint_strength_percent: 35,
         post_process_quantize_palette_id: "gray".to_string(),

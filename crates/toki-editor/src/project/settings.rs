@@ -1,5 +1,5 @@
 use chrono::Utc;
-use toki_core::project_runtime::PostProcessMode;
+use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy};
 
 use super::Project;
 
@@ -23,6 +23,7 @@ pub struct ProjectSettingsDraft {
     pub collision_mix_percent: u8,
     pub indexed_palette_override: Option<String>,
     pub post_process_mode: PostProcessMode,
+    pub post_process_quantize_strategy: QuantizeStrategy,
     pub post_process_tint_color: [u8; 4],
     pub post_process_tint_strength_percent: u8,
     pub post_process_quantize_palette_id: String,
@@ -50,6 +51,12 @@ impl ProjectSettingsDraft {
             collision_mix_percent: project.metadata.runtime.audio.collision_percent,
             indexed_palette_override: project.metadata.runtime.display.indexed_palette_override.clone(),
             post_process_mode: project.metadata.runtime.display.post_process.mode,
+            post_process_quantize_strategy: project
+                .metadata
+                .runtime
+                .display
+                .post_process
+                .quantize_strategy,
             post_process_tint_color: project.metadata.runtime.display.post_process.tint_color,
             post_process_tint_strength_percent: project
                 .metadata
@@ -111,6 +118,13 @@ pub fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettin
     }
     if project.metadata.runtime.display.post_process.mode != draft.post_process_mode {
         project.metadata.runtime.display.post_process.mode = draft.post_process_mode;
+        changed = true;
+    }
+    if project.metadata.runtime.display.post_process.quantize_strategy
+        != draft.post_process_quantize_strategy
+    {
+        project.metadata.runtime.display.post_process.quantize_strategy =
+            draft.post_process_quantize_strategy;
         changed = true;
     }
     if project.metadata.runtime.display.post_process.tint_color != draft.post_process_tint_color {
@@ -215,6 +229,7 @@ mod tests {
             collision_mix_percent: 35,
             indexed_palette_override: Some("gb_swamp".to_string()),
             post_process_mode: PostProcessMode::Tint,
+            post_process_quantize_strategy: QuantizeStrategy::RgbDistance,
             post_process_tint_color: [12, 34, 56, 255],
             post_process_tint_strength_percent: 65,
             post_process_quantize_palette_id: "poison".to_string(),
@@ -241,6 +256,10 @@ mod tests {
         assert_eq!(
             project.metadata.runtime.display.post_process.mode,
             PostProcessMode::Tint
+        );
+        assert_eq!(
+            project.metadata.runtime.display.post_process.quantize_strategy,
+            QuantizeStrategy::RgbDistance
         );
         assert_eq!(
             project.metadata.runtime.display.post_process.tint_color,

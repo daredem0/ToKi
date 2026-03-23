@@ -73,9 +73,18 @@ pub enum PostProcessMode {
     GbPalette,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum QuantizeStrategy {
+    #[default]
+    Luminance,
+    RgbDistance,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResolvedPostProcessSettings {
     pub mode: PostProcessMode,
+    pub quantize_strategy: QuantizeStrategy,
     pub tint_color: [u8; 4],
     pub tint_strength_percent: u8,
     pub quantize_palette: Palette4,
@@ -86,6 +95,8 @@ pub struct ResolvedPostProcessSettings {
 pub struct RuntimePostProcessSettings {
     #[serde(default)]
     pub mode: PostProcessMode,
+    #[serde(default)]
+    pub quantize_strategy: QuantizeStrategy,
     #[serde(default = "default_post_process_tint_color")]
     pub tint_color: [u8; 4],
     #[serde(default = "default_post_process_tint_strength_percent")]
@@ -100,6 +111,7 @@ impl Default for RuntimePostProcessSettings {
     fn default() -> Self {
         Self {
             mode: PostProcessMode::default(),
+            quantize_strategy: QuantizeStrategy::default(),
             tint_color: default_post_process_tint_color(),
             tint_strength_percent: default_post_process_tint_strength_percent(),
             quantize_palette_id: default_post_process_quantize_palette_id(),
@@ -121,6 +133,7 @@ impl RuntimePostProcessSettings {
 
         ResolvedPostProcessSettings {
             mode: self.mode,
+            quantize_strategy: self.quantize_strategy,
             tint_color: self.tint_color,
             tint_strength_percent: self.tint_strength_percent.min(100),
             quantize_palette,

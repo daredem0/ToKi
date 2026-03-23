@@ -62,6 +62,7 @@ impl GpuState {
     fn default_post_process_settings() -> ResolvedPostProcessSettings {
         ResolvedPostProcessSettings {
             mode: PostProcessMode::None,
+            quantize_strategy: toki_core::project_runtime::QuantizeStrategy::Luminance,
             tint_color: [0, 0, 0, 255],
             tint_strength_percent: 0,
             quantize_palette: toki_core::palette::Palette4::new([

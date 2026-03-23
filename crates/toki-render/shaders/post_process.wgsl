@@ -1,6 +1,6 @@
 struct PostProcessUniforms {
     mode: u32,
-    _padding0: u32,
+    quantize_strategy: u32,
     _padding1: u32,
     _padding2: u32,
     tint_color: vec4<f32>,
@@ -65,6 +65,33 @@ fn apply_contrast(value: f32, contrast: f32) -> f32 {
     return clamp((value - 0.5) * (1.0 + contrast) + 0.5, 0.0, 1.0);
 }
 
+fn rgb_distance_sq(lhs: vec3<f32>, rhs: vec3<f32>) -> f32 {
+    let delta = lhs - rhs;
+    return dot(delta, delta);
+}
+
+fn nearest_palette_color(rgb: vec3<f32>, palette: array<vec4<f32>, 4>) -> vec3<f32> {
+    var best = palette[0].rgb;
+    var best_distance = rgb_distance_sq(rgb, best);
+    for (var index = 1u; index < 4u; index = index + 1u) {
+        let candidate = palette[index].rgb;
+        let distance = rgb_distance_sq(rgb, candidate);
+        if distance < best_distance {
+            best = candidate;
+            best_distance = distance;
+        }
+    }
+    return best;
+}
+
+fn apply_contrast_rgb(rgb: vec3<f32>, contrast: f32) -> vec3<f32> {
+    return vec3<f32>(
+        apply_contrast(rgb.r, contrast),
+        apply_contrast(rgb.g, contrast),
+        apply_contrast(rgb.b, contrast),
+    );
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(source_texture, source_sampler, in.uv);
@@ -78,20 +105,29 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             return vec4<f32>(tint, color.a);
         }
         case 2u: {
-            let index = quantize_index(luminance(color.rgb));
-            let palette_color = uniforms.quantize_palette[index];
-            return vec4<f32>(palette_color.rgb, color.a);
+            if uniforms.quantize_strategy == 0u {
+                let index = quantize_index(luminance(color.rgb));
+                let palette_color = uniforms.quantize_palette[index];
+                return vec4<f32>(palette_color.rgb, color.a);
+            }
+            let palette_color = nearest_palette_color(color.rgb, uniforms.quantize_palette);
+            return vec4<f32>(palette_color, color.a);
         }
         case 3u: {
-            let gb_palette = array<vec3<f32>, 4>(
-                vec3<f32>(15.0 / 255.0, 56.0 / 255.0, 15.0 / 255.0),
-                vec3<f32>(48.0 / 255.0, 98.0 / 255.0, 48.0 / 255.0),
-                vec3<f32>(139.0 / 255.0, 172.0 / 255.0, 15.0 / 255.0),
-                vec3<f32>(155.0 / 255.0, 188.0 / 255.0, 15.0 / 255.0),
+            let gb_palette = array<vec4<f32>, 4>(
+                vec4<f32>(15.0 / 255.0, 56.0 / 255.0, 15.0 / 255.0, 1.0),
+                vec4<f32>(48.0 / 255.0, 98.0 / 255.0, 48.0 / 255.0, 1.0),
+                vec4<f32>(139.0 / 255.0, 172.0 / 255.0, 15.0 / 255.0, 1.0),
+                vec4<f32>(155.0 / 255.0, 188.0 / 255.0, 15.0 / 255.0, 1.0),
             );
-            let adjusted = apply_contrast(luminance(color.rgb), uniforms.gb_contrast);
-            let index = quantize_index(adjusted);
-            return vec4<f32>(gb_palette[index], color.a);
+            if uniforms.quantize_strategy == 0u {
+                let adjusted = apply_contrast(luminance(color.rgb), uniforms.gb_contrast);
+                let index = quantize_index(adjusted);
+                return vec4<f32>(gb_palette[index].rgb, color.a);
+            }
+            let adjusted = apply_contrast_rgb(color.rgb, uniforms.gb_contrast);
+            let palette_color = nearest_palette_color(adjusted, gb_palette);
+            return vec4<f32>(palette_color, color.a);
         }
         default: {
             return color;

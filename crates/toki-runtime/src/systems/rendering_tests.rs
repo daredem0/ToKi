@@ -6,7 +6,7 @@ use toki_core::fonts::find_font_files;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::palette::Palette4;
 use toki_core::graphics::vertex::QuadVertex;
-use toki_core::project_runtime::{PostProcessMode, ResolvedPostProcessSettings};
+use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings};
 use toki_core::sprite::SpriteFrame;
 use toki_core::sprite_render::{
     ResolvedSpriteRenderInstance, SpriteRenderMaterial, SpriteRenderOrigin, SpriteSortKey,
@@ -276,6 +276,7 @@ fn rendering_system_forwards_post_process_settings_to_backend() {
 
     rendering.set_post_process_settings(ResolvedPostProcessSettings {
         mode: PostProcessMode::Tint,
+        quantize_strategy: QuantizeStrategy::Luminance,
         tint_color: [10, 20, 30, 255],
         tint_strength_percent: 50,
         quantize_palette: Palette4::new([[0, 0, 0, 255]; 4]),

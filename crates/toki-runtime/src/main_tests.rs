@@ -6,7 +6,7 @@ use super::{
 use std::path::PathBuf;
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, MenuSettings, UiAction};
 use toki_core::project_runtime::{
-    PostProcessMode, RuntimeConfigAudio, RuntimeConfigDisplay, RuntimeConfigFile,
+    PostProcessMode, QuantizeStrategy, RuntimeConfigAudio, RuntimeConfigDisplay, RuntimeConfigFile,
     RuntimeConfigPack, RuntimeConfigSplash, RuntimeConfigStartup, RuntimePostProcessSettings,
 };
 use toki_runtime::{RuntimeAudioMixOptions, RuntimeDisplayOptions, RuntimeLaunchOptions};
@@ -144,6 +144,7 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
                 indexed_palette_override: None,
                 post_process: Some(RuntimePostProcessSettings {
                     mode: PostProcessMode::Tint,
+                    quantize_strategy: QuantizeStrategy::RgbDistance,
                     tint_color: [10, 20, 30, 255],
                     tint_strength_percent: 45,
                     quantize_palette_id: "sepia".to_string(),
@@ -172,6 +173,10 @@ fn apply_runtime_config_if_present_populates_pack_and_startup_scene() {
     assert!(options.display.show_entity_health_bars);
     assert!(!options.display.show_ground_shadows);
     assert_eq!(options.display.post_process.mode, PostProcessMode::Tint);
+    assert_eq!(
+        options.display.post_process.quantize_strategy,
+        QuantizeStrategy::RgbDistance
+    );
     assert_eq!(options.display.post_process.tint_color, [10, 20, 30, 255]);
     assert_eq!(options.display.post_process.tint_strength_percent, 45);
     assert_eq!(options.display.post_process.quantize_palette_id, "sepia");

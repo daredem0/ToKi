@@ -140,6 +140,43 @@ impl InspectorSystem {
                     });
             });
 
+            ui.add_enabled_ui(
+                matches!(
+                    draft.post_process_mode,
+                    toki_core::project_runtime::PostProcessMode::Quantize4
+                        | toki_core::project_runtime::PostProcessMode::GbPalette
+                ),
+                |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Quantize Strategy:");
+                        let current_label = match draft.post_process_quantize_strategy {
+                            toki_core::project_runtime::QuantizeStrategy::Luminance => "Luminance",
+                            toki_core::project_runtime::QuantizeStrategy::RgbDistance => {
+                                "RGB Distance"
+                            }
+                        };
+                        egui::ComboBox::from_id_salt("project_quantize_strategy")
+                            .selected_text(current_label)
+                            .show_ui(ui, |ui| {
+                                changed |= ui
+                                    .selectable_value(
+                                        &mut draft.post_process_quantize_strategy,
+                                        toki_core::project_runtime::QuantizeStrategy::Luminance,
+                                        "Luminance",
+                                    )
+                                    .changed();
+                                changed |= ui
+                                    .selectable_value(
+                                        &mut draft.post_process_quantize_strategy,
+                                        toki_core::project_runtime::QuantizeStrategy::RgbDistance,
+                                        "RGB Distance",
+                                    )
+                                    .changed();
+                            });
+                    });
+                },
+            );
+
             ui.horizontal(|ui| {
                 ui.label("Tint Color:");
                 let mut color32 = egui::Color32::from_rgba_unmultiplied(

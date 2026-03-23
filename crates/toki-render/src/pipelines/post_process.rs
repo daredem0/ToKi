@@ -1,13 +1,13 @@
 use bytemuck::{Pod, Zeroable};
 use toki_core::palette::Palette4;
-use toki_core::project_runtime::{PostProcessMode, ResolvedPostProcessSettings};
+use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings};
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct PostProcessUniforms {
     mode: u32,
-    _padding0: u32,
+    quantize_strategy: u32,
     _padding1: u32,
     _padding2: u32,
     tint_color: [f32; 4],
@@ -27,6 +27,13 @@ fn shader_mode(mode: PostProcessMode) -> u32 {
     }
 }
 
+fn shader_quantize_strategy(strategy: QuantizeStrategy) -> u32 {
+    match strategy {
+        QuantizeStrategy::Luminance => 0,
+        QuantizeStrategy::RgbDistance => 1,
+    }
+}
+
 fn color_to_vec4(color: [u8; 4]) -> [f32; 4] {
     [
         color[0] as f32 / 255.0,
@@ -43,7 +50,7 @@ fn palette_to_uniform(palette: Palette4) -> [[f32; 4]; 4] {
 fn build_uniforms(settings: ResolvedPostProcessSettings) -> PostProcessUniforms {
     PostProcessUniforms {
         mode: shader_mode(settings.mode),
-        _padding0: 0,
+        quantize_strategy: shader_quantize_strategy(settings.quantize_strategy),
         _padding1: 0,
         _padding2: 0,
         tint_color: color_to_vec4(settings.tint_color),
@@ -76,6 +83,42 @@ fn quantize_index(luminance: f32) -> usize {
     } else {
         3
     }
+}
+
+#[cfg(test)]
+fn rgb_distance_sq(lhs: [f32; 3], rhs: [f32; 3]) -> f32 {
+    let dr = lhs[0] - rhs[0];
+    let dg = lhs[1] - rhs[1];
+    let db = lhs[2] - rhs[2];
+    dr * dr + dg * dg + db * db
+}
+
+#[cfg(test)]
+fn nearest_palette_color(rgb: [f32; 3], palette: Palette4) -> [u8; 4] {
+    let mut best = palette.colors[0];
+    let mut best_distance = f32::MAX;
+    for color in palette.colors {
+        let candidate_rgb = [
+            color[0] as f32 / 255.0,
+            color[1] as f32 / 255.0,
+            color[2] as f32 / 255.0,
+        ];
+        let distance = rgb_distance_sq(rgb, candidate_rgb);
+        if distance < best_distance {
+            best_distance = distance;
+            best = color;
+        }
+    }
+    best
+}
+
+#[cfg(test)]
+fn apply_contrast_rgb(rgb: [f32; 3], contrast: f32) -> [f32; 3] {
+    [
+        apply_contrast(rgb[0], contrast),
+        apply_contrast(rgb[1], contrast),
+        apply_contrast(rgb[2], contrast),
+    ]
 }
 
 #[cfg(test)]
@@ -112,8 +155,13 @@ pub(crate) fn apply_post_process_pixel(
             ]
         }
         PostProcessMode::Quantize4 => {
-            let index = quantize_index(luminance(rgb));
-            let target = settings.quantize_palette.colors[index];
+            let target = match settings.quantize_strategy {
+                QuantizeStrategy::Luminance => {
+                    let index = quantize_index(luminance(rgb));
+                    settings.quantize_palette.colors[index]
+                }
+                QuantizeStrategy::RgbDistance => nearest_palette_color(rgb, settings.quantize_palette),
+            };
             [target[0], target[1], target[2], alpha]
         }
         PostProcessMode::GbPalette => {
@@ -124,9 +172,17 @@ pub(crate) fn apply_post_process_pixel(
                 [0x9B, 0xBC, 0x0F, 0xFF],
             ]);
             let contrast = settings.gb_contrast_percent.clamp(-100, 100) as f32 / 100.0;
-            let lum = apply_contrast(luminance(rgb), contrast);
-            let index = quantize_index(lum);
-            let target = gb_palette.colors[index];
+            let target = match settings.quantize_strategy {
+                QuantizeStrategy::Luminance => {
+                    let lum = apply_contrast(luminance(rgb), contrast);
+                    let index = quantize_index(lum);
+                    gb_palette.colors[index]
+                }
+                QuantizeStrategy::RgbDistance => {
+                    let adjusted = apply_contrast_rgb(rgb, contrast);
+                    nearest_palette_color(adjusted, gb_palette)
+                }
+            };
             [target[0], target[1], target[2], alpha]
         }
     }
@@ -218,6 +274,7 @@ impl PostProcessPipeline {
             contents: bytemuck::cast_slice(&[build_uniforms(
                 ResolvedPostProcessSettings {
                     mode: PostProcessMode::None,
+                    quantize_strategy: QuantizeStrategy::Luminance,
                     tint_color: [0, 0, 0, 255],
                     tint_strength_percent: 0,
                     quantize_palette: Palette4::new([
@@ -300,11 +357,12 @@ impl PostProcessPipeline {
 mod tests {
     use super::{apply_post_process_pixel, quantize_index, PostProcessUniforms};
     use toki_core::palette::Palette4;
-    use toki_core::project_runtime::{PostProcessMode, ResolvedPostProcessSettings};
+    use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings};
 
     fn settings(mode: PostProcessMode) -> ResolvedPostProcessSettings {
         ResolvedPostProcessSettings {
             mode,
+            quantize_strategy: QuantizeStrategy::Luminance,
             tint_color: [40, 80, 160, 255],
             tint_strength_percent: 50,
             quantize_palette: Palette4::new([
@@ -344,6 +402,24 @@ mod tests {
         let output =
             apply_post_process_pixel(settings(PostProcessMode::GbPalette), [150, 100, 60, 120]);
         assert_eq!(output[3], 120);
+    }
+
+    #[test]
+    fn quantize_rgb_distance_keeps_exact_palette_color_stable() {
+        let mut post = settings(PostProcessMode::Quantize4);
+        post.quantize_strategy = QuantizeStrategy::RgbDistance;
+        let color = post.quantize_palette.colors[2];
+        let output = apply_post_process_pixel(post, color);
+        assert_eq!(output, color);
+    }
+
+    #[test]
+    fn gb_rgb_distance_keeps_exact_gb_palette_color_stable() {
+        let mut post = settings(PostProcessMode::GbPalette);
+        post.quantize_strategy = QuantizeStrategy::RgbDistance;
+        let color = [0x8B, 0xAC, 0x0F, 0xFF];
+        let output = apply_post_process_pixel(post, color);
+        assert_eq!(output, color);
     }
 
     #[test]
