@@ -51,7 +51,10 @@ fn runtime_settings_defaults_match_engine_baseline() {
         settings.display.post_process.quantize_strategy,
         QuantizeStrategy::Luminance
     );
+    assert_eq!(settings.display.post_process.brightness_percent, 0);
+    assert_eq!(settings.display.post_process.saturation_percent, 100);
     assert_eq!(settings.display.post_process.quantize_palette_id, "gray");
+    assert_eq!(settings.display.post_process.vignette_strength_percent, 60);
     assert_eq!(settings.display.resolution_width, 160);
     assert_eq!(settings.display.resolution_height, 144);
     assert_eq!(settings.menu.pause_root_screen_id, "pause_menu");
@@ -93,25 +96,34 @@ fn runtime_metadata_supports_post_process_settings() {
     let metadata: ProjectRuntimeMetadata = toml::from_str(
         r#"
         [runtime.display.post_process]
-        mode = "tint"
+        mode = "brightness_saturation"
         quantize_strategy = "rgb_distance"
         tint_color = [12, 34, 56, 255]
         tint_strength_percent = 70
+        brightness_percent = 15
+        saturation_percent = 140
         quantize_palette_id = "poison"
         gb_contrast_percent = 18
+        vignette_strength_percent = 72
         "#,
     )
     .expect("runtime metadata should deserialize");
 
-    assert_eq!(metadata.runtime.display.post_process.mode, PostProcessMode::Tint);
+    assert_eq!(
+        metadata.runtime.display.post_process.mode,
+        PostProcessMode::BrightnessSaturation
+    );
     assert_eq!(
         metadata.runtime.display.post_process.quantize_strategy,
         QuantizeStrategy::RgbDistance
     );
     assert_eq!(metadata.runtime.display.post_process.tint_color, [12, 34, 56, 255]);
     assert_eq!(metadata.runtime.display.post_process.tint_strength_percent, 70);
+    assert_eq!(metadata.runtime.display.post_process.brightness_percent, 15);
+    assert_eq!(metadata.runtime.display.post_process.saturation_percent, 140);
     assert_eq!(metadata.runtime.display.post_process.quantize_palette_id, "poison");
     assert_eq!(metadata.runtime.display.post_process.gb_contrast_percent, 18);
+    assert_eq!(metadata.runtime.display.post_process.vignette_strength_percent, 72);
 }
 
 #[test]
@@ -121,8 +133,11 @@ fn runtime_post_process_settings_resolve_quantize_palette_from_registry() {
         quantize_strategy: QuantizeStrategy::Luminance,
         tint_color: [0, 0, 0, 255],
         tint_strength_percent: 10,
+        brightness_percent: 0,
+        saturation_percent: 100,
         quantize_palette_id: "night".to_string(),
         gb_contrast_percent: 0,
+        vignette_strength_percent: 60,
     };
 
     let resolved = settings.resolve(&std::collections::BTreeMap::new());

@@ -26,8 +26,11 @@ pub struct ProjectSettingsDraft {
     pub post_process_quantize_strategy: QuantizeStrategy,
     pub post_process_tint_color: [u8; 4],
     pub post_process_tint_strength_percent: u8,
+    pub post_process_brightness_percent: i16,
+    pub post_process_saturation_percent: u8,
     pub post_process_quantize_palette_id: String,
     pub post_process_gb_contrast_percent: i16,
+    pub post_process_vignette_strength_percent: u8,
 }
 
 impl ProjectSettingsDraft {
@@ -64,6 +67,18 @@ impl ProjectSettingsDraft {
                 .display
                 .post_process
                 .tint_strength_percent,
+            post_process_brightness_percent: project
+                .metadata
+                .runtime
+                .display
+                .post_process
+                .brightness_percent,
+            post_process_saturation_percent: project
+                .metadata
+                .runtime
+                .display
+                .post_process
+                .saturation_percent,
             post_process_quantize_palette_id: project
                 .metadata
                 .runtime
@@ -77,6 +92,12 @@ impl ProjectSettingsDraft {
                 .display
                 .post_process
                 .gb_contrast_percent,
+            post_process_vignette_strength_percent: project
+                .metadata
+                .runtime
+                .display
+                .post_process
+                .vignette_strength_percent,
         }
     }
 }
@@ -138,6 +159,20 @@ pub fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettin
             draft.post_process_tint_strength_percent;
         changed = true;
     }
+    if project.metadata.runtime.display.post_process.brightness_percent
+        != draft.post_process_brightness_percent
+    {
+        project.metadata.runtime.display.post_process.brightness_percent =
+            draft.post_process_brightness_percent;
+        changed = true;
+    }
+    if project.metadata.runtime.display.post_process.saturation_percent
+        != draft.post_process_saturation_percent
+    {
+        project.metadata.runtime.display.post_process.saturation_percent =
+            draft.post_process_saturation_percent;
+        changed = true;
+    }
     if project.metadata.runtime.display.post_process.quantize_palette_id
         != draft.post_process_quantize_palette_id
     {
@@ -150,6 +185,13 @@ pub fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettin
     {
         project.metadata.runtime.display.post_process.gb_contrast_percent =
             draft.post_process_gb_contrast_percent;
+        changed = true;
+    }
+    if project.metadata.runtime.display.post_process.vignette_strength_percent
+        != draft.post_process_vignette_strength_percent
+    {
+        project.metadata.runtime.display.post_process.vignette_strength_percent =
+            draft.post_process_vignette_strength_percent;
         changed = true;
     }
     if project.metadata.runtime.display.resolution_width != draft.resolution_width {
@@ -232,8 +274,11 @@ mod tests {
             post_process_quantize_strategy: QuantizeStrategy::RgbDistance,
             post_process_tint_color: [12, 34, 56, 255],
             post_process_tint_strength_percent: 65,
+            post_process_brightness_percent: 15,
+            post_process_saturation_percent: 140,
             post_process_quantize_palette_id: "poison".to_string(),
             post_process_gb_contrast_percent: 12,
+            post_process_vignette_strength_percent: 72,
         };
 
         let changed = apply_project_settings_draft(&mut project, &draft);
@@ -270,12 +315,24 @@ mod tests {
             65
         );
         assert_eq!(
+            project.metadata.runtime.display.post_process.brightness_percent,
+            15
+        );
+        assert_eq!(
+            project.metadata.runtime.display.post_process.saturation_percent,
+            140
+        );
+        assert_eq!(
             project.metadata.runtime.display.post_process.quantize_palette_id,
             "poison"
         );
         assert_eq!(
             project.metadata.runtime.display.post_process.gb_contrast_percent,
             12
+        );
+        assert_eq!(
+            project.metadata.runtime.display.post_process.vignette_strength_percent,
+            72
         );
         assert!(project.is_dirty);
         assert!(project.metadata.project.modified >= original_modified);

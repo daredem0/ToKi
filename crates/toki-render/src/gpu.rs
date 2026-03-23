@@ -65,6 +65,8 @@ impl GpuState {
             quantize_strategy: toki_core::project_runtime::QuantizeStrategy::Luminance,
             tint_color: [0, 0, 0, 255],
             tint_strength_percent: 0,
+            brightness_percent: 0,
+            saturation_percent: 100,
             quantize_palette: toki_core::palette::Palette4::new([
                 [0x11, 0x11, 0x11, 0xFF],
                 [0x55, 0x55, 0x55, 0xFF],
@@ -72,6 +74,7 @@ impl GpuState {
                 [0xF0, 0xF0, 0xF0, 0xFF],
             ]),
             gb_contrast_percent: 0,
+            vignette_strength_percent: 60,
         }
     }
 

@@ -13,8 +13,12 @@ struct PostProcessUniforms {
     tint_color: [f32; 4],
     tint_strength: f32,
     gb_contrast: f32,
+    brightness: f32,
+    saturation: f32,
+    vignette_strength: f32,
     _padding3: f32,
     _padding4: f32,
+    _padding5: f32,
     quantize_palette: [[f32; 4]; 4],
 }
 
@@ -22,8 +26,11 @@ fn shader_mode(mode: PostProcessMode) -> u32 {
     match mode {
         PostProcessMode::None => 0,
         PostProcessMode::Tint => 1,
-        PostProcessMode::Quantize4 => 2,
-        PostProcessMode::GbPalette => 3,
+        PostProcessMode::BrightnessSaturation => 2,
+        PostProcessMode::Quantize4 => 3,
+        PostProcessMode::OrderedDitherQuantize => 4,
+        PostProcessMode::GbPalette => 5,
+        PostProcessMode::Vignette => 6,
     }
 }
 
@@ -56,8 +63,12 @@ fn build_uniforms(settings: ResolvedPostProcessSettings) -> PostProcessUniforms 
         tint_color: color_to_vec4(settings.tint_color),
         tint_strength: settings.tint_strength_percent.min(100) as f32 / 100.0,
         gb_contrast: settings.gb_contrast_percent.clamp(-100, 100) as f32 / 100.0,
+        brightness: settings.brightness_percent.clamp(-100, 100) as f32 / 100.0,
+        saturation: settings.saturation_percent.min(200) as f32 / 100.0,
+        vignette_strength: settings.vignette_strength_percent.min(100) as f32 / 100.0,
         _padding3: 0.0,
         _padding4: 0.0,
+        _padding5: 0.0,
         quantize_palette: palette_to_uniform(settings.quantize_palette),
     }
 }
@@ -122,9 +133,64 @@ fn apply_contrast_rgb(rgb: [f32; 3], contrast: f32) -> [f32; 3] {
 }
 
 #[cfg(test)]
+fn apply_brightness_saturation(
+    rgb: [f32; 3],
+    brightness: f32,
+    saturation: f32,
+) -> [f32; 3] {
+    let lum = luminance(rgb);
+    let gray = [lum, lum, lum];
+    [
+        (gray[0] * (1.0 - saturation) + rgb[0] * saturation + brightness).clamp(0.0, 1.0),
+        (gray[1] * (1.0 - saturation) + rgb[1] * saturation + brightness).clamp(0.0, 1.0),
+        (gray[2] * (1.0 - saturation) + rgb[2] * saturation + brightness).clamp(0.0, 1.0),
+    ]
+}
+
+#[cfg(test)]
+fn bayer4x4_threshold(pixel: [u32; 2]) -> f32 {
+    const BAYER4X4: [[u8; 4]; 4] = [
+        [0, 8, 2, 10],
+        [12, 4, 14, 6],
+        [3, 11, 1, 9],
+        [15, 7, 13, 5],
+    ];
+    let x = (pixel[0] % 4) as usize;
+    let y = (pixel[1] % 4) as usize;
+    (BAYER4X4[y][x] as f32 + 0.5) / 16.0
+}
+
+#[cfg(test)]
+fn ordered_dither_quantize_index(lum: f32, pixel: [u32; 2]) -> usize {
+    let threshold_bias = (bayer4x4_threshold(pixel) - 0.5) / 4.0;
+    quantize_index((lum + threshold_bias).clamp(0.0, 1.0))
+}
+
+#[cfg(test)]
+fn apply_vignette(rgb: [f32; 3], uv: [f32; 2], strength: f32) -> [f32; 3] {
+    let dx = uv[0] * 2.0 - 1.0;
+    let dy = uv[1] * 2.0 - 1.0;
+    let dist = (dx * dx + dy * dy).sqrt();
+    let edge = ((dist - 0.35) / (1.0 - 0.35)).clamp(0.0, 1.0);
+    let smooth = edge * edge * (3.0 - 2.0 * edge);
+    let vignette = 1.0 - smooth * strength;
+    [rgb[0] * vignette, rgb[1] * vignette, rgb[2] * vignette]
+}
+
+#[cfg(test)]
 pub(crate) fn apply_post_process_pixel(
     settings: ResolvedPostProcessSettings,
     color: [u8; 4],
+) -> [u8; 4] {
+    apply_post_process_pixel_at(settings, color, [0, 0], [0.5, 0.5])
+}
+
+#[cfg(test)]
+pub(crate) fn apply_post_process_pixel_at(
+    settings: ResolvedPostProcessSettings,
+    color: [u8; 4],
+    pixel: [u32; 2],
+    uv: [f32; 2],
 ) -> [u8; 4] {
     if color[3] == 0 {
         return color;
@@ -154,6 +220,19 @@ pub(crate) fn apply_post_process_pixel(
                 alpha,
             ]
         }
+        PostProcessMode::BrightnessSaturation => {
+            let out = apply_brightness_saturation(
+                rgb,
+                settings.brightness_percent.clamp(-100, 100) as f32 / 100.0,
+                settings.saturation_percent.min(200) as f32 / 100.0,
+            );
+            [
+                (out[0] * 255.0).round() as u8,
+                (out[1] * 255.0).round() as u8,
+                (out[2] * 255.0).round() as u8,
+                alpha,
+            ]
+        }
         PostProcessMode::Quantize4 => {
             let target = match settings.quantize_strategy {
                 QuantizeStrategy::Luminance => {
@@ -162,6 +241,11 @@ pub(crate) fn apply_post_process_pixel(
                 }
                 QuantizeStrategy::RgbDistance => nearest_palette_color(rgb, settings.quantize_palette),
             };
+            [target[0], target[1], target[2], alpha]
+        }
+        PostProcessMode::OrderedDitherQuantize => {
+            let index = ordered_dither_quantize_index(luminance(rgb), pixel);
+            let target = settings.quantize_palette.colors[index];
             [target[0], target[1], target[2], alpha]
         }
         PostProcessMode::GbPalette => {
@@ -184,6 +268,19 @@ pub(crate) fn apply_post_process_pixel(
                 }
             };
             [target[0], target[1], target[2], alpha]
+        }
+        PostProcessMode::Vignette => {
+            let out = apply_vignette(
+                rgb,
+                uv,
+                settings.vignette_strength_percent.min(100) as f32 / 100.0,
+            );
+            [
+                (out[0] * 255.0).round() as u8,
+                (out[1] * 255.0).round() as u8,
+                (out[2] * 255.0).round() as u8,
+                alpha,
+            ]
         }
     }
 }
@@ -277,6 +374,8 @@ impl PostProcessPipeline {
                     quantize_strategy: QuantizeStrategy::Luminance,
                     tint_color: [0, 0, 0, 255],
                     tint_strength_percent: 0,
+                    brightness_percent: 0,
+                    saturation_percent: 100,
                     quantize_palette: Palette4::new([
                         [0, 0, 0, 255],
                         [85, 85, 85, 255],
@@ -284,6 +383,7 @@ impl PostProcessPipeline {
                         [255, 255, 255, 255],
                     ]),
                     gb_contrast_percent: 0,
+                    vignette_strength_percent: 60,
                 },
             )]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
@@ -355,7 +455,7 @@ impl PostProcessPipeline {
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_post_process_pixel, quantize_index, PostProcessUniforms};
+    use super::{apply_post_process_pixel, apply_post_process_pixel_at, quantize_index, PostProcessUniforms};
     use toki_core::palette::Palette4;
     use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings};
 
@@ -365,6 +465,8 @@ mod tests {
             quantize_strategy: QuantizeStrategy::Luminance,
             tint_color: [40, 80, 160, 255],
             tint_strength_percent: 50,
+            brightness_percent: 0,
+            saturation_percent: 100,
             quantize_palette: Palette4::new([
                 [10, 10, 10, 255],
                 [80, 80, 80, 255],
@@ -372,6 +474,7 @@ mod tests {
                 [240, 240, 240, 255],
             ]),
             gb_contrast_percent: 10,
+            vignette_strength_percent: 60,
         }
     }
 
@@ -398,10 +501,56 @@ mod tests {
     }
 
     #[test]
+    fn brightness_saturation_mode_adjusts_color_grade() {
+        let mut post = settings(PostProcessMode::BrightnessSaturation);
+        post.brightness_percent = 20;
+        post.saturation_percent = 150;
+        let output = apply_post_process_pixel(post, [120, 90, 60, 255]);
+        assert!(output[0] > 120);
+        assert!(output[0] > output[1]);
+        assert!(output[1] > output[2]);
+    }
+
+    #[test]
+    fn ordered_dither_quantize_uses_pixel_position() {
+        let color = [125, 125, 125, 255];
+        let low = apply_post_process_pixel_at(
+            settings(PostProcessMode::OrderedDitherQuantize),
+            color,
+            [0, 0],
+            [0.2, 0.2],
+        );
+        let high = apply_post_process_pixel_at(
+            settings(PostProcessMode::OrderedDitherQuantize),
+            color,
+            [0, 1],
+            [0.2, 0.2],
+        );
+        assert_ne!(low, high);
+    }
+
+    #[test]
     fn gb_post_process_preserves_alpha() {
         let output =
             apply_post_process_pixel(settings(PostProcessMode::GbPalette), [150, 100, 60, 120]);
         assert_eq!(output[3], 120);
+    }
+
+    #[test]
+    fn vignette_darkens_edges_more_than_center() {
+        let center = apply_post_process_pixel_at(
+            settings(PostProcessMode::Vignette),
+            [180, 180, 180, 255],
+            [0, 0],
+            [0.5, 0.5],
+        );
+        let edge = apply_post_process_pixel_at(
+            settings(PostProcessMode::Vignette),
+            [180, 180, 180, 255],
+            [0, 0],
+            [0.0, 0.0],
+        );
+        assert!(edge[0] < center[0]);
     }
 
     #[test]
@@ -423,7 +572,7 @@ mod tests {
     }
 
     #[test]
-    fn uniform_layout_matches_expected_112_byte_size() {
-        assert_eq!(std::mem::size_of::<PostProcessUniforms>(), 112);
+    fn uniform_layout_matches_expected_128_byte_size() {
+        assert_eq!(std::mem::size_of::<PostProcessUniforms>(), 128);
     }
 }

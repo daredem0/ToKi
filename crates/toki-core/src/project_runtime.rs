@@ -69,8 +69,11 @@ pub enum PostProcessMode {
     #[default]
     None,
     Tint,
+    BrightnessSaturation,
     Quantize4,
+    OrderedDitherQuantize,
     GbPalette,
+    Vignette,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
@@ -87,8 +90,11 @@ pub struct ResolvedPostProcessSettings {
     pub quantize_strategy: QuantizeStrategy,
     pub tint_color: [u8; 4],
     pub tint_strength_percent: u8,
+    pub brightness_percent: i16,
+    pub saturation_percent: u8,
     pub quantize_palette: Palette4,
     pub gb_contrast_percent: i16,
+    pub vignette_strength_percent: u8,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -101,10 +107,16 @@ pub struct RuntimePostProcessSettings {
     pub tint_color: [u8; 4],
     #[serde(default = "default_post_process_tint_strength_percent")]
     pub tint_strength_percent: u8,
+    #[serde(default = "default_post_process_brightness_percent")]
+    pub brightness_percent: i16,
+    #[serde(default = "default_post_process_saturation_percent")]
+    pub saturation_percent: u8,
     #[serde(default = "default_post_process_quantize_palette_id")]
     pub quantize_palette_id: String,
     #[serde(default = "default_post_process_gb_contrast_percent")]
     pub gb_contrast_percent: i16,
+    #[serde(default = "default_post_process_vignette_strength_percent")]
+    pub vignette_strength_percent: u8,
 }
 
 impl Default for RuntimePostProcessSettings {
@@ -114,8 +126,11 @@ impl Default for RuntimePostProcessSettings {
             quantize_strategy: QuantizeStrategy::default(),
             tint_color: default_post_process_tint_color(),
             tint_strength_percent: default_post_process_tint_strength_percent(),
+            brightness_percent: default_post_process_brightness_percent(),
+            saturation_percent: default_post_process_saturation_percent(),
             quantize_palette_id: default_post_process_quantize_palette_id(),
             gb_contrast_percent: default_post_process_gb_contrast_percent(),
+            vignette_strength_percent: default_post_process_vignette_strength_percent(),
         }
     }
 }
@@ -136,8 +151,11 @@ impl RuntimePostProcessSettings {
             quantize_strategy: self.quantize_strategy,
             tint_color: self.tint_color,
             tint_strength_percent: self.tint_strength_percent.min(100),
+            brightness_percent: self.brightness_percent.clamp(-100, 100),
+            saturation_percent: self.saturation_percent.min(200),
             quantize_palette,
             gb_contrast_percent: self.gb_contrast_percent.clamp(-100, 100),
+            vignette_strength_percent: self.vignette_strength_percent.min(100),
         }
     }
 }
@@ -332,12 +350,24 @@ pub const fn default_post_process_tint_strength_percent() -> u8 {
     35
 }
 
+pub const fn default_post_process_brightness_percent() -> i16 {
+    0
+}
+
+pub const fn default_post_process_saturation_percent() -> u8 {
+    100
+}
+
 pub fn default_post_process_quantize_palette_id() -> String {
     "gray".to_string()
 }
 
 pub const fn default_post_process_gb_contrast_percent() -> i16 {
     0
+}
+
+pub const fn default_post_process_vignette_strength_percent() -> u8 {
+    60
 }
 
 pub const fn default_show_ground_shadows() -> bool {

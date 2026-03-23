@@ -13,6 +13,8 @@ use super::App;
 const SETTING_STEP_PERCENT: u8 = 5;
 const TINT_CHANNEL_STEP: u8 = 16;
 const GB_CONTRAST_STEP: i16 = 5;
+const BRIGHTNESS_STEP_PERCENT: i16 = 5;
+const SATURATION_STEP_PERCENT: i16 = 10;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum RuntimeMenuOverlay {
@@ -147,46 +149,64 @@ impl App {
                 selected: selected_index == 1,
             },
             RuntimeOverlayEntry {
+                label: "Brightness".to_string(),
+                value_text: format!("{}%", post.brightness_percent),
+                slider_percent: Some(((post.brightness_percent + 100) / 2) as u8),
+                selected: selected_index == 2,
+            },
+            RuntimeOverlayEntry {
+                label: "Saturation".to_string(),
+                value_text: format!("{}%", post.saturation_percent),
+                slider_percent: Some(post.saturation_percent.min(200) / 2),
+                selected: selected_index == 3,
+            },
+            RuntimeOverlayEntry {
                 label: "Tint Strength".to_string(),
                 value_text: format!("{}%", post.tint_strength_percent),
                 slider_percent: Some(post.tint_strength_percent),
-                selected: selected_index == 2,
+                selected: selected_index == 4,
             },
             RuntimeOverlayEntry {
                 label: "Tint Red".to_string(),
                 value_text: post.tint_color[0].to_string(),
                 slider_percent: Some(channel_to_percent(post.tint_color[0])),
-                selected: selected_index == 3,
+                selected: selected_index == 5,
             },
             RuntimeOverlayEntry {
                 label: "Tint Green".to_string(),
                 value_text: post.tint_color[1].to_string(),
                 slider_percent: Some(channel_to_percent(post.tint_color[1])),
-                selected: selected_index == 4,
+                selected: selected_index == 6,
             },
             RuntimeOverlayEntry {
                 label: "Tint Blue".to_string(),
                 value_text: post.tint_color[2].to_string(),
                 slider_percent: Some(channel_to_percent(post.tint_color[2])),
-                selected: selected_index == 5,
+                selected: selected_index == 7,
             },
             RuntimeOverlayEntry {
                 label: "Quantize Palette".to_string(),
                 value_text: post.quantize_palette_id.clone(),
                 slider_percent: None,
-                selected: selected_index == 6,
+                selected: selected_index == 8,
             },
             RuntimeOverlayEntry {
                 label: "GB Contrast".to_string(),
                 value_text: format!("{}%", post.gb_contrast_percent),
                 slider_percent: Some(((post.gb_contrast_percent + 100) / 2) as u8),
-                selected: selected_index == 7,
+                selected: selected_index == 9,
+            },
+            RuntimeOverlayEntry {
+                label: "Vignette Strength".to_string(),
+                value_text: format!("{}%", post.vignette_strength_percent),
+                slider_percent: Some(post.vignette_strength_percent),
+                selected: selected_index == 10,
             },
             RuntimeOverlayEntry {
                 label: "Back".to_string(),
                 value_text: "Close".to_string(),
                 slider_percent: None,
-                selected: selected_index == 8,
+                selected: selected_index == 11,
             },
         ]
     }
@@ -234,7 +254,7 @@ impl App {
 
         let next_selected = match input {
             MenuInput::Up => Some(selected_index.saturating_sub(1)),
-            MenuInput::Down => Some((selected_index + 1).min(8)),
+            MenuInput::Down => Some((selected_index + 1).min(11)),
             _ => None,
         };
         if let Some(next_selected) = next_selected {
@@ -250,7 +270,7 @@ impl App {
         match input {
             MenuInput::Left => self.adjust_graphics_setting(selected_index, -1),
             MenuInput::Right | MenuInput::Confirm => {
-                if selected_index == 8 && matches!(input, MenuInput::Confirm) {
+                if selected_index == 11 && matches!(input, MenuInput::Confirm) {
                     return true;
                 }
                 self.adjust_graphics_setting(selected_index, 1);
@@ -299,23 +319,34 @@ impl App {
                     direction,
                 );
             }
-            2 => adjust_percent(
+            2 => {
+                let next = self.launch_options.display.post_process.brightness_percent
+                    + BRIGHTNESS_STEP_PERCENT * direction as i16;
+                self.launch_options.display.post_process.brightness_percent = next.clamp(-100, 100);
+            }
+            3 => {
+                let next = self.launch_options.display.post_process.saturation_percent as i16
+                    + SATURATION_STEP_PERCENT * direction as i16;
+                self.launch_options.display.post_process.saturation_percent =
+                    next.clamp(0, 200) as u8;
+            }
+            4 => adjust_percent(
                 &mut self.launch_options.display.post_process.tint_strength_percent,
                 (SETTING_STEP_PERCENT as i16) * direction as i16,
             ),
-            3 => adjust_channel(
+            5 => adjust_channel(
                 &mut self.launch_options.display.post_process.tint_color[0],
                 TINT_CHANNEL_STEP as i16 * direction as i16,
             ),
-            4 => adjust_channel(
+            6 => adjust_channel(
                 &mut self.launch_options.display.post_process.tint_color[1],
                 TINT_CHANNEL_STEP as i16 * direction as i16,
             ),
-            5 => adjust_channel(
+            7 => adjust_channel(
                 &mut self.launch_options.display.post_process.tint_color[2],
                 TINT_CHANNEL_STEP as i16 * direction as i16,
             ),
-            6 => {
+            8 => {
                 let palette_ids = available_palette_ids(&self.resources);
                 if !palette_ids.is_empty() {
                     cycle_string(
@@ -325,11 +356,15 @@ impl App {
                     );
                 }
             }
-            7 => {
+            9 => {
                 let next = self.launch_options.display.post_process.gb_contrast_percent
                     + GB_CONTRAST_STEP * direction as i16;
                 self.launch_options.display.post_process.gb_contrast_percent = next.clamp(-100, 100);
             }
+            10 => adjust_percent(
+                &mut self.launch_options.display.post_process.vignette_strength_percent,
+                (SETTING_STEP_PERCENT as i16) * direction as i16,
+            ),
             _ => return,
         }
 
@@ -412,8 +447,11 @@ fn cycle_post_process_mode(mode: PostProcessMode, direction: i32) -> PostProcess
     let modes = [
         PostProcessMode::None,
         PostProcessMode::Tint,
+        PostProcessMode::BrightnessSaturation,
         PostProcessMode::Quantize4,
+        PostProcessMode::OrderedDitherQuantize,
         PostProcessMode::GbPalette,
+        PostProcessMode::Vignette,
     ];
     let current_index = modes.iter().position(|candidate| *candidate == mode).unwrap_or(0) as i32;
     let next_index = (current_index + direction).rem_euclid(modes.len() as i32) as usize;
@@ -433,8 +471,11 @@ fn post_process_mode_label(mode: PostProcessMode) -> &'static str {
     match mode {
         PostProcessMode::None => "None",
         PostProcessMode::Tint => "Tint",
+        PostProcessMode::BrightnessSaturation => "Bright/Sat",
         PostProcessMode::Quantize4 => "Quantize 4",
+        PostProcessMode::OrderedDitherQuantize => "Dither Quantize",
         PostProcessMode::GbPalette => "GB Preset",
+        PostProcessMode::Vignette => "Vignette",
     }
 }
 
@@ -492,10 +533,10 @@ mod tests {
     fn mode_cycle_wraps_in_both_directions() {
         assert_eq!(
             cycle_post_process_mode(PostProcessMode::None, -1),
-            PostProcessMode::GbPalette
+            PostProcessMode::Vignette
         );
         assert_eq!(
-            cycle_post_process_mode(PostProcessMode::GbPalette, 1),
+            cycle_post_process_mode(PostProcessMode::Vignette, 1),
             PostProcessMode::None
         );
     }

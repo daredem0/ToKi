@@ -279,8 +279,11 @@ fn rendering_system_forwards_post_process_settings_to_backend() {
         quantize_strategy: QuantizeStrategy::Luminance,
         tint_color: [10, 20, 30, 255],
         tint_strength_percent: 50,
+        brightness_percent: 0,
+        saturation_percent: 100,
         quantize_palette: Palette4::new([[0, 0, 0, 255]; 4]),
         gb_contrast_percent: 0,
+        vignette_strength_percent: 60,
     });
 
     assert_eq!(updates.get(), 1);

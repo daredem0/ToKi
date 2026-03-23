@@ -266,8 +266,11 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
         post_process_quantize_strategy: toki_core::project_runtime::QuantizeStrategy::Luminance,
         post_process_tint_color: [32, 64, 96, 255],
         post_process_tint_strength_percent: 35,
+        post_process_brightness_percent: 0,
+        post_process_saturation_percent: 100,
         post_process_quantize_palette_id: "gray".to_string(),
         post_process_gb_contrast_percent: 0,
+        post_process_vignette_strength_percent: 60,
     };
 
     let changed = InspectorSystem::apply_project_settings_draft(&mut project, &draft);
