@@ -107,26 +107,38 @@ pub fn build_dialog_layout(
         width: content_width,
         height: body_height,
     };
-    let button_height = appearance.font_size_px as f32 + metrics.entry_padding_px.y * 2.0;
-    let button_width =
-        ((content_width - appearance.button_spacing_px as f32).max(2.0) * 0.5).floor();
-    let confirm_rect = MenuRect {
-        x: content_x,
-        y: body_rect.y + body_rect.height + appearance.footer_spacing_px as f32,
-        width: button_width,
-        height: button_height,
-    };
-    let cancel_rect = MenuRect {
-        x: content_x + button_width + appearance.button_spacing_px as f32,
-        y: confirm_rect.y,
-        width: button_width,
-        height: button_height,
-    };
+    let entry_height = appearance.font_size_px as f32 + metrics.entry_padding_px.y * 2.0;
+    let entries_start_y = body_rect.y + body_rect.height + appearance.footer_spacing_px as f32;
+    let entries = view
+        .entries
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| MenuEntryLayout {
+            rect: MenuRect {
+                x: content_x,
+                y: entries_start_y
+                    + index as f32
+                        * (entry_height + appearance.button_spacing_px as f32),
+                width: content_width,
+                height: entry_height,
+            },
+            text: entry.text.clone(),
+            selected: entry.selected,
+            selectable: entry.selectable,
+            border_style: entry
+                .border_style_override
+                .unwrap_or(appearance.border_style),
+        })
+        .collect::<Vec<_>>();
+    let entries_bottom = entries
+        .last()
+        .map(|entry| entry.rect.y + entry.rect.height)
+        .unwrap_or(body_rect.y + body_rect.height);
     let panel = MenuRect {
         x: (viewport.x - panel_width) * 0.5,
         y: (title_rect.y - metrics.panel_inner_margin_px).max(8.0),
         width: panel_width,
-        height: (cancel_rect.y + cancel_rect.height - title_rect.y)
+        height: (entries_bottom - title_rect.y)
             + metrics.panel_inner_margin_px * 2.0
             + appearance.title_spacing_px as f32,
     };
@@ -143,20 +155,7 @@ pub fn build_dialog_layout(
             text: view.body.clone(),
             border_style: appearance.border_style,
         },
-        confirm_button: MenuEntryLayout {
-            rect: confirm_rect,
-            text: view.confirm_text.clone(),
-            selected: view.confirm_selected,
-            selectable: true,
-            border_style: appearance.border_style,
-        },
-        cancel_button: MenuEntryLayout {
-            rect: cancel_rect,
-            text: view.cancel_text.clone(),
-            selected: !view.confirm_selected,
-            selectable: true,
-            border_style: appearance.border_style,
-        },
+        entries,
     }
 }
 

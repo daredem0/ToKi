@@ -188,6 +188,7 @@ pub fn render_rules_editor_section(
         scene_name,
         &mut edited_rules,
         &ctx.ui_state.scenes,
+        &ctx.ui_state.project.available_dialog_outcomes,
         ctx.config,
         map_size,
     );

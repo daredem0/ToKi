@@ -55,6 +55,13 @@ pub struct InteractionEvent {
     pub spatial: InteractionSpatial,
 }
 
+/// A dialog completion event emitted when a dialog closes with an outcome id.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DialogCompletionEvent {
+    pub dialog_id: String,
+    pub outcome_id: String,
+}
+
 /// A tile transition event recording when an entity enters or exits a specific tile.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TileTransitionEvent {

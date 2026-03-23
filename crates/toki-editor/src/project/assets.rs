@@ -2,9 +2,11 @@ use anyhow::Result;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
+use toki_core::dialog::DialogTree;
 use toki_core::palette::{load_palette_asset_from_path, Palette4};
 use toki_core::project_assets::{
     classify_sprite_metadata_file, discover_audio_files, discover_palette_assets,
+    discover_project_dialog_paths, load_dialog_from_path as load_dialog_from_project_path,
     load_entity_definition_from_path as load_entity_definition_from_project_path,
     load_scene_from_path as load_scene_from_project_path, SpriteMetadataFileKind,
 };
@@ -25,6 +27,8 @@ pub struct ProjectAssets {
     pub object_sheets: HashMap<String, ObjectSheetAsset>,
     /// Discovered entity definitions
     pub entities: HashMap<String, EntityAsset>,
+    /// Discovered dialog trees
+    pub dialogs: HashMap<String, DialogAsset>,
     /// Discovered project palette assets
     pub palettes: BTreeMap<String, PaletteAsset>,
 }
@@ -75,6 +79,12 @@ pub struct EntityAsset {
 }
 
 #[derive(Debug, Clone)]
+pub struct DialogAsset {
+    pub path: PathBuf,
+    pub dialog: Option<DialogTree>,
+}
+
+#[derive(Debug, Clone)]
 pub struct PaletteAsset {
     pub path: PathBuf,
     pub palette: Option<Palette4>,
@@ -90,6 +100,7 @@ impl ProjectAssets {
             sprite_atlases: HashMap::new(),
             object_sheets: HashMap::new(),
             entities: HashMap::new(),
+            dialogs: HashMap::new(),
             palettes: BTreeMap::new(),
         }
     }
@@ -100,15 +111,17 @@ impl ProjectAssets {
         self.scan_tilemaps()?;
         self.scan_sprite_atlases()?;
         self.scan_entities()?;
+        self.scan_dialogs()?;
         self.scan_palettes()?;
 
         tracing::info!(
-            "Scanned project assets: {} scenes, {} tilemaps, {} atlases, {} object sheets, {} entities, {} palettes",
+            "Scanned project assets: {} scenes, {} tilemaps, {} atlases, {} object sheets, {} entities, {} dialogs, {} palettes",
             self.scenes.len(),
             self.tilemaps.len(),
             self.sprite_atlases.len(),
             self.object_sheets.len(),
             self.entities.len(),
+            self.dialogs.len(),
             self.palettes.len()
         );
 
@@ -335,6 +348,22 @@ impl ProjectAssets {
         Ok(())
     }
 
+    fn scan_dialogs(&mut self) -> Result<()> {
+        self.dialogs.clear();
+        for path in discover_project_dialog_paths(&self.project_path)? {
+            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                self.dialogs.insert(
+                    stem.to_string(),
+                    DialogAsset {
+                        path,
+                        dialog: None,
+                    },
+                );
+            }
+        }
+        Ok(())
+    }
+
     /// Load a scene by name
     pub fn load_scene(&mut self, scene_name: &str) -> Result<Option<Scene>> {
         if let Some(scene_asset) = self.scenes.get_mut(scene_name) {
@@ -464,6 +493,41 @@ impl ProjectAssets {
             .iter()
             .filter_map(|(name, asset)| asset.palette.map(|palette| (name.clone(), palette)))
             .collect())
+    }
+
+    pub fn load_dialog(&mut self, dialog_id: &str) -> Result<Option<DialogTree>> {
+        if let Some(dialog_asset) = self.dialogs.get_mut(dialog_id) {
+            if dialog_asset.dialog.is_none() {
+                let dialog = load_dialog_from_project_path(&dialog_asset.path)
+                    .map_err(|error| anyhow::anyhow!("Failed to load dialog '{}': {}", dialog_id, error))?;
+                dialog_asset.dialog = Some(dialog.clone());
+                Ok(Some(dialog))
+            } else {
+                Ok(dialog_asset.dialog.clone())
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn save_dialog(&mut self, dialog: &DialogTree) -> Result<()> {
+        let path = self.project_path.join("dialogs").join(format!("{}.json", dialog.id));
+        toki_core::project_assets::save_dialog_to_path(&path, dialog)
+            .map_err(|error| anyhow::anyhow!("Failed to save dialog '{}': {}", dialog.id, error))?;
+        self.dialogs.insert(
+            dialog.id.clone(),
+            DialogAsset {
+                path,
+                dialog: Some(dialog.clone()),
+            },
+        );
+        Ok(())
+    }
+
+    pub fn get_dialog_names(&self) -> Vec<String> {
+        let mut names = self.dialogs.keys().cloned().collect::<Vec<_>>();
+        names.sort();
+        names
     }
 }
 

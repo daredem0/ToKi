@@ -99,7 +99,7 @@ impl RuleGraph {
             next_node_id += 1;
             nodes.push(RuleGraphNode {
                 id: trigger_id,
-                kind: RuleGraphNodeKind::Trigger(rule.trigger),
+                kind: RuleGraphNodeKind::Trigger(rule.trigger.clone()),
                 position: [0.0, 0.0],
             });
             let mut next_in_chain = None::<RuleGraphNodeId>;
@@ -275,7 +275,7 @@ impl RuleGraph {
                     node_id: chain.trigger_node_id,
                 });
             };
-            let RuleGraphNodeKind::Trigger(trigger) = trigger_node.kind else {
+            let RuleGraphNodeKind::Trigger(ref trigger) = trigger_node.kind else {
                 return Err(RuleGraphError::TriggerNodeKindMismatch {
                     rule_id: chain.rule_id.clone(),
                     node_id: chain.trigger_node_id,
@@ -330,7 +330,7 @@ impl RuleGraph {
                 enabled: chain.enabled,
                 priority: chain.priority,
                 once: chain.once,
-                trigger,
+                trigger: trigger.clone(),
                 conditions,
                 actions,
             });

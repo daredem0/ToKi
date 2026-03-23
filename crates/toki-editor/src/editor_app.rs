@@ -433,6 +433,7 @@ impl ApplicationHandler for EditorApp {
                         CenterPanelTab::SceneGraph
                         | CenterPanelTab::SceneRules
                         | CenterPanelTab::MenuEditor
+                        | CenterPanelTab::DialogEditor
                         | CenterPanelTab::SpriteEditor
                         | CenterPanelTab::AnimationEditor
                         | CenterPanelTab::EntityEditor => None,
@@ -865,6 +866,7 @@ impl EditorApp {
                     CenterPanelTab::SceneGraph
                     | CenterPanelTab::SceneRules
                     | CenterPanelTab::MenuEditor
+                    | CenterPanelTab::DialogEditor
                     | CenterPanelTab::SpriteEditor
                     | CenterPanelTab::AnimationEditor
                     | CenterPanelTab::EntityEditor => {}
@@ -887,13 +889,18 @@ impl EditorApp {
                 names.sort();
                 names
             });
+        let (current_project, project_assets) =
+            self.core.project_manager.current_project_and_assets_mut();
+        let mut current_project = current_project;
+        let mut project_assets = project_assets;
         let full_output = egui_ctx.run(raw_input, |ctx| {
             // Render UI - viewport will use the pre-rendered texture
             self.core.ui.render(
                 ctx,
                 self.viewports.scene.as_mut(),
                 self.viewports.map_editor.as_mut(),
-                self.core.project_manager.current_project.as_mut(),
+                current_project.as_deref_mut(),
+                project_assets.as_deref_mut(),
                 available_map_names.clone(),
                 Some(&mut self.core.config),
                 self.log_capture.as_ref(),

@@ -458,7 +458,8 @@ fn menu_controller_opens_dialog_and_back_dismisses_it() {
     assert_eq!(controller.handle_input(MenuInput::Confirm), None);
     assert!(controller.is_dialog_open());
     let dialog = controller.current_dialog_view().expect("dialog view");
-    assert!(dialog.confirm_selected);
+    assert_eq!(dialog.entries.len(), 2);
+    assert!(dialog.entries[0].selected);
 
     assert_eq!(controller.handle_input(MenuInput::Back), None);
     assert!(!controller.is_dialog_open());
@@ -511,9 +512,20 @@ fn compose_dialog_ui_builds_generic_blocks_for_dialog_overlay() {
             dialog_id: "exit_confirm".to_string(),
             title: "Exit Game?".to_string(),
             body: "Unsaved progress may be lost.".to_string(),
-            confirm_text: "Exit".to_string(),
-            cancel_text: "Cancel".to_string(),
-            confirm_selected: true,
+            entries: vec![
+                super::MenuViewEntry {
+                    text: "Exit".to_string(),
+                    selected: true,
+                    selectable: true,
+                    border_style_override: None,
+                },
+                super::MenuViewEntry {
+                    text: "Cancel".to_string(),
+                    selected: false,
+                    selectable: true,
+                    border_style_override: None,
+                },
+            ],
             hide_main_menu: false,
         },
         &appearance,

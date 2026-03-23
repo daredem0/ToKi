@@ -40,7 +40,8 @@ mod transitions;
 
 // Re-export event types for public use
 pub use events::{
-    CollisionEvent, DamageEvent, DeathEvent, InteractionEvent, InteractionSpatial,
+    CollisionEvent, DamageEvent, DeathEvent, DialogCompletionEvent, InteractionEvent,
+    InteractionSpatial,
     TileTransitionEvent,
 };
 
@@ -60,6 +61,8 @@ pub(super) struct RuleRuntimeState {
     pub(super) frame_death_events: Vec<DeathEvent>,
     /// Interaction events that occurred this frame.
     pub(super) frame_interactions: Vec<InteractionEvent>,
+    /// Dialog completion events that occurred outside the gameplay tick.
+    pub(super) frame_dialog_completions: Vec<DialogCompletionEvent>,
     /// Previous tile positions for entities, used to detect tile transitions.
     /// Key: EntityId, Value: (tile_x, tile_y)
     pub(super) entity_tile_positions: HashMap<EntityId, (u32, u32)>,
@@ -96,6 +99,10 @@ pub(super) enum RuleCommand {
         scene_name: String,
         spawn_point_id: String,
     },
+    StartDialog {
+        dialog_id: String,
+        context: crate::dialog::DialogRuntimeContext,
+    },
     DamageEntity {
         entity_id: EntityId,
         amount: i32,
@@ -127,6 +134,8 @@ pub(super) enum RuleCommand {
 
 /// A pending scene switch (scene_name, spawn_point_id).
 pub(super) type PendingSceneSwitch = (String, String);
+/// A pending dialog start request.
+pub(super) type PendingDialogStart = crate::events::DialogStartRequest;
 
 // Public API on GameState for rule management
 impl GameState {
@@ -157,5 +166,18 @@ impl GameState {
     /// Used by tests to set up specific scenarios.
     pub fn set_rule_velocity(&mut self, entity_id: EntityId, velocity: glam::IVec2) {
         self.rule_runtime.velocities.insert(entity_id, velocity);
+    }
+
+    pub fn record_dialog_completion(
+        &mut self,
+        dialog_id: impl Into<String>,
+        outcome_id: impl Into<String>,
+    ) {
+        self.rule_runtime
+            .frame_dialog_completions
+            .push(DialogCompletionEvent {
+                dialog_id: dialog_id.into(),
+                outcome_id: outcome_id.into(),
+            });
     }
 }

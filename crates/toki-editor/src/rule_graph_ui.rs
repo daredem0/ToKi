@@ -65,7 +65,9 @@ pub fn rule_graph_node_label(
             "{}: {}",
             badge,
             match &node.kind {
-                RuleGraphNodeKind::Trigger(trigger) => rule_graph_trigger_summary(*trigger, style),
+                RuleGraphNodeKind::Trigger(trigger) => {
+                    rule_graph_trigger_summary(trigger.clone(), style)
+                }
                 RuleGraphNodeKind::Condition(condition) => {
                     rule_graph_condition_summary(condition, style)
                 }
@@ -75,7 +77,7 @@ pub fn rule_graph_node_label(
         RuleGraphSummaryStyle::Detailed => {
             let details = match &node.kind {
                 RuleGraphNodeKind::Trigger(trigger) => {
-                    format!("Trigger {}", rule_graph_trigger_summary(*trigger, style))
+                    format!("Trigger {}", rule_graph_trigger_summary(trigger.clone(), style))
                 }
                 RuleGraphNodeKind::Condition(condition) => {
                     format!(
@@ -124,6 +126,18 @@ pub fn rule_graph_trigger_summary(trigger: RuleTrigger, style: RuleGraphSummaryS
                 format!("OnInteract({})", rule_graph_target_summary(target))
             }
             RuleGraphSummaryStyle::Detailed => "OnInteract".to_string(),
+        },
+        RuleTrigger::OnDialogComplete {
+            dialog_id,
+            outcome_id,
+        } => match style {
+            RuleGraphSummaryStyle::Compact => {
+                format!("OnDialogComplete({}, {})", dialog_id, outcome_id)
+            }
+            RuleGraphSummaryStyle::Detailed => format!(
+                "OnDialogComplete(dialog={}, outcome={})",
+                dialog_id, outcome_id
+            ),
         },
         RuleTrigger::OnTileEnter { x, y } => format!("OnTileEnter({}, {})", x, y),
         RuleTrigger::OnTileExit { x, y } => format!("OnTileExit({}, {})", x, y),
@@ -275,8 +289,17 @@ pub fn rule_graph_action_summary(action: &RuleAction, style: RuleGraphSummarySty
                     "<empty>"
                 } else {
                     spawn_point_id
-                };
+            };
             format!("SwitchScene({scene} -> {spawn})")
+        }
+        RuleAction::StartDialog { dialog_id } => {
+            let dialog = if matches!(style, RuleGraphSummaryStyle::Detailed) && dialog_id.is_empty()
+            {
+                "<empty>"
+            } else {
+                dialog_id
+            };
+            format!("StartDialog({dialog})")
         }
         RuleAction::DamageEntity { target, amount } => {
             format!(

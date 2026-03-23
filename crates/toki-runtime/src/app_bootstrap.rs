@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
 
+use toki_core::dialog::DialogTree;
 use toki_core::entity::EntityDefinition;
 use toki_core::project_assets::{
-    discover_project_entity_definition_paths, discover_project_scene_paths, first_existing_path,
-    resolve_project_scene_path,
+    discover_project_dialog_paths, discover_project_entity_definition_paths,
+    discover_project_scene_paths, first_existing_path, resolve_project_scene_path,
 };
 use toki_core::project_content::{
     build_game_state_from_project_content as shared_build_game_state_from_project_content,
@@ -48,29 +49,33 @@ impl ResolvedStartupRoot {
 struct PreloadedProjectContent {
     scenes: Vec<Scene>,
     entity_definitions: Vec<EntityDefinition>,
+    dialogs: Vec<DialogTree>,
 }
 
 struct StartupBundle {
     resources: ResourceManager,
     game_state: GameState,
+    dialogs: Vec<DialogTree>,
     pack_mount: Option<tempfile::TempDir>,
     asset_load_plan: RuntimeAssetLoadPlan,
     decoded_project_cache: DecodedProjectCache,
 }
 
+type StartupStateParts = (
+    ResourceManager,
+    GameState,
+    Vec<DialogTree>,
+    Option<tempfile::TempDir>,
+    RuntimeAssetLoadPlan,
+    DecodedProjectCache,
+);
+
 impl StartupBundle {
-    fn into_parts(
-        self,
-    ) -> (
-        ResourceManager,
-        GameState,
-        Option<tempfile::TempDir>,
-        RuntimeAssetLoadPlan,
-        DecodedProjectCache,
-    ) {
+    fn into_parts(self) -> StartupStateParts {
         (
             self.resources,
             self.game_state,
+            self.dialogs,
             self.pack_mount,
             self.asset_load_plan,
             self.decoded_project_cache,
@@ -121,6 +126,7 @@ impl<'a> StartupCoordinator<'a> {
             Ok(resources) => StartupBundle {
                 resources,
                 game_state: App::fallback_game_state(),
+                dialogs: Vec::new(),
                 pack_mount: None,
                 asset_load_plan: RuntimeAssetLoadPlan {
                     scene_name: self.launch_options.scene_name.clone(),
@@ -189,6 +195,7 @@ impl<'a> StartupCoordinator<'a> {
         Ok(StartupBundle {
             resources,
             game_state,
+            dialogs: preloaded.dialogs,
             pack_mount: startup_root.pack_mount,
             asset_load_plan,
             decoded_project_cache: std::mem::take(decoded_project_cache),
@@ -235,9 +242,26 @@ impl<'a> StartupCoordinator<'a> {
             },
         };
 
+        let dialogs = match App::load_project_dialogs_with_cache(project_path, decoded_project_cache)
+        {
+            Ok(dialogs) => dialogs,
+            Err(error) => match error_policy {
+                StartupErrorPolicy::Strict => return Err(error),
+                StartupErrorPolicy::Lenient => {
+                    tracing::error!(
+                        "Failed to preload dialogs from '{}': {}",
+                        project_path.display(),
+                        error
+                    );
+                    Vec::new()
+                }
+            },
+        };
+
         Ok(PreloadedProjectContent {
             scenes,
             entity_definitions,
+            dialogs,
         })
     }
 
@@ -261,13 +285,7 @@ impl<'a> StartupCoordinator<'a> {
 impl App {
     pub(super) fn build_startup_state(
         launch_options: &RuntimeLaunchOptions,
-    ) -> (
-        ResourceManager,
-        GameState,
-        Option<tempfile::TempDir>,
-        RuntimeAssetLoadPlan,
-        DecodedProjectCache,
-    ) {
+    ) -> StartupStateParts {
         StartupCoordinator::new(launch_options).build().into_parts()
     }
 
@@ -275,13 +293,7 @@ impl App {
     pub(super) fn build_startup_state_from_pack(
         launch_options: &RuntimeLaunchOptions,
         pack_path: &Path,
-    ) -> anyhow::Result<(
-        ResourceManager,
-        GameState,
-        Option<tempfile::TempDir>,
-        RuntimeAssetLoadPlan,
-        DecodedProjectCache,
-    )> {
+    ) -> anyhow::Result<StartupStateParts> {
         Ok(StartupCoordinator::new(launch_options)
             .build_from_pack(pack_path)?
             .into_parts())
@@ -347,6 +359,24 @@ impl App {
         }
         definitions.sort_by(|left, right| left.name.cmp(&right.name));
         Ok(definitions)
+    }
+
+    pub(super) fn load_project_dialogs_with_cache(
+        project_path: &Path,
+        decoded_project_cache: &mut DecodedProjectCache,
+    ) -> Result<Vec<DialogTree>, String> {
+        let dialog_paths =
+            discover_project_dialog_paths(project_path).map_err(|error| error.to_string())?;
+        let mut dialogs = Vec::new();
+        for path in dialog_paths {
+            dialogs.push(
+                decoded_project_cache
+                    .load_dialog_from_path(&path)
+                    .map_err(|error| error.to_string())?,
+            );
+        }
+        dialogs.sort_by(|left, right| left.id.cmp(&right.id));
+        Ok(dialogs)
     }
 
     #[cfg_attr(not(test), allow(dead_code))]

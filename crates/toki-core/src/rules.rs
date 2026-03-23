@@ -49,7 +49,7 @@ impl TriggerContext {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RuleTrigger {
     OnStart,
     OnUpdate,
@@ -84,6 +84,10 @@ pub enum RuleTrigger {
         #[serde(default)]
         entity: Option<RuleTarget>,
     },
+    OnDialogComplete {
+        dialog_id: String,
+        outcome_id: String,
+    },
     OnTileEnter {
         /// The tile x-coordinate (in tile units, not pixels).
         x: u32,
@@ -110,6 +114,7 @@ impl RuleTrigger {
                 | RuleTrigger::OnDamaged { .. }
                 | RuleTrigger::OnDeath { .. }
                 | RuleTrigger::OnInteract { .. }
+                | RuleTrigger::OnDialogComplete { .. }
                 | RuleTrigger::OnTileEnter { .. }
                 | RuleTrigger::OnTileExit { .. }
         )
@@ -159,6 +164,16 @@ impl RuleTrigger {
     pub const fn tile_coordinates(&self) -> Option<(u32, u32)> {
         match self {
             RuleTrigger::OnTileEnter { x, y } | RuleTrigger::OnTileExit { x, y } => Some((*x, *y)),
+            _ => None,
+        }
+    }
+
+    pub fn dialog_completion_ids(&self) -> Option<(&str, &str)> {
+        match self {
+            RuleTrigger::OnDialogComplete {
+                dialog_id,
+                outcome_id,
+            } => Some((dialog_id.as_str(), outcome_id.as_str())),
             _ => None,
         }
     }
@@ -317,6 +332,9 @@ pub enum RuleAction {
     SwitchScene {
         scene_name: String,
         spawn_point_id: String,
+    },
+    StartDialog {
+        dialog_id: String,
     },
     /// Damages the target entity by the specified amount.
     /// Does not reduce health below zero. Death is handled by the game state.

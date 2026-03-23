@@ -188,25 +188,25 @@ pub fn compose_dialog_ui(layout: &MenuDialogLayout, appearance: &MenuAppearance)
         });
     }
 
-    // Buttons
-    for button in [&layout.confirm_button, &layout.cancel_button] {
+    // Entries
+    for entry in &layout.entries {
         composition.push(UiBlock {
-            rect: button.rect,
+            rect: entry.rect,
             fill_color: menu_fill_color_rgba(
                 &appearance.entry_background_color_hex,
                 appearance.entry_background_transparent,
                 appearance.opacity_percent,
             ),
-            border_color: menu_border_color(button.border_style, border_color, opacity_alpha),
+            border_color: menu_border_color(entry.border_style, border_color, opacity_alpha),
             text: Some(UiTextBlock {
-                content: if button.selected {
-                    format!("> {}", button.text)
+                content: if entry.selected {
+                    format!("> {}", entry.text)
                 } else {
-                    format!("  {}", button.text)
+                    format!("  {}", entry.text)
                 },
-                position: glam::Vec2::new(button.rect.center_x(), button.rect.y + 6.0),
+                position: glam::Vec2::new(entry.rect.center_x(), entry.rect.y + 6.0),
                 anchor: TextAnchor::TopCenter,
-                style: if button.selected {
+                style: if entry.selected {
                     selected_button_style.clone()
                 } else {
                     button_style.clone()

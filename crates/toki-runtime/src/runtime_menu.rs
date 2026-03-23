@@ -2,16 +2,22 @@ use toki_core::menu::{
     build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui, MenuInput,
 };
 use toki_core::ui::UiCommand;
+use toki_core::DialogStartRequest;
 
 use super::App;
 
 impl App {
+    pub(super) fn is_dialog_open(&self) -> bool {
+        self.dialog_system.is_open()
+    }
+
     pub(super) fn is_menu_open(&self) -> bool {
         self.menu_system.is_open()
     }
 
     pub(super) fn should_gate_gameplay_for_menu(&self) -> bool {
-        self.menu_system.is_open() && self.menu_system.settings().gate_gameplay_when_open
+        self.dialog_system.is_open()
+            || (self.menu_system.is_open() && self.menu_system.settings().gate_gameplay_when_open)
     }
 
     pub(super) fn open_pause_menu(&mut self) {
@@ -21,6 +27,9 @@ impl App {
     }
 
     pub(super) fn handle_menu_input(&mut self, input: MenuInput) {
+        if self.handle_dialog_input(input) {
+            return;
+        }
         if self.handle_runtime_overlay_input(input) {
             return;
         }
@@ -29,7 +38,62 @@ impl App {
         }
     }
 
+    pub(super) fn apply_dialog_start_request(&mut self, request: DialogStartRequest) {
+        if let Err(error) = self
+            .dialog_system
+            .start_dialog(&self.game_system.game_state, &request.dialog_id, request.context)
+        {
+            tracing::warn!(
+                "Failed to start dialog '{}' from rule request: {:?}",
+                request.dialog_id,
+                error
+            );
+        } else {
+            self.runtime_overlay = None;
+            self.game_system.clear_runtime_inputs();
+        }
+    }
+
+    fn handle_dialog_input(&mut self, input: MenuInput) -> bool {
+        if !self.dialog_system.is_open() {
+            return false;
+        }
+
+        match self
+            .dialog_system
+            .handle_input(input, &self.game_system.game_state)
+        {
+            toki_core::dialog_runtime::DialogAdvanceResult::None => {}
+            toki_core::dialog_runtime::DialogAdvanceResult::Closed(completion) => {
+                if let Some(outcome_id) = completion.outcome_id.as_deref() {
+                    self.game_system
+                        .record_dialog_completion(&completion.dialog_id, outcome_id);
+                }
+            }
+        }
+        true
+    }
+
     pub(super) fn render_runtime_menu_overlay(&mut self) {
+        if self.dialog_system.is_open() {
+            let Some(dialog_view) = self.dialog_system.current_view() else {
+                return;
+            };
+            let viewport = self
+                .platform
+                .inner_size()
+                .map(|size| glam::Vec2::new(size.width as f32, size.height as f32))
+                .unwrap_or_else(|| {
+                    let size = self.camera_system.viewport_size();
+                    glam::Vec2::new(size.x as f32, size.y as f32)
+                });
+            let appearance = self.menu_system.settings().appearance.clone();
+            let dialog_layout = build_dialog_layout(&dialog_view, &appearance, viewport);
+            let dialog_composition = compose_dialog_ui(&dialog_layout, &appearance);
+            self.rendering.render_ui_composition(&dialog_composition);
+            return;
+        }
+
         if !self.menu_system.is_open() {
             return;
         }

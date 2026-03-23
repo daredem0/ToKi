@@ -194,6 +194,11 @@ impl GameManager {
         self.game_state.sync_entities_to_active_scene();
     }
 
+    pub fn record_dialog_completion(&mut self, dialog_id: &str, outcome_id: &str) {
+        self.game_state
+            .record_dialog_completion(dialog_id.to_string(), outcome_id.to_string());
+    }
+
     /// Get entities for camera system integration
     pub fn entities_for_camera(&self) -> Vec<Entity> {
         self.game_state.entities_owned()

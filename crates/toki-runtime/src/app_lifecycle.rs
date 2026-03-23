@@ -37,35 +37,45 @@ impl App {
                         Err(e) => tracing::error!("Failed to load game: {}", e),
                     },
                     KeyCode::Escape => {
-                        if self.is_menu_open() {
+                        if self.is_dialog_open() || self.is_menu_open() {
                             self.handle_menu_input(MenuInput::Back);
                         } else {
                             self.open_pause_menu();
                         }
                     }
-                    KeyCode::ArrowUp | KeyCode::KeyW if self.is_menu_open() => {
+                    KeyCode::ArrowUp | KeyCode::KeyW
+                        if self.is_dialog_open() || self.is_menu_open() =>
+                    {
                         self.handle_menu_input(MenuInput::Up);
                     }
-                    KeyCode::ArrowDown | KeyCode::KeyS if self.is_menu_open() => {
+                    KeyCode::ArrowDown | KeyCode::KeyS
+                        if self.is_dialog_open() || self.is_menu_open() =>
+                    {
                         self.handle_menu_input(MenuInput::Down);
                     }
-                    KeyCode::ArrowLeft | KeyCode::KeyA if self.is_menu_open() => {
+                    KeyCode::ArrowLeft | KeyCode::KeyA
+                        if self.is_dialog_open() || self.is_menu_open() =>
+                    {
                         self.handle_menu_input(MenuInput::Left);
                     }
-                    KeyCode::ArrowRight | KeyCode::KeyD if self.is_menu_open() => {
+                    KeyCode::ArrowRight | KeyCode::KeyD
+                        if self.is_dialog_open() || self.is_menu_open() =>
+                    {
                         self.handle_menu_input(MenuInput::Right);
                     }
-                    KeyCode::Enter | KeyCode::Space if self.is_menu_open() => {
+                    KeyCode::Enter | KeyCode::Space
+                        if self.is_dialog_open() || self.is_menu_open() =>
+                    {
                         self.handle_menu_input(MenuInput::Confirm);
                     }
                     _ => {
-                        if !self.is_menu_open() {
+                        if !self.is_dialog_open() && !self.is_menu_open() {
                             self.game_system.handle_keyboard_input(keycode, true);
                         }
                     }
                 },
                 ElementState::Released => {
-                    if !self.is_menu_open() {
+                    if !self.is_dialog_open() && !self.is_menu_open() {
                         self.game_system.handle_keyboard_input(keycode, false);
                     }
                 }

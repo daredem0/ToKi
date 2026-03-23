@@ -25,6 +25,7 @@ impl InspectorSystem {
         validation_issues: &[RuleValidationIssue],
         audio_choices: &RuleAudioChoices,
         scenes: &[toki_core::Scene],
+        available_dialog_outcomes: &std::collections::BTreeMap<String, Vec<String>>,
         map_size: Option<(u32, u32)>,
     ) -> RuleEditorOutcome {
         let mut outcome = RuleEditorOutcome::default();
@@ -115,6 +116,67 @@ impl InspectorSystem {
                                     .changed();
                             }
                         });
+                    });
+                }
+
+                if let RuleTrigger::OnDialogComplete {
+                    dialog_id,
+                    outcome_id,
+                } = &mut rule.trigger
+                {
+                    ui.horizontal(|ui| {
+                        ui.label("Dialog Id:");
+                        if available_dialog_outcomes.is_empty() {
+                            outcome.changed |= ui.text_edit_singleline(dialog_id).changed();
+                        } else {
+                            egui::ComboBox::from_id_salt(format!(
+                                "rule_trigger_dialog_id_{}_{}",
+                                scene_name, rule_index
+                            ))
+                            .selected_text(if dialog_id.is_empty() {
+                                "<select dialog>"
+                            } else {
+                                dialog_id.as_str()
+                            })
+                            .show_ui(ui, |ui| {
+                                for candidate in available_dialog_outcomes.keys() {
+                                    outcome.changed |= ui
+                                        .selectable_value(
+                                            dialog_id,
+                                            candidate.clone(),
+                                            candidate.as_str(),
+                                        )
+                                        .changed();
+                                }
+                            });
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Outcome Id:");
+                        if let Some(outcomes) = available_dialog_outcomes.get(dialog_id) {
+                            egui::ComboBox::from_id_salt(format!(
+                                "rule_trigger_dialog_outcome_{}_{}",
+                                scene_name, rule_index
+                            ))
+                            .selected_text(if outcome_id.is_empty() {
+                                "<select outcome>"
+                            } else {
+                                outcome_id.as_str()
+                            })
+                            .show_ui(ui, |ui| {
+                                for candidate in outcomes {
+                                    outcome.changed |= ui
+                                        .selectable_value(
+                                            outcome_id,
+                                            candidate.clone(),
+                                            candidate.as_str(),
+                                        )
+                                        .changed();
+                                }
+                            });
+                        } else {
+                            outcome.changed |= ui.text_edit_singleline(outcome_id).changed();
+                        }
                     });
                 }
 
@@ -240,6 +302,7 @@ impl InspectorSystem {
                             validation_issues,
                             audio_choices,
                             scenes,
+                            available_dialog_outcomes,
                         );
                     });
                 }
@@ -269,6 +332,7 @@ impl InspectorSystem {
         validation_issues: &[RuleValidationIssue],
         audio_choices: &RuleAudioChoices,
         scenes: &[toki_core::Scene],
+        available_dialog_outcomes: &std::collections::BTreeMap<String, Vec<String>>,
     ) -> bool {
         let mut changed = false;
         let id_salt = ctx.id_salt();
@@ -440,6 +504,32 @@ impl InspectorSystem {
                     spawn_point_id,
                     scenes,
                 );
+            }
+            RuleAction::StartDialog { dialog_id } => {
+                ui.horizontal(|ui| {
+                    ui.label("Dialog Id:");
+                    if available_dialog_outcomes.is_empty() {
+                        changed |= ui.text_edit_singleline(dialog_id).changed();
+                    } else {
+                        egui::ComboBox::from_id_salt(format!("rule_start_dialog_{id_salt}"))
+                            .selected_text(if dialog_id.is_empty() {
+                                "<select dialog>"
+                            } else {
+                                dialog_id.as_str()
+                            })
+                            .show_ui(ui, |ui| {
+                                for candidate in available_dialog_outcomes.keys() {
+                                    changed |= ui
+                                        .selectable_value(
+                                            dialog_id,
+                                            candidate.clone(),
+                                            candidate.as_str(),
+                                        )
+                                        .changed();
+                                }
+                            });
+                    }
+                });
             }
             RuleAction::DamageEntity { target, amount } => {
                 changed |= Self::render_rule_target_editor(

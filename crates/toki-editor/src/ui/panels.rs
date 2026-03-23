@@ -32,6 +32,7 @@ use toki_core::rules::{
 
 #[path = "panels/animation_editor/mod.rs"]
 mod animation_editor;
+mod dialog_editor;
 #[path = "panels/entity_editor/mod.rs"]
 mod entity_editor;
 mod map_editor;
@@ -93,7 +94,7 @@ enum GraphCommand {
 }
 
 impl PanelSystem {
-    fn center_panel_tabs() -> [EditorTabSpec<CenterPanelTab>; 8] {
+    fn center_panel_tabs() -> [EditorTabSpec<CenterPanelTab>; 9] {
         [
             EditorTabSpec {
                 value: CenterPanelTab::SceneViewport,
@@ -114,6 +115,10 @@ impl PanelSystem {
             EditorTabSpec {
                 value: CenterPanelTab::MenuEditor,
                 label: "Menu Editor",
+            },
+            EditorTabSpec {
+                value: CenterPanelTab::DialogEditor,
+                label: "Dialog Editor",
             },
             EditorTabSpec {
                 value: CenterPanelTab::SpriteEditor,
@@ -153,6 +158,7 @@ impl PanelSystem {
         scene_viewport: Option<&mut SceneViewport>,
         map_editor_viewport: Option<&mut SceneViewport>,
         project: Option<&mut crate::project::Project>,
+        project_assets: Option<&mut crate::project::ProjectAssets>,
         available_map_names: Option<Vec<String>>,
         config: Option<&mut EditorConfig>,
         renderer: Option<&mut egui_wgpu::Renderer>,
@@ -191,6 +197,11 @@ impl PanelSystem {
 
             if ui_state.center_panel_tab == CenterPanelTab::MenuEditor {
                 menu_editor::render_menu_editor(ui, ui_state, project);
+                return;
+            }
+
+            if ui_state.center_panel_tab == CenterPanelTab::DialogEditor {
+                dialog_editor::render_dialog_editor(ui, ui_state, project_assets);
                 return;
             }
 

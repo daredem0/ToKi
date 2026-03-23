@@ -1,4 +1,5 @@
 use crate::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
+use crate::dialog::DialogTree;
 use crate::entity::EntityDefinition;
 use crate::palette::{load_palette_asset_from_path, Palette4};
 use crate::scene::Scene;
@@ -91,6 +92,10 @@ pub fn scene_file_path(project_path: &Path, scene_name: &str) -> PathBuf {
         .join(format!("{scene_name}.json"))
 }
 
+pub fn dialog_file_path(project_path: &Path, dialog_name: &str) -> PathBuf {
+    project_path.join("dialogs").join(format!("{dialog_name}.json"))
+}
+
 #[derive(Debug, serde::Deserialize, Default)]
 struct ProjectSceneManifest {
     #[serde(default)]
@@ -179,6 +184,12 @@ pub fn discover_project_entity_definition_paths(
     find_json_files(&project_path.join("entities"))
 }
 
+pub fn discover_project_dialog_paths(
+    project_path: &Path,
+) -> Result<Vec<PathBuf>, ProjectAssetError> {
+    find_json_files(&project_path.join("dialogs"))
+}
+
 pub fn load_scene_from_path(path: &Path) -> Result<Scene, ProjectAssetError> {
     let json = fs::read_to_string(path)?;
     Ok(serde_json::from_str::<Scene>(&json).map_err(CoreError::from)?)
@@ -189,6 +200,20 @@ pub fn load_entity_definition_from_path(
 ) -> Result<EntityDefinition, ProjectAssetError> {
     let json = fs::read_to_string(path)?;
     Ok(serde_json::from_str::<EntityDefinition>(&json).map_err(CoreError::from)?)
+}
+
+pub fn load_dialog_from_path(path: &Path) -> Result<DialogTree, ProjectAssetError> {
+    let json = fs::read_to_string(path)?;
+    Ok(serde_json::from_str::<DialogTree>(&json).map_err(CoreError::from)?)
+}
+
+pub fn save_dialog_to_path(path: &Path, dialog: &DialogTree) -> Result<(), ProjectAssetError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let json = serde_json::to_string_pretty(dialog).map_err(CoreError::from)?;
+    fs::write(path, json)?;
+    Ok(())
 }
 
 pub fn find_json_files(dir: &Path) -> Result<Vec<PathBuf>, ProjectAssetError> {

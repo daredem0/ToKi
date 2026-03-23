@@ -55,6 +55,7 @@ pub enum RuleActionEditorKind {
     Spawn,
     DestroySelf,
     SwitchScene,
+    StartDialog,
     DamageEntity,
     HealEntity,
     AddInventoryItem,
@@ -90,6 +91,7 @@ pub enum RuleTriggerEditorKind {
     Death,
     Trigger,
     Interact,
+    DialogComplete,
     TileEnter,
     TileExit,
 }
@@ -103,6 +105,7 @@ pub fn rule_action_kind(action: &RuleAction) -> RuleActionEditorKind {
         RuleAction::Spawn { .. } => RuleActionEditorKind::Spawn,
         RuleAction::DestroySelf { .. } => RuleActionEditorKind::DestroySelf,
         RuleAction::SwitchScene { .. } => RuleActionEditorKind::SwitchScene,
+        RuleAction::StartDialog { .. } => RuleActionEditorKind::StartDialog,
         RuleAction::DamageEntity { .. } => RuleActionEditorKind::DamageEntity,
         RuleAction::HealEntity { .. } => RuleActionEditorKind::HealEntity,
         RuleAction::AddInventoryItem { .. } => RuleActionEditorKind::AddInventoryItem,
@@ -121,6 +124,7 @@ pub fn rule_action_kind_label(kind: RuleActionEditorKind) -> &'static str {
         RuleActionEditorKind::Spawn => "Spawn",
         RuleActionEditorKind::DestroySelf => "DestroySelf",
         RuleActionEditorKind::SwitchScene => "SwitchScene",
+        RuleActionEditorKind::StartDialog => "StartDialog",
         RuleActionEditorKind::DamageEntity => "DamageEntity",
         RuleActionEditorKind::HealEntity => "HealEntity",
         RuleActionEditorKind::AddInventoryItem => "AddInventoryItem",
@@ -157,6 +161,9 @@ pub fn default_rule_action(kind: RuleActionEditorKind) -> RuleAction {
         RuleActionEditorKind::SwitchScene => RuleAction::SwitchScene {
             scene_name: String::new(),
             spawn_point_id: String::new(),
+        },
+        RuleActionEditorKind::StartDialog => RuleAction::StartDialog {
+            dialog_id: String::new(),
         },
         RuleActionEditorKind::DamageEntity => RuleAction::DamageEntity {
             target: RuleTarget::Player,
@@ -275,6 +282,7 @@ pub fn rule_trigger_kind(trigger: &RuleTrigger) -> RuleTriggerEditorKind {
         RuleTrigger::OnDeath { .. } => RuleTriggerEditorKind::Death,
         RuleTrigger::OnTrigger => RuleTriggerEditorKind::Trigger,
         RuleTrigger::OnInteract { .. } => RuleTriggerEditorKind::Interact,
+        RuleTrigger::OnDialogComplete { .. } => RuleTriggerEditorKind::DialogComplete,
         RuleTrigger::OnTileEnter { .. } => RuleTriggerEditorKind::TileEnter,
         RuleTrigger::OnTileExit { .. } => RuleTriggerEditorKind::TileExit,
     }
@@ -291,6 +299,7 @@ pub fn rule_trigger_kind_label(kind: RuleTriggerEditorKind) -> &'static str {
         RuleTriggerEditorKind::Death => "OnDeath",
         RuleTriggerEditorKind::Trigger => "OnTrigger",
         RuleTriggerEditorKind::Interact => "OnInteract",
+        RuleTriggerEditorKind::DialogComplete => "OnDialogComplete",
         RuleTriggerEditorKind::TileEnter => "OnTileEnter",
         RuleTriggerEditorKind::TileExit => "OnTileExit",
     }
@@ -309,6 +318,10 @@ pub fn default_rule_trigger(kind: RuleTriggerEditorKind) -> RuleTrigger {
         RuleTriggerEditorKind::Interact => RuleTrigger::OnInteract {
             mode: InteractionMode::default(),
             entity: None,
+        },
+        RuleTriggerEditorKind::DialogComplete => RuleTrigger::OnDialogComplete {
+            dialog_id: String::new(),
+            outcome_id: String::new(),
         },
         RuleTriggerEditorKind::TileEnter => RuleTrigger::OnTileEnter { x: 0, y: 0 },
         RuleTriggerEditorKind::TileExit => RuleTrigger::OnTileExit { x: 0, y: 0 },

@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use toki_core::camera::{Camera, CameraController, CameraMode};
+use toki_core::dialog_runtime::DialogController;
 use toki_core::menu::{MenuController, MenuSettings};
 use toki_core::project_runtime::RuntimePostProcessSettings;
 use toki_core::TimingSystem;
@@ -175,6 +176,7 @@ struct App {
     frame_limiter: FrameLimiter,
     launch_options: RuntimeLaunchOptions,
     menu_system: MenuController,
+    dialog_system: DialogController,
     splash_policy: SplashPolicy,
     splash_config: ResolvedSplashConfig,
     splash_active: bool,
@@ -212,7 +214,7 @@ impl App {
     fn new(launch_options: RuntimeLaunchOptions) -> Self {
         let splash_policy = SplashPolicy::Community;
         let splash_config = splash_policy.resolve(&launch_options.splash);
-        let (resources, game_state, pack_mount, asset_load_plan, decoded_project_cache) =
+        let (resources, game_state, dialogs, pack_mount, asset_load_plan, decoded_project_cache) =
             Self::build_startup_state(&launch_options);
         let game_system = GameManager::new(game_state);
 
@@ -257,6 +259,7 @@ impl App {
         audio_system
             .set_channel_volume_percent("collision", launch_options.audio_mix.collision_percent);
         let menu_system = MenuController::new(launch_options.menu.clone());
+        let dialog_system = DialogController::new(dialogs);
         let mut scene_transition =
             SceneTransitionController::new(launch_options.transition.clone());
         if let Some(track_id) = game_system
@@ -299,6 +302,7 @@ impl App {
             frame_limiter,
             launch_options,
             menu_system,
+            dialog_system,
             splash_policy,
             splash_config,
             splash_active: true,

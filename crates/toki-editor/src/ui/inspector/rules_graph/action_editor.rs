@@ -3,6 +3,7 @@
 use super::*;
 
 impl InspectorSystem {
+    #[allow(clippy::too_many_arguments)]
     pub(in super::super) fn render_rule_graph_action_editor(
         ui: &mut egui::Ui,
         scene_name: &str,
@@ -10,6 +11,7 @@ impl InspectorSystem {
         action: &mut RuleAction,
         _validation_issues: &[RuleValidationIssue],
         audio_choices: &RuleAudioChoices,
+        available_dialog_outcomes: &std::collections::BTreeMap<String, Vec<String>>,
         scenes: &[toki_core::Scene],
     ) -> bool {
         let mut changed = false;
@@ -39,8 +41,15 @@ impl InspectorSystem {
             changed = true;
         }
 
-        changed |=
-            Self::render_action_parameters(ui, scene_name, node_key, action, audio_choices, scenes);
+        changed |= Self::render_action_parameters(
+            ui,
+            scene_name,
+            node_key,
+            action,
+            audio_choices,
+            available_dialog_outcomes,
+            scenes,
+        );
 
         changed
     }
@@ -51,6 +60,7 @@ impl InspectorSystem {
         node_key: &str,
         action: &mut RuleAction,
         audio_choices: &RuleAudioChoices,
+        available_dialog_outcomes: &std::collections::BTreeMap<String, Vec<String>>,
         scenes: &[toki_core::Scene],
     ) -> bool {
         match action {
@@ -90,6 +100,37 @@ impl InspectorSystem {
                 spawn_point_id,
                 scenes,
             ),
+            RuleAction::StartDialog { dialog_id } => {
+                let mut changed = false;
+                ui.horizontal(|ui| {
+                    ui.label("Dialog Id:");
+                    if available_dialog_outcomes.is_empty() {
+                        changed |= ui.text_edit_singleline(dialog_id).changed();
+                    } else {
+                        egui::ComboBox::from_id_salt(format!(
+                            "graph_start_dialog_{}_{}",
+                            scene_name, node_key
+                        ))
+                        .selected_text(if dialog_id.is_empty() {
+                            "<select dialog>"
+                        } else {
+                            dialog_id.as_str()
+                        })
+                        .show_ui(ui, |ui| {
+                            for candidate in available_dialog_outcomes.keys() {
+                                changed |= ui
+                                    .selectable_value(
+                                        dialog_id,
+                                        candidate.clone(),
+                                        candidate.as_str(),
+                                    )
+                                    .changed();
+                            }
+                        });
+                    }
+                });
+                changed
+            }
             RuleAction::DamageEntity { target, amount } => {
                 Self::render_damage_heal_params(ui, scene_name, node_key, target, amount, "damage")
             }

@@ -1,0 +1,22 @@
+{
+  "id": "dialog_1",
+  "title": "Test Dialog",
+  "entry_node_id": "start",
+  "allow_cancel": true,
+  "nodes": [
+    {
+      "id": "start",
+      "speaker_name": "NPC",
+      "kind": "line",
+      "body": "Hello.",
+      "next_node_id": "end"
+    },
+    {
+      "id": "end",
+      "speaker_name": "NPC",
+      "kind": "end",
+      "body": "Bye",
+      "outcome_id": "done"
+    }
+  ]
+}

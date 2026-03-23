@@ -377,6 +377,7 @@ fn trigger_kind_label(trigger: &RuleTrigger) -> &'static str {
         RuleTrigger::OnDeath { .. } => "OnDeath",
         RuleTrigger::OnTrigger => "OnTrigger",
         RuleTrigger::OnInteract { .. } => "OnInteract",
+        RuleTrigger::OnDialogComplete { .. } => "OnDialogComplete",
         RuleTrigger::OnTileEnter { .. } => "OnTileEnter",
         RuleTrigger::OnTileExit { .. } => "OnTileExit",
     }
@@ -391,6 +392,7 @@ fn action_kind_label(action: &RuleAction) -> &'static str {
         RuleAction::Spawn { .. } => "Spawn",
         RuleAction::DestroySelf { .. } => "DestroySelf",
         RuleAction::SwitchScene { .. } => "SwitchScene",
+        RuleAction::StartDialog { .. } => "StartDialog",
         RuleAction::DamageEntity { .. } => "DamageEntity",
         RuleAction::HealEntity { .. } => "HealEntity",
         RuleAction::AddInventoryItem { .. } => "AddInventoryItem",

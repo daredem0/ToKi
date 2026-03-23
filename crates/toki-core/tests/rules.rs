@@ -1629,6 +1629,72 @@ fn switch_scene_keeps_active_scene_when_target_scene_is_missing() {
 }
 
 #[test]
+fn start_dialog_action_emits_dialog_start_request() {
+    let mut state = GameState::new_empty();
+    let mut scene = scene_with_player("Dialog Scene", IVec2::new(0, 0));
+    scene.rules = RuleSet {
+        rules: vec![base_rule(
+            "start-dialog",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::StartDialog {
+                dialog_id: "intro".to_string(),
+            }],
+        )],
+    };
+    state.add_scene(scene);
+    state
+        .load_scene("Dialog Scene")
+        .expect("scene should load");
+
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    let request = result
+        .dialog_start_request
+        .expect("dialog start request should be emitted");
+    assert_eq!(request.dialog_id, "intro");
+}
+
+#[test]
+fn dialog_completion_trigger_can_drive_follow_up_rules() {
+    let mut state = GameState::new_empty();
+    let mut scene = scene_with_player("Dialog Scene", IVec2::new(0, 0));
+    scene.rules = RuleSet {
+        rules: vec![base_rule(
+            "dialog-reward",
+            RuleTrigger::OnDialogComplete {
+                dialog_id: "intro".to_string(),
+                outcome_id: "accepted".to_string(),
+            },
+            0,
+            vec![RuleAction::AddInventoryItem {
+                target: RuleTarget::Player,
+                item_id: "gift".to_string(),
+                count: 1,
+            }],
+        )],
+    };
+    state.add_scene(scene);
+    state
+        .load_scene("Dialog Scene")
+        .expect("scene should load");
+
+    state.record_dialog_completion("intro".to_string(), "accepted".to_string());
+    let _ = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    let player = state.player_entity().expect("player should exist");
+    assert_eq!(player.attributes.inventory.item_count("gift"), 1);
+}
+
+#[test]
 fn switch_scene_keeps_active_scene_when_target_spawn_is_missing() {
     let mut state = GameState::new_empty();
     let mut scene_a = scene_with_player("Scene A", IVec2::new(0, 0));

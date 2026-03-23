@@ -3,6 +3,7 @@ use crate::rule_graph_ui::{
     rule_graph_action_summary, rule_graph_condition_summary, rule_graph_trigger_summary,
     RuleGraphSummaryStyle,
 };
+use toki_core::rules::InteractionMode;
 
 impl PanelSystem {
     pub(super) fn trigger_summary(trigger: RuleTrigger) -> String {
@@ -260,6 +261,14 @@ impl PanelSystem {
                 changed |= ui.text_edit_singleline(spawn_point_id).changed();
                 changed
             }
+            RuleAction::StartDialog { dialog_id } => {
+                let mut changed = false;
+                ui.horizontal(|ui| {
+                    ui.label("Dialog Id");
+                    changed |= ui.text_edit_singleline(dialog_id).changed();
+                });
+                changed
+            }
             RuleAction::DamageEntity { target, amount } => {
                 let mut changed =
                     Self::edit_rule_target(ui, target, &format!("{id_prefix}::damage_target"));
@@ -482,8 +491,8 @@ impl PanelSystem {
 
         match node_kind {
             RuleGraphNodeKind::Trigger(trigger) => {
-                let mut trigger_value = trigger;
-                let mut kind = Self::graph_trigger_kind(trigger);
+                let mut trigger_value = trigger.clone();
+                let mut kind = Self::graph_trigger_kind(trigger.clone());
                 let kind_salt = format!("graph_canvas_trigger_kind::{scene_name}::{node_id}");
                 egui::ComboBox::from_id_salt(kind_salt)
                     .selected_text(Self::graph_trigger_kind_label(kind))
@@ -497,6 +506,10 @@ impl PanelSystem {
                             GraphTriggerKind::Damaged,
                             GraphTriggerKind::Death,
                             GraphTriggerKind::Trigger,
+                            GraphTriggerKind::Interact,
+                            GraphTriggerKind::DialogComplete,
+                            GraphTriggerKind::TileEnter,
+                            GraphTriggerKind::TileExit,
                         ] {
                             ui.selectable_value(
                                 &mut kind,
@@ -505,12 +518,49 @@ impl PanelSystem {
                             );
                         }
                     });
-                if kind != Self::graph_trigger_kind(trigger) {
+                if kind != Self::graph_trigger_kind(trigger.clone()) {
                     trigger_value = Self::graph_default_trigger(kind);
                 }
                 if let RuleTrigger::OnKey { key } = &mut trigger_value {
                     let key_salt = format!("graph_canvas_trigger_key::{scene_name}::{node_id}");
                     let _ = Self::edit_rule_key(ui, key, &key_salt);
+                }
+                if let RuleTrigger::OnInteract { mode, .. } = &mut trigger_value {
+                    let interact_salt =
+                        format!("graph_canvas_trigger_interact::{scene_name}::{node_id}");
+                    egui::ComboBox::from_id_salt((interact_salt.as_str(), "mode"))
+                        .selected_text(match mode {
+                            InteractionMode::Overlap => "Overlap (Same Tile)",
+                            InteractionMode::Adjacent => "Adjacent (Within Reach)",
+                            InteractionMode::InFront => "In Front",
+                        })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(
+                                mode,
+                                InteractionMode::Overlap,
+                                "Overlap (Same Tile)",
+                            );
+                            ui.selectable_value(
+                                mode,
+                                InteractionMode::Adjacent,
+                                "Adjacent (Within Reach)",
+                            );
+                            ui.selectable_value(mode, InteractionMode::InFront, "In Front");
+                        });
+                }
+                if let RuleTrigger::OnDialogComplete {
+                    dialog_id,
+                    outcome_id,
+                } = &mut trigger_value
+                {
+                    ui.horizontal(|ui| {
+                        ui.label("Dialog Id:");
+                        let _ = ui.text_edit_singleline(dialog_id);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Outcome Id:");
+                        let _ = ui.text_edit_singleline(outcome_id);
+                    });
                 }
                 if command.is_none() && trigger_value != trigger {
                     command = Some(GraphCommand::SetTrigger(node_id, trigger_value));

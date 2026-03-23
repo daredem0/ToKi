@@ -167,8 +167,7 @@ pub struct MenuDialogLayout {
     pub panel: MenuRect,
     pub title: MenuLayoutBlock,
     pub body: MenuLayoutBlock,
-    pub confirm_button: MenuEntryLayout,
-    pub cancel_button: MenuEntryLayout,
+    pub entries: Vec<MenuEntryLayout>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -263,9 +262,7 @@ pub struct MenuDialogView {
     pub dialog_id: String,
     pub title: String,
     pub body: String,
-    pub confirm_text: String,
-    pub cancel_text: String,
-    pub confirm_selected: bool,
+    pub entries: Vec<MenuViewEntry>,
     pub hide_main_menu: bool,
 }
 

@@ -187,6 +187,27 @@ impl InspectorSystem {
                 });
             }
 
+            if let RuleTrigger::OnDialogComplete {
+                dialog_id,
+                outcome_id,
+            } = &rule.trigger
+            {
+                if dialog_id.trim().is_empty() {
+                    issues.push(RuleValidationIssue {
+                        rule_index,
+                        action_index: None,
+                        message: "OnDialogComplete requires a dialog id".to_string(),
+                    });
+                }
+                if outcome_id.trim().is_empty() {
+                    issues.push(RuleValidationIssue {
+                        rule_index,
+                        action_index: None,
+                        message: "OnDialogComplete requires an outcome id".to_string(),
+                    });
+                }
+            }
+
             for (condition_index, condition) in rule.conditions.iter().enumerate() {
                 match condition {
                     RuleCondition::Always
@@ -318,6 +339,15 @@ impl InspectorSystem {
                                     ),
                                 });
                             }
+                        }
+                    }
+                    RuleAction::StartDialog { dialog_id } => {
+                        if dialog_id.trim().is_empty() {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "StartDialog requires a dialog id".to_string(),
+                            });
                         }
                     }
                     RuleAction::DamageEntity { amount, .. } => {

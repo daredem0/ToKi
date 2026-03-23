@@ -306,14 +306,15 @@ impl PanelSystem {
                                                 let node_label = format!(
                                                     "{} Trigger: {}",
                                                     badge,
-                                                    Self::trigger_summary(*trigger)
+                                                    Self::trigger_summary(trigger.clone())
                                                 );
                                                 let is_selected = selected_graph_node == Some(node_id);
                                                 if ui.selectable_label(is_selected, node_label).clicked() {
                                                     selected_graph_node = Some(node_id);
                                                 }
-                                                let mut trigger_value = *trigger;
-                                                let mut kind = Self::graph_trigger_kind(*trigger);
+                                                let mut trigger_value = trigger.clone();
+                                                let mut kind =
+                                                    Self::graph_trigger_kind(trigger.clone());
                                                 egui::ComboBox::from_id_salt((
                                                     "graph_trigger_kind",
                                                     &active_scene_name,
@@ -330,6 +331,10 @@ impl PanelSystem {
                                                             GraphTriggerKind::Damaged,
                                                             GraphTriggerKind::Death,
                                                             GraphTriggerKind::Trigger,
+                                                            GraphTriggerKind::Interact,
+                                                            GraphTriggerKind::DialogComplete,
+                                                            GraphTriggerKind::TileEnter,
+                                                            GraphTriggerKind::TileExit,
                                                         ] {
                                                             ui.selectable_value(
                                                                 &mut kind,
@@ -338,7 +343,8 @@ impl PanelSystem {
                                                             );
                                                         }
                                                     });
-                                                if kind != Self::graph_trigger_kind(*trigger) {
+                                                if kind != Self::graph_trigger_kind(trigger.clone())
+                                                {
                                                     trigger_value = Self::graph_default_trigger(kind);
                                                 }
                                                 if let RuleTrigger::OnKey { key } = &mut trigger_value {
@@ -350,6 +356,16 @@ impl PanelSystem {
                                                             active_scene_name, node_id
                                                         ),
                                                     );
+                                                }
+                                                if let RuleTrigger::OnDialogComplete {
+                                                    dialog_id,
+                                                    outcome_id,
+                                                } = &mut trigger_value
+                                                {
+                                                    ui.label("Dialog:");
+                                                    let _ = ui.text_edit_singleline(dialog_id);
+                                                    ui.label("Outcome:");
+                                                    let _ = ui.text_edit_singleline(outcome_id);
                                                 }
                                                 if trigger_value != *trigger {
                                                     pending_command =

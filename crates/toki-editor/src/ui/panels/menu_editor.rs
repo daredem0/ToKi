@@ -127,9 +127,20 @@ pub(super) fn render_menu_editor(
                     dialog_id: dialog.id.clone(),
                     title: dialog.title.clone(),
                     body: dialog.body.clone(),
-                    confirm_text: dialog.confirm_text.clone(),
-                    cancel_text: dialog.cancel_text.clone(),
-                    confirm_selected: true,
+                    entries: vec![
+                        toki_core::menu::MenuViewEntry {
+                            text: dialog.confirm_text.clone(),
+                            selected: true,
+                            selectable: true,
+                            border_style_override: None,
+                        },
+                        toki_core::menu::MenuViewEntry {
+                            text: dialog.cancel_text.clone(),
+                            selected: false,
+                            selectable: true,
+                            border_style_override: None,
+                        },
+                    ],
                     hide_main_menu: dialog.hide_main_menu,
                 },
                 &project.metadata.runtime.menu.appearance,

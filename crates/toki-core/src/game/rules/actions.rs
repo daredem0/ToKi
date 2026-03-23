@@ -55,6 +55,18 @@ impl GameState {
                     spawn_point_id: spawn_point_id.clone(),
                 });
             }
+            RuleAction::StartDialog { dialog_id } => {
+                let dialog_id = dialog_id.trim();
+                if !dialog_id.is_empty() {
+                    command_buffer.push(RuleCommand::StartDialog {
+                        dialog_id: dialog_id.to_string(),
+                        context: crate::dialog::DialogRuntimeContext {
+                            interactor: context.trigger_self,
+                            speaker: context.trigger_other,
+                        },
+                    });
+                }
+            }
             RuleAction::DamageEntity { target, amount } => {
                 if let Some(entity_id) = self.resolve_rule_target(*target, context) {
                     command_buffer.push(RuleCommand::DamageEntity {

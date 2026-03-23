@@ -53,6 +53,10 @@ impl App {
             self.audio_system.handle(event);
         }
 
+        if let Some(request) = game_result.dialog_start_request.clone() {
+            self.apply_dialog_start_request(request);
+        }
+
         if let Some(request) = game_result.scene_switch_request.clone() {
             let content_root = self.content_root_path().map(std::path::Path::to_path_buf);
             let mut coordinator = SceneRuntimeCoordinator::new(

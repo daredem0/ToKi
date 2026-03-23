@@ -17,6 +17,7 @@ impl InspectorSystem {
         scene_name: &str,
         rule_set: &mut RuleSet,
         scenes: &[toki_core::Scene],
+        available_dialog_outcomes: &std::collections::BTreeMap<String, Vec<String>>,
         config: Option<&EditorConfig>,
         map_size: Option<(u32, u32)>,
     ) -> bool {
@@ -58,6 +59,7 @@ impl InspectorSystem {
                 &validation_issues,
                 &audio_choices,
                 scenes,
+                available_dialog_outcomes,
                 map_size,
             );
             changed |= outcome.changed;

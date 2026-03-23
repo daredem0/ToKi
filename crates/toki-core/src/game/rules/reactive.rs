@@ -42,6 +42,12 @@ impl GameState {
             self.collect_rule_commands_for_interaction(event, &mut reactive_rule_commands);
         }
 
+        let dialog_completion_events =
+            std::mem::take(&mut self.rule_runtime.frame_dialog_completions);
+        for event in &dialog_completion_events {
+            self.collect_rule_commands_for_dialog_completion(event, &mut reactive_rule_commands);
+        }
+
         self.collect_rule_commands_for_tile_transitions(tilemap, &mut reactive_rule_commands);
 
         if self.any_entity_overlaps_trigger_tile(tilemap, atlas) {

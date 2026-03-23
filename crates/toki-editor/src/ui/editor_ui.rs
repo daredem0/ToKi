@@ -18,6 +18,8 @@ mod editor_ui_animation_editor;
 mod editor_ui_asset_palette;
 #[path = "editor_ui_entity_editor.rs"]
 mod editor_ui_entity_editor;
+#[path = "editor_ui_dialog_editor.rs"]
+mod editor_ui_dialog_editor;
 #[path = "editor_ui_graph.rs"]
 mod editor_ui_graph;
 #[path = "editor_ui_hierarchy_panel.rs"]
@@ -33,6 +35,7 @@ mod editor_ui_sprite_editor;
 
 pub(crate) use editor_ui_animation_authoring::AnimationAuthoringState;
 pub(crate) use editor_ui_animation_editor::AnimationEditorState;
+pub(crate) use editor_ui_dialog_editor::DialogEditorState;
 pub(crate) use editor_ui_entity_editor::{
     create_default_definition, EntityCategory, EntityEditState, EntityEditorState, EntitySummary,
 };
@@ -86,6 +89,7 @@ pub(crate) enum CenterPanelTab {
     SceneRules,
     MapEditor,
     MenuEditor,
+    DialogEditor,
     SpriteEditor,
     AnimationEditor,
     EntityEditor,
@@ -188,6 +192,7 @@ pub struct ProjectEditorState {
     pub window_title: Option<String>,
     pub pending_confirmation: Option<EditorConfirmation>,
     pub available_palettes: BTreeMap<String, Palette4>,
+    pub available_dialog_outcomes: BTreeMap<String, Vec<String>>,
     pub indexed_palette_override: Option<String>,
 }
 
@@ -215,6 +220,7 @@ impl Default for ProjectEditorState {
             window_title: Some("No project open".to_string()),
             pending_confirmation: None,
             available_palettes: builtin_palettes(),
+            available_dialog_outcomes: BTreeMap::new(),
             indexed_palette_override: None,
         }
     }
@@ -231,6 +237,10 @@ impl ProjectEditorState {
         let mut palettes = builtin_palettes();
         palettes.extend(project_palettes.iter().map(|(id, palette)| (id.clone(), *palette)));
         self.available_palettes = palettes;
+    }
+
+    pub fn set_available_dialogs(&mut self, dialogs: &BTreeMap<String, Vec<String>>) {
+        self.available_dialog_outcomes = dialogs.clone();
     }
 
     pub fn begin_new_project_dialog(
@@ -507,6 +517,9 @@ pub struct EditorUI {
     // Animation editor state
     pub animation: AnimationEditorState,
 
+    // Dialog editor state
+    pub dialog: DialogEditorState,
+
     // Entity editor state
     pub entity_editor: EntityEditorState,
 
@@ -559,6 +572,9 @@ impl EditorUI {
 
             // Animation editor state
             animation: AnimationEditorState::default(),
+
+            // Dialog editor state
+            dialog: DialogEditorState::default(),
 
             // Entity editor state
             entity_editor: EntityEditorState::default(),
@@ -773,6 +789,7 @@ impl EditorUI {
         scene_viewport: Option<&mut SceneViewport>,
         map_editor_viewport: Option<&mut SceneViewport>,
         mut project: Option<&mut crate::project::Project>,
+        project_assets: Option<&mut crate::project::ProjectAssets>,
         available_map_names: Option<Vec<String>>,
         config: Option<&mut crate::config::EditorConfig>,
         log_capture: Option<&crate::logging::LogCapture>,
@@ -821,6 +838,7 @@ impl EditorUI {
             scene_viewport,
             map_editor_viewport,
             project,
+            project_assets,
             available_map_names,
             config,
             renderer,

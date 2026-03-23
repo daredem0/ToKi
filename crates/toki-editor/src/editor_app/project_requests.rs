@@ -1,15 +1,28 @@
 use super::*;
 use crate::editor_services::graph_metadata;
+use crate::ui::editor_ui::DialogEditorState;
 
 impl EditorApp {
     pub(super) fn refresh_project_assets_after_rescan(&mut self) {
-        let project_palettes = self
+        let (project_palettes, available_dialogs) = self
             .core
             .project_manager
             .get_project_assets_mut()
-            .and_then(|assets| assets.load_project_palettes().ok())
+            .map(|assets| {
+                let palettes = assets.load_project_palettes().unwrap_or_default();
+                let dialogs = assets
+                    .get_dialog_names()
+                    .iter()
+                    .filter_map(|dialog_id| assets.load_dialog(dialog_id).ok().flatten())
+                    .collect::<Vec<_>>();
+                (
+                    palettes,
+                    DialogEditorState::collect_available_dialogs(&dialogs),
+                )
+            })
             .unwrap_or_default();
         self.core.ui.project.set_available_palettes(&project_palettes);
+        self.core.ui.project.set_available_dialogs(&available_dialogs);
 
         if let Some(current_project) = self.core.project_manager.current_project.as_ref() {
             let indexed_palette_override = current_project
@@ -88,15 +101,27 @@ impl EditorApp {
                     .current_project
                     .as_ref()
                     .map(|project| project.name.clone());
-                let project_palettes = self
+                let (project_palettes, available_dialogs) = self
                     .core
                     .project_manager
                     .get_project_assets_mut()
-                    .and_then(|assets| assets.load_project_palettes().ok())
+                    .map(|assets| {
+                        let palettes = assets.load_project_palettes().unwrap_or_default();
+                        let dialogs = assets
+                            .get_dialog_names()
+                            .iter()
+                            .filter_map(|dialog_id| assets.load_dialog(dialog_id).ok().flatten())
+                            .collect::<Vec<_>>();
+                        (
+                            palettes,
+                            DialogEditorState::collect_available_dialogs(&dialogs),
+                        )
+                    })
                     .unwrap_or_default();
                 if let Some(project_name) = project_name {
                     self.core.ui.set_title(&project_name);
                     self.core.ui.project.set_available_palettes(&project_palettes);
+                    self.core.ui.project.set_available_dialogs(&available_dialogs);
                 }
                 let indexed_palette_override = self
                     .core

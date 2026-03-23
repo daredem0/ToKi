@@ -130,7 +130,7 @@ impl InspectorSystem {
         match node_kind {
             RuleGraphNodeKind::Trigger(trigger) => {
                 ui.label("Trigger");
-                Self::edit_trigger_node(ui, ui_state, params, *trigger, graph, ctx)
+                Self::edit_trigger_node(ui, ui_state, params, trigger.clone(), graph, ctx)
             }
             RuleGraphNodeKind::Condition(condition) => {
                 ui.label("Condition");
@@ -151,13 +151,14 @@ impl InspectorSystem {
         graph: &mut RuleGraph,
         ctx: &NodeEditorContext,
     ) -> bool {
-        let mut edited_trigger = trigger;
+        let mut edited_trigger = trigger.clone();
         let map_size = Self::extract_map_size(ui_state, ctx.scene_index);
         let changed = Self::render_rule_graph_trigger_editor(
             ui,
             params.scene_name,
             params.node_key,
             &mut edited_trigger,
+            &ui_state.project.available_dialog_outcomes,
             map_size,
         );
 
@@ -217,6 +218,7 @@ impl InspectorSystem {
             &mut edited_action,
             &ctx.validation_issues,
             &ctx.audio_choices,
+            &ui_state.project.available_dialog_outcomes,
             &ui_state.scenes,
         );
 

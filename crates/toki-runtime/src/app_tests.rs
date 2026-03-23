@@ -440,7 +440,7 @@ fn build_startup_state_loads_resources_and_scene_from_pack_mount() {
         menu: MenuSettings::default(),
     };
 
-    let (resources, game_state, pack_mount, asset_load_plan, _) =
+    let (resources, game_state, _dialogs, pack_mount, asset_load_plan, _) =
         App::build_startup_state(&launch_options);
 
     assert!(pack_mount.is_some(), "pack mount should be retained");
@@ -555,7 +555,7 @@ fn build_startup_state_uses_scene_player_entry_and_preloads_all_scenes() {
         menu: MenuSettings::default(),
     };
 
-    let (_resources, game_state, _pack_mount, asset_load_plan, _) =
+    let (_resources, game_state, _dialogs, _pack_mount, asset_load_plan, _) =
         App::build_startup_state(&launch_options);
 
     assert_eq!(game_state.scene_manager().active_scene_name(), Some("Main"));
@@ -663,7 +663,7 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
         menu: MenuSettings::default(),
     };
 
-    let (_resources, game_state, _mount, asset_load_plan, _) =
+    let (_resources, game_state, _dialogs, _mount, asset_load_plan, _) =
         App::build_startup_state(&launch_options);
 
     assert_eq!(
@@ -823,7 +823,7 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
         },
         menu: MenuSettings::default(),
     };
-    let (resources, mut game_state, _mount, _asset_load_plan, _) =
+    let (resources, mut game_state, _dialogs, _mount, _asset_load_plan, _) =
         App::build_startup_state(&launch_options);
     let mut transition =
         super::app_transition::SceneTransitionController::new(launch_options.transition.clone());

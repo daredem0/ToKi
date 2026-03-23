@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
 
+use crate::dialog::DialogRuntimeContext;
+
 /// Trait that all game events must implement
 pub trait GameEvent: std::fmt::Debug + Clone + Send + Sync {}
 
@@ -67,6 +69,12 @@ pub struct SceneSwitchRequest {
     pub spawn_point_id: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DialogStartRequest {
+    pub dialog_id: String,
+    pub context: DialogRuntimeContext,
+}
+
 /// Game update result that includes both state changes and events
 #[derive(Debug, Default)]
 pub struct GameUpdateResult<T: GameEvent> {
@@ -76,6 +84,8 @@ pub struct GameUpdateResult<T: GameEvent> {
     pub events: Vec<T>,
     /// Optional deferred scene-switch request to be applied by the runtime layer.
     pub scene_switch_request: Option<SceneSwitchRequest>,
+    /// Optional deferred dialog-start request to be applied by the runtime layer.
+    pub dialog_start_request: Option<DialogStartRequest>,
 }
 
 impl<T: GameEvent> GameUpdateResult<T> {
@@ -85,6 +95,7 @@ impl<T: GameEvent> GameUpdateResult<T> {
             player_moved: false,
             events: Vec::new(),
             scene_switch_request: None,
+            dialog_start_request: None,
         }
     }
 
@@ -94,6 +105,7 @@ impl<T: GameEvent> GameUpdateResult<T> {
             player_moved,
             events: Vec::new(),
             scene_switch_request: None,
+            dialog_start_request: None,
         }
     }
 
@@ -115,6 +127,17 @@ impl<T: GameEvent> GameUpdateResult<T> {
         self.scene_switch_request = Some(SceneSwitchRequest {
             scene_name: scene_name.into(),
             spawn_point_id: spawn_point_id.into(),
+        });
+    }
+
+    pub fn request_dialog_start(
+        &mut self,
+        dialog_id: impl Into<String>,
+        context: DialogRuntimeContext,
+    ) {
+        self.dialog_start_request = Some(DialogStartRequest {
+            dialog_id: dialog_id.into(),
+            context,
         });
     }
 }

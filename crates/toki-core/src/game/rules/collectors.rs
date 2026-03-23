@@ -8,7 +8,8 @@ use crate::entity::EntityId;
 use crate::rules::{RuleTarget, RuleTrigger, TriggerContext};
 
 use super::events::{
-    CollisionEvent, DamageEvent, DeathEvent, InteractionEvent, InteractionSpatial,
+    CollisionEvent, DamageEvent, DeathEvent, DialogCompletionEvent, InteractionEvent,
+    InteractionSpatial,
 };
 use super::{GameState, RuleCommand};
 
@@ -171,6 +172,20 @@ impl GameState {
                 InteractionSpatial::InFront | InteractionSpatial::Overlap
             ),
         }
+    }
+
+    pub(in crate::game) fn collect_rule_commands_for_dialog_completion(
+        &mut self,
+        event: &DialogCompletionEvent,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        self.collect_rule_commands_for_trigger(
+            RuleTrigger::OnDialogComplete {
+                dialog_id: event.dialog_id.clone(),
+                outcome_id: event.outcome_id.clone(),
+            },
+            command_buffer,
+        );
     }
 
     /// Collects rule commands for OnCollision triggers.

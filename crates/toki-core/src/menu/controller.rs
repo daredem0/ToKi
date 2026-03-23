@@ -12,7 +12,7 @@ use super::types::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ActiveDialogState {
     dialog_id: String,
-    confirm_selected: bool,
+    selected_index: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -176,9 +176,20 @@ impl MenuController {
             dialog_id: dialog.id.clone(),
             title: dialog.title.clone(),
             body: dialog.body.clone(),
-            confirm_text: dialog.confirm_text.clone(),
-            cancel_text: dialog.cancel_text.clone(),
-            confirm_selected: active.confirm_selected,
+            entries: vec![
+                MenuViewEntry {
+                    text: dialog.confirm_text.clone(),
+                    selected: active.selected_index == 0,
+                    selectable: true,
+                    border_style_override: None,
+                },
+                MenuViewEntry {
+                    text: dialog.cancel_text.clone(),
+                    selected: active.selected_index == 1,
+                    selectable: true,
+                    border_style_override: None,
+                },
+            ],
             hide_main_menu: dialog.hide_main_menu,
         })
     }
@@ -212,14 +223,14 @@ impl MenuController {
         match input {
             MenuInput::Up | MenuInput::Down | MenuInput::Left | MenuInput::Right => {
                 if let Some(active_dialog) = &mut self.active_dialog {
-                    active_dialog.confirm_selected = !active_dialog.confirm_selected;
+                    active_dialog.selected_index = (active_dialog.selected_index + 1) % 2;
                 }
                 None
             }
             MenuInput::Confirm => {
                 let active_dialog = self.active_dialog.clone()?;
                 let dialog = self.dialog_map.get(&active_dialog.dialog_id)?.clone();
-                let action = if active_dialog.confirm_selected {
+                let action = if active_dialog.selected_index == 0 {
                     dialog.confirm_action
                 } else {
                     dialog.cancel_action
@@ -279,7 +290,7 @@ impl MenuController {
                 if self.dialog_map.contains_key(surface_id) {
                     self.active_dialog = Some(ActiveDialogState {
                         dialog_id: surface_id.clone(),
-                        confirm_selected: true,
+                        selected_index: 0,
                     });
                 } else if self.screen_map.contains_key(surface_id) {
                     self.active_dialog = None;

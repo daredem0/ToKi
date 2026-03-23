@@ -8,6 +8,7 @@ impl InspectorSystem {
         scene_name: &str,
         node_key: &str,
         trigger: &mut RuleTrigger,
+        available_dialog_outcomes: &std::collections::BTreeMap<String, Vec<String>>,
         map_size: Option<(u32, u32)>,
     ) -> bool {
         let mut changed = false;
@@ -37,7 +38,13 @@ impl InspectorSystem {
             changed = true;
         }
 
-        changed |= Self::render_trigger_parameters(ui, scene_name, node_key, trigger);
+        changed |= Self::render_trigger_parameters(
+            ui,
+            scene_name,
+            node_key,
+            trigger,
+            available_dialog_outcomes,
+        );
         changed |= Self::render_tile_coordinates(ui, trigger, map_size);
 
         changed
@@ -59,6 +66,10 @@ impl InspectorSystem {
                 mode: toki_core::rules::InteractionMode::default(),
                 entity: None,
             },
+            RuleTriggerKind::DialogComplete => RuleTrigger::OnDialogComplete {
+                dialog_id: String::new(),
+                outcome_id: String::new(),
+            },
             RuleTriggerKind::TileEnter => RuleTrigger::OnTileEnter { x: 0, y: 0 },
             RuleTriggerKind::TileExit => RuleTrigger::OnTileExit { x: 0, y: 0 },
         }
@@ -69,6 +80,7 @@ impl InspectorSystem {
         scene_name: &str,
         node_key: &str,
         trigger: &mut RuleTrigger,
+        available_dialog_outcomes: &std::collections::BTreeMap<String, Vec<String>>,
     ) -> bool {
         let mut changed = false;
 
@@ -89,6 +101,67 @@ impl InspectorSystem {
                 ),
                 mode,
             );
+        }
+
+        if let RuleTrigger::OnDialogComplete {
+            dialog_id,
+            outcome_id,
+        } = trigger
+        {
+            ui.horizontal(|ui| {
+                ui.label("Dialog Id:");
+                if available_dialog_outcomes.is_empty() {
+                    changed |= ui.text_edit_singleline(dialog_id).changed();
+                } else {
+                    egui::ComboBox::from_id_salt(format!(
+                        "graph_node_trigger_dialog_id_{}_{}",
+                        scene_name, node_key
+                    ))
+                    .selected_text(if dialog_id.is_empty() {
+                        "<select dialog>"
+                    } else {
+                        dialog_id.as_str()
+                    })
+                    .show_ui(ui, |ui| {
+                        for candidate in available_dialog_outcomes.keys() {
+                            changed |= ui
+                                .selectable_value(
+                                    dialog_id,
+                                    candidate.clone(),
+                                    candidate.as_str(),
+                                )
+                                .changed();
+                        }
+                    });
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Outcome Id:");
+                if let Some(outcomes) = available_dialog_outcomes.get(dialog_id) {
+                    egui::ComboBox::from_id_salt(format!(
+                        "graph_node_trigger_outcome_id_{}_{}",
+                        scene_name, node_key
+                    ))
+                    .selected_text(if outcome_id.is_empty() {
+                        "<select outcome>"
+                    } else {
+                        outcome_id.as_str()
+                    })
+                    .show_ui(ui, |ui| {
+                        for candidate in outcomes {
+                            changed |= ui
+                                .selectable_value(
+                                    outcome_id,
+                                    candidate.clone(),
+                                    candidate.as_str(),
+                                )
+                                .changed();
+                        }
+                    });
+                } else {
+                    changed |= ui.text_edit_singleline(outcome_id).changed();
+                }
+            });
         }
 
         // Entity filter editors for triggers that support them

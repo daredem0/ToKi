@@ -201,6 +201,12 @@ impl ProjectManager {
         self.project_assets.as_mut()
     }
 
+    pub fn current_project_and_assets_mut(
+        &mut self,
+    ) -> (Option<&mut Project>, Option<&mut ProjectAssets>) {
+        (self.current_project.as_mut(), self.project_assets.as_mut())
+    }
+
     /// Rescan project assets (e.g., after saving new sprites)
     pub fn rescan_assets(&mut self) -> Result<()> {
         if let Some(project_assets) = &mut self.project_assets {
@@ -268,6 +274,7 @@ impl ProjectManager {
         fs::create_dir_all(project_path.join("assets").join("tilemaps"))?;
         fs::create_dir_all(project_path.join("assets").join("audio"))?;
         fs::create_dir_all(project_path.join("entities"))?;
+        fs::create_dir_all(project_path.join("dialogs"))?;
         fs::create_dir_all(project_path.join("palettes"))?;
         fs::create_dir_all(project_path.join("settings"))?;
 

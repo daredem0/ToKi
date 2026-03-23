@@ -9,7 +9,7 @@ use crate::assets::tilemap::TileMap;
 use crate::entity::EntityId;
 use crate::events::GameUpdateResult;
 
-use super::{AudioEvent, GameState, PendingSceneSwitch, RuleCommand};
+use super::{AudioEvent, GameState, PendingDialogStart, PendingSceneSwitch, RuleCommand};
 
 impl GameState {
     pub(in crate::game) fn apply_rule_commands(
@@ -17,10 +17,15 @@ impl GameState {
         commands: Vec<RuleCommand>,
         result: &mut GameUpdateResult<AudioEvent>,
         tilemap: &TileMap,
-    ) -> (Vec<(EntityId, AnimationState)>, Option<PendingSceneSwitch>) {
+    ) -> (
+        Vec<(EntityId, AnimationState)>,
+        Option<PendingSceneSwitch>,
+        Option<PendingDialogStart>,
+    ) {
         let mut buffered_velocities = HashMap::new();
         let mut buffered_animations = HashMap::new();
         let mut pending_scene_switch = None;
+        let mut pending_dialog_start = None;
 
         for command in commands {
             match command {
@@ -62,6 +67,12 @@ impl GameState {
                         &spawn_point_id,
                         &mut pending_scene_switch,
                     );
+                }
+                RuleCommand::StartDialog { dialog_id, context } => {
+                    if pending_dialog_start.is_none() {
+                        pending_dialog_start =
+                            Some(crate::events::DialogStartRequest { dialog_id, context });
+                    }
                 }
                 RuleCommand::DamageEntity { entity_id, amount } => {
                     self.stat_effect_service()
@@ -108,7 +119,10 @@ impl GameState {
 
         let mut pending_animations = buffered_animations.into_iter().collect::<Vec<_>>();
         pending_animations.sort_by_key(|(entity_id, _)| *entity_id);
-        (pending_animations, pending_scene_switch)
+        if let Some(request) = &pending_dialog_start {
+            result.request_dialog_start(request.dialog_id.clone(), request.context);
+        }
+        (pending_animations, pending_scene_switch, pending_dialog_start)
     }
 
     fn apply_destroy_self(&mut self, entity_id: EntityId) {

@@ -371,7 +371,7 @@ impl PanelSystem {
     pub(super) fn rule_graph_node_kind_compact_label(kind: &RuleGraphNodeKind) -> String {
         match kind {
             RuleGraphNodeKind::Trigger(trigger) => {
-                format!("Trigger {}", Self::trigger_summary(*trigger))
+                format!("Trigger {}", Self::trigger_summary(trigger.clone()))
             }
             RuleGraphNodeKind::Condition(condition) => {
                 format!("Condition {}", Self::condition_summary(condition))
