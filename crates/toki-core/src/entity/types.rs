@@ -13,6 +13,67 @@ const fn default_has_shadow() -> bool {
     true
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EntityFootprint {
+    pub offset: [i32; 2],
+    pub size: [u32; 2],
+}
+
+impl EntityFootprint {
+    pub const fn new(offset: [i32; 2], size: [u32; 2]) -> Self {
+        Self { offset, size }
+    }
+
+    pub fn world_bounds(&self, entity_position: IVec2) -> (IVec2, UVec2) {
+        (
+            entity_position + IVec2::new(self.offset[0], self.offset[1]),
+            UVec2::new(self.size[0], self.size[1]),
+        )
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct EntityGrounding {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<[i32; 2]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub footprint: Option<EntityFootprint>,
+}
+
+impl EntityGrounding {
+    pub fn is_empty(&self) -> bool {
+        self.origin.is_none() && self.footprint.is_none()
+    }
+
+    pub fn resolved_origin(&self, render_size: UVec2) -> IVec2 {
+        self.origin
+            .map(|origin| IVec2::new(origin[0], origin[1]))
+            .unwrap_or_else(|| {
+                IVec2::new(
+                    (render_size.x / 2) as i32,
+                    render_size.y.saturating_sub(1) as i32,
+                )
+            })
+    }
+
+    pub fn resolved_footprint(
+        &self,
+        render_size: UVec2,
+        collision_box: Option<&CollisionBox>,
+    ) -> EntityFootprint {
+        self.footprint.unwrap_or_else(|| {
+            collision_box
+                .map(|collision| {
+                    EntityFootprint::new(
+                        [collision.offset.x, collision.offset.y],
+                        [collision.size.x, collision.size.y],
+                    )
+                })
+                .unwrap_or_else(|| EntityFootprint::new([0, 0], [render_size.x, render_size.y]))
+        })
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PickupDef {
     pub item_id: String,
@@ -324,6 +385,9 @@ pub struct EntityAttributes {
     /// Static sprite reference for non-animated entities.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub static_object_render: Option<StaticObjectRenderDef>,
+    /// Ground-contact origin and footprint used for fake-depth systems.
+    #[serde(default, skip_serializing_if = "EntityGrounding::is_empty")]
+    pub grounding: EntityGrounding,
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Behavior
@@ -434,6 +498,7 @@ impl Default for EntityAttributes {
             primary_projectile: None,
             projectile: None,
             static_object_render: None,
+            grounding: EntityGrounding::default(),
             pickup: None,
             inventory: Inventory::default(),
             has_inventory: false,
@@ -442,6 +507,25 @@ impl Default for EntityAttributes {
 }
 
 impl Entity {
+    pub fn resolved_ground_origin(&self) -> IVec2 {
+        self.position + self.attributes.grounding.resolved_origin(self.size)
+    }
+
+    pub fn resolved_footprint(&self) -> EntityFootprint {
+        self.attributes
+            .grounding
+            .resolved_footprint(self.size, self.collision_box.as_ref())
+    }
+
+    pub fn footprint_world_bounds(&self) -> (IVec2, UVec2) {
+        self.resolved_footprint().world_bounds(self.position)
+    }
+
+    pub fn ground_contact_y(&self) -> i32 {
+        let (footprint_pos, footprint_size) = self.footprint_world_bounds();
+        footprint_pos.y + footprint_size.y as i32
+    }
+
     pub fn effective_control_role(&self) -> ControlRole {
         self.control_role.resolved()
     }

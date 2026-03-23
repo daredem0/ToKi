@@ -351,6 +351,8 @@ impl SceneViewport {
 
     pub(super) fn add_entity_debug_shapes(&mut self, scene_data: &mut SceneData) {
         let entity_color = [1.0, 0.0, 0.0, 0.8];
+        let footprint_color = [0.0, 1.0, 1.0, 0.8];
+        let origin_color = [1.0, 1.0, 1.0, 0.9];
         let trigger_tile_color = [1.0, 1.0, 0.0, 0.6];
 
         let renderable_entities = self.game_state.get_renderable_entities();
@@ -394,6 +396,28 @@ impl SceneViewport {
                 size.x,
                 size.y
             );
+        }
+
+        for entity_id in self.game_state.entity_manager().active_entities() {
+            let Some(entity) = self.game_state.entity_manager().get_entity(entity_id) else {
+                continue;
+            };
+
+            let (footprint_pos, footprint_size) = entity.footprint_world_bounds();
+            scene_data.debug_shapes.push(toki_render::DebugShape {
+                shape_type: toki_render::DebugShapeType::Rectangle,
+                position: footprint_pos.as_vec2(),
+                size: footprint_size.as_vec2(),
+                color: footprint_color,
+            });
+
+            let origin = entity.resolved_ground_origin();
+            scene_data.debug_shapes.push(toki_render::DebugShape {
+                shape_type: toki_render::DebugShapeType::Rectangle,
+                position: glam::Vec2::new(origin.x as f32 - 1.0, origin.y as f32 - 1.0),
+                size: glam::Vec2::new(3.0, 3.0),
+                color: origin_color,
+            });
         }
     }
 

@@ -11,8 +11,8 @@ use toki_core::assets::tilemap::TileMap;
 use toki_core::collision::CollisionBox;
 use toki_core::entity::{
     AiConfig, AnimationsDef, AttributesDef, AudioDef, CollisionDef, Entity, EntityAttributes,
-    EntityDefinition, EntityKind, MovementProfile, MovementSoundTrigger, PickupDef, RenderingDef,
-    StaticObjectRenderDef,
+    EntityDefinition, EntityFootprint, EntityGrounding, EntityKind, MovementProfile,
+    MovementSoundTrigger, PickupDef, RenderingDef, StaticObjectRenderDef,
 };
 use toki_core::scene::{SceneAnchor, SceneAnchorKind, ScenePlayerEntry};
 use toki_core::Scene;
@@ -470,6 +470,7 @@ fn load_preview_sprite_frame_static_supports_object_sheet_backed_entities() {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
             }),
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: None,
@@ -565,6 +566,7 @@ fn build_scene_player_overlay_sprites_uses_scene_player_entry_spawn_point() {
                 sheet: "items".to_string(),
                 object_name: "hero_idle".to_string(),
             }),
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: None,
@@ -659,6 +661,7 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
                 has_shadow: true,
                 palette_override: None,
                 static_object: None,
+                grounding: Default::default(),
             },
             attributes: AttributesDef {
                 health: Some(100),
@@ -699,6 +702,60 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
         .expect("entity json should serialize"),
     )
     .expect("entity definition should be written");
+    fs::write(
+        project_path.join("entities/test.json"),
+        serde_json::to_string_pretty(&EntityDefinition {
+            name: "test".to_string(),
+            display_name: "Test Entity".to_string(),
+            description: "Scene entity".to_string(),
+            rendering: RenderingDef {
+                size: [16, 16],
+                render_layer: 0,
+                visible: true,
+                has_shadow: true,
+                palette_override: None,
+                static_object: None,
+                grounding: Default::default(),
+            },
+            attributes: AttributesDef {
+                health: Some(100),
+                stats: HashMap::new(),
+                speed: 0.0,
+                solid: true,
+                active: true,
+                can_move: false,
+                interactable: false,
+                interaction_reach: 0,
+                ai_config: AiConfig::default(),
+                movement_profile: MovementProfile::None,
+                primary_projectile: None,
+                pickup: None,
+                has_inventory: false,
+            },
+            collision: CollisionDef {
+                enabled: true,
+                offset: [0, 0],
+                size: [16, 16],
+                trigger: false,
+            },
+            audio: AudioDef {
+                footstep_trigger_distance: 16.0,
+                hearing_radius: 192,
+                movement_sound_trigger: MovementSoundTrigger::Distance,
+                movement_sound: "step".to_string(),
+                collision_sound: None,
+            },
+            animations: AnimationsDef {
+                atlas_name: "".to_string(),
+                clips: vec![],
+                default_state: "".to_string(),
+            },
+            category: "character".to_string(),
+            tags: vec!["test".to_string()],
+        })
+        .expect("entity json should serialize"),
+    )
+    .expect("entity definition should be written");
 
     let mut project_assets = ProjectAssets::new(project_path);
     project_assets
@@ -734,6 +791,105 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
         "authored scene entity should still be present in preview GameState"
     );
     assert_eq!(game_state.entities().len(), 2);
+}
+
+#[test]
+fn build_scene_preview_game_state_loads_scene_entity_definitions_for_legacy_grounding_hydration() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should exist");
+    let project_path = temp_dir.path().to_path_buf();
+    fs::create_dir_all(project_path.join("entities")).expect("entities dir should exist");
+
+    let soldier_definition = EntityDefinition {
+        name: "soldier".to_string(),
+        display_name: "Soldier".to_string(),
+        description: "Soldier".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+            has_shadow: true,
+            palette_override: None,
+            static_object: None,
+            grounding: EntityGrounding {
+                origin: None,
+                footprint: Some(EntityFootprint::new([4, 12], [8, 4])),
+            },
+        },
+        attributes: AttributesDef {
+            health: Some(100),
+            stats: HashMap::new(),
+            speed: 0.0,
+            solid: true,
+            active: true,
+            can_move: false,
+            interactable: false,
+            interaction_reach: 0,
+            ai_config: AiConfig::default(),
+            movement_profile: MovementProfile::None,
+            primary_projectile: None,
+            pickup: None,
+            has_inventory: false,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [4, 12],
+            size: [8, 4],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: "step".to_string(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: "".to_string(),
+            clips: vec![],
+            default_state: "".to_string(),
+        },
+        category: "character".to_string(),
+        tags: vec!["soldier".to_string()],
+    };
+
+    fs::write(
+        project_path.join("entities/soldier.json"),
+        serde_json::to_string_pretty(&soldier_definition)
+            .expect("entity json should serialize"),
+    )
+    .expect("entity definition should be written");
+
+    let mut project_assets = ProjectAssets::new(project_path);
+    project_assets
+        .scan_assets()
+        .expect("project assets should scan");
+
+    let mut scene = Scene::new("Main Scene".to_string());
+    let mut stale_scene_entity = soldier_definition
+        .create_entity(IVec2::new(24, 48), 15)
+        .expect("scene entity should instantiate");
+    stale_scene_entity.attributes.grounding = EntityGrounding::default();
+    stale_scene_entity.collision_box = Some(CollisionBox::solid_box(stale_scene_entity.size));
+    scene.entities.push(stale_scene_entity);
+
+    let game_state = EditorApp::build_scene_preview_game_state(&scene, Some(&mut project_assets))
+        .expect("scene preview game state should build");
+
+    let soldier = game_state
+        .entities_owned()
+        .into_iter()
+        .find(|entity| entity.definition_name.as_deref() == Some("soldier"))
+        .expect("soldier should exist in preview");
+    assert_eq!(
+        soldier.attributes.grounding.footprint,
+        Some(EntityFootprint::new([4, 12], [8, 4]))
+    );
+    let collision_box = soldier
+        .collision_box
+        .as_ref()
+        .expect("collision should exist");
+    assert_eq!(collision_box.offset, IVec2::new(4, 12));
+    assert_eq!(collision_box.size, UVec2::new(8, 4));
 }
 
 #[test]
@@ -793,6 +949,7 @@ fn build_scene_player_overlay_sprites_skips_when_scene_already_contains_authored
                     sheet: "items".to_string(),
                     object_name: "hero_idle".to_string(),
                 }),
+                grounding: Default::default(),
             },
             attributes: AttributesDef {
                 health: None,
@@ -904,6 +1061,7 @@ fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk(
                     sheet: "items".to_string(),
                     object_name: "hero_idle".to_string(),
                 }),
+                grounding: Default::default(),
             },
             attributes: AttributesDef {
                 health: None,

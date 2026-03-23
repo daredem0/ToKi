@@ -1,4 +1,5 @@
 use crate::pipelines::sprite::SpriteInstance as SpriteRenderInstance;
+use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
 use crate::targets::RenderTarget;
 use crate::{DebugPipeline, RenderError, RenderPipeline, SpritePipeline, TilemapPipeline};
 use std::collections::BTreeMap;
@@ -86,10 +87,17 @@ pub struct SceneRenderer {
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
     sprite_pipelines_by_texture: BTreeMap<String, SpritePipeline>,
+    sprite_draw_batches: Vec<OrderedDrawBatch<SceneSpriteBatchKey>>,
     underlay_pipeline: DebugPipeline,
     debug_pipeline: DebugPipeline,
     current_sprite_texture_path: Option<std::path::PathBuf>, // Cache current sprite texture
     current_projection: glam::Mat4,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum SceneSpriteBatchKey {
+    Default,
+    Textured(String),
 }
 
 impl SceneRenderer {
@@ -141,6 +149,7 @@ impl SceneRenderer {
             tilemap_pipeline,
             sprite_pipeline,
             sprite_pipelines_by_texture: BTreeMap::new(),
+            sprite_draw_batches: Vec::new(),
             underlay_pipeline,
             debug_pipeline,
             current_sprite_texture_path: sprite_texture_cache,
@@ -207,6 +216,11 @@ impl SceneRenderer {
         for pipeline in self.sprite_pipelines_by_texture.values_mut() {
             pipeline.clear_sprites();
         }
+        self.sprite_draw_batches.clear();
+    }
+
+    fn record_sprite_draw_batch(&mut self, key: SceneSpriteBatchKey, start: usize) {
+        append_ordered_draw_batch(&mut self.sprite_draw_batches, key, start);
     }
 
     fn add_sprite_instance(&mut self, sprite: &SpriteInstance) {
@@ -235,6 +249,12 @@ impl SceneRenderer {
                         self.sprite_pipelines_by_texture.len()
                     )
                 });
+            let batch_key = SceneSpriteBatchKey::Textured(cache_key.clone());
+            let instance_index = self
+                .sprite_pipelines_by_texture
+                .get(&cache_key)
+                .map(|pipeline| pipeline.instance_count())
+                .unwrap_or(0);
             let pipeline = self
                 .sprite_pipelines_by_texture
                 .entry(cache_key)
@@ -248,10 +268,17 @@ impl SceneRenderer {
                 });
             pipeline.update_projection(&self.queue, self.current_projection);
             pipeline.add_sprite(render_instance);
+            self.record_sprite_draw_batch(batch_key, instance_index);
         } else if let Some(texture_path) = &sprite.texture_path {
+            let texture_key = texture_path.to_string_lossy().to_string();
+            let instance_index = self
+                .sprite_pipelines_by_texture
+                .get(&texture_key)
+                .map(|pipeline| pipeline.instance_count())
+                .unwrap_or(0);
             let pipeline = self
                 .sprite_pipelines_by_texture
-                .entry(texture_path.to_string_lossy().to_string())
+                .entry(texture_key.clone())
                 .or_insert_with(|| {
                     SpritePipeline::new(
                         &self.device,
@@ -262,8 +289,11 @@ impl SceneRenderer {
                 });
             pipeline.update_projection(&self.queue, self.current_projection);
             pipeline.add_sprite(render_instance);
+            self.record_sprite_draw_batch(SceneSpriteBatchKey::Textured(texture_key), instance_index);
         } else {
+            let instance_index = self.sprite_pipeline.instance_count();
             self.sprite_pipeline.add_sprite(render_instance);
+            self.record_sprite_draw_batch(SceneSpriteBatchKey::Default, instance_index);
         }
     }
 
@@ -310,6 +340,22 @@ impl SceneRenderer {
                 OverlayShapeType::Circle => {}
                 OverlayShapeType::Line { end, thickness } => {
                     pipeline.add_line(shape.position, end, thickness, shape.color);
+                }
+            }
+        }
+    }
+
+    fn render_sprite_batches<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
+        for batch in &self.sprite_draw_batches {
+            match &batch.key {
+                SceneSpriteBatchKey::Default => {
+                    self.sprite_pipeline
+                        .render_range(render_pass, batch.start, batch.count);
+                }
+                SceneSpriteBatchKey::Textured(texture_key) => {
+                    if let Some(pipeline) = self.sprite_pipelines_by_texture.get(texture_key) {
+                        pipeline.render_range(render_pass, batch.start, batch.count);
+                    }
                 }
             }
         }
@@ -428,10 +474,7 @@ impl SceneRenderer {
             tracing::trace!("Rendering underlay pipeline");
             self.underlay_pipeline.render(&mut render_pass);
             tracing::trace!("Rendering sprite pipeline");
-            self.sprite_pipeline.render(&mut render_pass);
-            for pipeline in self.sprite_pipelines_by_texture.values() {
-                pipeline.render(&mut render_pass);
-            }
+            self.render_sprite_batches(&mut render_pass);
             tracing::trace!("Rendering debug pipeline");
             self.debug_pipeline.render(&mut render_pass);
         }
@@ -559,10 +602,7 @@ impl SceneRenderer {
             tracing::trace!("Rendering underlay pipeline");
             self.underlay_pipeline.render(&mut render_pass);
             tracing::trace!("Rendering sprite pipeline");
-            self.sprite_pipeline.render(&mut render_pass);
-            for pipeline in self.sprite_pipelines_by_texture.values() {
-                pipeline.render(&mut render_pass);
-            }
+            self.render_sprite_batches(&mut render_pass);
             tracing::trace!("Rendering debug pipeline");
             self.debug_pipeline.render(&mut render_pass);
         }

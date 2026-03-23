@@ -39,6 +39,7 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
             palette_override: None,
             animation_controller: Some(controller),
             static_object_render: None,
+            grounding: Default::default(),
             render_layer: 0,
             active: true,
             can_move: true,

@@ -1,8 +1,38 @@
 //! Core component section rendering - Rendering and Attributes.
 
 use crate::ui::EditorUI;
+use toki_core::entity::EntityFootprint;
 
 use super::widgets::{render_atlas_dropdown, show_field_error};
+
+fn resolved_ground_origin(edit: &crate::ui::editor_ui::EntityEditState) -> [i32; 2] {
+    edit.definition
+        .rendering
+        .grounding
+        .origin
+        .unwrap_or([
+            (edit.definition.rendering.size[0] / 2) as i32,
+            edit.definition.rendering.size[1].saturating_sub(1) as i32,
+        ])
+}
+
+fn resolved_ground_footprint(edit: &crate::ui::editor_ui::EntityEditState) -> EntityFootprint {
+    edit.definition
+        .rendering
+        .grounding
+        .footprint
+        .unwrap_or(EntityFootprint::new(
+            edit.definition.collision.offset,
+            edit.definition.collision.size,
+        ))
+}
+
+fn sync_collision_from_grounding(edit: &mut crate::ui::editor_ui::EntityEditState) {
+    if let Some(footprint) = edit.definition.rendering.grounding.footprint {
+        edit.definition.collision.offset = footprint.offset;
+        edit.definition.collision.size = footprint.size;
+    }
+}
 
 pub fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     let available_atlases = ui_state.entity_editor.available_atlases.clone();
@@ -97,6 +127,57 @@ pub fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                     edit.mark_dirty();
                 }
             });
+
+            egui::CollapsingHeader::new("Grounding")
+                .default_open(false)
+                .show(ui, |ui| {
+                    let mut origin = resolved_ground_origin(edit);
+                    ui.horizontal(|ui| {
+                        ui.label("Origin:");
+                        let origin_changed = ui
+                            .add(egui::DragValue::new(&mut origin[0]))
+                            .changed()
+                            | ui.add(egui::DragValue::new(&mut origin[1])).changed();
+                        if origin_changed {
+                            edit.definition.rendering.grounding.origin = Some(origin);
+                            edit.mark_dirty();
+                        }
+                    });
+
+                    let mut footprint = resolved_ground_footprint(edit);
+                    ui.horizontal(|ui| {
+                        ui.label("Footprint Offset:");
+                        let offset_changed = ui
+                            .add(egui::DragValue::new(&mut footprint.offset[0]))
+                            .changed()
+                            | ui
+                                .add(egui::DragValue::new(&mut footprint.offset[1]))
+                                .changed();
+                        if offset_changed {
+                            edit.definition.rendering.grounding.footprint = Some(footprint);
+                            sync_collision_from_grounding(edit);
+                            edit.mark_dirty();
+                        }
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.label("Footprint Size:");
+                        let mut width = footprint.size[0] as i32;
+                        let mut height = footprint.size[1] as i32;
+                        let size_changed = ui
+                            .add(egui::DragValue::new(&mut width).range(1..=1024))
+                            .changed()
+                            | ui
+                                .add(egui::DragValue::new(&mut height).range(1..=1024))
+                                .changed();
+                        if size_changed {
+                            footprint.size = [width.max(1) as u32, height.max(1) as u32];
+                            edit.definition.rendering.grounding.footprint = Some(footprint);
+                            sync_collision_from_grounding(edit);
+                            edit.mark_dirty();
+                        }
+                    });
+                });
         });
 }
 

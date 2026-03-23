@@ -36,6 +36,7 @@ fn sample_entity_with_id(id: u32) -> toki_core::entity::Entity {
             palette_override: None,
             animation_controller: None,
             static_object_render: None,
+            grounding: Default::default(),
             render_layer: 1,
             active: true,
             can_move: true,
@@ -170,6 +171,7 @@ fn apply_entity_property_draft_to_definition_updates_has_shadow() {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: toki_core::entity::AttributesDef {
             health: None,
@@ -1110,6 +1112,7 @@ fn save_entity_definition_persists_audio_updates() {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: toki_core::entity::AttributesDef {
             health: Some(100),

@@ -340,6 +340,7 @@ fn load_entity_definition_from_path_reads_definition_json() {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: crate::entity::AttributesDef {
             health: Some(1),

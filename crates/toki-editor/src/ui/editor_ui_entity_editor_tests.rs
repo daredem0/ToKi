@@ -509,6 +509,25 @@ fn edit_state_from_definition() {
     assert_eq!(state.definition.name, "test_entity");
     assert!(!state.dirty);
     assert!(state.validation_errors.is_empty());
+    assert!(state.definition.rendering.grounding.is_empty());
+}
+
+#[test]
+fn edit_state_preserves_authored_grounding() {
+    let mut def = make_test_definition();
+    def.rendering.grounding.origin = Some([12, 30]);
+    def.rendering.grounding.footprint = Some(toki_core::entity::EntityFootprint::new(
+        [8, 24],
+        [16, 8],
+    ));
+
+    let state = EntityEditState::from_definition(def, PathBuf::from("/test/entity.json"));
+
+    assert_eq!(state.definition.rendering.grounding.origin, Some([12, 30]));
+    assert_eq!(
+        state.definition.rendering.grounding.footprint,
+        Some(toki_core::entity::EntityFootprint::new([8, 24], [16, 8]))
+    );
 }
 
 #[test]

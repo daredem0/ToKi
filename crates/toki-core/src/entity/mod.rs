@@ -21,7 +21,7 @@ pub use definition::{
 pub use manager::EntityManager;
 pub use types::{
     AiBehavior, AiConfig, ControlRole, Entity, EntityAttributes, EntityAudioComponent,
-    EntityAudioSettings, EntityId, EntityKind, EntityStats, Inventory, MovementProfile,
-    MovementSoundTrigger, PickupDef, PrimaryProjectileDef, ProjectileState, StaticObjectRenderDef,
-    ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
+    EntityAudioSettings, EntityFootprint, EntityGrounding, EntityId, EntityKind, EntityStats,
+    Inventory, MovementProfile, MovementSoundTrigger, PickupDef, PrimaryProjectileDef,
+    ProjectileState, StaticObjectRenderDef, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
 };

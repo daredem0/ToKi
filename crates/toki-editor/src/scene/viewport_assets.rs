@@ -5,8 +5,8 @@ use toki_core::palette::{recolor_indexed_image, Palette4};
 use toki_core::project_assets::normalize_asset_name;
 use toki_core::sprite_render::{
     resolve_atlas_tile_frame, resolve_object_sheet_frame, resolve_sprite_render_requests,
-    ResolvedSpriteVisual, SpriteAssetResolver, SpriteRenderMaterial, SpriteRenderRequest,
-    SpriteResolveError, SpriteResolveFailure,
+    sort_sprite_render_requests, ResolvedSpriteVisual, SpriteAssetResolver,
+    SpriteRenderMaterial, SpriteRenderRequest, SpriteResolveError, SpriteResolveFailure,
 };
 
 struct ViewportSpriteResolver<'a, 'b> {
@@ -170,12 +170,15 @@ impl SceneViewport {
         project_path: Option<&std::path::Path>,
         requests: &[SpriteRenderRequest],
     ) -> (Vec<toki_render::SpriteInstance>, Vec<SpriteResolveFailure>) {
+        let mut sorted_requests = requests.to_vec();
+        sort_sprite_render_requests(&mut sorted_requests);
         let mut resolver = ViewportSpriteResolver {
             viewport: self,
             project_assets,
             project_path,
         };
-        let (resolved, mut failures) = resolve_sprite_render_requests(&mut resolver, requests);
+        let (resolved, mut failures) =
+            resolve_sprite_render_requests(&mut resolver, &sorted_requests);
         let mut instances = Vec::with_capacity(resolved.len());
         for sprite in resolved {
             let (texture_path, texture_image, texture_cache_key) = match sprite.material {

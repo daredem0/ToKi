@@ -184,6 +184,10 @@ impl SpritePipeline {
         self.needs_buffer_update = true;
     }
 
+    pub fn instance_count(&self) -> usize {
+        self.instances.len()
+    }
+
     pub fn update_projection(&self, queue: &Queue, mvp: glam::Mat4) {
         let uniforms = SpriteUniforms {
             mvp: mvp.to_cols_array_2d(),
@@ -215,12 +219,7 @@ impl SpritePipeline {
 
 impl RenderPipeline for SpritePipeline {
     fn render<'a>(&'a self, render_pass: &mut RenderPass<'a>) {
-        if !self.instances.is_empty() {
-            render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.draw(0..(self.instances.len() * 6) as u32, 0..1);
-        }
+        self.render_range(render_pass, 0, self.instances.len());
     }
 
     fn update(&mut self) {
@@ -232,5 +231,28 @@ impl RenderPipeline for SpritePipeline {
         if self.needs_buffer_update {
             self.update_vertex_buffer(queue);
         }
+    }
+}
+
+impl SpritePipeline {
+    pub fn render_range<'a>(
+        &'a self,
+        render_pass: &mut RenderPass<'a>,
+        start: usize,
+        count: usize,
+    ) {
+        if count == 0 || start >= self.instances.len() {
+            return;
+        }
+
+        let end = (start + count).min(self.instances.len());
+        if end <= start {
+            return;
+        }
+
+        render_pass.set_pipeline(&self.render_pipeline);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.draw((start * 6) as u32..(end * 6) as u32, 0..1);
     }
 }

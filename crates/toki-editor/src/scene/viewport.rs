@@ -533,29 +533,37 @@ impl SceneViewport {
         &self,
         world_pos: glam::Vec2,
     ) -> Option<toki_core::entity::EntityId> {
-        // Get entity IDs from the active scene
-        let entity_ids = self.game_state.entity_manager().active_entities();
-
         // Convert world position to integer coordinates for comparison
         let world_pos_i32 = world_to_i32_floor(world_pos);
 
-        // Iterate through entity IDs in reverse order (top layer first)
-        // This ensures we select the topmost entity if they overlap
-        for &entity_id in entity_ids.iter().rev() {
-            if let Some(entity) = self.game_state.entity_manager().get_entity(entity_id) {
-                if point_in_entity_bounds(world_pos_i32, entity.position, entity.size) {
-                    tracing::debug!(
-                        "Entity hit detected: ID={}, position=({}, {}), size={}x{}, click=({}, {})",
-                        entity.id,
-                        entity.position.x,
-                        entity.position.y,
-                        entity.size.x,
-                        entity.size.y,
-                        world_pos_i32.x,
-                        world_pos_i32.y
-                    );
-                    return Some(entity.id);
-                }
+        let mut entities = self
+            .game_state
+            .entity_manager()
+            .active_entities()
+            .into_iter()
+            .filter_map(|entity_id| self.game_state.entity_manager().get_entity(entity_id))
+            .collect::<Vec<_>>();
+        entities.sort_by_key(|entity| {
+            (
+                entity.ground_contact_y(),
+                entity.attributes.render_layer,
+                entity.id,
+            )
+        });
+
+        for entity in entities.into_iter().rev() {
+            if point_in_entity_bounds(world_pos_i32, entity.position, entity.size) {
+                tracing::debug!(
+                    "Entity hit detected: ID={}, position=({}, {}), size={}x{}, click=({}, {})",
+                    entity.id,
+                    entity.position.x,
+                    entity.position.y,
+                    entity.size.x,
+                    entity.size.y,
+                    world_pos_i32.x,
+                    world_pos_i32.y
+                );
+                return Some(entity.id);
             }
         }
 

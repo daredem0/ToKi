@@ -8,7 +8,21 @@
       16
     ],
     "render_layer": 1,
-    "visible": true
+    "visible": true,
+    "has_shadow": true,
+    "palette_override": "",
+    "grounding": {
+      "footprint": {
+        "offset": [
+          4,
+          12
+        ],
+        "size": [
+          8,
+          4
+        ]
+      }
+    }
   },
   "attributes": {
     "health": 100,
@@ -20,7 +34,12 @@
     "solid": true,
     "active": true,
     "can_move": true,
-    "ai_behavior": "none",
+    "interactable": false,
+    "interaction_reach": 0,
+    "ai_config": {
+      "behavior": "none",
+      "detection_radius": 0
+    },
     "movement_profile": "player_wasd",
     "primary_projectile": {
       "sheet": "fauna",
@@ -42,12 +61,12 @@
   "collision": {
     "enabled": true,
     "offset": [
-      0,
-      0
+      4,
+      12
     ],
     "size": [
-      16,
-      16
+      8,
+      4
     ],
     "trigger": false
   },

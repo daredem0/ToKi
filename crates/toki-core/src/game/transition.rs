@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::animation::AnimationState;
+use crate::collision::CollisionBox;
 use crate::entity::{ControlRole, Entity, EntityDefinition, EntityId, EntityKind, EntityManager};
 use crate::rules::RuleSet;
 use crate::scene::{Scene, SceneAnchorFacing};
@@ -42,7 +43,7 @@ impl<'a> SceneTransitionPlanner<'a> {
             {
                 continue;
             }
-            entity_manager.add_existing_entity(entity.clone());
+            entity_manager.add_existing_entity(self.hydrate_legacy_scene_entity(entity));
         }
 
         let player_id = if let Some(player_entry) = &scene.player_entry {
@@ -125,6 +126,35 @@ impl<'a> SceneTransitionPlanner<'a> {
         player.entity_kind = EntityKind::Player;
         Self::apply_durable_player_state(&mut player, preserved_player);
         Ok(player)
+    }
+
+    fn hydrate_legacy_scene_entity(&self, entity: &Entity) -> Entity {
+        let Some(definition_name) = entity.definition_name.as_deref() else {
+            return entity.clone();
+        };
+        let Some(definition) = self.entity_definitions.get(definition_name) else {
+            return entity.clone();
+        };
+
+        let mut hydrated = entity.clone();
+        if !hydrated.attributes.grounding.is_empty() {
+            return hydrated;
+        }
+
+        if let Some(collision_box) = hydrated.collision_box.as_ref() {
+            if Self::is_legacy_default_collision(entity, collision_box) {
+                hydrated.attributes.grounding = definition.get_grounding();
+                hydrated.collision_box = definition.get_collision_box();
+            }
+        }
+
+        hydrated
+    }
+
+    fn is_legacy_default_collision(entity: &Entity, collision_box: &CollisionBox) -> bool {
+        collision_box.offset == glam::IVec2::ZERO
+            && collision_box.size == entity.size
+            && !collision_box.trigger
     }
 
     fn reposition_preserved_player(
@@ -215,6 +245,7 @@ mod tests {
 
     use super::SceneTransitionPlanner;
     use crate::animation::AnimationState;
+    use crate::entity::{EntityFootprint, EntityGrounding};
     use crate::entity::{
         AiConfig, AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef,
         ControlRole, EntityDefinition, MovementProfile, MovementSoundTrigger, RenderingDef,
@@ -234,6 +265,7 @@ mod tests {
                 has_shadow: true,
                 palette_override: None,
                 static_object: None,
+                grounding: Default::default(),
             },
             attributes: AttributesDef {
                 health: Some(100),
@@ -314,5 +346,105 @@ mod tests {
         assert_eq!(player.attributes.current_stat("health"), Some(75));
         assert_eq!(player.attributes.inventory.item_count("coin"), 2);
         assert_eq!(player.control_role, ControlRole::PlayerCharacter);
+    }
+
+    #[test]
+    fn scene_transition_planner_migrates_legacy_default_scene_entity_collision_from_definition() {
+        let definition = EntityDefinition {
+            name: "player".to_string(),
+            display_name: "Player".to_string(),
+            description: String::new(),
+            rendering: RenderingDef {
+                size: [16, 16],
+                render_layer: 1,
+                visible: true,
+                has_shadow: true,
+                palette_override: None,
+                static_object: None,
+                grounding: EntityGrounding {
+                    origin: None,
+                    footprint: Some(EntityFootprint::new([4, 12], [8, 4])),
+                },
+            },
+            attributes: AttributesDef {
+                health: Some(100),
+                stats: HashMap::new(),
+                speed: 2.0,
+                solid: true,
+                active: true,
+                can_move: true,
+                interactable: false,
+                interaction_reach: 0,
+                ai_config: AiConfig::default(),
+                movement_profile: MovementProfile::PlayerWasd,
+                primary_projectile: None,
+                pickup: None,
+                has_inventory: true,
+            },
+            collision: CollisionDef {
+                enabled: true,
+                offset: [4, 12],
+                size: [8, 4],
+                trigger: false,
+            },
+            audio: AudioDef {
+                footstep_trigger_distance: 32.0,
+                hearing_radius: 192,
+                movement_sound_trigger: MovementSoundTrigger::Distance,
+                movement_sound: "step".to_string(),
+                collision_sound: None,
+            },
+            animations: AnimationsDef {
+                atlas_name: "creatures".to_string(),
+                clips: vec![AnimationClipDef {
+                    state: "idle".to_string(),
+                    frame_tiles: vec!["slime/idle_0".to_string()],
+                    frame_positions: None,
+                    frame_duration_ms: 200.0,
+                    frame_durations_ms: None,
+                    loop_mode: "loop".to_string(),
+                }],
+                default_state: "idle".to_string(),
+            },
+            category: "human".to_string(),
+            tags: vec!["player".to_string()],
+        };
+        let definitions = HashMap::from([(definition.name.clone(), definition.clone())]);
+        let planner = SceneTransitionPlanner::new(&definitions);
+        let mut scene = Scene::new("Scene A".to_string());
+
+        let mut legacy_entity = definition
+            .create_entity(glam::IVec2::new(48, 128), 14)
+            .expect("entity should instantiate");
+        legacy_entity.attributes.grounding = EntityGrounding::default();
+        legacy_entity.collision_box = Some(crate::collision::CollisionBox::solid_box(
+            legacy_entity.size,
+        ));
+        scene.entities.push(legacy_entity);
+
+        let prepared = planner
+            .prepare_scene_load(&scene, None, None)
+            .expect("scene should load");
+
+        let entity = prepared
+            .entity_manager
+            .active_entities()
+            .into_iter()
+            .find_map(|entity_id| {
+                let entity = prepared.entity_manager.get_entity(entity_id)?;
+                (entity.definition_name.as_deref() == Some("player")).then_some(entity)
+            })
+            .expect("player entity should be present");
+
+        assert_eq!(
+            entity.attributes.grounding.footprint,
+            Some(EntityFootprint::new([4, 12], [8, 4]))
+        );
+        let collision_box = entity
+            .collision_box
+            .as_ref()
+            .expect("collision should exist");
+        assert_eq!(collision_box.offset, glam::IVec2::new(4, 12));
+        assert_eq!(collision_box.size, glam::UVec2::new(8, 4));
     }
 }

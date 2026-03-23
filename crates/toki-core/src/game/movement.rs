@@ -16,6 +16,27 @@ struct MovementCollisionResult {
 }
 
 impl GameState {
+    fn clamp_entity_position_to_world_bounds(
+        entity: &crate::entity::Entity,
+        candidate_position: glam::IVec2,
+        world_bounds: glam::UVec2,
+    ) -> glam::IVec2 {
+        let footprint = entity.resolved_footprint();
+        let min_x = -footprint.offset[0];
+        let min_y = -footprint.offset[1];
+        let max_x = world_bounds.x as i32 - footprint.size[0] as i32 - footprint.offset[0];
+        let max_y = world_bounds.y as i32 - footprint.size[1] as i32 - footprint.offset[1];
+
+        glam::IVec2::new(
+            candidate_position
+                .x
+                .clamp(min_x.min(max_x), min_x.max(max_x)),
+            candidate_position
+                .y
+                .clamp(min_y.min(max_y), min_y.max(max_y)),
+        )
+    }
+
     pub(super) fn movement_delta_from_keys(keys: &[InputKey]) -> glam::IVec2 {
         let mut delta = glam::IVec2::ZERO;
         for key in keys {
@@ -68,34 +89,41 @@ impl GameState {
         result: &mut GameUpdateResult<AudioEvent>,
         time_scale: f32,
     ) -> bool {
-        let Some(entity) = self.entity_manager.get_entity(entity_id) else {
-            return false;
+        let (current_position, accumulator, new_position) = {
+            let Some(entity) = self.entity_manager.get_entity(entity_id) else {
+                return false;
+            };
+
+            let current_position = entity.position;
+            let entity_speed = entity.attributes.speed * time_scale;
+            let mut accumulator = entity.movement_accumulator;
+
+            let pixels_x =
+                Self::update_axis_accumulator(&mut accumulator.x, entity_speed, direction.x);
+            let pixels_y =
+                Self::update_axis_accumulator(&mut accumulator.y, entity_speed, direction.y);
+
+            let new_position = if pixels_x == 0 && pixels_y == 0 {
+                None
+            } else {
+                Some(Self::clamp_entity_position_to_world_bounds(
+                    entity,
+                    glam::IVec2::new(current_position.x + pixels_x, current_position.y + pixels_y),
+                    world_bounds,
+                ))
+            };
+
+            (current_position, accumulator, new_position)
         };
 
-        let current_position = entity.position;
-        let entity_speed = entity.attributes.speed * time_scale;
-        let entity_size = entity.size;
-        let mut accumulator = entity.movement_accumulator;
-
-        let pixels_x = Self::update_axis_accumulator(&mut accumulator.x, entity_speed, direction.x);
-        let pixels_y = Self::update_axis_accumulator(&mut accumulator.y, entity_speed, direction.y);
-
-        // Store updated accumulator
+        // Store updated accumulator after all immutable reads of `entity`.
         if let Some(entity) = self.entity_manager.get_entity_mut(entity_id) {
             entity.movement_accumulator = accumulator;
         }
 
-        if pixels_x == 0 && pixels_y == 0 {
+        let Some(new_position) = new_position else {
             return false;
-        }
-
-        let max_x = (world_bounds.x as i32 - entity_size.x as i32).max(0);
-        let max_y = (world_bounds.y as i32 - entity_size.y as i32).max(0);
-
-        let new_position = glam::IVec2::new(
-            (current_position.x + pixels_x).clamp(0, max_x),
-            (current_position.y + pixels_y).clamp(0, max_y),
-        );
+        };
 
         if new_position == current_position {
             return false;
@@ -470,11 +498,13 @@ impl GameState {
                 continue;
             };
 
-            let max_x = (world_bounds.x as i32 - current_entity.size.x as i32).max(0);
-            let max_y = (world_bounds.y as i32 - current_entity.size.y as i32).max(0);
-            let candidate_position = glam::IVec2::new(
-                (current_entity.position.x + velocity.x).clamp(0, max_x),
-                (current_entity.position.y + velocity.y).clamp(0, max_y),
+            let candidate_position = Self::clamp_entity_position_to_world_bounds(
+                &current_entity,
+                glam::IVec2::new(
+                    current_entity.position.x + velocity.x,
+                    current_entity.position.y + velocity.y,
+                ),
+                world_bounds,
             );
 
             if candidate_position == current_entity.position {

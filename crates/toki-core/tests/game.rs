@@ -8,8 +8,8 @@ use toki_core::assets::{
 };
 use toki_core::entity::{
     AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, ControlRole,
-    EntityDefinition, EntityKind, MovementProfile, MovementSoundTrigger, PickupDef,
-    PrimaryProjectileDef, RenderingDef, ATTACK_POWER_STAT_ID,
+    EntityDefinition, EntityFootprint, EntityGrounding, EntityKind, MovementProfile,
+    MovementSoundTrigger, PickupDef, PrimaryProjectileDef, RenderingDef, ATTACK_POWER_STAT_ID,
 };
 use toki_core::rules::{Rule, RuleAction, RuleSet, RuleTarget, RuleTrigger};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
@@ -110,6 +110,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(100),
@@ -178,6 +179,7 @@ fn player_definition(name: &str) -> EntityDefinition {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(100),
@@ -505,6 +507,42 @@ fn game_state_world_bounds_right_boundary() {
     // One more update should not move further
     let result = game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
     assert!(!result.player_moved); // Should not report movement when clamped
+}
+
+#[test]
+fn game_state_world_bounds_clamp_uses_footprint_not_full_sprite_size() {
+    let mut scene = Scene::new("Main Scene".to_string());
+    scene.anchors.push(SceneAnchor {
+        id: "spawn".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::ZERO,
+        facing: None,
+    });
+    scene.player_entry = Some(ScenePlayerEntry {
+        entity_definition_name: "foot_player".to_string(),
+        spawn_point_id: "spawn".to_string(),
+    });
+
+    let mut definition = player_definition("foot_player");
+    definition.rendering.size = [32, 48];
+    definition.rendering.grounding = EntityGrounding {
+        origin: Some([16, 47]),
+        footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
+    };
+    definition.collision.offset = [0, 0];
+    definition.collision.size = [32, 48];
+
+    let mut game_state =
+        toki_core::project_content::build_game_state_from_scene(scene, [definition])
+            .expect("scene should load");
+
+    game_state.handle_key_press(InputKey::Right);
+    let world_bounds = UVec2::new(32, 128);
+    for _ in 0..40 {
+        game_state.update(world_bounds, &create_test_tilemap(), &create_test_atlas());
+    }
+
+    assert_eq!(game_state.player_position().x, 8);
 }
 
 #[test]
@@ -1743,6 +1781,7 @@ fn game_state_static_entity_renderables_include_object_sheet_backed_entities() {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
             }),
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: None,
@@ -1804,7 +1843,7 @@ fn game_state_static_entity_renderables_include_object_sheet_backed_entities() {
         }
     );
     assert_eq!(static_request.position, IVec2::new(32, 48));
-    assert!(game_state.get_renderable_entities().is_empty());
+    assert_eq!(game_state.get_renderable_entities().len(), 1);
 }
 
 #[test]
@@ -3097,6 +3136,21 @@ fn game_state_entity_size_used_for_right_boundary_clamping() {
         .get_entity_mut(player_id)
         .unwrap()
         .size = UVec2::new(32, 32);
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .collision_box
+        .as_mut()
+        .expect("player collision should exist")
+        .size = UVec2::new(32, 32);
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .attributes
+        .grounding
+        .footprint = Some(EntityFootprint::new([0, 0], [32, 32]));
 
     // Also set speed high so we reach boundary quickly
     game_state
@@ -3130,6 +3184,21 @@ fn game_state_entity_size_used_for_bottom_boundary_clamping() {
         .get_entity_mut(player_id)
         .unwrap()
         .size = UVec2::new(24, 24);
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .collision_box
+        .as_mut()
+        .expect("player collision should exist")
+        .size = UVec2::new(24, 24);
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .unwrap()
+        .attributes
+        .grounding
+        .footprint = Some(EntityFootprint::new([0, 0], [24, 24]));
 
     // Set speed high
     game_state

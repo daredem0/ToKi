@@ -15,6 +15,7 @@ fn test_entity_definition_create_entity_basic() {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(100),
@@ -152,6 +153,7 @@ fn test_entity_definition_create_npc_entity() {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(50),
@@ -306,6 +308,7 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
             }),
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(25),
@@ -436,6 +439,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(100),
@@ -532,6 +536,7 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(100),
@@ -639,6 +644,7 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
             }),
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(25),
@@ -709,6 +715,7 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
             }),
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(30),
@@ -780,6 +787,7 @@ fn test_entity_definition_copies_authored_primary_projectile() {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(30),
@@ -866,6 +874,7 @@ fn test_entity_definition_copies_authored_pickup() {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
             }),
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: None,
@@ -940,6 +949,7 @@ fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type()
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: None,
@@ -998,6 +1008,7 @@ fn test_entity_definition_invalid_animation_state() {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: None,
@@ -1061,6 +1072,7 @@ fn test_entity_definition_invalid_loop_mode() {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: None,
@@ -1124,6 +1136,7 @@ fn test_entity_definition_serialization() {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: None,
@@ -1255,6 +1268,7 @@ fn create_entity_copies_has_shadow_from_definition_rendering() {
             has_shadow: false,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: None,
@@ -1313,6 +1327,7 @@ fn test_entity_definition_create_audio_component() {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(100),
@@ -1572,6 +1587,140 @@ fn test_legacy_ai_behavior_backward_compatibility() {
 }
 
 #[test]
+fn entity_definition_defaults_grounding_to_bottom_center_and_collision_footprint() {
+    let entity_def = EntityDefinition {
+        name: "grounding_default".to_string(),
+        display_name: "Grounding Default".to_string(),
+        description: String::new(),
+        rendering: RenderingDef {
+            size: [32, 48],
+            render_layer: 0,
+            visible: true,
+            has_shadow: true,
+            palette_override: None,
+            static_object: None,
+            grounding: Default::default(),
+        },
+        attributes: AttributesDef {
+            health: None,
+            stats: std::collections::HashMap::new(),
+            speed: 1.0,
+            solid: true,
+            active: true,
+            can_move: true,
+            ai_config: AiConfig::default(),
+            movement_profile: MovementProfile::LegacyDefault,
+            primary_projectile: None,
+            pickup: None,
+            has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [8, 40],
+            size: [16, 8],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: String::new(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: String::new(),
+            clips: vec![],
+            default_state: String::new(),
+        },
+        category: "creature".to_string(),
+        tags: vec![],
+    };
+
+    let entity = entity_def
+        .create_entity(IVec2::new(10, 20), 7)
+        .expect("entity should build");
+
+    assert_eq!(
+        entity.attributes.grounding.resolved_origin(entity.size),
+        IVec2::new(16, 47)
+    );
+    assert_eq!(entity.resolved_footprint().offset, [8, 40]);
+    assert_eq!(entity.resolved_footprint().size, [16, 8]);
+    assert_eq!(entity.footprint_world_bounds(), (IVec2::new(18, 60), glam::UVec2::new(16, 8)));
+}
+
+#[test]
+fn entity_definition_uses_explicit_grounding_for_collision_and_sorting() {
+    let entity_def = EntityDefinition {
+        name: "grounding_override".to_string(),
+        display_name: "Grounding Override".to_string(),
+        description: String::new(),
+        rendering: RenderingDef {
+            size: [32, 48],
+            render_layer: 0,
+            visible: true,
+            has_shadow: true,
+            palette_override: None,
+            static_object: None,
+            grounding: EntityGrounding {
+                origin: Some([12, 45]),
+                footprint: Some(EntityFootprint::new([10, 38], [12, 10])),
+            },
+        },
+        attributes: AttributesDef {
+            health: None,
+            stats: std::collections::HashMap::new(),
+            speed: 1.0,
+            solid: true,
+            active: true,
+            can_move: true,
+            ai_config: AiConfig::default(),
+            movement_profile: MovementProfile::LegacyDefault,
+            primary_projectile: None,
+            pickup: None,
+            has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [32, 48],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 16.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::Distance,
+            movement_sound: String::new(),
+            collision_sound: None,
+        },
+        animations: AnimationsDef {
+            atlas_name: String::new(),
+            clips: vec![],
+            default_state: String::new(),
+        },
+        category: "creature".to_string(),
+        tags: vec![],
+    };
+
+    let entity = entity_def
+        .create_entity(IVec2::new(100, 200), 8)
+        .expect("entity should build");
+
+    let collision = entity
+        .collision_box
+        .as_ref()
+        .expect("collision should exist");
+    assert_eq!(collision.offset, IVec2::new(10, 38));
+    assert_eq!(collision.size, glam::UVec2::new(12, 10));
+    assert_eq!(entity.resolved_ground_origin(), IVec2::new(112, 245));
+    assert_eq!(entity.ground_contact_y(), 248);
+}
+
+#[test]
 fn test_ai_config_takes_precedence_over_legacy_ai_behavior() {
     // When both ai_config and ai_behavior are present, ai_config takes precedence
     let entity_json = r#"
@@ -1800,6 +1949,7 @@ fn test_entity_definition_with_position_based_animations() {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(50),

@@ -233,6 +233,7 @@ fn viewport_resolves_shared_sprite_render_requests_for_static_entities() {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
             }),
+            grounding: Default::default(),
         },
         attributes: toki_core::entity::AttributesDef {
             health: None,
@@ -438,6 +439,124 @@ fn viewport_recolors_palette_indexed_sprites_and_applies_palette_override() {
             .to_vec(),
         vec![1, 2, 3, 255]
     );
+
+    std::fs::remove_dir_all(tmp).expect("temp dir cleanup should succeed");
+}
+
+#[test]
+fn resolve_sprite_requests_into_instances_sorts_requests_before_building_draw_instances() {
+    let tmp = make_unique_temp_dir();
+    let sprites_dir = tmp.join("assets").join("sprites");
+    std::fs::create_dir_all(&sprites_dir).expect("sprites dir should exist");
+
+    std::fs::write(
+        sprites_dir.join("creatures.json"),
+        serde_json::json!({
+            "image": "creatures.png",
+            "tile_size": [16, 16],
+            "tiles": {
+                "slime": {
+                    "position": [0, 0],
+                    "properties": { "solid": false, "trigger": false }
+                }
+            }
+        })
+        .to_string(),
+    )
+    .expect("atlas should be written");
+    save_image_rgba8(
+        sprites_dir.join("creatures.png"),
+        16,
+        16,
+        &vec![255u8; 16 * 16 * 4],
+    )
+    .expect("png should be written");
+    std::fs::write(
+        tmp.join("terrain.json"),
+        serde_json::json!({
+            "image": "assets/sprites/creatures.png",
+            "tile_size": [16, 16],
+            "tiles": {
+                "grass": {
+                    "position": [0, 0],
+                    "properties": { "solid": false, "trigger": false }
+                }
+            }
+        })
+        .to_string(),
+    )
+    .expect("terrain atlas should be written");
+    std::fs::write(
+        tmp.join("tilemap.json"),
+        serde_json::json!({
+            "size": [1, 1],
+            "tile_size": [16, 16],
+            "atlas": "terrain.json",
+            "tiles": ["grass"],
+            "objects": []
+        })
+        .to_string(),
+    )
+    .expect("tilemap should be written");
+
+    let mut project_assets = ProjectAssets::new(tmp.clone());
+    project_assets.scan_assets().expect("assets should scan");
+
+    let resources = toki_core::ResourceManager::load_with_paths(
+        &tmp.join("terrain.json"),
+        &sprites_dir.join("creatures.json"),
+        &tmp.join("tilemap.json"),
+    )
+    .expect("resources should load");
+    let mut viewport = SceneViewport::with_game_state_and_resources_for_tests(
+        toki_core::GameState::new_empty(),
+        resources,
+    )
+    .expect("viewport should exist");
+
+    let far_request = SpriteRenderRequest {
+        origin: SpriteRenderOrigin::StaticEntity(1),
+        sort_key: SpriteSortKey {
+            primary: 100,
+            secondary: 0,
+            sequence: 0,
+        },
+        visual: SpriteVisualRef::AtlasTile {
+            atlas_name: "creatures".to_string(),
+            tile_name: "slime".to_string(),
+        },
+        position: glam::IVec2::new(100, 100),
+        size: SpriteRenderSize::Intrinsic,
+        palette_override: None,
+        flip_x: false,
+    };
+    let near_request = SpriteRenderRequest {
+        origin: SpriteRenderOrigin::StaticEntity(2),
+        sort_key: SpriteSortKey {
+            primary: 10,
+            secondary: 0,
+            sequence: 0,
+        },
+        visual: SpriteVisualRef::AtlasTile {
+            atlas_name: "creatures".to_string(),
+            tile_name: "slime".to_string(),
+        },
+        position: glam::IVec2::new(10, 10),
+        size: SpriteRenderSize::Intrinsic,
+        palette_override: None,
+        flip_x: false,
+    };
+
+    let (instances, failures) = viewport.resolve_sprite_requests_into_instances(
+        &project_assets,
+        Some(&tmp),
+        &[far_request, near_request],
+    );
+
+    assert!(failures.is_empty(), "unexpected failures: {failures:?}");
+    assert_eq!(instances.len(), 2);
+    assert_eq!(instances[0].position, glam::IVec2::new(10, 10));
+    assert_eq!(instances[1].position, glam::IVec2::new(100, 100));
 
     std::fs::remove_dir_all(tmp).expect("temp dir cleanup should succeed");
 }

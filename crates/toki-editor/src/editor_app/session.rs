@@ -101,30 +101,44 @@ impl EditorApp {
         scene: &toki_core::Scene,
         project_assets: Option<&mut ProjectAssets>,
     ) -> Result<toki_core::GameState, String> {
-        let mut entity_definitions = Vec::new();
+        let mut definition_names = std::collections::BTreeSet::new();
 
         if let Some(player_entry) = scene.player_entry.as_ref() {
+            definition_names.insert(player_entry.entity_definition_name.clone());
+        }
+
+        for entity in &scene.entities {
+            if let Some(definition_name) = entity.definition_name.as_ref() {
+                definition_names.insert(definition_name.clone());
+            }
+        }
+
+        let mut entity_definitions = Vec::new();
+        if !definition_names.is_empty() {
             let project_assets = project_assets.ok_or_else(|| {
                 format!(
-                    "Scene '{}' has a player entry but no project assets are available",
+                    "Scene '{}' references entity definitions but no project assets are available",
                     scene.name
                 )
             })?;
-            let definition = project_assets
-                .load_entity_definition(&player_entry.entity_definition_name)
-                .map_err(|error| {
-                    format!(
-                        "Failed to load player entity definition '{}' for scene '{}': {}",
-                        player_entry.entity_definition_name, scene.name, error
-                    )
-                })?
-                .ok_or_else(|| {
-                    format!(
-                        "Scene '{}' references missing player entity definition '{}'",
-                        scene.name, player_entry.entity_definition_name
-                    )
-                })?;
-            entity_definitions.push(definition);
+
+            for definition_name in definition_names {
+                let definition = project_assets
+                    .load_entity_definition(&definition_name)
+                    .map_err(|error| {
+                        format!(
+                            "Failed to load entity definition '{}' for scene '{}': {}",
+                            definition_name, scene.name, error
+                        )
+                    })?
+                    .ok_or_else(|| {
+                        format!(
+                            "Scene '{}' references missing entity definition '{}'",
+                            scene.name, definition_name
+                        )
+                    })?;
+                entity_definitions.push(definition);
+            }
         }
 
         build_game_state_from_scene(scene.clone(), entity_definitions)

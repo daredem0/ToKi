@@ -13,6 +13,7 @@ use toki_core::text::TextItem;
 
 use crate::targets::{OffscreenTarget, RenderTarget};
 use crate::pipelines::sprite::SpriteInstance;
+use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
 use crate::pipelines::RenderPipeline;
 use crate::wgpu_utils::{choose_present_mode, create_device_and_surface};
 use crate::{
@@ -30,6 +31,7 @@ pub struct GpuState {
     tilemap_pipeline: TilemapPipeline,
     sprite_pipeline: SpritePipeline,
     sprite_pipelines_by_texture: BTreeMap<PathBuf, SpritePipeline>,
+    sprite_draw_batches: Vec<OrderedDrawBatch<GpuSpriteBatchKey>>,
     world_underlay_pipeline: DebugPipeline,
     debug_pipeline: DebugPipeline,
     ui_rect_pipeline: DebugPipeline,
@@ -41,6 +43,12 @@ pub struct GpuState {
     text_items: Vec<TextItem>,
     tilemap_render_enabled: bool,
     current_mvp: glam::Mat4,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum GpuSpriteBatchKey {
+    Default,
+    Textured(PathBuf),
 }
 
 impl std::fmt::Debug for GpuState {
@@ -120,9 +128,20 @@ impl GpuState {
         }
 
         self.world_underlay_pipeline.render(&mut render_pass);
-        self.sprite_pipeline.render(&mut render_pass);
-        for pipeline in self.sprite_pipelines_by_texture.values() {
-            pipeline.render(&mut render_pass);
+        let sprite_pipeline = &self.sprite_pipeline;
+        let sprite_pipelines_by_texture = &self.sprite_pipelines_by_texture;
+        let sprite_draw_batches = &self.sprite_draw_batches;
+        for batch in sprite_draw_batches {
+            match &batch.key {
+                GpuSpriteBatchKey::Default => {
+                    sprite_pipeline.render_range(&mut render_pass, batch.start, batch.count);
+                }
+                GpuSpriteBatchKey::Textured(texture_path) => {
+                    if let Some(pipeline) = sprite_pipelines_by_texture.get(texture_path) {
+                        pipeline.render_range(&mut render_pass, batch.start, batch.count);
+                    }
+                }
+            }
         }
         self.debug_pipeline.render(&mut render_pass);
         self.ui_rect_pipeline.render(&mut render_pass);
@@ -133,6 +152,10 @@ impl GpuState {
         }
     }
 
+    fn record_sprite_draw_batch(&mut self, key: GpuSpriteBatchKey, start: usize) {
+        append_ordered_draw_batch(&mut self.sprite_draw_batches, key, start);
+    }
+
     pub fn add_sprite(&mut self, frame: SpriteFrame, pos: glam::IVec2, size: glam::UVec2) {
         let instance = SpriteInstance {
             frame,
@@ -140,7 +163,9 @@ impl GpuState {
             size: size.as_vec2(),    // Convert to float for GPU
             flip_x: false,
         };
+        let instance_index = self.sprite_pipeline.instance_count();
         self.sprite_pipeline.add_sprite(instance);
+        self.record_sprite_draw_batch(GpuSpriteBatchKey::Default, instance_index);
     }
 
     pub fn add_sprite_flipped(
@@ -156,7 +181,9 @@ impl GpuState {
             size: size.as_vec2(),
             flip_x,
         };
+        let instance_index = self.sprite_pipeline.instance_count();
         self.sprite_pipeline.add_sprite(instance);
+        self.record_sprite_draw_batch(GpuSpriteBatchKey::Default, instance_index);
     }
 
     pub fn add_sprite_with_texture(
@@ -172,14 +199,25 @@ impl GpuState {
             size: size.as_vec2(),
             flip_x: false,
         };
+        let instance_index = self
+            .sprite_pipelines_by_texture
+            .get(&texture_path)
+            .map(|pipeline| pipeline.instance_count())
+            .unwrap_or(0);
         let pipeline = self
             .sprite_pipelines_by_texture
             .entry(texture_path.clone())
             .or_insert_with(|| {
-                SpritePipeline::new(&self.device, &self.queue, self.config.format, texture_path)
+                SpritePipeline::new(
+                    &self.device,
+                    &self.queue,
+                    self.config.format,
+                    texture_path.clone(),
+                )
             });
         pipeline.update_projection(&self.queue, self.current_mvp);
         pipeline.add_sprite(instance);
+        self.record_sprite_draw_batch(GpuSpriteBatchKey::Textured(texture_path), instance_index);
     }
 
     pub fn add_sprite_with_texture_flipped(
@@ -196,14 +234,25 @@ impl GpuState {
             size: size.as_vec2(),
             flip_x,
         };
+        let instance_index = self
+            .sprite_pipelines_by_texture
+            .get(&texture_path)
+            .map(|pipeline| pipeline.instance_count())
+            .unwrap_or(0);
         let pipeline = self
             .sprite_pipelines_by_texture
             .entry(texture_path.clone())
             .or_insert_with(|| {
-                SpritePipeline::new(&self.device, &self.queue, self.config.format, texture_path)
+                SpritePipeline::new(
+                    &self.device,
+                    &self.queue,
+                    self.config.format,
+                    texture_path.clone(),
+                )
             });
         pipeline.update_projection(&self.queue, self.current_mvp);
         pipeline.add_sprite(instance);
+        self.record_sprite_draw_batch(GpuSpriteBatchKey::Textured(texture_path), instance_index);
     }
 
     pub fn add_sprite_with_texture_rgba8(
@@ -221,9 +270,14 @@ impl GpuState {
             size: size.as_vec2(),
             flip_x,
         };
+        let instance_index = self
+            .sprite_pipelines_by_texture
+            .get(&texture_key)
+            .map(|pipeline| pipeline.instance_count())
+            .unwrap_or(0);
         let pipeline = self
             .sprite_pipelines_by_texture
-            .entry(texture_key)
+            .entry(texture_key.clone())
             .or_insert_with(|| {
                 SpritePipeline::from_rgba8(
                     &self.device,
@@ -234,6 +288,7 @@ impl GpuState {
             });
         pipeline.update_projection(&self.queue, self.current_mvp);
         pipeline.add_sprite(instance);
+        self.record_sprite_draw_batch(GpuSpriteBatchKey::Textured(texture_key), instance_index);
     }
 
     pub fn clear_sprites(&mut self) {
@@ -241,6 +296,7 @@ impl GpuState {
         for pipeline in self.sprite_pipelines_by_texture.values_mut() {
             pipeline.clear_sprites();
         }
+        self.sprite_draw_batches.clear();
     }
 
     pub fn clear_text_items(&mut self) {
@@ -378,6 +434,7 @@ impl GpuState {
             tilemap_pipeline,
             sprite_pipeline,
             sprite_pipelines_by_texture: BTreeMap::new(),
+            sprite_draw_batches: Vec::new(),
             world_underlay_pipeline,
             debug_pipeline,
             ui_rect_pipeline,
@@ -469,6 +526,7 @@ impl GpuState {
             tilemap_pipeline,
             sprite_pipeline,
             sprite_pipelines_by_texture: BTreeMap::new(),
+            sprite_draw_batches: Vec::new(),
             world_underlay_pipeline,
             debug_pipeline,
             ui_rect_pipeline,

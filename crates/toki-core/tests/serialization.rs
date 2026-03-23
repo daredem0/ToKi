@@ -18,6 +18,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(100),
@@ -95,6 +96,7 @@ fn create_test_entity() -> Entity {
         palette_override: None,
         animation_controller: Some(controller),
         static_object_render: None,
+            grounding: Default::default(),
         render_layer: 2,
         active: true,
         can_move: true,

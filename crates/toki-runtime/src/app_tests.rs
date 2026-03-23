@@ -48,6 +48,7 @@ fn write_player_definition(project_path: &std::path::Path, name: &str) {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+                grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(100),

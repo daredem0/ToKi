@@ -1,9 +1,17 @@
 //! Component section rendering for entity editor.
 
 use crate::ui::EditorUI;
+use toki_core::entity::EntityFootprint;
 use toki_core::entity::AiBehavior;
 
 use super::widgets::{render_sfx_dropdown, show_field_error};
+
+fn sync_grounding_footprint(edit: &mut crate::ui::editor_ui::EntityEditState) {
+    edit.definition.rendering.grounding.footprint = Some(EntityFootprint::new(
+        edit.definition.collision.offset,
+        edit.definition.collision.size,
+    ));
+}
 
 pub fn render_component_toggles(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.heading("Components");
@@ -54,6 +62,7 @@ fn render_collision_settings(ui: &mut egui::Ui, edit: &mut crate::ui::editor_ui:
             ))
             .changed()
         {
+            sync_grounding_footprint(edit);
             edit.mark_dirty();
         }
         ui.label(",");
@@ -63,6 +72,7 @@ fn render_collision_settings(ui: &mut egui::Ui, edit: &mut crate::ui::editor_ui:
             ))
             .changed()
         {
+            sync_grounding_footprint(edit);
             edit.mark_dirty();
         }
     });
@@ -77,6 +87,7 @@ fn render_collision_settings(ui: &mut egui::Ui, edit: &mut crate::ui::editor_ui:
             .changed()
         {
             edit.definition.collision.size[0] = w.max(1) as u32;
+            sync_grounding_footprint(edit);
             edit.mark_dirty();
         }
         ui.label("x");
@@ -85,6 +96,7 @@ fn render_collision_settings(ui: &mut egui::Ui, edit: &mut crate::ui::editor_ui:
             .changed()
         {
             edit.definition.collision.size[1] = h.max(1) as u32;
+            sync_grounding_footprint(edit);
             edit.mark_dirty();
         }
     });

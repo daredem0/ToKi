@@ -126,16 +126,18 @@ impl<'a> RenderQueryFacade<'a> {
             .filter_map(|&entity_id| {
                 let entity = self.entity_manager.get_entity(entity_id)?;
                 let is_visible = entity.attributes.visible;
-                let has_animation = entity.attributes.animation_controller.is_some();
+                let is_renderable = entity.attributes.animation_controller.is_some()
+                    || entity.attributes.static_object_render.is_some()
+                    || entity.attributes.projectile.is_some();
 
                 tracing::trace!(
-                    "Entity {}: visible={}, has_animation={}",
+                    "Entity {}: visible={}, is_renderable={}",
                     entity_id,
                     is_visible,
-                    has_animation
+                    is_renderable
                 );
 
-                if is_visible && has_animation {
+                if is_visible && is_renderable {
                     tracing::trace!(
                         "Entity {} is renderable at ({}, {}) with size {}x{}",
                         entity_id,
@@ -249,7 +251,7 @@ impl<'a> RenderQueryFacade<'a> {
                 requests.push(SpriteRenderRequest {
                     origin: SpriteRenderOrigin::AnimatedEntity(entity_id),
                     sort_key: SpriteSortKey {
-                        primary: 0,
+                        primary: entity.ground_contact_y(),
                         secondary: entity.attributes.render_layer,
                         sequence: animated_sequence,
                     },
@@ -272,7 +274,7 @@ impl<'a> RenderQueryFacade<'a> {
                 requests.push(SpriteRenderRequest {
                     origin: SpriteRenderOrigin::StaticEntity(entity_id),
                     sort_key: SpriteSortKey {
-                        primary: 1,
+                        primary: entity.ground_contact_y(),
                         secondary: entity.attributes.render_layer,
                         sequence: static_sequence,
                     },
@@ -293,7 +295,7 @@ impl<'a> RenderQueryFacade<'a> {
                 requests.push(SpriteRenderRequest {
                     origin: SpriteRenderOrigin::Projectile(entity_id),
                     sort_key: SpriteSortKey {
-                        primary: 2,
+                        primary: entity.ground_contact_y(),
                         secondary: entity.attributes.render_layer,
                         sequence: projectile_sequence,
                     },
@@ -489,7 +491,9 @@ impl GameState {
 #[cfg(test)]
 mod tests {
     use super::{GroundShadow, RenderQueryFacade};
-    use crate::entity::{EntityManager, EntityStats, StaticObjectRenderDef};
+    use crate::entity::{
+        EntityFootprint, EntityGrounding, EntityManager, EntityStats, StaticObjectRenderDef,
+    };
 
     #[test]
     fn health_bar_queries_filter_invisible_and_inactive_entities() {
@@ -633,5 +637,57 @@ mod tests {
                 color: [0.0, 0.0, 0.0, 0.28],
             }]
         );
+    }
+
+    #[test]
+    fn sprite_render_requests_sort_entities_by_ground_contact_y() {
+        let mut entity_manager = EntityManager::new();
+        let lower_id = entity_manager.spawn_entity(
+            crate::entity::EntityKind::Npc,
+            glam::IVec2::new(0, 0),
+            glam::UVec2::new(32, 48),
+            crate::entity::EntityAttributes {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "lower".to_string(),
+                }),
+                grounding: EntityGrounding {
+                    origin: Some([16, 47]),
+                    footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
+                },
+                ..crate::entity::EntityAttributes::default()
+            },
+        );
+        let upper_id = entity_manager.spawn_entity(
+            crate::entity::EntityKind::Npc,
+            glam::IVec2::new(0, 24),
+            glam::UVec2::new(32, 48),
+            crate::entity::EntityAttributes {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "upper".to_string(),
+                }),
+                grounding: EntityGrounding {
+                    origin: Some([16, 47]),
+                    footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
+                },
+                ..crate::entity::EntityAttributes::default()
+            },
+        );
+
+        let facade = RenderQueryFacade::new(&entity_manager, None, false);
+        let mut requests = facade.sprite_render_requests();
+        crate::sprite_render::sort_sprite_render_requests(&mut requests);
+
+        assert_eq!(requests.len(), 2);
+        assert_eq!(
+            requests[0].origin,
+            crate::sprite_render::SpriteRenderOrigin::StaticEntity(lower_id)
+        );
+        assert_eq!(
+            requests[1].origin,
+            crate::sprite_render::SpriteRenderOrigin::StaticEntity(upper_id)
+        );
+        assert!(requests[0].sort_key.primary < requests[1].sort_key.primary);
     }
 }

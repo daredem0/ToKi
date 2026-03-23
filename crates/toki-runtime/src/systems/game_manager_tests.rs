@@ -137,6 +137,7 @@ fn sprite_render_request_wrapper_exposes_object_sheet_backed_entities() {
                 sheet: "items".to_string(),
                 object_name: "coin".to_string(),
             }),
+            grounding: Default::default(),
         },
         attributes: toki_core::entity::AttributesDef {
             health: None,

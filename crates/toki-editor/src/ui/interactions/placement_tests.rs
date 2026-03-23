@@ -25,6 +25,7 @@ fn sample_entity_definition(name: &str) -> EntityDefinition {
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: Default::default(),
         },
         attributes: AttributesDef {
             health: Some(10),

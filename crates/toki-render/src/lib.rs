@@ -4,6 +4,7 @@ mod errors;
 mod gpu;
 mod pipelines;
 mod scene;
+mod sprite_batch_order;
 mod targets;
 mod text;
 mod texture;

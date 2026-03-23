@@ -5,8 +5,9 @@
 use super::builder::EntityBuilder;
 use super::types::{
     AiBehavior, AiConfig, ControlRole, Entity, EntityAttributes, EntityAudioComponent,
-    EntityAudioSettings, EntityId, EntityKind, EntityStats, Inventory, MovementProfile,
-    MovementSoundTrigger, PickupDef, PrimaryProjectileDef, StaticObjectRenderDef, HEALTH_STAT_ID,
+    EntityAudioSettings, EntityGrounding, EntityId, EntityKind, EntityStats, Inventory,
+    MovementProfile, MovementSoundTrigger, PickupDef, PrimaryProjectileDef,
+    StaticObjectRenderDef, HEALTH_STAT_ID,
 };
 use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use crate::collision::CollisionBox;
@@ -48,6 +49,8 @@ pub struct RenderingDef {
     pub palette_override: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub static_object: Option<StaticObjectRenderDef>,
+    #[serde(default, skip_serializing_if = "EntityGrounding::is_empty")]
+    pub grounding: EntityGrounding,
 }
 
 /// Wire format for deserializing attributes with backward compatibility
@@ -218,8 +221,9 @@ impl EntityDefinition {
     pub fn create_entity(&self, position: IVec2, entity_id: EntityId) -> Result<Entity, String> {
         let entity_kind = Self::runtime_entity_kind_for_category(&self.category);
         let animation_controller = self.build_animation_controller()?;
-        let attributes = self.build_attributes(animation_controller);
-        let collision_box = self.build_collision_box();
+        let grounding = self.build_grounding();
+        let attributes = self.build_attributes(animation_controller, grounding.clone());
+        let collision_box = self.build_collision_box(&grounding);
         let audio = self.build_audio_settings();
 
         let entity = EntityBuilder::new(
@@ -279,6 +283,7 @@ impl EntityDefinition {
     fn build_attributes(
         &self,
         animation_controller: Option<AnimationController>,
+        grounding: EntityGrounding,
     ) -> EntityAttributes {
         let stats = self.build_stats();
         let mut attributes = EntityAttributes {
@@ -304,6 +309,7 @@ impl EntityDefinition {
             primary_projectile: self.attributes.primary_projectile.clone(),
             projectile: None,
             static_object_render: self.rendering.static_object.clone(),
+            grounding,
             pickup: self.attributes.pickup.clone(),
             inventory: Inventory::default(),
             has_inventory: self.attributes.has_inventory,
@@ -327,11 +333,29 @@ impl EntityDefinition {
         stats
     }
 
-    fn build_collision_box(&self) -> Option<CollisionBox> {
+    fn build_grounding(&self) -> EntityGrounding {
+        let mut grounding = self.rendering.grounding.clone();
+        if grounding.footprint.is_none() {
+            grounding.footprint = Some(self.legacy_collision_footprint());
+        }
+        grounding
+    }
+
+    fn legacy_collision_footprint(&self) -> super::types::EntityFootprint {
+        super::types::EntityFootprint::new(
+            [self.collision.offset[0], self.collision.offset[1]],
+            [self.collision.size[0], self.collision.size[1]],
+        )
+    }
+
+    fn build_collision_box(&self, grounding: &EntityGrounding) -> Option<CollisionBox> {
         if self.collision.enabled {
+            let footprint = grounding
+                .footprint
+                .unwrap_or_else(|| self.legacy_collision_footprint());
             Some(CollisionBox::new(
-                IVec2::new(self.collision.offset[0], self.collision.offset[1]),
-                UVec2::new(self.collision.size[0], self.collision.size[1]),
+                IVec2::new(footprint.offset[0], footprint.offset[1]),
+                UVec2::new(footprint.size[0], footprint.size[1]),
                 self.collision.trigger,
             ))
         } else {
@@ -396,14 +420,12 @@ impl EntityDefinition {
     /// Get collision box from entity definition without creating full entity.
     /// Useful for placement validation.
     pub fn get_collision_box(&self) -> Option<CollisionBox> {
-        if self.collision.enabled {
-            Some(CollisionBox::new(
-                IVec2::new(self.collision.offset[0], self.collision.offset[1]),
-                UVec2::new(self.collision.size[0], self.collision.size[1]),
-                self.collision.trigger,
-            ))
-        } else {
-            None
-        }
+        let grounding = self.build_grounding();
+        self.build_collision_box(&grounding)
+    }
+
+    /// Resolve the effective grounding that runtime entities spawned from this definition use.
+    pub fn get_grounding(&self) -> EntityGrounding {
+        self.build_grounding()
     }
 }

@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use toki_core::entity::{
     AiConfig, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
+    EntityGrounding,
     MovementProfile, MovementSoundTrigger, PickupDef, PrimaryProjectileDef, RenderingDef,
 };
 
@@ -45,6 +46,7 @@ pub fn create_default_definition(
             has_shadow: true,
             palette_override: None,
             static_object: None,
+            grounding: EntityGrounding::default(),
         },
         attributes: AttributesDef {
             health: None,
