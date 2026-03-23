@@ -9,6 +9,21 @@ repository.workspace = true
 homepage.workspace = true
 readme.workspace = true
 
+[package.metadata.deb]
+maintainer = "f.leuze@outlook.de"
+depends = "libasound2"
+recommends = "libvulkan1"
+section = "devel"
+priority = "optional"
+assets = [
+    ["../../target/release/toki-editor", "usr/bin/toki-editor", "755"],
+    ["../../target/release/toki-runtime", "usr/bin/toki-runtime", "755"],
+    ["../../LICENSE-TOKI.md", "usr/share/doc/toki-editor/LICENSE-TOKI.md", "644"],
+    ["../../THIRD_PARTY_LICENSES.md", "usr/share/doc/toki-editor/THIRD_PARTY_LICENSES.md", "644"],
+    ["../../packaging/toki-editor.desktop", "usr/share/applications/toki-editor.desktop", "644"],
+    ["../../packaging/toki-editor.png", "usr/share/icons/hicolor/128x128/apps/toki-editor.png", "644"],
+]
+
 [features]
 default = ["editor"]
 editor = []

@@ -202,6 +202,65 @@ fn build_runtime_launch_args_omits_absent_optional_values() {
 }
 
 #[test]
+fn discover_runtime_binary_prefers_persisted_path_then_bundled_then_workspace_release() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let persisted = temp.path().join("configured-runtime");
+    let bundled_dir = temp.path().join("bundle");
+    let bundled_exe = bundled_dir.join(EditorApp::runtime_binary_name());
+    let workspace_root = temp.path().join("workspace");
+    let workspace_release = workspace_root
+        .join("target")
+        .join("release")
+        .join(EditorApp::runtime_binary_name());
+    std::fs::create_dir_all(&bundled_dir).expect("bundled dir");
+    std::fs::create_dir_all(workspace_release.parent().expect("release dir"))
+        .expect("workspace release dir");
+
+    std::fs::write(&workspace_release, "workspace").expect("workspace runtime");
+    let discovered = EditorApp::discover_runtime_binary_from_sources(
+        Some(persisted.as_path()),
+        Some(bundled_exe.as_path()),
+        &workspace_root,
+    )
+    .expect("workspace runtime should be found");
+    assert_eq!(discovered, workspace_release);
+
+    std::fs::write(&bundled_exe, "bundled").expect("bundled runtime");
+    let discovered = EditorApp::discover_runtime_binary_from_sources(
+        Some(persisted.as_path()),
+        Some(bundled_exe.as_path()),
+        &workspace_root,
+    )
+    .expect("bundled runtime should be found");
+    assert_eq!(discovered, bundled_exe);
+
+    std::fs::write(&persisted, "configured").expect("configured runtime");
+    let discovered = EditorApp::discover_runtime_binary_from_sources(
+        Some(persisted.as_path()),
+        Some(bundled_exe.as_path()),
+        &workspace_root,
+    )
+    .expect("configured runtime should be found");
+    assert_eq!(discovered, persisted);
+}
+
+#[test]
+fn runtime_discovery_error_message_lists_all_candidates() {
+    let candidates = vec![
+        PathBuf::from("/tmp/runtime-configured"),
+        PathBuf::from("/opt/toki/toki-runtime"),
+        PathBuf::from("/workspace/target/release/toki-runtime"),
+    ];
+
+    let message = EditorApp::runtime_discovery_error_message(&candidates);
+
+    assert!(message.contains("Could not find a ToKi runtime binary for export."));
+    assert!(message.contains("/tmp/runtime-configured"));
+    assert!(message.contains("/opt/toki/toki-runtime"));
+    assert!(message.contains("/workspace/target/release/toki-runtime"));
+}
+
+#[test]
 fn suggested_new_project_parent_path_uses_current_project_parent_directory() {
     let current_project_path = std::path::Path::new("/tmp/projects/MyGame");
 

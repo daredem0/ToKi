@@ -1,0 +1,37 @@
+pkgname=toki-editor-bin
+pkgver=${PKGVER:-0.0.0}
+pkgrel=${PKGREL:-1}
+pkgdesc="Visual editor for creating top-down Game Boy-style games"
+arch=('x86_64')
+url="https://github.com/daredem0/ToKi"
+license=('custom')
+depends=('alsa-lib')
+optdepends=('vulkan-icd-loader: Vulkan rendering support')
+provides=('toki-editor' 'toki-runtime')
+conflicts=('toki-editor')
+source=(
+  "toki-editor"
+  "toki-runtime"
+  "LICENSE-TOKI.md"
+  "THIRD_PARTY_LICENSES.md"
+  "toki-editor.desktop"
+  "toki-editor.png"
+)
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+build() {
+  :
+}
+
+package() {
+  install -Dm755 "${srcdir}/toki-editor" "${pkgdir}/usr/bin/toki-editor"
+  install -Dm755 "${srcdir}/toki-runtime" "${pkgdir}/usr/bin/toki-runtime"
+  install -Dm644 "${srcdir}/LICENSE-TOKI.md" \
+    "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE-TOKI.md"
+  install -Dm644 "${srcdir}/THIRD_PARTY_LICENSES.md" \
+    "${pkgdir}/usr/share/licenses/${pkgname}/THIRD_PARTY_LICENSES.md"
+  install -Dm644 "${srcdir}/toki-editor.desktop" \
+    "${pkgdir}/usr/share/applications/toki-editor.desktop"
+  install -Dm644 "${srcdir}/toki-editor.png" \
+    "${pkgdir}/usr/share/icons/hicolor/128x128/apps/toki-editor.png"
+}

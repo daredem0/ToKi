@@ -49,3 +49,25 @@ fn grid_settings_serializes_as_2d_grid_size() {
     let json = serde_json::to_string(&config).expect("editor config should serialize to json");
     assert!(json.contains("\"grid_size\":[8,12]"));
 }
+
+#[test]
+fn editor_config_defaults_runtime_binary_path_to_none() {
+    let config = EditorConfig::default();
+    assert!(config.current_runtime_binary_path().is_none());
+}
+
+#[test]
+fn editor_config_serializes_and_deserializes_runtime_binary_path() {
+    let mut config = EditorConfig::default();
+    config.set_runtime_binary_path(Some(std::path::PathBuf::from(
+        "/tmp/toki-runtime",
+    )));
+
+    let json = serde_json::to_string(&config).expect("config should serialize");
+    let parsed: EditorConfig = serde_json::from_str(&json).expect("config should deserialize");
+
+    assert_eq!(
+        parsed.current_runtime_binary_path(),
+        Some(&std::path::PathBuf::from("/tmp/toki-runtime"))
+    );
+}

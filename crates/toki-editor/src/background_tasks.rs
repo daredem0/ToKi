@@ -3,11 +3,9 @@ use crate::project::ProjectAssets;
 use crate::validation::AssetValidator;
 use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::thread::JoinHandle;
-use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackgroundTaskKind {
@@ -50,7 +48,7 @@ pub enum BackgroundTaskUpdate {
 #[derive(Debug, Clone)]
 pub struct ExportBundleJob {
     pub project: Project,
-    pub workspace_root: PathBuf,
+    pub runtime_binary_path: PathBuf,
     pub export_root: PathBuf,
     pub startup_scene: Option<String>,
     pub splash_duration_ms: u64,
@@ -210,33 +208,38 @@ fn run_export_bundle_job(
     sender: mpsc::Sender<WorkerMessage>,
 ) -> TaskResult {
     let _ = sender.send(WorkerMessage::Progress(
-        "Building runtime for game export".to_string(),
+        "Preparing export bundle".to_string(),
     ));
 
-    match build_runtime_binary_for_export(&job.workspace_root, &cancel_flag) {
-        Ok(runtime_binary_path) => {
-            if cancel_flag.load(Ordering::SeqCst) {
-                return TaskResult::Cancelled;
-            }
+    if cancel_flag.load(Ordering::SeqCst) {
+        return TaskResult::Cancelled;
+    }
 
-            let _ = sender.send(WorkerMessage::Progress(
-                "Writing runtime pack and config".to_string(),
-            ));
-            match crate::project::export::export_hybrid_bundle(
-                &job.project,
-                &runtime_binary_path,
-                &job.export_root,
-                job.startup_scene.as_deref(),
-                job.splash_duration_ms,
-            ) {
-                Ok(bundle_dir) => {
-                    TaskResult::Completed(format!("Exported game to '{}'", bundle_dir.display()))
-                }
-                Err(error) => TaskResult::Failed(format!("Game export failed: {}", error)),
-            }
+    let _ = sender.send(WorkerMessage::Progress(
+        format!(
+            "Using runtime binary '{}'",
+            job.runtime_binary_path.display()
+        ),
+    ));
+
+    if cancel_flag.load(Ordering::SeqCst) {
+        return TaskResult::Cancelled;
+    }
+
+    let _ = sender.send(WorkerMessage::Progress(
+        "Writing runtime pack and config".to_string(),
+    ));
+    match crate::project::export::export_hybrid_bundle(
+        &job.project,
+        &job.runtime_binary_path,
+        &job.export_root,
+        job.startup_scene.as_deref(),
+        job.splash_duration_ms,
+    ) {
+        Ok(bundle_dir) => {
+            TaskResult::Completed(format!("Exported game to '{}'", bundle_dir.display()))
         }
-        Err(BuildRuntimeError::Cancelled) => TaskResult::Cancelled,
-        Err(BuildRuntimeError::Failed(error)) => TaskResult::Failed(error),
+        Err(error) => TaskResult::Failed(format!("Game export failed: {}", error)),
     }
 }
 
@@ -266,70 +269,6 @@ fn run_validate_assets_job(
     match validator.validate_project_assets(&project_assets) {
         Ok(()) => TaskResult::Completed("Asset validation finished successfully".to_string()),
         Err(error) => TaskResult::Failed(format!("Asset validation failed: {}", error)),
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum BuildRuntimeError {
-    Cancelled,
-    Failed(String),
-}
-
-fn build_runtime_binary_for_export(
-    workspace_root: &std::path::Path,
-    cancel_flag: &Arc<AtomicBool>,
-) -> Result<PathBuf, BuildRuntimeError> {
-    let mut child = Command::new("cargo")
-        .current_dir(workspace_root)
-        .arg("build")
-        .arg("-p")
-        .arg("toki-runtime")
-        .spawn()
-        .map_err(|error| {
-            BuildRuntimeError::Failed(format!("Failed to launch cargo build: {}", error))
-        })?;
-
-    loop {
-        if cancel_flag.load(Ordering::SeqCst) {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(BuildRuntimeError::Cancelled);
-        }
-
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                if !status.success() {
-                    return Err(BuildRuntimeError::Failed(format!(
-                        "cargo build -p toki-runtime failed with status {}",
-                        status
-                    )));
-                }
-
-                let runtime_binary_name = if cfg!(target_os = "windows") {
-                    "toki-runtime.exe"
-                } else {
-                    "toki-runtime"
-                };
-                let runtime_binary_path = workspace_root
-                    .join("target")
-                    .join("debug")
-                    .join(runtime_binary_name);
-                if !runtime_binary_path.exists() {
-                    return Err(BuildRuntimeError::Failed(format!(
-                        "Runtime binary not found after build: {}",
-                        runtime_binary_path.display()
-                    )));
-                }
-                return Ok(runtime_binary_path);
-            }
-            Ok(None) => std::thread::sleep(Duration::from_millis(100)),
-            Err(error) => {
-                return Err(BuildRuntimeError::Failed(format!(
-                    "Failed while waiting for cargo build: {}",
-                    error
-                )))
-            }
-        }
     }
 }
 

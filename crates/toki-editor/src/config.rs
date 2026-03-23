@@ -10,6 +10,10 @@ pub struct EditorConfig {
     /// Path to the current project folder
     pub project_path: Option<PathBuf>,
 
+    /// Optional user-selected runtime binary path used for export/runtime discovery.
+    #[serde(default)]
+    pub runtime_binary_path: Option<PathBuf>,
+
     /// Editor UI settings
     pub editor_settings: EditorSettings,
 
@@ -128,6 +132,7 @@ impl Default for EditorConfig {
     fn default() -> Self {
         Self {
             project_path: None,
+            runtime_binary_path: None,
             editor_settings: EditorSettings::default(),
             recent_projects: Vec::new(),
             rendering: RenderingSettings::default(),
@@ -263,6 +268,16 @@ impl EditorConfig {
     /// Get current project path
     pub fn current_project_path(&self) -> Option<&PathBuf> {
         self.project_path.as_ref()
+    }
+
+    /// Set or clear the persisted runtime binary path used for export discovery.
+    pub fn set_runtime_binary_path(&mut self, path: Option<PathBuf>) {
+        self.runtime_binary_path = path;
+    }
+
+    /// Get the persisted runtime binary path, if any.
+    pub fn current_runtime_binary_path(&self) -> Option<&PathBuf> {
+        self.runtime_binary_path.as_ref()
     }
 
     /// Check if a project path is set

@@ -11,10 +11,11 @@
   <img src="./assets/TokiLogo.png" alt="ToKi Logo" width="320" />
 </p>
 
-**ToKi** is a lightweight 2D game engine and editor for Game Boy-style top-down games.  
-It is aimed at small, self-contained pixel-art projects that want an integrated workflow for gameplay code, authored assets, scene editing, map editing, runtime UI, and export.
+**ToKi** is a fully data-driven 2D game engine and editor for Game Boy-style top-down games. Design your entire game — entities, scenes, rules, AI, maps, menus, and all gameplay logic — inside a visual editor, then export a ready-to-play build. **No programming required.**
 
-The project is built as a modular Rust workspace with a shared core, a renderer, a runtime application, and a GUI-first editor. The overall direction is an engine that provides reusable building blocks instead of hardcoded game-specific features, while still staying focused on retro-style top-down games rather than trying to be a fully general-purpose engine.
+The runtime is a generic interpreter: it reads JSON project data and a `.toki.pak` archive at startup and executes the game from that data alone. The same runtime binary runs any ToKi game without recompilation. This means shipping a game is as simple as pairing the editor-authored data with the pre-built runtime.
+
+ToKi is aimed at small, self-contained pixel-art projects that want an integrated workflow for asset authoring, scene editing, map editing, runtime UI, and export — all from one tool. The project is built as a modular Rust workspace with a shared core, a renderer, a runtime application, and a GUI-first editor. It provides reusable building blocks instead of hardcoded game-specific features, while staying focused on retro-style top-down games rather than trying to be a general-purpose engine.
 
 **Status:** ToKi is still a work in progress. The core architecture and many major systems are in place, but the engine is still evolving and some areas are incomplete, being actively refactored, or not yet stabilized.
 

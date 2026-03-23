@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=ToKi Editor
+Comment=Visual editor for creating top-down Game Boy-style games
+Exec=toki-editor
+Icon=toki-editor
+Terminal=false
+Categories=Development;GameDevelopment;
+StartupNotify=true
