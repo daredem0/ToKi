@@ -91,6 +91,9 @@ fn render_dialog_main(
         dirty |= ui.text_edit_singleline(&mut dialog.entry_node_id).changed();
     });
     dirty |= ui.checkbox(&mut dialog.allow_cancel, "Allow Cancel").changed();
+    dirty |= ui
+        .checkbox(&mut dialog.gate_gameplay, "Gate Gameplay While Dialog Is Open")
+        .changed();
 
     let validation = dialog.validate();
     if !validation.errors.is_empty() {

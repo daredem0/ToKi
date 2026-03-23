@@ -17,6 +17,17 @@ impl UiRect {
     pub fn center_y(&self) -> f32 {
         self.y + self.height * 0.5
     }
+
+    pub fn inset(&self, amount: f32) -> Self {
+        let inset = amount.max(0.0);
+        let double = inset * 2.0;
+        Self {
+            x: self.x + inset,
+            y: self.y + inset,
+            width: (self.width - double).max(0.0),
+            height: (self.height - double).max(0.0),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -41,6 +52,7 @@ pub struct UiBlock {
     pub rect: UiRect,
     pub fill_color: Option<[f32; 4]>,
     pub border_color: Option<[f32; 4]>,
+    pub border_thickness: f32,
     pub text: Option<UiTextBlock>,
 }
 

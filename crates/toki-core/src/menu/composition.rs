@@ -54,6 +54,7 @@ pub fn compose_menu_ui(layout: &MenuLayout, appearance: &MenuAppearance) -> UiCo
             appearance.opacity_percent,
         ),
         border_color: menu_border_color(appearance.border_style, border_color, opacity_alpha),
+        border_thickness: appearance.border_thickness_px as f32,
         text: None,
     });
 
@@ -66,6 +67,7 @@ pub fn compose_menu_ui(layout: &MenuLayout, appearance: &MenuAppearance) -> UiCo
             appearance.opacity_percent,
         ),
         border_color: menu_border_color(layout.title.border_style, border_color, opacity_alpha),
+        border_thickness: appearance.border_thickness_px as f32,
         text: Some(UiTextBlock {
             content: layout.title.text.clone(),
             position: glam::Vec2::new(layout.title.rect.center_x(), layout.title.rect.y + 10.0),
@@ -90,6 +92,7 @@ pub fn compose_menu_ui(layout: &MenuLayout, appearance: &MenuAppearance) -> UiCo
                 appearance.opacity_percent,
             ),
             border_color: menu_border_color(entry.border_style, border_color, opacity_alpha),
+            border_thickness: appearance.border_thickness_px as f32,
             text: Some(UiTextBlock {
                 content: if entry.selected {
                     format!("> {}", entry.text)
@@ -109,6 +112,7 @@ pub fn compose_menu_ui(layout: &MenuLayout, appearance: &MenuAppearance) -> UiCo
         rect: layout.hint.rect,
         fill_color: None,
         border_color: None,
+        border_thickness: 0.0,
         text: Some(UiTextBlock {
             content: layout.hint.text.clone(),
             position: glam::Vec2::new(layout.hint.rect.center_x(), layout.hint.rect.y + 4.0),
@@ -161,6 +165,7 @@ pub fn compose_dialog_ui(layout: &MenuDialogLayout, appearance: &MenuAppearance)
             appearance.opacity_percent,
         ),
         border_color: menu_border_color(appearance.border_style, border_color, opacity_alpha),
+        border_thickness: appearance.border_thickness_px as f32,
         text: None,
     });
 
@@ -174,6 +179,7 @@ pub fn compose_dialog_ui(layout: &MenuDialogLayout, appearance: &MenuAppearance)
                 appearance.opacity_percent,
             ),
             border_color: menu_border_color(block.border_style, border_color, opacity_alpha),
+            border_thickness: appearance.border_thickness_px as f32,
             text: Some(UiTextBlock {
                 content: block.text.clone(),
                 position: glam::Vec2::new(block.rect.center_x(), block.rect.y + 10.0),
@@ -198,6 +204,7 @@ pub fn compose_dialog_ui(layout: &MenuDialogLayout, appearance: &MenuAppearance)
                 appearance.opacity_percent,
             ),
             border_color: menu_border_color(entry.border_style, border_color, opacity_alpha),
+            border_thickness: appearance.border_thickness_px as f32,
             text: Some(UiTextBlock {
                 content: if entry.selected {
                     format!("> {}", entry.text)

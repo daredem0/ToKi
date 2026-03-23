@@ -66,6 +66,13 @@ impl DialogController {
         self.active.as_ref().map(|active| active.dialog_id.as_str())
     }
 
+    pub fn active_dialog_gates_gameplay(&self) -> bool {
+        self.active
+            .as_ref()
+            .and_then(|active| self.dialogs.get(&active.dialog_id))
+            .is_some_and(|dialog| dialog.gate_gameplay)
+    }
+
     pub fn start_dialog(
         &mut self,
         game_state: &GameState,
@@ -301,6 +308,31 @@ impl DialogController {
         self.handle_input(MenuInput::Confirm, game_state)
     }
 
+    pub fn select_entry(&mut self, entry_index: usize) {
+        let Some(active) = self.active.as_mut() else {
+            return;
+        };
+        let Some(dialog) = self.dialogs.get(&active.dialog_id) else {
+            return;
+        };
+        let Some(node) = dialog.node(&active.current_node_id) else {
+            return;
+        };
+        let max_index = match &node.kind {
+            DialogNodeKind::Choice { choices, .. } => {
+                choices.len() + usize::from(dialog.allow_cancel)
+            }
+            DialogNodeKind::Line { .. } | DialogNodeKind::End { .. } => {
+                1 + usize::from(dialog.allow_cancel)
+            }
+            DialogNodeKind::Branch { .. } => 0,
+        };
+        if max_index == 0 {
+            return;
+        }
+        active.selected_index = entry_index.min(max_index - 1);
+    }
+
     fn resolve_branches(&mut self, game_state: &GameState) {
         for _ in 0..32 {
             let Some(active) = self.active.as_mut() else {
@@ -442,6 +474,7 @@ mod tests {
             title: "Intro".to_string(),
             entry_node_id: "start".to_string(),
             allow_cancel: true,
+            gate_gameplay: true,
             nodes: vec![
                 DialogNode {
                     id: "start".to_string(),
@@ -498,6 +531,7 @@ mod tests {
             title: "Choices".to_string(),
             entry_node_id: "start".to_string(),
             allow_cancel: true,
+            gate_gameplay: true,
             nodes: vec![
                 DialogNode {
                     id: "start".to_string(),
@@ -574,5 +608,18 @@ mod tests {
                 outcome_id: None,
             })
         );
+    }
+
+    #[test]
+    fn dialog_controller_reports_active_gate_gameplay_flag() {
+        let game_state = GameState::new_empty();
+        let mut dialog = simple_dialog();
+        dialog.gate_gameplay = false;
+        let mut controller = DialogController::new(vec![dialog]);
+        controller
+            .start_dialog(&game_state, "intro", DialogRuntimeContext::default())
+            .expect("dialog should start");
+
+        assert!(!controller.active_dialog_gates_gameplay());
     }
 }

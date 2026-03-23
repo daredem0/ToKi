@@ -27,6 +27,9 @@ pub const DEFAULT_FOOTER_SPACING_PX: u16 = 16;
 /// Default menu opacity (100 = fully opaque).
 pub const DEFAULT_OPACITY_PERCENT: u16 = 100;
 
+/// Default border thickness in pixels.
+pub const DEFAULT_BORDER_THICKNESS_PX: u16 = 2;
+
 /// Default menu border color (green tint).
 pub const DEFAULT_BORDER_COLOR: &str = "#7CFF7C";
 
@@ -83,6 +86,10 @@ pub fn default_menu_footer_spacing_px() -> u16 {
 
 pub fn default_menu_opacity_percent() -> u16 {
     DEFAULT_OPACITY_PERCENT
+}
+
+pub fn default_menu_border_thickness_px() -> u16 {
+    DEFAULT_BORDER_THICKNESS_PX
 }
 
 pub fn default_menu_border_color_hex() -> String {

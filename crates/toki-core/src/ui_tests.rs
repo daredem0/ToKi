@@ -39,6 +39,7 @@ fn ui_composition_preserves_block_order() {
         },
         fill_color: Some([0.1, 0.2, 0.3, 1.0]),
         border_color: None,
+        border_thickness: 0.0,
         text: None,
     });
     composition.push(UiBlock {
@@ -50,6 +51,7 @@ fn ui_composition_preserves_block_order() {
         },
         fill_color: None,
         border_color: Some([0.9, 0.9, 0.9, 1.0]),
+        border_thickness: 2.0,
         text: Some(UiTextBlock {
             content: "Resume".to_string(),
             position: glam::Vec2::new(68.0, 66.0),

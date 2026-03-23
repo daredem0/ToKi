@@ -316,6 +316,9 @@ impl ApplicationHandler for App {
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.cursor_position = Some(glam::Vec2::new(position.x as f32, position.y as f32));
+                self.handle_menu_pointer_hover(
+                    glam::Vec2::new(position.x as f32, position.y as f32),
+                );
             }
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,

@@ -560,6 +560,7 @@ fn compose_runtime_settings_ui(
             },
             fill_color: Some(track),
             border_color: None,
+            border_thickness: 0.0,
             text: None,
         });
         composition.push(UiBlock {
@@ -571,6 +572,7 @@ fn compose_runtime_settings_ui(
             },
             fill_color: Some(accent),
             border_color: None,
+            border_thickness: 0.0,
             text: None,
         });
     }

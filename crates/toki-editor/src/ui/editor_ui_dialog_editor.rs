@@ -27,6 +27,7 @@ impl DialogEditorState {
                 title: "New Dialog".to_string(),
                 entry_node_id: start_id.clone(),
                 allow_cancel: true,
+                gate_gameplay: true,
                 nodes: vec![
                     DialogNode {
                         id: start_id,
@@ -136,6 +137,7 @@ mod tests {
             title: String::new(),
             entry_node_id: "end".to_string(),
             allow_cancel: true,
+            gate_gameplay: true,
             nodes: vec![DialogNode {
                 id: "end".to_string(),
                 speaker_name: None,

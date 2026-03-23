@@ -115,6 +115,12 @@ impl InspectorSystem {
             .default_open(false)
             .show(ui, |ui| {
                 ctx.changed |= Self::render_opacity_slider(ui, &mut ctx.appearance.opacity_percent);
+                ctx.changed |= Self::render_drag_value(
+                    ui,
+                    "Border Thickness",
+                    &mut ctx.appearance.border_thickness_px,
+                    1..=12,
+                );
                 ctx.changed |=
                     Self::render_border_style_combo(ui, &mut ctx.appearance.border_style);
                 ctx.changed |= Self::render_hex_color_field(

@@ -7,6 +7,10 @@ fn default_allow_cancel() -> bool {
     true
 }
 
+fn default_gate_gameplay() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DialogTree {
     pub id: String,
@@ -15,6 +19,8 @@ pub struct DialogTree {
     pub entry_node_id: String,
     #[serde(default = "default_allow_cancel")]
     pub allow_cancel: bool,
+    #[serde(default = "default_gate_gameplay")]
+    pub gate_gameplay: bool,
     #[serde(default)]
     pub nodes: Vec<DialogNode>,
 }
@@ -324,6 +330,7 @@ mod tests {
             title: "Intro".to_string(),
             entry_node_id: "start".to_string(),
             allow_cancel: true,
+            gate_gameplay: true,
             nodes: vec![
                 DialogNode {
                     id: "start".to_string(),
@@ -356,6 +363,7 @@ mod tests {
             title: String::new(),
             entry_node_id: "start".to_string(),
             allow_cancel: true,
+            gate_gameplay: true,
             nodes: vec![
                 DialogNode {
                     id: "start".to_string(),
@@ -391,6 +399,7 @@ mod tests {
             title: String::new(),
             entry_node_id: "start".to_string(),
             allow_cancel: true,
+            gate_gameplay: true,
             nodes: vec![
                 DialogNode {
                     id: "start".to_string(),

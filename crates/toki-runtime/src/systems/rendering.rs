@@ -488,13 +488,14 @@ impl RenderingSystem {
                 );
             }
             if let Some(border) = block.border_color {
-                self.add_ui_rect(
-                    block.rect.x,
-                    block.rect.y,
-                    block.rect.width,
-                    block.rect.height,
-                    border,
-                );
+                let passes = block.border_thickness.max(1.0).round() as u32;
+                for pass in 0..passes {
+                    let rect = block.rect.inset(pass as f32);
+                    if rect.width <= 0.0 || rect.height <= 0.0 {
+                        break;
+                    }
+                    self.add_ui_rect(rect.x, rect.y, rect.width, rect.height, border);
+                }
             }
             if let Some(text) = &block.text {
                 self.add_text_item(text.to_text_item());

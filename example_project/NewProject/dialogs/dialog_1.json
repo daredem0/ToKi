@@ -3,6 +3,7 @@
   "title": "Test Dialog",
   "entry_node_id": "start",
   "allow_cancel": true,
+  "gate_gameplay": false,
   "nodes": [
     {
       "id": "start",

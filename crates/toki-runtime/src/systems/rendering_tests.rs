@@ -550,6 +550,7 @@ fn render_ui_composition_dispatches_rectangles_and_text() {
         },
         fill_color: Some([0.1, 0.2, 0.3, 0.8]),
         border_color: Some([0.9, 1.0, 0.9, 1.0]),
+        border_thickness: 2.0,
         text: Some(UiTextBlock {
             content: "Paused".to_string(),
             position: glam::Vec2::new(76.0, 34.0),
@@ -561,7 +562,7 @@ fn render_ui_composition_dispatches_rectangles_and_text() {
 
     rendering.render_ui_composition(&composition);
 
-    assert_eq!(ui_rect_count.get(), 2);
+    assert_eq!(ui_rect_count.get(), 3);
     assert_eq!(text_count.get(), 1);
 }
 

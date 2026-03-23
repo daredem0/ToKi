@@ -17,8 +17,12 @@ impl App {
     }
 
     pub(super) fn should_gate_gameplay_for_menu(&self) -> bool {
-        self.dialog_system.is_open()
-            || (self.menu_system.is_open() && self.menu_system.settings().gate_gameplay_when_open)
+        should_gate_gameplay(
+            self.dialog_system.is_open(),
+            self.dialog_system.active_dialog_gates_gameplay(),
+            self.menu_system.is_open(),
+            self.menu_system.settings().gate_gameplay_when_open,
+        )
     }
 
     pub(super) fn open_pause_menu(&mut self) {
@@ -78,6 +82,45 @@ impl App {
             if let Some(command) = self.menu_system.activate_dialog_entry(entry_index) {
                 self.apply_menu_command(command);
             }
+            return true;
+        }
+        false
+    }
+
+    pub(super) fn handle_menu_pointer_hover(&mut self, position: glam::Vec2) -> bool {
+        let viewport = self
+            .platform
+            .inner_size()
+            .map(|size| glam::Vec2::new(size.width as f32, size.height as f32))
+            .unwrap_or_else(|| {
+                let size = self.camera_system.viewport_size();
+                glam::Vec2::new(size.x as f32, size.y as f32)
+            });
+
+        if self.dialog_system.is_open() {
+            let Some(dialog_view) = self.dialog_system.current_view() else {
+                return false;
+            };
+            let appearance = narrative_dialog_appearance(&self.launch_options).clone();
+            let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
+            if let Some(entry_index) = dialog_entry_at_position(&layout, position) {
+                self.dialog_system.select_entry(entry_index);
+                return true;
+            }
+            return false;
+        }
+
+        if self.runtime_overlay.is_some() || !self.menu_system.is_open() {
+            return false;
+        }
+
+        let Some(dialog_view) = self.menu_system.current_dialog_view() else {
+            return false;
+        };
+        let appearance = self.menu_system.settings().appearance.clone();
+        let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
+        if let Some(entry_index) = dialog_entry_at_position(&layout, position) {
+            self.menu_system.select_dialog_entry(entry_index);
             return true;
         }
         false
@@ -216,6 +259,15 @@ fn narrative_dialog_appearance(
     launch_options: &super::RuntimeLaunchOptions,
 ) -> &toki_core::menu::MenuAppearance {
     &launch_options.dialog_appearance
+}
+
+fn should_gate_gameplay(
+    dialog_open: bool,
+    dialog_gate_gameplay: bool,
+    menu_open: bool,
+    menu_gate_gameplay: bool,
+) -> bool {
+    (dialog_open && dialog_gate_gameplay) || (menu_open && menu_gate_gameplay)
 }
 
 fn dialog_entry_at_position(layout: &MenuDialogLayout, position: glam::Vec2) -> Option<usize> {
@@ -405,5 +457,13 @@ mod tests {
 
         assert_eq!(dialog_entry_at_position(&layout, glam::Vec2::new(20.0, 35.0)), Some(0));
         assert_eq!(dialog_entry_at_position(&layout, glam::Vec2::new(5.0, 5.0)), None);
+    }
+
+    #[test]
+    fn gameplay_gate_requires_active_system_and_enabled_flag() {
+        assert!(!should_gate_gameplay(true, false, false, false));
+        assert!(should_gate_gameplay(true, true, false, false));
+        assert!(!should_gate_gameplay(false, false, true, false));
+        assert!(should_gate_gameplay(false, false, true, true));
     }
 }
