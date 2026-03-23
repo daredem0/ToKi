@@ -484,7 +484,10 @@ mod tests {
     #[test]
     fn effective_paint_color_keeps_truecolor_values() {
         let color = PixelColor::rgb(12, 34, 56);
-        assert_eq!(effective_paint_color(ColorMode::TrueColor, color, None), color);
+        assert_eq!(
+            effective_paint_color(ColorMode::TrueColor, color, None),
+            color
+        );
     }
 
     #[test]

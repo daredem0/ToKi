@@ -3,8 +3,8 @@
 
 use super::editor_ui_animation_authoring::{AnimationAuthoringState, AuthoredClip};
 use std::path::PathBuf;
-use toki_core::assets::atlas::ColorMode;
 use toki_core::animation::ClipPlayback;
+use toki_core::assets::atlas::ColorMode;
 
 /// Viewport state for the atlas canvas view
 #[derive(Debug, Clone)]

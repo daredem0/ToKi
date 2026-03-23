@@ -96,7 +96,10 @@ impl App {
         let appearance = self.menu_system.settings().appearance.clone();
         let layout = build_menu_layout(&menu_view, &appearance, viewport);
         if let Some(entry_index) = menu_entry_at_position(&layout, position) {
-            if self.menu_system.select_screen_view_entry(&inventory, entry_index) {
+            if self
+                .menu_system
+                .select_screen_view_entry(&inventory, entry_index)
+            {
                 if let Some(command) = self.menu_system.handle_input(MenuInput::Confirm) {
                     self.apply_menu_command(command);
                 }
@@ -153,8 +156,10 @@ impl App {
         };
         let appearance = self.menu_system.settings().appearance.clone();
         let layout = build_menu_layout(&menu_view, &appearance, viewport);
-        menu_entry_at_position(&layout, position)
-            .is_some_and(|entry_index| self.menu_system.select_screen_view_entry(&inventory, entry_index))
+        menu_entry_at_position(&layout, position).is_some_and(|entry_index| {
+            self.menu_system
+                .select_screen_view_entry(&inventory, entry_index)
+        })
     }
 
     pub(super) fn handle_menu_pointer_drag(&mut self, position: glam::Vec2) -> bool {
@@ -174,10 +179,11 @@ impl App {
     }
 
     pub(super) fn apply_dialog_start_request(&mut self, request: DialogStartRequest) {
-        if let Err(error) = self
-            .dialog_system
-            .start_dialog(&self.game_system.game_state, &request.dialog_id, request.context)
-        {
+        if let Err(error) = self.dialog_system.start_dialog(
+            &self.game_system.game_state,
+            &request.dialog_id,
+            request.context,
+        ) {
             tracing::warn!(
                 "Failed to start dialog '{}' from rule request: {:?}",
                 request.dialog_id,
@@ -406,7 +412,10 @@ mod tests {
             UiCommand::OpenGraphicsSettings,
         );
 
-        assert_eq!(runtime_overlay, Some(super::super::RuntimeMenuOverlay::graphics()));
+        assert_eq!(
+            runtime_overlay,
+            Some(super::super::RuntimeMenuOverlay::graphics())
+        );
     }
 
     #[test]
@@ -511,8 +520,14 @@ mod tests {
             }],
         };
 
-        assert_eq!(dialog_entry_at_position(&layout, glam::Vec2::new(20.0, 35.0)), Some(0));
-        assert_eq!(dialog_entry_at_position(&layout, glam::Vec2::new(5.0, 5.0)), None);
+        assert_eq!(
+            dialog_entry_at_position(&layout, glam::Vec2::new(20.0, 35.0)),
+            Some(0)
+        );
+        assert_eq!(
+            dialog_entry_at_position(&layout, glam::Vec2::new(5.0, 5.0)),
+            None
+        );
     }
 
     #[test]
@@ -558,8 +573,14 @@ mod tests {
             },
         };
 
-        assert_eq!(menu_entry_at_position(&layout, glam::Vec2::new(20.0, 35.0)), Some(0));
-        assert_eq!(menu_entry_at_position(&layout, glam::Vec2::new(5.0, 5.0)), None);
+        assert_eq!(
+            menu_entry_at_position(&layout, glam::Vec2::new(20.0, 35.0)),
+            Some(0)
+        );
+        assert_eq!(
+            menu_entry_at_position(&layout, glam::Vec2::new(5.0, 5.0)),
+            None
+        );
     }
 
     #[test]

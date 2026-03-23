@@ -6,12 +6,12 @@ use crate::ui::{UiAction, UiRect};
 
 use super::constants::{
     default_gate_gameplay_when_open, default_menu_background_color_hex,
-    default_menu_border_color_hex, default_menu_border_thickness_px, default_menu_button_spacing_px,
-    default_menu_entry_background_color_hex, default_menu_font_family, default_menu_font_size_px,
-    default_menu_footer_spacing_px, default_menu_footer_text, default_menu_height_percent,
-    default_menu_opacity_percent, default_menu_screens, default_menu_text_color_hex,
-    default_menu_title_background_color_hex, default_menu_title_spacing_px,
-    default_menu_width_percent, default_pause_root_screen_id,
+    default_menu_border_color_hex, default_menu_border_thickness_px,
+    default_menu_button_spacing_px, default_menu_entry_background_color_hex,
+    default_menu_font_family, default_menu_font_size_px, default_menu_footer_spacing_px,
+    default_menu_footer_text, default_menu_height_percent, default_menu_opacity_percent,
+    default_menu_screens, default_menu_text_color_hex, default_menu_title_background_color_hex,
+    default_menu_title_spacing_px, default_menu_width_percent, default_pause_root_screen_id,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

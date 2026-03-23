@@ -215,12 +215,10 @@ fn run_export_bundle_job(
         return TaskResult::Cancelled;
     }
 
-    let _ = sender.send(WorkerMessage::Progress(
-        format!(
-            "Using runtime binary '{}'",
-            job.runtime_binary_path.display()
-        ),
-    ));
+    let _ = sender.send(WorkerMessage::Progress(format!(
+        "Using runtime binary '{}'",
+        job.runtime_binary_path.display()
+    )));
 
     if cancel_flag.load(Ordering::SeqCst) {
         return TaskResult::Cancelled;

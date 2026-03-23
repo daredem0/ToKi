@@ -54,7 +54,12 @@ impl ProjectSettingsDraft {
             music_mix_percent: project.metadata.runtime.audio.music_percent,
             movement_mix_percent: project.metadata.runtime.audio.movement_percent,
             collision_mix_percent: project.metadata.runtime.audio.collision_percent,
-            indexed_palette_override: project.metadata.runtime.display.indexed_palette_override.clone(),
+            indexed_palette_override: project
+                .metadata
+                .runtime
+                .display
+                .indexed_palette_override
+                .clone(),
             post_process_mode: project.metadata.runtime.display.post_process.mode,
             post_process_quantize_strategy: project
                 .metadata
@@ -147,57 +152,120 @@ pub fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettin
         project.metadata.runtime.display.post_process.mode = draft.post_process_mode;
         changed = true;
     }
-    if project.metadata.runtime.display.post_process.quantize_strategy
+    if project
+        .metadata
+        .runtime
+        .display
+        .post_process
+        .quantize_strategy
         != draft.post_process_quantize_strategy
     {
-        project.metadata.runtime.display.post_process.quantize_strategy =
-            draft.post_process_quantize_strategy;
+        project
+            .metadata
+            .runtime
+            .display
+            .post_process
+            .quantize_strategy = draft.post_process_quantize_strategy;
         changed = true;
     }
     if project.metadata.runtime.display.post_process.tint_color != draft.post_process_tint_color {
         project.metadata.runtime.display.post_process.tint_color = draft.post_process_tint_color;
         changed = true;
     }
-    if project.metadata.runtime.display.post_process.tint_strength_percent
+    if project
+        .metadata
+        .runtime
+        .display
+        .post_process
+        .tint_strength_percent
         != draft.post_process_tint_strength_percent
     {
-        project.metadata.runtime.display.post_process.tint_strength_percent =
-            draft.post_process_tint_strength_percent;
+        project
+            .metadata
+            .runtime
+            .display
+            .post_process
+            .tint_strength_percent = draft.post_process_tint_strength_percent;
         changed = true;
     }
-    if project.metadata.runtime.display.post_process.brightness_percent
+    if project
+        .metadata
+        .runtime
+        .display
+        .post_process
+        .brightness_percent
         != draft.post_process_brightness_percent
     {
-        project.metadata.runtime.display.post_process.brightness_percent =
-            draft.post_process_brightness_percent;
+        project
+            .metadata
+            .runtime
+            .display
+            .post_process
+            .brightness_percent = draft.post_process_brightness_percent;
         changed = true;
     }
-    if project.metadata.runtime.display.post_process.saturation_percent
+    if project
+        .metadata
+        .runtime
+        .display
+        .post_process
+        .saturation_percent
         != draft.post_process_saturation_percent
     {
-        project.metadata.runtime.display.post_process.saturation_percent =
-            draft.post_process_saturation_percent;
+        project
+            .metadata
+            .runtime
+            .display
+            .post_process
+            .saturation_percent = draft.post_process_saturation_percent;
         changed = true;
     }
-    if project.metadata.runtime.display.post_process.quantize_palette_id
+    if project
+        .metadata
+        .runtime
+        .display
+        .post_process
+        .quantize_palette_id
         != draft.post_process_quantize_palette_id
     {
-        project.metadata.runtime.display.post_process.quantize_palette_id =
-            draft.post_process_quantize_palette_id.clone();
+        project
+            .metadata
+            .runtime
+            .display
+            .post_process
+            .quantize_palette_id = draft.post_process_quantize_palette_id.clone();
         changed = true;
     }
-    if project.metadata.runtime.display.post_process.gb_contrast_percent
+    if project
+        .metadata
+        .runtime
+        .display
+        .post_process
+        .gb_contrast_percent
         != draft.post_process_gb_contrast_percent
     {
-        project.metadata.runtime.display.post_process.gb_contrast_percent =
-            draft.post_process_gb_contrast_percent;
+        project
+            .metadata
+            .runtime
+            .display
+            .post_process
+            .gb_contrast_percent = draft.post_process_gb_contrast_percent;
         changed = true;
     }
-    if project.metadata.runtime.display.post_process.vignette_strength_percent
+    if project
+        .metadata
+        .runtime
+        .display
+        .post_process
+        .vignette_strength_percent
         != draft.post_process_vignette_strength_percent
     {
-        project.metadata.runtime.display.post_process.vignette_strength_percent =
-            draft.post_process_vignette_strength_percent;
+        project
+            .metadata
+            .runtime
+            .display
+            .post_process
+            .vignette_strength_percent = draft.post_process_vignette_strength_percent;
         changed = true;
     }
     if project.metadata.runtime.display.resolution_width != draft.resolution_width {
@@ -299,7 +367,12 @@ mod tests {
         assert!(project.metadata.runtime.display.show_entity_health_bars);
         assert!(!project.metadata.runtime.display.show_ground_shadows);
         assert_eq!(
-            project.metadata.runtime.display.indexed_palette_override.as_deref(),
+            project
+                .metadata
+                .runtime
+                .display
+                .indexed_palette_override
+                .as_deref(),
             Some("gb_swamp")
         );
         assert_eq!(project.metadata.runtime.audio.master_percent, 85);
@@ -311,7 +384,12 @@ mod tests {
             PostProcessMode::Tint
         );
         assert_eq!(
-            project.metadata.runtime.display.post_process.quantize_strategy,
+            project
+                .metadata
+                .runtime
+                .display
+                .post_process
+                .quantize_strategy,
             QuantizeStrategy::RgbDistance
         );
         assert_eq!(
@@ -319,27 +397,57 @@ mod tests {
             [12, 34, 56, 255]
         );
         assert_eq!(
-            project.metadata.runtime.display.post_process.tint_strength_percent,
+            project
+                .metadata
+                .runtime
+                .display
+                .post_process
+                .tint_strength_percent,
             65
         );
         assert_eq!(
-            project.metadata.runtime.display.post_process.brightness_percent,
+            project
+                .metadata
+                .runtime
+                .display
+                .post_process
+                .brightness_percent,
             15
         );
         assert_eq!(
-            project.metadata.runtime.display.post_process.saturation_percent,
+            project
+                .metadata
+                .runtime
+                .display
+                .post_process
+                .saturation_percent,
             140
         );
         assert_eq!(
-            project.metadata.runtime.display.post_process.quantize_palette_id,
+            project
+                .metadata
+                .runtime
+                .display
+                .post_process
+                .quantize_palette_id,
             "poison"
         );
         assert_eq!(
-            project.metadata.runtime.display.post_process.gb_contrast_percent,
+            project
+                .metadata
+                .runtime
+                .display
+                .post_process
+                .gb_contrast_percent,
             12
         );
         assert_eq!(
-            project.metadata.runtime.display.post_process.vignette_strength_percent,
+            project
+                .metadata
+                .runtime
+                .display
+                .post_process
+                .vignette_strength_percent,
             72
         );
         assert!(project.is_dirty);

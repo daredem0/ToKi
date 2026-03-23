@@ -245,11 +245,11 @@ mod tests {
 
     use super::SceneTransitionPlanner;
     use crate::animation::AnimationState;
-    use crate::entity::{EntityFootprint, EntityGrounding};
     use crate::entity::{
         AiConfig, AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef,
         ControlRole, EntityDefinition, MovementProfile, MovementSoundTrigger, RenderingDef,
     };
+    use crate::entity::{EntityFootprint, EntityGrounding};
     use crate::scene::{Scene, SceneAnchor, SceneAnchorKind, ScenePlayerEntry};
 
     #[test]

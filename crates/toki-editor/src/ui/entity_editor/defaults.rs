@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use toki_core::entity::{
     AiConfig, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
-    EntityGrounding,
-    MovementProfile, MovementSoundTrigger, PickupDef, PrimaryProjectileDef, RenderingDef,
+    EntityGrounding, MovementProfile, MovementSoundTrigger, PickupDef, PrimaryProjectileDef,
+    RenderingDef,
 };
 
 /// Create default projectile definition

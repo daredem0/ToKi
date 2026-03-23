@@ -1,8 +1,6 @@
 use crate::config::EditorConfig;
-use crate::editor_sprite_preview::{
-    load_texture_preview_image, texture_preview_cache_key,
-};
 use crate::editor_grid::GridInteraction;
+use crate::editor_sprite_preview::{load_texture_preview_image, texture_preview_cache_key};
 use crate::editor_types::PlacementPreviewVisual;
 use crate::project::ProjectAssets;
 use crate::scene::viewport::{DragPreviewSprite, OverlayLineInstance, OverlaySpriteInstance};
@@ -147,38 +145,37 @@ pub fn load_preview_sprite_frame(
                     .path
                     .parent()
                     .map(|parent| parent.join(&sprite_atlas.image));
-                let (texture_image, texture_cache_key) = if let Some(texture_path) =
-                    texture_path.as_ref()
-                {
-                    match load_texture_preview_image(
-                        texture_path,
-                        sprite_atlas.color_mode,
-                        available_palettes,
-                        indexed_palette_override,
-                        entity_def.rendering.palette_override.as_deref(),
-                        sprite_atlas.palette.as_deref(),
-                    ) {
-                        Ok((image, palette_id)) if sprite_atlas.is_palette_indexed() => (
-                            Some(image),
-                            Some(texture_preview_cache_key(
-                                texture_path,
-                                sprite_atlas.color_mode,
-                                palette_id.as_deref(),
-                            )),
-                        ),
-                        Ok((_image, _)) => (None, None),
-                        Err(error) => {
-                            tracing::warn!(
-                                "Failed to recolor indexed preview sprite for '{}': {}",
-                                entity_def_name,
-                                error
-                            );
-                            (None, None)
+                let (texture_image, texture_cache_key) =
+                    if let Some(texture_path) = texture_path.as_ref() {
+                        match load_texture_preview_image(
+                            texture_path,
+                            sprite_atlas.color_mode,
+                            available_palettes,
+                            indexed_palette_override,
+                            entity_def.rendering.palette_override.as_deref(),
+                            sprite_atlas.palette.as_deref(),
+                        ) {
+                            Ok((image, palette_id)) if sprite_atlas.is_palette_indexed() => (
+                                Some(image),
+                                Some(texture_preview_cache_key(
+                                    texture_path,
+                                    sprite_atlas.color_mode,
+                                    palette_id.as_deref(),
+                                )),
+                            ),
+                            Ok((_image, _)) => (None, None),
+                            Err(error) => {
+                                tracing::warn!(
+                                    "Failed to recolor indexed preview sprite for '{}': {}",
+                                    entity_def_name,
+                                    error
+                                );
+                                (None, None)
+                            }
                         }
-                    }
-                } else {
-                    (None, None)
-                };
+                    } else {
+                        (None, None)
+                    };
                 return Some(PlacementPreviewVisual {
                     frame: toki_core::sprite::SpriteFrame {
                         u0: uvs[0],

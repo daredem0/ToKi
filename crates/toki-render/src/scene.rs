@@ -289,7 +289,10 @@ impl SceneRenderer {
                 });
             pipeline.update_projection(&self.queue, self.current_projection);
             pipeline.add_sprite(render_instance);
-            self.record_sprite_draw_batch(SceneSpriteBatchKey::Textured(texture_key), instance_index);
+            self.record_sprite_draw_batch(
+                SceneSpriteBatchKey::Textured(texture_key),
+                instance_index,
+            );
         } else {
             let instance_index = self.sprite_pipeline.instance_count();
             self.sprite_pipeline.add_sprite(render_instance);

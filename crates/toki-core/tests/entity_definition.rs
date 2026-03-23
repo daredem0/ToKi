@@ -1648,7 +1648,10 @@ fn entity_definition_defaults_grounding_to_bottom_center_and_collision_footprint
     );
     assert_eq!(entity.resolved_footprint().offset, [8, 40]);
     assert_eq!(entity.resolved_footprint().size, [16, 8]);
-    assert_eq!(entity.footprint_world_bounds(), (IVec2::new(18, 60), glam::UVec2::new(16, 8)));
+    assert_eq!(
+        entity.footprint_world_bounds(),
+        (IVec2::new(18, 60), glam::UVec2::new(16, 8))
+    );
 }
 
 #[test]

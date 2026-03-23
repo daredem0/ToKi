@@ -6,14 +6,10 @@ use toki_core::entity::EntityFootprint;
 use super::widgets::{render_atlas_dropdown, show_field_error};
 
 fn resolved_ground_origin(edit: &crate::ui::editor_ui::EntityEditState) -> [i32; 2] {
-    edit.definition
-        .rendering
-        .grounding
-        .origin
-        .unwrap_or([
-            (edit.definition.rendering.size[0] / 2) as i32,
-            edit.definition.rendering.size[1].saturating_sub(1) as i32,
-        ])
+    edit.definition.rendering.grounding.origin.unwrap_or([
+        (edit.definition.rendering.size[0] / 2) as i32,
+        edit.definition.rendering.size[1].saturating_sub(1) as i32,
+    ])
 }
 
 fn resolved_ground_footprint(edit: &crate::ui::editor_ui::EntityEditState) -> EntityFootprint {
@@ -134,9 +130,7 @@ pub fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                     let mut origin = resolved_ground_origin(edit);
                     ui.horizontal(|ui| {
                         ui.label("Origin:");
-                        let origin_changed = ui
-                            .add(egui::DragValue::new(&mut origin[0]))
-                            .changed()
+                        let origin_changed = ui.add(egui::DragValue::new(&mut origin[0])).changed()
                             | ui.add(egui::DragValue::new(&mut origin[1])).changed();
                         if origin_changed {
                             edit.definition.rendering.grounding.origin = Some(origin);
@@ -150,8 +144,7 @@ pub fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                         let offset_changed = ui
                             .add(egui::DragValue::new(&mut footprint.offset[0]))
                             .changed()
-                            | ui
-                                .add(egui::DragValue::new(&mut footprint.offset[1]))
+                            | ui.add(egui::DragValue::new(&mut footprint.offset[1]))
                                 .changed();
                         if offset_changed {
                             edit.definition.rendering.grounding.footprint = Some(footprint);
@@ -167,8 +160,7 @@ pub fn render_rendering_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                         let size_changed = ui
                             .add(egui::DragValue::new(&mut width).range(1..=1024))
                             .changed()
-                            | ui
-                                .add(egui::DragValue::new(&mut height).range(1..=1024))
+                            | ui.add(egui::DragValue::new(&mut height).range(1..=1024))
                                 .changed();
                         if size_changed {
                             footprint.size = [width.max(1) as u32, height.max(1) as u32];

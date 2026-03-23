@@ -192,7 +192,11 @@ impl EntityPropertyDraft {
             size_y: entity.size.y as i64,
             visible: entity.attributes.visible,
             has_shadow: entity.attributes.has_shadow,
-            palette_override: entity.attributes.palette_override.clone().unwrap_or_default(),
+            palette_override: entity
+                .attributes
+                .palette_override
+                .clone()
+                .unwrap_or_default(),
             active: entity.attributes.active,
             solid: entity.attributes.solid,
             interactable: entity.attributes.interactable,
@@ -370,7 +374,13 @@ impl InspectorSystem {
                 egui::ScrollArea::vertical().show(ui, |ui| match ui_state.right_panel_tab {
                     super::editor_ui::RightPanelTab::Inspector => {
                         Self::render_selection_inspector_contents(
-                            ui_state, ui, ctx, game_state, project, project_assets, config,
+                            ui_state,
+                            ui,
+                            ctx,
+                            game_state,
+                            project,
+                            project_assets,
+                            config,
                         );
                     }
                     super::editor_ui::RightPanelTab::Project => {

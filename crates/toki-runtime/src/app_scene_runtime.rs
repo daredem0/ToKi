@@ -217,7 +217,8 @@ impl<'a> SceneRuntimeCoordinator<'a> {
                     Err(error) => Err(toki_render::RenderError::Other(format!("{error:?}"))),
                 }
             } else {
-                self.rendering.load_tilemap_texture(tilemap_texture_path.clone())
+                self.rendering
+                    .load_tilemap_texture(tilemap_texture_path.clone())
             };
 
             if let Err(error) = tilemap_result {

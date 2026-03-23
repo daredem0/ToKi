@@ -4,8 +4,8 @@ use std::path::Path;
 use std::rc::Rc;
 use toki_core::fonts::find_font_files;
 use toki_core::graphics::image::DecodedImage;
-use toki_core::palette::Palette4;
 use toki_core::graphics::vertex::QuadVertex;
+use toki_core::palette::Palette4;
 use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings};
 use toki_core::sprite::SpriteFrame;
 use toki_core::sprite_render::{

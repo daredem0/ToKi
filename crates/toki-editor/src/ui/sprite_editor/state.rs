@@ -1,8 +1,9 @@
 //! Sprite editor state - the main container for sprite editing state.
 
 use super::{
-    CanvasSide, CanvasState, DiscoveredSpriteAsset, DualCanvasLayout, PixelColor, ResizeAnchor,
-    SpriteCanvas, SpriteEditorTool, canonical_indexed_color, indexed_slot_for_authored_color,
+    canonical_indexed_color, indexed_slot_for_authored_color, CanvasSide, CanvasState,
+    DiscoveredSpriteAsset, DualCanvasLayout, PixelColor, ResizeAnchor, SpriteCanvas,
+    SpriteEditorTool,
 };
 use std::collections::BTreeMap;
 use toki_core::assets::atlas::ColorMode;

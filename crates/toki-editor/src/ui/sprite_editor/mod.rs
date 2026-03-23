@@ -22,8 +22,8 @@ pub use history::{SpriteEditCommand, SpriteEditorHistory};
 pub use selection::SpriteSelection;
 pub use state::SpriteEditorState;
 pub use types::{
-    canonical_indexed_color, indexed_slot_for_authored_color, preview_indexed_color,
-    nearest_palette_slot, DiscoveredSpriteAsset, PixelColor, ResizeAnchor, SpriteAssetKind,
+    canonical_indexed_color, indexed_slot_for_authored_color, nearest_palette_slot,
+    preview_indexed_color, DiscoveredSpriteAsset, PixelColor, ResizeAnchor, SpriteAssetKind,
     SpriteEditorTool,
 };
 pub use viewport::SpriteCanvasViewport;

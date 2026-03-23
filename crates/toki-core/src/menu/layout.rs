@@ -104,8 +104,7 @@ pub fn build_dialog_layout(
         .map(|(index, entry)| MenuEntryLayout {
             rect: MenuRect {
                 y: entries_start_y
-                    + index as f32
-                        * (entry_height + appearance.button_spacing_px as f32),
+                    + index as f32 * (entry_height + appearance.button_spacing_px as f32),
                 x: 0.0,
                 width: content_width,
                 height: entry_height,
@@ -184,7 +183,9 @@ fn dialog_panel_rect(
 
     let (x, y) = match position {
         MenuDialogPosition::Top => (centered_x, top_y),
-        MenuDialogPosition::Bottom => (centered_x, (viewport.y - panel_height - margin).max(margin)),
+        MenuDialogPosition::Bottom => {
+            (centered_x, (viewport.y - panel_height - margin).max(margin))
+        }
         MenuDialogPosition::Left => (margin, centered_y.max(margin)),
         MenuDialogPosition::Right => (
             (viewport.x - panel_width - margin).max(margin),

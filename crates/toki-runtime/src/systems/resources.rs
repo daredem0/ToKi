@@ -2,10 +2,10 @@ use std::collections::{BTreeMap, HashMap};
 use toki_core::assets::{atlas::AtlasMeta, object_sheet::ObjectSheetMeta, tilemap::TileMap};
 use toki_core::palette::{resolve_palette, Palette4};
 pub use toki_core::project_assets::{
-    classify_sprite_metadata_file, find_first_json_file, first_existing_path, load_project_palettes,
-    normalize_asset_name, resolve_atlas_texture_path, resolve_object_sheet_texture_path,
-    resolve_project_resource_paths, resolve_tilemap_atlas_path, ResolvedProjectResourcePaths,
-    SpriteMetadataFileKind,
+    classify_sprite_metadata_file, find_first_json_file, first_existing_path,
+    load_project_palettes, normalize_asset_name, resolve_atlas_texture_path,
+    resolve_object_sheet_texture_path, resolve_project_resource_paths, resolve_tilemap_atlas_path,
+    ResolvedProjectResourcePaths, SpriteMetadataFileKind,
 };
 use toki_core::project_runtime::ProjectRuntimeMetadata;
 use toki_core::sprite_render::{
@@ -104,8 +104,8 @@ impl ResourceManager {
             &resolved_paths.object_sheet_paths,
             decoded_project_cache,
         )?;
-        let (project_palettes, indexed_palette_override) =
-            load_palette_settings(project_path).unwrap_or_else(|error| {
+        let (project_palettes, indexed_palette_override) = load_palette_settings(project_path)
+            .unwrap_or_else(|error| {
                 tracing::warn!(
                     "Failed to load palette settings from '{}': {}",
                     project_path.display(),
@@ -321,7 +321,8 @@ impl SpriteAssetResolver for ResourceManager {
 fn load_palette_settings(
     project_path: &std::path::Path,
 ) -> Result<(BTreeMap<String, Palette4>, Option<String>), String> {
-    let project_palettes = load_project_palettes(project_path).map_err(|error| error.to_string())?;
+    let project_palettes =
+        load_project_palettes(project_path).map_err(|error| error.to_string())?;
     let project_file = project_path.join("project.toml");
     if !project_file.exists() {
         return Ok((project_palettes, None));
@@ -330,7 +331,10 @@ fn load_palette_settings(
     let content = std::fs::read_to_string(&project_file).map_err(|error| error.to_string())?;
     let metadata =
         toml::from_str::<ProjectRuntimeMetadata>(&content).map_err(|error| error.to_string())?;
-    Ok((project_palettes, metadata.runtime.display.indexed_palette_override))
+    Ok((
+        project_palettes,
+        metadata.runtime.display.indexed_palette_override,
+    ))
 }
 
 fn register_sprite_atlas(

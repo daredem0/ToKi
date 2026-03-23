@@ -138,13 +138,12 @@ fn reload_project_assets_refreshes_available_palettes_and_scene_list() {
     app.handle_reload_project_assets_request();
 
     assert!(app.core.ui.project.available_palettes.contains_key("swamp"));
-    assert!(
-        app.core
-            .ui
-            .scenes
-            .iter()
-            .any(|scene| scene.name == "ReloadedScene")
-    );
+    assert!(app
+        .core
+        .ui
+        .scenes
+        .iter()
+        .any(|scene| scene.name == "ReloadedScene"));
 }
 
 #[test]
@@ -913,8 +912,7 @@ fn build_scene_preview_game_state_loads_scene_entity_definitions_for_legacy_grou
 
     fs::write(
         project_path.join("entities/soldier.json"),
-        serde_json::to_string_pretty(&soldier_definition)
-            .expect("entity json should serialize"),
+        serde_json::to_string_pretty(&soldier_definition).expect("entity json should serialize"),
     )
     .expect("entity definition should be written");
 

@@ -30,8 +30,8 @@ use crate::scene::overlays as scene_overlays;
 use crate::scene::viewport::DragPreviewSprite;
 use crate::scene::viewport::ViewportOverlayData;
 use crate::scene::SceneViewport;
-use crate::ui::editor_ui::{CenterPanelTab, MapEditorDraft};
 use crate::ui::editor_ui::EditorConfirmation;
+use crate::ui::editor_ui::{CenterPanelTab, MapEditorDraft};
 use crate::ui::EditorUI;
 
 #[path = "editor_app/background_tasks.rs"]
@@ -73,8 +73,10 @@ pub(crate) struct EditorResourceCache {
     /// Caches which project's menu preview fonts have been registered with egui.
     pub menu_font_project_path: Option<PathBuf>,
     /// Caches preview visuals by project and entity definition name.
-    pub preview_sprite_frames:
-        std::collections::HashMap<(PathBuf, String, Option<String>), Option<PlacementPreviewVisual>>,
+    pub preview_sprite_frames: std::collections::HashMap<
+        (PathBuf, String, Option<String>),
+        Option<PlacementPreviewVisual>,
+    >,
 }
 
 /// Platform layer: window, renderer, and egui integration.
@@ -714,35 +716,30 @@ impl EditorApp {
                                 project_assets,
                                 &mut self.resources.preview_sprite_frames,
                                 &self.core.ui.project.available_palettes,
-                                self.core
-                                    .project_manager
-                                    .current_project
-                                    .as_ref()
-                                    .and_then(|project| {
+                                self.core.project_manager.current_project.as_ref().and_then(
+                                    |project| {
                                         project
                                             .metadata
                                             .runtime
                                             .display
                                             .indexed_palette_override
                                             .as_deref()
-                                    }),
+                                    },
+                                ),
                             );
                         if let Some(scene_viewport) = &mut self.viewports.scene {
-                            let indexed_palette_override = self
-                                .core
-                                .project_manager
-                                .current_project
-                                .as_ref()
-                                .and_then(|project| {
-                                    project
-                                        .metadata
-                                        .runtime
-                                        .display
-                                        .indexed_palette_override
-                                        .clone()
-                                });
-                            scene_viewport
-                                .set_indexed_palette_override(indexed_palette_override);
+                            let indexed_palette_override =
+                                self.core.project_manager.current_project.as_ref().and_then(
+                                    |project| {
+                                        project
+                                            .metadata
+                                            .runtime
+                                            .display
+                                            .indexed_palette_override
+                                            .clone()
+                                    },
+                                );
+                            scene_viewport.set_indexed_palette_override(indexed_palette_override);
                             let placement_preview = if self.core.ui.is_in_placement_mode() {
                                 if self.core.ui.placement.entity_move_drag.is_none() {
                                     let is_valid =
@@ -835,19 +832,17 @@ impl EditorApp {
                     }
                     CenterPanelTab::MapEditor => {
                         if let Some(map_editor_viewport) = &mut self.viewports.map_editor {
-                            let indexed_palette_override = self
-                                .core
-                                .project_manager
-                                .current_project
-                                .as_ref()
-                                .and_then(|project| {
-                                    project
-                                        .metadata
-                                        .runtime
-                                        .display
-                                        .indexed_palette_override
-                                        .clone()
-                                });
+                            let indexed_palette_override =
+                                self.core.project_manager.current_project.as_ref().and_then(
+                                    |project| {
+                                        project
+                                            .metadata
+                                            .runtime
+                                            .display
+                                            .indexed_palette_override
+                                            .clone()
+                                    },
+                                );
                             map_editor_viewport
                                 .set_indexed_palette_override(indexed_palette_override);
                             if let Err(e) = map_editor_viewport.render_to_texture(

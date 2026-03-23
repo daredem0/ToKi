@@ -206,7 +206,10 @@ impl InspectorSystem {
             );
 
             ui.add_enabled_ui(
-                matches!(draft.post_process_mode, toki_core::project_runtime::PostProcessMode::Tint),
+                matches!(
+                    draft.post_process_mode,
+                    toki_core::project_runtime::PostProcessMode::Tint
+                ),
                 |ui| {
                     ui.horizontal(|ui| {
                         ui.label("Tint Color:");
@@ -304,7 +307,10 @@ impl InspectorSystem {
             );
 
             ui.add_enabled_ui(
-                matches!(draft.post_process_mode, toki_core::project_runtime::PostProcessMode::GbPalette),
+                matches!(
+                    draft.post_process_mode,
+                    toki_core::project_runtime::PostProcessMode::GbPalette
+                ),
                 |ui| {
                     ui.horizontal(|ui| {
                         ui.label("GB Contrast:");
@@ -322,7 +328,10 @@ impl InspectorSystem {
             );
 
             ui.add_enabled_ui(
-                matches!(draft.post_process_mode, toki_core::project_runtime::PostProcessMode::Vignette),
+                matches!(
+                    draft.post_process_mode,
+                    toki_core::project_runtime::PostProcessMode::Vignette
+                ),
                 |ui| {
                     ui.horizontal(|ui| {
                         ui.label("Vignette Strength:");
@@ -542,12 +551,7 @@ impl InspectorSystem {
                                 color[0], color[1], color[2], color[3],
                             );
                             if ui.color_edit_button_srgba(&mut color32).changed() {
-                                *color = [
-                                    color32.r(),
-                                    color32.g(),
-                                    color32.b(),
-                                    color32.a(),
-                                ];
+                                *color = [color32.r(), color32.g(), color32.b(), color32.a()];
                                 palette_files_changed = true;
                             }
                         }

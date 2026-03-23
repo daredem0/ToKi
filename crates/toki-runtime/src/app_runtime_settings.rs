@@ -134,10 +134,7 @@ impl App {
         };
         self.select_runtime_overlay_entry(match target {
             RuntimeOverlayHitTarget::Entry(entry_index)
-            | RuntimeOverlayHitTarget::Slider {
-                entry_index,
-                ..
-            } => entry_index,
+            | RuntimeOverlayHitTarget::Slider { entry_index, .. } => entry_index,
         });
         true
     }
@@ -288,7 +285,9 @@ impl App {
                 RuntimeOverlayEntry {
                     label: "Target FPS".to_string(),
                     value_text: fps_label(self.launch_options.display.target_fps).to_string(),
-                    slider_percent: Some(target_fps_to_slider(self.launch_options.display.target_fps)),
+                    slider_percent: Some(target_fps_to_slider(
+                        self.launch_options.display.target_fps,
+                    )),
                     selected: false,
                 },
             ),
@@ -464,8 +463,10 @@ impl App {
             _ => None,
         };
         if let Some(next_selected) = next_selected {
-            let RuntimeMenuOverlay::Audio { selected_index } =
-                self.runtime_overlay.as_mut().expect("audio overlay must be active")
+            let RuntimeMenuOverlay::Audio { selected_index } = self
+                .runtime_overlay
+                .as_mut()
+                .expect("audio overlay must be active")
             else {
                 return false;
             };
@@ -474,8 +475,12 @@ impl App {
         }
 
         match input {
-            MenuInput::Left => self.adjust_audio_setting(selected_index, -(SETTING_STEP_PERCENT as i16)),
-            MenuInput::Right => self.adjust_audio_setting(selected_index, SETTING_STEP_PERCENT as i16),
+            MenuInput::Left => {
+                self.adjust_audio_setting(selected_index, -(SETTING_STEP_PERCENT as i16))
+            }
+            MenuInput::Right => {
+                self.adjust_audio_setting(selected_index, SETTING_STEP_PERCENT as i16)
+            }
             MenuInput::Confirm => {
                 if selected_index == 4 {
                     return true;
@@ -501,8 +506,10 @@ impl App {
             _ => None,
         };
         if let Some(next_selected) = next_selected {
-            let RuntimeMenuOverlay::Graphics { selected_index } =
-                self.runtime_overlay.as_mut().expect("graphics overlay must be active")
+            let RuntimeMenuOverlay::Graphics { selected_index } = self
+                .runtime_overlay
+                .as_mut()
+                .expect("graphics overlay must be active")
             else {
                 return false;
             };
@@ -513,7 +520,8 @@ impl App {
         match input {
             MenuInput::Left => self.adjust_graphics_setting(selected_index, -1),
             MenuInput::Right | MenuInput::Confirm => {
-                let selected_key = self.graphics_entries_with_keys(selected_index)[selected_index].0;
+                let selected_key =
+                    self.graphics_entries_with_keys(selected_index)[selected_index].0;
                 if selected_key == GraphicsSettingKey::Back && matches!(input, MenuInput::Confirm) {
                     return true;
                 }
@@ -541,10 +549,8 @@ impl App {
             .set_channel_volume_percent("music_a", self.launch_options.audio_mix.music_percent);
         self.audio_system
             .set_channel_volume_percent("music_b", self.launch_options.audio_mix.music_percent);
-        self.audio_system.set_channel_volume_percent(
-            "movement",
-            self.launch_options.audio_mix.movement_percent,
-        );
+        self.audio_system
+            .set_channel_volume_percent("movement", self.launch_options.audio_mix.movement_percent);
         self.audio_system.set_channel_volume_percent(
             "collision",
             self.launch_options.audio_mix.collision_percent,
@@ -570,14 +576,17 @@ impl App {
                 }
             }
             GraphicsSettingKey::PostProcessMode => {
-                self.launch_options.display.post_process.mode =
-                    cycle_post_process_mode(self.launch_options.display.post_process.mode, direction);
-            }
-            GraphicsSettingKey::QuantizeStrategy => {
-                self.launch_options.display.post_process.quantize_strategy = cycle_quantize_strategy(
-                    self.launch_options.display.post_process.quantize_strategy,
+                self.launch_options.display.post_process.mode = cycle_post_process_mode(
+                    self.launch_options.display.post_process.mode,
                     direction,
                 );
+            }
+            GraphicsSettingKey::QuantizeStrategy => {
+                self.launch_options.display.post_process.quantize_strategy =
+                    cycle_quantize_strategy(
+                        self.launch_options.display.post_process.quantize_strategy,
+                        direction,
+                    );
             }
             GraphicsSettingKey::Brightness => {
                 let next = self.launch_options.display.post_process.brightness_percent
@@ -591,7 +600,11 @@ impl App {
                     next.clamp(0, 200) as u8;
             }
             GraphicsSettingKey::TintStrength => adjust_percent(
-                &mut self.launch_options.display.post_process.tint_strength_percent,
+                &mut self
+                    .launch_options
+                    .display
+                    .post_process
+                    .tint_strength_percent,
                 (SETTING_STEP_PERCENT as i16) * direction as i16,
             ),
             GraphicsSettingKey::TintRed => adjust_channel(
@@ -619,10 +632,15 @@ impl App {
             GraphicsSettingKey::GbContrast => {
                 let next = self.launch_options.display.post_process.gb_contrast_percent
                     + GB_CONTRAST_STEP * direction as i16;
-                self.launch_options.display.post_process.gb_contrast_percent = next.clamp(-100, 100);
+                self.launch_options.display.post_process.gb_contrast_percent =
+                    next.clamp(-100, 100);
             }
             GraphicsSettingKey::VignetteStrength => adjust_percent(
-                &mut self.launch_options.display.post_process.vignette_strength_percent,
+                &mut self
+                    .launch_options
+                    .display
+                    .post_process
+                    .vignette_strength_percent,
                 (SETTING_STEP_PERCENT as i16) * direction as i16,
             ),
             GraphicsSettingKey::Back => return,
@@ -725,24 +743,32 @@ impl App {
                     (percent as u16 * 2).min(200) as u8;
             }
             GraphicsSettingKey::TintStrength => {
-                self.launch_options.display.post_process.tint_strength_percent = percent.min(100);
+                self.launch_options
+                    .display
+                    .post_process
+                    .tint_strength_percent = percent.min(100);
             }
             GraphicsSettingKey::TintRed => {
-                self.launch_options.display.post_process.tint_color[0] = percent_to_channel(percent);
+                self.launch_options.display.post_process.tint_color[0] =
+                    percent_to_channel(percent);
             }
             GraphicsSettingKey::TintGreen => {
-                self.launch_options.display.post_process.tint_color[1] = percent_to_channel(percent);
+                self.launch_options.display.post_process.tint_color[1] =
+                    percent_to_channel(percent);
             }
             GraphicsSettingKey::TintBlue => {
-                self.launch_options.display.post_process.tint_color[2] = percent_to_channel(percent);
+                self.launch_options.display.post_process.tint_color[2] =
+                    percent_to_channel(percent);
             }
             GraphicsSettingKey::GbContrast => {
                 self.launch_options.display.post_process.gb_contrast_percent =
                     (percent as i16 * 2 - 100).clamp(-100, 100);
             }
             GraphicsSettingKey::VignetteStrength => {
-                self.launch_options.display.post_process.vignette_strength_percent =
-                    percent.min(100);
+                self.launch_options
+                    .display
+                    .post_process
+                    .vignette_strength_percent = percent.min(100);
             }
             GraphicsSettingKey::Vsync
             | GraphicsSettingKey::PostProcessMode
@@ -763,7 +789,8 @@ fn compose_runtime_settings_ui(
     appearance: &MenuAppearance,
 ) -> UiComposition {
     let mut composition = compose_menu_ui(layout, appearance);
-    let accent = menu_hex_color_rgba(&appearance.border_color_hex).unwrap_or([0.49, 1.0, 0.49, 1.0]);
+    let accent =
+        menu_hex_color_rgba(&appearance.border_color_hex).unwrap_or([0.49, 1.0, 0.49, 1.0]);
     let track = [0.12, 0.18, 0.12, 0.85];
 
     for (layout_entry, overlay_entry) in layout_entries.iter().zip(overlay_entries.iter()) {
@@ -808,8 +835,10 @@ fn runtime_overlay_hit_target_at_position(
     overlay_entries: &[RuntimeOverlayEntry],
     position: glam::Vec2,
 ) -> Option<RuntimeOverlayHitTarget> {
-    for (entry_index, (layout_entry, overlay_entry)) in
-        layout_entries.iter().zip(overlay_entries.iter()).enumerate()
+    for (entry_index, (layout_entry, overlay_entry)) in layout_entries
+        .iter()
+        .zip(overlay_entries.iter())
+        .enumerate()
     {
         if let Some(slider_rect) = runtime_overlay_slider_rect(layout_entry, overlay_entry) {
             if rect_contains(slider_rect, position) {
@@ -937,7 +966,10 @@ fn cycle_post_process_mode(mode: PostProcessMode, direction: i32) -> PostProcess
         PostProcessMode::GbPalette,
         PostProcessMode::Vignette,
     ];
-    let current_index = modes.iter().position(|candidate| *candidate == mode).unwrap_or(0) as i32;
+    let current_index = modes
+        .iter()
+        .position(|candidate| *candidate == mode)
+        .unwrap_or(0) as i32;
     let next_index = (current_index + direction).rem_euclid(modes.len() as i32) as usize;
     modes[next_index]
 }
@@ -989,9 +1021,9 @@ mod tests {
         runtime_overlay_slider_rect, slider_percent_from_position, slider_to_target_fps,
         target_fps_to_slider, RuntimeMenuOverlay, RuntimeOverlayEntry, RuntimeOverlayHitTarget,
     };
+    use toki_core::menu::{MenuBorderStyle, MenuEntryLayout};
     use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy};
     use toki_core::ui::UiRect;
-    use toki_core::menu::{MenuBorderStyle, MenuEntryLayout};
 
     #[test]
     fn percent_adjustment_clamps_to_zero_and_hundred() {
@@ -1044,7 +1076,10 @@ mod tests {
 
     #[test]
     fn quantize_strategy_label_matches_ui_text() {
-        assert_eq!(quantize_strategy_label(QuantizeStrategy::Luminance), "Luminance");
+        assert_eq!(
+            quantize_strategy_label(QuantizeStrategy::Luminance),
+            "Luminance"
+        );
         assert_eq!(
             quantize_strategy_label(QuantizeStrategy::RgbDistance),
             "RGB Distance"
@@ -1054,9 +1089,17 @@ mod tests {
     #[test]
     fn string_cycle_wraps() {
         let mut value = "b".to_string();
-        cycle_string(&mut value, &["a".to_string(), "b".to_string(), "c".to_string()], 1);
+        cycle_string(
+            &mut value,
+            &["a".to_string(), "b".to_string(), "c".to_string()],
+            1,
+        );
         assert_eq!(value, "c");
-        cycle_string(&mut value, &["a".to_string(), "b".to_string(), "c".to_string()], 1);
+        cycle_string(
+            &mut value,
+            &["a".to_string(), "b".to_string(), "c".to_string()],
+            1,
+        );
         assert_eq!(value, "a");
     }
 
@@ -1095,7 +1138,10 @@ mod tests {
 
     #[test]
     fn overlay_constructors_start_on_first_entry() {
-        assert_eq!(RuntimeMenuOverlay::audio(), RuntimeMenuOverlay::Audio { selected_index: 0 });
+        assert_eq!(
+            RuntimeMenuOverlay::audio(),
+            RuntimeMenuOverlay::Audio { selected_index: 0 }
+        );
         assert_eq!(
             RuntimeMenuOverlay::graphics(),
             RuntimeMenuOverlay::Graphics { selected_index: 0 }
@@ -1122,7 +1168,8 @@ mod tests {
             slider_percent: Some(50),
             selected: true,
         };
-        let slider_rect = runtime_overlay_slider_rect(&layout_entry, &overlay_entry).expect("slider");
+        let slider_rect =
+            runtime_overlay_slider_rect(&layout_entry, &overlay_entry).expect("slider");
         assert!(rect_contains(
             slider_rect,
             glam::Vec2::new(slider_rect.x + 1.0, slider_rect.y + 1.0)
@@ -1131,7 +1178,10 @@ mod tests {
             runtime_overlay_hit_target_at_position(
                 &[layout_entry],
                 &[overlay_entry],
-                glam::Vec2::new(slider_rect.x + slider_rect.width * 0.75, slider_rect.y + 2.0),
+                glam::Vec2::new(
+                    slider_rect.x + slider_rect.width * 0.75,
+                    slider_rect.y + 2.0
+                ),
             ),
             Some(RuntimeOverlayHitTarget::Slider {
                 entry_index: 0,

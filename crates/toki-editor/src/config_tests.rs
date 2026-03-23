@@ -59,9 +59,7 @@ fn editor_config_defaults_runtime_binary_path_to_none() {
 #[test]
 fn editor_config_serializes_and_deserializes_runtime_binary_path() {
     let mut config = EditorConfig::default();
-    config.set_runtime_binary_path(Some(std::path::PathBuf::from(
-        "/tmp/toki-runtime",
-    )));
+    config.set_runtime_binary_path(Some(std::path::PathBuf::from("/tmp/toki-runtime")));
 
     let json = serde_json::to_string(&config).expect("config should serialize");
     let parsed: EditorConfig = serde_json::from_str(&json).expect("config should deserialize");

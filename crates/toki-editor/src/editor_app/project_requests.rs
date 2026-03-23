@@ -21,8 +21,14 @@ impl EditorApp {
                 )
             })
             .unwrap_or_default();
-        self.core.ui.project.set_available_palettes(&project_palettes);
-        self.core.ui.project.set_available_dialogs(&available_dialogs);
+        self.core
+            .ui
+            .project
+            .set_available_palettes(&project_palettes);
+        self.core
+            .ui
+            .project
+            .set_available_dialogs(&available_dialogs);
 
         if let Some(current_project) = self.core.project_manager.current_project.as_ref() {
             let indexed_palette_override = current_project
@@ -120,8 +126,14 @@ impl EditorApp {
                     .unwrap_or_default();
                 if let Some(project_name) = project_name {
                     self.core.ui.set_title(&project_name);
-                    self.core.ui.project.set_available_palettes(&project_palettes);
-                    self.core.ui.project.set_available_dialogs(&available_dialogs);
+                    self.core
+                        .ui
+                        .project
+                        .set_available_palettes(&project_palettes);
+                    self.core
+                        .ui
+                        .project
+                        .set_available_dialogs(&available_dialogs);
                 }
                 let indexed_palette_override = self
                     .core

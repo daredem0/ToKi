@@ -226,10 +226,7 @@ mod tests {
     #[test]
     fn resolve_palette_prefers_project_over_builtin() {
         let mut project_palettes = BTreeMap::new();
-        project_palettes.insert(
-            "gb_default".to_string(),
-            Palette4::new([[1, 2, 3, 255]; 4]),
-        );
+        project_palettes.insert("gb_default".to_string(), Palette4::new([[1, 2, 3, 255]; 4]));
 
         let resolved =
             resolve_palette("gb_default", &project_palettes).expect("project palette should win");

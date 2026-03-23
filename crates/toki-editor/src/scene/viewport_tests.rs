@@ -367,9 +367,11 @@ fn viewport_recolors_palette_indexed_sprites_and_applies_palette_override() {
         &tmp.join("tilemap.json"),
     )
     .expect("resources should load");
-    let mut viewport =
-        SceneViewport::with_game_state_and_resources_for_tests(toki_core::GameState::new_empty(), resources)
-            .expect("viewport should exist");
+    let mut viewport = SceneViewport::with_game_state_and_resources_for_tests(
+        toki_core::GameState::new_empty(),
+        resources,
+    )
+    .expect("viewport should exist");
     let mut palettes = toki_core::palette::builtin_palettes();
     viewport.set_available_palettes(&palettes);
 
@@ -390,13 +392,15 @@ fn viewport_recolors_palette_indexed_sprites_and_applies_palette_override() {
         flip_x: false,
     };
 
-    let (default_sprites, default_failures) =
-        viewport.resolve_sprite_requests_into_instances(
-            &project_assets,
-            Some(&tmp),
-            std::slice::from_ref(&request),
-        );
-    assert!(default_failures.is_empty(), "unexpected failures: {default_failures:?}");
+    let (default_sprites, default_failures) = viewport.resolve_sprite_requests_into_instances(
+        &project_assets,
+        Some(&tmp),
+        std::slice::from_ref(&request),
+    );
+    assert!(
+        default_failures.is_empty(),
+        "unexpected failures: {default_failures:?}"
+    );
     let poison = resolve_palette("poison", &palettes).expect("poison palette should exist");
     assert_eq!(
         default_sprites[0]

@@ -78,10 +78,7 @@ mod tests {
     #[test]
     fn resolve_indexed_preview_palette_prefers_global_override() {
         let mut palettes = toki_core::palette::builtin_palettes();
-        palettes.insert(
-            "custom".to_string(),
-            Palette4::new([[1, 2, 3, 255]; 4]),
-        );
+        palettes.insert("custom".to_string(), Palette4::new([[1, 2, 3, 255]; 4]));
 
         let resolved = resolve_indexed_preview_palette(
             ColorMode::PaletteIndexed,

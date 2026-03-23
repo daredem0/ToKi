@@ -6,8 +6,8 @@ use super::builder::EntityBuilder;
 use super::types::{
     AiBehavior, AiConfig, ControlRole, Entity, EntityAttributes, EntityAudioComponent,
     EntityAudioSettings, EntityGrounding, EntityId, EntityKind, EntityStats, Inventory,
-    MovementProfile, MovementSoundTrigger, PickupDef, PrimaryProjectileDef,
-    StaticObjectRenderDef, HEALTH_STAT_ID,
+    MovementProfile, MovementSoundTrigger, PickupDef, PrimaryProjectileDef, StaticObjectRenderDef,
+    HEALTH_STAT_ID,
 };
 use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use crate::collision::CollisionBox;

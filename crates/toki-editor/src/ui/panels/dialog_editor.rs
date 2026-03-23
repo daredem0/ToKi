@@ -37,11 +37,7 @@ pub(super) fn render_dialog_editor(
     render_dialog_main(ui, ui_state, project_assets);
 }
 
-fn render_dialog_main(
-    ui: &mut Ui,
-    ui_state: &mut EditorUI,
-    project_assets: &mut ProjectAssets,
-) {
+fn render_dialog_main(ui: &mut Ui, ui_state: &mut EditorUI, project_assets: &mut ProjectAssets) {
     let Some(mut dialog) = ui_state.dialog.draft.take() else {
         ui.label("No dialog selected.");
         return;
@@ -90,9 +86,14 @@ fn render_dialog_main(
         ui.label("Entry Node:");
         dirty |= ui.text_edit_singleline(&mut dialog.entry_node_id).changed();
     });
-    dirty |= ui.checkbox(&mut dialog.allow_cancel, "Allow Cancel").changed();
     dirty |= ui
-        .checkbox(&mut dialog.gate_gameplay, "Gate Gameplay While Dialog Is Open")
+        .checkbox(&mut dialog.allow_cancel, "Allow Cancel")
+        .changed();
+    dirty |= ui
+        .checkbox(
+            &mut dialog.gate_gameplay,
+            "Gate Gameplay While Dialog Is Open",
+        )
         .changed();
 
     let validation = dialog.validate();
@@ -121,7 +122,12 @@ fn render_dialog_main(
     ui_state.dialog.draft = Some(dialog);
 }
 
-fn render_node_list(ui: &mut Ui, ui_state: &mut EditorUI, dialog: &mut toki_core::dialog::DialogTree, dirty: &mut bool) {
+fn render_node_list(
+    ui: &mut Ui,
+    ui_state: &mut EditorUI,
+    dialog: &mut toki_core::dialog::DialogTree,
+    dirty: &mut bool,
+) {
     ui.horizontal_wrapped(|ui| {
         for (label, kind) in [
             ("+ Line", DialogNodeKindSelection::Line),
@@ -162,7 +168,11 @@ fn render_node_editor(
         ui.label("Select a node.");
         return;
     };
-    let Some(node_index) = dialog.nodes.iter().position(|node| node.id == selected_node_id) else {
+    let Some(node_index) = dialog
+        .nodes
+        .iter()
+        .position(|node| node.id == selected_node_id)
+    else {
         ui.label("Selected node no longer exists.");
         return;
     };
@@ -239,7 +249,12 @@ fn render_node_editor(
                     ui.label("Next Node:");
                     *dirty |= ui.text_edit_singleline(&mut choice.next_node_id).changed();
                 });
-                render_conditions(ui, &mut choice.conditions, dirty, ("choice_conditions", index));
+                render_conditions(
+                    ui,
+                    &mut choice.conditions,
+                    dirty,
+                    ("choice_conditions", index),
+                );
             }
         }
         DialogNodeKind::Branch {
@@ -261,7 +276,12 @@ fn render_node_editor(
                     ui.label("Next Node:");
                     *dirty |= ui.text_edit_singleline(&mut branch.next_node_id).changed();
                 });
-                render_conditions(ui, &mut branch.conditions, dirty, ("branch_conditions", index));
+                render_conditions(
+                    ui,
+                    &mut branch.conditions,
+                    dirty,
+                    ("branch_conditions", index),
+                );
             }
         }
         DialogNodeKind::End { body, outcome_id } => {
@@ -337,7 +357,10 @@ fn render_conditions(
                     ui.horizontal(|ui| {
                         ui.label("Min Count:");
                         let mut count = *min_count as i32;
-                        if ui.add(egui::DragValue::new(&mut count).range(0..=9999)).changed() {
+                        if ui
+                            .add(egui::DragValue::new(&mut count).range(0..=9999))
+                            .changed()
+                        {
                             *min_count = count.max(0) as u32;
                             *dirty = true;
                         }

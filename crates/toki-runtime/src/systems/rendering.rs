@@ -371,8 +371,7 @@ impl RenderingSystem {
                     palette,
                 },
             ) => {
-                let texture_key =
-                    palette_texture_key(texture_path.as_path(), palette_id.as_str());
+                let texture_key = palette_texture_key(texture_path.as_path(), palette_id.as_str());
                 let image = if let Some(image) = self.recolored_sprite_images.get(&texture_key) {
                     image.clone()
                 } else {

@@ -244,7 +244,11 @@ fn resolve_atlas_tile_uses_palette_indexed_material_for_indexed_atlases() {
     fs::create_dir_all(&sprites_dir).expect("sprites dir");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
 
-    write_palette_indexed_atlas(&sprites_dir.join("creatures.json"), "creatures.png", "sepia");
+    write_palette_indexed_atlas(
+        &sprites_dir.join("creatures.json"),
+        "creatures.png",
+        "sepia",
+    );
     write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
     write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
 
@@ -269,7 +273,11 @@ fn resolve_indexed_palette_falls_back_when_entity_override_is_invalid() {
     fs::create_dir_all(&sprites_dir).expect("sprites dir");
     fs::create_dir_all(&tilemaps_dir).expect("tilemaps dir");
 
-    write_palette_indexed_atlas(&sprites_dir.join("creatures.json"), "creatures.png", "sepia");
+    write_palette_indexed_atlas(
+        &sprites_dir.join("creatures.json"),
+        "creatures.png",
+        "sepia",
+    );
     write_minimal_atlas(&tilemaps_dir.join("terrain.json"), "terrain.png");
     write_minimal_map(&tilemaps_dir.join("demo_map.json"), "terrain.json");
 

@@ -5,8 +5,8 @@ use toki_core::palette::{recolor_indexed_image, Palette4};
 use toki_core::project_assets::normalize_asset_name;
 use toki_core::sprite_render::{
     resolve_atlas_tile_frame, resolve_object_sheet_frame, resolve_sprite_render_requests,
-    sort_sprite_render_requests, ResolvedSpriteVisual, SpriteAssetResolver,
-    SpriteRenderMaterial, SpriteRenderRequest, SpriteResolveError, SpriteResolveFailure,
+    sort_sprite_render_requests, ResolvedSpriteVisual, SpriteAssetResolver, SpriteRenderMaterial,
+    SpriteRenderRequest, SpriteResolveError, SpriteResolveFailure,
 };
 
 struct ViewportSpriteResolver<'a, 'b> {
@@ -37,19 +37,20 @@ impl SceneViewport {
             return Ok(image.clone());
         }
 
-        let decoded = self
-            .decoded_sprite_image(texture_path)
-            .map_err(|error| SpriteResolveError::AssetLoadFailed {
+        let decoded = self.decoded_sprite_image(texture_path).map_err(|error| {
+            SpriteResolveError::AssetLoadFailed {
                 asset_kind: "sprite_texture",
                 asset_name: texture_path.display().to_string(),
                 message: error.to_string(),
-            })?;
-        let recolored =
-            recolor_indexed_image(&decoded, palette).map_err(|error| SpriteResolveError::AssetLoadFailed {
+            }
+        })?;
+        let recolored = recolor_indexed_image(&decoded, palette).map_err(|error| {
+            SpriteResolveError::AssetLoadFailed {
                 asset_kind: "sprite_texture",
                 asset_name: texture_path.display().to_string(),
                 message: error.to_string(),
-            })?;
+            }
+        })?;
         self.recolored_sprite_images
             .insert(cache_key.to_string(), recolored.clone());
         Ok(recolored)

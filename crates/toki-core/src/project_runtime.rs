@@ -140,7 +140,10 @@ impl Default for RuntimePostProcessSettings {
 }
 
 impl RuntimePostProcessSettings {
-    pub fn resolve(&self, project_palettes: &BTreeMap<String, Palette4>) -> ResolvedPostProcessSettings {
+    pub fn resolve(
+        &self,
+        project_palettes: &BTreeMap<String, Palette4>,
+    ) -> ResolvedPostProcessSettings {
         let quantize_palette = resolve_palette(&self.quantize_palette_id, project_palettes)
             .or_else(|| resolve_palette("gray", project_palettes))
             .unwrap_or(Palette4::new([

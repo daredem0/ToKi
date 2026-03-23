@@ -41,8 +41,7 @@ mod transitions;
 // Re-export event types for public use
 pub use events::{
     CollisionEvent, DamageEvent, DeathEvent, DialogCompletionEvent, InteractionEvent,
-    InteractionSpatial,
-    TileTransitionEvent,
+    InteractionSpatial, TileTransitionEvent,
 };
 
 use super::{AudioChannel, AudioEvent, GameState};

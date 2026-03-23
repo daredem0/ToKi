@@ -125,11 +125,7 @@ impl InspectorSystem {
                     .show_ui(ui, |ui| {
                         for candidate in available_dialog_outcomes.keys() {
                             changed |= ui
-                                .selectable_value(
-                                    dialog_id,
-                                    candidate.clone(),
-                                    candidate.as_str(),
-                                )
+                                .selectable_value(dialog_id, candidate.clone(), candidate.as_str())
                                 .changed();
                         }
                     });
@@ -150,11 +146,7 @@ impl InspectorSystem {
                     .show_ui(ui, |ui| {
                         for candidate in outcomes {
                             changed |= ui
-                                .selectable_value(
-                                    outcome_id,
-                                    candidate.clone(),
-                                    candidate.as_str(),
-                                )
+                                .selectable_value(outcome_id, candidate.clone(), candidate.as_str())
                                 .changed();
                         }
                     });

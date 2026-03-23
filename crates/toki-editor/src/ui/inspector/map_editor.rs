@@ -150,9 +150,7 @@ impl InspectorSystem {
                         ui.label("Atlas Mode:");
                         ui.label(match atlas.color_mode {
                             toki_core::assets::atlas::ColorMode::TrueColor => "TrueColor",
-                            toki_core::assets::atlas::ColorMode::PaletteIndexed => {
-                                "PaletteIndexed"
-                            }
+                            toki_core::assets::atlas::ColorMode::PaletteIndexed => "PaletteIndexed",
                         });
                     });
                     if atlas.is_palette_indexed() {

@@ -182,7 +182,8 @@ impl ApplicationHandler for App {
                 } else {
                     tracing::error!("Failed to initialize GPU with runtime asset plan: {error}");
                 }
-                self.rendering.initialize_gpu(window, self.launch_options.display.vsync);
+                self.rendering
+                    .initialize_gpu(window, self.launch_options.display.vsync);
             } else {
                 self.post_splash_sprite_texture_path =
                     self.asset_load_plan.sprite_texture_path.clone();
@@ -317,11 +318,15 @@ impl ApplicationHandler for App {
             WindowEvent::CursorMoved { position, .. } => {
                 self.cursor_position = Some(glam::Vec2::new(position.x as f32, position.y as f32));
                 if self.left_mouse_down {
-                    self.handle_menu_pointer_drag(glam::Vec2::new(position.x as f32, position.y as f32));
+                    self.handle_menu_pointer_drag(glam::Vec2::new(
+                        position.x as f32,
+                        position.y as f32,
+                    ));
                 }
-                self.handle_menu_pointer_hover(
-                    glam::Vec2::new(position.x as f32, position.y as f32),
-                );
+                self.handle_menu_pointer_hover(glam::Vec2::new(
+                    position.x as f32,
+                    position.y as f32,
+                ));
             }
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,

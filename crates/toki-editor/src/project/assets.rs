@@ -352,13 +352,8 @@ impl ProjectAssets {
         self.dialogs.clear();
         for path in discover_project_dialog_paths(&self.project_path)? {
             if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                self.dialogs.insert(
-                    stem.to_string(),
-                    DialogAsset {
-                        path,
-                        dialog: None,
-                    },
-                );
+                self.dialogs
+                    .insert(stem.to_string(), DialogAsset { path, dialog: None });
             }
         }
         Ok(())
@@ -498,8 +493,10 @@ impl ProjectAssets {
     pub fn load_dialog(&mut self, dialog_id: &str) -> Result<Option<DialogTree>> {
         if let Some(dialog_asset) = self.dialogs.get_mut(dialog_id) {
             if dialog_asset.dialog.is_none() {
-                let dialog = load_dialog_from_project_path(&dialog_asset.path)
-                    .map_err(|error| anyhow::anyhow!("Failed to load dialog '{}': {}", dialog_id, error))?;
+                let dialog =
+                    load_dialog_from_project_path(&dialog_asset.path).map_err(|error| {
+                        anyhow::anyhow!("Failed to load dialog '{}': {}", dialog_id, error)
+                    })?;
                 dialog_asset.dialog = Some(dialog.clone());
                 Ok(Some(dialog))
             } else {
@@ -511,7 +508,10 @@ impl ProjectAssets {
     }
 
     pub fn save_dialog(&mut self, dialog: &DialogTree) -> Result<()> {
-        let path = self.project_path.join("dialogs").join(format!("{}.json", dialog.id));
+        let path = self
+            .project_path
+            .join("dialogs")
+            .join(format!("{}.json", dialog.id));
         toki_core::project_assets::save_dialog_to_path(&path, dialog)
             .map_err(|error| anyhow::anyhow!("Failed to save dialog '{}': {}", dialog.id, error))?;
         self.dialogs.insert(

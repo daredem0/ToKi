@@ -93,7 +93,9 @@ pub fn scene_file_path(project_path: &Path, scene_name: &str) -> PathBuf {
 }
 
 pub fn dialog_file_path(project_path: &Path, dialog_name: &str) -> PathBuf {
-    project_path.join("dialogs").join(format!("{dialog_name}.json"))
+    project_path
+        .join("dialogs")
+        .join(format!("{dialog_name}.json"))
 }
 
 #[derive(Debug, serde::Deserialize, Default)]
@@ -307,7 +309,9 @@ pub fn discover_audio_files(dir: &Path) -> Result<Vec<DiscoveredAudioAsset>, Pro
     Ok(assets)
 }
 
-pub fn discover_palette_assets(dir: &Path) -> Result<Vec<DiscoveredPaletteAsset>, ProjectAssetError> {
+pub fn discover_palette_assets(
+    dir: &Path,
+) -> Result<Vec<DiscoveredPaletteAsset>, ProjectAssetError> {
     if !dir.exists() {
         return Ok(Vec::new());
     }
@@ -328,7 +332,9 @@ pub fn discover_palette_assets(dir: &Path) -> Result<Vec<DiscoveredPaletteAsset>
     Ok(assets)
 }
 
-pub fn load_project_palettes(project_path: &Path) -> Result<BTreeMap<String, Palette4>, ProjectAssetError> {
+pub fn load_project_palettes(
+    project_path: &Path,
+) -> Result<BTreeMap<String, Palette4>, ProjectAssetError> {
     let palette_dir = project_path.join("palettes");
     let discovered = discover_palette_assets(&palette_dir)?;
     Ok(discovered

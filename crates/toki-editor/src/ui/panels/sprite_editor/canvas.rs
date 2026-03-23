@@ -632,12 +632,9 @@ mod tests {
 
     #[test]
     fn canvas_display_pixels_recolors_canonical_indexed_shades_with_selected_palette() {
-        let canvas = SpriteCanvas::from_rgba(
-            2,
-            1,
-            vec![0x00, 0x00, 0x00, 0xFF, 0xAA, 0xAA, 0xAA, 0x80],
-        )
-        .unwrap();
+        let canvas =
+            SpriteCanvas::from_rgba(2, 1, vec![0x00, 0x00, 0x00, 0xFF, 0xAA, 0xAA, 0xAA, 0x80])
+                .unwrap();
         let palette = Palette4::new([
             [10, 20, 30, 255],
             [40, 50, 60, 255],

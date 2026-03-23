@@ -77,7 +77,10 @@ pub fn rule_graph_node_label(
         RuleGraphSummaryStyle::Detailed => {
             let details = match &node.kind {
                 RuleGraphNodeKind::Trigger(trigger) => {
-                    format!("Trigger {}", rule_graph_trigger_summary(trigger.clone(), style))
+                    format!(
+                        "Trigger {}",
+                        rule_graph_trigger_summary(trigger.clone(), style)
+                    )
                 }
                 RuleGraphNodeKind::Condition(condition) => {
                     format!(
@@ -289,7 +292,7 @@ pub fn rule_graph_action_summary(action: &RuleAction, style: RuleGraphSummarySty
                     "<empty>"
                 } else {
                     spawn_point_id
-            };
+                };
             format!("SwitchScene({scene} -> {spawn})")
         }
         RuleAction::StartDialog { dialog_id } => {

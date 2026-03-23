@@ -175,13 +175,16 @@ pub async fn create_device_and_surface_async(
     };
 
     surface.configure(&device, &config);
-    (device, queue, surface, config, surface_caps.present_modes.clone())
+    (
+        device,
+        queue,
+        surface,
+        config,
+        surface_caps.present_modes.clone(),
+    )
 }
 
-pub fn choose_present_mode(
-    present_modes: &[wgpu::PresentMode],
-    vsync: bool,
-) -> wgpu::PresentMode {
+pub fn choose_present_mode(present_modes: &[wgpu::PresentMode], vsync: bool) -> wgpu::PresentMode {
     if vsync {
         present_modes
             .iter()

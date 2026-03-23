@@ -153,42 +153,43 @@ impl SpriteEditorState {
         let canvas = SpriteCanvas::from_rgba(decoded.width, decoded.height, decoded.data)
             .ok_or_else(|| "Failed to create canvas from image data".to_string())?;
 
-        let (cell_size, is_sheet, original_aliases, color_mode, selected_palette_id) = match asset.kind {
-            SpriteAssetKind::TileAtlas => {
-                let meta = AtlasMeta::load_from_file(&asset.json_path)
-                    .map_err(|e| format!("Failed to load atlas metadata: {e}"))?;
-                let is_sheet = meta.tiles.len() > 1;
-                let aliases = ordered_atlas_aliases(
-                    &meta,
-                    decoded.width / meta.tile_size.x.max(1),
-                    decoded.height / meta.tile_size.y.max(1),
-                );
-                (
-                    meta.tile_size,
-                    is_sheet,
-                    aliases,
-                    meta.color_mode,
-                    meta.palette.clone(),
-                )
-            }
-            SpriteAssetKind::ObjectSheet => {
-                let meta = ObjectSheetMeta::load_from_file(&asset.json_path)
-                    .map_err(|e| format!("Failed to load object sheet metadata: {e}"))?;
-                let is_sheet = meta.objects.len() > 1;
-                let aliases = ordered_object_aliases(
-                    &meta,
-                    decoded.width / meta.tile_size.x.max(1),
-                    decoded.height / meta.tile_size.y.max(1),
-                );
-                (
-                    meta.tile_size,
-                    is_sheet,
-                    aliases,
-                    toki_core::assets::atlas::ColorMode::TrueColor,
-                    None,
-                )
-            }
-        };
+        let (cell_size, is_sheet, original_aliases, color_mode, selected_palette_id) =
+            match asset.kind {
+                SpriteAssetKind::TileAtlas => {
+                    let meta = AtlasMeta::load_from_file(&asset.json_path)
+                        .map_err(|e| format!("Failed to load atlas metadata: {e}"))?;
+                    let is_sheet = meta.tiles.len() > 1;
+                    let aliases = ordered_atlas_aliases(
+                        &meta,
+                        decoded.width / meta.tile_size.x.max(1),
+                        decoded.height / meta.tile_size.y.max(1),
+                    );
+                    (
+                        meta.tile_size,
+                        is_sheet,
+                        aliases,
+                        meta.color_mode,
+                        meta.palette.clone(),
+                    )
+                }
+                SpriteAssetKind::ObjectSheet => {
+                    let meta = ObjectSheetMeta::load_from_file(&asset.json_path)
+                        .map_err(|e| format!("Failed to load object sheet metadata: {e}"))?;
+                    let is_sheet = meta.objects.len() > 1;
+                    let aliases = ordered_object_aliases(
+                        &meta,
+                        decoded.width / meta.tile_size.x.max(1),
+                        decoded.height / meta.tile_size.y.max(1),
+                    );
+                    (
+                        meta.tile_size,
+                        is_sheet,
+                        aliases,
+                        toki_core::assets::atlas::ColorMode::TrueColor,
+                        None,
+                    )
+                }
+            };
 
         self.reset_canvas_state(canvas, false);
         self.color_mode = color_mode;
@@ -416,12 +417,7 @@ impl SpriteEditorState {
             SpriteAssetKind::TileAtlas => {
                 let mut meta = if self.is_sheet() {
                     let (cols, rows) = self.sheet_cell_count().unwrap_or((1, 1));
-                    self.create_atlas_with_names(
-                        png_filename,
-                        cols,
-                        rows,
-                        source_metadata_path,
-                    )
+                    self.create_atlas_with_names(png_filename, cols, rows, source_metadata_path)
                 } else {
                     self.create_atlas_with_names(png_filename, 1, 1, source_metadata_path)
                 };
@@ -440,10 +436,10 @@ impl SpriteEditorState {
                 meta.color_mode = self.color_mode;
                 meta.palette =
                     if self.color_mode == toki_core::assets::atlas::ColorMode::PaletteIndexed {
-                    self.selected_palette_id.clone()
-                } else {
-                    None
-                };
+                        self.selected_palette_id.clone()
+                    } else {
+                        None
+                    };
                 meta.save_to_file(json_path)
                     .map_err(|e| format!("Failed to save metadata: {e}"))?;
             }
@@ -653,15 +649,17 @@ impl SpriteEditorState {
                 .unwrap_or("sprite")
         );
         match kind {
-            SpriteAssetKind::TileAtlas => toki_core::assets::atlas::AtlasMeta::load_from_file(json_path)
-                .ok()
-                .and_then(|meta| {
-                    meta.image
-                        .file_name()
-                        .and_then(|name| name.to_str())
-                        .map(str::to_string)
-                })
-                .unwrap_or(fallback),
+            SpriteAssetKind::TileAtlas => {
+                toki_core::assets::atlas::AtlasMeta::load_from_file(json_path)
+                    .ok()
+                    .and_then(|meta| {
+                        meta.image
+                            .file_name()
+                            .and_then(|name| name.to_str())
+                            .map(str::to_string)
+                    })
+                    .unwrap_or(fallback)
+            }
             SpriteAssetKind::ObjectSheet => {
                 toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(json_path)
                     .ok()
@@ -684,13 +682,15 @@ impl SpriteEditorState {
         canvas_height: u32,
     ) -> Option<Vec<Vec<String>>> {
         match kind {
-            SpriteAssetKind::TileAtlas => toki_core::assets::atlas::AtlasMeta::load_from_file(json_path)
-                .ok()
-                .map(|meta| {
-                    let cols = (canvas_width / meta.tile_size.x.max(1)).max(1);
-                    let rows = (canvas_height / meta.tile_size.y.max(1)).max(1);
-                    ordered_atlas_aliases(&meta, cols, rows)
-                }),
+            SpriteAssetKind::TileAtlas => {
+                toki_core::assets::atlas::AtlasMeta::load_from_file(json_path)
+                    .ok()
+                    .map(|meta| {
+                        let cols = (canvas_width / meta.tile_size.x.max(1)).max(1);
+                        let rows = (canvas_height / meta.tile_size.y.max(1)).max(1);
+                        ordered_atlas_aliases(&meta, cols, rows)
+                    })
+            }
             SpriteAssetKind::ObjectSheet => {
                 toki_core::assets::object_sheet::ObjectSheetMeta::load_from_file(json_path)
                     .ok()

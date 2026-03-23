@@ -133,11 +133,7 @@ fn apply_contrast_rgb(rgb: [f32; 3], contrast: f32) -> [f32; 3] {
 }
 
 #[cfg(test)]
-fn apply_brightness_saturation(
-    rgb: [f32; 3],
-    brightness: f32,
-    saturation: f32,
-) -> [f32; 3] {
+fn apply_brightness_saturation(rgb: [f32; 3], brightness: f32, saturation: f32) -> [f32; 3] {
     let lum = luminance(rgb);
     let gray = [lum, lum, lum];
     [
@@ -149,12 +145,7 @@ fn apply_brightness_saturation(
 
 #[cfg(test)]
 fn bayer4x4_threshold(pixel: [u32; 2]) -> f32 {
-    const BAYER4X4: [[u8; 4]; 4] = [
-        [0, 8, 2, 10],
-        [12, 4, 14, 6],
-        [3, 11, 1, 9],
-        [15, 7, 13, 5],
-    ];
+    const BAYER4X4: [[u8; 4]; 4] = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
     let x = (pixel[0] % 4) as usize;
     let y = (pixel[1] % 4) as usize;
     (BAYER4X4[y][x] as f32 + 0.5) / 16.0
@@ -239,7 +230,9 @@ pub(crate) fn apply_post_process_pixel_at(
                     let index = quantize_index(luminance(rgb));
                     settings.quantize_palette.colors[index]
                 }
-                QuantizeStrategy::RgbDistance => nearest_palette_color(rgb, settings.quantize_palette),
+                QuantizeStrategy::RgbDistance => {
+                    nearest_palette_color(rgb, settings.quantize_palette)
+                }
             };
             [target[0], target[1], target[2], alpha]
         }
@@ -368,24 +361,22 @@ impl PostProcessPipeline {
 
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Post Process Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[build_uniforms(
-                ResolvedPostProcessSettings {
-                    mode: PostProcessMode::None,
-                    quantize_strategy: QuantizeStrategy::Luminance,
-                    tint_color: [0, 0, 0, 255],
-                    tint_strength_percent: 0,
-                    brightness_percent: 0,
-                    saturation_percent: 100,
-                    quantize_palette: Palette4::new([
-                        [0, 0, 0, 255],
-                        [85, 85, 85, 255],
-                        [170, 170, 170, 255],
-                        [255, 255, 255, 255],
-                    ]),
-                    gb_contrast_percent: 0,
-                    vignette_strength_percent: 60,
-                },
-            )]),
+            contents: bytemuck::cast_slice(&[build_uniforms(ResolvedPostProcessSettings {
+                mode: PostProcessMode::None,
+                quantize_strategy: QuantizeStrategy::Luminance,
+                tint_color: [0, 0, 0, 255],
+                tint_strength_percent: 0,
+                brightness_percent: 0,
+                saturation_percent: 100,
+                quantize_palette: Palette4::new([
+                    [0, 0, 0, 255],
+                    [85, 85, 85, 255],
+                    [170, 170, 170, 255],
+                    [255, 255, 255, 255],
+                ]),
+                gb_contrast_percent: 0,
+                vignette_strength_percent: 60,
+            })]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -406,11 +397,7 @@ impl PostProcessPipeline {
         }
     }
 
-    pub fn update_settings(
-        &mut self,
-        queue: &wgpu::Queue,
-        settings: ResolvedPostProcessSettings,
-    ) {
+    pub fn update_settings(&mut self, queue: &wgpu::Queue, settings: ResolvedPostProcessSettings) {
         queue.write_buffer(
             &self.uniform_buffer,
             0,
@@ -455,9 +442,13 @@ impl PostProcessPipeline {
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_post_process_pixel, apply_post_process_pixel_at, quantize_index, PostProcessUniforms};
+    use super::{
+        apply_post_process_pixel, apply_post_process_pixel_at, quantize_index, PostProcessUniforms,
+    };
     use toki_core::palette::Palette4;
-    use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings};
+    use toki_core::project_runtime::{
+        PostProcessMode, QuantizeStrategy, ResolvedPostProcessSettings,
+    };
 
     fn settings(mode: PostProcessMode) -> ResolvedPostProcessSettings {
         ResolvedPostProcessSettings {
@@ -488,7 +479,8 @@ mod tests {
 
     #[test]
     fn tint_post_process_blends_toward_tint_color() {
-        let output = apply_post_process_pixel(settings(PostProcessMode::Tint), [100, 100, 100, 255]);
+        let output =
+            apply_post_process_pixel(settings(PostProcessMode::Tint), [100, 100, 100, 255]);
         assert!(output[2] > output[0]);
         assert_eq!(output[3], 255);
     }

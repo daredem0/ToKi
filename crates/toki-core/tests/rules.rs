@@ -1643,9 +1643,7 @@ fn start_dialog_action_emits_dialog_start_request() {
         )],
     };
     state.add_scene(scene);
-    state
-        .load_scene("Dialog Scene")
-        .expect("scene should load");
+    state.load_scene("Dialog Scene").expect("scene should load");
 
     let result = state.update(
         UVec2::new(256, 256),
@@ -1679,9 +1677,7 @@ fn dialog_completion_trigger_can_drive_follow_up_rules() {
         )],
     };
     state.add_scene(scene);
-    state
-        .load_scene("Dialog Scene")
-        .expect("scene should load");
+    state.load_scene("Dialog Scene").expect("scene should load");
 
     state.record_dialog_completion("intro".to_string(), "accepted".to_string());
     let _ = state.update(

@@ -11,14 +11,14 @@ use toki_core::project_runtime::{PostProcessMode, ResolvedPostProcessSettings};
 use toki_core::sprite::SpriteFrame;
 use toki_core::text::TextItem;
 
-use crate::targets::{OffscreenTarget, RenderTarget};
 use crate::pipelines::sprite::SpriteInstance;
-use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
 use crate::pipelines::RenderPipeline;
+use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
+use crate::targets::{OffscreenTarget, RenderTarget};
 use crate::wgpu_utils::{choose_present_mode, create_device_and_surface};
 use crate::{
-    DebugPipeline, GlyphonTextRenderer, PostProcessPipeline, SpritePipeline,
-    TextBackgroundRect, TilemapPipeline,
+    DebugPipeline, GlyphonTextRenderer, PostProcessPipeline, SpritePipeline, TextBackgroundRect,
+    TilemapPipeline,
 };
 
 #[allow(dead_code)]
@@ -89,16 +89,22 @@ impl GpuState {
 
     fn ensure_post_process_target(&mut self) -> Result<(), crate::RenderError> {
         let size = (self.config.width.max(1), self.config.height.max(1));
-        let target = self.post_process_target.get_or_insert(
-            OffscreenTarget::new(self.device.clone(), size, self.config.format)?
-        );
+        let target = self.post_process_target.get_or_insert(OffscreenTarget::new(
+            self.device.clone(),
+            size,
+            self.config.format,
+        )?);
         target.resize(size)?;
         self.post_process_pipeline
             .update_source_texture(&self.device, target.get_render_view()?);
         Ok(())
     }
 
-    fn render_scene_to_view(&mut self, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
+    fn render_scene_to_view(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+    ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -279,12 +285,7 @@ impl GpuState {
             .sprite_pipelines_by_texture
             .entry(texture_key.clone())
             .or_insert_with(|| {
-                SpritePipeline::from_rgba8(
-                    &self.device,
-                    &self.queue,
-                    self.config.format,
-                    image,
-                )
+                SpritePipeline::from_rgba8(&self.device, &self.queue, self.config.format, image)
             });
         pipeline.update_projection(&self.queue, self.current_mvp);
         pipeline.add_sprite(instance);

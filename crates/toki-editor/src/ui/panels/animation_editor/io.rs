@@ -49,7 +49,15 @@ pub fn load_entity(ui_state: &mut EditorUI, project_path: &Path, entity_name: &s
         .load_entity(entity_name, file_path, authoring);
 
     // Store atlas metadata for canvas rendering
-    if let Some((cell_size, png_path, color_mode, palette_id, entity_palette_override, atlas_default_palette)) = atlas_info {
+    if let Some((
+        cell_size,
+        png_path,
+        color_mode,
+        palette_id,
+        entity_palette_override,
+        atlas_default_palette,
+    )) = atlas_info
+    {
         ui_state.animation.atlas_cell_size = Some((cell_size.x, cell_size.y));
         ui_state.animation.atlas_texture_path = Some(png_path);
         ui_state.animation.atlas_color_mode = color_mode;

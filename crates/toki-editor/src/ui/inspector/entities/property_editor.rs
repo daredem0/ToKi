@@ -9,8 +9,8 @@ use super::types::EntityPropertyDraft;
 use crate::config::EditorConfig;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use toki_core::palette::Palette4;
 use toki_core::entity::{AiBehavior, ControlRole, MovementProfile, MovementSoundTrigger};
+use toki_core::palette::Palette4;
 
 impl InspectorSystem {
     pub(in super::super) fn render_entity_property_editor(

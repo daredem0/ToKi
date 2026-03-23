@@ -344,17 +344,19 @@ fn ensure_atlas_texture(ui_state: &mut EditorUI, ctx: &egui::Context) {
         ui_state.animation.atlas_entity_palette_override.as_deref(),
         ui_state.animation.atlas_default_palette.as_deref(),
     ) else {
-        tracing::error!("Failed to load animation atlas preview image: {:?}", png_path);
+        tracing::error!(
+            "Failed to load animation atlas preview image: {:?}",
+            png_path
+        );
         return;
     };
 
     ui_state.animation.atlas_image_size = Some((decoded.width, decoded.height));
-    ui_state.animation.atlas_texture_cache_key =
-        Some(texture_preview_cache_key(
-            png_path,
-            ui_state.animation.atlas_color_mode,
-            palette_id.as_deref(),
-        ));
+    ui_state.animation.atlas_texture_cache_key = Some(texture_preview_cache_key(
+        png_path,
+        ui_state.animation.atlas_color_mode,
+        palette_id.as_deref(),
+    ));
 
     let color_image = egui::ColorImage::from_rgba_unmultiplied(
         [decoded.width as usize, decoded.height as usize],
@@ -381,13 +383,8 @@ mod tests {
     fn load_animation_atlas_preview_image_recolors_palette_indexed_atlas() {
         let temp_dir = tempfile::tempdir().expect("temp dir should exist");
         let png_path = temp_dir.path().join("atlas.png");
-        save_image_rgba8(
-            &png_path,
-            1,
-            1,
-            &[0x00, 0x00, 0x00, 0xFF],
-        )
-        .expect("png should be written");
+        save_image_rgba8(&png_path, 1, 1, &[0x00, 0x00, 0x00, 0xFF])
+            .expect("png should be written");
 
         let palettes = toki_core::palette::builtin_palettes();
         let (image, palette_id) = load_texture_preview_image(
@@ -409,13 +406,7 @@ mod tests {
     fn load_animation_atlas_preview_image_keeps_truecolor_pixels() {
         let temp_dir = tempfile::tempdir().expect("temp dir should exist");
         let png_path = temp_dir.path().join("atlas.png");
-        save_image_rgba8(
-            &png_path,
-            1,
-            1,
-            &[1, 2, 3, 255],
-        )
-        .expect("png should be written");
+        save_image_rgba8(&png_path, 1, 1, &[1, 2, 3, 255]).expect("png should be written");
 
         let palettes = toki_core::palette::builtin_palettes();
         let (image, palette_id) = load_texture_preview_image(

@@ -1,8 +1,8 @@
 use super::{can_entity_move_to_position, can_place_collision_box_at_position, CollisionBox};
 use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use crate::assets::tilemap::{MapObjectInstance, TileMap};
-use crate::entity::{EntityFootprint, EntityGrounding};
 use crate::entity::{Entity, EntityAttributes, EntityKind};
+use crate::entity::{EntityFootprint, EntityGrounding};
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
 use std::path::PathBuf;

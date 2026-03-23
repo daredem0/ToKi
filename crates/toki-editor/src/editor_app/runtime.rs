@@ -263,7 +263,11 @@ impl EditorApp {
             "".to_string(),
             "Searched:".to_string(),
         ];
-        lines.extend(candidates.iter().map(|path| format!("- {}", path.display())));
+        lines.extend(
+            candidates
+                .iter()
+                .map(|path| format!("- {}", path.display())),
+        );
         lines.push("".to_string());
         lines.push("Select a toki-runtime binary manually.".to_string());
         lines.join("\n")

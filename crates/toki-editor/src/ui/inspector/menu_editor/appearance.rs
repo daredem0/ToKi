@@ -211,10 +211,7 @@ impl InspectorSystem {
         false
     }
 
-    fn render_dialog_position_combo(
-        ui: &mut egui::Ui,
-        position: &mut MenuDialogPosition,
-    ) -> bool {
+    fn render_dialog_position_combo(ui: &mut egui::Ui, position: &mut MenuDialogPosition) -> bool {
         let mut selected = *position;
         egui::ComboBox::from_label("Dialog Position")
             .selected_text(match selected {

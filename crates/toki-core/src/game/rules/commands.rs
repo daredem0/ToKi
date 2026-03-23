@@ -122,7 +122,11 @@ impl GameState {
         if let Some(request) = &pending_dialog_start {
             result.request_dialog_start(request.dialog_id.clone(), request.context);
         }
-        (pending_animations, pending_scene_switch, pending_dialog_start)
+        (
+            pending_animations,
+            pending_scene_switch,
+            pending_dialog_start,
+        )
     }
 
     fn apply_destroy_self(&mut self, entity_id: EntityId) {

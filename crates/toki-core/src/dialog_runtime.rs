@@ -117,19 +117,22 @@ impl DialogController {
             .filter(|speaker| !speaker.trim().is_empty())
             .unwrap_or_else(|| dialog.title.clone());
         let entries = match &node.kind {
-            DialogNodeKind::Line { next_node_id, .. } => {
-                line_entries(dialog.allow_cancel, next_node_id.is_some(), active.selected_index)
-            }
+            DialogNodeKind::Line { next_node_id, .. } => line_entries(
+                dialog.allow_cancel,
+                next_node_id.is_some(),
+                active.selected_index,
+            ),
             DialogNodeKind::Choice { choices, .. } => {
-                let choice_entries = choices
-                    .iter()
-                    .enumerate()
-                    .map(|(index, choice)| MenuViewEntry {
-                        text: choice.label.clone(),
-                        selected: index == active.selected_index,
-                        selectable: true,
-                        border_style_override: None,
-                    });
+                let choice_entries =
+                    choices
+                        .iter()
+                        .enumerate()
+                        .map(|(index, choice)| MenuViewEntry {
+                            text: choice.label.clone(),
+                            selected: index == active.selected_index,
+                            selectable: true,
+                            border_style_override: None,
+                        });
                 if dialog.allow_cancel {
                     choice_entries
                         .chain(std::iter::once(MenuViewEntry {
@@ -180,8 +183,7 @@ impl DialogController {
                 MenuInput::Up | MenuInput::Left => {
                     let total = choices.len() + usize::from(dialog.allow_cancel);
                     if total > 0 {
-                        active.selected_index =
-                            (active.selected_index + total - 1) % total;
+                        active.selected_index = (active.selected_index + total - 1) % total;
                     }
                     DialogAdvanceResult::None
                 }
@@ -279,7 +281,9 @@ impl DialogController {
                     self.active = None;
                     DialogAdvanceResult::Closed(completion)
                 }
-                MenuInput::Confirm | MenuInput::Back if dialog.allow_cancel || matches!(input, MenuInput::Confirm) => {
+                MenuInput::Confirm | MenuInput::Back
+                    if dialog.allow_cancel || matches!(input, MenuInput::Confirm) =>
+                {
                     let completion = DialogCompletion {
                         dialog_id: active.dialog_id.clone(),
                         outcome_id: outcome_id.clone(),
@@ -385,24 +389,32 @@ impl DialogController {
         condition: &DialogCondition,
     ) -> bool {
         match condition {
-            DialogCondition::HealthBelow { target, threshold } => resolve_dialog_target(game_state, context, *target)
-                .and_then(|entity_id| game_state.entity_manager().get_entity(entity_id))
-                .and_then(|entity| entity.attributes.stats.current(HEALTH_STAT_ID))
-                .is_some_and(|health| health < *threshold),
-            DialogCondition::HealthAbove { target, threshold } => resolve_dialog_target(game_state, context, *target)
-                .and_then(|entity_id| game_state.entity_manager().get_entity(entity_id))
-                .and_then(|entity| entity.attributes.stats.current(HEALTH_STAT_ID))
-                .is_some_and(|health| health > *threshold),
+            DialogCondition::HealthBelow { target, threshold } => {
+                resolve_dialog_target(game_state, context, *target)
+                    .and_then(|entity_id| game_state.entity_manager().get_entity(entity_id))
+                    .and_then(|entity| entity.attributes.stats.current(HEALTH_STAT_ID))
+                    .is_some_and(|health| health < *threshold)
+            }
+            DialogCondition::HealthAbove { target, threshold } => {
+                resolve_dialog_target(game_state, context, *target)
+                    .and_then(|entity_id| game_state.entity_manager().get_entity(entity_id))
+                    .and_then(|entity| entity.attributes.stats.current(HEALTH_STAT_ID))
+                    .is_some_and(|health| health > *threshold)
+            }
             DialogCondition::HasInventoryItem {
                 target,
                 item_id,
                 min_count,
             } => resolve_dialog_target(game_state, context, *target)
                 .and_then(|entity_id| game_state.entity_manager().get_entity(entity_id))
-                .is_some_and(|entity| entity.attributes.inventory.item_count(item_id) >= *min_count),
-            DialogCondition::EntityHasTag { target, tag } => resolve_dialog_target(game_state, context, *target)
-                .and_then(|entity_id| game_state.entity_manager().get_entity(entity_id))
-                .is_some_and(|entity| entity.tags.contains(tag)),
+                .is_some_and(|entity| {
+                    entity.attributes.inventory.item_count(item_id) >= *min_count
+                }),
+            DialogCondition::EntityHasTag { target, tag } => {
+                resolve_dialog_target(game_state, context, *target)
+                    .and_then(|entity_id| game_state.entity_manager().get_entity(entity_id))
+                    .is_some_and(|entity| entity.tags.contains(tag))
+            }
             DialogCondition::EntityIsKind {
                 target,
                 entity_kind,
@@ -509,7 +521,10 @@ mod tests {
         assert_eq!(first.body, "Hello");
         assert_eq!(first.entries.len(), 2);
 
-        assert_eq!(controller.handle_input(MenuInput::Confirm, &game_state), DialogAdvanceResult::None);
+        assert_eq!(
+            controller.handle_input(MenuInput::Confirm, &game_state),
+            DialogAdvanceResult::None
+        );
         let second = controller.current_view().expect("view");
         assert_eq!(second.body, "Bye");
 
@@ -577,9 +592,15 @@ mod tests {
             .start_dialog(&game_state, "choices", DialogRuntimeContext::default())
             .expect("dialog should start");
         controller.handle_input(MenuInput::Down, &game_state);
-        assert_eq!(controller.current_view().expect("view").entries[1].text, "Beta");
+        assert_eq!(
+            controller.current_view().expect("view").entries[1].text,
+            "Beta"
+        );
         assert!(controller.current_view().expect("view").entries[1].selected);
-        assert_eq!(controller.handle_input(MenuInput::Confirm, &game_state), DialogAdvanceResult::None);
+        assert_eq!(
+            controller.handle_input(MenuInput::Confirm, &game_state),
+            DialogAdvanceResult::None
+        );
         assert_eq!(
             controller.handle_input(MenuInput::Confirm, &game_state),
             DialogAdvanceResult::Closed(DialogCompletion {

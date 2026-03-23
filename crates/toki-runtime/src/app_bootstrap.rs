@@ -177,7 +177,12 @@ impl<'a> StartupCoordinator<'a> {
         )
         .map_err(|error| error.to_string())?;
         let mut resources = resources;
-        if self.launch_options.display.indexed_palette_override.is_some() {
+        if self
+            .launch_options
+            .display
+            .indexed_palette_override
+            .is_some()
+        {
             resources.set_indexed_palette_override(
                 self.launch_options.display.indexed_palette_override.clone(),
             );
@@ -242,21 +247,21 @@ impl<'a> StartupCoordinator<'a> {
             },
         };
 
-        let dialogs = match App::load_project_dialogs_with_cache(project_path, decoded_project_cache)
-        {
-            Ok(dialogs) => dialogs,
-            Err(error) => match error_policy {
-                StartupErrorPolicy::Strict => return Err(error),
-                StartupErrorPolicy::Lenient => {
-                    tracing::error!(
-                        "Failed to preload dialogs from '{}': {}",
-                        project_path.display(),
-                        error
-                    );
-                    Vec::new()
-                }
-            },
-        };
+        let dialogs =
+            match App::load_project_dialogs_with_cache(project_path, decoded_project_cache) {
+                Ok(dialogs) => dialogs,
+                Err(error) => match error_policy {
+                    StartupErrorPolicy::Strict => return Err(error),
+                    StartupErrorPolicy::Lenient => {
+                        tracing::error!(
+                            "Failed to preload dialogs from '{}': {}",
+                            project_path.display(),
+                            error
+                        );
+                        Vec::new()
+                    }
+                },
+            };
 
         Ok(PreloadedProjectContent {
             scenes,
@@ -283,9 +288,7 @@ impl<'a> StartupCoordinator<'a> {
 }
 
 impl App {
-    pub(super) fn build_startup_state(
-        launch_options: &RuntimeLaunchOptions,
-    ) -> StartupStateParts {
+    pub(super) fn build_startup_state(launch_options: &RuntimeLaunchOptions) -> StartupStateParts {
         StartupCoordinator::new(launch_options).build().into_parts()
     }
 

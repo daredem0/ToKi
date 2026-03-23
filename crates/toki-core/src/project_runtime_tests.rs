@@ -1,8 +1,8 @@
+use crate::menu::{MenuAppearance, MenuTextAppearance};
 use crate::project_runtime::{
     PostProcessMode, ProjectPreset, ProjectRuntimeMetadata, QuantizeStrategy, RuntimeConfigFile,
     RuntimeDisplaySettings, RuntimePostProcessSettings, RuntimeSettings,
 };
-use crate::menu::{MenuAppearance, MenuTextAppearance};
 
 #[test]
 fn project_preset_topdown_returns_gameboy_resolution() {
@@ -123,13 +123,35 @@ fn runtime_metadata_supports_post_process_settings() {
         metadata.runtime.display.post_process.quantize_strategy,
         QuantizeStrategy::RgbDistance
     );
-    assert_eq!(metadata.runtime.display.post_process.tint_color, [12, 34, 56, 255]);
-    assert_eq!(metadata.runtime.display.post_process.tint_strength_percent, 70);
+    assert_eq!(
+        metadata.runtime.display.post_process.tint_color,
+        [12, 34, 56, 255]
+    );
+    assert_eq!(
+        metadata.runtime.display.post_process.tint_strength_percent,
+        70
+    );
     assert_eq!(metadata.runtime.display.post_process.brightness_percent, 15);
-    assert_eq!(metadata.runtime.display.post_process.saturation_percent, 140);
-    assert_eq!(metadata.runtime.display.post_process.quantize_palette_id, "poison");
-    assert_eq!(metadata.runtime.display.post_process.gb_contrast_percent, 18);
-    assert_eq!(metadata.runtime.display.post_process.vignette_strength_percent, 72);
+    assert_eq!(
+        metadata.runtime.display.post_process.saturation_percent,
+        140
+    );
+    assert_eq!(
+        metadata.runtime.display.post_process.quantize_palette_id,
+        "poison"
+    );
+    assert_eq!(
+        metadata.runtime.display.post_process.gb_contrast_percent,
+        18
+    );
+    assert_eq!(
+        metadata
+            .runtime
+            .display
+            .post_process
+            .vignette_strength_percent,
+        72
+    );
     assert!(metadata.runtime.scene_persistence);
 }
 
@@ -146,7 +168,10 @@ fn runtime_metadata_supports_dedicated_dialog_appearance() {
     .expect("runtime metadata should deserialize");
 
     assert_eq!(metadata.runtime.dialog_appearance.font_family, "Mono");
-    assert_eq!(metadata.runtime.dialog_appearance.border_color_hex, "#112233");
+    assert_eq!(
+        metadata.runtime.dialog_appearance.border_color_hex,
+        "#112233"
+    );
     assert_eq!(metadata.runtime.dialog_appearance.menu_width_percent, 72);
     assert_eq!(
         metadata.runtime.dialog_appearance.dialog_speaker_text,
@@ -215,7 +240,10 @@ fn runtime_post_process_settings_resolve_quantize_palette_from_registry() {
     let resolved = settings.resolve(&std::collections::BTreeMap::new());
 
     assert_eq!(resolved.mode, PostProcessMode::Quantize4);
-    assert_eq!(resolved.quantize_palette.colors[0], [0x10, 0x18, 0x2B, 0xFF]);
+    assert_eq!(
+        resolved.quantize_palette.colors[0],
+        [0x10, 0x18, 0x2B, 0xFF]
+    );
 }
 
 #[test]

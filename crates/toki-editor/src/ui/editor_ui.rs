@@ -16,10 +16,10 @@ mod editor_ui_animation_authoring;
 mod editor_ui_animation_editor;
 #[path = "editor_ui_asset_palette.rs"]
 mod editor_ui_asset_palette;
-#[path = "editor_ui_entity_editor.rs"]
-mod editor_ui_entity_editor;
 #[path = "editor_ui_dialog_editor.rs"]
 mod editor_ui_dialog_editor;
+#[path = "editor_ui_entity_editor.rs"]
+mod editor_ui_entity_editor;
 #[path = "editor_ui_graph.rs"]
 mod editor_ui_graph;
 #[path = "editor_ui_hierarchy_panel.rs"]
@@ -235,7 +235,11 @@ pub enum EditorConfirmation {
 impl ProjectEditorState {
     pub fn set_available_palettes(&mut self, project_palettes: &BTreeMap<String, Palette4>) {
         let mut palettes = builtin_palettes();
-        palettes.extend(project_palettes.iter().map(|(id, palette)| (id.clone(), *palette)));
+        palettes.extend(
+            project_palettes
+                .iter()
+                .map(|(id, palette)| (id.clone(), *palette)),
+        );
         self.available_palettes = palettes;
     }
 

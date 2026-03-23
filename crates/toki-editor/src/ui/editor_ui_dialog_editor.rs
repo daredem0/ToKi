@@ -111,7 +111,10 @@ fn unique_dialog_id(existing_dialog_ids: &[String]) -> String {
     let mut index = 1usize;
     loop {
         let candidate = format!("dialog_{index}");
-        if !existing_dialog_ids.iter().any(|existing| existing == &candidate) {
+        if !existing_dialog_ids
+            .iter()
+            .any(|existing| existing == &candidate)
+        {
             return candidate;
         }
         index += 1;
@@ -148,9 +151,6 @@ mod tests {
             }],
         }];
         let available = DialogEditorState::collect_available_dialogs(&dialogs);
-        assert_eq!(
-            available.get("intro"),
-            Some(&vec!["accepted".to_string()])
-        );
+        assert_eq!(available.get("intro"), Some(&vec!["accepted".to_string()]));
     }
 }

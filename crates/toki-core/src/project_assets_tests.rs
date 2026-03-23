@@ -1,13 +1,13 @@
+use crate::assets::atlas::ColorMode;
+use crate::graphics::image::{load_image_rgba8, save_image_rgba8};
+use crate::palette::{save_palette_asset_to_path, validate_indexed_rgba8, Palette4};
 use crate::project_assets::{
-    classify_sprite_metadata_file, discover_audio_files, discover_project_scene_paths,
-    discover_palette_assets, discover_sprite_metadata, load_entity_definition_from_path,
+    classify_sprite_metadata_file, discover_audio_files, discover_palette_assets,
+    discover_project_scene_paths, discover_sprite_metadata, load_entity_definition_from_path,
     load_project_palettes, load_scene_from_path, normalize_asset_name,
     resolve_project_resource_paths, scene_file_path, tilemap_file_path, ProjectAudioFormat,
     SpriteMetadataFileKind,
 };
-use crate::assets::atlas::ColorMode;
-use crate::graphics::image::{load_image_rgba8, save_image_rgba8};
-use crate::palette::{save_palette_asset_to_path, validate_indexed_rgba8, Palette4};
 use std::fs;
 
 // ============================================================================
@@ -884,11 +884,11 @@ indexed_palette_override = "gb_default"
         16,
         16,
         &[
-            0x00, 0x00, 0x00, 0xFF, 0x55, 0x55, 0x55, 0xFF, 0xAA, 0xAA, 0xAA, 0xFF, 0xFF,
-            0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x55, 0x55, 0x55, 0xFF, 0xAA, 0xAA,
-            0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x55, 0x55, 0x55,
-            0xFF, 0xAA, 0xAA, 0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0xFF,
-            0x55, 0x55, 0x55, 0xFF, 0xAA, 0xAA, 0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0x00, 0x00, 0x00, 0xFF, 0x55, 0x55, 0x55, 0xFF, 0xAA, 0xAA, 0xAA, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x55, 0x55, 0x55, 0xFF, 0xAA, 0xAA, 0xAA, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x55, 0x55, 0x55, 0xFF, 0xAA, 0xAA,
+            0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x55, 0x55, 0x55, 0xFF,
+            0xAA, 0xAA, 0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
         ]
         .repeat(16),
     )
@@ -900,9 +900,14 @@ indexed_palette_override = "gb_default"
             .join("truecolor_demo.png"),
         16,
         16,
-        &[[255, 64, 96, 255], [96, 200, 96, 255], [255, 220, 64, 255], [255, 255, 255, 255]]
-            .concat()
-            .repeat(16 * 16 / 4),
+        &[
+            [255, 64, 96, 255],
+            [96, 200, 96, 255],
+            [255, 220, 64, 255],
+            [255, 255, 255, 255],
+        ]
+        .concat()
+        .repeat(16 * 16 / 4),
     )
     .expect("truecolor png");
     save_image_rgba8(
@@ -912,9 +917,14 @@ indexed_palette_override = "gb_default"
             .join("terrain.png"),
         16,
         16,
-        &[[32, 160, 64, 255], [48, 184, 80, 255], [32, 160, 64, 255], [48, 184, 80, 255]]
-            .concat()
-            .repeat(16 * 16 / 4),
+        &[
+            [32, 160, 64, 255],
+            [48, 184, 80, 255],
+            [32, 160, 64, 255],
+            [48, 184, 80, 255],
+        ]
+        .concat()
+        .repeat(16 * 16 / 4),
     )
     .expect("terrain png");
 
@@ -948,13 +958,17 @@ indexed_palette_override = "gb_default"
     assert_eq!(scene.maps, vec!["palette_demo_map".to_string()]);
     assert_eq!(scene.entities.len(), 2);
     assert_eq!(
-        scene.player_entry.as_ref().map(|entry| entry.entity_definition_name.as_str()),
+        scene
+            .player_entry
+            .as_ref()
+            .map(|entry| entry.entity_definition_name.as_str()),
         Some("palette_player")
     );
 
-    let definition =
-        load_entity_definition_from_path(&project_root.join("entities").join("palette_player.json"))
-            .expect("palette player definition should parse");
+    let definition = load_entity_definition_from_path(
+        &project_root.join("entities").join("palette_player.json"),
+    )
+    .expect("palette player definition should parse");
     assert_eq!(definition.animations.atlas_name, "indexed_demo.json");
 
     let project_palettes = load_project_palettes(project_root).expect("project palettes");
@@ -972,7 +986,10 @@ indexed_palette_override = "gb_default"
         &project_root.join("entities").join("truecolor_flower.json"),
     )
     .expect("truecolor flower definition should parse");
-    assert_eq!(truecolor_definition.animations.atlas_name, "truecolor_demo.json");
+    assert_eq!(
+        truecolor_definition.animations.atlas_name,
+        "truecolor_demo.json"
+    );
 
     let resolved = resolve_project_resource_paths(project_root, Some("palette_demo_map"))
         .expect("example project should resolve runtime resource paths");

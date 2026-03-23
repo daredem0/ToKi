@@ -2,8 +2,8 @@ use super::{
     collect_map_object_sprite_render_requests, resolve_atlas_tile_frame,
     resolve_object_sheet_frame, resolve_sprite_render_request, resolve_sprite_render_requests,
     sort_sprite_render_requests, ResolvedSpriteVisual, SpriteAssetResolver, SpriteRenderMaterial,
-    SpriteRenderOrigin, SpriteRenderRequest, SpriteRenderSize, SpriteResolveError,
-    SpriteSortKey, SpriteVisualRef,
+    SpriteRenderOrigin, SpriteRenderRequest, SpriteRenderSize, SpriteResolveError, SpriteSortKey,
+    SpriteVisualRef,
 };
 use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use crate::assets::object_sheet::{ObjectSheetMeta, ObjectSheetType, ObjectSpriteInfo};

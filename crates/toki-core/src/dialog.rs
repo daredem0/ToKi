@@ -133,26 +133,31 @@ impl DialogTree {
     pub fn validate(&self) -> DialogValidationReport {
         let mut report = DialogValidationReport::default();
         if self.id.trim().is_empty() {
-            report.errors.push("Dialog id must not be empty".to_string());
+            report
+                .errors
+                .push("Dialog id must not be empty".to_string());
         }
         if self.entry_node_id.trim().is_empty() {
-            report
-                .errors
-                .push(format!("Dialog '{}' entry node id must not be empty", self.id));
+            report.errors.push(format!(
+                "Dialog '{}' entry node id must not be empty",
+                self.id
+            ));
         }
         if self.nodes.is_empty() {
-            report
-                .errors
-                .push(format!("Dialog '{}' must contain at least one node", self.id));
+            report.errors.push(format!(
+                "Dialog '{}' must contain at least one node",
+                self.id
+            ));
             return report;
         }
 
         let mut node_map = HashMap::new();
         for node in &self.nodes {
             if node.id.trim().is_empty() {
-                report
-                    .errors
-                    .push(format!("Dialog '{}' contains a node with an empty id", self.id));
+                report.errors.push(format!(
+                    "Dialog '{}' contains a node with an empty id",
+                    self.id
+                ));
                 continue;
             }
             if node_map.insert(node.id.clone(), node).is_some() {
@@ -282,10 +287,13 @@ impl DialogTree {
 impl DialogNode {
     pub fn next_node_ids(&self) -> Vec<&str> {
         match &self.kind {
-            DialogNodeKind::Line { next_node_id, .. } => next_node_id.iter().map(String::as_str).collect(),
-            DialogNodeKind::Choice { choices, .. } => {
-                choices.iter().map(|choice| choice.next_node_id.as_str()).collect()
+            DialogNodeKind::Line { next_node_id, .. } => {
+                next_node_id.iter().map(String::as_str).collect()
             }
+            DialogNodeKind::Choice { choices, .. } => choices
+                .iter()
+                .map(|choice| choice.next_node_id.as_str())
+                .collect(),
             DialogNodeKind::Branch {
                 branches,
                 default_next_node_id,

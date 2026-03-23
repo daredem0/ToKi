@@ -96,7 +96,7 @@ fn create_test_entity() -> Entity {
         palette_override: None,
         animation_controller: Some(controller),
         static_object_render: None,
-            grounding: Default::default(),
+        grounding: Default::default(),
         render_layer: 2,
         active: true,
         can_move: true,

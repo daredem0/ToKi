@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::object_sheet::ObjectSheetMeta;
-use crate::palette::Palette4;
 use crate::assets::tilemap::TileMap;
 use crate::entity::EntityId;
+use crate::palette::Palette4;
 use crate::sprite::SpriteFrame;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,7 +58,10 @@ pub struct SpriteRenderRequest {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpriteRenderMaterial {
     TrueColor,
-    PaletteIndexed { palette_id: String, palette: Palette4 },
+    PaletteIndexed {
+        palette_id: String,
+        palette: Palette4,
+    },
 }
 
 #[derive(Debug, Clone)]

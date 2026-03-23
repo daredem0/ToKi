@@ -139,7 +139,10 @@ fn load_project_palettes_reads_palette_json_files() {
     let palettes = assets
         .load_project_palettes()
         .expect("palette load should succeed");
-    assert_eq!(palettes.keys().cloned().collect::<Vec<_>>(), vec!["forest", "night"]);
+    assert_eq!(
+        palettes.keys().cloned().collect::<Vec<_>>(),
+        vec!["forest", "night"]
+    );
 }
 
 #[test]

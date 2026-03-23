@@ -1,8 +1,8 @@
 //! Component section rendering for entity editor.
 
 use crate::ui::EditorUI;
-use toki_core::entity::EntityFootprint;
 use toki_core::entity::AiBehavior;
+use toki_core::entity::EntityFootprint;
 
 use super::widgets::{render_sfx_dropdown, show_field_error};
 

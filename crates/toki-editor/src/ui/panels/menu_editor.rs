@@ -308,7 +308,10 @@ fn paint_ui_block(
         painter.rect_stroke(
             rect,
             0.0,
-            egui::Stroke::new(block.border_thickness.max(1.0), menu_preview_color32(border)),
+            egui::Stroke::new(
+                block.border_thickness.max(1.0),
+                menu_preview_color32(border),
+            ),
             egui::StrokeKind::Outside,
         );
     }

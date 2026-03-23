@@ -4,7 +4,9 @@ use super::{
     load_runtime_config_from_candidates, option_value, parse_launch_options,
 };
 use std::path::PathBuf;
-use toki_core::menu::{MenuAppearance, MenuItemDefinition, MenuScreenDefinition, MenuSettings, UiAction};
+use toki_core::menu::{
+    MenuAppearance, MenuItemDefinition, MenuScreenDefinition, MenuSettings, UiAction,
+};
 use toki_core::project_runtime::{
     PostProcessMode, QuantizeStrategy, RuntimeConfigAudio, RuntimeConfigDisplay, RuntimeConfigFile,
     RuntimeConfigPack, RuntimeConfigSplash, RuntimeConfigStartup, RuntimePostProcessSettings,
@@ -508,12 +510,11 @@ fn apply_project_runtime_settings_loads_dedicated_dialog_appearance() {
     )
     .expect("project");
 
-    let updated = apply_project_runtime_settings_from_project_file_if_present(
-        RuntimeLaunchOptions {
+    let updated =
+        apply_project_runtime_settings_from_project_file_if_present(RuntimeLaunchOptions {
             project_path: Some(dir.path().to_path_buf()),
             ..RuntimeLaunchOptions::default()
-        },
-    );
+        });
 
     assert_eq!(
         updated.dialog_appearance,

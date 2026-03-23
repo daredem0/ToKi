@@ -22,9 +22,9 @@ pub mod utilities;
 // Re-export commonly used items
 pub use composition::{compose_dialog_ui, compose_menu_ui};
 pub use constants::{
-    DEFAULT_BACKGROUND_COLOR, DEFAULT_BORDER_COLOR, DEFAULT_BUTTON_SPACING_PX,
-    DEFAULT_BORDER_THICKNESS_PX, DEFAULT_ENTRY_BACKGROUND_COLOR, DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE_PX,
-    DEFAULT_FOOTER_SPACING_PX, DEFAULT_FOOTER_TEXT, DEFAULT_HEIGHT_PERCENT,
+    DEFAULT_BACKGROUND_COLOR, DEFAULT_BORDER_COLOR, DEFAULT_BORDER_THICKNESS_PX,
+    DEFAULT_BUTTON_SPACING_PX, DEFAULT_ENTRY_BACKGROUND_COLOR, DEFAULT_FONT_FAMILY,
+    DEFAULT_FONT_SIZE_PX, DEFAULT_FOOTER_SPACING_PX, DEFAULT_FOOTER_TEXT, DEFAULT_HEIGHT_PERCENT,
     DEFAULT_OPACITY_PERCENT, DEFAULT_TEXT_COLOR, DEFAULT_TITLE_BACKGROUND_COLOR,
     DEFAULT_TITLE_SPACING_PX, DEFAULT_WIDTH_PERCENT,
 };
@@ -32,8 +32,8 @@ pub use controller::MenuController;
 pub use layout::{build_dialog_layout, build_menu_layout};
 pub use types::{
     InventoryEntry, MenuAppearance, MenuBorderStyle, MenuDialogDefinition, MenuDialogLayout,
-    MenuDialogPosition, MenuDialogView, MenuEntryLayout, MenuInput, MenuItemDefinition,
-    MenuLayout, MenuLayoutBlock, MenuListSource, MenuRect, MenuScreenDefinition, MenuSettings,
+    MenuDialogPosition, MenuDialogView, MenuEntryLayout, MenuInput, MenuItemDefinition, MenuLayout,
+    MenuLayoutBlock, MenuListSource, MenuRect, MenuScreenDefinition, MenuSettings,
     MenuTextAppearance, MenuView, MenuViewEntry, MenuVisualMetrics,
 };
 pub use utilities::{

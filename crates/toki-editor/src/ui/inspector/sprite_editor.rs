@@ -1,7 +1,7 @@
 use super::*;
+use crate::ui::sprite_editor::{canonical_indexed_color, indexed_slot_for_authored_color};
 use toki_core::assets::atlas::ColorMode;
 use toki_core::palette::validate_indexed_rgba8;
-use crate::ui::sprite_editor::{canonical_indexed_color, indexed_slot_for_authored_color};
 
 impl InspectorSystem {
     pub(super) fn render_sprite_editor_inspector(
@@ -260,15 +260,18 @@ fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         ensure_valid_indexed_foreground_color(ui_state);
         if let Some(palette_id) = ui_state.sprite.selected_palette_id.clone() {
             if let Some(palette) = ui_state.project.available_palettes.get(&palette_id) {
-                let selected_slot =
-                    indexed_slot_for_authored_color(ui_state.sprite.foreground_color, Some(*palette));
+                let selected_slot = indexed_slot_for_authored_color(
+                    ui_state.sprite.foreground_color,
+                    Some(*palette),
+                );
                 ui.horizontal_wrapped(|ui| {
                     for (slot, color) in palette.colors.iter().copied().enumerate() {
                         let pixel_color = PixelColor::from_rgba_array(color);
                         let is_selected = selected_slot == Some(slot);
                         let (rect, response) =
                             ui.allocate_exact_size(egui::vec2(24.0, 24.0), egui::Sense::click());
-                        ui.painter().rect_filled(rect, 3.0, pixel_color.to_color32());
+                        ui.painter()
+                            .rect_filled(rect, 3.0, pixel_color.to_color32());
                         ui.painter().rect_stroke(
                             rect,
                             3.0,

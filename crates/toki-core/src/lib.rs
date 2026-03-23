@@ -13,12 +13,12 @@ pub mod math {
 }
 pub mod errors;
 pub use errors::CoreError;
-pub mod pack;
 pub mod dialog;
 pub mod dialog_runtime;
+pub mod pack;
+pub mod palette;
 pub mod project_assets;
 pub mod project_content;
-pub mod palette;
 pub mod project_runtime;
 pub use project_runtime::TimingMode;
 
@@ -41,8 +41,7 @@ pub use camera::{Camera, CameraController, CameraMode};
 
 pub mod events;
 pub use events::{
-    DialogStartRequest, EventHandler, EventQueue, GameEvent, GameUpdateResult,
-    SceneSwitchRequest,
+    DialogStartRequest, EventHandler, EventQueue, GameEvent, GameUpdateResult, SceneSwitchRequest,
 };
 
 pub mod ai;

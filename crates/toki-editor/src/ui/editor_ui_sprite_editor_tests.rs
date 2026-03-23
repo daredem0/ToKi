@@ -41,10 +41,22 @@ fn pixel_color_to_array_roundtrip() {
 
 #[test]
 fn canonical_indexed_color_returns_expected_shades() {
-    assert_eq!(canonical_indexed_color(0), PixelColor::rgb(0x00, 0x00, 0x00));
-    assert_eq!(canonical_indexed_color(1), PixelColor::rgb(0x55, 0x55, 0x55));
-    assert_eq!(canonical_indexed_color(2), PixelColor::rgb(0xAA, 0xAA, 0xAA));
-    assert_eq!(canonical_indexed_color(3), PixelColor::rgb(0xFF, 0xFF, 0xFF));
+    assert_eq!(
+        canonical_indexed_color(0),
+        PixelColor::rgb(0x00, 0x00, 0x00)
+    );
+    assert_eq!(
+        canonical_indexed_color(1),
+        PixelColor::rgb(0x55, 0x55, 0x55)
+    );
+    assert_eq!(
+        canonical_indexed_color(2),
+        PixelColor::rgb(0xAA, 0xAA, 0xAA)
+    );
+    assert_eq!(
+        canonical_indexed_color(3),
+        PixelColor::rgb(0xFF, 0xFF, 0xFF)
+    );
 }
 
 #[test]
@@ -71,7 +83,10 @@ fn nearest_palette_slot_prefers_closest_palette_color() {
         [255, 255, 255, 255],
     ]);
 
-    assert_eq!(nearest_palette_slot(PixelColor::rgb(120, 130, 125), palette), 2);
+    assert_eq!(
+        nearest_palette_slot(PixelColor::rgb(120, 130, 125), palette),
+        2
+    );
 }
 
 // ============================================================================
@@ -858,8 +873,14 @@ fn sprite_editor_state_sync_palette_selection_keeps_valid_loaded_palette() {
     };
 
     let palettes = std::collections::BTreeMap::from([
-        ("gb_default".to_string(), toki_core::palette::builtin_palettes()["gb_default"]),
-        ("sepia".to_string(), toki_core::palette::builtin_palettes()["sepia"]),
+        (
+            "gb_default".to_string(),
+            toki_core::palette::builtin_palettes()["gb_default"],
+        ),
+        (
+            "sepia".to_string(),
+            toki_core::palette::builtin_palettes()["sepia"],
+        ),
     ]);
 
     state.sync_palette_selection(&palettes);
@@ -876,8 +897,14 @@ fn sprite_editor_state_sync_palette_selection_falls_back_to_first_available_pale
     };
 
     let palettes = std::collections::BTreeMap::from([
-        ("gb_default".to_string(), toki_core::palette::builtin_palettes()["gb_default"]),
-        ("sepia".to_string(), toki_core::palette::builtin_palettes()["sepia"]),
+        (
+            "gb_default".to_string(),
+            toki_core::palette::builtin_palettes()["gb_default"],
+        ),
+        (
+            "sepia".to_string(),
+            toki_core::palette::builtin_palettes()["sepia"],
+        ),
     ]);
 
     state.sync_palette_selection(&palettes);
@@ -918,7 +945,10 @@ fn sprite_editor_state_save_current_atlas_preserves_existing_tile_metadata() {
     state.save_current_asset().unwrap();
 
     let saved = AtlasMeta::load_from_file(temp.path().join("sprite.json")).unwrap();
-    assert_eq!(saved.color_mode, toki_core::assets::atlas::ColorMode::PaletteIndexed);
+    assert_eq!(
+        saved.color_mode,
+        toki_core::assets::atlas::ColorMode::PaletteIndexed
+    );
     assert_eq!(saved.palette.as_deref(), Some("gb_default"));
 
     let idle_0 = saved.tiles.get("idle_0").unwrap();
@@ -1061,8 +1091,14 @@ fn sprite_editor_state_save_current_object_sheet_preserves_existing_object_names
     state.save_current_asset().unwrap();
 
     let saved = ObjectSheetMeta::load_from_file(temp.path().join("objects.json")).unwrap();
-    assert_eq!(saved.objects.get("torch").unwrap().position, glam::UVec2::new(0, 0));
-    assert_eq!(saved.objects.get("barrel").unwrap().position, glam::UVec2::new(1, 0));
+    assert_eq!(
+        saved.objects.get("torch").unwrap().position,
+        glam::UVec2::new(0, 0)
+    );
+    assert_eq!(
+        saved.objects.get("barrel").unwrap().position,
+        glam::UVec2::new(1, 0)
+    );
     assert_eq!(
         saved.objects.get("object_2").unwrap().position,
         glam::UVec2::new(2, 0)

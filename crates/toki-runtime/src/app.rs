@@ -50,8 +50,8 @@ mod app_transition;
 #[path = "runtime_menu.rs"]
 mod runtime_menu;
 
-use app_splash::{ResolvedSplashConfig, SplashPolicy};
 use app_runtime_settings::RuntimeMenuOverlay;
+use app_splash::{ResolvedSplashConfig, SplashPolicy};
 use app_transition::SceneTransitionController;
 use toki_core::project_assets::first_existing_path;
 
