@@ -151,6 +151,7 @@ pub struct RuntimeLaunchOptions {
     pub pack_path: Option<PathBuf>,
     pub scene_name: Option<String>,
     pub map_name: Option<String>,
+    pub scene_persistence: bool,
     pub splash: RuntimeSplashOptions,
     pub audio_mix: RuntimeAudioMixOptions,
     pub display: RuntimeDisplayOptions,

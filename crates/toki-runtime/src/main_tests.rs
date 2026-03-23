@@ -403,6 +403,9 @@ music_percent = 72
 movement_percent = 58
 collision_percent = 31
 
+[runtime]
+scene_persistence = true
+
 [runtime.display]
 show_entity_health_bars = true
 show_ground_shadows = false
@@ -435,6 +438,7 @@ kind = "close_menu"
     assert_eq!(updated.audio_mix.music_percent, 72);
     assert_eq!(updated.audio_mix.movement_percent, 58);
     assert_eq!(updated.audio_mix.collision_percent, 31);
+    assert!(updated.scene_persistence);
     assert!(updated.display.show_entity_health_bars);
     assert!(!updated.display.show_ground_shadows);
     assert_eq!(updated.menu.pause_root_screen_id, "custom_pause");

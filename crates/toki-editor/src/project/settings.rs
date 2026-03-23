@@ -9,6 +9,7 @@ pub struct ProjectSettingsDraft {
     pub version: String,
     pub description: String,
     pub splash_duration_ms: u64,
+    pub scene_persistence: bool,
     pub show_entity_health_bars: bool,
     pub show_ground_shadows: bool,
     pub resolution_width: u32,
@@ -40,6 +41,7 @@ impl ProjectSettingsDraft {
             version: project.metadata.project.version.clone(),
             description: project.metadata.project.description.clone(),
             splash_duration_ms: project.metadata.runtime.splash.duration_ms,
+            scene_persistence: project.metadata.runtime.scene_persistence,
             show_entity_health_bars: project.metadata.runtime.display.show_entity_health_bars,
             show_ground_shadows: project.metadata.runtime.display.show_ground_shadows,
             resolution_width: project.metadata.runtime.display.resolution_width,
@@ -122,6 +124,10 @@ pub fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettin
     }
     if project.metadata.runtime.splash.duration_ms != draft.splash_duration_ms {
         project.metadata.runtime.splash.duration_ms = draft.splash_duration_ms;
+        changed = true;
+    }
+    if project.metadata.runtime.scene_persistence != draft.scene_persistence {
+        project.metadata.runtime.scene_persistence = draft.scene_persistence;
         changed = true;
     }
     if project.metadata.runtime.display.show_entity_health_bars != draft.show_entity_health_bars {
@@ -257,6 +263,7 @@ mod tests {
             version: "2.0.0".to_string(),
             description: "Updated description".to_string(),
             splash_duration_ms: 4500,
+            scene_persistence: true,
             show_entity_health_bars: true,
             show_ground_shadows: false,
             resolution_width: 320,
@@ -288,6 +295,7 @@ mod tests {
         assert_eq!(project.metadata.project.version, "2.0.0");
         assert_eq!(project.metadata.project.description, "Updated description");
         assert_eq!(project.metadata.runtime.splash.duration_ms, 4500);
+        assert!(project.metadata.runtime.scene_persistence);
         assert!(project.metadata.runtime.display.show_entity_health_bars);
         assert!(!project.metadata.runtime.display.show_ground_shadows);
         assert_eq!(

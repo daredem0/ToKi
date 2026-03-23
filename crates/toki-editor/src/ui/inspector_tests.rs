@@ -249,6 +249,7 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
         version: "2.0.0".to_string(),
         description: "Updated description".to_string(),
         splash_duration_ms: 4500,
+        scene_persistence: true,
         show_entity_health_bars: true,
         show_ground_shadows: false,
         resolution_width: 160,
@@ -281,6 +282,7 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
     assert_eq!(project.metadata.project.version, "2.0.0");
     assert_eq!(project.metadata.project.description, "Updated description");
     assert_eq!(project.metadata.runtime.splash.duration_ms, 4500);
+    assert!(project.metadata.runtime.scene_persistence);
     assert!(project.metadata.runtime.display.show_entity_health_bars);
     assert!(!project.metadata.runtime.display.show_ground_shadows);
     assert_eq!(project.metadata.runtime.audio.master_percent, 85);

@@ -43,6 +43,7 @@ fn runtime_settings_defaults_match_engine_baseline() {
     assert_eq!(settings.audio.music_percent, 100);
     assert_eq!(settings.audio.movement_percent, 100);
     assert_eq!(settings.audio.collision_percent, 100);
+    assert!(!settings.scene_persistence);
     assert!(!settings.display.show_entity_health_bars);
     assert!(settings.display.show_ground_shadows);
     assert_eq!(settings.display.indexed_palette_override, None);
@@ -95,6 +96,9 @@ fn runtime_metadata_supports_global_indexed_palette_override() {
 fn runtime_metadata_supports_post_process_settings() {
     let metadata: ProjectRuntimeMetadata = toml::from_str(
         r#"
+        [runtime]
+        scene_persistence = true
+
         [runtime.display.post_process]
         mode = "brightness_saturation"
         quantize_strategy = "rgb_distance"
@@ -124,6 +128,7 @@ fn runtime_metadata_supports_post_process_settings() {
     assert_eq!(metadata.runtime.display.post_process.quantize_palette_id, "poison");
     assert_eq!(metadata.runtime.display.post_process.gb_contrast_percent, 18);
     assert_eq!(metadata.runtime.display.post_process.vignette_strength_percent, 72);
+    assert!(metadata.runtime.scene_persistence);
 }
 
 #[test]

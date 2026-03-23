@@ -408,6 +408,12 @@ impl InspectorSystem {
                     )
                     .changed();
             });
+            changed |= ui
+                .checkbox(
+                    &mut draft.scene_persistence,
+                    "Persist Scene State Across Scene Changes",
+                )
+                .changed();
         });
 
         ui.separator();

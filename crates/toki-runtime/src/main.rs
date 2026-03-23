@@ -313,6 +313,7 @@ fn apply_project_runtime_settings_from_project_file_if_present(
         launch_options.audio_mix.collision_percent =
             metadata.runtime.audio.collision_percent.min(100);
     }
+    launch_options.scene_persistence = metadata.runtime.scene_persistence;
     if should_apply_display {
         launch_options.display.show_entity_health_bars =
             metadata.runtime.display.show_entity_health_bars;

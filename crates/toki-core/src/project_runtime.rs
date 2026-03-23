@@ -57,6 +57,8 @@ pub struct RuntimeSettings {
     pub splash: RuntimeSplashSettings,
     #[serde(default)]
     pub audio: RuntimeAudioMixSettings,
+    #[serde(default = "default_scene_persistence")]
+    pub scene_persistence: bool,
     #[serde(default)]
     pub display: RuntimeDisplaySettings,
     #[serde(default)]
@@ -372,6 +374,10 @@ pub const fn default_post_process_vignette_strength_percent() -> u8 {
 
 pub const fn default_show_ground_shadows() -> bool {
     true
+}
+
+pub const fn default_scene_persistence() -> bool {
+    false
 }
 
 /// Default zoom level (100 = 1.0x, no zoom)

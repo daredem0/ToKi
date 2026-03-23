@@ -2,19 +2,22 @@
 name = "TopDownBundle"
 version = "1.0.0"
 created = "2025-08-28T20:32:34.920817717Z"
-modified = "2026-03-23T18:05:06.706778030Z"
+modified = "2026-03-23T19:06:29.020702556Z"
 toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
 main = "scenes/main.json"
-"Main Scene" = "scenes/Main Scene.json"
 "Scene 2" = "scenes/Scene 2.json"
+"Main Scene" = "scenes/Main Scene.json"
 
 [assets]
 sprites = "assets/sprites/"
 tilemaps = "assets/tilemaps/"
 audio = "assets/audio/"
+
+[runtime]
+scene_persistence = true
 
 [runtime.splash]
 duration_ms = 1200
@@ -37,6 +40,7 @@ timing_mode = "delta"
 
 [runtime.display.post_process]
 mode = "none"
+quantize_strategy = "luminance"
 tint_color = [
     32,
     64,
@@ -44,8 +48,11 @@ tint_color = [
     255,
 ]
 tint_strength_percent = 35
+brightness_percent = 0
+saturation_percent = 100
 quantize_palette_id = "gray"
 gb_contrast_percent = 0
+vignette_strength_percent = 60
 
 [runtime.menu]
 pause_root_screen_id = "pause_menu"
@@ -95,14 +102,6 @@ surface_id = "inventory_menu"
 
 [[runtime.menu.screens.items]]
 kind = "button"
-text = "Exit Game"
-
-[runtime.menu.screens.items.action]
-kind = "open_surface"
-surface_id = "end_game"
-
-[[runtime.menu.screens.items]]
-kind = "button"
 text = "Audio Settings"
 
 [runtime.menu.screens.items.action]
@@ -114,6 +113,14 @@ text = "Graphics Settings"
 
 [runtime.menu.screens.items.action]
 kind = "open_graphics_settings"
+
+[[runtime.menu.screens.items]]
+kind = "button"
+text = "Exit Game"
+
+[runtime.menu.screens.items.action]
+kind = "open_surface"
+surface_id = "end_game"
 
 [[runtime.menu.screens]]
 id = "inventory_menu"
@@ -159,6 +166,10 @@ pan = [
 ]
 
 [editor.graph_layouts."Scene 2".node_positions]
+"node:2" = [
+    800.0,
+    50.0,
+]
 "node:1" = [
     60.0,
     50.0,
@@ -171,10 +182,6 @@ pan = [
     430.0,
     50.0,
 ]
-"node:2" = [
-    800.0,
-    50.0,
-]
 
 [editor.graph_layouts."Main Scene"]
 zoom = 0.7297272086143494
@@ -184,77 +191,77 @@ pan = [
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
-"node:10" = [
+"node:16" = [
     60.0,
-    210.296875,
-]
-"node:1" = [
-    60.0,
-    64.328125,
+    307.609375,
 ]
 "node:2" = [
     469.625,
     64.328125,
 ]
-"node:18" = [
-    259.625,
-    307.609375,
-]
-"node:3" = [
-    246.0,
-    64.328125,
-]
-"node:6" = [
-    244.359375,
-    112.984375,
-]
-"node:17" = [
-    483.578125,
-    307.609375,
-]
 "node:14" = [
     522.25,
     258.953125,
 ]
-"node:4" = [
+"node:13" = [
     60.0,
-    112.984375,
-]
-"node:9" = [
-    318.65625,
-    161.640625,
-]
-"node:8" = [
-    615.984375,
-    161.640625,
-]
-"node:7" = [
-    60.0,
-    161.640625,
+    258.953125,
 ]
 "node:15" = [
     262.625,
     258.953125,
 ]
+"node:10" = [
+    60.0,
+    210.296875,
+]
 "node:11" = [
     584.375,
     210.296875,
 ]
-"node:16" = [
-    60.0,
+"node:17" = [
+    483.578125,
     307.609375,
 ]
-"node:5" = [
-    488.640625,
-    112.984375,
+"node:8" = [
+    615.984375,
+    161.640625,
+]
+"node:9" = [
+    318.65625,
+    161.640625,
+]
+"node:3" = [
+    246.0,
+    64.328125,
 ]
 "node:12" = [
     293.71875,
     210.296875,
 ]
-"node:13" = [
+"node:7" = [
     60.0,
-    258.953125,
+    161.640625,
+]
+"node:6" = [
+    244.359375,
+    112.984375,
+]
+"node:1" = [
+    60.0,
+    64.328125,
+]
+"node:5" = [
+    488.640625,
+    112.984375,
+]
+"node:4" = [
+    60.0,
+    112.984375,
+]
+"node:18" = [
+    259.625,
+    307.609375,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]

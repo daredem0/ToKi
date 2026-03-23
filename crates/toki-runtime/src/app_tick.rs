@@ -65,6 +65,7 @@ impl App {
                 &mut self.asset_load_plan,
                 &mut self.scene_transition,
                 &self.launch_options.audio_mix,
+                self.launch_options.scene_persistence,
                 self.launch_options.display.indexed_palette_override.clone(),
                 content_root,
             );
@@ -83,6 +84,7 @@ impl App {
                 &mut self.asset_load_plan,
                 &mut self.scene_transition,
                 &self.launch_options.audio_mix,
+                self.launch_options.scene_persistence,
                 self.launch_options.display.indexed_palette_override.clone(),
                 content_root,
             );

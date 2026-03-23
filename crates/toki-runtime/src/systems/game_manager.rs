@@ -190,6 +190,10 @@ impl GameManager {
             .transition_to_scene(scene_name, spawn_point_id)
     }
 
+    pub fn sync_entities_to_active_scene(&mut self) {
+        self.game_state.sync_entities_to_active_scene();
+    }
+
     /// Get entities for camera system integration
     pub fn entities_for_camera(&self) -> Vec<Entity> {
         self.game_state.entities_owned()

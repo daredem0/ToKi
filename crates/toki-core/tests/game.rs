@@ -2456,6 +2456,59 @@ fn game_state_transition_to_scene_resets_non_player_entities_on_return() {
 }
 
 #[test]
+fn game_state_transition_to_scene_preserves_non_player_entities_when_scene_is_synced() {
+    let mut game_state = GameState::new_empty();
+    game_state.add_entity_definition(player_definition("player"));
+
+    let mut scene_a = Scene::new("Scene A".to_string());
+    scene_a.add_anchor(scene_anchor("return_spawn", IVec2::new(16, 16), None));
+    let mut hero = player_definition("player")
+        .create_entity(IVec2::new(0, 0), 1)
+        .expect("hero should instantiate");
+    hero.control_role = ControlRole::PlayerCharacter;
+    hero.entity_kind = EntityKind::Player;
+    scene_a.add_entity(hero);
+    let npc_id = scene_a.add_entity(
+        test_definition("villager", "creature")
+            .create_entity(IVec2::new(40, 40), 9)
+            .expect("npc should instantiate"),
+    );
+
+    let mut scene_b = Scene::new("Scene B".to_string());
+    scene_b.add_anchor(scene_anchor("entry_b", IVec2::new(96, 32), None));
+
+    game_state.add_scene(scene_a);
+    game_state.add_scene(scene_b);
+    game_state
+        .load_scene("Scene A")
+        .expect("initial scene should load");
+
+    {
+        let npc = game_state
+            .entity_manager_mut()
+            .get_entity_mut(npc_id)
+            .expect("npc should exist");
+        npc.position = IVec2::new(80, 80);
+        npc.attributes.active = false;
+    }
+    game_state.sync_entities_to_active_scene();
+
+    game_state
+        .transition_to_scene("Scene B", "entry_b")
+        .expect("transition to scene B should succeed");
+    game_state
+        .transition_to_scene("Scene A", "return_spawn")
+        .expect("transition back should succeed");
+
+    let npc = game_state
+        .entity_manager()
+        .get_entity(npc_id)
+        .expect("synced npc should be restored on return");
+    assert_eq!(npc.position, IVec2::new(80, 80));
+    assert!(!npc.attributes.active);
+}
+
+#[test]
 fn game_state_transition_to_scene_missing_spawn_fails_without_corrupting_state() {
     let mut game_state = GameState::new_empty();
     game_state.add_entity_definition(player_definition("player"));

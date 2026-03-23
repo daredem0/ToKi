@@ -21,6 +21,7 @@ pub(super) struct SceneRuntimeCoordinator<'a> {
     asset_load_plan: &'a mut RuntimeAssetLoadPlan,
     scene_transition: &'a mut SceneTransitionController,
     audio_mix: &'a RuntimeAudioMixOptions,
+    scene_persistence: bool,
     indexed_palette_override: Option<String>,
     content_root: Option<PathBuf>,
 }
@@ -37,6 +38,7 @@ impl<'a> SceneRuntimeCoordinator<'a> {
         asset_load_plan: &'a mut RuntimeAssetLoadPlan,
         scene_transition: &'a mut SceneTransitionController,
         audio_mix: &'a RuntimeAudioMixOptions,
+        scene_persistence: bool,
         indexed_palette_override: Option<String>,
         content_root: Option<PathBuf>,
     ) -> Self {
@@ -50,6 +52,7 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             asset_load_plan,
             scene_transition,
             audio_mix,
+            scene_persistence,
             indexed_palette_override,
             content_root,
         }
@@ -71,6 +74,9 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             self.audio_mix.music_percent,
         ) {
             super::app_transition::TransitionAdvance::ReadyToSwap(request) => {
+                if self.scene_persistence {
+                    self.game_system.sync_entities_to_active_scene();
+                }
                 let switch_result = self
                     .game_system
                     .transition_to_scene(&request.scene_name, &request.spawn_point_id);
@@ -248,6 +254,7 @@ impl App {
             &mut self.asset_load_plan,
             &mut self.scene_transition,
             &self.launch_options.audio_mix,
+            self.launch_options.scene_persistence,
             self.launch_options.display.indexed_palette_override.clone(),
             content_root,
         )
