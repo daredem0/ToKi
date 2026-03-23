@@ -422,6 +422,10 @@ fn pick_map_editor_tile_sets_selected_tile_and_switches_back_to_brush() {
 #[test]
 fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
     let mut ui = EditorUI::new();
+    let grounding = toki_core::entity::EntityGrounding {
+        origin: Some([8, 15]),
+        footprint: Some(toki_core::entity::EntityFootprint::new([4, 12], [8, 4])),
+    };
     ui.map.selected_tile_info = Some(super::MapEditorTileInfo {
         tile_x: 1,
         tile_y: 2,
@@ -434,6 +438,7 @@ fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
         object_name: "bush".to_string(),
         position: glam::UVec2::new(16, 32),
         size_px: glam::UVec2::new(16, 16),
+        grounding: grounding.clone(),
         visible: true,
         solid: false,
     };
@@ -467,35 +472,43 @@ fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
         .as_ref()
         .expect("selected object should remain");
     assert_eq!(selected.position, glam::UVec2::new(32, 32));
+    assert_eq!(selected.grounding, grounding);
     assert!(selected.solid);
 }
 
 #[test]
 fn queue_map_editor_object_property_edit_updates_selected_object_info() {
     let mut ui = EditorUI::new();
+    let grounding = toki_core::entity::EntityGrounding {
+        origin: Some([8, 15]),
+        footprint: Some(toki_core::entity::EntityFootprint::new([4, 12], [8, 4])),
+    };
     let object = toki_core::assets::tilemap::MapObjectInstance {
         sheet: std::path::PathBuf::from("fauna.json"),
         object_name: "bush".to_string(),
         position: glam::UVec2::new(16, 16),
         size_px: glam::UVec2::new(16, 16),
+        grounding: Default::default(),
         visible: true,
         solid: false,
     };
     ui.select_map_editor_object(2, &object);
 
-    ui.queue_map_editor_object_property_edit(2, false, true);
+    ui.queue_map_editor_object_property_edit(2, grounding.clone(), false, true);
 
     let selected = ui
         .map
         .selected_object_info
         .as_ref()
         .expect("selected object should exist");
+    assert_eq!(selected.grounding, grounding);
     assert!(!selected.visible);
     assert!(selected.solid);
     let request = ui
         .take_map_editor_object_property_edit_request()
         .expect("edit request should exist");
     assert_eq!(request.object_index, 2);
+    assert_eq!(request.grounding, grounding);
     assert!(!request.visible);
     assert!(request.solid);
 }

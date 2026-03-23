@@ -43,6 +43,7 @@ fn place_object_appends_map_object_instance() {
             object_name: "fauna_a".to_string(),
             position: UVec2::new(16, 32),
             size_px: UVec2::new(16, 16),
+            grounding: Default::default(),
             visible: true,
             solid: true,
         }]
@@ -58,6 +59,7 @@ fn object_index_at_world_prefers_last_placed_object() {
             object_name: "first".to_string(),
             position: UVec2::new(16, 16),
             size_px: UVec2::new(16, 16),
+            grounding: Default::default(),
             visible: true,
             solid: true,
         },
@@ -66,6 +68,7 @@ fn object_index_at_world_prefers_last_placed_object() {
             object_name: "second".to_string(),
             position: UVec2::new(16, 16),
             size_px: UVec2::new(16, 16),
+            grounding: Default::default(),
             visible: true,
             solid: true,
         },
@@ -104,6 +107,7 @@ fn object_index_at_world_ignores_invisible_objects() {
         object_name: "hidden".to_string(),
         position: UVec2::new(16, 16),
         size_px: UVec2::new(16, 16),
+        grounding: Default::default(),
         visible: false,
         solid: true,
     }];

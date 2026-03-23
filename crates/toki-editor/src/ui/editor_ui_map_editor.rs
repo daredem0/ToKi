@@ -3,6 +3,7 @@ use super::EditorUI;
 use crate::ui::undo_redo::EditorCommand;
 use std::path::PathBuf;
 use toki_core::assets::tilemap::{MapObjectInstance, TileMap};
+use toki_core::entity::EntityGrounding;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MapEditorTool {
@@ -30,6 +31,7 @@ pub struct MapEditorObjectInfo {
     pub object_name: String,
     pub position: glam::UVec2,
     pub size_px: glam::UVec2,
+    pub grounding: EntityGrounding,
     pub visible: bool,
     pub solid: bool,
 }
@@ -43,6 +45,7 @@ pub struct MapObjectMoveDragState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MapEditorObjectPropertyEditRequest {
     pub object_index: usize,
+    pub grounding: EntityGrounding,
     pub visible: bool,
     pub solid: bool,
 }
@@ -320,6 +323,7 @@ impl EditorUI {
             object_name: object.object_name.clone(),
             position: object.position,
             size_px: object.size_px,
+            grounding: object.grounding.clone(),
             visible: object.visible,
             solid: object.solid,
         });
@@ -344,6 +348,7 @@ impl EditorUI {
         selected.object_name = object.object_name.clone();
         selected.position = object.position;
         selected.size_px = object.size_px;
+        selected.grounding = object.grounding.clone();
         selected.visible = object.visible;
         selected.solid = object.solid;
     }
@@ -366,16 +371,19 @@ impl EditorUI {
     pub fn queue_map_editor_object_property_edit(
         &mut self,
         object_index: usize,
+        grounding: EntityGrounding,
         visible: bool,
         solid: bool,
     ) {
         self.map.object_edit_requested = Some(MapEditorObjectPropertyEditRequest {
             object_index,
+            grounding: grounding.clone(),
             visible,
             solid,
         });
         if let Some(selected) = self.map.selected_object_info.as_mut() {
             if selected.index == object_index {
+                selected.grounding = grounding;
                 selected.visible = visible;
                 selected.solid = solid;
             }

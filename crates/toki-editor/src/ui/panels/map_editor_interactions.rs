@@ -24,7 +24,10 @@ impl PanelSystem {
         let Some(object) = tilemap.objects.get(edit.object_index) else {
             return false;
         };
-        if object.visible == edit.visible && object.solid == edit.solid {
+        if object.visible == edit.visible
+            && object.solid == edit.solid
+            && object.grounding == edit.grounding
+        {
             return false;
         }
 
@@ -33,6 +36,7 @@ impl PanelSystem {
             ui_state.cancel_map_editor_edit();
             return false;
         };
+        object.grounding = edit.grounding;
         object.visible = edit.visible;
         object.solid = edit.solid;
         ui_state.finish_map_editor_edit(tilemap);

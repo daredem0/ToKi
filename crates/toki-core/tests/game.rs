@@ -2017,6 +2017,7 @@ fn game_state_player_is_blocked_by_solid_map_object_collision() {
         object_name: "bush".to_string(),
         position: UVec2::new(16, 0),
         size_px: UVec2::new(16, 16),
+        grounding: Default::default(),
         visible: true,
         solid: true,
     });

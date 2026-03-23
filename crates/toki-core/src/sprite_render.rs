@@ -379,7 +379,7 @@ pub fn collect_map_object_sprite_render_requests(tilemap: &TileMap) -> Vec<Sprit
                     position: object.position.as_ivec2(),
                 },
                 sort_key: SpriteSortKey {
-                    primary: object.position.y as i32 + object.size_px.y as i32,
+                    primary: object.ground_contact_y(),
                     secondary: 0,
                     sequence: index as u32,
                 },

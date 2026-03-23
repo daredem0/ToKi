@@ -1,6 +1,7 @@
 use super::{can_entity_move_to_position, can_place_collision_box_at_position, CollisionBox};
 use crate::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use crate::assets::tilemap::{MapObjectInstance, TileMap};
+use crate::entity::{EntityFootprint, EntityGrounding};
 use crate::entity::{Entity, EntityAttributes, EntityKind};
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
@@ -147,6 +148,7 @@ fn can_place_collision_box_rejects_overlap_with_solid_map_object() {
         object_name: "bush".to_string(),
         position: UVec2::new(16, 16),
         size_px: UVec2::new(16, 16),
+        grounding: Default::default(),
         visible: true,
         solid: true,
     });
@@ -168,6 +170,7 @@ fn can_place_collision_box_ignores_non_solid_map_object() {
         object_name: "bush".to_string(),
         position: UVec2::new(0, 0),
         size_px: UVec2::new(16, 16),
+        grounding: Default::default(),
         visible: true,
         solid: false,
     });
@@ -176,6 +179,38 @@ fn can_place_collision_box_ignores_non_solid_map_object() {
     assert!(can_place_collision_box_at_position(
         Some(&collision_box),
         IVec2::new(0, 0),
+        &tilemap,
+        &atlas,
+    ));
+}
+
+#[test]
+fn can_place_collision_box_ignores_tall_map_object_visual_area_above_its_footprint() {
+    let (mut tilemap, atlas) = collision_assets_with_center_solid_tile();
+    tilemap.tiles.fill("floor".to_string());
+    tilemap.objects.push(MapObjectInstance {
+        sheet: PathBuf::from("props.json"),
+        object_name: "tree".to_string(),
+        position: UVec2::new(16, 16),
+        size_px: UVec2::new(32, 48),
+        grounding: EntityGrounding {
+            origin: Some([16, 47]),
+            footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
+        },
+        visible: true,
+        solid: true,
+    });
+    let collision_box = CollisionBox::solid_box(UVec2::new(16, 16));
+
+    assert!(can_place_collision_box_at_position(
+        Some(&collision_box),
+        IVec2::new(16, 24),
+        &tilemap,
+        &atlas,
+    ));
+    assert!(!can_place_collision_box_at_position(
+        Some(&collision_box),
+        IVec2::new(24, 56),
         &tilemap,
         &atlas,
     ));

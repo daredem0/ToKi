@@ -57,13 +57,56 @@ impl InspectorSystem {
                         ));
                     });
 
+                    let mut grounding = selected_object.grounding.clone();
+                    let origin = grounding.origin.get_or_insert([
+                        (selected_object.size_px.x / 2) as i32,
+                        selected_object.size_px.y.saturating_sub(1) as i32,
+                    ]);
+                    ui.separator();
+                    ui.label("Grounding");
+                    let mut grounding_changed = false;
+                    ui.horizontal(|ui| {
+                        ui.label("Origin:");
+                        grounding_changed |= ui
+                            .add(egui::DragValue::new(&mut origin[0]).speed(1))
+                            .changed();
+                        grounding_changed |= ui
+                            .add(egui::DragValue::new(&mut origin[1]).speed(1))
+                            .changed();
+                    });
+                    let footprint = grounding.footprint.get_or_insert_with(|| {
+                        toki_core::entity::EntityFootprint::new(
+                            [0, 0],
+                            [selected_object.size_px.x, selected_object.size_px.y],
+                        )
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Footprint Offset:");
+                        grounding_changed |= ui
+                            .add(egui::DragValue::new(&mut footprint.offset[0]).speed(1))
+                            .changed();
+                        grounding_changed |= ui
+                            .add(egui::DragValue::new(&mut footprint.offset[1]).speed(1))
+                            .changed();
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Footprint Size:");
+                        grounding_changed |= ui
+                            .add(egui::DragValue::new(&mut footprint.size[0]).range(1..=u32::MAX))
+                            .changed();
+                        grounding_changed |= ui
+                            .add(egui::DragValue::new(&mut footprint.size[1]).range(1..=u32::MAX))
+                            .changed();
+                    });
+
                     let mut visible = selected_object.visible;
                     let mut solid = selected_object.solid;
                     let visible_changed = ui.checkbox(&mut visible, "Visible").changed();
                     let solid_changed = ui.checkbox(&mut solid, "Solid").changed();
-                    if visible_changed || solid_changed {
+                    if grounding_changed || visible_changed || solid_changed {
                         ui_state.queue_map_editor_object_property_edit(
                             selected_object.index,
+                            grounding,
                             visible,
                             solid,
                         );

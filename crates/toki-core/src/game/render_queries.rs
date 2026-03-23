@@ -210,12 +210,16 @@ impl<'a> RenderQueryFacade<'a> {
                     return None;
                 }
 
-                let sprite_width = entity.size.x as f32;
-                let sprite_height = entity.size.y as f32;
-                let shadow_width = (sprite_width * 0.75).round().max(6.0);
-                let shadow_height = (sprite_height * 0.18).round().clamp(2.0, 4.0);
-                let shadow_x = entity.position.x as f32 + (sprite_width - shadow_width) * 0.5;
-                let shadow_y = entity.position.y as f32 + sprite_height - shadow_height;
+                let (footprint_pos, footprint_size) = entity.footprint_world_bounds();
+                let ground_origin = entity.resolved_ground_origin();
+                let footprint_width = footprint_size.x.max(1) as f32;
+                let footprint_height = footprint_size.y.max(1) as f32;
+                let shadow_width = (footprint_width * 1.25).round().max(4.0);
+                let shadow_height = (footprint_height * 0.75).round().clamp(2.0, 6.0);
+                let shadow_x =
+                    ground_origin.x as f32 - shadow_width * 0.5;
+                let shadow_y =
+                    footprint_pos.y as f32 + footprint_height - shadow_height;
 
                 Some(GroundShadow {
                     position: glam::Vec2::new(shadow_x, shadow_y),
@@ -632,8 +636,41 @@ mod tests {
         assert_eq!(
             shadows,
             vec![GroundShadow {
-                position: glam::Vec2::new(12.0, 33.0),
-                size: glam::Vec2::new(12.0, 3.0),
+                position: glam::Vec2::new(8.0, 30.0),
+                size: glam::Vec2::new(20.0, 6.0),
+                color: [0.0, 0.0, 0.0, 0.28],
+            }]
+        );
+    }
+
+    #[test]
+    fn ground_shadow_queries_follow_narrow_footprint_instead_of_full_sprite_width() {
+        let mut entity_manager = EntityManager::new();
+        entity_manager.spawn_entity(
+            crate::entity::EntityKind::Npc,
+            glam::IVec2::new(10, 20),
+            glam::UVec2::new(32, 48),
+            crate::entity::EntityAttributes {
+                static_object_render: Some(StaticObjectRenderDef {
+                    sheet: "objects".to_string(),
+                    object_name: "tree".to_string(),
+                }),
+                grounding: EntityGrounding {
+                    origin: Some([16, 47]),
+                    footprint: Some(EntityFootprint::new([8, 40], [16, 8])),
+                },
+                ..crate::entity::EntityAttributes::default()
+            },
+        );
+
+        let facade = RenderQueryFacade::new(&entity_manager, None, false);
+        let shadows = facade.entity_ground_shadows();
+
+        assert_eq!(
+            shadows,
+            vec![GroundShadow {
+                position: glam::Vec2::new(16.0, 62.0),
+                size: glam::Vec2::new(20.0, 6.0),
                 color: [0.0, 0.0, 0.0, 0.28],
             }]
         );

@@ -24,6 +24,7 @@ impl MapObjectInteraction {
             object_name: object_name.to_string(),
             position: world_anchor,
             size_px,
+            grounding: Default::default(),
             visible: true,
             solid: true,
         };

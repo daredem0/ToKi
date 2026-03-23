@@ -7,9 +7,9 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
+"Scene 2" = "scenes/Scene 2.json"
 main = "scenes/main.json"
 "Main Scene" = "scenes/Main Scene.json"
-"Scene 2" = "scenes/Scene 2.json"
 
 [assets]
 sprites = "assets/sprites/"
@@ -206,31 +206,6 @@ recent_files = []
 
 [editor.camera_settings]
 
-[editor.graph_layouts."Scene 2"]
-zoom = 0.8264462351799011
-pan = [
-    -74.87890625,
-    64.38671875,
-]
-
-[editor.graph_layouts."Scene 2".node_positions]
-"node:1" = [
-    60.0,
-    50.0,
-]
-"node:3" = [
-    430.0,
-    50.0,
-]
-"node:2" = [
-    800.0,
-    50.0,
-]
-"node:4" = [
-    656.8824462890625,
-    177.01071166992188,
-]
-
 [editor.graph_layouts."Main Scene"]
 zoom = 0.6747616529464722
 pan = [
@@ -239,21 +214,17 @@ pan = [
 ]
 
 [editor.graph_layouts."Main Scene".node_positions]
-"node:7" = [
+"node:11" = [
+    584.375,
+    208.0,
+]
+"node:1" = [
     60.0,
-    160.0,
-]
-"node:6" = [
-    244.359375,
-    112.0,
-]
-"node:9" = [
-    318.65625,
-    160.0,
-]
-"node:3" = [
-    246.0,
     64.0,
+]
+"node:16" = [
+    60.0,
+    304.0,
 ]
 "node:14" = [
     522.25,
@@ -263,21 +234,29 @@ pan = [
     259.625,
     304.0,
 ]
-"node:12" = [
-    293.71875,
+"node:10" = [
+    60.0,
     208.0,
 ]
-"node:8" = [
-    615.984375,
-    160.0,
+"node:3" = [
+    246.0,
+    64.0,
+]
+"node:19" = [
+    758.296875,
+    64.0,
+]
+"node:13" = [
+    60.0,
+    256.0,
 ]
 "node:15" = [
     262.625,
     256.0,
 ]
-"node:11" = [
-    584.375,
-    208.0,
+"node:9" = [
+    318.65625,
+    160.0,
 ]
 "node:17" = [
     483.578125,
@@ -291,29 +270,50 @@ pan = [
     60.0,
     112.0,
 ]
-"node:10" = [
+"node:7" = [
     60.0,
-    208.0,
+    160.0,
 ]
-"node:16" = [
-    60.0,
-    304.0,
+"node:8" = [
+    615.984375,
+    160.0,
+]
+"node:6" = [
+    244.359375,
+    112.0,
 ]
 "node:5" = [
     488.640625,
     112.0,
 ]
+"node:12" = [
+    293.71875,
+    208.0,
+]
+
+[editor.graph_layouts."Scene 2"]
+zoom = 0.8264462351799011
+pan = [
+    -74.87890625,
+    64.38671875,
+]
+
+[editor.graph_layouts."Scene 2".node_positions]
+"node:3" = [
+    430.0,
+    50.0,
+]
+"node:4" = [
+    656.8824462890625,
+    177.01071166992188,
+]
+"node:2" = [
+    800.0,
+    50.0,
+]
 "node:1" = [
     60.0,
-    64.0,
-]
-"node:19" = [
-    758.296875,
-    64.0,
-]
-"node:13" = [
-    60.0,
-    256.0,
+    50.0,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]

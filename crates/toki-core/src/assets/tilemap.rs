@@ -1,4 +1,5 @@
 use crate::assets::atlas::AtlasMeta;
+use crate::entity::{EntityFootprint, EntityGrounding};
 use crate::graphics::vertex::QuadVertex;
 use crate::CoreError;
 use glam::UVec2;
@@ -16,6 +17,8 @@ pub struct MapObjectInstance {
     pub position: UVec2,
     #[serde(default = "default_map_object_size_px")]
     pub size_px: UVec2,
+    #[serde(default, skip_serializing_if = "EntityGrounding::is_empty")]
+    pub grounding: EntityGrounding,
     #[serde(default = "default_map_object_visible")]
     pub visible: bool,
     #[serde(default = "default_map_object_solid")]
@@ -42,6 +45,22 @@ fn default_map_object_visible() -> bool {
 
 fn default_map_object_solid() -> bool {
     true
+}
+
+impl MapObjectInstance {
+    pub fn resolved_footprint(&self) -> EntityFootprint {
+        self.grounding.resolved_footprint(self.size_px, None)
+    }
+
+    pub fn footprint_world_bounds(&self) -> (glam::IVec2, UVec2) {
+        self.resolved_footprint()
+            .world_bounds(self.position.as_ivec2())
+    }
+
+    pub fn ground_contact_y(&self) -> i32 {
+        let (pos, size) = self.footprint_world_bounds();
+        pos.y + size.y as i32
+    }
 }
 
 impl TileMap {

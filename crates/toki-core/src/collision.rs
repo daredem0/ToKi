@@ -186,13 +186,12 @@ pub fn can_place_collision_box_at_position(
 
 fn collides_with_solid_map_object(tilemap: &TileMap, box_pos: IVec2, box_size: UVec2) -> bool {
     tilemap.objects.iter().any(|object| {
-        object.solid
-            && aabb_overlap(
-                box_pos,
-                box_size,
-                object.position.as_ivec2(),
-                object.size_px,
-            )
+        if !object.solid {
+            return false;
+        }
+
+        let (object_pos, object_size) = object.footprint_world_bounds();
+        aabb_overlap(box_pos, box_size, object_pos, object_size)
     })
 }
 
