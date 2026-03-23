@@ -34,7 +34,7 @@ pub use types::{
     InventoryEntry, MenuAppearance, MenuBorderStyle, MenuDialogDefinition, MenuDialogLayout,
     MenuDialogPosition, MenuDialogView, MenuEntryLayout, MenuInput, MenuItemDefinition,
     MenuLayout, MenuLayoutBlock, MenuListSource, MenuRect, MenuScreenDefinition, MenuSettings,
-    MenuView, MenuViewEntry, MenuVisualMetrics,
+    MenuTextAppearance, MenuView, MenuViewEntry, MenuVisualMetrics,
 };
 pub use utilities::{
     apply_menu_opacity, menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba,

@@ -231,6 +231,29 @@ impl MenuController {
         }
     }
 
+    pub fn select_screen_view_entry(
+        &mut self,
+        inventory: &[InventoryEntry],
+        view_entry_index: usize,
+    ) -> bool {
+        if self.active_dialog.is_some() {
+            return false;
+        }
+
+        let Some(screen_id) = self.stack.last().cloned() else {
+            return false;
+        };
+        let Some(screen_item_index) =
+            self.screen_item_index_for_view_entry(&screen_id, inventory, view_entry_index)
+        else {
+            return false;
+        };
+
+        self.selected_index_by_screen
+            .insert(screen_id, screen_item_index);
+        true
+    }
+
     fn handle_dialog_input(&mut self, input: MenuInput) -> Option<UiCommand> {
         match input {
             MenuInput::Up | MenuInput::Down | MenuInput::Left | MenuInput::Right => {
@@ -363,5 +386,53 @@ impl MenuController {
                 .iter()
                 .position(|item| matches!(item, MenuItemDefinition::Button { .. }))
         })
+    }
+
+    fn screen_item_index_for_view_entry(
+        &self,
+        screen_id: &str,
+        inventory: &[InventoryEntry],
+        view_entry_index: usize,
+    ) -> Option<usize> {
+        let screen = self.screen_map.get(screen_id)?;
+        let mut rendered_index = 0usize;
+
+        for (item_index, item) in screen.items.iter().enumerate() {
+            match item {
+                MenuItemDefinition::Label { .. } => {
+                    if rendered_index == view_entry_index {
+                        return None;
+                    }
+                    rendered_index += 1;
+                }
+                MenuItemDefinition::Button { .. } => {
+                    if rendered_index == view_entry_index {
+                        return Some(item_index);
+                    }
+                    rendered_index += 1;
+                }
+                MenuItemDefinition::DynamicList {
+                    heading, source, ..
+                } => {
+                    if heading.is_some() {
+                        if rendered_index == view_entry_index {
+                            return None;
+                        }
+                        rendered_index += 1;
+                    }
+
+                    let item_count = match source {
+                        MenuListSource::PlayerInventory => inventory.len().max(1),
+                    };
+
+                    if (rendered_index..rendered_index + item_count).contains(&view_entry_index) {
+                        return None;
+                    }
+                    rendered_index += item_count;
+                }
+            }
+        }
+
+        None
     }
 }

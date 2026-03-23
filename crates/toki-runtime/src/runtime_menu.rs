@@ -1,6 +1,6 @@
 use toki_core::menu::{
     build_dialog_layout, build_menu_layout, compose_dialog_ui, compose_menu_ui, MenuDialogLayout,
-    MenuInput,
+    MenuInput, MenuLayout,
 };
 use toki_core::ui::UiCommand;
 use toki_core::DialogStartRequest;
@@ -73,16 +73,31 @@ impl App {
             return false;
         }
 
-        let Some(dialog_view) = self.menu_system.current_dialog_view() else {
+        if let Some(dialog_view) = self.menu_system.current_dialog_view() {
+            let appearance = self.menu_system.settings().appearance.clone();
+            let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
+            if let Some(entry_index) = dialog_entry_at_position(&layout, position) {
+                if let Some(command) = self.menu_system.activate_dialog_entry(entry_index) {
+                    self.apply_menu_command(command);
+                }
+                return true;
+            }
+            return false;
+        }
+
+        let inventory = self.game_system.player_inventory_entries();
+        let Some(menu_view) = self.menu_system.current_view(&inventory) else {
             return false;
         };
         let appearance = self.menu_system.settings().appearance.clone();
-        let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
-        if let Some(entry_index) = dialog_entry_at_position(&layout, position) {
-            if let Some(command) = self.menu_system.activate_dialog_entry(entry_index) {
-                self.apply_menu_command(command);
+        let layout = build_menu_layout(&menu_view, &appearance, viewport);
+        if let Some(entry_index) = menu_entry_at_position(&layout, position) {
+            if self.menu_system.select_screen_view_entry(&inventory, entry_index) {
+                if let Some(command) = self.menu_system.handle_input(MenuInput::Confirm) {
+                    self.apply_menu_command(command);
+                }
+                return true;
             }
-            return true;
         }
         false
     }
@@ -114,16 +129,24 @@ impl App {
             return false;
         }
 
-        let Some(dialog_view) = self.menu_system.current_dialog_view() else {
+        if let Some(dialog_view) = self.menu_system.current_dialog_view() {
+            let appearance = self.menu_system.settings().appearance.clone();
+            let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
+            if let Some(entry_index) = dialog_entry_at_position(&layout, position) {
+                self.menu_system.select_dialog_entry(entry_index);
+                return true;
+            }
+            return false;
+        }
+
+        let inventory = self.game_system.player_inventory_entries();
+        let Some(menu_view) = self.menu_system.current_view(&inventory) else {
             return false;
         };
         let appearance = self.menu_system.settings().appearance.clone();
-        let layout = build_dialog_layout(&dialog_view, &appearance, viewport);
-        if let Some(entry_index) = dialog_entry_at_position(&layout, position) {
-            self.menu_system.select_dialog_entry(entry_index);
-            return true;
-        }
-        false
+        let layout = build_menu_layout(&menu_view, &appearance, viewport);
+        menu_entry_at_position(&layout, position)
+            .is_some_and(|entry_index| self.menu_system.select_screen_view_entry(&inventory, entry_index))
     }
 
     pub(super) fn apply_dialog_start_request(&mut self, request: DialogStartRequest) {
@@ -271,6 +294,15 @@ fn should_gate_gameplay(
 }
 
 fn dialog_entry_at_position(layout: &MenuDialogLayout, position: glam::Vec2) -> Option<usize> {
+    layout.entries.iter().position(|entry| {
+        position.x >= entry.rect.x
+            && position.x <= entry.rect.x + entry.rect.width
+            && position.y >= entry.rect.y
+            && position.y <= entry.rect.y + entry.rect.height
+    })
+}
+
+fn menu_entry_at_position(layout: &MenuLayout, position: glam::Vec2) -> Option<usize> {
     layout.entries.iter().position(|entry| {
         position.x >= entry.rect.x
             && position.x <= entry.rect.x + entry.rect.width
@@ -457,6 +489,53 @@ mod tests {
 
         assert_eq!(dialog_entry_at_position(&layout, glam::Vec2::new(20.0, 35.0)), Some(0));
         assert_eq!(dialog_entry_at_position(&layout, glam::Vec2::new(5.0, 5.0)), None);
+    }
+
+    #[test]
+    fn menu_entry_hit_testing_uses_rendered_entry_rects() {
+        let layout = MenuLayout {
+            panel: toki_core::ui::UiRect {
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 100.0,
+            },
+            title: toki_core::menu::MenuLayoutBlock {
+                rect: toki_core::ui::UiRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 100.0,
+                    height: 10.0,
+                },
+                text: String::new(),
+                border_style: toki_core::menu::MenuBorderStyle::Square,
+            },
+            entries: vec![toki_core::menu::MenuEntryLayout {
+                rect: toki_core::ui::UiRect {
+                    x: 10.0,
+                    y: 30.0,
+                    width: 80.0,
+                    height: 16.0,
+                },
+                text: "Resume".to_string(),
+                selected: true,
+                selectable: true,
+                border_style: toki_core::menu::MenuBorderStyle::Square,
+            }],
+            hint: toki_core::menu::MenuLayoutBlock {
+                rect: toki_core::ui::UiRect {
+                    x: 0.0,
+                    y: 90.0,
+                    width: 100.0,
+                    height: 10.0,
+                },
+                text: String::new(),
+                border_style: toki_core::menu::MenuBorderStyle::None,
+            },
+        };
+
+        assert_eq!(menu_entry_at_position(&layout, glam::Vec2::new(20.0, 35.0)), Some(0));
+        assert_eq!(menu_entry_at_position(&layout, glam::Vec2::new(5.0, 5.0)), None);
     }
 
     #[test]

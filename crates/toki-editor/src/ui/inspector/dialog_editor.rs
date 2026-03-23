@@ -82,7 +82,9 @@ impl InspectorSystem {
             ui_state,
             ui,
             &mut project.metadata.runtime.dialog_appearance,
+            true,
         );
+
         if changed {
             project.metadata.project.modified = Utc::now();
             project.is_dirty = true;

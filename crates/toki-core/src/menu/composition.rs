@@ -1,9 +1,9 @@
 //! Menu UI composition.
 
-use crate::text::{TextAnchor, TextStyle, TextWeight};
+use crate::text::{TextAnchor, TextSlant, TextStyle, TextWeight};
 use crate::ui::{UiBlock, UiComposition, UiTextBlock};
 
-use super::types::{MenuAppearance, MenuDialogLayout, MenuLayout};
+use super::types::{MenuAppearance, MenuDialogLayout, MenuLayout, MenuTextAppearance};
 use super::utilities::{
     apply_menu_opacity, menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba,
 };
@@ -18,29 +18,38 @@ pub fn compose_menu_ui(layout: &MenuLayout, appearance: &MenuAppearance) -> UiCo
         appearance.opacity_percent,
     );
     let title_style = TextStyle {
-        font_family: appearance.font_family.clone(),
         size_px: appearance.font_size_px as f32 + 4.0,
         weight: TextWeight::Bold,
-        color: text_color,
-        ..TextStyle::default()
+        ..menu_text_style(
+            &MenuTextAppearance {
+                font_family: appearance.font_family.clone(),
+                ..MenuTextAppearance::default()
+            },
+            text_color,
+        )
     };
-    let entry_style = TextStyle {
-        font_family: appearance.font_family.clone(),
-        size_px: appearance.font_size_px as f32,
-        weight: TextWeight::Normal,
-        color: text_color,
-        ..TextStyle::default()
-    };
+    let entry_style = menu_text_style(
+        &MenuTextAppearance {
+            font_family: appearance.font_family.clone(),
+            font_size_px: appearance.font_size_px,
+            ..MenuTextAppearance::default()
+        },
+        text_color,
+    );
     let selected_style = TextStyle {
         color: text_color,
         weight: TextWeight::Bold,
         ..entry_style.clone()
     };
     let hint_style = TextStyle {
-        font_family: appearance.font_family.clone(),
         size_px: (appearance.font_size_px as f32 - 2.0).max(10.0),
-        color: text_color,
-        ..TextStyle::default()
+        ..menu_text_style(
+            &MenuTextAppearance {
+                font_family: appearance.font_family.clone(),
+                ..MenuTextAppearance::default()
+            },
+            text_color,
+        )
     };
 
     let mut composition = UiComposition::default();
@@ -134,24 +143,19 @@ pub fn compose_dialog_ui(layout: &MenuDialogLayout, appearance: &MenuAppearance)
         menu_hex_color_rgba(&appearance.text_color_hex).unwrap_or([1.0, 1.0, 1.0, 1.0]),
         appearance.opacity_percent,
     );
-    let title_style = TextStyle {
-        font_family: appearance.font_family.clone(),
-        size_px: appearance.font_size_px as f32 + 4.0,
-        weight: TextWeight::Bold,
-        color: text_color,
-        ..TextStyle::default()
-    };
-    let body_style = TextStyle {
-        font_family: appearance.font_family.clone(),
-        size_px: appearance.font_size_px as f32,
-        weight: TextWeight::Normal,
-        color: text_color,
-        ..TextStyle::default()
-    };
-    let button_style = body_style.clone();
+    let title_style = menu_text_style(&appearance.dialog_speaker_text, text_color);
+    let body_style = menu_text_style(&appearance.dialog_body_text, text_color);
+    let button_style = menu_text_style(
+        &MenuTextAppearance {
+            font_family: appearance.font_family.clone(),
+            font_size_px: appearance.font_size_px,
+            ..MenuTextAppearance::default()
+        },
+        text_color,
+    );
     let selected_button_style = TextStyle {
         weight: TextWeight::Bold,
-        ..body_style.clone()
+        ..button_style.clone()
     };
 
     let mut composition = UiComposition::default();
@@ -224,4 +228,22 @@ pub fn compose_dialog_ui(layout: &MenuDialogLayout, appearance: &MenuAppearance)
     }
 
     composition
+}
+
+fn menu_text_style(appearance: &MenuTextAppearance, color: [f32; 4]) -> TextStyle {
+    TextStyle {
+        font_family: appearance.font_family.clone(),
+        size_px: appearance.font_size_px as f32,
+        weight: if appearance.bold {
+            TextWeight::Bold
+        } else {
+            TextWeight::Normal
+        },
+        slant: if appearance.cursive {
+            TextSlant::Italic
+        } else {
+            TextSlant::Normal
+        },
+        color,
+    }
 }

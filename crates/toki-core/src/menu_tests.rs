@@ -3,8 +3,9 @@ use super::{
     menu_border_color, menu_fill_color_rgba, menu_hex_color_rgba, menu_visual_metrics,
     InventoryEntry, MenuAppearance, MenuBorderStyle, MenuController, MenuDialogDefinition,
     MenuDialogPosition, MenuInput, MenuItemDefinition, MenuListSource, MenuScreenDefinition,
-    MenuSettings, MenuView, MenuViewEntry, UiAction, UiCommand,
+    MenuSettings, MenuTextAppearance, MenuView, MenuViewEntry, UiAction, UiCommand,
 };
+use crate::text::{TextSlant, TextWeight};
 
 #[test]
 fn menu_controller_opens_pause_root_and_renders_default_selection() {
@@ -269,6 +270,24 @@ fn menu_settings_default_includes_appearance_defaults() {
     assert!(!settings.appearance.menu_background_transparent);
     assert!(!settings.appearance.title_background_transparent);
     assert!(!settings.appearance.entry_background_transparent);
+    assert_eq!(
+        settings.appearance.dialog_speaker_text,
+        MenuTextAppearance {
+            font_family: "Sans".to_string(),
+            font_size_px: 18,
+            bold: true,
+            cursive: false,
+        }
+    );
+    assert_eq!(
+        settings.appearance.dialog_body_text,
+        MenuTextAppearance {
+            font_family: "Sans".to_string(),
+            font_size_px: 14,
+            bold: false,
+            cursive: false,
+        }
+    );
     assert!(settings.dialogs.is_empty());
 }
 
@@ -506,7 +525,21 @@ fn menu_controller_dialog_confirm_returns_runtime_command() {
 
 #[test]
 fn compose_dialog_ui_builds_generic_blocks_for_dialog_overlay() {
-    let appearance = MenuAppearance::default();
+    let appearance = MenuAppearance {
+        dialog_speaker_text: MenuTextAppearance {
+            font_family: "Mono".to_string(),
+            font_size_px: 22,
+            bold: true,
+            cursive: true,
+        },
+        dialog_body_text: MenuTextAppearance {
+            font_family: "Serif".to_string(),
+            font_size_px: 12,
+            bold: false,
+            cursive: true,
+        },
+        ..MenuAppearance::default()
+    };
     let layout = build_dialog_layout(
         &super::MenuDialogView {
             dialog_id: "exit_confirm".to_string(),
@@ -544,6 +577,51 @@ fn compose_dialog_ui_builds_generic_blocks_for_dialog_overlay() {
         "Exit Game?"
     );
     assert_eq!(
+        composition.blocks[1]
+            .text
+            .as_ref()
+            .expect("dialog title")
+            .style
+            .font_family,
+        "Mono"
+    );
+    assert_eq!(
+        composition.blocks[1]
+            .text
+            .as_ref()
+            .expect("dialog title")
+            .style
+            .weight,
+        TextWeight::Bold
+    );
+    assert_eq!(
+        composition.blocks[1]
+            .text
+            .as_ref()
+            .expect("dialog title")
+            .style
+            .slant,
+        TextSlant::Italic
+    );
+    assert_eq!(
+        composition.blocks[2]
+            .text
+            .as_ref()
+            .expect("dialog body")
+            .style
+            .font_family,
+        "Serif"
+    );
+    assert_eq!(
+        composition.blocks[2]
+            .text
+            .as_ref()
+            .expect("dialog body")
+            .style
+            .size_px,
+        12.0
+    );
+    assert_eq!(
         composition.blocks[3]
             .text
             .as_ref()
@@ -551,6 +629,85 @@ fn compose_dialog_ui_builds_generic_blocks_for_dialog_overlay() {
             .content,
         "> Exit"
     );
+}
+
+#[test]
+fn build_dialog_layout_uses_speaker_and_body_font_sizes() {
+    let appearance = MenuAppearance {
+        dialog_speaker_text: MenuTextAppearance {
+            font_family: "Sans".to_string(),
+            font_size_px: 24,
+            bold: true,
+            cursive: false,
+        },
+        dialog_body_text: MenuTextAppearance {
+            font_family: "Sans".to_string(),
+            font_size_px: 10,
+            bold: false,
+            cursive: false,
+        },
+        ..MenuAppearance::default()
+    };
+    let layout = build_dialog_layout(
+        &super::MenuDialogView {
+            dialog_id: "exit_confirm".to_string(),
+            title: "Exit Game?".to_string(),
+            body: "Unsaved progress may be lost.".to_string(),
+            entries: vec![super::MenuViewEntry {
+                text: "Exit".to_string(),
+                selected: true,
+                selectable: true,
+                border_style_override: None,
+            }],
+            hide_main_menu: false,
+        },
+        &appearance,
+        glam::Vec2::new(320.0, 180.0),
+    );
+
+    assert_eq!(layout.title.rect.height, 24.0 + 20.0);
+    assert_eq!(layout.body.rect.height, 40.0 + 12.0);
+}
+
+#[test]
+fn menu_controller_select_screen_view_entry_maps_rendered_entries_to_buttons() {
+    let settings = MenuSettings {
+        pause_root_screen_id: "custom".to_string(),
+        gate_gameplay_when_open: true,
+        appearance: Default::default(),
+        screens: vec![MenuScreenDefinition {
+            id: "custom".to_string(),
+            title: "Custom".to_string(),
+            title_border_style_override: None,
+            items: vec![
+                MenuItemDefinition::Label {
+                    text: "Heading".to_string(),
+                    border_style_override: None,
+                },
+                MenuItemDefinition::DynamicList {
+                    heading: Some("Items".to_string()),
+                    source: MenuListSource::PlayerInventory,
+                    empty_text: "Empty".to_string(),
+                    border_style_override: None,
+                },
+                MenuItemDefinition::Button {
+                    text: "Resume".to_string(),
+                    border_style_override: None,
+                    action: UiAction::CloseUi,
+                },
+            ],
+        }],
+        dialogs: Vec::new(),
+    };
+    let mut controller = MenuController::new(settings);
+    controller.open_pause_root();
+
+    assert!(!controller.select_screen_view_entry(&[], 1));
+    assert!(!controller.select_screen_view_entry(&[], 2));
+    assert!(controller.select_screen_view_entry(&[], 3));
+
+    let view = controller.current_view(&[]).expect("view");
+    assert!(view.entries[3].selected);
 }
 
 #[test]

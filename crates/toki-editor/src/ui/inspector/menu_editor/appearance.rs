@@ -7,6 +7,7 @@ impl InspectorSystem {
         ui: &mut egui::Ui,
         ui_state: &EditorUI,
         ctx: &mut AppearanceEditContext,
+        include_dialog_text_controls: bool,
     ) {
         egui::CollapsingHeader::new("Typography")
             .default_open(false)
@@ -27,6 +28,21 @@ impl InspectorSystem {
                     &mut ctx.appearance.font_size_px,
                     8..=64,
                 );
+                if include_dialog_text_controls {
+                    ui.separator();
+                    ctx.changed |= Self::render_text_appearance_editor(
+                        ui,
+                        "Speaker / Title",
+                        &mut ctx.appearance.dialog_speaker_text,
+                        &font_choices,
+                    );
+                    ctx.changed |= Self::render_text_appearance_editor(
+                        ui,
+                        "Body",
+                        &mut ctx.appearance.dialog_body_text,
+                        &font_choices,
+                    );
+                }
             });
     }
 
@@ -48,6 +64,26 @@ impl InspectorSystem {
             return true;
         }
         false
+    }
+
+    pub(in super::super) fn render_text_appearance_editor(
+        ui: &mut egui::Ui,
+        label: &str,
+        style: &mut MenuTextAppearance,
+        font_choices: &[String],
+    ) -> bool {
+        let mut changed = false;
+        ui.push_id(label, |ui| {
+            ui.group(|ui| {
+                ui.label(label);
+                changed |= Self::render_font_family_combo(ui, &mut style.font_family, font_choices);
+                changed |=
+                    Self::render_drag_value(ui, "Font Size", &mut style.font_size_px, 8..=64);
+                changed |= ui.checkbox(&mut style.bold, "Bold").changed();
+                changed |= ui.checkbox(&mut style.cursive, "Cursive").changed();
+            });
+        });
+        changed
     }
 
     pub(super) fn render_drag_value(

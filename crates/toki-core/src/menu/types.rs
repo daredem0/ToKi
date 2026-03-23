@@ -82,6 +82,10 @@ pub struct MenuAppearance {
     pub border_style: MenuBorderStyle,
     #[serde(default)]
     pub dialog_position: MenuDialogPosition,
+    #[serde(default = "default_dialog_speaker_text_appearance")]
+    pub dialog_speaker_text: MenuTextAppearance,
+    #[serde(default = "default_dialog_body_text_appearance")]
+    pub dialog_body_text: MenuTextAppearance,
 }
 
 impl Default for MenuAppearance {
@@ -107,8 +111,46 @@ impl Default for MenuAppearance {
             footer_text: default_menu_footer_text(),
             border_style: MenuBorderStyle::default(),
             dialog_position: MenuDialogPosition::default(),
+            dialog_speaker_text: default_dialog_speaker_text_appearance(),
+            dialog_body_text: default_dialog_body_text_appearance(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MenuTextAppearance {
+    #[serde(default = "default_menu_font_family")]
+    pub font_family: String,
+    #[serde(default = "default_menu_font_size_px")]
+    pub font_size_px: u16,
+    #[serde(default)]
+    pub bold: bool,
+    #[serde(default)]
+    pub cursive: bool,
+}
+
+impl Default for MenuTextAppearance {
+    fn default() -> Self {
+        Self {
+            font_family: default_menu_font_family(),
+            font_size_px: default_menu_font_size_px(),
+            bold: false,
+            cursive: false,
+        }
+    }
+}
+
+fn default_dialog_speaker_text_appearance() -> MenuTextAppearance {
+    MenuTextAppearance {
+        font_family: default_menu_font_family(),
+        font_size_px: default_menu_font_size_px().saturating_add(4),
+        bold: true,
+        cursive: false,
+    }
+}
+
+fn default_dialog_body_text_appearance() -> MenuTextAppearance {
+    MenuTextAppearance::default()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

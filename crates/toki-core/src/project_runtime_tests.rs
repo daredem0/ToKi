@@ -2,7 +2,7 @@ use crate::project_runtime::{
     PostProcessMode, ProjectPreset, ProjectRuntimeMetadata, QuantizeStrategy, RuntimeConfigFile,
     RuntimeDisplaySettings, RuntimePostProcessSettings, RuntimeSettings,
 };
-use crate::menu::MenuAppearance;
+use crate::menu::{MenuAppearance, MenuTextAppearance};
 
 #[test]
 fn project_preset_topdown_returns_gameboy_resolution() {
@@ -148,6 +148,54 @@ fn runtime_metadata_supports_dedicated_dialog_appearance() {
     assert_eq!(metadata.runtime.dialog_appearance.font_family, "Mono");
     assert_eq!(metadata.runtime.dialog_appearance.border_color_hex, "#112233");
     assert_eq!(metadata.runtime.dialog_appearance.menu_width_percent, 72);
+    assert_eq!(
+        metadata.runtime.dialog_appearance.dialog_speaker_text,
+        MenuTextAppearance {
+            font_family: "Sans".to_string(),
+            font_size_px: 18,
+            bold: true,
+            cursive: false,
+        }
+    );
+}
+
+#[test]
+fn runtime_metadata_supports_dialog_speaker_and_body_text_styles() {
+    let metadata: ProjectRuntimeMetadata = toml::from_str(
+        r##"
+        [runtime.dialog_appearance.dialog_speaker_text]
+        font_family = "Mono"
+        font_size_px = 20
+        bold = true
+        cursive = true
+
+        [runtime.dialog_appearance.dialog_body_text]
+        font_family = "Serif"
+        font_size_px = 12
+        bold = false
+        cursive = true
+        "##,
+    )
+    .expect("runtime metadata should deserialize");
+
+    assert_eq!(
+        metadata.runtime.dialog_appearance.dialog_speaker_text,
+        MenuTextAppearance {
+            font_family: "Mono".to_string(),
+            font_size_px: 20,
+            bold: true,
+            cursive: true,
+        }
+    );
+    assert_eq!(
+        metadata.runtime.dialog_appearance.dialog_body_text,
+        MenuTextAppearance {
+            font_family: "Serif".to_string(),
+            font_size_px: 12,
+            bold: false,
+            cursive: true,
+        }
+    );
 }
 
 #[test]

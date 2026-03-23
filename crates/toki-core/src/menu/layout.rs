@@ -89,12 +89,11 @@ pub fn build_dialog_layout(
     let panel_width = (viewport.x * (appearance.menu_width_percent.clamp(20, 100) as f32 / 100.0))
         .clamp(160.0, (viewport.x - 16.0).max(160.0));
     let content_width = (panel_width - metrics.panel_inner_margin_px * 2.0).max(1.0);
-    let title_height = appearance.font_size_px as f32
-        + metrics.title_size_delta_px
-        + metrics.title_padding_px.y * 2.0;
+    let title_height =
+        appearance.dialog_speaker_text.font_size_px as f32 + metrics.title_padding_px.y * 2.0;
     let local_title_y = metrics.panel_inner_margin_px;
-    let body_height =
-        ((appearance.font_size_px as f32 * 3.2).max(40.0)) + metrics.entry_padding_px.y * 2.0;
+    let body_height = ((appearance.dialog_body_text.font_size_px as f32 * 3.2).max(40.0))
+        + metrics.entry_padding_px.y * 2.0;
     let local_body_y = local_title_y + title_height + appearance.title_spacing_px as f32;
     let entry_height = appearance.font_size_px as f32 + metrics.entry_padding_px.y * 2.0;
     let entries_start_y = local_body_y + body_height + appearance.footer_spacing_px as f32;

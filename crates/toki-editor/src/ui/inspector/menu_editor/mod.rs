@@ -24,6 +24,7 @@ use crate::ui::undo_redo::EditorCommand;
 use toki_core::menu::{
     MenuAppearance, MenuBorderStyle, MenuDialogDefinition, MenuDialogPosition,
     MenuItemDefinition, MenuListSource, MenuScreenDefinition, MenuSettings, UiAction,
+    MenuTextAppearance,
 };
 
 /// Context for editing menu appearance settings
@@ -71,9 +72,10 @@ impl InspectorSystem {
         ui_state: &EditorUI,
         ui: &mut egui::Ui,
         appearance: &mut MenuAppearance,
+        include_dialog_text_controls: bool,
     ) -> bool {
         let mut ctx = AppearanceEditContext::new(appearance);
-        Self::render_typography_header(ui, ui_state, &mut ctx);
+        Self::render_typography_header(ui, ui_state, &mut ctx, include_dialog_text_controls);
         Self::render_layout_header(ui, &mut ctx);
         Self::render_style_header(ui, &mut ctx);
         Self::render_backgrounds_header(ui, &mut ctx);
@@ -145,6 +147,7 @@ impl InspectorSystem {
             ui_state,
             ui,
             &mut project.metadata.runtime.menu.appearance,
+            false,
         );
         Self::commit_menu_settings_change(ui_state, project, before_settings);
 
