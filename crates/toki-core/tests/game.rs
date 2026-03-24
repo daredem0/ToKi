@@ -3310,6 +3310,49 @@ fn update_with_delta_half_timestep_moves_less() {
 }
 
 #[test]
+fn game_state_ai_speed_below_one_accumulates_movement() {
+    let world_bounds = UVec2::new(1000, 1000);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    let mut game_state = GameState::new(create_test_sprite());
+    let player_id = game_state.player_id().expect("player should exist");
+    game_state
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+        .expect("player should exist")
+        .position = IVec2::new(32, 32);
+
+    let mut chaser = test_definition("fractional_chaser", "creature");
+    chaser.attributes.ai_config = AiConfig {
+        behavior: AiBehavior::Chase,
+        detection_radius: 500,
+    };
+    chaser.attributes.speed = 0.5;
+
+    let chaser_id = game_state
+        .entity_manager_mut()
+        .spawn_from_definition(&chaser, IVec2::new(64, 32))
+        .expect("chaser should spawn");
+
+    game_state.update(world_bounds, &tilemap, &atlas);
+    let first_position = game_state
+        .entity_manager()
+        .get_entity(chaser_id)
+        .expect("chaser should exist")
+        .position;
+    assert_eq!(first_position, IVec2::new(64, 32));
+
+    game_state.update(world_bounds, &tilemap, &atlas);
+    let second_position = game_state
+        .entity_manager()
+        .get_entity(chaser_id)
+        .expect("chaser should exist")
+        .position;
+    assert_eq!(second_position, IVec2::new(63, 32));
+}
+
+#[test]
 fn update_with_delta_accumulates_fractional_movement() {
     let mut game_state = GameState::new(create_test_sprite());
     let player_id = game_state.player_id().unwrap();

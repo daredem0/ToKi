@@ -11,6 +11,12 @@ use glam::{IVec2, UVec2};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+fn intended_position(result: &AiUpdateResult, current_position: IVec2) -> Option<IVec2> {
+    result
+        .movement_intent
+        .map(|movement_intent| current_position + movement_intent)
+}
+
 // ============================================================================
 // BehaviorHandler Trait Tests
 // ============================================================================
@@ -41,7 +47,7 @@ fn chase_handler_returns_result_when_player_in_range() {
     let result = result.unwrap();
     assert_eq!(result.entity_id, 2);
     // Should move toward player
-    if let Some(new_pos) = result.new_position {
+    if let Some(new_pos) = intended_position(&result, IVec2::new(70, 100)) {
         assert!(new_pos.x > 70, "Should move toward player");
     }
 }
@@ -71,7 +77,7 @@ fn run_handler_moves_away_from_player() {
     assert!(result.is_some());
     let result = result.unwrap();
     // Should move away from player
-    if let Some(new_pos) = result.new_position {
+    if let Some(new_pos) = intended_position(&result, IVec2::new(120, 100)) {
         assert!(new_pos.x > 120, "Should move away from player");
     }
 }
@@ -538,7 +544,7 @@ fn ai_system_chase_moves_toward_player_when_in_radius() {
     assert_eq!(result.entity_id, 2);
 
     // Chaser should move toward player (increasing x position)
-    if let Some(new_pos) = result.new_position {
+    if let Some(new_pos) = intended_position(result, IVec2::new(50, 100)) {
         assert!(new_pos.x > 50, "Chaser should move toward player (right)");
     }
     assert_eq!(result.new_animation, Some(AnimationState::Walk));
@@ -635,7 +641,7 @@ fn ai_system_chase_closes_distance_to_player() {
     assert_eq!(results.len(), 1);
     let result = &results[0];
 
-    if let Some(new_pos) = result.new_position {
+    if let Some(new_pos) = intended_position(result, IVec2::new(60, 60)) {
         let new_distance = ((100 - new_pos.x) as f32).hypot((100 - new_pos.y) as f32);
         assert!(
             new_distance < initial_distance,
@@ -681,7 +687,7 @@ fn ai_system_run_moves_away_from_player_when_in_radius() {
     assert_eq!(result.entity_id, 2);
 
     // Runner should move away from player (increasing x position, away from player at 100)
-    if let Some(new_pos) = result.new_position {
+    if let Some(new_pos) = intended_position(result, IVec2::new(120, 100)) {
         assert!(
             new_pos.x > 120,
             "Runner should move away from player (right)"
@@ -772,7 +778,7 @@ fn ai_system_run_increases_distance_from_player() {
     assert_eq!(results.len(), 1);
     let result = &results[0];
 
-    if let Some(new_pos) = result.new_position {
+    if let Some(new_pos) = intended_position(result, IVec2::new(120, 120)) {
         let new_distance = ((new_pos.x - 100) as f32).hypot((new_pos.y - 100) as f32);
         assert!(
             new_distance > initial_distance,
@@ -817,7 +823,7 @@ fn ai_system_chase_respects_world_bounds() {
     let result = &results[0];
 
     // Position should never go negative
-    if let Some(new_pos) = result.new_position {
+    if let Some(new_pos) = intended_position(result, IVec2::new(20, 100)) {
         assert!(
             new_pos.x >= 0,
             "Chaser should not move outside world bounds"
@@ -860,7 +866,7 @@ fn ai_system_run_respects_world_bounds() {
     let result = &results[0];
 
     // Position should stay within world bounds
-    if let Some(new_pos) = result.new_position {
+    if let Some(new_pos) = intended_position(result, IVec2::new(230, 100)) {
         assert!(
             new_pos.x <= 240,
             "Runner should not move outside world bounds (max_x=240)"
@@ -905,7 +911,7 @@ fn ai_system_chase_navigates_around_vertical_wall() {
     let result = &results[0];
 
     // Chaser should move vertically (up or down) to navigate around the wall
-    if let Some(new_pos) = result.new_position {
+    if let Some(new_pos) = intended_position(result, IVec2::new(48, 50)) {
         // Should have moved in y direction since x is blocked
         assert!(
             new_pos.y != 50 || new_pos.x != 48,
@@ -947,7 +953,7 @@ fn ai_system_run_navigates_around_horizontal_wall() {
     let result = &results[0];
 
     // Runner should still move (either find alternative or move in perpendicular direction)
-    if let Some(new_pos) = result.new_position {
+    if let Some(new_pos) = intended_position(result, IVec2::new(50, 48)) {
         assert!(
             new_pos.x != 50 || new_pos.y != 48,
             "Runner should find alternative path"
@@ -986,11 +992,11 @@ fn ai_system_chase_tries_perpendicular_when_blocked() {
 
     // Should move up or down to try to get around the wall
     assert!(
-        result.new_position.is_some(),
+        result.movement_intent.is_some(),
         "Chaser should move in perpendicular direction when primary is blocked"
     );
 
-    if let Some(new_pos) = result.new_position {
+    if let Some(new_pos) = intended_position(result, IVec2::new(46, 32)) {
         // X should stay same (blocked by wall), Y should change (perpendicular)
         assert_eq!(new_pos.x, 46, "X should stay same (blocked by wall)");
         assert_ne!(new_pos.y, 32, "Y should change (perpendicular movement)");
@@ -1103,7 +1109,7 @@ fn ai_system_chase_idle_wander_is_throttled() {
     assert_eq!(results.len(), 1);
     // Should return idle with no position change (throttled)
     assert!(
-        results[0].new_position.is_none(),
+        results[0].movement_intent.is_none(),
         "Idle wander should be throttled on non-wander frames"
     );
 }
@@ -1151,7 +1157,7 @@ fn ai_system_chase_transitions_from_wander_to_chase() {
     let result = &results[0];
 
     // Should move toward player (chasing, not wandering)
-    if let Some(new_pos) = result.new_position {
+    if let Some(new_pos) = intended_position(result, IVec2::new(50, 50)) {
         assert!(
             new_pos.x > 50,
             "Chaser should move toward player when in radius"
@@ -1228,7 +1234,7 @@ fn ai_system_run_and_multiply_flees_from_player() {
     );
 
     assert_eq!(results.len(), 1);
-    if let Some(new_pos) = results[0].new_position {
+    if let Some(new_pos) = intended_position(&results[0], IVec2::new(120, 120)) {
         let new_distance = ((new_pos.x - 100) as f32).hypot((new_pos.y - 100) as f32);
         assert!(
             new_distance > initial_distance,
@@ -1281,7 +1287,7 @@ fn ai_system_run_and_multiply_seeks_compatible_entity() {
 
     // Entity at (50, 50) should move toward entity at (80, 50)
     let entity1_result = results.iter().find(|r| r.entity_id == 2).unwrap();
-    if let Some(new_pos) = entity1_result.new_position {
+    if let Some(new_pos) = intended_position(entity1_result, IVec2::new(50, 50)) {
         assert!(
             new_pos.x > 50,
             "Entity should seek compatible mate: moved to x={}",

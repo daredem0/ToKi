@@ -4,14 +4,12 @@ use crate::animation::AnimationState;
 use crate::entity::{AiBehavior, Entity, EntityId};
 use glam::IVec2;
 
-use super::constants::{
-    IDLE_WAIT_MAX_FRAMES, IDLE_WAIT_MIN_FRAMES, TILE_SIZE_PX, WANDER_MAX_TILES, WANDER_MIN_TILES,
-    WANDER_SPEED_MULTIPLIER, WANDER_UPDATE_FREQUENCY,
-};
+use super::constants::{IDLE_WAIT_MAX_FRAMES, IDLE_WAIT_MIN_FRAMES, TILE_SIZE_PX};
 use super::context::AiContext;
 use super::movement::{
-    build_wander_result, compute_directions_away, compute_directions_toward, distance_between,
-    random_cardinal_direction, try_movement_with_fallback,
+    build_movement_intent_result, build_wander_intent_result, compute_directions_away,
+    compute_directions_toward, distance_between, preview_intended_position,
+    random_cardinal_direction, try_intent_with_fallback,
 };
 use super::types::{AiRuntimeState, AiUpdateResult, WanderPhase};
 
@@ -46,17 +44,12 @@ impl BehaviorUpdate for ChaseHandler {
         let current_position = entity.position;
         let detection_radius = entity.attributes.ai_config.detection_radius;
 
-        let distance = distance_between(current_position, player_pos);
-
-        // If player is outside detection radius, wander randomly
-        if distance > detection_radius as f32 {
+        if distance_between(current_position, player_pos) > detection_radius as f32 {
             return IdleWanderHandler.update(entity, entity_id, player_position, ctx, ai_state);
         }
 
-        let movement_step = entity.attributes.speed.round() as i32;
-        let directions = compute_directions_toward(current_position, player_pos, movement_step);
-
-        try_movement_with_fallback(entity, entity_id, current_position, &directions, ctx)
+        let directions = compute_directions_toward(current_position, player_pos);
+        try_intent_with_fallback(entity, entity_id, current_position, &directions, ctx)
     }
 }
 
@@ -77,21 +70,16 @@ impl BehaviorUpdate for RunHandler {
         let current_position = entity.position;
         let detection_radius = entity.attributes.ai_config.detection_radius;
 
-        let distance = distance_between(current_position, player_pos);
-
-        // If player is outside detection radius, wander randomly
-        if distance > detection_radius as f32 {
+        if distance_between(current_position, player_pos) > detection_radius as f32 {
             return IdleWanderHandler.update(entity, entity_id, player_position, ctx, ai_state);
         }
 
-        let movement_step = entity.attributes.speed.round() as i32;
-        let directions = compute_directions_away(current_position, player_pos, movement_step);
-
-        try_movement_with_fallback(entity, entity_id, current_position, &directions, ctx)
+        let directions = compute_directions_away(current_position, player_pos);
+        try_intent_with_fallback(entity, entity_id, current_position, &directions, ctx)
     }
 }
 
-/// Wander behavior handler - random movement every 60 frames.
+/// Wander behavior handler - produces a random direction intent periodically.
 #[derive(Debug, Clone, Copy)]
 pub struct WanderHandler {
     frame_counter: u64,
@@ -112,40 +100,25 @@ impl BehaviorUpdate for WanderHandler {
         ctx: &AiContext,
         _ai_state: &mut AiRuntimeState,
     ) -> Option<AiUpdateResult> {
-        // Wander only updates periodically to avoid chaotic movement
-        if !self.frame_counter.is_multiple_of(WANDER_UPDATE_FREQUENCY) {
+        if !self
+            .frame_counter
+            .is_multiple_of(super::constants::WANDER_UPDATE_FREQUENCY)
+        {
             return None;
         }
 
-        let current_position = entity.position;
-        let movement_step = (entity.attributes.speed * WANDER_SPEED_MULTIPLIER).round() as i32;
-        let (max_x, max_y) = ctx.max_position(entity.size);
-
-        let random_direction = fastrand::u32(0..5);
-        let new_position = match random_direction {
-            0 => IVec2::new(
-                current_position.x,
-                (current_position.y - movement_step).max(0),
-            ),
-            1 => IVec2::new(
-                current_position.x,
-                (current_position.y + movement_step).min(max_y),
-            ),
-            2 => IVec2::new(
-                (current_position.x - movement_step).max(0),
-                current_position.y,
-            ),
-            3 => IVec2::new(
-                (current_position.x + movement_step).min(max_x),
-                current_position.y,
-            ),
-            _ => current_position,
+        let direction = match fastrand::u32(0..5) {
+            0 => IVec2::new(0, -1),
+            1 => IVec2::new(0, 1),
+            2 => IVec2::new(-1, 0),
+            3 => IVec2::new(1, 0),
+            _ => IVec2::ZERO,
         };
-
-        let entity_moved = new_position != current_position
-            && ctx.is_movement_valid(entity, entity_id, new_position);
-
-        build_wander_result(entity_id, current_position, new_position, entity_moved)
+        let can_move = preview_intended_position(entity, entity.position, direction, ctx)
+            .is_some_and(|candidate| {
+                candidate == entity.position || ctx.is_movement_valid(entity, entity_id, candidate)
+            });
+        build_wander_intent_result(entity_id, can_move, can_move.then_some(direction))
     }
 }
 
@@ -170,46 +143,41 @@ impl BehaviorUpdate for IdleWanderHandler {
                     ai_state.wait_frames_remaining -= 1;
                     return Some(AiUpdateResult {
                         entity_id,
-                        new_position: None,
+                        movement_intent: None,
                         new_animation: Some(AnimationState::Idle),
-                        movement_distance: 0.0,
                         spawn_request: None,
                     });
                 }
 
-                // Done waiting - start walking
                 let direction = random_cardinal_direction();
-                let tiles = fastrand::u32(WANDER_MIN_TILES..=WANDER_MAX_TILES);
+                let tiles = fastrand::u32(
+                    super::constants::WANDER_MIN_TILES..=super::constants::WANDER_MAX_TILES,
+                );
 
                 ai_state.wander_phase = WanderPhase::Walking {
                     direction,
-                    remaining_distance: (tiles as i32) * TILE_SIZE_PX,
+                    remaining_distance: ((tiles as i32) * TILE_SIZE_PX) as f32,
                 };
 
                 Some(AiUpdateResult {
                     entity_id,
-                    new_position: None,
+                    movement_intent: None,
                     new_animation: Some(AnimationState::Walk),
-                    movement_distance: 0.0,
                     spawn_request: None,
                 })
             }
             WanderPhase::Walking {
                 direction,
                 remaining_distance,
-            } => {
-                let dir = *direction;
-                let remaining = *remaining_distance;
-                self.handle_walking(
-                    entity,
-                    entity_id,
-                    current_position,
-                    dir,
-                    remaining,
-                    ctx,
-                    ai_state,
-                )
-            }
+            } => self.handle_walking(
+                entity,
+                entity_id,
+                current_position,
+                *direction,
+                *remaining_distance,
+                ctx,
+                ai_state,
+            ),
         }
     }
 }
@@ -222,54 +190,42 @@ impl IdleWanderHandler {
         entity_id: EntityId,
         current_position: IVec2,
         direction: IVec2,
-        remaining_distance: i32,
+        remaining_distance: f32,
         ctx: &AiContext,
         ai_state: &mut AiRuntimeState,
     ) -> Option<AiUpdateResult> {
-        let movement_step = entity.attributes.speed.round() as i32;
-        let (max_x, max_y) = ctx.max_position(entity.size);
+        let can_move = preview_intended_position(entity, current_position, direction, ctx)
+            .is_some_and(|candidate| {
+                candidate == current_position || ctx.is_movement_valid(entity, entity_id, candidate)
+            });
+        let new_remaining = remaining_distance - entity.attributes.speed.max(0.0);
 
-        let scaled_direction = IVec2::new(direction.x * movement_step, direction.y * movement_step);
-        let new_position = IVec2::new(
-            (current_position.x + scaled_direction.x).clamp(0, max_x),
-            (current_position.y + scaled_direction.y).clamp(0, max_y),
-        );
-
-        let can_move = new_position != current_position
-            && ctx.is_movement_valid(entity, entity_id, new_position);
-
-        let new_remaining = remaining_distance - movement_step;
-
-        if can_move && new_remaining > 0 {
+        if can_move && new_remaining > 0.0 {
             ai_state.wander_phase = WanderPhase::Walking {
                 direction,
                 remaining_distance: new_remaining,
             };
-            return Some(super::movement::build_movement_result(
+            return Some(build_movement_intent_result(
                 entity_id,
-                current_position,
-                new_position,
+                Some(direction),
                 true,
             ));
         }
 
-        // Transition to waiting
         ai_state.wander_phase = WanderPhase::Waiting;
         ai_state.wait_frames_remaining = fastrand::u32(IDLE_WAIT_MIN_FRAMES..=IDLE_WAIT_MAX_FRAMES);
 
         if can_move {
-            Some(super::movement::build_movement_result(
+            Some(build_movement_intent_result(
                 entity_id,
-                current_position,
-                new_position,
+                Some(direction),
                 true,
             ))
         } else {
             Some(AiUpdateResult {
                 entity_id,
-                new_position: None,
+                movement_intent: None,
                 new_animation: Some(AnimationState::Idle),
-                movement_distance: 0.0,
                 spawn_request: None,
             })
         }
@@ -292,7 +248,7 @@ impl BehaviorHandler {
             AiBehavior::Chase => Some(Self::Chase(ChaseHandler)),
             AiBehavior::Run => Some(Self::Run(RunHandler)),
             AiBehavior::Wander => Some(Self::Wander(WanderHandler::new(frame_counter))),
-            AiBehavior::RunAndMultiply => None, // Complex behavior still handled in AiSystem
+            AiBehavior::RunAndMultiply => None,
             AiBehavior::None => None,
         }
     }

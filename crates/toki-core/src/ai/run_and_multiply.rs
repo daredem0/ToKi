@@ -7,8 +7,7 @@ use glam::IVec2;
 use super::constants::TILE_SIZE_PX;
 use super::context::AiContext;
 use super::movement::{
-    compute_directions_away, compute_directions_toward, distance_between,
-    try_movement_with_fallback,
+    compute_directions_away, compute_directions_toward, distance_between, try_intent_with_fallback,
 };
 use super::system::AiSystem;
 use super::types::{AiSpawnRequest, AiUpdateResult, SpawnMode};
@@ -148,10 +147,9 @@ impl AiSystem {
             return None;
         }
 
-        let movement_step = entity.attributes.speed.round() as i32;
-        let directions = compute_directions_away(entity.position, closest_pos, movement_step);
+        let directions = compute_directions_away(entity.position, closest_pos);
 
-        try_movement_with_fallback(entity, entity_id, entity.position, &directions, ctx)
+        try_intent_with_fallback(entity, entity_id, entity.position, &directions, ctx)
     }
 
     fn handle_mating_collision(
@@ -175,9 +173,8 @@ impl AiSystem {
 
         Some(AiUpdateResult {
             entity_id,
-            new_position: None,
+            movement_intent: None,
             new_animation: Some(AnimationState::Idle),
-            movement_distance: 0.0,
             spawn_request: Some(AiSpawnRequest {
                 position: spawn_pos,
                 parent_entity_ids: vec![entity_id, mate_id],
@@ -243,27 +240,20 @@ impl AiSystem {
         ctx: &AiContext,
     ) -> Option<AiUpdateResult> {
         let player_pos = player_position?;
-        let movement_step = entity.attributes.speed.round() as i32;
 
         if let Some(mate_id) = mate {
             if let Some(mate_entity) = ctx.entity_manager.get_entity(mate_id) {
-                let directions =
-                    compute_directions_toward(entity.position, mate_entity.position, movement_step);
-                let result = try_movement_with_fallback(
-                    entity,
-                    entity_id,
-                    entity.position,
-                    &directions,
-                    ctx,
-                );
-                if result.as_ref().is_some_and(|r| r.new_position.is_some()) {
+                let directions = compute_directions_toward(entity.position, mate_entity.position);
+                let result =
+                    try_intent_with_fallback(entity, entity_id, entity.position, &directions, ctx);
+                if result.as_ref().is_some_and(|r| r.movement_intent.is_some()) {
                     return result;
                 }
             }
         }
 
-        let directions = compute_directions_away(entity.position, player_pos, movement_step);
-        try_movement_with_fallback(entity, entity_id, entity.position, &directions, ctx)
+        let directions = compute_directions_away(entity.position, player_pos);
+        try_intent_with_fallback(entity, entity_id, entity.position, &directions, ctx)
     }
 
     fn seek_entity(
@@ -274,9 +264,8 @@ impl AiSystem {
         ctx: &AiContext,
     ) -> Option<AiUpdateResult> {
         let target = ctx.entity_manager.get_entity(target_id)?;
-        let movement_step = entity.attributes.speed.round() as i32;
-        let directions = compute_directions_toward(entity.position, target.position, movement_step);
+        let directions = compute_directions_toward(entity.position, target.position);
 
-        try_movement_with_fallback(entity, entity_id, entity.position, &directions, ctx)
+        try_intent_with_fallback(entity, entity_id, entity.position, &directions, ctx)
     }
 }

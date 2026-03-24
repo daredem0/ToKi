@@ -15,7 +15,7 @@ pub enum WanderPhase {
     /// Entity is walking in a direction for remaining distance (in pixels)
     Walking {
         direction: IVec2,
-        remaining_distance: i32,
+        remaining_distance: f32,
     },
 }
 
@@ -83,9 +83,8 @@ impl Default for AiRuntimeState {
 #[derive(Debug, Clone)]
 pub struct AiUpdateResult {
     pub entity_id: EntityId,
-    pub new_position: Option<IVec2>,
+    pub movement_intent: Option<IVec2>,
     pub new_animation: Option<AnimationState>,
-    pub movement_distance: f32,
     /// Optional spawn request (used by RunAndMultiply)
     pub spawn_request: Option<AiSpawnRequest>,
 }
