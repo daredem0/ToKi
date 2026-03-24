@@ -1,6 +1,14 @@
 use super::*;
 use crate::ui::EditorUI;
 
+#[derive(Default)]
+struct GraphCommandFlags {
+    scene_changed: bool,
+    graph_changed: bool,
+    layout_changed: bool,
+    operation_error: Option<String>,
+}
+
 impl PanelSystem {
     pub(super) fn render_scene_graph(
         ui: &mut egui::Ui,
@@ -255,395 +263,39 @@ impl PanelSystem {
             }
 
             if show_scene_rules {
-                let node_by_id = graph
-                    .nodes
-                    .iter()
-                    .map(|node| (node.id, node))
-                    .collect::<HashMap<_, _>>();
-                let mut outgoing = HashMap::<u64, Vec<u64>>::new();
-                for edge in &graph.edges {
-                    outgoing.entry(edge.from).or_default().push(edge.to);
+                if pending_command.is_none() {
+                    pending_command = Self::render_scene_rules_list(
+                        ui,
+                        &graph,
+                        &node_badges,
+                        &active_scene_name,
+                        &mut selected_graph_node,
+                    );
+                } else {
+                    let _ = Self::render_scene_rules_list(
+                        ui,
+                        &graph,
+                        &node_badges,
+                        &active_scene_name,
+                        &mut selected_graph_node,
+                    );
                 }
-
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    for (rule_index, chain) in graph.chains.iter().enumerate() {
-                        ui.push_id(("graph_chain", chain.trigger_node_id), |ui| {
-                            ui.group(|ui| {
-                                ui.horizontal(|ui| {
-                                    ui.strong(format!("Rule {}: {}", rule_index + 1, chain.rule_id));
-                                    if !chain.enabled {
-                                        ui.label("(disabled)");
-                                    }
-                                    if ui.small_button("🗑 Rule").clicked() {
-                                        pending_command =
-                                            Some(GraphCommand::RemoveNode(chain.trigger_node_id));
-                                    }
-                                });
-
-                                let sequence = match graph.chain_node_sequence(chain.trigger_node_id) {
-                                    Ok(sequence) => sequence,
-                                    Err(error) => {
-                                        ui.colored_label(
-                                            egui::Color32::from_rgb(255, 120, 120),
-                                            format!("Invalid chain: {:?}", error),
-                                        );
-                                        Vec::new()
-                                    }
-                                };
-                                let sequence_set = sequence.iter().copied().collect::<HashSet<_>>();
-
-                                for node_id in sequence {
-                                    let Some(node) = node_by_id.get(&node_id) else {
-                                        continue;
-                                    };
-                                    ui.push_id(("graph_node", node_id), |ui| {
-                                        ui.horizontal(|ui| match &node.kind {
-                                            RuleGraphNodeKind::Trigger(trigger) => {
-                                                let badge = node_badges
-                                                    .get(&node_id)
-                                                    .cloned()
-                                                    .unwrap_or_else(|| "T?".to_string());
-                                                let node_label = format!(
-                                                    "{} Trigger: {}",
-                                                    badge,
-                                                    Self::trigger_summary(trigger.clone())
-                                                );
-                                                let is_selected = selected_graph_node == Some(node_id);
-                                                if ui.selectable_label(is_selected, node_label).clicked() {
-                                                    selected_graph_node = Some(node_id);
-                                                }
-                                                let mut trigger_value = trigger.clone();
-                                                let mut kind =
-                                                    Self::graph_trigger_kind(trigger.clone());
-                                                egui::ComboBox::from_id_salt((
-                                                    "graph_trigger_kind",
-                                                    &active_scene_name,
-                                                    node_id,
-                                                ))
-                                                    .selected_text(Self::graph_trigger_kind_label(kind))
-                                                    .show_ui(ui, |ui| {
-                                                        for candidate in [
-                                                            GraphTriggerKind::Start,
-                                                            GraphTriggerKind::Update,
-                                                            GraphTriggerKind::PlayerMove,
-                                                            GraphTriggerKind::Key,
-                                                            GraphTriggerKind::Collision,
-                                                            GraphTriggerKind::Damaged,
-                                                            GraphTriggerKind::Death,
-                                                            GraphTriggerKind::Trigger,
-                                                            GraphTriggerKind::Interact,
-                                                            GraphTriggerKind::DialogComplete,
-                                                            GraphTriggerKind::TileEnter,
-                                                            GraphTriggerKind::TileExit,
-                                                        ] {
-                                                            ui.selectable_value(
-                                                                &mut kind,
-                                                                candidate,
-                                                                Self::graph_trigger_kind_label(candidate),
-                                                            );
-                                                        }
-                                                    });
-                                                if kind != Self::graph_trigger_kind(trigger.clone())
-                                                {
-                                                    trigger_value = Self::graph_default_trigger(kind);
-                                                }
-                                                if let RuleTrigger::OnKey { key } = &mut trigger_value {
-                                                    let _ = Self::edit_rule_key(
-                                                        ui,
-                                                        key,
-                                                        &format!(
-                                                            "graph_trigger_key::{}::{}",
-                                                            active_scene_name, node_id
-                                                        ),
-                                                    );
-                                                }
-                                                if let RuleTrigger::OnDialogComplete {
-                                                    dialog_id,
-                                                    outcome_id,
-                                                } = &mut trigger_value
-                                                {
-                                                    ui.label("Dialog:");
-                                                    let _ = ui.text_edit_singleline(dialog_id);
-                                                    ui.label("Outcome:");
-                                                    let _ = ui.text_edit_singleline(outcome_id);
-                                                }
-                                                if trigger_value != *trigger {
-                                                    pending_command =
-                                                        Some(GraphCommand::SetTrigger(node_id, trigger_value));
-                                                }
-                                            }
-                                            RuleGraphNodeKind::Condition(condition) => {
-                                                let badge = node_badges
-                                                    .get(&node_id)
-                                                    .cloned()
-                                                    .unwrap_or_else(|| "C?".to_string());
-                                                let node_label = format!(
-                                                    "{} Condition: {}",
-                                                    badge,
-                                                    Self::condition_summary(condition)
-                                                );
-                                                let is_selected = selected_graph_node == Some(node_id);
-                                                if ui.selectable_label(is_selected, node_label).clicked() {
-                                                    selected_graph_node = Some(node_id);
-                                                }
-                                                let mut kind = Self::graph_condition_kind(condition);
-                                                egui::ComboBox::from_id_salt((
-                                                    "graph_condition_kind",
-                                                    &active_scene_name,
-                                                    node_id,
-                                                ))
-                                                    .selected_text(Self::graph_condition_kind_label(kind))
-                                                    .show_ui(ui, |ui| {
-                                                        for candidate in [
-                                                            GraphConditionKind::Always,
-                                                            GraphConditionKind::TargetExists,
-                                                            GraphConditionKind::KeyHeld,
-                                                            GraphConditionKind::EntityActive,
-                                                            GraphConditionKind::HealthBelow,
-                                                            GraphConditionKind::HealthAbove,
-                                                            GraphConditionKind::TriggerOtherIsPlayer,
-                                                            GraphConditionKind::EntityIsKind,
-                                                            GraphConditionKind::TriggerOtherIsKind,
-                                                            GraphConditionKind::EntityHasTag,
-                                                            GraphConditionKind::TriggerOtherHasTag,
-                                                            GraphConditionKind::HasInventoryItem,
-                                                        ] {
-                                                            ui.selectable_value(
-                                                                &mut kind,
-                                                                candidate,
-                                                                Self::graph_condition_kind_label(candidate),
-                                                            );
-                                                        }
-                                                    });
-                                                let mut edited_condition = condition.clone();
-                                                if kind != Self::graph_condition_kind(condition) {
-                                                    edited_condition =
-                                                        Self::graph_default_condition(kind);
-                                                }
-                                                let payload_changed =
-                                                    Self::edit_graph_condition_payload(
-                                                        ui,
-                                                        &mut edited_condition,
-                                                        &format!(
-                                                            "graph_condition_payload::{}::{}",
-                                                            active_scene_name, node_id
-                                                        ),
-                                                    );
-                                                if edited_condition != *condition || payload_changed {
-                                                    pending_command = Some(GraphCommand::SetCondition(
-                                                        node_id,
-                                                        edited_condition,
-                                                    ));
-                                                }
-                                                if ui.small_button("✕").clicked() {
-                                                    pending_command =
-                                                        Some(GraphCommand::RemoveNode(node_id));
-                                                }
-                                            }
-                                            RuleGraphNodeKind::Action(action) => {
-                                                let badge = node_badges
-                                                    .get(&node_id)
-                                                    .cloned()
-                                                    .unwrap_or_else(|| "A?".to_string());
-                                                let node_label =
-                                                    format!(
-                                                        "{} Action: {}",
-                                                        badge,
-                                                        Self::action_summary(action)
-                                                    );
-                                                let is_selected = selected_graph_node == Some(node_id);
-                                                if ui.selectable_label(is_selected, node_label).clicked() {
-                                                    selected_graph_node = Some(node_id);
-                                                }
-                                                let mut kind = Self::graph_action_kind(action);
-                                                egui::ComboBox::from_id_salt((
-                                                    "graph_action_kind",
-                                                    &active_scene_name,
-                                                    node_id,
-                                                ))
-                                                    .selected_text(Self::graph_action_kind_label(kind))
-                                                    .show_ui(ui, |ui| {
-                                                        for candidate in [
-                                                            GraphActionKind::PlaySound,
-                                                            GraphActionKind::PlayMusic,
-                                                            GraphActionKind::PlayAnimation,
-                                                            GraphActionKind::SetVelocity,
-                                                            GraphActionKind::Spawn,
-                                                            GraphActionKind::DestroySelf,
-                                                            GraphActionKind::SwitchScene,
-                                                            GraphActionKind::DamageEntity,
-                                                            GraphActionKind::HealEntity,
-                                                            GraphActionKind::AddInventoryItem,
-                                                            GraphActionKind::RemoveInventoryItem,
-                                                            GraphActionKind::SetEntityActive,
-                                                            GraphActionKind::TeleportEntity,
-                                                        ] {
-                                                            ui.selectable_value(
-                                                                &mut kind,
-                                                                candidate,
-                                                                Self::graph_action_kind_label(candidate),
-                                                            );
-                                                        }
-                                                    });
-                                                let mut edited_action = action.clone();
-                                                if kind != Self::graph_action_kind(action) {
-                                                    edited_action = Self::graph_default_action(kind);
-                                                }
-                                                let payload_changed = Self::edit_graph_action_payload(
-                                                    ui,
-                                                    &mut edited_action,
-                                                    &format!(
-                                                        "graph_action_payload::{}::{}",
-                                                        active_scene_name, node_id
-                                                    ),
-                                                );
-                                                if edited_action != *action || payload_changed {
-                                                    pending_command = Some(GraphCommand::SetAction(
-                                                        node_id,
-                                                        edited_action,
-                                                    ));
-                                                }
-                                                if ui.small_button("✕").clicked() {
-                                                    pending_command =
-                                                        Some(GraphCommand::RemoveNode(node_id));
-                                                }
-                                            }
-                                        });
-                                    });
-                                }
-
-                                let edge_list = graph
-                                    .edges
-                                    .iter()
-                                    .filter(|edge| {
-                                        sequence_set.contains(&edge.from)
-                                            || sequence_set.contains(&edge.to)
-                                    })
-                                    .copied()
-                                    .collect::<Vec<_>>();
-
-                                if !edge_list.is_empty() {
-                                    egui::CollapsingHeader::new("Edges")
-                                        .id_salt(("graph_edges", chain.trigger_node_id))
-                                        .show(ui, |ui| {
-                                            for edge in edge_list {
-                                                ui.horizontal(|ui| {
-                                                    let from_label = Self::rule_graph_node_label(
-                                                        &graph,
-                                                        &node_badges,
-                                                        edge.from,
-                                                    )
-                                                    .unwrap_or_else(|| format!("node {}", edge.from));
-                                                    let to_label = Self::rule_graph_node_label(
-                                                        &graph,
-                                                        &node_badges,
-                                                        edge.to,
-                                                    )
-                                                    .unwrap_or_else(|| format!("node {}", edge.to));
-                                                    ui.monospace(format!(
-                                                        "{} -> {}",
-                                                        from_label, to_label
-                                                    ));
-                                                    if ui.small_button("Disconnect").clicked() {
-                                                        pending_command = Some(
-                                                            GraphCommand::Disconnect(edge.from, edge.to),
-                                                        );
-                                                    }
-                                                });
-                                            }
-                                        });
-                                }
-
-                                if let Some(next_nodes) = outgoing.get(&chain.trigger_node_id) {
-                                    if next_nodes.is_empty() {
-                                        ui.colored_label(
-                                            egui::Color32::from_rgb(255, 210, 80),
-                                            "Trigger has no outgoing edge. Connect it to continue chain.",
-                                        );
-                                    }
-                                }
-                            });
-                        });
-                        ui.add_space(6.0);
-                    }
-                });
             }
 
             if let Some(command) = pending_command {
-                let is_layout_command = matches!(command, GraphCommand::SetNodePosition(_, _));
-                let is_reset_layout = matches!(command, GraphCommand::ResetLayout);
-                let is_draft_only_command = matches!(
+                let flags = Self::apply_graph_command(
+                    ui,
+                    &mut graph,
+                    &node_badges,
                     command,
-                    GraphCommand::AddConditionNode | GraphCommand::AddActionNode
+                    graph_zoom,
+                    &mut graph_pan,
                 );
-                let remembered_layout = Self::remember_graph_layout(&graph);
-                let command_result = match command {
-                    GraphCommand::AddTrigger => graph.add_trigger_chain().map(|_| ()),
-                    GraphCommand::ResetLayout => {
-                        let auto_positions =
-                            Self::compute_auto_layout_positions(ui, &graph, &node_badges);
-                        auto_positions
-                            .into_iter()
-                            .try_for_each(|(node_id, position)| {
-                                graph.set_node_position(node_id, position)
-                            })
-                    }
-                    GraphCommand::AddConditionNode => {
-                        graph.add_condition_node(RuleCondition::Always).map(|_| ())
-                    }
-                    GraphCommand::SetTrigger(trigger_node_id, trigger) => {
-                        graph.set_trigger_for_chain(trigger_node_id, trigger)
-                    }
-                    GraphCommand::AddActionNode => graph
-                        .add_action_node(RuleAction::PlaySound {
-                            channel: RuleSoundChannel::Movement,
-                            sound_id: "sfx_placeholder".to_string(),
-                        })
-                        .map(|_| ()),
-                    GraphCommand::SetCondition(node_id, condition) => {
-                        graph.set_condition_for_node(node_id, condition)
-                    }
-                    GraphCommand::SetAction(node_id, action) => {
-                        graph.set_action_for_node(node_id, action)
-                    }
-                    GraphCommand::SetNodePosition(node_id, position) => {
-                        graph.set_node_position(node_id, position)
-                    }
-                    GraphCommand::RemoveNode(node_id) => graph.remove_node(node_id),
-                    GraphCommand::Connect(from, to) => graph.connect_nodes(from, to),
-                    GraphCommand::Disconnect(from, to) => {
-                        graph.disconnect_nodes(from, to);
-                        Ok(())
-                    }
-                    GraphCommand::DisconnectMany(edges) => {
-                        for (from, to) in edges {
-                            graph.disconnect_nodes(from, to);
-                        }
-                        Ok(())
-                    }
-                    GraphCommand::DisconnectNode(node_id) => graph.disconnect_node(node_id),
-                };
-
-                match command_result {
-                    Ok(()) => {
-                        graph_changed = true;
-                        if is_reset_layout {
-                            // Keep a visible border gap when snapping to auto layout.
-                            graph_pan = [16.0, 16.0];
-                            Self::enforce_graph_border_gap(&graph, graph_zoom, &mut graph_pan);
-                        }
-                        if !is_layout_command && !is_reset_layout {
-                            Self::restore_graph_layout(&mut graph, &remembered_layout);
-                        }
-                        if is_layout_command || is_reset_layout || is_draft_only_command {
-                            layout_changed = true;
-                        } else {
-                            scene_changed = true;
-                        }
-                    }
-                    Err(error) => {
-                        operation_error = Some(format!("Graph edit failed: {:?}", error));
-                    }
+                scene_changed |= flags.scene_changed;
+                graph_changed |= flags.graph_changed;
+                layout_changed |= flags.layout_changed;
+                if let Some(error) = flags.operation_error {
+                    operation_error = Some(error);
                 }
             }
 
@@ -709,6 +361,419 @@ impl PanelSystem {
         }
         if let Some(error) = operation_error {
             ui.colored_label(egui::Color32::from_rgb(255, 120, 120), error);
+        }
+    }
+
+    fn render_scene_rules_list(
+        ui: &mut egui::Ui,
+        graph: &RuleGraph,
+        node_badges: &HashMap<u64, String>,
+        active_scene_name: &str,
+        selected_graph_node: &mut Option<u64>,
+    ) -> Option<GraphCommand> {
+        let node_by_id = graph
+            .nodes
+            .iter()
+            .map(|node| (node.id, node))
+            .collect::<HashMap<_, _>>();
+        let mut outgoing = HashMap::<u64, Vec<u64>>::new();
+        for edge in &graph.edges {
+            outgoing.entry(edge.from).or_default().push(edge.to);
+        }
+
+        let mut pending_command = None;
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            for (rule_index, chain) in graph.chains.iter().enumerate() {
+                ui.push_id(("graph_chain", chain.trigger_node_id), |ui| {
+                    ui.group(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.strong(format!("Rule {}: {}", rule_index + 1, chain.rule_id));
+                            if !chain.enabled {
+                                ui.label("(disabled)");
+                            }
+                            if ui.small_button("🗑 Rule").clicked() {
+                                pending_command =
+                                    Some(GraphCommand::RemoveNode(chain.trigger_node_id));
+                            }
+                        });
+
+                        let sequence = match graph.chain_node_sequence(chain.trigger_node_id) {
+                            Ok(sequence) => sequence,
+                            Err(error) => {
+                                ui.colored_label(
+                                    egui::Color32::from_rgb(255, 120, 120),
+                                    format!("Invalid chain: {:?}", error),
+                                );
+                                Vec::new()
+                            }
+                        };
+                        let sequence_set = sequence.iter().copied().collect::<HashSet<_>>();
+
+                        for node_id in sequence {
+                            let Some(node) = node_by_id.get(&node_id) else {
+                                continue;
+                            };
+                            ui.push_id(("graph_node", node_id), |ui| {
+                                ui.horizontal(|ui| match &node.kind {
+                                    RuleGraphNodeKind::Trigger(trigger) => {
+                                        let badge = node_badges
+                                            .get(&node_id)
+                                            .cloned()
+                                            .unwrap_or_else(|| "T?".to_string());
+                                        let node_label = format!(
+                                            "{} Trigger: {}",
+                                            badge,
+                                            Self::trigger_summary(trigger.clone())
+                                        );
+                                        let is_selected = *selected_graph_node == Some(node_id);
+                                        if ui.selectable_label(is_selected, node_label).clicked() {
+                                            *selected_graph_node = Some(node_id);
+                                        }
+                                        let mut trigger_value = trigger.clone();
+                                        let mut kind = Self::graph_trigger_kind(trigger.clone());
+                                        egui::ComboBox::from_id_salt((
+                                            "graph_trigger_kind",
+                                            active_scene_name,
+                                            node_id,
+                                        ))
+                                        .selected_text(Self::graph_trigger_kind_label(kind))
+                                        .show_ui(
+                                            ui,
+                                            |ui| {
+                                                for candidate in [
+                                                    GraphTriggerKind::Start,
+                                                    GraphTriggerKind::Update,
+                                                    GraphTriggerKind::PlayerMove,
+                                                    GraphTriggerKind::Key,
+                                                    GraphTriggerKind::Collision,
+                                                    GraphTriggerKind::Damaged,
+                                                    GraphTriggerKind::Death,
+                                                    GraphTriggerKind::Trigger,
+                                                    GraphTriggerKind::Interact,
+                                                    GraphTriggerKind::DialogComplete,
+                                                    GraphTriggerKind::TileEnter,
+                                                    GraphTriggerKind::TileExit,
+                                                ] {
+                                                    ui.selectable_value(
+                                                        &mut kind,
+                                                        candidate,
+                                                        Self::graph_trigger_kind_label(candidate),
+                                                    );
+                                                }
+                                            },
+                                        );
+                                        if kind != Self::graph_trigger_kind(trigger.clone()) {
+                                            trigger_value = Self::graph_default_trigger(kind);
+                                        }
+                                        if let RuleTrigger::OnKey { key } = &mut trigger_value {
+                                            let _ = Self::edit_rule_key(
+                                                ui,
+                                                key,
+                                                &format!(
+                                                    "graph_trigger_key::{}::{}",
+                                                    active_scene_name, node_id
+                                                ),
+                                            );
+                                        }
+                                        if let RuleTrigger::OnDialogComplete {
+                                            dialog_id,
+                                            outcome_id,
+                                        } = &mut trigger_value
+                                        {
+                                            ui.label("Dialog:");
+                                            let _ = ui.text_edit_singleline(dialog_id);
+                                            ui.label("Outcome:");
+                                            let _ = ui.text_edit_singleline(outcome_id);
+                                        }
+                                        if trigger_value != *trigger {
+                                            pending_command = Some(GraphCommand::SetTrigger(
+                                                node_id,
+                                                trigger_value,
+                                            ));
+                                        }
+                                    }
+                                    RuleGraphNodeKind::Condition(condition) => {
+                                        let badge = node_badges
+                                            .get(&node_id)
+                                            .cloned()
+                                            .unwrap_or_else(|| "C?".to_string());
+                                        let node_label = format!(
+                                            "{} Condition: {}",
+                                            badge,
+                                            Self::condition_summary(condition)
+                                        );
+                                        let is_selected = *selected_graph_node == Some(node_id);
+                                        if ui.selectable_label(is_selected, node_label).clicked() {
+                                            *selected_graph_node = Some(node_id);
+                                        }
+                                        let mut kind = Self::graph_condition_kind(condition);
+                                        egui::ComboBox::from_id_salt((
+                                            "graph_condition_kind",
+                                            active_scene_name,
+                                            node_id,
+                                        ))
+                                        .selected_text(Self::graph_condition_kind_label(kind))
+                                        .show_ui(
+                                            ui,
+                                            |ui| {
+                                                for candidate in [
+                                                    GraphConditionKind::Always,
+                                                    GraphConditionKind::TargetExists,
+                                                    GraphConditionKind::KeyHeld,
+                                                    GraphConditionKind::EntityActive,
+                                                    GraphConditionKind::HealthBelow,
+                                                    GraphConditionKind::HealthAbove,
+                                                    GraphConditionKind::TriggerOtherIsPlayer,
+                                                    GraphConditionKind::EntityIsKind,
+                                                    GraphConditionKind::TriggerOtherIsKind,
+                                                    GraphConditionKind::EntityHasTag,
+                                                    GraphConditionKind::TriggerOtherHasTag,
+                                                    GraphConditionKind::HasInventoryItem,
+                                                ] {
+                                                    ui.selectable_value(
+                                                        &mut kind,
+                                                        candidate,
+                                                        Self::graph_condition_kind_label(candidate),
+                                                    );
+                                                }
+                                            },
+                                        );
+                                        let mut edited_condition = condition.clone();
+                                        if kind != Self::graph_condition_kind(condition) {
+                                            edited_condition = Self::graph_default_condition(kind);
+                                        }
+                                        let payload_changed = Self::edit_graph_condition_payload(
+                                            ui,
+                                            &mut edited_condition,
+                                            &format!(
+                                                "graph_condition_payload::{}::{}",
+                                                active_scene_name, node_id
+                                            ),
+                                        );
+                                        if edited_condition != *condition || payload_changed {
+                                            pending_command = Some(GraphCommand::SetCondition(
+                                                node_id,
+                                                edited_condition,
+                                            ));
+                                        }
+                                        if ui.small_button("✕").clicked() {
+                                            pending_command =
+                                                Some(GraphCommand::RemoveNode(node_id));
+                                        }
+                                    }
+                                    RuleGraphNodeKind::Action(action) => {
+                                        let badge = node_badges
+                                            .get(&node_id)
+                                            .cloned()
+                                            .unwrap_or_else(|| "A?".to_string());
+                                        let node_label = format!(
+                                            "{} Action: {}",
+                                            badge,
+                                            Self::action_summary(action)
+                                        );
+                                        let is_selected = *selected_graph_node == Some(node_id);
+                                        if ui.selectable_label(is_selected, node_label).clicked() {
+                                            *selected_graph_node = Some(node_id);
+                                        }
+                                        let mut kind = Self::graph_action_kind(action);
+                                        egui::ComboBox::from_id_salt((
+                                            "graph_action_kind",
+                                            active_scene_name,
+                                            node_id,
+                                        ))
+                                        .selected_text(Self::graph_action_kind_label(kind))
+                                        .show_ui(
+                                            ui,
+                                            |ui| {
+                                                for candidate in [
+                                                    GraphActionKind::PlaySound,
+                                                    GraphActionKind::PlayMusic,
+                                                    GraphActionKind::PlayAnimation,
+                                                    GraphActionKind::SetVelocity,
+                                                    GraphActionKind::Spawn,
+                                                    GraphActionKind::DestroySelf,
+                                                    GraphActionKind::SwitchScene,
+                                                    GraphActionKind::DamageEntity,
+                                                    GraphActionKind::HealEntity,
+                                                    GraphActionKind::AddInventoryItem,
+                                                    GraphActionKind::RemoveInventoryItem,
+                                                    GraphActionKind::SetEntityActive,
+                                                    GraphActionKind::TeleportEntity,
+                                                ] {
+                                                    ui.selectable_value(
+                                                        &mut kind,
+                                                        candidate,
+                                                        Self::graph_action_kind_label(candidate),
+                                                    );
+                                                }
+                                            },
+                                        );
+                                        let mut edited_action = action.clone();
+                                        if kind != Self::graph_action_kind(action) {
+                                            edited_action = Self::graph_default_action(kind);
+                                        }
+                                        let payload_changed = Self::edit_graph_action_payload(
+                                            ui,
+                                            &mut edited_action,
+                                            &format!(
+                                                "graph_action_payload::{}::{}",
+                                                active_scene_name, node_id
+                                            ),
+                                        );
+                                        if edited_action != *action || payload_changed {
+                                            pending_command = Some(GraphCommand::SetAction(
+                                                node_id,
+                                                edited_action,
+                                            ));
+                                        }
+                                        if ui.small_button("✕").clicked() {
+                                            pending_command =
+                                                Some(GraphCommand::RemoveNode(node_id));
+                                        }
+                                    }
+                                });
+                            });
+                        }
+
+                        let edge_list = graph
+                            .edges
+                            .iter()
+                            .filter(|edge| {
+                                sequence_set.contains(&edge.from) || sequence_set.contains(&edge.to)
+                            })
+                            .copied()
+                            .collect::<Vec<_>>();
+
+                        if !edge_list.is_empty() {
+                            egui::CollapsingHeader::new("Edges")
+                                .id_salt(("graph_edges", chain.trigger_node_id))
+                                .show(ui, |ui| {
+                                    for edge in edge_list {
+                                        ui.horizontal(|ui| {
+                                            let from_label = Self::rule_graph_node_label(
+                                                graph,
+                                                node_badges,
+                                                edge.from,
+                                            )
+                                            .unwrap_or_else(|| format!("node {}", edge.from));
+                                            let to_label = Self::rule_graph_node_label(
+                                                graph,
+                                                node_badges,
+                                                edge.to,
+                                            )
+                                            .unwrap_or_else(|| format!("node {}", edge.to));
+                                            ui.monospace(format!("{} -> {}", from_label, to_label));
+                                            if ui.small_button("Disconnect").clicked() {
+                                                pending_command = Some(GraphCommand::Disconnect(
+                                                    edge.from, edge.to,
+                                                ));
+                                            }
+                                        });
+                                    }
+                                });
+                        }
+
+                        if let Some(next_nodes) = outgoing.get(&chain.trigger_node_id) {
+                            if next_nodes.is_empty() {
+                                ui.colored_label(
+                                    egui::Color32::from_rgb(255, 210, 80),
+                                    "Trigger has no outgoing edge. Connect it to continue chain.",
+                                );
+                            }
+                        }
+                    });
+                });
+                ui.add_space(6.0);
+            }
+        });
+        pending_command
+    }
+
+    fn apply_graph_command(
+        ui: &egui::Ui,
+        graph: &mut RuleGraph,
+        node_badges: &HashMap<u64, String>,
+        command: GraphCommand,
+        graph_zoom: f32,
+        graph_pan: &mut [f32; 2],
+    ) -> GraphCommandFlags {
+        let is_layout_command = matches!(command, GraphCommand::SetNodePosition(_, _));
+        let is_reset_layout = matches!(command, GraphCommand::ResetLayout);
+        let is_draft_only_command = matches!(
+            command,
+            GraphCommand::AddConditionNode | GraphCommand::AddActionNode
+        );
+        let remembered_layout = Self::remember_graph_layout(graph);
+        let command_result = match command {
+            GraphCommand::AddTrigger => graph.add_trigger_chain().map(|_| ()),
+            GraphCommand::ResetLayout => {
+                let auto_positions = Self::compute_auto_layout_positions(ui, graph, node_badges);
+                auto_positions
+                    .into_iter()
+                    .try_for_each(|(node_id, position)| graph.set_node_position(node_id, position))
+            }
+            GraphCommand::AddConditionNode => {
+                graph.add_condition_node(RuleCondition::Always).map(|_| ())
+            }
+            GraphCommand::SetTrigger(trigger_node_id, trigger) => {
+                graph.set_trigger_for_chain(trigger_node_id, trigger)
+            }
+            GraphCommand::AddActionNode => graph
+                .add_action_node(RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "sfx_placeholder".to_string(),
+                })
+                .map(|_| ()),
+            GraphCommand::SetCondition(node_id, condition) => {
+                graph.set_condition_for_node(node_id, condition)
+            }
+            GraphCommand::SetAction(node_id, action) => graph.set_action_for_node(node_id, action),
+            GraphCommand::SetNodePosition(node_id, position) => {
+                graph.set_node_position(node_id, position)
+            }
+            GraphCommand::RemoveNode(node_id) => graph.remove_node(node_id),
+            GraphCommand::Connect(from, to) => graph.connect_nodes(from, to),
+            GraphCommand::Disconnect(from, to) => {
+                graph.disconnect_nodes(from, to);
+                Ok(())
+            }
+            GraphCommand::DisconnectMany(edges) => {
+                for (from, to) in edges {
+                    graph.disconnect_nodes(from, to);
+                }
+                Ok(())
+            }
+            GraphCommand::DisconnectNode(node_id) => graph.disconnect_node(node_id),
+        };
+
+        match command_result {
+            Ok(()) => {
+                let mut flags = GraphCommandFlags {
+                    graph_changed: true,
+                    ..Default::default()
+                };
+                if is_reset_layout {
+                    *graph_pan = [16.0, 16.0];
+                    Self::enforce_graph_border_gap(graph, graph_zoom, graph_pan);
+                }
+                if !is_layout_command && !is_reset_layout {
+                    Self::restore_graph_layout(graph, &remembered_layout);
+                }
+                if is_layout_command || is_reset_layout || is_draft_only_command {
+                    flags.layout_changed = true;
+                } else {
+                    flags.scene_changed = true;
+                }
+                flags
+            }
+            Err(error) => {
+                let message = format!("Graph edit failed: {:?}", error);
+                tracing::warn!("{message}");
+                GraphCommandFlags {
+                    operation_error: Some(message),
+                    ..Default::default()
+                }
+            }
         }
     }
 }

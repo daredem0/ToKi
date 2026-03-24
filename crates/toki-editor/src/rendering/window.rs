@@ -17,7 +17,7 @@ impl WindowRenderer {
     pub async fn new(window: Arc<Window>) -> Result<Self> {
         // Use consolidated WGPU setup from toki-render
         let (device, queue, surface, surface_config, _) =
-            wgpu_utils::create_device_and_surface_async(window, true).await;
+            wgpu_utils::create_device_and_surface_async(window, true).await?;
 
         // Initialize egui renderer
         let egui_renderer =

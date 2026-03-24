@@ -5,6 +5,7 @@ use super::{
 use crate::draw::build_quad_vertices;
 use crate::vertex::VertexLayout;
 use crate::wgpu_utils::{create_bind_group_layout, create_shader_module};
+use crate::RenderError;
 use bytemuck::{Pod, Zeroable};
 use glam::Vec2;
 use toki_core::graphics::vertex::QuadVertex;
@@ -58,7 +59,7 @@ impl SpritePipeline {
         queue: &Queue,
         surface_format: wgpu::TextureFormat,
         texture_source: TextureSource<'_>,
-    ) -> Self {
+    ) -> Result<Self, RenderError> {
         let dummy_uniforms = SpriteUniforms {
             mvp: glam::Mat4::IDENTITY.to_cols_array_2d(),
         };
@@ -75,7 +76,7 @@ impl SpritePipeline {
             &uniform_buffer,
             texture_source,
             Some("Sprite Texture"),
-        );
+        )?;
 
         let render_pipeline =
             Self::build_render_pipeline(device, surface_format, &bind_group_layout);
@@ -88,14 +89,14 @@ impl SpritePipeline {
             mapped_at_creation: false,
         });
 
-        Self {
+        Ok(Self {
             render_pipeline,
             bind_group,
             uniform_buffer,
             vertex_buffer,
             instances: Vec::new(),
             needs_buffer_update: false,
-        }
+        })
     }
 
     pub fn add_sprite(&mut self, instance: SpriteInstance) {

@@ -1,4 +1,5 @@
 use super::EditorApp;
+use crate::project::assets::TilemapAsset;
 use crate::project::ProjectAssets;
 use crate::ui::editor_ui::EditorConfirmation;
 use crate::ui::editor_ui::{EntityMoveDragState, MapEditorDraft};
@@ -257,6 +258,38 @@ fn runtime_discovery_error_message_lists_all_candidates() {
     assert!(message.contains("/tmp/runtime-configured"));
     assert!(message.contains("/opt/toki/toki-runtime"));
     assert!(message.contains("/workspace/target/release/toki-runtime"));
+}
+
+#[test]
+fn collect_available_map_names_sorts_tilemap_names() {
+    let mut project_assets = ProjectAssets::new(PathBuf::from("/tmp/demo"));
+    project_assets.tilemaps.insert(
+        "z_map".to_string(),
+        TilemapAsset {
+            path: PathBuf::from("maps/z_map.json"),
+        },
+    );
+    project_assets.tilemaps.insert(
+        "a_map".to_string(),
+        TilemapAsset {
+            path: PathBuf::from("maps/a_map.json"),
+        },
+    );
+
+    let names = EditorApp::collect_available_map_names(Some(&project_assets));
+
+    assert_eq!(names, Some(vec!["a_map".to_string(), "z_map".to_string()]));
+}
+
+#[test]
+fn project_indexed_palette_override_reads_runtime_display_setting() {
+    let mut project =
+        crate::project::Project::new("Demo".to_string(), PathBuf::from("/tmp/DemoProject"));
+    project.metadata.runtime.display.indexed_palette_override = Some("pocket".to_string());
+
+    let override_name = EditorApp::project_indexed_palette_override(Some(&project));
+
+    assert_eq!(override_name.as_deref(), Some("pocket"));
 }
 
 #[test]
