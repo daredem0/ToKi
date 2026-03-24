@@ -5,7 +5,7 @@
 use tracing::debug;
 
 use crate::entity::EntityId;
-use crate::rules::{RuleTarget, RuleTrigger, TriggerContext};
+use crate::rules::{RuleAction, RuleTarget, RuleTrigger, TriggerContext};
 
 use super::events::{
     CollisionEvent, DamageEvent, DeathEvent, DialogCompletionEvent, InteractionEvent,
@@ -14,6 +14,75 @@ use super::events::{
 use super::{GameState, RuleCommand};
 
 impl GameState {
+    pub(in crate::game::rules) fn rule_is_collectible(
+        &self,
+        rule: &crate::rules::Rule,
+    ) -> bool {
+        rule.enabled
+            && !(rule.once
+                && self
+                    .rule_runtime
+                    .fired_once_rules
+                    .contains(rule.id.as_str()))
+    }
+
+    pub(in crate::game::rules) fn sort_rule_indices(&self, indices: &mut [usize]) {
+        indices.sort_by(|&a, &b| {
+            let rule_a = &self.rules.rules[a];
+            let rule_b = &self.rules.rules[b];
+            rule_b
+                .priority
+                .cmp(&rule_a.priority)
+                .then_with(|| rule_a.id.cmp(&rule_b.id))
+        });
+    }
+
+    pub(in crate::game::rules) fn execute_sorted_rule_indices<ShouldExecute, LogRule, LogAction>(
+        &mut self,
+        sorted_indices: &[usize],
+        context: &TriggerContext,
+        command_buffer: &mut Vec<RuleCommand>,
+        mut should_execute_rule: ShouldExecute,
+        mut log_rule: LogRule,
+        mut log_action: LogAction,
+    ) where
+        ShouldExecute: FnMut(&crate::rules::Rule) -> bool,
+        LogRule: FnMut(&crate::rules::Rule, bool),
+        LogAction: FnMut(&str, &RuleAction),
+    {
+        let mut fired_once_ids = Vec::new();
+
+        for &idx in sorted_indices {
+            let Some((actions, rule_id, rule_once)) = ({
+                let rule = &self.rules.rules[idx];
+                if !should_execute_rule(rule) {
+                    None
+                } else {
+                    let conditions_result = self.rule_conditions_match(&rule.conditions, context);
+                    log_rule(rule, conditions_result);
+                    if !conditions_result {
+                        None
+                    } else {
+                        Some((rule.actions.clone(), rule.id.clone(), rule.once))
+                    }
+                }
+            }) else {
+                continue;
+            };
+
+            for action in &actions {
+                log_action(&rule_id, action);
+                self.buffer_rule_action(action, context, command_buffer);
+            }
+
+            if rule_once {
+                fired_once_ids.push(rule_id);
+            }
+        }
+
+        self.rule_runtime.fired_once_rules.extend(fired_once_ids);
+    }
+
     /// Collects rule commands for a trigger without context.
     pub(in crate::game) fn collect_rule_commands_for_trigger(
         &mut self,
@@ -34,46 +103,32 @@ impl GameState {
         context: TriggerContext,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        let mut matching_rules: Vec<&crate::rules::Rule> = self
+        let mut sorted_indices = self
             .rules
             .rules
             .iter()
-            .filter(|rule| rule.enabled && rule.trigger == trigger)
-            .filter(|rule| {
-                !(rule.once
-                    && self
-                        .rule_runtime
-                        .fired_once_rules
-                        .contains(rule.id.as_str()))
-            })
-            .collect();
-
-        matching_rules.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
-
-        let mut fired_once_ids = Vec::new();
-        for rule in matching_rules {
-            let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
-            debug!(
-                rule_id = %rule.id,
-                trigger = ?trigger,
-                conditions_passed = conditions_result,
-                "Rule evaluated"
-            );
-
-            if !conditions_result {
-                continue;
-            }
-
-            for action in &rule.actions {
-                debug!(rule_id = %rule.id, action = ?action, "Executing action");
-                self.buffer_rule_action(action, &context, command_buffer);
-            }
-
-            if rule.once {
-                fired_once_ids.push(rule.id.clone());
-            }
-        }
-        self.rule_runtime.fired_once_rules.extend(fired_once_ids);
+            .enumerate()
+            .filter(|(_, rule)| self.rule_is_collectible(rule) && rule.trigger == trigger)
+            .map(|(idx, _)| idx)
+            .collect::<Vec<_>>();
+        self.sort_rule_indices(&mut sorted_indices);
+        self.execute_sorted_rule_indices(
+            &sorted_indices,
+            &context,
+            command_buffer,
+            |_| true,
+            |rule, conditions_result| {
+                debug!(
+                    rule_id = %rule.id,
+                    trigger = ?trigger,
+                    conditions_passed = conditions_result,
+                    "Rule evaluated"
+                );
+            },
+            |rule_id, action| {
+                debug!(rule_id = %rule_id, action = ?action, "Executing action");
+            },
+        );
     }
 
     /// Collects rule commands for OnInteract triggers.
@@ -85,19 +140,14 @@ impl GameState {
         let context = TriggerContext::with_pair(event.interactor, event.interactable);
 
         // Collect matching rule indices to avoid borrow conflicts
-        let matching_indices: Vec<usize> = self
+        let mut sorted_indices = self
             .rules
             .rules
             .iter()
             .enumerate()
             .filter(|(_, rule)| {
-                rule.enabled
+                self.rule_is_collectible(rule)
                     && matches!(rule.trigger, RuleTrigger::OnInteract { .. })
-                    && !(rule.once
-                        && self
-                            .rule_runtime
-                            .fired_once_rules
-                            .contains(rule.id.as_str()))
             })
             .filter(|(_, rule)| {
                 let mode = rule.trigger.interaction_mode().unwrap_or_default();
@@ -109,52 +159,28 @@ impl GameState {
                     )
             })
             .map(|(i, _)| i)
-            .collect();
-
-        // Sort by priority then id
-        let mut sorted_indices = matching_indices;
-        sorted_indices.sort_by(|&a, &b| {
-            let rule_a = &self.rules.rules[a];
-            let rule_b = &self.rules.rules[b];
-            rule_b
-                .priority
-                .cmp(&rule_a.priority)
-                .then_with(|| rule_a.id.cmp(&rule_b.id))
-        });
-
-        let mut fired_once_ids = Vec::new();
-        for idx in sorted_indices {
-            let rule = &self.rules.rules[idx];
-            let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
-            debug!(
-                rule_id = %rule.id,
-                trigger = ?rule.trigger,
-                interactor = ?event.interactor,
-                interactable = ?event.interactable,
-                spatial = ?event.spatial,
-                conditions_passed = conditions_result,
-                "Interaction rule evaluated"
-            );
-
-            if !conditions_result {
-                continue;
-            }
-
-            // Clone actions to avoid borrow conflict
-            let actions = rule.actions.clone();
-            let rule_id = rule.id.clone();
-            let rule_once = rule.once;
-
-            for action in &actions {
+            .collect::<Vec<_>>();
+        self.sort_rule_indices(&mut sorted_indices);
+        self.execute_sorted_rule_indices(
+            &sorted_indices,
+            &context,
+            command_buffer,
+            |_| true,
+            |rule, conditions_result| {
+                debug!(
+                    rule_id = %rule.id,
+                    trigger = ?rule.trigger,
+                    interactor = ?event.interactor,
+                    interactable = ?event.interactable,
+                    spatial = ?event.spatial,
+                    conditions_passed = conditions_result,
+                    "Interaction rule evaluated"
+                );
+            },
+            |rule_id, action| {
                 debug!(rule_id = %rule_id, action = ?action, "Executing action");
-                self.buffer_rule_action(action, &context, command_buffer);
-            }
-
-            if rule_once {
-                fired_once_ids.push(rule_id);
-            }
-        }
-        self.rule_runtime.fired_once_rules.extend(fired_once_ids);
+            },
+        );
     }
 
     /// Checks if an interaction mode matches a spatial relationship.
@@ -200,19 +226,14 @@ impl GameState {
             TriggerContext::with_self_only(event.entity_a)
         };
 
-        let matching_indices: Vec<usize> = self
+        let mut sorted_indices = self
             .rules
             .rules
             .iter()
             .enumerate()
             .filter(|(_, rule)| {
-                rule.enabled
+                self.rule_is_collectible(rule)
                     && matches!(rule.trigger, RuleTrigger::OnCollision { .. })
-                    && !(rule.once
-                        && self
-                            .rule_runtime
-                            .fired_once_rules
-                            .contains(rule.id.as_str()))
                     && self.entity_filter_matches(
                         rule.trigger.collision_entity_filter(),
                         event.entity_a,
@@ -220,64 +241,41 @@ impl GameState {
                     )
             })
             .map(|(i, _)| i)
-            .collect();
-
-        let mut sorted_indices = matching_indices;
-        sorted_indices.sort_by(|&a, &b| {
-            let rule_a = &self.rules.rules[a];
-            let rule_b = &self.rules.rules[b];
-            rule_b
-                .priority
-                .cmp(&rule_a.priority)
-                .then_with(|| rule_a.id.cmp(&rule_b.id))
-        });
-
-        let mut fired_once_ids = Vec::new();
-        for idx in sorted_indices {
-            let rule = &self.rules.rules[idx];
-            let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
-
-            if event.entity_b.is_some() {
-                debug!(
-                    rule_id = %rule.id,
-                    trigger = ?rule.trigger,
-                    entity_a = ?event.entity_a,
-                    entity_b = ?event.entity_b,
-                    conditions_passed = conditions_result,
-                    "Collision rule evaluated"
-                );
-            } else {
-                tracing::trace!(
-                    rule_id = %rule.id,
-                    trigger = ?rule.trigger,
-                    entity_a = ?event.entity_a,
-                    conditions_passed = conditions_result,
-                    "Wall collision rule evaluated"
-                );
-            }
-
-            if !conditions_result {
-                continue;
-            }
-
-            let actions = rule.actions.clone();
-            let rule_id = rule.id.clone();
-            let rule_once = rule.once;
-
-            for action in &actions {
+            .collect::<Vec<_>>();
+        self.sort_rule_indices(&mut sorted_indices);
+        self.execute_sorted_rule_indices(
+            &sorted_indices,
+            &context,
+            command_buffer,
+            |_| true,
+            |rule, conditions_result| {
+                if event.entity_b.is_some() {
+                    debug!(
+                        rule_id = %rule.id,
+                        trigger = ?rule.trigger,
+                        entity_a = ?event.entity_a,
+                        entity_b = ?event.entity_b,
+                        conditions_passed = conditions_result,
+                        "Collision rule evaluated"
+                    );
+                } else {
+                    tracing::trace!(
+                        rule_id = %rule.id,
+                        trigger = ?rule.trigger,
+                        entity_a = ?event.entity_a,
+                        conditions_passed = conditions_result,
+                        "Wall collision rule evaluated"
+                    );
+                }
+            },
+            |rule_id, action| {
                 if event.entity_b.is_some() {
                     debug!(rule_id = %rule_id, action = ?action, "Executing action");
                 } else {
                     tracing::trace!(rule_id = %rule_id, action = ?action, "Executing wall collision action");
                 }
-                self.buffer_rule_action(action, &context, command_buffer);
-            }
-
-            if rule_once {
-                fired_once_ids.push(rule_id);
-            }
-        }
-        self.rule_runtime.fired_once_rules.extend(fired_once_ids);
+            },
+        );
     }
 
     /// Collects rule commands for OnDamaged triggers.
@@ -292,19 +290,14 @@ impl GameState {
             TriggerContext::with_self_only(event.victim)
         };
 
-        let matching_indices: Vec<usize> = self
+        let mut sorted_indices = self
             .rules
             .rules
             .iter()
             .enumerate()
             .filter(|(_, rule)| {
-                rule.enabled
+                self.rule_is_collectible(rule)
                     && matches!(rule.trigger, RuleTrigger::OnDamaged { .. })
-                    && !(rule.once
-                        && self
-                            .rule_runtime
-                            .fired_once_rules
-                            .contains(rule.id.as_str()))
                     && self.entity_filter_matches(
                         rule.trigger.damaged_entity_filter(),
                         event.victim,
@@ -312,49 +305,27 @@ impl GameState {
                     )
             })
             .map(|(i, _)| i)
-            .collect();
-
-        let mut sorted_indices = matching_indices;
-        sorted_indices.sort_by(|&a, &b| {
-            let rule_a = &self.rules.rules[a];
-            let rule_b = &self.rules.rules[b];
-            rule_b
-                .priority
-                .cmp(&rule_a.priority)
-                .then_with(|| rule_a.id.cmp(&rule_b.id))
-        });
-
-        let mut fired_once_ids = Vec::new();
-        for idx in sorted_indices {
-            let rule = &self.rules.rules[idx];
-            let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
-            debug!(
-                rule_id = %rule.id,
-                trigger = ?rule.trigger,
-                victim = ?event.victim,
-                attacker = ?event.attacker,
-                conditions_passed = conditions_result,
-                "Damage rule evaluated"
-            );
-
-            if !conditions_result {
-                continue;
-            }
-
-            let actions = rule.actions.clone();
-            let rule_id = rule.id.clone();
-            let rule_once = rule.once;
-
-            for action in &actions {
+            .collect::<Vec<_>>();
+        self.sort_rule_indices(&mut sorted_indices);
+        self.execute_sorted_rule_indices(
+            &sorted_indices,
+            &context,
+            command_buffer,
+            |_| true,
+            |rule, conditions_result| {
+                debug!(
+                    rule_id = %rule.id,
+                    trigger = ?rule.trigger,
+                    victim = ?event.victim,
+                    attacker = ?event.attacker,
+                    conditions_passed = conditions_result,
+                    "Damage rule evaluated"
+                );
+            },
+            |rule_id, action| {
                 debug!(rule_id = %rule_id, action = ?action, "Executing action");
-                self.buffer_rule_action(action, &context, command_buffer);
-            }
-
-            if rule_once {
-                fired_once_ids.push(rule_id);
-            }
-        }
-        self.rule_runtime.fired_once_rules.extend(fired_once_ids);
+            },
+        );
     }
 
     /// Checks if an entity filter matches a target entity.
@@ -384,19 +355,14 @@ impl GameState {
             TriggerContext::with_self_only(event.victim)
         };
 
-        let matching_indices: Vec<usize> = self
+        let mut sorted_indices = self
             .rules
             .rules
             .iter()
             .enumerate()
             .filter(|(_, rule)| {
-                rule.enabled
+                self.rule_is_collectible(rule)
                     && matches!(rule.trigger, RuleTrigger::OnDeath { .. })
-                    && !(rule.once
-                        && self
-                            .rule_runtime
-                            .fired_once_rules
-                            .contains(rule.id.as_str()))
                     && self.entity_filter_matches(
                         rule.trigger.death_entity_filter(),
                         event.victim,
@@ -404,49 +370,27 @@ impl GameState {
                     )
             })
             .map(|(i, _)| i)
-            .collect();
-
-        let mut sorted_indices = matching_indices;
-        sorted_indices.sort_by(|&a, &b| {
-            let rule_a = &self.rules.rules[a];
-            let rule_b = &self.rules.rules[b];
-            rule_b
-                .priority
-                .cmp(&rule_a.priority)
-                .then_with(|| rule_a.id.cmp(&rule_b.id))
-        });
-
-        let mut fired_once_ids = Vec::new();
-        for idx in sorted_indices {
-            let rule = &self.rules.rules[idx];
-            let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
-            tracing::info!(
-                rule_id = %rule.id,
-                trigger = ?rule.trigger,
-                victim = ?event.victim,
-                attacker = ?event.attacker,
-                conditions_passed = conditions_result,
-                "Death rule evaluated"
-            );
-
-            if !conditions_result {
-                continue;
-            }
-
-            let actions = rule.actions.clone();
-            let rule_id = rule.id.clone();
-            let rule_once = rule.once;
-
-            for action in &actions {
+            .collect::<Vec<_>>();
+        self.sort_rule_indices(&mut sorted_indices);
+        self.execute_sorted_rule_indices(
+            &sorted_indices,
+            &context,
+            command_buffer,
+            |_| true,
+            |rule, conditions_result| {
+                tracing::info!(
+                    rule_id = %rule.id,
+                    trigger = ?rule.trigger,
+                    victim = ?event.victim,
+                    attacker = ?event.attacker,
+                    conditions_passed = conditions_result,
+                    "Death rule evaluated"
+                );
+            },
+            |rule_id, action| {
                 tracing::info!(rule_id = %rule_id, action = ?action, "Executing death action");
-                self.buffer_rule_action(action, &context, command_buffer);
-            }
-
-            if rule_once {
-                fired_once_ids.push(rule_id);
-            }
-        }
-        self.rule_runtime.fired_once_rules.extend(fired_once_ids);
+            },
+        );
     }
 
     pub(in crate::game) fn collect_rule_commands_for_key_triggers(

@@ -2329,6 +2329,67 @@ fn on_interact_provides_trigger_context() {
 }
 
 #[test]
+fn interaction_rules_respect_priority_ordering() {
+    let mut state = GameState::new_empty();
+    state.spawn_player_at(IVec2::new(50, 50));
+
+    let npc_id = state.spawn_player_like_npc(IVec2::new(50, 50));
+    state
+        .entity_manager_mut()
+        .get_entity_mut(npc_id)
+        .expect("npc should exist")
+        .attributes
+        .interactable = true;
+
+    state.set_rules(RuleSet {
+        rules: vec![
+            base_rule(
+                "low-priority",
+                RuleTrigger::OnInteract {
+                    mode: InteractionMode::default(),
+                    entity: None,
+                },
+                1,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "low".to_string(),
+                }],
+            ),
+            base_rule(
+                "high-priority",
+                RuleTrigger::OnInteract {
+                    mode: InteractionMode::default(),
+                    entity: None,
+                },
+                10,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "high".to_string(),
+                }],
+            ),
+        ],
+    });
+
+    state.handle_key_press(InputKey::Interact);
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    let sounds = result
+        .events
+        .iter()
+        .filter_map(|event| match event {
+            AudioEvent::PlaySound { sound_id, .. } => Some(sound_id.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(sounds, vec!["high", "low"]);
+}
+
+#[test]
 fn on_damaged_fires_when_entity_takes_damage() {
     let mut state = GameState::new_empty();
     let player_id = state.spawn_player_at(IVec2::new(50, 50));
