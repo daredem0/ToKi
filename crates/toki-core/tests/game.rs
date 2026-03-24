@@ -14,6 +14,7 @@ use toki_core::entity::{
 use toki_core::rules::{Rule, RuleAction, RuleSet, RuleTarget, RuleTrigger};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{
+    entity::{AiBehavior, AiConfig},
     game::AudioChannel,
     game::AudioEvent,
     game::InputAction,
@@ -3373,4 +3374,47 @@ fn update_with_delta_scales_animation_timing() {
         final_frame_timer > 0.0 || initial_frame_timer != final_frame_timer,
         "Animation timing should have changed"
     );
+}
+
+#[test]
+fn update_with_delta_keeps_ai_consistent_across_frame_chunking() {
+    let world_bounds = UVec2::new(1000, 1000);
+    let tilemap = create_test_tilemap();
+    let atlas = create_test_atlas();
+
+    let mut single_frame_state = GameState::new(create_test_sprite());
+    let mut split_frame_state = GameState::new(create_test_sprite());
+
+    let mut chaser = test_definition("chaser", "creature");
+    chaser.attributes.ai_config = AiConfig {
+        behavior: AiBehavior::Chase,
+        detection_radius: 500,
+    };
+    chaser.attributes.speed = 1.0;
+
+    let single_frame_chaser = single_frame_state
+        .entity_manager_mut()
+        .spawn_from_definition(&chaser, IVec2::new(100, 60))
+        .expect("chaser should spawn");
+    let split_frame_chaser = split_frame_state
+        .entity_manager_mut()
+        .spawn_from_definition(&chaser, IVec2::new(100, 60))
+        .expect("chaser should spawn");
+
+    single_frame_state.update_with_delta(DEFAULT_TIMESTEP_MS * 2.0, world_bounds, &tilemap, &atlas);
+    split_frame_state.update_with_delta(DEFAULT_TIMESTEP_MS, world_bounds, &tilemap, &atlas);
+    split_frame_state.update_with_delta(DEFAULT_TIMESTEP_MS, world_bounds, &tilemap, &atlas);
+
+    let single_frame_position = single_frame_state
+        .entity_manager()
+        .get_entity(single_frame_chaser)
+        .expect("single-frame chaser should exist")
+        .position;
+    let split_frame_position = split_frame_state
+        .entity_manager()
+        .get_entity(split_frame_chaser)
+        .expect("split-frame chaser should exist")
+        .position;
+
+    assert_eq!(single_frame_position, split_frame_position);
 }

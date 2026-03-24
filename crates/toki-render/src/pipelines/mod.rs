@@ -9,9 +9,7 @@ use toki_core::graphics::image::DecodedImage;
 use wgpu::util::DeviceExt;
 use wgpu::{BindGroupLayout, Device, Queue, RenderPass, RenderPipeline as WgpuRenderPipeline};
 
-use crate::wgpu_utils::{
-    create_texture_bindgroup, create_texture_bindgroup_from_rgba8,
-};
+use crate::wgpu_utils::{create_texture_bindgroup, create_texture_bindgroup_from_rgba8};
 
 /// Common trait for all rendering pipelines
 pub trait RenderPipeline {

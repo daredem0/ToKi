@@ -35,6 +35,7 @@ impl GameState {
             rule_runtime: RuleRuntimeState::default(),
             pending_stat_changes: Vec::new(),
             pending_despawns: Vec::new(),
+            ai_delta_accumulator_ms: 0.0,
         }
     }
 
@@ -52,6 +53,7 @@ impl GameState {
             rule_runtime: RuleRuntimeState::default(),
             pending_stat_changes: Vec::new(),
             pending_despawns: Vec::new(),
+            ai_delta_accumulator_ms: 0.0,
         }
     }
 
@@ -360,6 +362,7 @@ impl GameState {
         self.clear_runtime_inputs();
         self.pending_stat_changes.clear();
         self.pending_despawns.clear();
+        self.ai_delta_accumulator_ms = 0.0;
         self.entity_manager = prepared.entity_manager;
         self.player_id = prepared.player_id;
         self.set_rules(prepared.rules);

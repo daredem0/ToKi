@@ -36,7 +36,9 @@ impl GameState {
     ) -> bool {
         match condition {
             RuleCondition::Always => true,
-            RuleCondition::TargetExists { target } => self.resolve_entity(*target, context).is_some(),
+            RuleCondition::TargetExists { target } => {
+                self.resolve_entity(*target, context).is_some()
+            }
             RuleCondition::KeyHeld { key } => {
                 self.all_held_keys().contains(&Self::to_input_key(*key))
             }
@@ -72,11 +74,9 @@ impl GameState {
                 target,
                 item_id,
                 min_count,
-            } => self
-                .resolve_entity(*target, context)
-                .is_some_and(|entity| {
-                    entity.attributes.inventory.item_count(item_id) >= *min_count
-                }),
+            } => self.resolve_entity(*target, context).is_some_and(|entity| {
+                entity.attributes.inventory.item_count(item_id) >= *min_count
+            }),
         }
     }
 }

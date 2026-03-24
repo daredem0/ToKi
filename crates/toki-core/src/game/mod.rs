@@ -37,6 +37,7 @@ pub use rules::{
 /// Default timestep in milliseconds for fixed 60 FPS game logic.
 /// Used as the baseline for delta time scaling.
 pub const DEFAULT_TIMESTEP_MS: f32 = 16.667;
+const MAX_AI_FIXED_STEPS_PER_UPDATE: usize = 10;
 
 /// Core input keys abstraction (platform-independent)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -136,6 +137,10 @@ pub struct GameState {
     /// Entities that died and need to be despawned after death events are processed.
     #[serde(skip, default)]
     pending_despawns: Vec<EntityId>,
+
+    /// Runtime-only accumulator for feeding fixed-step AI updates in delta mode.
+    #[serde(skip, default)]
+    ai_delta_accumulator_ms: f32,
 }
 
 use input_state::InputRuntimeState;
@@ -229,7 +234,7 @@ impl GameState {
         self.resolve_pending_stat_changes();
 
         // Update NPC AI
-        self.update_npc_ai(world_bounds, tilemap, atlas, &mut result);
+        self.update_npc_ai_fixed(world_bounds, tilemap, atlas, &mut result);
 
         // Detect tile transitions after all movement is complete
         self.detect_tile_transitions(tilemap);
@@ -337,8 +342,14 @@ impl GameState {
         self.collect_interaction_events();
         self.resolve_pending_stat_changes();
 
-        // Update NPC AI
-        self.update_npc_ai(world_bounds, tilemap, atlas, &mut result);
+        // Update NPC AI on a fixed cadence so behavior stays consistent across frame rates.
+        self.update_npc_ai_with_delta(
+            animation_delta_ms,
+            world_bounds,
+            tilemap,
+            atlas,
+            &mut result,
+        );
 
         // Detect tile transitions after all movement is complete
         self.detect_tile_transitions(tilemap);
@@ -406,7 +417,7 @@ impl GameState {
     }
 
     /// Update NPC AI using the AI system
-    fn update_npc_ai(
+    fn update_npc_ai_fixed(
         &mut self,
         world_bounds: glam::UVec2,
         tilemap: &TileMap,
@@ -423,6 +434,28 @@ impl GameState {
         let effects = self.ai_runtime_applier().apply_updates(ai_updates);
         for (entity_id, movement_distance) in effects.movement_audio {
             self.emit_entity_movement_audio(entity_id, movement_distance, result);
+        }
+    }
+
+    fn update_npc_ai_with_delta(
+        &mut self,
+        delta_ms: f32,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+        result: &mut GameUpdateResult<AudioEvent>,
+    ) {
+        self.ai_delta_accumulator_ms += delta_ms.max(0.0);
+
+        let mut steps = 0;
+        while self.ai_delta_accumulator_ms >= DEFAULT_TIMESTEP_MS {
+            self.update_npc_ai_fixed(world_bounds, tilemap, atlas, result);
+            self.ai_delta_accumulator_ms -= DEFAULT_TIMESTEP_MS;
+            steps += 1;
+
+            if steps >= MAX_AI_FIXED_STEPS_PER_UPDATE {
+                break;
+            }
         }
     }
 }

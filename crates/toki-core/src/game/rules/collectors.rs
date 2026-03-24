@@ -14,10 +14,7 @@ use super::events::{
 use super::{GameState, RuleCommand};
 
 impl GameState {
-    pub(in crate::game::rules) fn rule_is_collectible(
-        &self,
-        rule: &crate::rules::Rule,
-    ) -> bool {
+    pub(in crate::game::rules) fn rule_is_collectible(&self, rule: &crate::rules::Rule) -> bool {
         rule.enabled
             && !(rule.once
                 && self

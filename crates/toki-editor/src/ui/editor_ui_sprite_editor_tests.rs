@@ -657,10 +657,7 @@ fn sprite_editor_state_import_external_image_as_sheet() {
     assert_eq!(state.canvas_dimensions(), Some((32, 16)));
     assert_eq!(state.sheet_cell_count(), Some((2, 1)));
     assert_eq!(state.active().save_asset_name, "tiles");
-    assert_eq!(
-        state.active().save_asset_kind,
-        SpriteAssetKind::TileAtlas
-    );
+    assert_eq!(state.active().save_asset_kind, SpriteAssetKind::TileAtlas);
 }
 
 #[test]
