@@ -178,82 +178,51 @@ impl GameState {
 
             let context = TriggerContext::with_self_only(event.entity_id);
 
-            // Collect matching rule indices to avoid borrow conflicts
-            let matching_indices: Vec<usize> = self
+            let mut sorted_indices = self
                 .rules
                 .rules
                 .iter()
                 .enumerate()
-                .filter(|(_, rule)| rule.enabled && rule.trigger == trigger)
-                .filter(|(_, rule)| {
-                    !(rule.once
-                        && self
-                            .rule_runtime
-                            .fired_once_rules
-                            .contains(rule.id.as_str()))
-                })
+                .filter(|(_, rule)| self.rule_is_collectible(rule) && rule.trigger == trigger)
                 .map(|(i, _)| i)
-                .collect();
-
-            let mut sorted_indices = matching_indices;
-            sorted_indices.sort_by(|&a, &b| {
-                let rule_a = &self.rules.rules[a];
-                let rule_b = &self.rules.rules[b];
-                rule_b
-                    .priority
-                    .cmp(&rule_a.priority)
-                    .then_with(|| rule_a.id.cmp(&rule_b.id))
-            });
-
-            let mut fired_once_ids = Vec::new();
-            for idx in sorted_indices {
-                let rule = &self.rules.rules[idx];
-
-                // Validate tile coordinates are within map bounds
-                if let Some((tile_x, tile_y)) = rule.trigger.tile_coordinates() {
-                    if tile_x >= map_width || tile_y >= map_height {
-                        warn!(
-                            rule_id = %rule.id,
-                            tile_x = tile_x,
-                            tile_y = tile_y,
-                            map_width = map_width,
-                            map_height = map_height,
-                            "Skipping tile trigger rule with out-of-bounds coordinates"
-                        );
-                        continue;
+                .collect::<Vec<_>>();
+            self.sort_rule_indices(&mut sorted_indices);
+            self.execute_sorted_rule_indices(
+                &sorted_indices,
+                &context,
+                command_buffer,
+                |rule| {
+                    if let Some((tile_x, tile_y)) = rule.trigger.tile_coordinates() {
+                        if tile_x >= map_width || tile_y >= map_height {
+                            warn!(
+                                rule_id = %rule.id,
+                                tile_x = tile_x,
+                                tile_y = tile_y,
+                                map_width = map_width,
+                                map_height = map_height,
+                                "Skipping tile trigger rule with out-of-bounds coordinates"
+                            );
+                            return false;
+                        }
                     }
-                }
-
-                let conditions_result = self.rule_conditions_match(&rule.conditions, &context);
-                debug!(
-                    rule_id = %rule.id,
-                    trigger = ?trigger,
-                    entity = ?event.entity_id,
-                    tile_x = event.tile_x,
-                    tile_y = event.tile_y,
-                    is_enter = event.is_enter,
-                    conditions_passed = conditions_result,
-                    "Tile transition rule evaluated"
-                );
-
-                if !conditions_result {
-                    continue;
-                }
-
-                let actions = rule.actions.clone();
-                let rule_id = rule.id.clone();
-                let rule_once = rule.once;
-
-                for action in &actions {
+                    true
+                },
+                |rule, conditions_result| {
+                    debug!(
+                        rule_id = %rule.id,
+                        trigger = ?trigger,
+                        entity = ?event.entity_id,
+                        tile_x = event.tile_x,
+                        tile_y = event.tile_y,
+                        is_enter = event.is_enter,
+                        conditions_passed = conditions_result,
+                        "Tile transition rule evaluated"
+                    );
+                },
+                |rule_id, action| {
                     debug!(rule_id = %rule_id, action = ?action, "Executing tile transition action");
-                    self.buffer_rule_action(action, &context, command_buffer);
-                }
-
-                if rule_once {
-                    fired_once_ids.push(rule_id);
-                }
-            }
-            self.rule_runtime.fired_once_rules.extend(fired_once_ids);
+                },
+            );
         }
     }
 }

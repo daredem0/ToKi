@@ -8,6 +8,18 @@ use crate::rules::{RuleAction, RuleSoundChannel, TriggerContext};
 use super::{AudioChannel, GameState, RuleCommand};
 
 impl GameState {
+    fn resolve_and_push(
+        &self,
+        target: crate::rules::RuleTarget,
+        context: &TriggerContext,
+        command_buffer: &mut Vec<RuleCommand>,
+        make_command: impl FnOnce(crate::entity::EntityId) -> RuleCommand,
+    ) {
+        if let Some(entity_id) = self.resolve_rule_target(target, context) {
+            command_buffer.push(make_command(entity_id));
+        }
+    }
+
     pub(super) fn buffer_rule_action(
         &self,
         action: &RuleAction,
@@ -37,9 +49,9 @@ impl GameState {
                 });
             }
             RuleAction::DestroySelf { target } => {
-                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
-                    command_buffer.push(RuleCommand::DestroySelf { entity_id });
-                }
+                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                    RuleCommand::DestroySelf { entity_id }
+                });
             }
             RuleAction::SwitchScene {
                 scene_name,
@@ -68,67 +80,67 @@ impl GameState {
                 }
             }
             RuleAction::DamageEntity { target, amount } => {
-                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
-                    command_buffer.push(RuleCommand::DamageEntity {
+                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                    RuleCommand::DamageEntity {
                         entity_id,
                         amount: *amount,
-                    });
-                }
+                    }
+                });
             }
             RuleAction::HealEntity { target, amount } => {
-                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
-                    command_buffer.push(RuleCommand::HealEntity {
+                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                    RuleCommand::HealEntity {
                         entity_id,
                         amount: *amount,
-                    });
-                }
+                    }
+                });
             }
             RuleAction::AddInventoryItem {
                 target,
                 item_id,
                 count,
             } => {
-                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
-                    command_buffer.push(RuleCommand::AddInventoryItem {
+                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                    RuleCommand::AddInventoryItem {
                         entity_id,
                         item_id: item_id.clone(),
                         count: *count,
-                    });
-                }
+                    }
+                });
             }
             RuleAction::RemoveInventoryItem {
                 target,
                 item_id,
                 count,
             } => {
-                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
-                    command_buffer.push(RuleCommand::RemoveInventoryItem {
+                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                    RuleCommand::RemoveInventoryItem {
                         entity_id,
                         item_id: item_id.clone(),
                         count: *count,
-                    });
-                }
+                    }
+                });
             }
             RuleAction::SetEntityActive { target, active } => {
-                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
-                    command_buffer.push(RuleCommand::SetEntityActive {
+                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                    RuleCommand::SetEntityActive {
                         entity_id,
                         active: *active,
-                    });
-                }
+                    }
+                });
             }
             RuleAction::TeleportEntity {
                 target,
                 tile_x,
                 tile_y,
             } => {
-                if let Some(entity_id) = self.resolve_rule_target(*target, context) {
-                    command_buffer.push(RuleCommand::TeleportEntity {
+                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                    RuleCommand::TeleportEntity {
                         entity_id,
                         tile_x: *tile_x,
                         tile_y: *tile_y,
-                    });
-                }
+                    }
+                });
             }
         }
     }
@@ -172,9 +184,9 @@ impl GameState {
         context: &TriggerContext,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        if let Some(entity_id) = self.resolve_rule_target(target, context) {
-            command_buffer.push(RuleCommand::PlayAnimation { entity_id, state });
-        }
+        self.resolve_and_push(target, context, command_buffer, |entity_id| {
+            RuleCommand::PlayAnimation { entity_id, state }
+        });
     }
 
     fn buffer_set_velocity(
@@ -184,11 +196,11 @@ impl GameState {
         context: &TriggerContext,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        if let Some(entity_id) = self.resolve_rule_target(target, context) {
-            command_buffer.push(RuleCommand::SetVelocity {
+        self.resolve_and_push(target, context, command_buffer, |entity_id| {
+            RuleCommand::SetVelocity {
                 entity_id,
                 velocity: glam::IVec2::new(velocity[0], velocity[1]),
-            });
-        }
+            }
+        });
     }
 }
