@@ -429,12 +429,7 @@ impl InspectorSystem {
         let Some(scene) = scenes.iter().find(|scene| scene.name == target_scene_name) else {
             return Vec::new();
         };
-        let mut ids = scene
-            .anchors
-            .iter()
-            .filter(|anchor| matches!(anchor.kind, toki_core::scene::SceneAnchorKind::SpawnPoint))
-            .map(|anchor| anchor.id.clone())
-            .collect::<Vec<_>>();
+        let mut ids = scene.spawn_point_ids();
         ids.sort();
         ids
     }

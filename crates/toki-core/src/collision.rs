@@ -68,53 +68,10 @@ pub fn can_entity_move_to_position(
     tilemap: &TileMap,
     atlas: &AtlasMeta,
 ) -> bool {
-    // If entity has no collision box, allow movement
     let Some(collision_box) = &entity.collision_box else {
         return true;
     };
-
-    // Skip collision for trigger boxes (they don't block movement)
-    if collision_box.trigger {
-        return true;
-    }
-
-    // Get the world bounds of the collision box at the new position
-    let (box_pos, box_size) = collision_box.world_bounds(new_position);
-
-    // Handle negative coordinates - treat as blocked
-    if box_pos.x < 0 || box_pos.y < 0 {
-        return false;
-    }
-
-    // Convert collision box bounds to tile coordinates
-    let tile_size = tilemap.tile_size;
-    let min_tile_x = (box_pos.x as u32) / tile_size.x;
-    let min_tile_y = (box_pos.y as u32) / tile_size.y;
-    let max_tile_x = ((box_pos.x + box_size.x as i32 - 1) as u32) / tile_size.x;
-    let max_tile_y = ((box_pos.y + box_size.y as i32 - 1) as u32) / tile_size.y;
-
-    // Check all tiles that the collision box would overlap
-    for tile_y in min_tile_y..=max_tile_y {
-        for tile_x in min_tile_x..=max_tile_x {
-            match tilemap.is_tile_solid_at(atlas, tile_x, tile_y) {
-                Ok(is_solid) => {
-                    if is_solid {
-                        return false;
-                    }
-                }
-                Err(_) => {
-                    // Out of bounds or other error - treat as blocking
-                    return false;
-                }
-            }
-        }
-    }
-
-    if collides_with_solid_map_object(tilemap, box_pos, box_size) {
-        return false;
-    }
-
-    true
+    !is_collision_box_blocked(collision_box, new_position, tilemap, atlas)
 }
 
 /// Check if a collision box at a specific position would collide with solid tiles.
@@ -135,53 +92,49 @@ pub fn can_place_collision_box_at_position(
     tilemap: &TileMap,
     atlas: &AtlasMeta,
 ) -> bool {
-    // If no collision box, allow placement
     let Some(collision_box) = collision_box else {
         return true;
     };
+    !is_collision_box_blocked(collision_box, position, tilemap, atlas)
+}
 
-    // Skip collision for trigger boxes (they don't block placement)
+fn is_collision_box_blocked(
+    collision_box: &CollisionBox,
+    position: IVec2,
+    tilemap: &TileMap,
+    atlas: &AtlasMeta,
+) -> bool {
     if collision_box.trigger {
-        return true;
-    }
-
-    // Get the world bounds of the collision box at the position
-    let (box_pos, box_size) = collision_box.world_bounds(position);
-
-    // Handle negative coordinates - treat as blocked
-    if box_pos.x < 0 || box_pos.y < 0 {
         return false;
     }
 
-    // Convert collision box bounds to tile coordinates
+    let (box_pos, box_size) = collision_box.world_bounds(position);
+    if box_pos.x < 0 || box_pos.y < 0 {
+        return true;
+    }
+
     let tile_size = tilemap.tile_size;
     let min_tile_x = (box_pos.x as u32) / tile_size.x;
     let min_tile_y = (box_pos.y as u32) / tile_size.y;
     let max_tile_x = ((box_pos.x + box_size.x as i32 - 1) as u32) / tile_size.x;
     let max_tile_y = ((box_pos.y + box_size.y as i32 - 1) as u32) / tile_size.y;
 
-    // Check all tiles that the collision box would overlap
     for tile_y in min_tile_y..=max_tile_y {
         for tile_x in min_tile_x..=max_tile_x {
             match tilemap.is_tile_solid_at(atlas, tile_x, tile_y) {
                 Ok(is_solid) => {
                     if is_solid {
-                        return false;
+                        return true;
                     }
                 }
                 Err(_) => {
-                    // Out of bounds or other error - treat as blocking
-                    return false;
+                    return true;
                 }
             }
         }
     }
 
-    if collides_with_solid_map_object(tilemap, box_pos, box_size) {
-        return false;
-    }
-
-    true
+    collides_with_solid_map_object(tilemap, box_pos, box_size)
 }
 
 fn collides_with_solid_map_object(tilemap: &TileMap, box_pos: IVec2, box_size: UVec2) -> bool {

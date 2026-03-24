@@ -1052,6 +1052,28 @@ fn validate_rule_set_for_scene_reports_invalid_switch_scene_targets() {
 }
 
 #[test]
+fn scene_switch_spawn_point_ids_returns_sorted_scene_spawn_ids() {
+    let mut scene = Scene::new("Target Scene".to_string());
+    scene.add_anchor(SceneAnchor {
+        id: "spawn_b".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(64, 32),
+        facing: None,
+    });
+    scene.add_anchor(SceneAnchor {
+        id: "spawn_a".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(16, 32),
+        facing: None,
+    });
+
+    assert_eq!(
+        InspectorSystem::scene_switch_spawn_point_ids(&[scene], "Target Scene"),
+        vec!["spawn_a".to_string(), "spawn_b".to_string()]
+    );
+}
+
+#[test]
 fn selected_map_editor_tile_metadata_reads_solid_and_trigger_flags() {
     let mut tiles = std::collections::HashMap::new();
     tiles.insert(

@@ -507,6 +507,13 @@ impl Default for EntityAttributes {
 }
 
 impl Entity {
+    pub fn interaction_bounds(&self) -> (IVec2, UVec2) {
+        self.collision_box
+            .as_ref()
+            .map(|collision_box| collision_box.world_bounds(self.position))
+            .unwrap_or((self.position, self.size))
+    }
+
     pub fn resolved_ground_origin(&self) -> IVec2 {
         self.position + self.attributes.grounding.resolved_origin(self.size)
     }

@@ -1,5 +1,4 @@
 use crate::collision;
-use crate::entity::Entity;
 
 use super::GameState;
 
@@ -21,14 +20,6 @@ impl GameState {
             .collect::<Vec<_>>();
         entries.sort_by(|a, b| a.item_id.cmp(&b.item_id));
         entries
-    }
-
-    fn entity_bounds_for_pickup_interaction(entity: &Entity) -> (glam::IVec2, glam::UVec2) {
-        if let Some(collision_box) = &entity.collision_box {
-            collision_box.world_bounds(entity.position)
-        } else {
-            (entity.position, entity.size)
-        }
     }
 
     pub(super) fn collect_overlapping_pickups(&mut self) {
@@ -62,8 +53,7 @@ impl GameState {
             let Some(collector) = self.entity_manager.get_entity(collector_id) else {
                 continue;
             };
-            let (collector_pos, collector_size) =
-                Self::entity_bounds_for_pickup_interaction(collector);
+            let (collector_pos, collector_size) = collector.interaction_bounds();
 
             for &pickup_id in &pickup_ids {
                 let Some(pickup_entity) = self.entity_manager.get_entity(pickup_id) else {
@@ -76,8 +66,7 @@ impl GameState {
                     continue;
                 }
 
-                let (pickup_pos, pickup_size) =
-                    Self::entity_bounds_for_pickup_interaction(pickup_entity);
+                let (pickup_pos, pickup_size) = pickup_entity.interaction_bounds();
                 if !collision::aabb_overlap(collector_pos, collector_size, pickup_pos, pickup_size)
                 {
                     continue;

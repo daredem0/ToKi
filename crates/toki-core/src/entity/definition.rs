@@ -363,58 +363,36 @@ impl EntityDefinition {
         }
     }
 
-    fn build_audio_settings(&self) -> EntityAudioSettings {
-        let movement_sound = self.audio.movement_sound.trim();
-        let movement_sound = if movement_sound.is_empty() {
+    fn normalize_audio_id(value: &str) -> Option<String> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
             None
         } else {
-            Some(movement_sound.to_string())
-        };
+            Some(trimmed.to_string())
+        }
+    }
 
-        let collision_sound = self
-            .audio
-            .collision_sound
-            .as_ref()
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .map(ToString::to_string);
-
+    fn normalized_audio_settings(&self) -> EntityAudioSettings {
         EntityAudioSettings {
             footstep_trigger_distance: self.audio.footstep_trigger_distance,
             hearing_radius: self.audio.hearing_radius,
             movement_sound_trigger: self.audio.movement_sound_trigger,
-            movement_sound,
-            collision_sound,
+            movement_sound: Self::normalize_audio_id(&self.audio.movement_sound),
+            collision_sound: self
+                .audio
+                .collision_sound
+                .as_deref()
+                .and_then(Self::normalize_audio_id),
         }
+    }
+
+    fn build_audio_settings(&self) -> EntityAudioSettings {
+        self.normalized_audio_settings()
     }
 
     /// Build a runtime audio component from this definition.
     pub fn create_audio_component(&self) -> EntityAudioComponent {
-        let movement_sound = {
-            let trimmed = self.audio.movement_sound.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        };
-        let collision_sound = self
-            .audio
-            .collision_sound
-            .as_ref()
-            .map(|value| value.trim())
-            .filter(|value| !value.is_empty())
-            .map(ToString::to_string);
-
-        EntityAudioComponent {
-            footstep_distance_accumulator: 0.0,
-            footstep_trigger_distance: self.audio.footstep_trigger_distance,
-            hearing_radius: self.audio.hearing_radius,
-            movement_sound_trigger: self.audio.movement_sound_trigger,
-            last_collision_state: false,
-            movement_sound,
-            collision_sound,
-        }
+        self.build_audio_settings().to_component()
     }
 
     /// Get collision box from entity definition without creating full entity.

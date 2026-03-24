@@ -1391,6 +1391,63 @@ fn test_entity_definition_create_audio_component() {
     );
 }
 
+#[test]
+fn test_entity_definition_create_audio_component_trims_blank_audio_fields() {
+    let entity_def = EntityDefinition {
+        name: "audio_trim_test".to_string(),
+        display_name: "Audio Trim Test".to_string(),
+        description: "Audio normalization".to_string(),
+        rendering: RenderingDef {
+            size: [16, 16],
+            render_layer: 0,
+            visible: true,
+            has_shadow: true,
+            palette_override: None,
+            static_object: None,
+            grounding: Default::default(),
+        },
+        attributes: AttributesDef {
+            health: Some(100),
+            stats: std::collections::HashMap::new(),
+            speed: 2.0,
+            solid: true,
+            active: true,
+            can_move: true,
+            ai_config: AiConfig::default(),
+            movement_profile: MovementProfile::LegacyDefault,
+            primary_projectile: None,
+            pickup: None,
+            has_inventory: false,
+            interactable: false,
+            interaction_reach: 0,
+        },
+        collision: CollisionDef {
+            enabled: true,
+            offset: [0, 0],
+            size: [16, 16],
+            trigger: false,
+        },
+        audio: AudioDef {
+            footstep_trigger_distance: 24.0,
+            hearing_radius: 192,
+            movement_sound_trigger: MovementSoundTrigger::AnimationLoop,
+            movement_sound: "   ".to_string(),
+            collision_sound: Some("   ".to_string()),
+        },
+        animations: AnimationsDef {
+            atlas_name: "test".to_string(),
+            clips: vec![],
+            default_state: "idle".to_string(),
+        },
+        category: "test".to_string(),
+        tags: vec![],
+    };
+
+    let audio_component = entity_def.create_audio_component();
+    assert_eq!(audio_component.movement_sound, None);
+    assert_eq!(audio_component.collision_sound, None);
+}
+
 // ============================================================================
 // Phase 2A: Extended AI Behavior Tests
 // ============================================================================
