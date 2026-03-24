@@ -738,13 +738,13 @@ jobs:
           awk -v tag_re="${TAG_RE}" -v version_re="${VERSION_RE}" '
             BEGIN {
               capture = 0;
-              match_header = "^## \\[ (" tag_re "|" version_re ")\\]";
-              gsub(/ /, "", match_header);
+              match_header = "^## \\[(" tag_re "|" version_re ")\\]";
             }
-            $0 ~ /^## \[/ && capture && $0 !~ match_header { exit }
+            $0 ~ "^## \\[" && capture && $0 !~ match_header { exit }
             $0 ~ match_header { capture = 1 }
             capture { print }
           ' CHANGELOG.md > dist/release-notes.md
+
           if ! grep -q '[^[:space:]]' dist/release-notes.md; then
             echo "No CHANGELOG section found for tag ${TAG} (or ${VERSION})." >&2
             exit 1
