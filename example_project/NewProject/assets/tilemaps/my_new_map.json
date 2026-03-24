@@ -16393,5 +16393,133 @@
     "grass",
     "stone",
     "grass"
+  ],
+  "objects": [
+    {
+      "sheet": "house_tileset16x16.json",
+      "object_name": "object_1",
+      "position": [
+        256,
+        512
+      ],
+      "size_px": [
+        16,
+        16
+      ],
+      "visible": true,
+      "solid": true
+    },
+    {
+      "sheet": "house_tileset16x16.json",
+      "object_name": "object_0",
+      "position": [
+        240,
+        512
+      ],
+      "size_px": [
+        16,
+        16
+      ],
+      "visible": true,
+      "solid": true
+    },
+    {
+      "sheet": "house_tileset16x16.json",
+      "object_name": "object_2",
+      "position": [
+        272,
+        512
+      ],
+      "size_px": [
+        16,
+        16
+      ],
+      "visible": true,
+      "solid": true
+    },
+    {
+      "sheet": "house_tileset16x16.json",
+      "object_name": "object_9",
+      "position": [
+        240,
+        528
+      ],
+      "size_px": [
+        16,
+        16
+      ],
+      "visible": true,
+      "solid": true
+    },
+    {
+      "sheet": "house_tileset16x16.json",
+      "object_name": "object_10",
+      "position": [
+        256,
+        528
+      ],
+      "size_px": [
+        16,
+        16
+      ],
+      "visible": true,
+      "solid": true
+    },
+    {
+      "sheet": "house_tileset16x16.json",
+      "object_name": "object_10",
+      "position": [
+        272,
+        528
+      ],
+      "size_px": [
+        16,
+        16
+      ],
+      "visible": true,
+      "solid": true
+    },
+    {
+      "sheet": "house_tileset16x16.json",
+      "object_name": "object_21",
+      "position": [
+        256,
+        544
+      ],
+      "size_px": [
+        16,
+        16
+      ],
+      "visible": true,
+      "solid": true
+    },
+    {
+      "sheet": "house_tileset16x16.json",
+      "object_name": "object_23",
+      "position": [
+        272,
+        544
+      ],
+      "size_px": [
+        16,
+        16
+      ],
+      "visible": true,
+      "solid": true
+    },
+    {
+      "sheet": "house_tileset16x16.json",
+      "object_name": "object_16",
+      "position": [
+        240,
+        544
+      ],
+      "size_px": [
+        16,
+        16
+      ],
+      "visible": true,
+      "solid": true
+    }
   ]
 }
