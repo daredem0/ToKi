@@ -6,5 +6,5 @@ Comment=Visual editor for creating top-down Game Boy-style games
 Exec=toki-editor
 Icon=toki-editor
 Terminal=false
-Categories=Development;GameDevelopment;
+Categories=Development;IDE;
 StartupNotify=true

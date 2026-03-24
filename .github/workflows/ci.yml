@@ -425,21 +425,12 @@ jobs:
   package-arch:
     name: Package (Arch)
     runs-on: ubuntu-22.04
-    container: archlinux:latest
     needs: build-release-linux
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           lfs: true
-
-      - name: Install build tools
-        run: pacman -Syu --noconfirm base-devel git bash sed curl
-
-      - name: Create non-root builder
-        run: |
-          useradd -m builder
-          chown -R builder:builder .
 
       - name: Download prebuilt binaries
         uses: actions/download-artifact@v4
@@ -450,7 +441,23 @@ jobs:
       - name: Build Arch package
         run: |
           chmod +x scripts/build-arch.sh scripts/detect-libc-suffix.sh
-          su builder -c "TOKI_USE_PREBUILT=1 ./scripts/build-arch.sh"
+          docker run --rm \
+            -v "${PWD}:/workspace" \
+            -w /workspace \
+            archlinux:latest \
+            bash -lc '
+              set -euo pipefail
+              pacman -Sy --noconfirm --needed base-devel git bash sed curl alsa-lib
+              HOST_UID="$(stat -c %u /workspace)"
+              HOST_GID="$(stat -c %g /workspace)"
+              HOST_GROUP="$(getent group "${HOST_GID}" | cut -d: -f1 || true)"
+              if [[ -z "${HOST_GROUP}" ]]; then
+                groupadd -g "${HOST_GID}" builder
+                HOST_GROUP="builder"
+              fi
+              useradd -m -u "${HOST_UID}" -g "${HOST_GROUP}" builder
+              su builder -c "TOKI_USE_PREBUILT=1 ./scripts/build-arch.sh"
+            '
 
       - name: Upload Arch package artifact
         uses: actions/upload-artifact@v4

@@ -18,7 +18,7 @@ fn collect_source_files_returns_sorted_relative_paths() {
     let files = collect_source_files(&project_root, None).expect("collect files");
     let relative = files
         .iter()
-        .map(|f| f.relative_path.to_string_lossy().to_string())
+        .map(|f| f.relative_path.to_string_lossy().replace('\\', "/"))
         .collect::<Vec<_>>();
     assert_eq!(
         relative,
