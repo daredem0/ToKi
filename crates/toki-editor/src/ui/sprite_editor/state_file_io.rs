@@ -40,6 +40,22 @@ impl SpriteEditorState {
         self.show_load_dialog = true;
     }
 
+    /// Open the new-canvas dialog with an image already selected as the source.
+    pub fn begin_new_canvas_from_image_dialog(
+        &mut self,
+        path: &std::path::Path,
+    ) -> Result<(), String> {
+        use toki_core::graphics::image::load_image_rgba8;
+
+        let decoded = load_image_rgba8(path).map_err(|e| format!("Failed to load image: {e}"))?;
+        self.new_canvas_source_image = Some(path.to_path_buf());
+        self.new_canvas_source_image_size = Some(glam::UVec2::new(decoded.width, decoded.height));
+        self.new_canvas_is_sheet = true;
+        self.new_canvas_error = None;
+        self.show_new_canvas_dialog = true;
+        Ok(())
+    }
+
     /// Open the merge dialog and scan for assets
     pub fn begin_merge_dialog(&mut self, sprites_dir: &std::path::Path) {
         self.discovered_assets = Self::scan_sprite_assets(sprites_dir);
@@ -615,6 +631,43 @@ impl SpriteEditorState {
         let cs = self.active_mut();
         cs.save_asset_name = save_name;
         cs.cell_size = cell_size;
+        Ok(())
+    }
+
+    /// Import an external image file as a sheet canvas using the configured tile size.
+    pub fn import_external_image_as_sheet(
+        &mut self,
+        path: &std::path::Path,
+        cell_width: u32,
+        cell_height: u32,
+    ) -> Result<(), String> {
+        use toki_core::graphics::image::load_image_rgba8;
+
+        let decoded = load_image_rgba8(path).map_err(|e| format!("Failed to load image: {e}"))?;
+        let cell_width = cell_width.max(1);
+        let cell_height = cell_height.max(1);
+
+        if decoded.width % cell_width != 0 || decoded.height % cell_height != 0 {
+            return Err(format!(
+                "Image size {}x{} does not divide evenly by configured tile size {}x{}",
+                decoded.width, decoded.height, cell_width, cell_height
+            ));
+        }
+
+        let canvas = SpriteCanvas::from_rgba(decoded.width, decoded.height, decoded.data)
+            .ok_or_else(|| "Failed to create canvas from image data".to_string())?;
+        let save_name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("imported")
+            .to_string();
+
+        self.reset_canvas_state(canvas, true);
+        let cs = self.active_mut();
+        cs.save_asset_name = save_name;
+        cs.cell_size = glam::UVec2::new(cell_width, cell_height);
+        cs.show_cell_grid = true;
+        cs.save_asset_kind = SpriteAssetKind::TileAtlas;
         Ok(())
     }
 

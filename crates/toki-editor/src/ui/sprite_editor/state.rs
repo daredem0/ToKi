@@ -6,6 +6,7 @@ use super::{
     SpriteEditorTool,
 };
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use toki_core::assets::atlas::ColorMode;
 use toki_core::palette::Palette4;
 
@@ -47,6 +48,12 @@ pub struct SpriteEditorState {
     pub new_sheet_rows: u32,
     /// New canvas dialog: create as sheet
     pub new_canvas_is_sheet: bool,
+    /// Optional source image for creating a new canvas from an existing PNG.
+    pub new_canvas_source_image: Option<PathBuf>,
+    /// Cached dimensions of the source image selected for new-canvas-from-image flow.
+    pub new_canvas_source_image_size: Option<glam::UVec2>,
+    /// Inline error shown in the new canvas dialog.
+    pub new_canvas_error: Option<String>,
     /// Show save sprite dialog
     pub show_save_dialog: bool,
     /// Show the load sprite dialog
@@ -102,6 +109,9 @@ impl Default for SpriteEditorState {
             new_sheet_cols: 4,
             new_sheet_rows: 4,
             new_canvas_is_sheet: false,
+            new_canvas_source_image: None,
+            new_canvas_source_image_size: None,
+            new_canvas_error: None,
             show_save_dialog: false,
             show_load_dialog: false,
             discovered_assets: Vec::new(),
