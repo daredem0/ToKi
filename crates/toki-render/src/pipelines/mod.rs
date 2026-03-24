@@ -40,7 +40,18 @@ impl<'a> TextureSource<'a> {
     pub(crate) fn rgba8(image: &'a DecodedImage) -> Self {
         Self::Rgba8(image)
     }
+
+    /// A 1x1 white pixel, matching the existing no-texture fallback behavior.
+    pub(crate) fn placeholder() -> Self {
+        Self::Rgba8(PLACEHOLDER_IMAGE.get_or_init(|| DecodedImage {
+            width: 1,
+            height: 1,
+            data: vec![255, 255, 255, 255],
+        }))
+    }
 }
+
+static PLACEHOLDER_IMAGE: std::sync::OnceLock<DecodedImage> = std::sync::OnceLock::new();
 
 pub(crate) fn create_mvp_uniform_buffer<T: Pod>(
     device: &Device,
@@ -163,6 +174,20 @@ mod tests {
             TextureSource::Rgba8(decoded) => {
                 assert_eq!(decoded.width, 2);
                 assert_eq!(decoded.height, 3);
+            }
+        }
+    }
+
+    #[test]
+    fn texture_source_placeholder_is_1x1_white() {
+        let source = TextureSource::placeholder();
+
+        match source {
+            TextureSource::Path(_) => panic!("expected rgba8 placeholder"),
+            TextureSource::Rgba8(decoded) => {
+                assert_eq!(decoded.width, 1);
+                assert_eq!(decoded.height, 1);
+                assert_eq!(decoded.data, vec![255, 255, 255, 255]);
             }
         }
     }
