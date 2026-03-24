@@ -113,41 +113,19 @@ impl SceneRenderer {
         tracing::info!("Surface format: {:?}", surface_format);
         tracing::info!("Tilemap texture: {:?}", tilemap_texture);
         tracing::info!("Sprite texture: {:?}", sprite_texture);
-        let tilemap_pipeline = if let Some(texture_path) = tilemap_texture {
-            TilemapPipeline::new(
-                &device,
-                &queue,
-                surface_format,
-                TextureSource::path(texture_path),
-            )
-        } else {
-            // Create with default/placeholder texture
-            TilemapPipeline::new(
-                &device,
-                &queue,
-                surface_format,
-                TextureSource::path(std::path::PathBuf::from("")),
-            )
-        };
+        let tilemap_source = tilemap_texture
+            .map(TextureSource::path)
+            .unwrap_or_else(TextureSource::placeholder);
+        let tilemap_pipeline =
+            TilemapPipeline::new(&device, &queue, surface_format, tilemap_source);
 
         // Clone sprite_texture for caching before moving it
         let sprite_texture_cache = sprite_texture.clone();
-        let sprite_pipeline = if let Some(texture_path) = sprite_texture {
-            SpritePipeline::new(
-                &device,
-                &queue,
-                surface_format,
-                TextureSource::path(texture_path),
-            )
-        } else {
-            // Create with default/placeholder texture
-            SpritePipeline::new(
-                &device,
-                &queue,
-                surface_format,
-                TextureSource::path(std::path::PathBuf::from("")),
-            )
-        };
+        let sprite_source = sprite_texture
+            .map(TextureSource::path)
+            .unwrap_or_else(TextureSource::placeholder);
+        let sprite_pipeline =
+            SpritePipeline::new(&device, &queue, surface_format, sprite_source);
 
         let underlay_pipeline = DebugPipeline::new(&device, surface_format);
         let debug_pipeline = DebugPipeline::new(&device, surface_format);
