@@ -640,6 +640,46 @@ fn sprite_editor_state_import_external_image() {
 }
 
 #[test]
+fn sprite_editor_state_import_external_image_as_sheet() {
+    use tempfile::tempdir;
+
+    let temp = tempdir().unwrap();
+    let png_path = temp.path().join("tiles.png");
+    let pixel_data = vec![255; 32 * 16 * 4];
+    create_test_png(&png_path, 32, 16, &pixel_data);
+
+    let mut state = SpriteEditorState::default();
+    let result = state.import_external_image_as_sheet(&png_path, 16, 16);
+
+    assert!(result.is_ok(), "Import as sheet should succeed");
+    assert!(state.has_canvas());
+    assert!(state.is_sheet());
+    assert_eq!(state.canvas_dimensions(), Some((32, 16)));
+    assert_eq!(state.sheet_cell_count(), Some((2, 1)));
+    assert_eq!(state.active().save_asset_name, "tiles");
+    assert_eq!(
+        state.active().save_asset_kind,
+        SpriteAssetKind::TileAtlas
+    );
+}
+
+#[test]
+fn sprite_editor_state_import_external_image_as_sheet_rejects_non_divisible_dimensions() {
+    use tempfile::tempdir;
+
+    let temp = tempdir().unwrap();
+    let png_path = temp.path().join("tiles.png");
+    let pixel_data = vec![255; 30 * 16 * 4];
+    create_test_png(&png_path, 30, 16, &pixel_data);
+
+    let mut state = SpriteEditorState::default();
+    let result = state.import_external_image_as_sheet(&png_path, 16, 16);
+
+    assert!(result.is_err());
+    assert!(!state.has_canvas());
+}
+
+#[test]
 fn sprite_editor_state_import_nonexistent_file_fails() {
     let mut state = SpriteEditorState::default();
     let result = state.import_external_image(std::path::Path::new("/nonexistent/path/file.png"));

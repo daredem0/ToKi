@@ -33,11 +33,34 @@ pub fn render_dialogs(
 }
 
 fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
+    let source_image = ui_state.sprite.new_canvas_source_image.clone();
+    let source_image_size = ui_state.sprite.new_canvas_source_image_size;
+    let source_image_validation = source_image_size.map(|size| {
+        let sprite_w = ui_state.sprite.new_sprite_width.max(1);
+        let sprite_h = ui_state.sprite.new_sprite_height.max(1);
+        if size.x % sprite_w == 0 && size.y % sprite_h == 0 {
+            Ok((size.x / sprite_w, size.y / sprite_h))
+        } else {
+            Err(format!(
+                "Image size {}x{} does not divide evenly by configured tile size {}x{}.",
+                size.x, size.y, sprite_w, sprite_h
+            ))
+        }
+    });
+
     egui::Window::new("New Canvas")
         .collapsible(false)
         .resizable(false)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {
+            if let Some(path) = source_image.as_ref() {
+                ui.label(format!("Source Image: {}", path.display()));
+                if let Some(size) = source_image_size {
+                    ui.label(format!("Image Size: {}x{}", size.x, size.y));
+                }
+                ui.add_space(4.0);
+            }
+
             ui.horizontal(|ui| {
                 ui.label("Sprite Width:");
                 ui.add(
@@ -57,46 +80,83 @@ fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
 
             ui.separator();
 
-            ui.checkbox(
-                &mut ui_state.sprite.new_canvas_is_sheet,
-                "Create as sprite sheet",
-            );
+            if source_image.is_some() {
+                ui_state.sprite.new_canvas_is_sheet = true;
+                let mut forced_sheet = true;
+                ui.add_enabled(
+                    false,
+                    egui::Checkbox::new(&mut forced_sheet, "Create as sprite sheet"),
+                );
+            } else {
+                ui.checkbox(
+                    &mut ui_state.sprite.new_canvas_is_sheet,
+                    "Create as sprite sheet",
+                );
+            }
 
             if ui_state.sprite.new_canvas_is_sheet {
-                ui.horizontal(|ui| {
-                    ui.label("Columns:");
-                    ui.add(
-                        egui::DragValue::new(&mut ui_state.sprite.new_sheet_cols)
-                            .range(1..=64)
-                            .speed(1),
-                    );
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Rows:");
-                    ui.add(
-                        egui::DragValue::new(&mut ui_state.sprite.new_sheet_rows)
-                            .range(1..=64)
-                            .speed(1),
-                    );
-                });
+                if source_image.is_some() {
+                    match source_image_validation.as_ref() {
+                        Some(Ok((cols, rows))) => {
+                            ui.label(format!(
+                                "Canvas: {}x{} ({}x{} tiles, {} cells)",
+                                source_image_size.unwrap().x,
+                                source_image_size.unwrap().y,
+                                cols,
+                                rows,
+                                cols * rows
+                            ));
+                        }
+                        Some(Err(error)) => {
+                            ui.colored_label(egui::Color32::RED, error);
+                        }
+                        None => {}
+                    }
+                } else {
+                    ui.horizontal(|ui| {
+                        ui.label("Columns:");
+                        ui.add(
+                            egui::DragValue::new(&mut ui_state.sprite.new_sheet_cols)
+                                .range(1..=64)
+                                .speed(1),
+                        );
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Rows:");
+                        ui.add(
+                            egui::DragValue::new(&mut ui_state.sprite.new_sheet_rows)
+                                .range(1..=64)
+                                .speed(1),
+                        );
+                    });
 
-                // Show calculated canvas size
-                let cols = ui_state.sprite.new_sheet_cols;
-                let rows = ui_state.sprite.new_sheet_rows;
-                let canvas_w = ui_state.sprite.new_sprite_width * cols;
-                let canvas_h = ui_state.sprite.new_sprite_height * rows;
-                ui.label(format!(
-                    "Canvas: {}x{} ({} cells)",
-                    canvas_w,
-                    canvas_h,
-                    cols * rows
-                ));
+                    // Show calculated canvas size
+                    let cols = ui_state.sprite.new_sheet_cols;
+                    let rows = ui_state.sprite.new_sheet_rows;
+                    let canvas_w = ui_state.sprite.new_sprite_width * cols;
+                    let canvas_h = ui_state.sprite.new_sprite_height * rows;
+                    ui.label(format!(
+                        "Canvas: {}x{} ({} cells)",
+                        canvas_w,
+                        canvas_h,
+                        cols * rows
+                    ));
+                }
             }
 
             ui.separator();
 
+            if let Some(error) = ui_state.sprite.new_canvas_error.as_ref() {
+                ui.colored_label(egui::Color32::RED, error);
+                ui.separator();
+            }
+
             ui.horizontal(|ui| {
-                if ui.button("Create").clicked() {
+                let create_enabled = !matches!(source_image_validation.as_ref(), Some(Err(_)));
+                if ui
+                    .add_enabled(create_enabled, egui::Button::new("Create"))
+                    .clicked()
+                {
                     submit_new_canvas(ui_state);
                 }
                 if ui.button("Cancel").clicked() {
@@ -109,6 +169,24 @@ fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
 fn submit_new_canvas(ui_state: &mut EditorUI) {
     let sprite_w = ui_state.sprite.new_sprite_width.max(1);
     let sprite_h = ui_state.sprite.new_sprite_height.max(1);
+    ui_state.sprite.new_canvas_error = None;
+
+    if let Some(path) = ui_state.sprite.new_canvas_source_image.clone() {
+        match ui_state
+            .sprite
+            .import_external_image_as_sheet(&path, sprite_w, sprite_h)
+        {
+            Ok(()) => {
+                ui_state.sprite.show_new_canvas_dialog = false;
+                ui_state.sprite.new_canvas_source_image = None;
+                ui_state.sprite.new_canvas_source_image_size = None;
+            }
+            Err(error) => {
+                ui_state.sprite.new_canvas_error = Some(error);
+            }
+        }
+        return;
+    }
 
     if ui_state.sprite.new_canvas_is_sheet {
         let cols = ui_state.sprite.new_sheet_cols.max(1);
@@ -123,6 +201,8 @@ fn submit_new_canvas(ui_state: &mut EditorUI) {
         ui_state.sprite.active_mut().show_cell_grid = false;
     }
     ui_state.sprite.show_new_canvas_dialog = false;
+    ui_state.sprite.new_canvas_source_image = None;
+    ui_state.sprite.new_canvas_source_image_size = None;
 }
 
 fn render_save_dialog(

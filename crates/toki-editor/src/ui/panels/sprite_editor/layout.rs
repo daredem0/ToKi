@@ -18,6 +18,18 @@ pub fn render_no_canvas_message(
                 ui_state.begin_new_sprite_canvas_dialog();
             }
             ui.add_space(5.0);
+            if ui.button("Create New Canvas from Image").clicked() {
+                if let Some(path) = rfd::FileDialog::new()
+                    .set_title("Create New Canvas from Image")
+                    .add_filter("PNG Image", &["png"])
+                    .pick_file()
+                {
+                    if let Err(e) = ui_state.sprite.begin_new_canvas_from_image_dialog(&path) {
+                        tracing::error!("Failed to prepare new canvas from image: {}", e);
+                    }
+                }
+            }
+            ui.add_space(5.0);
             let load_enabled = sprites_dir.is_some();
             if ui
                 .add_enabled(load_enabled, egui::Button::new("Load Existing Sprite"))
