@@ -7,6 +7,53 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-03-24
+
+### Added
+- Added project palette assets with palette-file discovery, indexed atlas color-mode metadata, a Game Boy style palette pipeline, and palette conversion tooling in the Sprite Editor.
+- Added runtime post-processing options including tint, `Quantize4`, `GB Preset`, ordered-dither quantization, brightness/saturation, and vignette effects.
+- Added configurable quantization strategy selection (`Luminance` vs `RGB Distance`) for `Quantize4` and `GB Preset`.
+- Added runtime graphics-menu controls for vsync and target FPS.
+- Added optional scene persistence as a project-level runtime setting so scene entity state can persist across scene changes within a session.
+- Added a full dialog system with standalone dialog assets, runtime dialog execution, rule integration (`StartDialog`, `OnDialogComplete`), and editor authoring support.
+- Added dedicated dialog styling separate from pause/menu styling while keeping the shared menu/dialog rendering backend.
+- Added dialog layout placement controls (`Top`, `Bottom`, `Left`, `Right`), border thickness, per-dialog gameplay gating, and separate speaker/body typography settings.
+- Added runtime mouse hover and click interaction for dialog buttons, menu screens, submenus, and runtime settings overlays, including draggable audio sliders.
+- Added grounding-based fake-depth data for entities and map objects with authored ground origin and footprint controls.
+- Added editor grounding authoring and viewport debug overlays for sprite bounds, collision, footprint, and ground origin.
+- Added map-object grounding authoring in the map editor and runtime support for footprint-based map-object collision and sorting.
+- Added shipping infrastructure for packaged editor/runtime distribution, including runtime auto-discovery for export, Linux packaging scripts, Windows installer metadata, and CI packaging/release jobs.
+
+### Changed
+- Changed project palettes to live as standalone palette files instead of being embedded in project metadata.
+- Changed palette-indexed rendering across editor and runtime so indexed sprites, atlases, previews, and viewport rendering consistently use the resolved palette override.
+- Changed the runtime graphics menu to be cleaner and mode-aware by only showing controls relevant to the active post-process mode.
+- Changed dialog authoring workflow so dialog asset management lives in the inspector while the center panel focuses on dialog content editing.
+- Changed runtime dialog/menu interaction so keyboard selection, hover selection, and click activation behave consistently across overlays and authored menus.
+- Changed dialog and menu appearance editing to share more of the same styling surface, including typography and border controls.
+- Changed scene/entity grounding to drive world-bound clamping and depth sorting from ground contact rather than full sprite bounds.
+- Changed sprite rendering to preserve sorted draw order across texture atlases instead of breaking logical depth order during texture batching.
+- Changed runtime shadows to anchor at the grounded footprint/contact point and tuned shadow sizing to blend footprint and sprite width more conservatively.
+- Changed editor scene preview loading to hydrate placed scene entities from their definitions when legacy scene instances still rely on implicit defaults.
+- Changed export flow to prefer a discovered bundled/runtime binary instead of assuming a local Rust toolchain.
+- Changed CI so heavy Windows/package jobs are more selective while AppImage packaging remains available on all branches.
+
+### Fixed
+- Fixed palette alias preservation and sprite metadata handling during palette conversion workflows.
+- Fixed runtime and editor preview rendering for palette-indexed entities and mixed atlas content.
+- Fixed a WGSL shader compile failure caused by using reserved keyword `smooth` in the vignette shader.
+- Fixed dialog navigation so `WASD` and arrow keys can switch between available buttons, and hover state updates the active button highlight.
+- Fixed menu/runtime hover behavior so nested menus and runtime settings overlays respond to cursor movement and clicks, not just top-level menus.
+- Fixed widget-ID collisions in dialog typography controls inside the inspector.
+- Fixed stale scene/entity grounding in runtime and editor preview by hydrating untouched legacy scene entities from their current definitions.
+- Fixed remaining depth-order bugs by sorting editor viewport sprite requests and preserving cross-atlas sprite order in the renderer.
+- Fixed oversized and undersized grounded shadow behavior with a more stable sizing heuristic.
+- Fixed AppImage packaging so bundled editor/runtime executables keep executable permissions and the desktop entry passes validation.
+- Fixed Linux packaging/CI issues across Arch and AppImage jobs and tightened release packaging behavior.
+
+### Docs
+- Updated architecture/shipping/depth planning documents and review notes to reflect the new dialog, fake-depth, packaging, and code-quality work.
+
 ## [0.2.1] - 2026-03-22
 
 ### Added
