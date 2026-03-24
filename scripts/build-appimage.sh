@@ -64,13 +64,13 @@ mkdir -p \
   "${APPDIR}/usr/share/applications" \
   "${APPDIR}/usr/share/licenses"
 
-cp target/release/toki-editor "${APPDIR}/usr/bin/toki-editor"
-cp target/release/toki-runtime "${APPDIR}/usr/bin/toki-runtime"
-cp packaging/toki-editor.desktop "${APPDIR}/toki-editor.desktop"
-cp packaging/toki-editor.desktop "${APPDIR}/usr/share/applications/toki-editor.desktop"
-cp packaging/toki-editor.png "${APPDIR}/toki-editor.png"
-cp LICENSE-TOKI.md "${APPDIR}/usr/share/licenses/LICENSE-TOKI.md"
-cp THIRD_PARTY_LICENSES.md "${APPDIR}/usr/share/licenses/THIRD_PARTY_LICENSES.md"
+install -m755 target/release/toki-editor "${APPDIR}/usr/bin/toki-editor"
+install -m755 target/release/toki-runtime "${APPDIR}/usr/bin/toki-runtime"
+install -m644 packaging/toki-editor.desktop "${APPDIR}/toki-editor.desktop"
+install -m644 packaging/toki-editor.desktop "${APPDIR}/usr/share/applications/toki-editor.desktop"
+install -m644 packaging/toki-editor.png "${APPDIR}/toki-editor.png"
+install -m644 LICENSE-TOKI.md "${APPDIR}/usr/share/licenses/LICENSE-TOKI.md"
+install -m644 THIRD_PARTY_LICENSES.md "${APPDIR}/usr/share/licenses/THIRD_PARTY_LICENSES.md"
 
 cat > "${APPDIR}/AppRun" <<'EOF'
 #!/usr/bin/env bash
