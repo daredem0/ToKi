@@ -7,6 +7,71 @@ use glam::IVec2;
 use super::context::AiContext;
 use super::types::AiUpdateResult;
 
+fn update_axis_accumulator(accumulator: &mut f32, speed: f32, direction: i32) -> i32 {
+    if direction == 0 {
+        *accumulator = 0.0;
+        return 0;
+    }
+
+    let direction_sign = direction.signum() as f32;
+    let accumulator_sign = accumulator.signum();
+    if accumulator_sign != 0.0 && accumulator_sign != direction_sign {
+        *accumulator = 0.0;
+    }
+
+    *accumulator += speed * direction_sign;
+    let whole_pixels = accumulator.trunc() as i32;
+    *accumulator -= whole_pixels as f32;
+    whole_pixels
+}
+
+fn clamp_entity_position_to_world_bounds(
+    entity: &Entity,
+    candidate_position: IVec2,
+    ctx: &AiContext,
+) -> IVec2 {
+    let footprint = entity.resolved_footprint();
+    let min_x = -footprint.offset[0];
+    let min_y = -footprint.offset[1];
+    let max_x = ctx.world_bounds.x as i32 - footprint.size[0] as i32 - footprint.offset[0];
+    let max_y = ctx.world_bounds.y as i32 - footprint.size[1] as i32 - footprint.offset[1];
+
+    IVec2::new(
+        candidate_position
+            .x
+            .clamp(min_x.min(max_x), min_x.max(max_x)),
+        candidate_position
+            .y
+            .clamp(min_y.min(max_y), min_y.max(max_y)),
+    )
+}
+
+pub fn preview_intended_position(
+    entity: &Entity,
+    current_position: IVec2,
+    direction: IVec2,
+    ctx: &AiContext,
+) -> Option<IVec2> {
+    if direction == IVec2::ZERO {
+        return None;
+    }
+
+    let mut accumulator = entity.movement_accumulator;
+    let speed = entity.attributes.speed.max(0.0);
+    let pixels_x = update_axis_accumulator(&mut accumulator.x, speed, direction.x);
+    let pixels_y = update_axis_accumulator(&mut accumulator.y, speed, direction.y);
+
+    if pixels_x == 0 && pixels_y == 0 {
+        return Some(current_position);
+    }
+
+    Some(clamp_entity_position_to_world_bounds(
+        entity,
+        current_position + IVec2::new(pixels_x, pixels_y),
+        ctx,
+    ))
+}
+
 /// Calculate distance between two positions.
 pub fn distance_between(a: IVec2, b: IVec2) -> f32 {
     let dx = (b.x - a.x) as f32;
@@ -26,7 +91,7 @@ pub fn random_cardinal_direction() -> IVec2 {
 
 /// Compute movement directions toward a target, ordered by priority.
 /// Returns primary direction first, then perpendicular directions.
-pub fn compute_directions_toward(current: IVec2, target: IVec2, step: i32) -> Vec<IVec2> {
+pub fn compute_directions_toward(current: IVec2, target: IVec2) -> Vec<IVec2> {
     let dx = target.x - current.x;
     let dy = target.y - current.y;
 
@@ -34,22 +99,22 @@ pub fn compute_directions_toward(current: IVec2, target: IVec2, step: i32) -> Ve
 
     // Primary direction (dominant axis)
     if dx.abs() >= dy.abs() {
-        directions.push(IVec2::new(dx.signum() * step, 0));
+        directions.push(IVec2::new(dx.signum(), 0));
         // Perpendicular directions
         if dy != 0 {
-            directions.push(IVec2::new(0, dy.signum() * step));
+            directions.push(IVec2::new(0, dy.signum()));
         } else {
-            directions.push(IVec2::new(0, step));
-            directions.push(IVec2::new(0, -step));
+            directions.push(IVec2::new(0, 1));
+            directions.push(IVec2::new(0, -1));
         }
     } else {
-        directions.push(IVec2::new(0, dy.signum() * step));
+        directions.push(IVec2::new(0, dy.signum()));
         // Perpendicular directions
         if dx != 0 {
-            directions.push(IVec2::new(dx.signum() * step, 0));
+            directions.push(IVec2::new(dx.signum(), 0));
         } else {
-            directions.push(IVec2::new(step, 0));
-            directions.push(IVec2::new(-step, 0));
+            directions.push(IVec2::new(1, 0));
+            directions.push(IVec2::new(-1, 0));
         }
     }
 
@@ -58,7 +123,7 @@ pub fn compute_directions_toward(current: IVec2, target: IVec2, step: i32) -> Ve
 
 /// Compute movement directions away from a threat, ordered by priority.
 /// Returns primary direction first, then perpendicular directions.
-pub fn compute_directions_away(current: IVec2, threat: IVec2, step: i32) -> Vec<IVec2> {
+pub fn compute_directions_away(current: IVec2, threat: IVec2) -> Vec<IVec2> {
     let dx = current.x - threat.x;
     let dy = current.y - threat.y;
 
@@ -67,92 +132,75 @@ pub fn compute_directions_away(current: IVec2, threat: IVec2, step: i32) -> Vec<
     // Primary direction (dominant axis away from threat)
     if dx.abs() >= dy.abs() {
         let dir = if dx == 0 { 1 } else { dx.signum() };
-        directions.push(IVec2::new(dir * step, 0));
+        directions.push(IVec2::new(dir, 0));
         // Perpendicular directions
         if dy != 0 {
-            directions.push(IVec2::new(0, dy.signum() * step));
+            directions.push(IVec2::new(0, dy.signum()));
         } else {
-            directions.push(IVec2::new(0, step));
-            directions.push(IVec2::new(0, -step));
+            directions.push(IVec2::new(0, 1));
+            directions.push(IVec2::new(0, -1));
         }
     } else {
         let dir = if dy == 0 { 1 } else { dy.signum() };
-        directions.push(IVec2::new(0, dir * step));
+        directions.push(IVec2::new(0, dir));
         // Perpendicular directions
         if dx != 0 {
-            directions.push(IVec2::new(dx.signum() * step, 0));
+            directions.push(IVec2::new(dx.signum(), 0));
         } else {
-            directions.push(IVec2::new(step, 0));
-            directions.push(IVec2::new(-step, 0));
+            directions.push(IVec2::new(1, 0));
+            directions.push(IVec2::new(-1, 0));
         }
     }
 
     directions
 }
 
-/// Try movement in multiple directions, falling back to perpendicular if blocked.
-pub fn try_movement_with_fallback(
+/// Try intent directions in priority order, falling back when the per-tick shared movement
+/// preview is blocked.
+pub fn try_intent_with_fallback(
     entity: &Entity,
     entity_id: EntityId,
     current_position: IVec2,
     directions: &[IVec2],
     ctx: &AiContext,
 ) -> Option<AiUpdateResult> {
-    let (max_x, max_y) = ctx.max_position(entity.size);
-
     for &direction in directions {
-        let new_position = IVec2::new(
-            (current_position.x + direction.x).clamp(0, max_x),
-            (current_position.y + direction.y).clamp(0, max_y),
-        );
+        if direction == IVec2::ZERO {
+            continue;
+        }
+        let Some(new_position) =
+            preview_intended_position(entity, current_position, direction, ctx)
+        else {
+            continue;
+        };
 
         if new_position == current_position {
-            continue; // Clamped to same position, try next direction
+            return Some(build_movement_intent_result(
+                entity_id,
+                Some(direction),
+                true,
+            ));
         }
 
         if ctx.is_movement_valid(entity, entity_id, new_position) {
-            return Some(build_movement_result(
+            return Some(build_movement_intent_result(
                 entity_id,
-                current_position,
-                new_position,
+                Some(direction),
                 true,
             ));
         }
     }
 
-    // All directions blocked, stay in place
-    Some(build_movement_result(
-        entity_id,
-        current_position,
-        current_position,
-        false,
-    ))
+    Some(build_movement_intent_result(entity_id, None, false))
 }
 
-/// Build the final AI update result after computing movement.
-pub fn build_movement_result(
+/// Build the final AI update result after choosing movement intent.
+pub fn build_movement_intent_result(
     entity_id: EntityId,
-    current_position: IVec2,
-    new_position: IVec2,
+    movement_intent: Option<IVec2>,
     movement_valid: bool,
 ) -> AiUpdateResult {
-    let entity_moved = movement_valid && new_position != current_position;
-
-    let final_position = if entity_moved {
-        new_position
-    } else {
-        current_position
-    };
-
-    let movement_distance = if entity_moved {
-        let dx = (final_position.x - current_position.x) as f32;
-        let dy = (final_position.y - current_position.y) as f32;
-        (dx * dx + dy * dy).sqrt()
-    } else {
-        0.0
-    };
-
-    let desired_animation = if entity_moved {
+    let desired_animation = if movement_valid && movement_intent.is_some() {
         AnimationState::Walk
     } else {
         AnimationState::Idle
@@ -160,38 +208,18 @@ pub fn build_movement_result(
 
     AiUpdateResult {
         entity_id,
-        new_position: if entity_moved {
-            Some(final_position)
-        } else {
-            None
-        },
+        movement_intent: movement_intent.filter(|intent| *intent != IVec2::ZERO),
         new_animation: Some(desired_animation),
-        movement_distance,
         spawn_request: None,
     }
 }
 
 /// Build a wander-specific result with optional movement.
-pub fn build_wander_result(
+pub fn build_wander_intent_result(
     entity_id: EntityId,
-    current_position: IVec2,
-    new_position: IVec2,
     entity_moved: bool,
+    movement_intent: Option<IVec2>,
 ) -> Option<AiUpdateResult> {
-    let final_position = if entity_moved {
-        new_position
-    } else {
-        current_position
-    };
-
-    let movement_distance = if entity_moved {
-        let dx = (final_position.x - current_position.x) as f32;
-        let dy = (final_position.y - current_position.y) as f32;
-        (dx * dx + dy * dy).sqrt()
-    } else {
-        0.0
-    };
-
     let desired_animation = if entity_moved {
         AnimationState::Walk
     } else {
@@ -200,13 +228,8 @@ pub fn build_wander_result(
 
     Some(AiUpdateResult {
         entity_id,
-        new_position: if entity_moved {
-            Some(final_position)
-        } else {
-            None
-        },
+        movement_intent: movement_intent.filter(|intent| *intent != IVec2::ZERO),
         new_animation: Some(desired_animation),
-        movement_distance,
         spawn_request: None,
     })
 }

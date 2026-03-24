@@ -79,7 +79,7 @@ impl GameState {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn apply_accumulated_movement_scaled(
+    pub(super) fn apply_accumulated_movement_scaled(
         &mut self,
         entity_id: EntityId,
         direction: glam::IVec2,

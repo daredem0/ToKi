@@ -1,0 +1,173 @@
+{
+  "name": "goblin",
+  "display_name": "Goblin",
+  "description": "",
+  "rendering": {
+    "size": [
+      16,
+      16
+    ],
+    "render_layer": 0,
+    "visible": true,
+    "has_shadow": true,
+    "palette_override": "",
+    "grounding": {
+      "origin": [
+        8,
+        15
+      ],
+      "footprint": {
+        "offset": [
+          4,
+          12
+        ],
+        "size": [
+          8,
+          4
+        ]
+      }
+    }
+  },
+  "attributes": {
+    "health": 150,
+    "speed": 1.0,
+    "solid": true,
+    "active": true,
+    "can_move": true,
+    "interactable": true,
+    "interaction_reach": 16,
+    "ai_config": {
+      "behavior": "wander",
+      "detection_radius": 128
+    },
+    "movement_profile": "legacy_default",
+    "has_inventory": false
+  },
+  "collision": {
+    "enabled": true,
+    "offset": [
+      4,
+      12
+    ],
+    "size": [
+      8,
+      4
+    ],
+    "trigger": false
+  },
+  "audio": {
+    "footstep_trigger_distance": 16.0,
+    "hearing_radius": 192,
+    "movement_sound_trigger": "distance",
+    "movement_sound": "Jump 1",
+    "collision_sound": "sfx_hit2"
+  },
+  "animations": {
+    "atlas_name": "goblin.json",
+    "clips": [
+      {
+        "state": "idle",
+        "frame_tiles": [
+          "goblin/idle_a",
+          "goblin/idle_b"
+        ],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk",
+        "frame_tiles": [
+          "goblin/walk_a",
+          "goblin/walk_b",
+          "goblin/walk_c",
+          "goblin/walk_d"
+        ],
+        "frame_duration_ms": 150.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "idle_down",
+        "frame_tiles": [
+          "goblin/idle_down_a",
+          "goblin/idle_down_b"
+        ],
+        "frame_duration_ms": 150.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "idle_left",
+        "frame_tiles": [
+          "goblin/idle_left_a",
+          "goblin/idle_left_b"
+        ],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "idle_up",
+        "frame_tiles": [
+          "goblin/idle_up_a",
+          "goblin/idle_up_b"
+        ],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "idle_right",
+        "frame_tiles": [
+          "goblin/idle_right_a",
+          "goblin/idle_right_b"
+        ],
+        "frame_duration_ms": 300.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_down",
+        "frame_tiles": [
+          "goblin/walk_down_a",
+          "goblin/walk_down_b",
+          "goblin/walk_down_c",
+          "goblin/walk_down_d"
+        ],
+        "frame_duration_ms": 150.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_up",
+        "frame_tiles": [
+          "goblin/walk_up_a",
+          "goblin/walk_up_b",
+          "goblin/walk_up_c",
+          "goblin/walk_up_d"
+        ],
+        "frame_duration_ms": 150.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_left",
+        "frame_tiles": [
+          "goblin/walk_left_a",
+          "goblin/walk_left_b",
+          "goblin/walk_left_c",
+          "goblin/walk_left_d"
+        ],
+        "frame_duration_ms": 150.0,
+        "loop_mode": "loop"
+      },
+      {
+        "state": "walk_right",
+        "frame_tiles": [
+          "goblin/walk_right_a",
+          "goblin/walk_right_b",
+          "goblin/walk_right_c",
+          "goblin/walk_right_d"
+        ],
+        "frame_duration_ms": 150.0,
+        "loop_mode": "loop"
+      }
+    ],
+    "default_state": "walk"
+  },
+  "category": "creature",
+  "tags": []
+}

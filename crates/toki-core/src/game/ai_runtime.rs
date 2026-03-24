@@ -5,11 +5,6 @@ use crate::entity::{EntityDefinition, EntityId, EntityManager};
 
 use super::GameState;
 
-#[derive(Debug, Default)]
-pub(super) struct AiRuntimeEffects {
-    pub(super) movement_audio: Vec<(EntityId, f32)>,
-}
-
 pub(super) struct AiRuntimeApplier<'a> {
     entity_manager: &'a mut EntityManager,
     ai_system: &'a mut AiSystem,
@@ -29,26 +24,13 @@ impl<'a> AiRuntimeApplier<'a> {
         }
     }
 
-    pub(super) fn apply_updates(&mut self, ai_updates: Vec<AiUpdateResult>) -> AiRuntimeEffects {
-        let mut effects = AiRuntimeEffects::default();
+    pub(super) fn apply_updates(&mut self, ai_updates: Vec<AiUpdateResult>) {
         for ai_result in ai_updates {
-            self.apply_result(ai_result, &mut effects);
+            self.apply_result(ai_result);
         }
-        effects
     }
 
-    fn apply_result(&mut self, ai_result: AiUpdateResult, effects: &mut AiRuntimeEffects) {
-        if let Some(new_position) = ai_result.new_position {
-            if let Some(entity) = self.entity_manager.get_entity_mut(ai_result.entity_id) {
-                entity.position = new_position;
-            }
-            if ai_result.movement_distance > 0.0 {
-                effects
-                    .movement_audio
-                    .push((ai_result.entity_id, ai_result.movement_distance));
-            }
-        }
-
+    fn apply_result(&mut self, ai_result: AiUpdateResult) {
         if let Some(animation) = ai_result.new_animation {
             if let Some(entity) = self.entity_manager.get_entity_mut(ai_result.entity_id) {
                 if let Some(controller) = &mut entity.attributes.animation_controller {
@@ -195,11 +177,10 @@ mod tests {
         let definitions = HashMap::from([(definition.name.clone(), definition)]);
         let mut applier = AiRuntimeApplier::new(&mut entity_manager, &mut ai_system, &definitions);
 
-        let effects = applier.apply_updates(vec![AiUpdateResult {
+        applier.apply_updates(vec![AiUpdateResult {
             entity_id: 1,
-            new_position: None,
+            movement_intent: None,
             new_animation: None,
-            movement_distance: 0.0,
             spawn_request: Some(AiSpawnRequest {
                 position: glam::IVec2::new(32, 32),
                 parent_entity_ids: vec![7, 8],
@@ -210,7 +191,6 @@ mod tests {
             }),
         }]);
 
-        assert!(effects.movement_audio.is_empty());
         assert_eq!(applier.entity_manager.active_entities().len(), 1);
         let spawned_id = applier.entity_manager.active_entities()[0];
         assert!(applier.ai_system.is_entity_separating(spawned_id));

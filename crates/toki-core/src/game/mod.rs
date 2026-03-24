@@ -431,10 +431,42 @@ impl GameState {
             tilemap,
             atlas,
         );
-        let effects = self.ai_runtime_applier().apply_updates(ai_updates);
-        for (entity_id, movement_distance) in effects.movement_audio {
-            self.emit_entity_movement_audio(entity_id, movement_distance, result);
+        for ai_result in &ai_updates {
+            let Some(direction) = ai_result.movement_intent else {
+                continue;
+            };
+            let Some(initial_position) = self
+                .entity_manager
+                .get_entity(ai_result.entity_id)
+                .map(|entity| entity.position)
+            else {
+                continue;
+            };
+
+            self.apply_accumulated_movement_scaled(
+                ai_result.entity_id,
+                direction,
+                world_bounds,
+                tilemap,
+                atlas,
+                result,
+                1.0,
+            );
+
+            let Some(final_position) = self
+                .entity_manager
+                .get_entity(ai_result.entity_id)
+                .map(|entity| entity.position)
+            else {
+                continue;
+            };
+            self.emit_entity_movement_audio(
+                ai_result.entity_id,
+                Self::movement_distance(initial_position, final_position),
+                result,
+            );
         }
+        self.ai_runtime_applier().apply_updates(ai_updates);
     }
 
     fn update_npc_ai_with_delta(
