@@ -171,4 +171,12 @@ impl Scene {
             .iter_mut()
             .find(|anchor| anchor.id == anchor_id)
     }
+
+    pub fn spawn_point_ids(&self) -> Vec<String> {
+        self.anchors
+            .iter()
+            .filter(|anchor| matches!(anchor.kind, SceneAnchorKind::SpawnPoint))
+            .map(|anchor| anchor.id.clone())
+            .collect()
+    }
 }

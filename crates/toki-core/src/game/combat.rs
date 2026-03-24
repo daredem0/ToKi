@@ -25,19 +25,11 @@ impl GameState {
             .unwrap_or(10)
     }
 
-    fn entity_bounds_for_stat_interaction(entity: &Entity) -> (glam::IVec2, glam::UVec2) {
-        if let Some(collision_box) = &entity.collision_box {
-            collision_box.world_bounds(entity.position)
-        } else {
-            (entity.position, entity.size)
-        }
-    }
-
     fn primary_action_hitbox(
         entity: &Entity,
         facing: FacingDirection,
     ) -> (glam::IVec2, glam::UVec2) {
-        let (origin, size) = Self::entity_bounds_for_stat_interaction(entity);
+        let (origin, size) = entity.interaction_bounds();
         match facing {
             FacingDirection::Down => (glam::IVec2::new(origin.x, origin.y + size.y as i32), size),
             FacingDirection::Up => (glam::IVec2::new(origin.x, origin.y - size.y as i32), size),
@@ -74,7 +66,7 @@ impl GameState {
                 {
                     return None;
                 }
-                let (target_pos, target_size) = Self::entity_bounds_for_stat_interaction(target);
+                let (target_pos, target_size) = target.interaction_bounds();
                 if !collision::aabb_overlap(hitbox_pos, hitbox_size, target_pos, target_size) {
                     return None;
                 }
@@ -183,8 +175,7 @@ impl GameState {
     fn projectile_hit_target(&self, projectile_id: EntityId) -> Option<EntityId> {
         let projectile = self.entity_manager.get_entity(projectile_id)?;
         let projectile_state = projectile.attributes.projectile.as_ref()?;
-        let (projectile_pos, projectile_size) =
-            Self::entity_bounds_for_stat_interaction(projectile);
+        let (projectile_pos, projectile_size) = projectile.interaction_bounds();
 
         let mut target_ids = self.entity_manager.active_entities();
         target_ids.sort_unstable();
@@ -203,7 +194,7 @@ impl GameState {
                 continue;
             }
 
-            let (target_pos, target_size) = Self::entity_bounds_for_stat_interaction(target);
+            let (target_pos, target_size) = target.interaction_bounds();
             if collision::aabb_overlap(projectile_pos, projectile_size, target_pos, target_size) {
                 return Some(target_id);
             }

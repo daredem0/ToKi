@@ -233,6 +233,28 @@ fn test_scene_has_map() {
 }
 
 #[test]
+fn test_scene_spawn_point_ids_returns_only_spawn_points_in_authored_order() {
+    let mut scene = Scene::new("test_scene".to_string());
+    scene.add_anchor(SceneAnchor {
+        id: "spawn_a".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(0, 0),
+        facing: None,
+    });
+    scene.add_anchor(SceneAnchor {
+        id: "spawn_b".to_string(),
+        kind: SceneAnchorKind::SpawnPoint,
+        position: IVec2::new(16, 16),
+        facing: Some(SceneAnchorFacing::Down),
+    });
+
+    assert_eq!(
+        scene.spawn_point_ids(),
+        vec!["spawn_a".to_string(), "spawn_b".to_string()]
+    );
+}
+
+#[test]
 fn test_scene_serialization() {
     let mut scene = Scene::new("test_scene".to_string());
     scene.description = Some("A test scene".to_string());

@@ -7,7 +7,7 @@ use super::scene_helpers::{
 };
 use crate::editor_services::commands as editor_commands;
 use toki_core::entity::ControlRole;
-use toki_core::scene::{SceneAnchorKind, ScenePlayerEntry};
+use toki_core::scene::ScenePlayerEntry;
 
 /// Inspector for scene selection.
 pub struct SceneInspector {
@@ -255,12 +255,7 @@ impl PlayerEntryContext {
                 crate::project::ProjectAssets::discover_project_entity_definition_names(&p.path)
             })
             .unwrap_or_default();
-        let spawn_points = scene
-            .anchors
-            .iter()
-            .filter(|a| a.kind == SceneAnchorKind::SpawnPoint)
-            .map(|a| a.id.clone())
-            .collect();
+        let spawn_points = scene.spawn_point_ids();
         Self {
             entity_defs,
             spawn_points,

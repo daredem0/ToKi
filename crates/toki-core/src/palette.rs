@@ -28,26 +28,7 @@ impl Palette4 {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct PaletteAssetFile {
-    pub colors: [[u8; 4]; 4],
-}
-
-impl From<Palette4> for PaletteAssetFile {
-    fn from(value: Palette4) -> Self {
-        Self {
-            colors: value.colors,
-        }
-    }
-}
-
-impl From<PaletteAssetFile> for Palette4 {
-    fn from(value: PaletteAssetFile) -> Self {
-        Self {
-            colors: value.colors,
-        }
-    }
-}
+pub type PaletteAssetFile = Palette4;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IndexedImageValidation {
@@ -61,13 +42,7 @@ impl IndexedImageValidation {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IndexedImageValidationError {
-    pub unique_color_count: usize,
-    pub invalid_colors: Vec<[u8; 4]>,
-}
-
-impl std::fmt::Display for IndexedImageValidationError {
+impl std::fmt::Display for IndexedImageValidation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -78,7 +53,9 @@ impl std::fmt::Display for IndexedImageValidationError {
     }
 }
 
-impl std::error::Error for IndexedImageValidationError {}
+impl std::error::Error for IndexedImageValidation {}
+
+pub type IndexedImageValidationError = IndexedImageValidation;
 
 pub fn builtin_palettes() -> BTreeMap<String, Palette4> {
     [
@@ -144,12 +121,11 @@ pub fn resolve_palette(
 
 pub fn load_palette_asset_from_path(path: &Path) -> Result<Palette4, CoreError> {
     let content = fs::read_to_string(path)?;
-    let file = serde_json::from_str::<PaletteAssetFile>(&content)?;
-    Ok(file.into())
+    serde_json::from_str::<PaletteAssetFile>(&content).map_err(Into::into)
 }
 
 pub fn save_palette_asset_to_path(path: &Path, palette: Palette4) -> Result<(), CoreError> {
-    let content = serde_json::to_string_pretty(&PaletteAssetFile::from(palette))?;
+    let content = serde_json::to_string_pretty(&palette)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -186,10 +162,7 @@ pub fn recolor_indexed_image(
 ) -> Result<DecodedImage, IndexedImageValidationError> {
     let validation = validate_indexed_rgba8(&image.data);
     if !validation.is_valid() {
-        return Err(IndexedImageValidationError {
-            unique_color_count: validation.unique_color_count,
-            invalid_colors: validation.invalid_colors,
-        });
+        return Err(validation);
     }
 
     let mut recolored = image.data.clone();
@@ -276,6 +249,21 @@ mod tests {
                 255, 255, 255, 0,
             ]
         );
+    }
+
+    #[test]
+    fn recolor_indexed_image_returns_validation_details_for_invalid_input() {
+        let image = DecodedImage {
+            width: 1,
+            height: 1,
+            data: vec![1, 2, 3, 255],
+        };
+
+        let error =
+            recolor_indexed_image(&image, Palette4::new([[0, 0, 0, 255]; 4])).unwrap_err();
+
+        assert_eq!(error.unique_color_count, 1);
+        assert_eq!(error.invalid_colors, vec![[1, 2, 3, 255]]);
     }
 
     #[test]

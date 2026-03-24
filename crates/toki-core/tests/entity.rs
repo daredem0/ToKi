@@ -206,6 +206,32 @@ fn test_entity_manager_creation() {
 }
 
 #[test]
+fn test_entity_interaction_bounds_prefers_collision_box() {
+    let mut entity = player_definition()
+        .create_entity(IVec2::new(10, 20), 1)
+        .expect("player definition spawn should succeed");
+    entity.collision_box = Some(CollisionBox::new(IVec2::new(4, 5), UVec2::new(6, 7), false));
+
+    let (position, size) = entity.interaction_bounds();
+
+    assert_eq!(position, IVec2::new(14, 25));
+    assert_eq!(size, UVec2::new(6, 7));
+}
+
+#[test]
+fn test_entity_interaction_bounds_falls_back_to_entity_rect_without_collision_box() {
+    let mut entity = player_definition()
+        .create_entity(IVec2::new(10, 20), 1)
+        .expect("player definition spawn should succeed");
+    entity.collision_box = None;
+
+    let (position, size) = entity.interaction_bounds();
+
+    assert_eq!(position, IVec2::new(10, 20));
+    assert_eq!(size, UVec2::new(16, 16));
+}
+
+#[test]
 fn test_spawn_player() {
     let mut manager = EntityManager::new();
     let position = IVec2::new(100, 50);
