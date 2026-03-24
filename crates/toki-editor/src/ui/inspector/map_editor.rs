@@ -271,40 +271,20 @@ impl InspectorSystem {
                             });
                     });
                     ui_state.sync_map_editor_object_selection(&object_names);
-                    ui.horizontal(|ui| {
-                        ui.label("Object:");
-                        egui::ComboBox::from_id_salt("inspector_map_editor_object_selector")
-                            .selected_text(
-                                ui_state
-                                    .map
-                                    .selected_object_name
-                                    .as_deref()
-                                    .unwrap_or("No object selected"),
-                            )
-                            .show_ui(ui, |ui| {
-                                for object_name in &object_names {
-                                    let is_selected = ui_state.map.selected_object_name.as_deref()
-                                        == Some(object_name.as_str());
-                                    if ui.selectable_label(is_selected, object_name).clicked() {
-                                        ui_state.map.selected_object_name =
-                                            Some(object_name.clone());
-                                    }
-                                }
-                            });
-                    });
+                    ui.separator();
+                    ui.label("Objects");
+                    Self::render_map_editor_object_sheet_gallery(
+                        ui_state,
+                        ui,
+                        ctx,
+                        &object_sheet,
+                        &texture_path,
+                        &object_names,
+                    );
 
                     if let Some(object_name) = ui_state.map.selected_object_name.clone() {
-                        ui.horizontal(|ui| {
-                            ui.label(format!("Selected Object: {}", object_name));
-                            Self::render_map_editor_selected_object_preview(
-                                ui_state,
-                                ui,
-                                ctx,
-                                &object_sheet,
-                                &texture_path,
-                                &object_name,
-                            );
-                        });
+                        ui.separator();
+                        ui.label(format!("Selected Object: {}", object_name));
                         if let Some(object_info) = object_sheet.objects.get(&object_name) {
                             ui.horizontal(|ui| {
                                 ui.label("Size:");
@@ -447,7 +427,20 @@ impl InspectorSystem {
             })?;
 
         let mut object_names = object_sheet.objects.keys().cloned().collect::<Vec<_>>();
-        object_names.sort();
+        object_names.sort_by(|left, right| {
+            let left_info = object_sheet.objects.get(left);
+            let right_info = object_sheet.objects.get(right);
+
+            match (left_info, right_info) {
+                (Some(left_info), Some(right_info)) => left_info
+                    .position
+                    .y
+                    .cmp(&right_info.position.y)
+                    .then_with(|| left_info.position.x.cmp(&right_info.position.x))
+                    .then_with(|| left.cmp(right)),
+                _ => left.cmp(right),
+            }
+        });
         let texture_path = object_sheet_path.parent()?.join(&object_sheet.image);
 
         Some((sheet_names, object_names, object_sheet, texture_path))
@@ -501,61 +494,125 @@ impl InspectorSystem {
         response.on_hover_text(tile_name);
     }
 
-    pub(super) fn render_map_editor_selected_object_preview(
+    fn render_map_editor_object_sheet_gallery(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
         object_sheet: &ObjectSheetMeta,
         texture_path: &std::path::Path,
-        object_name: &str,
+        object_names: &[String],
     ) {
         let Some(texture) =
             Self::ensure_map_editor_brush_preview_texture(ui_state, ctx, texture_path)
         else {
+            ui.label("Preview texture unavailable.");
             return;
         };
         let Some(texture_size) = object_sheet.image_size() else {
-            return;
-        };
-        let Some(rect_px) = object_sheet.get_object_rect(object_name) else {
+            ui.label("Preview image size unavailable.");
             return;
         };
 
-        let uv_rect = egui::Rect::from_min_max(
-            egui::pos2(
-                rect_px[0] as f32 / texture_size.x as f32,
-                rect_px[1] as f32 / texture_size.y as f32,
-            ),
-            egui::pos2(
-                (rect_px[0] + rect_px[2]) as f32 / texture_size.x as f32,
-                (rect_px[1] + rect_px[3]) as f32 / texture_size.y as f32,
-            ),
-        );
+        const COLUMNS: usize = 4;
+        const SLOT_SIZE: f32 = 64.0;
 
-        let max_dimension = rect_px[2].max(rect_px[3]) as f32;
-        let preview_scale = if max_dimension > 0.0 {
-            48.0 / max_dimension
+        egui::ScrollArea::vertical()
+            .max_height(280.0)
+            .show(ui, |ui| {
+                egui::Grid::new("inspector_map_editor_object_gallery")
+                    .num_columns(COLUMNS)
+                    .spacing([8.0, 8.0])
+                    .show(ui, |ui| {
+                        for (index, object_name) in object_names.iter().enumerate() {
+                            ui.vertical(|ui| {
+                                let is_selected = ui_state.map.selected_object_name.as_deref()
+                                    == Some(object_name.as_str());
+                                if Self::render_map_editor_object_gallery_item(
+                                    ui,
+                                    texture.id(),
+                                    texture_size,
+                                    object_sheet,
+                                    object_name,
+                                    is_selected,
+                                    SLOT_SIZE,
+                                )
+                                .clicked()
+                                {
+                                    ui_state.map.selected_object_name = Some(object_name.clone());
+                                }
+                                ui.add_sized(
+                                    [SLOT_SIZE, 16.0],
+                                    egui::Label::new(
+                                        egui::RichText::new(object_name.as_str()).small(),
+                                    )
+                                    .truncate(),
+                                );
+                            });
+
+                            if (index + 1) % COLUMNS == 0 {
+                                ui.end_row();
+                            }
+                        }
+                    });
+            });
+    }
+
+    fn render_map_editor_object_gallery_item(
+        ui: &mut egui::Ui,
+        texture_id: egui::TextureId,
+        texture_size: glam::UVec2,
+        object_sheet: &ObjectSheetMeta,
+        object_name: &str,
+        selected: bool,
+        slot_size: f32,
+    ) -> egui::Response {
+        let desired_size = egui::vec2(slot_size, slot_size);
+        let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+        let frame_stroke = if selected {
+            egui::Stroke::new(2.0, egui::Color32::LIGHT_BLUE)
         } else {
-            1.0
+            egui::Stroke::new(1.0, egui::Color32::GRAY)
         };
-        let preview_size = egui::vec2(
-            rect_px[2] as f32 * preview_scale,
-            rect_px[3] as f32 * preview_scale,
-        );
-        let (rect, response) = ui.allocate_exact_size(preview_size, egui::Sense::hover());
-        ui.painter().rect_stroke(
+        let frame_fill = if selected {
+            egui::Color32::from_rgb(35, 55, 75)
+        } else {
+            egui::Color32::from_gray(24)
+        };
+        ui.painter().rect(
             rect,
-            2.0,
-            egui::Stroke::new(1.0, egui::Color32::GRAY),
+            4.0,
+            frame_fill,
+            frame_stroke,
             egui::StrokeKind::Outside,
         );
-        ui.painter().image(
-            texture.id(),
-            rect.shrink(2.0),
-            uv_rect,
-            egui::Color32::WHITE,
-        );
-        response.on_hover_text(object_name);
+
+        if let Some(rect_px) = object_sheet.get_object_rect(object_name) {
+            let uv_rect = egui::Rect::from_min_max(
+                egui::pos2(
+                    rect_px[0] as f32 / texture_size.x as f32,
+                    rect_px[1] as f32 / texture_size.y as f32,
+                ),
+                egui::pos2(
+                    (rect_px[0] + rect_px[2]) as f32 / texture_size.x as f32,
+                    (rect_px[1] + rect_px[3]) as f32 / texture_size.y as f32,
+                ),
+            );
+            let max_dimension = rect_px[2].max(rect_px[3]) as f32;
+            let preview_scale = if max_dimension > 0.0 {
+                (slot_size - 8.0) / max_dimension
+            } else {
+                1.0
+            };
+            let preview_size = egui::vec2(
+                rect_px[2] as f32 * preview_scale,
+                rect_px[3] as f32 * preview_scale,
+            );
+            let preview_rect = egui::Rect::from_center_size(rect.center(), preview_size);
+            ui.painter()
+                .image(texture_id, preview_rect, uv_rect, egui::Color32::WHITE);
+        }
+
+        response.on_hover_text(object_name)
     }
 
     pub(super) fn selected_map_editor_tile_metadata(
