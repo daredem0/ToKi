@@ -4,6 +4,7 @@ use super::{
 };
 use crate::vertex::VertexLayout;
 use crate::wgpu_utils::{create_bind_group_layout, create_shader_module};
+use crate::RenderError;
 use bytemuck::{Pod, Zeroable};
 use toki_core::graphics::vertex::QuadVertex;
 use wgpu::util::DeviceExt;
@@ -47,7 +48,7 @@ impl TilemapPipeline {
         queue: &Queue,
         surface_format: wgpu::TextureFormat,
         texture_source: TextureSource<'_>,
-    ) -> Self {
+    ) -> Result<Self, RenderError> {
         let dummy_uniforms = TilemapUniforms {
             mvp: glam::Mat4::IDENTITY.to_cols_array_2d(),
         };
@@ -64,18 +65,18 @@ impl TilemapPipeline {
             &uniform_buffer,
             texture_source,
             Some("Tilemap Texture"),
-        );
+        )?;
 
         let render_pipeline =
             Self::build_render_pipeline(device, surface_format, &bind_group_layout);
 
-        Self {
+        Ok(Self {
             render_pipeline,
             bind_group,
             uniform_buffer,
             vertex_buffer: None,
             vertex_count: 0,
-        }
+        })
     }
 
     pub fn update_vertices(&mut self, device: &Device, vertices: &[QuadVertex]) {

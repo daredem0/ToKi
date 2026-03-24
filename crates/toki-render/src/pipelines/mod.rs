@@ -10,6 +10,7 @@ use wgpu::util::DeviceExt;
 use wgpu::{BindGroupLayout, Device, Queue, RenderPass, RenderPipeline as WgpuRenderPipeline};
 
 use crate::wgpu_utils::{create_texture_bindgroup, create_texture_bindgroup_from_rgba8};
+use crate::RenderError;
 
 /// Common trait for all rendering pipelines
 pub trait RenderPipeline {
@@ -78,7 +79,7 @@ pub(crate) fn create_texture_bindgroup_for_source(
     uniform_buffer: &wgpu::Buffer,
     texture_source: TextureSource<'_>,
     texture_label: Option<&str>,
-) -> wgpu::BindGroup {
+) -> Result<wgpu::BindGroup, RenderError> {
     match texture_source {
         TextureSource::Path(texture_path) => create_texture_bindgroup(
             device,

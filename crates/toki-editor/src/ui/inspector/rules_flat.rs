@@ -1,4 +1,5 @@
 use super::*;
+use toki_core::animation::AnimationState;
 
 struct RuleActionEditorContext<'a> {
     scene_name: &'a str,
@@ -337,158 +338,43 @@ impl InspectorSystem {
         let mut changed = false;
         let id_salt = ctx.id_salt();
 
+        let (selected_kind, kind_changed) =
+            Self::render_rule_action_kind_picker(ui, action, &id_salt);
+        changed |= kind_changed;
         let current_kind = Self::action_kind(action);
-        let mut selected_kind = current_kind;
-        ui.horizontal(|ui| {
-            ui.label("Type:");
-            egui::ComboBox::from_id_salt(format!("rule_action_kind_{id_salt}"))
-                .selected_text(Self::action_kind_label(current_kind))
-                .show_ui(ui, |ui| {
-                    for candidate in RuleActionKind::iter() {
-                        changed |= ui
-                            .selectable_value(
-                                &mut selected_kind,
-                                candidate,
-                                Self::action_kind_label(candidate),
-                            )
-                            .changed();
-                    }
-                });
-        });
         if selected_kind != current_kind {
             Self::switch_action_kind(action, selected_kind);
         }
 
         match action {
             RuleAction::PlaySound { channel, sound_id } => {
-                ui.horizontal(|ui| {
-                    ui.label("Channel:");
-                    egui::ComboBox::from_id_salt(format!("rule_sound_channel_{id_salt}"))
-                        .selected_text(match channel {
-                            RuleSoundChannel::Movement => "Movement",
-                            RuleSoundChannel::Collision => "Collision",
-                        })
-                        .show_ui(ui, |ui| {
-                            changed |= ui
-                                .selectable_value(channel, RuleSoundChannel::Movement, "Movement")
-                                .changed();
-                            changed |= ui
-                                .selectable_value(channel, RuleSoundChannel::Collision, "Collision")
-                                .changed();
-                        });
-                });
-
-                ui.horizontal(|ui| {
-                    ui.label("Sound Id:");
-                    changed |= ui.text_edit_singleline(sound_id).changed();
-                });
-
-                changed |= Self::render_audio_choice_picker(
+                changed |= Self::render_play_sound_action_editor(
                     ui,
-                    format!("rule_sfx_picker_{id_salt}"),
-                    "SFX",
+                    &id_salt,
+                    channel,
                     sound_id,
-                    &audio_choices.sfx,
+                    audio_choices,
                 );
             }
             RuleAction::PlayMusic { track_id } => {
-                ui.horizontal(|ui| {
-                    ui.label("Track Id:");
-                    changed |= ui.text_edit_singleline(track_id).changed();
-                });
-
-                changed |= Self::render_audio_choice_picker(
-                    ui,
-                    format!("rule_music_picker_{id_salt}"),
-                    "Music",
-                    track_id,
-                    &audio_choices.music,
-                );
+                changed |=
+                    Self::render_play_music_action_editor(ui, &id_salt, track_id, audio_choices);
             }
             RuleAction::PlayAnimation { target, state } => {
-                changed |= Self::render_rule_target_editor(
-                    ui,
-                    ctx.scene_name,
-                    ctx.rule_index,
-                    ctx.action_index,
-                    target,
-                );
-
-                ui.horizontal(|ui| {
-                    ui.label("State:");
-                    egui::ComboBox::from_id_salt(format!("rule_animation_state_{id_salt}"))
-                        .selected_text(animation_state_label(*state))
-                        .show_ui(ui, |ui| {
-                            for candidate in animation_state_options() {
-                                changed |= ui
-                                    .selectable_value(
-                                        state,
-                                        candidate,
-                                        animation_state_label(candidate),
-                                    )
-                                    .changed();
-                            }
-                        });
-                });
+                changed |=
+                    Self::render_play_animation_action_editor(ui, &ctx, &id_salt, target, state);
             }
             RuleAction::SetVelocity { target, velocity } => {
-                changed |= Self::render_rule_target_editor(
-                    ui,
-                    ctx.scene_name,
-                    ctx.rule_index,
-                    ctx.action_index,
-                    target,
-                );
-
-                ui.horizontal(|ui| {
-                    ui.label("Velocity:");
-                    changed |= ui
-                        .add(egui::DragValue::new(&mut velocity[0]).speed(1.0))
-                        .changed();
-                    changed |= ui
-                        .add(egui::DragValue::new(&mut velocity[1]).speed(1.0))
-                        .changed();
-                });
+                changed |= Self::render_set_velocity_action_editor(ui, &ctx, target, velocity);
             }
             RuleAction::Spawn {
                 entity_type,
                 position,
             } => {
-                ui.horizontal(|ui| {
-                    ui.label("Entity Type:");
-                    egui::ComboBox::from_id_salt(format!("rule_spawn_type_{id_salt}"))
-                        .selected_text(Self::spawn_entity_type_label(*entity_type))
-                        .show_ui(ui, |ui| {
-                            for candidate in RuleSpawnEntityType::iter() {
-                                changed |= ui
-                                    .selectable_value(
-                                        entity_type,
-                                        candidate,
-                                        Self::spawn_entity_type_label(candidate),
-                                    )
-                                    .changed();
-                            }
-                        });
-                });
-
-                ui.horizontal(|ui| {
-                    ui.label("Position:");
-                    changed |= ui
-                        .add(egui::DragValue::new(&mut position[0]).speed(1.0))
-                        .changed();
-                    changed |= ui
-                        .add(egui::DragValue::new(&mut position[1]).speed(1.0))
-                        .changed();
-                });
+                changed |= Self::render_spawn_action_editor(ui, &id_salt, entity_type, position);
             }
             RuleAction::DestroySelf { target } => {
-                changed |= Self::render_rule_target_editor(
-                    ui,
-                    ctx.scene_name,
-                    ctx.rule_index,
-                    ctx.action_index,
-                    target,
-                );
+                changed |= Self::render_target_only_action_editor(ui, &ctx, target);
             }
             RuleAction::SwitchScene {
                 scene_name,
@@ -506,161 +392,42 @@ impl InspectorSystem {
                 );
             }
             RuleAction::StartDialog { dialog_id } => {
-                ui.horizontal(|ui| {
-                    ui.label("Dialog Id:");
-                    if available_dialog_outcomes.is_empty() {
-                        changed |= ui.text_edit_singleline(dialog_id).changed();
-                    } else {
-                        egui::ComboBox::from_id_salt(format!("rule_start_dialog_{id_salt}"))
-                            .selected_text(if dialog_id.is_empty() {
-                                "<select dialog>"
-                            } else {
-                                dialog_id.as_str()
-                            })
-                            .show_ui(ui, |ui| {
-                                for candidate in available_dialog_outcomes.keys() {
-                                    changed |= ui
-                                        .selectable_value(
-                                            dialog_id,
-                                            candidate.clone(),
-                                            candidate.as_str(),
-                                        )
-                                        .changed();
-                                }
-                            });
-                    }
-                });
+                changed |= Self::render_start_dialog_action_editor(
+                    ui,
+                    &id_salt,
+                    dialog_id,
+                    available_dialog_outcomes,
+                );
             }
             RuleAction::DamageEntity { target, amount } => {
-                changed |= Self::render_rule_target_editor(
-                    ui,
-                    ctx.scene_name,
-                    ctx.rule_index,
-                    ctx.action_index,
-                    target,
-                );
-
-                ui.horizontal(|ui| {
-                    ui.label("Amount:");
-                    changed |= ui
-                        .add(egui::DragValue::new(amount).speed(1.0).range(0..=9999))
-                        .changed();
-                });
+                changed |= Self::render_targeted_amount_action_editor(ui, &ctx, target, amount);
             }
             RuleAction::HealEntity { target, amount } => {
-                changed |= Self::render_rule_target_editor(
-                    ui,
-                    ctx.scene_name,
-                    ctx.rule_index,
-                    ctx.action_index,
-                    target,
-                );
-
-                ui.horizontal(|ui| {
-                    ui.label("Amount:");
-                    changed |= ui
-                        .add(egui::DragValue::new(amount).speed(1.0).range(0..=9999))
-                        .changed();
-                });
+                changed |= Self::render_targeted_amount_action_editor(ui, &ctx, target, amount);
             }
             RuleAction::AddInventoryItem {
                 target,
                 item_id,
                 count,
             } => {
-                changed |= Self::render_rule_target_editor(
-                    ui,
-                    ctx.scene_name,
-                    ctx.rule_index,
-                    ctx.action_index,
-                    target,
-                );
-
-                ui.horizontal(|ui| {
-                    ui.label("Item Id:");
-                    changed |= ui.text_edit_singleline(item_id).changed();
-                });
-
-                ui.horizontal(|ui| {
-                    ui.label("Count:");
-                    changed |= ui
-                        .add(egui::DragValue::new(count).speed(1.0).range(1..=9999))
-                        .changed();
-                });
+                changed |= Self::render_inventory_action_editor(ui, &ctx, target, item_id, count);
             }
             RuleAction::RemoveInventoryItem {
                 target,
                 item_id,
                 count,
             } => {
-                changed |= Self::render_rule_target_editor(
-                    ui,
-                    ctx.scene_name,
-                    ctx.rule_index,
-                    ctx.action_index,
-                    target,
-                );
-
-                ui.horizontal(|ui| {
-                    ui.label("Item Id:");
-                    changed |= ui.text_edit_singleline(item_id).changed();
-                });
-
-                ui.horizontal(|ui| {
-                    ui.label("Count:");
-                    changed |= ui
-                        .add(egui::DragValue::new(count).speed(1.0).range(1..=9999))
-                        .changed();
-                });
+                changed |= Self::render_inventory_action_editor(ui, &ctx, target, item_id, count);
             }
             RuleAction::SetEntityActive { target, active } => {
-                changed |= Self::render_rule_target_editor(
-                    ui,
-                    ctx.scene_name,
-                    ctx.rule_index,
-                    ctx.action_index,
-                    target,
-                );
-
-                ui.horizontal(|ui| {
-                    changed |= ui.checkbox(active, "Active").changed();
-                });
+                changed |= Self::render_set_active_action_editor(ui, &ctx, target, active);
             }
             RuleAction::TeleportEntity {
                 target,
                 tile_x,
                 tile_y,
             } => {
-                changed |= Self::render_rule_target_editor(
-                    ui,
-                    ctx.scene_name,
-                    ctx.rule_index,
-                    ctx.action_index,
-                    target,
-                );
-
-                ui.horizontal(|ui| {
-                    ui.label("Tile X:");
-                    let mut x_val = *tile_x as i32;
-                    if ui
-                        .add(egui::DragValue::new(&mut x_val).speed(1.0).range(0..=9999))
-                        .changed()
-                    {
-                        *tile_x = x_val.max(0) as u32;
-                        changed = true;
-                    }
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Tile Y:");
-                    let mut y_val = *tile_y as i32;
-                    if ui
-                        .add(egui::DragValue::new(&mut y_val).speed(1.0).range(0..=9999))
-                        .changed()
-                    {
-                        *tile_y = y_val.max(0) as u32;
-                        changed = true;
-                    }
-                });
+                changed |= Self::render_teleport_action_editor(ui, &ctx, target, tile_x, tile_y);
             }
         }
 
@@ -670,6 +437,332 @@ impl InspectorSystem {
             ui.colored_label(egui::Color32::from_rgb(255, 210, 80), &issue.message);
         }
 
+        changed
+    }
+
+    fn render_rule_action_kind_picker(
+        ui: &mut egui::Ui,
+        action: &RuleAction,
+        id_salt: &str,
+    ) -> (RuleActionKind, bool) {
+        let current_kind = Self::action_kind(action);
+        let mut selected_kind = current_kind;
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Type:");
+            egui::ComboBox::from_id_salt(format!("rule_action_kind_{id_salt}"))
+                .selected_text(Self::action_kind_label(current_kind))
+                .show_ui(ui, |ui| {
+                    for candidate in RuleActionKind::iter() {
+                        changed |= ui
+                            .selectable_value(
+                                &mut selected_kind,
+                                candidate,
+                                Self::action_kind_label(candidate),
+                            )
+                            .changed();
+                    }
+                });
+        });
+        (selected_kind, changed)
+    }
+
+    fn render_play_sound_action_editor(
+        ui: &mut egui::Ui,
+        id_salt: &str,
+        channel: &mut RuleSoundChannel,
+        sound_id: &mut String,
+        audio_choices: &RuleAudioChoices,
+    ) -> bool {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Channel:");
+            egui::ComboBox::from_id_salt(format!("rule_sound_channel_{id_salt}"))
+                .selected_text(match channel {
+                    RuleSoundChannel::Movement => "Movement",
+                    RuleSoundChannel::Collision => "Collision",
+                })
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(channel, RuleSoundChannel::Movement, "Movement")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(channel, RuleSoundChannel::Collision, "Collision")
+                        .changed();
+                });
+        });
+        ui.horizontal(|ui| {
+            ui.label("Sound Id:");
+            changed |= ui.text_edit_singleline(sound_id).changed();
+        });
+        changed
+            | Self::render_audio_choice_picker(
+                ui,
+                format!("rule_sfx_picker_{id_salt}"),
+                "SFX",
+                sound_id,
+                &audio_choices.sfx,
+            )
+    }
+
+    fn render_play_music_action_editor(
+        ui: &mut egui::Ui,
+        id_salt: &str,
+        track_id: &mut String,
+        audio_choices: &RuleAudioChoices,
+    ) -> bool {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Track Id:");
+            changed |= ui.text_edit_singleline(track_id).changed();
+        });
+        changed
+            | Self::render_audio_choice_picker(
+                ui,
+                format!("rule_music_picker_{id_salt}"),
+                "Music",
+                track_id,
+                &audio_choices.music,
+            )
+    }
+
+    fn render_play_animation_action_editor(
+        ui: &mut egui::Ui,
+        ctx: &RuleActionEditorContext<'_>,
+        id_salt: &str,
+        target: &mut RuleTarget,
+        state: &mut AnimationState,
+    ) -> bool {
+        let mut changed = Self::render_rule_target_editor(
+            ui,
+            ctx.scene_name,
+            ctx.rule_index,
+            ctx.action_index,
+            target,
+        );
+        ui.horizontal(|ui| {
+            ui.label("State:");
+            egui::ComboBox::from_id_salt(format!("rule_animation_state_{id_salt}"))
+                .selected_text(animation_state_label(*state))
+                .show_ui(ui, |ui| {
+                    for candidate in animation_state_options() {
+                        changed |= ui
+                            .selectable_value(state, candidate, animation_state_label(candidate))
+                            .changed();
+                    }
+                });
+        });
+        changed
+    }
+
+    fn render_set_velocity_action_editor(
+        ui: &mut egui::Ui,
+        ctx: &RuleActionEditorContext<'_>,
+        target: &mut RuleTarget,
+        velocity: &mut [i32; 2],
+    ) -> bool {
+        let mut changed = Self::render_rule_target_editor(
+            ui,
+            ctx.scene_name,
+            ctx.rule_index,
+            ctx.action_index,
+            target,
+        );
+        ui.horizontal(|ui| {
+            ui.label("Velocity:");
+            changed |= ui
+                .add(egui::DragValue::new(&mut velocity[0]).speed(1.0))
+                .changed();
+            changed |= ui
+                .add(egui::DragValue::new(&mut velocity[1]).speed(1.0))
+                .changed();
+        });
+        changed
+    }
+
+    fn render_spawn_action_editor(
+        ui: &mut egui::Ui,
+        id_salt: &str,
+        entity_type: &mut RuleSpawnEntityType,
+        position: &mut [i32; 2],
+    ) -> bool {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Entity Type:");
+            egui::ComboBox::from_id_salt(format!("rule_spawn_type_{id_salt}"))
+                .selected_text(Self::spawn_entity_type_label(*entity_type))
+                .show_ui(ui, |ui| {
+                    for candidate in RuleSpawnEntityType::iter() {
+                        changed |= ui
+                            .selectable_value(
+                                entity_type,
+                                candidate,
+                                Self::spawn_entity_type_label(candidate),
+                            )
+                            .changed();
+                    }
+                });
+        });
+        ui.horizontal(|ui| {
+            ui.label("Position:");
+            changed |= ui
+                .add(egui::DragValue::new(&mut position[0]).speed(1.0))
+                .changed();
+            changed |= ui
+                .add(egui::DragValue::new(&mut position[1]).speed(1.0))
+                .changed();
+        });
+        changed
+    }
+
+    fn render_target_only_action_editor(
+        ui: &mut egui::Ui,
+        ctx: &RuleActionEditorContext<'_>,
+        target: &mut RuleTarget,
+    ) -> bool {
+        Self::render_rule_target_editor(
+            ui,
+            ctx.scene_name,
+            ctx.rule_index,
+            ctx.action_index,
+            target,
+        )
+    }
+
+    fn render_start_dialog_action_editor(
+        ui: &mut egui::Ui,
+        id_salt: &str,
+        dialog_id: &mut String,
+        available_dialog_outcomes: &std::collections::BTreeMap<String, Vec<String>>,
+    ) -> bool {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Dialog Id:");
+            if available_dialog_outcomes.is_empty() {
+                changed |= ui.text_edit_singleline(dialog_id).changed();
+            } else {
+                egui::ComboBox::from_id_salt(format!("rule_start_dialog_{id_salt}"))
+                    .selected_text(if dialog_id.is_empty() {
+                        "<select dialog>"
+                    } else {
+                        dialog_id.as_str()
+                    })
+                    .show_ui(ui, |ui| {
+                        for candidate in available_dialog_outcomes.keys() {
+                            changed |= ui
+                                .selectable_value(dialog_id, candidate.clone(), candidate.as_str())
+                                .changed();
+                        }
+                    });
+            }
+        });
+        changed
+    }
+
+    fn render_targeted_amount_action_editor(
+        ui: &mut egui::Ui,
+        ctx: &RuleActionEditorContext<'_>,
+        target: &mut RuleTarget,
+        amount: &mut i32,
+    ) -> bool {
+        let mut changed = Self::render_rule_target_editor(
+            ui,
+            ctx.scene_name,
+            ctx.rule_index,
+            ctx.action_index,
+            target,
+        );
+        ui.horizontal(|ui| {
+            ui.label("Amount:");
+            changed |= ui
+                .add(egui::DragValue::new(amount).speed(1.0).range(0..=9999))
+                .changed();
+        });
+        changed
+    }
+
+    fn render_inventory_action_editor(
+        ui: &mut egui::Ui,
+        ctx: &RuleActionEditorContext<'_>,
+        target: &mut RuleTarget,
+        item_id: &mut String,
+        count: &mut u32,
+    ) -> bool {
+        let mut changed = Self::render_rule_target_editor(
+            ui,
+            ctx.scene_name,
+            ctx.rule_index,
+            ctx.action_index,
+            target,
+        );
+        ui.horizontal(|ui| {
+            ui.label("Item Id:");
+            changed |= ui.text_edit_singleline(item_id).changed();
+        });
+        ui.horizontal(|ui| {
+            ui.label("Count:");
+            changed |= ui
+                .add(egui::DragValue::new(count).speed(1.0).range(1..=9999))
+                .changed();
+        });
+        changed
+    }
+
+    fn render_set_active_action_editor(
+        ui: &mut egui::Ui,
+        ctx: &RuleActionEditorContext<'_>,
+        target: &mut RuleTarget,
+        active: &mut bool,
+    ) -> bool {
+        let mut changed = Self::render_rule_target_editor(
+            ui,
+            ctx.scene_name,
+            ctx.rule_index,
+            ctx.action_index,
+            target,
+        );
+        ui.horizontal(|ui| {
+            changed |= ui.checkbox(active, "Active").changed();
+        });
+        changed
+    }
+
+    fn render_teleport_action_editor(
+        ui: &mut egui::Ui,
+        ctx: &RuleActionEditorContext<'_>,
+        target: &mut RuleTarget,
+        tile_x: &mut u32,
+        tile_y: &mut u32,
+    ) -> bool {
+        let mut changed = Self::render_rule_target_editor(
+            ui,
+            ctx.scene_name,
+            ctx.rule_index,
+            ctx.action_index,
+            target,
+        );
+        ui.horizontal(|ui| {
+            ui.label("Tile X:");
+            let mut x_val = *tile_x as i32;
+            if ui
+                .add(egui::DragValue::new(&mut x_val).speed(1.0).range(0..=9999))
+                .changed()
+            {
+                *tile_x = x_val.max(0) as u32;
+                changed = true;
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.label("Tile Y:");
+            let mut y_val = *tile_y as i32;
+            if ui
+                .add(egui::DragValue::new(&mut y_val).speed(1.0).range(0..=9999))
+                .changed()
+            {
+                *tile_y = y_val.max(0) as u32;
+                changed = true;
+            }
+        });
         changed
     }
 

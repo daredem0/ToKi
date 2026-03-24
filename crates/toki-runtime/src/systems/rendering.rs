@@ -93,9 +93,14 @@ impl RenderingSystem {
     }
 
     /// Initialize GPU state with the given window (uses default textures)
-    pub fn initialize_gpu(&mut self, window: Arc<Window>, vsync: bool) {
-        let gpu = GpuState::new(window, vsync);
+    pub fn initialize_gpu(
+        &mut self,
+        window: Arc<Window>,
+        vsync: bool,
+    ) -> Result<(), toki_render::RenderError> {
+        let gpu = GpuState::new(window, vsync)?;
         self.backend = Some(Box::new(gpu));
+        Ok(())
     }
 
     #[cfg(test)]

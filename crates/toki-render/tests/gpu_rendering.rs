@@ -243,3 +243,46 @@ fn scene_renderer_texture_reload_paths_are_supported() {
 
     std::fs::remove_dir_all(tmp).expect("temp dir cleanup should succeed");
 }
+
+#[test]
+fn scene_renderer_creation_returns_error_for_missing_explicit_texture() {
+    let Some((device, queue)) = create_device_and_queue() else {
+        eprintln!("Skipping GPU-backed test: no compatible adapter/device available");
+        return;
+    };
+
+    let missing_texture = std::env::temp_dir().join("toki_render_missing_texture_creation.png");
+    let result = SceneRenderer::new(
+        device,
+        queue,
+        wgpu::TextureFormat::Bgra8UnormSrgb,
+        Some(missing_texture.clone()),
+        None,
+    );
+
+    assert!(
+        result.is_err(),
+        "missing explicit texture should return Err"
+    );
+}
+
+#[test]
+fn scene_renderer_texture_reload_returns_error_for_missing_file() {
+    let Some((device, queue)) = create_device_and_queue() else {
+        eprintln!("Skipping GPU-backed test: no compatible adapter/device available");
+        return;
+    };
+
+    let mut renderer = SceneRenderer::new(
+        device,
+        queue,
+        wgpu::TextureFormat::Bgra8UnormSrgb,
+        None,
+        None,
+    )
+    .expect("scene renderer should be created with default placeholder textures");
+
+    let missing_texture = std::env::temp_dir().join("toki_render_missing_texture_reload.png");
+    let result = renderer.load_sprite_texture(missing_texture);
+    assert!(result.is_err(), "missing reload texture should return Err");
+}

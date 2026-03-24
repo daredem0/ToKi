@@ -117,14 +117,14 @@ impl SceneRenderer {
             .map(TextureSource::path)
             .unwrap_or_else(TextureSource::placeholder);
         let tilemap_pipeline =
-            TilemapPipeline::new(&device, &queue, surface_format, tilemap_source);
+            TilemapPipeline::new(&device, &queue, surface_format, tilemap_source)?;
 
         // Clone sprite_texture for caching before moving it
         let sprite_texture_cache = sprite_texture.clone();
         let sprite_source = sprite_texture
             .map(TextureSource::path)
             .unwrap_or_else(TextureSource::placeholder);
-        let sprite_pipeline = SpritePipeline::new(&device, &queue, surface_format, sprite_source);
+        let sprite_pipeline = SpritePipeline::new(&device, &queue, surface_format, sprite_source)?;
 
         let underlay_pipeline = DebugPipeline::new(&device, surface_format);
         let debug_pipeline = DebugPipeline::new(&device, surface_format);
@@ -156,7 +156,7 @@ impl SceneRenderer {
             &self.queue,
             wgpu::TextureFormat::Bgra8UnormSrgb, // TODO: Get from render target
             TextureSource::path(texture_path.clone()),
-        );
+        )?;
         tracing::info!("Tilemap texture loaded successfully");
         Ok(())
     }
@@ -180,7 +180,7 @@ impl SceneRenderer {
             &self.queue,
             wgpu::TextureFormat::Bgra8UnormSrgb, // TODO: Get from render target
             TextureSource::path(texture_path.clone()),
-        );
+        )?;
         self.sprite_pipelines_by_texture.clear();
         self.current_sprite_texture_path = Some(texture_path);
         tracing::info!("Sprite texture loaded successfully");
@@ -243,20 +243,31 @@ impl SceneRenderer {
                 .get(&cache_key)
                 .map(|pipeline| pipeline.instance_count())
                 .unwrap_or(0);
-            let pipeline = self
-                .sprite_pipelines_by_texture
-                .entry(cache_key)
-                .or_insert_with(|| {
-                    SpritePipeline::new(
-                        &self.device,
-                        &self.queue,
-                        wgpu::TextureFormat::Bgra8UnormSrgb,
-                        TextureSource::rgba8(image),
-                    )
-                });
-            pipeline.update_projection(&self.queue, self.current_projection);
-            pipeline.add_sprite(render_instance);
-            self.record_sprite_draw_batch(batch_key, instance_index);
+            if !self.sprite_pipelines_by_texture.contains_key(&cache_key) {
+                match SpritePipeline::new(
+                    &self.device,
+                    &self.queue,
+                    wgpu::TextureFormat::Bgra8UnormSrgb,
+                    TextureSource::rgba8(image),
+                ) {
+                    Ok(pipeline) => {
+                        self.sprite_pipelines_by_texture
+                            .insert(cache_key.clone(), pipeline);
+                    }
+                    Err(error) => {
+                        tracing::warn!(
+                            texture_key = %cache_key,
+                            "Skipping inline RGBA8 sprite with failed texture pipeline creation: {error}"
+                        );
+                        return;
+                    }
+                }
+            }
+            if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(&cache_key) {
+                pipeline.update_projection(&self.queue, self.current_projection);
+                pipeline.add_sprite(render_instance);
+                self.record_sprite_draw_batch(batch_key, instance_index);
+            }
         } else if let Some(texture_path) = &sprite.texture_path {
             let texture_key = texture_path.to_string_lossy().to_string();
             let instance_index = self
@@ -264,23 +275,34 @@ impl SceneRenderer {
                 .get(&texture_key)
                 .map(|pipeline| pipeline.instance_count())
                 .unwrap_or(0);
-            let pipeline = self
-                .sprite_pipelines_by_texture
-                .entry(texture_key.clone())
-                .or_insert_with(|| {
-                    SpritePipeline::new(
-                        &self.device,
-                        &self.queue,
-                        wgpu::TextureFormat::Bgra8UnormSrgb,
-                        TextureSource::path(texture_path.clone()),
-                    )
-                });
-            pipeline.update_projection(&self.queue, self.current_projection);
-            pipeline.add_sprite(render_instance);
-            self.record_sprite_draw_batch(
-                SceneSpriteBatchKey::Textured(texture_key),
-                instance_index,
-            );
+            if !self.sprite_pipelines_by_texture.contains_key(&texture_key) {
+                match SpritePipeline::new(
+                    &self.device,
+                    &self.queue,
+                    wgpu::TextureFormat::Bgra8UnormSrgb,
+                    TextureSource::path(texture_path.clone()),
+                ) {
+                    Ok(pipeline) => {
+                        self.sprite_pipelines_by_texture
+                            .insert(texture_key.clone(), pipeline);
+                    }
+                    Err(error) => {
+                        tracing::warn!(
+                            texture_path = %texture_path.display(),
+                            "Skipping sprite with failed texture pipeline creation: {error}"
+                        );
+                        return;
+                    }
+                }
+            }
+            if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(&texture_key) {
+                pipeline.update_projection(&self.queue, self.current_projection);
+                pipeline.add_sprite(render_instance);
+                self.record_sprite_draw_batch(
+                    SceneSpriteBatchKey::Textured(texture_key),
+                    instance_index,
+                );
+            }
         } else {
             let instance_index = self.sprite_pipeline.instance_count();
             self.sprite_pipeline.add_sprite(render_instance);
@@ -352,32 +374,9 @@ impl SceneRenderer {
         }
     }
 
-    /// Render scene to any render target with custom projection matrix
-    pub fn render_scene_with_projection<T: RenderTarget>(
-        &mut self,
-        target: &mut T,
-        scene_data: &SceneData,
-        projection: glam::Mat4,
-    ) -> Result<(), RenderError> {
-        tracing::trace!("Starting scene render with custom projection");
-        tracing::trace!(
-            "Scene data - tilemap: {}, sprites: {}, underlay_shapes: {}, debug_shapes: {}, overlay_shapes: {}",
-            scene_data.tilemap.is_some(),
-            scene_data.sprites.len(),
-            scene_data.underlay_shapes.len(),
-            scene_data.debug_shapes.len(),
-            scene_data.overlay_shapes.len()
-        );
-
-        target.begin_frame()?;
-
-        // Use provided projection matrix
-        self.update_projection(projection);
-
-        // Generate and upload tilemap vertices (same logic as runtime)
+    fn prepare_scene_pipelines(&mut self, scene_data: &SceneData) {
         if let (Some(tilemap), Some(atlas)) = (&scene_data.tilemap, &scene_data.atlas) {
             let vertices = if scene_data.visible_chunks.is_empty() {
-                // Render all tiles (for editor or small maps)
                 tracing::trace!(
                     "Generating vertices for all tiles ({}x{})",
                     tilemap.size.x,
@@ -385,7 +384,6 @@ impl SceneRenderer {
                 );
                 tilemap.generate_vertices(atlas, scene_data.texture_size)
             } else {
-                // Render only visible chunks (for runtime performance)
                 tracing::trace!(
                     "Generating vertices for {} visible chunks",
                     scene_data.visible_chunks.len()
@@ -403,17 +401,14 @@ impl SceneRenderer {
             tracing::trace!("No tilemap or atlas to render");
         }
 
-        // Add sprites (same logic as runtime)
         tracing::trace!("Adding {} sprites to pipeline", scene_data.sprites.len());
         self.clear_sprite_batches();
         for sprite in &scene_data.sprites {
             self.add_sprite_instance(sprite);
         }
-
         self.update_sprite_batches();
         tracing::trace!("Updated sprite vertex buffer on GPU");
 
-        // Add debug shapes
         tracing::trace!(
             "Adding {} underlay shapes, {} debug shapes and {} overlay shapes to pipeline",
             scene_data.underlay_shapes.len(),
@@ -426,12 +421,14 @@ impl SceneRenderer {
         self.debug_pipeline.clear();
         self.add_debug_shape_batch(&scene_data.debug_shapes);
         Self::add_overlay_shape_batch_to(&mut self.debug_pipeline, &scene_data.overlay_shapes);
-
-        // Finalize debug shapes
         tracing::trace!("Finalizing debug shapes");
         self.debug_pipeline.update_vertices(&self.device);
+    }
 
-        // Render using WGPU pipelines
+    fn execute_scene_render_pass<T: RenderTarget>(
+        &mut self,
+        target: &mut T,
+    ) -> Result<(), RenderError> {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -459,7 +456,6 @@ impl SceneRenderer {
                 occlusion_query_set: None,
             });
 
-            // Same pipeline calls for both runtime and editor!
             tracing::trace!("Rendering tilemap pipeline");
             self.tilemap_pipeline.render(&mut render_pass);
             tracing::trace!("Rendering underlay pipeline");
@@ -472,10 +468,41 @@ impl SceneRenderer {
 
         tracing::trace!("Submitting render commands to GPU");
         self.queue.submit(std::iter::once(encoder.finish()));
-        target.end_frame()?;
+        Ok(())
+    }
 
+    fn render_scene_internal<T: RenderTarget>(
+        &mut self,
+        target: &mut T,
+        scene_data: &SceneData,
+        projection: glam::Mat4,
+    ) -> Result<(), RenderError> {
+        target.begin_frame()?;
+        self.update_projection(projection);
+        self.prepare_scene_pipelines(scene_data);
+        self.execute_scene_render_pass(target)?;
+        target.end_frame()?;
         tracing::trace!("Scene render complete");
         Ok(())
+    }
+
+    /// Render scene to any render target with custom projection matrix
+    pub fn render_scene_with_projection<T: RenderTarget>(
+        &mut self,
+        target: &mut T,
+        scene_data: &SceneData,
+        projection: glam::Mat4,
+    ) -> Result<(), RenderError> {
+        tracing::trace!("Starting scene render with custom projection");
+        tracing::trace!(
+            "Scene data - tilemap: {}, sprites: {}, underlay_shapes: {}, debug_shapes: {}, overlay_shapes: {}",
+            scene_data.tilemap.is_some(),
+            scene_data.sprites.len(),
+            scene_data.underlay_shapes.len(),
+            scene_data.debug_shapes.len(),
+            scene_data.overlay_shapes.len()
+        );
+        self.render_scene_internal(target, scene_data, projection)
     }
 
     /// Render scene to any render target
@@ -493,117 +520,10 @@ impl SceneRenderer {
             scene_data.debug_shapes.len(),
             scene_data.overlay_shapes.len()
         );
-
-        target.begin_frame()?;
-
-        // Update projection matrix based on target size
         let (width, height) = target.size();
         tracing::trace!("Render target size: {}x{}", width, height);
         let projection = self.calculate_projection_for_size(width, height);
-        self.update_projection(projection);
-
-        // Generate and upload tilemap vertices (same logic as runtime)
-        if let (Some(tilemap), Some(atlas)) = (&scene_data.tilemap, &scene_data.atlas) {
-            let vertices = if scene_data.visible_chunks.is_empty() {
-                // Render all tiles (for editor or small maps)
-                tracing::trace!(
-                    "Generating vertices for all tiles ({}x{})",
-                    tilemap.size.x,
-                    tilemap.size.y
-                );
-                tilemap.generate_vertices(atlas, scene_data.texture_size)
-            } else {
-                // Render only visible chunks (for runtime performance)
-                tracing::trace!(
-                    "Generating vertices for {} visible chunks",
-                    scene_data.visible_chunks.len()
-                );
-                tilemap.generate_vertices_for_chunks(
-                    atlas,
-                    scene_data.texture_size,
-                    &scene_data.visible_chunks,
-                )
-            };
-            tracing::trace!("Updating tilemap pipeline with {} vertices", vertices.len());
-            self.tilemap_pipeline
-                .update_vertices(&self.device, &vertices);
-        } else {
-            tracing::trace!("No tilemap or atlas to render");
-        }
-
-        // Add sprites (same logic as runtime)
-        tracing::trace!("Adding {} sprites to pipeline", scene_data.sprites.len());
-        self.clear_sprite_batches();
-        for sprite in &scene_data.sprites {
-            self.add_sprite_instance(sprite);
-        }
-
-        self.update_sprite_batches();
-        tracing::trace!("Updated sprite vertex buffer on GPU");
-
-        // Add debug shapes
-        tracing::trace!(
-            "Adding {} underlay shapes, {} debug shapes and {} overlay shapes to pipeline",
-            scene_data.underlay_shapes.len(),
-            scene_data.debug_shapes.len(),
-            scene_data.overlay_shapes.len()
-        );
-        self.underlay_pipeline.clear();
-        Self::add_overlay_shape_batch_to(&mut self.underlay_pipeline, &scene_data.underlay_shapes);
-        self.underlay_pipeline.update_vertices(&self.device);
-        self.debug_pipeline.clear();
-        self.add_debug_shape_batch(&scene_data.debug_shapes);
-        Self::add_overlay_shape_batch_to(&mut self.debug_pipeline, &scene_data.overlay_shapes);
-
-        // Finalize debug shapes
-        tracing::trace!("Finalizing debug shapes");
-        self.debug_pipeline.update_vertices(&self.device);
-
-        // Render using WGPU pipelines
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Scene Render Encoder"),
-            });
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Scene Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: target.get_render_view()?,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.1,
-                            b: 0.12,
-                            a: 1.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-
-            // Same pipeline calls for both runtime and editor!
-            tracing::trace!("Rendering tilemap pipeline");
-            self.tilemap_pipeline.render(&mut render_pass);
-            tracing::trace!("Rendering underlay pipeline");
-            self.underlay_pipeline.render(&mut render_pass);
-            tracing::trace!("Rendering sprite pipeline");
-            self.render_sprite_batches(&mut render_pass);
-            tracing::trace!("Rendering debug pipeline");
-            self.debug_pipeline.render(&mut render_pass);
-        }
-
-        tracing::trace!("Submitting render commands to GPU");
-        self.queue.submit(std::iter::once(encoder.finish()));
-        target.end_frame()?;
-
-        tracing::trace!("Scene render complete");
-        Ok(())
+        self.render_scene_internal(target, scene_data, projection)
     }
 
     fn calculate_projection_for_size(&self, width: u32, height: u32) -> glam::Mat4 {

@@ -17,8 +17,8 @@ use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
 use crate::targets::{OffscreenTarget, RenderTarget};
 use crate::wgpu_utils::{choose_present_mode, create_device_and_surface};
 use crate::{
-    DebugPipeline, GlyphonTextRenderer, PostProcessPipeline, SpritePipeline, TextBackgroundRect,
-    TilemapPipeline,
+    DebugPipeline, GlyphonTextRenderer, PostProcessPipeline, RenderError, SpritePipeline,
+    TextBackgroundRect, TilemapPipeline,
 };
 
 #[allow(dead_code)]
@@ -210,20 +210,34 @@ impl GpuState {
             .get(&texture_path)
             .map(|pipeline| pipeline.instance_count())
             .unwrap_or(0);
-        let pipeline = self
-            .sprite_pipelines_by_texture
-            .entry(texture_path.clone())
-            .or_insert_with(|| {
-                SpritePipeline::new(
-                    &self.device,
-                    &self.queue,
-                    self.config.format,
-                    TextureSource::path(texture_path.clone()),
-                )
-            });
-        pipeline.update_projection(&self.queue, self.current_mvp);
-        pipeline.add_sprite(instance);
-        self.record_sprite_draw_batch(GpuSpriteBatchKey::Textured(texture_path), instance_index);
+        if !self.sprite_pipelines_by_texture.contains_key(&texture_path) {
+            match SpritePipeline::new(
+                &self.device,
+                &self.queue,
+                self.config.format,
+                TextureSource::path(texture_path.clone()),
+            ) {
+                Ok(pipeline) => {
+                    self.sprite_pipelines_by_texture
+                        .insert(texture_path.clone(), pipeline);
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        texture_path = %texture_path.display(),
+                        "Skipping sprite with failed texture pipeline creation: {error}"
+                    );
+                    return;
+                }
+            }
+        }
+        if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(&texture_path) {
+            pipeline.update_projection(&self.queue, self.current_mvp);
+            pipeline.add_sprite(instance);
+            self.record_sprite_draw_batch(
+                GpuSpriteBatchKey::Textured(texture_path),
+                instance_index,
+            );
+        }
     }
 
     pub fn add_sprite_with_texture_flipped(
@@ -245,20 +259,34 @@ impl GpuState {
             .get(&texture_path)
             .map(|pipeline| pipeline.instance_count())
             .unwrap_or(0);
-        let pipeline = self
-            .sprite_pipelines_by_texture
-            .entry(texture_path.clone())
-            .or_insert_with(|| {
-                SpritePipeline::new(
-                    &self.device,
-                    &self.queue,
-                    self.config.format,
-                    TextureSource::path(texture_path.clone()),
-                )
-            });
-        pipeline.update_projection(&self.queue, self.current_mvp);
-        pipeline.add_sprite(instance);
-        self.record_sprite_draw_batch(GpuSpriteBatchKey::Textured(texture_path), instance_index);
+        if !self.sprite_pipelines_by_texture.contains_key(&texture_path) {
+            match SpritePipeline::new(
+                &self.device,
+                &self.queue,
+                self.config.format,
+                TextureSource::path(texture_path.clone()),
+            ) {
+                Ok(pipeline) => {
+                    self.sprite_pipelines_by_texture
+                        .insert(texture_path.clone(), pipeline);
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        texture_path = %texture_path.display(),
+                        "Skipping flipped sprite with failed texture pipeline creation: {error}"
+                    );
+                    return;
+                }
+            }
+        }
+        if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(&texture_path) {
+            pipeline.update_projection(&self.queue, self.current_mvp);
+            pipeline.add_sprite(instance);
+            self.record_sprite_draw_batch(
+                GpuSpriteBatchKey::Textured(texture_path),
+                instance_index,
+            );
+        }
     }
 
     pub fn add_sprite_with_texture_rgba8(
@@ -281,20 +309,31 @@ impl GpuState {
             .get(&texture_key)
             .map(|pipeline| pipeline.instance_count())
             .unwrap_or(0);
-        let pipeline = self
-            .sprite_pipelines_by_texture
-            .entry(texture_key.clone())
-            .or_insert_with(|| {
-                SpritePipeline::new(
-                    &self.device,
-                    &self.queue,
-                    self.config.format,
-                    TextureSource::rgba8(image),
-                )
-            });
-        pipeline.update_projection(&self.queue, self.current_mvp);
-        pipeline.add_sprite(instance);
-        self.record_sprite_draw_batch(GpuSpriteBatchKey::Textured(texture_key), instance_index);
+        if !self.sprite_pipelines_by_texture.contains_key(&texture_key) {
+            match SpritePipeline::new(
+                &self.device,
+                &self.queue,
+                self.config.format,
+                TextureSource::rgba8(image),
+            ) {
+                Ok(pipeline) => {
+                    self.sprite_pipelines_by_texture
+                        .insert(texture_key.clone(), pipeline);
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        texture_key = %texture_key.display(),
+                        "Skipping RGBA8 sprite with failed texture pipeline creation: {error}"
+                    );
+                    return;
+                }
+            }
+        }
+        if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(&texture_key) {
+            pipeline.update_projection(&self.queue, self.current_mvp);
+            pipeline.add_sprite(instance);
+            self.record_sprite_draw_batch(GpuSpriteBatchKey::Textured(texture_key), instance_index);
+        }
     }
 
     pub fn clear_sprites(&mut self) {
@@ -414,23 +453,23 @@ impl GpuState {
         }
     }
 
-    pub fn new(window: Arc<Window>, vsync: bool) -> Self {
+    pub fn new(window: Arc<Window>, vsync: bool) -> Result<Self, RenderError> {
         let (device, queue, surface, config, supported_present_modes) =
-            create_device_and_surface(Arc::clone(&window), vsync);
+            create_device_and_surface(Arc::clone(&window), vsync)?;
 
         let tilemap_pipeline = TilemapPipeline::new(
             &device,
             &queue,
             config.format,
             TextureSource::path(default_texture_path()),
-        );
+        )?;
 
         let sprite_pipeline = SpritePipeline::new(
             &device,
             &queue,
             config.format,
             TextureSource::path(default_texture_path()),
-        );
+        )?;
 
         let world_underlay_pipeline = DebugPipeline::new(&device, config.format);
         let debug_pipeline = DebugPipeline::new(&device, config.format);
@@ -439,7 +478,7 @@ impl GpuState {
         let post_process_pipeline = PostProcessPipeline::new(&device, config.format);
         let text_renderer = GlyphonTextRenderer::new(&device, &queue, config.format);
 
-        Self {
+        Ok(Self {
             surface,
             config,
             supported_present_modes,
@@ -460,7 +499,7 @@ impl GpuState {
             text_items: Vec::new(),
             tilemap_render_enabled: true,
             current_mvp: glam::Mat4::IDENTITY,
-        }
+        })
     }
 
     /// Load a new tilemap texture at runtime
@@ -474,7 +513,7 @@ impl GpuState {
             &self.queue,
             self.config.format,
             TextureSource::path(texture_path),
-        );
+        )?;
         self.tilemap_pipeline = new_pipeline;
         Ok(())
     }
@@ -488,7 +527,7 @@ impl GpuState {
             &self.queue,
             self.config.format,
             TextureSource::rgba8(image),
-        );
+        )?;
         self.tilemap_pipeline = new_pipeline;
         Ok(())
     }
@@ -501,7 +540,7 @@ impl GpuState {
             &self.queue,
             self.config.format,
             TextureSource::path(texture_path),
-        );
+        )?;
         self.sprite_pipeline = new_pipeline;
         self.sprite_pipelines_by_texture.clear();
         Ok(())
@@ -516,7 +555,7 @@ impl GpuState {
             &self.queue,
             self.config.format,
             TextureSource::rgba8(image),
-        );
+        )?;
         self.sprite_pipeline = new_pipeline;
         self.sprite_pipelines_by_texture.clear();
         Ok(())
@@ -530,7 +569,7 @@ impl GpuState {
         sprite_texture: Option<PathBuf>,
     ) -> Result<Self, crate::RenderError> {
         let (device, queue, surface, config, supported_present_modes) =
-            create_device_and_surface(Arc::clone(&window), vsync);
+            create_device_and_surface(Arc::clone(&window), vsync)?;
 
         // Use provided textures; otherwise fall back to a generated 1x1 white texture.
         let tilemap_path = tilemap_texture.unwrap_or_else(default_texture_path);
@@ -541,14 +580,14 @@ impl GpuState {
             &queue,
             config.format,
             TextureSource::path(tilemap_path),
-        );
+        )?;
 
         let sprite_pipeline = SpritePipeline::new(
             &device,
             &queue,
             config.format,
             TextureSource::path(sprite_path),
-        );
+        )?;
 
         let world_underlay_pipeline = DebugPipeline::new(&device, config.format);
         let debug_pipeline = DebugPipeline::new(&device, config.format);
@@ -637,10 +676,22 @@ impl GpuState {
             });
         self.refresh_ui_text_backgrounds(&text_backgrounds);
 
-        let output = self
-            .surface
-            .get_current_texture()
-            .expect("Failed to acquire next swap chain texture");
+        let output = match self.surface.get_current_texture() {
+            Ok(output) => output,
+            Err(error) => {
+                tracing::warn!("Failed to acquire next swap chain texture: {error}");
+                match error {
+                    wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost => {
+                        self.surface.configure(&self.device, &self.config);
+                    }
+                    wgpu::SurfaceError::OutOfMemory => {
+                        tracing::error!("Surface out of memory; skipping frame");
+                    }
+                    wgpu::SurfaceError::Timeout | wgpu::SurfaceError::Other => {}
+                }
+                return;
+            }
+        };
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
@@ -659,26 +710,31 @@ impl GpuState {
         } else if let Some(target) = &mut self.post_process_target {
             self.post_process_pipeline
                 .update_settings(&self.queue, self.post_process_settings);
-            let target_view = target
-                .get_render_view()
-                .expect("post-process target render view must exist")
-                .clone();
-            self.render_scene_to_view(&mut encoder, &target_view);
-            let mut post_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Post Process Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-            self.post_process_pipeline.render(&mut post_pass);
+            match target.get_render_view() {
+                Ok(target_view) => {
+                    let target_view = target_view.clone();
+                    self.render_scene_to_view(&mut encoder, &target_view);
+                    let mut post_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("Post Process Pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: &view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                    });
+                    self.post_process_pipeline.render(&mut post_pass);
+                }
+                Err(error) => {
+                    tracing::warn!("Failed to access post-process target view: {error}");
+                    self.render_scene_to_view(&mut encoder, &view);
+                }
+            }
         }
 
         self.queue.submit(Some(encoder.finish()));

@@ -182,8 +182,14 @@ impl ApplicationHandler for App {
                 } else {
                     tracing::error!("Failed to initialize GPU with runtime asset plan: {error}");
                 }
-                self.rendering
-                    .initialize_gpu(window, self.launch_options.display.vsync);
+                if let Err(fallback_error) = self
+                    .rendering
+                    .initialize_gpu(window, self.launch_options.display.vsync)
+                {
+                    tracing::error!(
+                        "Failed to initialize GPU with default textures: {fallback_error}"
+                    );
+                }
             } else {
                 self.post_splash_sprite_texture_path =
                     self.asset_load_plan.sprite_texture_path.clone();

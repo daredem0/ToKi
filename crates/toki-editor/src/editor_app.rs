@@ -622,274 +622,328 @@ impl ApplicationHandler for EditorApp {
 
 impl EditorApp {
     fn render(&mut self, event_loop: &ActiveEventLoop) {
-        let window = match &self.platform.window {
-            Some(window) => window.clone(),
-            None => return, // Not initialized yet
+        let Some((window, egui_ctx)) = self.render_window_and_ctx() else {
+            return;
         };
-        let egui_ctx = match self.platform.egui_winit.as_ref() {
-            Some(egui) => egui.egui_ctx().clone(),
-            None => return, // Not initialized yet
-        };
-        if self.core.ui.project.background_task_running {
-            self.ensure_busy_logo_texture(&egui_ctx);
-        }
-        self.sync_project_menu_preview_fonts(&egui_ctx);
+        self.prepare_render_state(&egui_ctx);
 
-        // Load sprite frame cache if needed (before render loop to avoid borrowing issues)
         let project_path = self.core.config.current_project_path().cloned();
-        if self.core.ui.is_in_placement_mode()
-            && self.core.ui.placement.preview_cached_frame.is_none()
+        self.ensure_placement_preview_cached_frame(project_path.as_deref());
+        self.sync_indexed_palette_override_from_project();
+
+        let raw_input = {
+            let Some(egui_winit) = &mut self.platform.egui_winit else {
+                return;
+            };
+            egui_winit.take_egui_input(&window)
+        };
+
+        self.pre_render_active_center_viewport(project_path.as_deref());
+
+        let available_map_names =
+            Self::collect_available_map_names(self.core.project_manager.get_project_assets());
+        let full_output = self.run_egui_frame(&egui_ctx, raw_input, available_map_names);
+
+        if self.handle_render_ui_requests(event_loop) {
+            return;
+        }
+
         {
-            let placement_entity_definition = self
-                .core
-                .ui
-                .placement
-                .entity_definition()
-                .map(str::to_string);
-            if let (Some(entity_def), Some(project_path), Some(project_assets)) = (
-                placement_entity_definition.as_deref(),
-                &project_path,
-                self.core.project_manager.get_project_assets(),
-            ) {
-                let indexed_palette_override = self
-                    .core
-                    .project_manager
-                    .current_project
-                    .as_ref()
-                    .and_then(|project| {
-                        project
-                            .metadata
-                            .runtime
-                            .display
-                            .indexed_palette_override
-                            .as_deref()
-                    });
-                let cached_frame = scene_overlays::cached_preview_sprite_frame(
-                    &mut self.resources.preview_sprite_frames,
-                    entity_def,
-                    project_path.as_path(),
-                    project_assets,
-                    &self.core.ui.project.available_palettes,
-                    indexed_palette_override,
-                );
-                self.core.ui.placement.preview_cached_frame = cached_frame;
+            let Some(egui_winit) = &mut self.platform.egui_winit else {
+                return;
+            };
+            egui_winit.handle_platform_output(&window, full_output.platform_output.clone());
+        }
+
+        {
+            let Some(renderer) = &mut self.platform.renderer else {
+                return;
+            };
+            if let Err(e) = renderer.render(&window, full_output, &egui_ctx) {
+                tracing::error!("Render error: {e}");
             }
         }
 
-        let egui_winit = match &mut self.platform.egui_winit {
-            Some(egui) => egui,
-            None => return, // Not initialized yet
-        };
+        graph_metadata::persist_if_dirty(
+            &mut self.core.ui,
+            self.core.project_manager.current_project.as_mut(),
+            &egui_ctx,
+        );
 
-        self.core.ui.project.indexed_palette_override = self
+        self.request_redraw_if_needed(&window, &egui_ctx);
+        self.handle_post_render_requests(event_loop);
+    }
+
+    fn render_window_and_ctx(
+        &self,
+    ) -> Option<(std::sync::Arc<winit::window::Window>, egui::Context)> {
+        let window = self.platform.window.as_ref()?.clone();
+        let egui_ctx = self.platform.egui_winit.as_ref()?.egui_ctx().clone();
+        Some((window, egui_ctx))
+    }
+
+    fn prepare_render_state(&mut self, egui_ctx: &egui::Context) {
+        if self.core.ui.project.background_task_running {
+            self.ensure_busy_logo_texture(egui_ctx);
+        }
+        self.sync_project_menu_preview_fonts(egui_ctx);
+    }
+
+    fn ensure_placement_preview_cached_frame(&mut self, project_path: Option<&std::path::Path>) {
+        if !(self.core.ui.is_in_placement_mode()
+            && self.core.ui.placement.preview_cached_frame.is_none())
+        {
+            return;
+        }
+
+        let placement_entity_definition = self
             .core
-            .project_manager
-            .current_project
-            .as_ref()
-            .and_then(|project| {
-                project
-                    .metadata
-                    .runtime
-                    .display
-                    .indexed_palette_override
-                    .clone()
-            });
+            .ui
+            .placement
+            .entity_definition()
+            .map(str::to_string);
+        if let (Some(entity_def), Some(project_path), Some(project_assets)) = (
+            placement_entity_definition.as_deref(),
+            project_path,
+            self.core.project_manager.get_project_assets(),
+        ) {
+            let cached_frame = scene_overlays::cached_preview_sprite_frame(
+                &mut self.resources.preview_sprite_frames,
+                entity_def,
+                project_path,
+                project_assets,
+                &self.core.ui.project.available_palettes,
+                Self::project_indexed_palette_override(
+                    self.core.project_manager.current_project.as_ref(),
+                )
+                .as_deref(),
+            );
+            self.core.ui.placement.preview_cached_frame = cached_frame;
+        }
+    }
 
-        // Prepare egui input
-        let raw_input = egui_winit.take_egui_input(&window);
+    fn sync_indexed_palette_override_from_project(&mut self) {
+        self.core.ui.project.indexed_palette_override = Self::project_indexed_palette_override(
+            self.core.project_manager.current_project.as_ref(),
+        );
+    }
 
-        let renderer = match &mut self.platform.renderer {
-            Some(renderer) => renderer,
-            None => return, // Not initialized yet
+    fn project_indexed_palette_override(
+        project: Option<&crate::project::Project>,
+    ) -> Option<String> {
+        project.and_then(|project| {
+            project
+                .metadata
+                .runtime
+                .display
+                .indexed_palette_override
+                .clone()
+        })
+    }
+
+    fn pre_render_active_center_viewport(&mut self, project_path: Option<&std::path::Path>) {
+        let Some(project_path) = project_path else {
+            return;
         };
-
-        // Pre-render active center viewport to texture before egui UI.
-        if let Some(project_path) = &project_path {
-            if let Some(project_assets) = self.core.project_manager.get_project_assets() {
-                match self.core.ui.center_panel_tab {
-                    CenterPanelTab::SceneViewport => {
-                        let scene_player_overlay_sprites =
-                            scene_overlays::build_scene_player_overlay_sprites(
-                                self.core.ui.active_scene.as_deref(),
-                                &self.core.ui.scenes,
-                                project_path.as_path(),
-                                project_assets,
-                                &mut self.resources.preview_sprite_frames,
-                                &self.core.ui.project.available_palettes,
-                                self.core.project_manager.current_project.as_ref().and_then(
-                                    |project| {
-                                        project
-                                            .metadata
-                                            .runtime
-                                            .display
-                                            .indexed_palette_override
-                                            .as_deref()
-                                    },
-                                ),
-                            );
-                        if let Some(scene_viewport) = &mut self.viewports.scene {
-                            let indexed_palette_override =
-                                self.core.project_manager.current_project.as_ref().and_then(
-                                    |project| {
-                                        project
-                                            .metadata
-                                            .runtime
-                                            .display
-                                            .indexed_palette_override
-                                            .clone()
-                                    },
-                                );
-                            scene_viewport.set_indexed_palette_override(indexed_palette_override);
-                            let placement_preview = if self.core.ui.is_in_placement_mode() {
-                                if self.core.ui.placement.entity_move_drag.is_none() {
-                                    let is_valid =
-                                        self.core.ui.placement.preview_valid.unwrap_or(true);
-                                    match (
-                                        self.core.ui.placement.entity_definition(),
-                                        &self.core.ui.placement.preview_position,
-                                        &self.core.ui.placement.preview_cached_frame,
-                                    ) {
-                                        (Some(_entity_def), Some(position), Some(cached_frame)) => {
-                                            Some((*position, cached_frame.clone(), is_valid))
-                                        }
-                                        _ => None,
-                                    }
-                                } else {
-                                    None
-                                }
-                            } else {
-                                None
-                            };
-
-                            let dragged_anchor =
-                                self.core.ui.placement.scene_anchor_move_drag.as_ref().map(
-                                    |drag| (drag.scene_name.as_str(), drag.anchor.id.as_str()),
-                                );
-                            let anchor_overlay_lines =
-                                scene_overlays::build_scene_anchor_overlay_lines(
-                                    scene_overlays::SceneAnchorOverlayRequest {
-                                        active_scene_name: self.core.ui.active_scene.as_deref(),
-                                        scenes: &self.core.ui.scenes,
-                                        dragged_anchor,
-                                        preview_position: self.core.ui.placement.preview_position,
-                                        preview_valid: self
-                                            .core
-                                            .ui
-                                            .placement
-                                            .preview_valid
-                                            .unwrap_or(true),
-                                        draft_active: self
-                                            .core
-                                            .ui
-                                            .placement
-                                            .scene_anchor_draft()
-                                            .is_some(),
-                                    },
-                                    scene_viewport.tilemap(),
-                                    Some(&self.core.config),
-                                );
-                            let drag_preview_sprites = self
-                                .core
-                                .ui
-                                .placement
-                                .entity_move_drag
-                                .as_ref()
-                                .and_then(|drag| {
-                                    self.core.ui.placement.preview_position.map(
-                                        |preview_position| {
-                                            let tilemap = scene_viewport.tilemap();
-                                            let terrain_atlas = tilemap.map(|_| {
-                                                scene_viewport.resources().get_terrain_atlas()
-                                            });
-                                            scene_overlays::build_drag_preview_sprites(
-                                                &drag.dragged_entities,
-                                                drag.entity.position,
-                                                preview_position,
-                                                tilemap,
-                                                terrain_atlas,
-                                            )
-                                        },
-                                    )
-                                });
-
-                            let overlay_data = ViewportOverlayData {
-                                placement_preview,
-                                drag_preview_sprites: drag_preview_sprites.unwrap_or_default(),
-                                overlay_sprites: scene_player_overlay_sprites,
-                                overlay_rects: Vec::new(),
-                                overlay_lines: anchor_overlay_lines,
-                            };
-
-                            if let Err(e) = scene_viewport.render_to_texture(
-                                project_path.as_path(),
-                                project_assets,
-                                renderer.egui_renderer_mut(),
-                                &overlay_data,
-                            ) {
-                                tracing::error!("Failed to render scene to texture: {}", e);
-                            }
-                        }
-                    }
-                    CenterPanelTab::MapEditor => {
-                        if let Some(map_editor_viewport) = &mut self.viewports.map_editor {
-                            let indexed_palette_override =
-                                self.core.project_manager.current_project.as_ref().and_then(
-                                    |project| {
-                                        project
-                                            .metadata
-                                            .runtime
-                                            .display
-                                            .indexed_palette_override
-                                            .clone()
-                                    },
-                                );
-                            map_editor_viewport
-                                .set_indexed_palette_override(indexed_palette_override);
-                            if let Err(e) = map_editor_viewport.render_to_texture(
-                                project_path.as_path(),
-                                project_assets,
-                                renderer.egui_renderer_mut(),
-                                &ViewportOverlayData::default(),
-                            ) {
-                                tracing::error!(
-                                    "Failed to render map editor viewport to texture: {}",
-                                    e
-                                );
-                            }
-                        }
-                    }
-                    CenterPanelTab::SceneGraph
-                    | CenterPanelTab::SceneRules
-                    | CenterPanelTab::MenuEditor
-                    | CenterPanelTab::DialogEditor
-                    | CenterPanelTab::SpriteEditor
-                    | CenterPanelTab::AnimationEditor
-                    | CenterPanelTab::EntityEditor => {}
-                }
-            } else if self.core.project_manager.current_project.is_some() {
+        let Some(project_assets) = self.core.project_manager.get_project_assets() else {
+            if self.core.project_manager.current_project.is_some() {
                 tracing::warn!(
                     "No project assets available for viewport rendering {:?}",
                     self.core.project_manager.current_project
                 );
             }
-        }
+            return;
+        };
+        let Some(renderer) = &mut self.platform.renderer else {
+            return;
+        };
 
-        // Run egui UI
-        let available_map_names = self
-            .core
-            .project_manager
-            .get_project_assets()
-            .map(|assets| {
-                let mut names = assets.tilemaps.keys().cloned().collect::<Vec<_>>();
-                names.sort();
-                names
-            });
+        match self.core.ui.center_panel_tab {
+            CenterPanelTab::SceneViewport => {
+                let scene_player_overlay_sprites =
+                    scene_overlays::build_scene_player_overlay_sprites(
+                        self.core.ui.active_scene.as_deref(),
+                        &self.core.ui.scenes,
+                        project_path,
+                        project_assets,
+                        &mut self.resources.preview_sprite_frames,
+                        &self.core.ui.project.available_palettes,
+                        Self::project_indexed_palette_override(
+                            self.core.project_manager.current_project.as_ref(),
+                        )
+                        .as_deref(),
+                    );
+                let overlay_data = self.viewports.scene.as_ref().map(|scene_viewport| {
+                    Self::build_scene_viewport_overlay_data(
+                        &self.core.ui,
+                        &self.core.config,
+                        scene_viewport,
+                        scene_player_overlay_sprites,
+                    )
+                });
+                if let (Some(scene_viewport), Some(overlay_data)) =
+                    (&mut self.viewports.scene, overlay_data)
+                {
+                    Self::pre_render_scene_viewport(
+                        scene_viewport,
+                        project_path,
+                        project_assets,
+                        renderer,
+                        Self::project_indexed_palette_override(
+                            self.core.project_manager.current_project.as_ref(),
+                        ),
+                        overlay_data,
+                    );
+                }
+            }
+            CenterPanelTab::MapEditor => {
+                if let Some(map_editor_viewport) = &mut self.viewports.map_editor {
+                    Self::pre_render_map_editor_viewport(
+                        map_editor_viewport,
+                        project_path,
+                        project_assets,
+                        renderer,
+                        Self::project_indexed_palette_override(
+                            self.core.project_manager.current_project.as_ref(),
+                        ),
+                    );
+                }
+            }
+            CenterPanelTab::SceneGraph
+            | CenterPanelTab::SceneRules
+            | CenterPanelTab::MenuEditor
+            | CenterPanelTab::DialogEditor
+            | CenterPanelTab::SpriteEditor
+            | CenterPanelTab::AnimationEditor
+            | CenterPanelTab::EntityEditor => {}
+        }
+    }
+
+    fn pre_render_scene_viewport(
+        scene_viewport: &mut crate::scene::SceneViewport,
+        project_path: &std::path::Path,
+        project_assets: &ProjectAssets,
+        renderer: &mut crate::rendering::window::WindowRenderer,
+        indexed_palette_override: Option<String>,
+        overlay_data: ViewportOverlayData,
+    ) {
+        scene_viewport.set_indexed_palette_override(indexed_palette_override);
+        if let Err(e) = scene_viewport.render_to_texture(
+            project_path,
+            project_assets,
+            renderer.egui_renderer_mut(),
+            &overlay_data,
+        ) {
+            tracing::error!("Failed to render scene to texture: {}", e);
+        }
+    }
+
+    fn build_scene_viewport_overlay_data(
+        ui_state: &crate::ui::EditorUI,
+        config: &crate::config::EditorConfig,
+        scene_viewport: &crate::scene::SceneViewport,
+        scene_player_overlay_sprites: Vec<crate::scene::viewport::OverlaySpriteInstance>,
+    ) -> ViewportOverlayData {
+        let placement_preview =
+            if ui_state.is_in_placement_mode() && ui_state.placement.entity_move_drag.is_none() {
+                let is_valid = ui_state.placement.preview_valid.unwrap_or(true);
+                match (
+                    ui_state.placement.entity_definition(),
+                    &ui_state.placement.preview_position,
+                    &ui_state.placement.preview_cached_frame,
+                ) {
+                    (Some(_entity_def), Some(position), Some(cached_frame)) => {
+                        Some((*position, cached_frame.clone(), is_valid))
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            };
+
+        let dragged_anchor = ui_state
+            .placement
+            .scene_anchor_move_drag
+            .as_ref()
+            .map(|drag| (drag.scene_name.as_str(), drag.anchor.id.as_str()));
+        let anchor_overlay_lines = scene_overlays::build_scene_anchor_overlay_lines(
+            scene_overlays::SceneAnchorOverlayRequest {
+                active_scene_name: ui_state.active_scene.as_deref(),
+                scenes: &ui_state.scenes,
+                dragged_anchor,
+                preview_position: ui_state.placement.preview_position,
+                preview_valid: ui_state.placement.preview_valid.unwrap_or(true),
+                draft_active: ui_state.placement.scene_anchor_draft().is_some(),
+            },
+            scene_viewport.tilemap(),
+            Some(config),
+        );
+        let drag_preview_sprites = ui_state
+            .placement
+            .entity_move_drag
+            .as_ref()
+            .and_then(|drag| {
+                ui_state.placement.preview_position.map(|preview_position| {
+                    let tilemap = scene_viewport.tilemap();
+                    let terrain_atlas =
+                        tilemap.map(|_| scene_viewport.resources().get_terrain_atlas());
+                    scene_overlays::build_drag_preview_sprites(
+                        &drag.dragged_entities,
+                        drag.entity.position,
+                        preview_position,
+                        tilemap,
+                        terrain_atlas,
+                    )
+                })
+            })
+            .unwrap_or_default();
+
+        ViewportOverlayData {
+            placement_preview,
+            drag_preview_sprites,
+            overlay_sprites: scene_player_overlay_sprites,
+            overlay_rects: Vec::new(),
+            overlay_lines: anchor_overlay_lines,
+        }
+    }
+
+    fn pre_render_map_editor_viewport(
+        map_editor_viewport: &mut crate::scene::SceneViewport,
+        project_path: &std::path::Path,
+        project_assets: &ProjectAssets,
+        renderer: &mut crate::rendering::window::WindowRenderer,
+        indexed_palette_override: Option<String>,
+    ) {
+        map_editor_viewport.set_indexed_palette_override(indexed_palette_override);
+        if let Err(e) = map_editor_viewport.render_to_texture(
+            project_path,
+            project_assets,
+            renderer.egui_renderer_mut(),
+            &ViewportOverlayData::default(),
+        ) {
+            tracing::error!("Failed to render map editor viewport to texture: {}", e);
+        }
+    }
+
+    fn collect_available_map_names(project_assets: Option<&ProjectAssets>) -> Option<Vec<String>> {
+        project_assets.map(|assets| {
+            let mut names = assets.tilemaps.keys().cloned().collect::<Vec<_>>();
+            names.sort();
+            names
+        })
+    }
+
+    fn run_egui_frame(
+        &mut self,
+        egui_ctx: &egui::Context,
+        raw_input: egui::RawInput,
+        available_map_names: Option<Vec<String>>,
+    ) -> egui::FullOutput {
         let (current_project, project_assets) =
             self.core.project_manager.current_project_and_assets_mut();
         let mut current_project = current_project;
         let mut project_assets = project_assets;
-        let full_output = egui_ctx.run(raw_input, |ctx| {
-            // Render UI - viewport will use the pre-rendered texture
+        egui_ctx.run(raw_input, |ctx| {
             self.core.ui.render(
                 ctx,
                 self.viewports.scene.as_mut(),
@@ -899,17 +953,17 @@ impl EditorApp {
                 available_map_names.clone(),
                 Some(&mut self.core.config),
                 self.log_capture.as_ref(),
-                None, // Can't pass renderer due to borrow issues
+                None,
                 self.resources.busy_logo_texture.as_ref(),
             );
-        });
+        })
+    }
 
-        // Handle UI requests
+    fn handle_render_ui_requests(&mut self, event_loop: &ActiveEventLoop) -> bool {
         if self.core.ui.visibility.should_exit {
             event_loop.exit();
-            return;
+            return true;
         }
-
         if self.core.ui.visibility.create_test_entities {
             if let Some(viewport) = &mut self.viewports.scene {
                 let game_state = viewport.game_state_mut();
@@ -919,27 +973,27 @@ impl EditorApp {
             }
             self.core.ui.visibility.create_test_entities = false;
         }
+        false
+    }
 
-        // Handle platform output (cursor, clipboard, etc.)
-        egui_winit.handle_platform_output(&window, full_output.platform_output.clone());
-
-        // Render frame
-        if let Err(e) = renderer.render(&window, full_output, &egui_ctx) {
-            tracing::error!("Render error: {e}");
-        }
-
-        graph_metadata::persist_if_dirty(
-            &mut self.core.ui,
-            self.core.project_manager.current_project.as_mut(),
-            &egui_ctx,
-        );
-
-        // Request redraw if egui wants a repaint
-        if egui_ctx.has_requested_repaint() {
+    fn request_redraw_if_needed(&self, window: &winit::window::Window, egui_ctx: &egui::Context) {
+        if egui_ctx.has_requested_repaint()
+            || self
+                .viewports
+                .scene
+                .as_ref()
+                .is_some_and(crate::scene::SceneViewport::needs_render)
+            || self
+                .viewports
+                .map_editor
+                .as_ref()
+                .is_some_and(crate::scene::SceneViewport::needs_render)
+        {
             window.request_redraw();
         }
+    }
 
-        // Handle project management requests and other actions after rendering is done
+    fn handle_post_render_requests(&mut self, event_loop: &ActiveEventLoop) {
         self.handle_project_requests(event_loop);
         self.handle_play_scene_request();
         self.handle_active_scene_map_loading();
@@ -949,23 +1003,6 @@ impl EditorApp {
         self.handle_save_map_editor_request();
         self.handle_map_editor_map_requests();
         self.handle_sprite_asset_rescan();
-
-        if self
-            .viewports
-            .scene
-            .as_ref()
-            .is_some_and(crate::scene::SceneViewport::needs_render)
-        {
-            window.request_redraw();
-        }
-        if self
-            .viewports
-            .map_editor
-            .as_ref()
-            .is_some_and(crate::scene::SceneViewport::needs_render)
-        {
-            window.request_redraw();
-        }
     }
 
     /// Handle sprite asset rescan request (after saving new sprites)

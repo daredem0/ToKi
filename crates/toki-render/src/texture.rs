@@ -11,18 +11,20 @@ impl GpuTexture {
     pub fn from_file(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        path: &str,
+        path: &Path,
         label: Option<&str>,
     ) -> Result<Self, RenderError> {
         // Check for empty path and create default texture
-        if path.is_empty() {
+        if path.as_os_str().is_empty() {
             tracing::trace!("Creating default white texture for label: {:?}", label);
             return Self::create_default_white_texture(device, queue, label);
         }
 
         // load the img
-        let path_obj = Path::new(path);
-        let image = load_image_rgba8(path_obj)?;
+        let image = load_image_rgba8(path).map_err(|source| RenderError::TextureLoad {
+            path: path.display().to_string(),
+            source,
+        })?;
         Self::from_rgba8(device, queue, &image, label)
     }
 

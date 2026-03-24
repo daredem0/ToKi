@@ -10,6 +10,7 @@ use std::sync::Arc;
 // Local modules
 
 use crate::texture::GpuTexture;
+use crate::RenderError;
 use toki_core::graphics::image::DecodedImage;
 
 pub fn create_texture_bindgroup(
@@ -19,37 +20,24 @@ pub fn create_texture_bindgroup(
     uniform_buffer: &wgpu::Buffer,
     texture_file: std::path::PathBuf,
     texture_label: Option<&str>,
-) -> wgpu::BindGroup {
-    // Convert path to string with proper error handling
-    let texture_path_str = texture_file.as_path().to_str().unwrap_or_else(|| {
-        tracing::error!(
-            "Failed to convert texture path to string: {:?}",
-            texture_file
-        );
-        panic!("Invalid texture path encoding: {:?}", texture_file);
-    });
+) -> Result<wgpu::BindGroup, RenderError> {
+    let texture_path = texture_file.as_path();
 
-    if texture_path_str.is_empty() {
+    if texture_path.as_os_str().is_empty() {
         tracing::trace!(
             "Loading default texture (no path provided) for label: {:?}",
             texture_label
         );
     } else {
-        tracing::debug!("Loading texture from: {}", texture_path_str);
+        tracing::debug!("Loading texture from: {}", texture_path.display());
     }
 
-    let texture = GpuTexture::from_file(device, queue, texture_path_str, texture_label)
-        .unwrap_or_else(|e| {
-            tracing::error!("Failed to load texture from '{}': {}", texture_path_str, e);
-            tracing::error!("Texture label: {:?}", texture_label);
-            tracing::error!("Make sure the texture file exists and is a valid image format");
-            panic!("Texture loading failed for '{}': {}", texture_path_str, e);
-        });
+    let texture = GpuTexture::from_file(device, queue, texture_path, texture_label)?;
 
     tracing::trace!("Creating bind group for texture: {:?}", texture_label);
     let bind_group = create_bind_group(device, texture_bind_group_layout, &texture, uniform_buffer);
 
-    if texture_path_str.is_empty() {
+    if texture_path.as_os_str().is_empty() {
         tracing::trace!(
             "Successfully created texture bind group with default texture for: {:?}",
             texture_label
@@ -57,11 +45,11 @@ pub fn create_texture_bindgroup(
     } else {
         tracing::trace!(
             "Successfully created texture bind group for: {}",
-            texture_path_str
+            texture_path.display()
         );
     }
 
-    bind_group
+    Ok(bind_group)
 }
 
 pub fn create_texture_bindgroup_from_rgba8(
@@ -71,30 +59,35 @@ pub fn create_texture_bindgroup_from_rgba8(
     uniform_buffer: &wgpu::Buffer,
     image: &DecodedImage,
     texture_label: Option<&str>,
-) -> wgpu::BindGroup {
-    let texture = GpuTexture::from_rgba8(device, queue, image, texture_label).unwrap_or_else(|e| {
-        tracing::error!(
-            "Failed to create texture from decoded RGBA8 image for {:?}: {}",
-            texture_label,
-            e
-        );
-        panic!(
-            "Texture creation from decoded image failed for {:?}: {}",
-            texture_label, e
-        );
-    });
-    create_bind_group(device, texture_bind_group_layout, &texture, uniform_buffer)
+) -> Result<wgpu::BindGroup, RenderError> {
+    let label = texture_label.unwrap_or("<unnamed texture>").to_string();
+    let texture =
+        GpuTexture::from_rgba8(device, queue, image, texture_label).map_err(|source| {
+            RenderError::TextureCreation {
+                label,
+                message: source.to_string(),
+            }
+        })?;
+    Ok(create_bind_group(
+        device,
+        texture_bind_group_layout,
+        &texture,
+        uniform_buffer,
+    ))
 }
 pub fn create_device_and_surface(
     window: Arc<Window>,
     vsync: bool,
-) -> (
-    wgpu::Device,
-    wgpu::Queue,
-    Surface<'static>,
-    SurfaceConfiguration,
-    Vec<wgpu::PresentMode>,
-) {
+) -> Result<
+    (
+        wgpu::Device,
+        wgpu::Queue,
+        Surface<'static>,
+        SurfaceConfiguration,
+        Vec<wgpu::PresentMode>,
+    ),
+    RenderError,
+> {
     pollster::block_on(create_device_and_surface_async(window, vsync))
 }
 
@@ -102,13 +95,16 @@ pub fn create_device_and_surface(
 pub async fn create_device_and_surface_async(
     window: Arc<Window>,
     vsync: bool,
-) -> (
-    wgpu::Device,
-    wgpu::Queue,
-    Surface<'static>,
-    SurfaceConfiguration,
-    Vec<wgpu::PresentMode>,
-) {
+) -> Result<
+    (
+        wgpu::Device,
+        wgpu::Queue,
+        Surface<'static>,
+        SurfaceConfiguration,
+        Vec<wgpu::PresentMode>,
+    ),
+    RenderError,
+> {
     // Create wgpu instance with better defaults
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
         backends: wgpu::Backends::PRIMARY,
@@ -120,9 +116,7 @@ pub async fn create_device_and_surface_async(
     let size = window.inner_size();
 
     // Create the surface of the window
-    let surface = instance
-        .create_surface(window)
-        .expect("Failed to create surface");
+    let surface = instance.create_surface(window)?;
 
     // Get a GPU adapter with proper error handling
     let adapter = instance
@@ -132,7 +126,7 @@ pub async fn create_device_and_surface_async(
             force_fallback_adapter: false,
         })
         .await
-        .expect("No suitable GPU adapters found on the system!");
+        .map_err(|_| RenderError::AdapterUnavailable)?;
 
     // Request GPU device and command queue with proper features
     let (device, queue) = adapter
@@ -144,7 +138,7 @@ pub async fn create_device_and_surface_async(
             label: Some("Toki Device"),
         })
         .await
-        .expect("Failed to create device");
+        .map_err(|error| RenderError::DeviceRequest(error.to_string()))?;
 
     // Configure surface with VSync and proper format selection
     let surface_caps = surface.get_capabilities(&adapter);
@@ -175,13 +169,13 @@ pub async fn create_device_and_surface_async(
     };
 
     surface.configure(&device, &config);
-    (
+    Ok((
         device,
         queue,
         surface,
         config,
         surface_caps.present_modes.clone(),
-    )
+    ))
 }
 
 pub fn choose_present_mode(present_modes: &[wgpu::PresentMode], vsync: bool) -> wgpu::PresentMode {
