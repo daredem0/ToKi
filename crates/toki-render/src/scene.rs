@@ -1,4 +1,5 @@
 use crate::pipelines::sprite::SpriteInstance as SpriteRenderInstance;
+use crate::pipelines::TextureSource;
 use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
 use crate::targets::RenderTarget;
 use crate::{DebugPipeline, RenderError, RenderPipeline, SpritePipeline, TilemapPipeline};
@@ -113,28 +114,38 @@ impl SceneRenderer {
         tracing::info!("Tilemap texture: {:?}", tilemap_texture);
         tracing::info!("Sprite texture: {:?}", sprite_texture);
         let tilemap_pipeline = if let Some(texture_path) = tilemap_texture {
-            TilemapPipeline::new(&device, &queue, surface_format, texture_path)
+            TilemapPipeline::new(
+                &device,
+                &queue,
+                surface_format,
+                TextureSource::path(texture_path),
+            )
         } else {
             // Create with default/placeholder texture
             TilemapPipeline::new(
                 &device,
                 &queue,
                 surface_format,
-                std::path::PathBuf::from(""),
+                TextureSource::path(std::path::PathBuf::from("")),
             )
         };
 
         // Clone sprite_texture for caching before moving it
         let sprite_texture_cache = sprite_texture.clone();
         let sprite_pipeline = if let Some(texture_path) = sprite_texture {
-            SpritePipeline::new(&device, &queue, surface_format, texture_path)
+            SpritePipeline::new(
+                &device,
+                &queue,
+                surface_format,
+                TextureSource::path(texture_path),
+            )
         } else {
             // Create with default/placeholder texture
             SpritePipeline::new(
                 &device,
                 &queue,
                 surface_format,
-                std::path::PathBuf::from(""),
+                TextureSource::path(std::path::PathBuf::from("")),
             )
         };
 
@@ -167,7 +178,7 @@ impl SceneRenderer {
             &self.device,
             &self.queue,
             wgpu::TextureFormat::Bgra8UnormSrgb, // TODO: Get from render target
-            texture_path.clone(),
+            TextureSource::path(texture_path.clone()),
         );
         tracing::info!("Tilemap texture loaded successfully");
         Ok(())
@@ -191,7 +202,7 @@ impl SceneRenderer {
             &self.device,
             &self.queue,
             wgpu::TextureFormat::Bgra8UnormSrgb, // TODO: Get from render target
-            texture_path.clone(),
+            TextureSource::path(texture_path.clone()),
         );
         self.sprite_pipelines_by_texture.clear();
         self.current_sprite_texture_path = Some(texture_path);
@@ -259,11 +270,11 @@ impl SceneRenderer {
                 .sprite_pipelines_by_texture
                 .entry(cache_key)
                 .or_insert_with(|| {
-                    SpritePipeline::from_rgba8(
+                    SpritePipeline::new(
                         &self.device,
                         &self.queue,
                         wgpu::TextureFormat::Bgra8UnormSrgb,
-                        image,
+                        TextureSource::rgba8(image),
                     )
                 });
             pipeline.update_projection(&self.queue, self.current_projection);
@@ -284,7 +295,7 @@ impl SceneRenderer {
                         &self.device,
                         &self.queue,
                         wgpu::TextureFormat::Bgra8UnormSrgb,
-                        texture_path.clone(),
+                        TextureSource::path(texture_path.clone()),
                     )
                 });
             pipeline.update_projection(&self.queue, self.current_projection);

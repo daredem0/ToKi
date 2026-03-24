@@ -12,7 +12,7 @@ use toki_core::sprite::SpriteFrame;
 use toki_core::text::TextItem;
 
 use crate::pipelines::sprite::SpriteInstance;
-use crate::pipelines::RenderPipeline;
+use crate::pipelines::{RenderPipeline, TextureSource};
 use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
 use crate::targets::{OffscreenTarget, RenderTarget};
 use crate::wgpu_utils::{choose_present_mode, create_device_and_surface};
@@ -218,7 +218,7 @@ impl GpuState {
                     &self.device,
                     &self.queue,
                     self.config.format,
-                    texture_path.clone(),
+                    TextureSource::path(texture_path.clone()),
                 )
             });
         pipeline.update_projection(&self.queue, self.current_mvp);
@@ -253,7 +253,7 @@ impl GpuState {
                     &self.device,
                     &self.queue,
                     self.config.format,
-                    texture_path.clone(),
+                    TextureSource::path(texture_path.clone()),
                 )
             });
         pipeline.update_projection(&self.queue, self.current_mvp);
@@ -285,7 +285,12 @@ impl GpuState {
             .sprite_pipelines_by_texture
             .entry(texture_key.clone())
             .or_insert_with(|| {
-                SpritePipeline::from_rgba8(&self.device, &self.queue, self.config.format, image)
+                SpritePipeline::new(
+                    &self.device,
+                    &self.queue,
+                    self.config.format,
+                    TextureSource::rgba8(image),
+                )
             });
         pipeline.update_projection(&self.queue, self.current_mvp);
         pipeline.add_sprite(instance);
@@ -414,10 +419,20 @@ impl GpuState {
             create_device_and_surface(Arc::clone(&window), vsync);
 
         let tilemap_pipeline =
-            TilemapPipeline::new(&device, &queue, config.format, default_texture_path());
+            TilemapPipeline::new(
+                &device,
+                &queue,
+                config.format,
+                TextureSource::path(default_texture_path()),
+            );
 
         let sprite_pipeline =
-            SpritePipeline::new(&device, &queue, config.format, default_texture_path());
+            SpritePipeline::new(
+                &device,
+                &queue,
+                config.format,
+                TextureSource::path(default_texture_path()),
+            );
 
         let world_underlay_pipeline = DebugPipeline::new(&device, config.format);
         let debug_pipeline = DebugPipeline::new(&device, config.format);
@@ -457,7 +472,12 @@ impl GpuState {
     ) -> Result<(), crate::RenderError> {
         // Create new tilemap pipeline with the specified texture
         let new_pipeline =
-            TilemapPipeline::new(&self.device, &self.queue, self.config.format, texture_path);
+            TilemapPipeline::new(
+                &self.device,
+                &self.queue,
+                self.config.format,
+                TextureSource::path(texture_path),
+            );
         self.tilemap_pipeline = new_pipeline;
         Ok(())
     }
@@ -467,7 +487,12 @@ impl GpuState {
         image: &DecodedImage,
     ) -> Result<(), crate::RenderError> {
         let new_pipeline =
-            TilemapPipeline::from_rgba8(&self.device, &self.queue, self.config.format, image);
+            TilemapPipeline::new(
+                &self.device,
+                &self.queue,
+                self.config.format,
+                TextureSource::rgba8(image),
+            );
         self.tilemap_pipeline = new_pipeline;
         Ok(())
     }
@@ -476,7 +501,12 @@ impl GpuState {
     pub fn load_sprite_texture(&mut self, texture_path: PathBuf) -> Result<(), crate::RenderError> {
         // Create new sprite pipeline with the specified texture
         let new_pipeline =
-            SpritePipeline::new(&self.device, &self.queue, self.config.format, texture_path);
+            SpritePipeline::new(
+                &self.device,
+                &self.queue,
+                self.config.format,
+                TextureSource::path(texture_path),
+            );
         self.sprite_pipeline = new_pipeline;
         self.sprite_pipelines_by_texture.clear();
         Ok(())
@@ -487,7 +517,12 @@ impl GpuState {
         image: &DecodedImage,
     ) -> Result<(), crate::RenderError> {
         let new_pipeline =
-            SpritePipeline::from_rgba8(&self.device, &self.queue, self.config.format, image);
+            SpritePipeline::new(
+                &self.device,
+                &self.queue,
+                self.config.format,
+                TextureSource::rgba8(image),
+            );
         self.sprite_pipeline = new_pipeline;
         self.sprite_pipelines_by_texture.clear();
         Ok(())
@@ -507,9 +542,19 @@ impl GpuState {
         let tilemap_path = tilemap_texture.unwrap_or_else(default_texture_path);
         let sprite_path = sprite_texture.unwrap_or_else(default_texture_path);
 
-        let tilemap_pipeline = TilemapPipeline::new(&device, &queue, config.format, tilemap_path);
+        let tilemap_pipeline = TilemapPipeline::new(
+            &device,
+            &queue,
+            config.format,
+            TextureSource::path(tilemap_path),
+        );
 
-        let sprite_pipeline = SpritePipeline::new(&device, &queue, config.format, sprite_path);
+        let sprite_pipeline = SpritePipeline::new(
+            &device,
+            &queue,
+            config.format,
+            TextureSource::path(sprite_path),
+        );
 
         let world_underlay_pipeline = DebugPipeline::new(&device, config.format);
         let debug_pipeline = DebugPipeline::new(&device, config.format);

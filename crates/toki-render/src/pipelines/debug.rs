@@ -1,4 +1,4 @@
-use super::RenderPipeline;
+use super::{create_mvp_uniform_buffer, write_uniform_buffer, RenderPipeline};
 use crate::vertex::VertexLayout;
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
@@ -186,11 +186,8 @@ impl DebugPipeline {
             mvp: glam::Mat4::IDENTITY.to_cols_array_2d(),
         };
 
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Debug Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[dummy_uniforms]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
+        let uniform_buffer =
+            create_mvp_uniform_buffer(device, "Debug Uniform Buffer", dummy_uniforms);
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Debug Bind Group Layout"),
@@ -301,10 +298,13 @@ impl DebugPipeline {
 
     /// Update MVP matrix for camera transformation
     pub fn update_camera(&self, queue: &Queue, mvp_matrix: glam::Mat4) {
-        let uniforms = DebugUniforms {
-            mvp: mvp_matrix.to_cols_array_2d(),
-        };
-        queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+        write_uniform_buffer(
+            queue,
+            &self.uniform_buffer,
+            DebugUniforms {
+                mvp: mvp_matrix.to_cols_array_2d(),
+            },
+        );
     }
 
     /// Update vertex buffer with current debug shapes

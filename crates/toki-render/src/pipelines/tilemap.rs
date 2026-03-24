@@ -1,12 +1,10 @@
-use super::RenderPipeline;
-use crate::vertex::VertexLayout;
-use crate::wgpu_utils::{
-    create_bind_group_layout, create_shader_module, create_texture_bindgroup,
-    create_texture_bindgroup_from_rgba8,
+use super::{
+    build_standard_render_pipeline, create_mvp_uniform_buffer,
+    create_texture_bindgroup_for_source, write_uniform_buffer, RenderPipeline, TextureSource,
 };
+use crate::vertex::VertexLayout;
+use crate::wgpu_utils::{create_bind_group_layout, create_shader_module};
 use bytemuck::{Pod, Zeroable};
-use std::path::PathBuf;
-use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
 use wgpu::util::DeviceExt;
 use wgpu::{Device, Queue, RenderPass, RenderPipeline as WgpuRenderPipeline};
@@ -33,104 +31,41 @@ impl TilemapPipeline {
         bind_group_layout: &wgpu::BindGroupLayout,
     ) -> WgpuRenderPipeline {
         let shader = create_shader_module(device);
-
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Tilemap Pipeline Layout"),
-            bind_group_layouts: &[bind_group_layout],
-            push_constant_ranges: &[],
-        });
-
-        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Tilemap Pipeline"),
-            cache: None,
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                buffers: &[QuadVertex::desc()],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        })
+        build_standard_render_pipeline(
+            device,
+            surface_format,
+            &shader,
+            "Tilemap Pipeline Layout",
+            "Tilemap Pipeline",
+            &[bind_group_layout],
+            &[QuadVertex::desc()],
+        )
     }
 
-    pub fn new(
+    pub(crate) fn new(
         device: &Device,
         queue: &Queue,
         surface_format: wgpu::TextureFormat,
-        texture_path: PathBuf,
+        texture_source: TextureSource<'_>,
     ) -> Self {
         let dummy_uniforms = TilemapUniforms {
             mvp: glam::Mat4::IDENTITY.to_cols_array_2d(),
         };
 
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Tilemap Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[dummy_uniforms]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
+        let uniform_buffer =
+            create_mvp_uniform_buffer(device, "Tilemap Uniform Buffer", dummy_uniforms);
 
         let bind_group_layout = create_bind_group_layout(device);
 
-        let bind_group = create_texture_bindgroup(
+        let bind_group = create_texture_bindgroup_for_source(
             device,
             queue,
             &bind_group_layout,
             &uniform_buffer,
-            texture_path,
+            texture_source,
             Some("Tilemap Texture"),
         );
 
-        let render_pipeline =
-            Self::build_render_pipeline(device, surface_format, &bind_group_layout);
-
-        Self {
-            render_pipeline,
-            bind_group,
-            uniform_buffer,
-            vertex_buffer: None,
-            vertex_count: 0,
-        }
-    }
-
-    pub fn from_rgba8(
-        device: &Device,
-        queue: &Queue,
-        surface_format: wgpu::TextureFormat,
-        image: &DecodedImage,
-    ) -> Self {
-        let dummy_uniforms = TilemapUniforms {
-            mvp: glam::Mat4::IDENTITY.to_cols_array_2d(),
-        };
-
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Tilemap Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[dummy_uniforms]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let bind_group_layout = create_bind_group_layout(device);
-        let bind_group = create_texture_bindgroup_from_rgba8(
-            device,
-            queue,
-            &bind_group_layout,
-            &uniform_buffer,
-            image,
-            Some("Tilemap Texture"),
-        );
         let render_pipeline =
             Self::build_render_pipeline(device, surface_format, &bind_group_layout);
 
@@ -163,10 +98,13 @@ impl TilemapPipeline {
     }
 
     pub fn update_projection(&self, queue: &Queue, mvp: glam::Mat4) {
-        let uniforms = TilemapUniforms {
-            mvp: mvp.to_cols_array_2d(),
-        };
-        queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+        write_uniform_buffer(
+            queue,
+            &self.uniform_buffer,
+            TilemapUniforms {
+                mvp: mvp.to_cols_array_2d(),
+            },
+        );
     }
 }
 

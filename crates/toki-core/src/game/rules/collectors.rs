@@ -53,6 +53,8 @@ impl GameState {
         let mut fired_once_ids = Vec::new();
 
         for &idx in sorted_indices {
+            // Extract owned data in a block to release the borrow on self.rules
+            // before calling self.buffer_rule_action below.
             let Some((actions, rule_id, rule_once)) = ({
                 let rule = &self.rules.rules[idx];
                 if !should_execute_rule(rule) {
