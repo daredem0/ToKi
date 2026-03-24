@@ -418,21 +418,19 @@ impl GpuState {
         let (device, queue, surface, config, supported_present_modes) =
             create_device_and_surface(Arc::clone(&window), vsync);
 
-        let tilemap_pipeline =
-            TilemapPipeline::new(
-                &device,
-                &queue,
-                config.format,
-                TextureSource::path(default_texture_path()),
-            );
+        let tilemap_pipeline = TilemapPipeline::new(
+            &device,
+            &queue,
+            config.format,
+            TextureSource::path(default_texture_path()),
+        );
 
-        let sprite_pipeline =
-            SpritePipeline::new(
-                &device,
-                &queue,
-                config.format,
-                TextureSource::path(default_texture_path()),
-            );
+        let sprite_pipeline = SpritePipeline::new(
+            &device,
+            &queue,
+            config.format,
+            TextureSource::path(default_texture_path()),
+        );
 
         let world_underlay_pipeline = DebugPipeline::new(&device, config.format);
         let debug_pipeline = DebugPipeline::new(&device, config.format);
@@ -471,13 +469,12 @@ impl GpuState {
         texture_path: PathBuf,
     ) -> Result<(), crate::RenderError> {
         // Create new tilemap pipeline with the specified texture
-        let new_pipeline =
-            TilemapPipeline::new(
-                &self.device,
-                &self.queue,
-                self.config.format,
-                TextureSource::path(texture_path),
-            );
+        let new_pipeline = TilemapPipeline::new(
+            &self.device,
+            &self.queue,
+            self.config.format,
+            TextureSource::path(texture_path),
+        );
         self.tilemap_pipeline = new_pipeline;
         Ok(())
     }
@@ -486,13 +483,12 @@ impl GpuState {
         &mut self,
         image: &DecodedImage,
     ) -> Result<(), crate::RenderError> {
-        let new_pipeline =
-            TilemapPipeline::new(
-                &self.device,
-                &self.queue,
-                self.config.format,
-                TextureSource::rgba8(image),
-            );
+        let new_pipeline = TilemapPipeline::new(
+            &self.device,
+            &self.queue,
+            self.config.format,
+            TextureSource::rgba8(image),
+        );
         self.tilemap_pipeline = new_pipeline;
         Ok(())
     }
@@ -500,13 +496,12 @@ impl GpuState {
     /// Load a new sprite texture at runtime
     pub fn load_sprite_texture(&mut self, texture_path: PathBuf) -> Result<(), crate::RenderError> {
         // Create new sprite pipeline with the specified texture
-        let new_pipeline =
-            SpritePipeline::new(
-                &self.device,
-                &self.queue,
-                self.config.format,
-                TextureSource::path(texture_path),
-            );
+        let new_pipeline = SpritePipeline::new(
+            &self.device,
+            &self.queue,
+            self.config.format,
+            TextureSource::path(texture_path),
+        );
         self.sprite_pipeline = new_pipeline;
         self.sprite_pipelines_by_texture.clear();
         Ok(())
@@ -516,13 +511,12 @@ impl GpuState {
         &mut self,
         image: &DecodedImage,
     ) -> Result<(), crate::RenderError> {
-        let new_pipeline =
-            SpritePipeline::new(
-                &self.device,
-                &self.queue,
-                self.config.format,
-                TextureSource::rgba8(image),
-            );
+        let new_pipeline = SpritePipeline::new(
+            &self.device,
+            &self.queue,
+            self.config.format,
+            TextureSource::rgba8(image),
+        );
         self.sprite_pipeline = new_pipeline;
         self.sprite_pipelines_by_texture.clear();
         Ok(())

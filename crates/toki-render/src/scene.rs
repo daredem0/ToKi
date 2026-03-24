@@ -124,8 +124,7 @@ impl SceneRenderer {
         let sprite_source = sprite_texture
             .map(TextureSource::path)
             .unwrap_or_else(TextureSource::placeholder);
-        let sprite_pipeline =
-            SpritePipeline::new(&device, &queue, surface_format, sprite_source);
+        let sprite_pipeline = SpritePipeline::new(&device, &queue, surface_format, sprite_source);
 
         let underlay_pipeline = DebugPipeline::new(&device, surface_format);
         let debug_pipeline = DebugPipeline::new(&device, surface_format);

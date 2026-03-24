@@ -259,8 +259,7 @@ mod tests {
             data: vec![1, 2, 3, 255],
         };
 
-        let error =
-            recolor_indexed_image(&image, Palette4::new([[0, 0, 0, 255]; 4])).unwrap_err();
+        let error = recolor_indexed_image(&image, Palette4::new([[0, 0, 0, 255]; 4])).unwrap_err();
 
         assert_eq!(error.unique_color_count, 1);
         assert_eq!(error.invalid_colors, vec![[1, 2, 3, 255]]);
