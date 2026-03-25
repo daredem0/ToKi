@@ -5,6 +5,18 @@ use super::{
     SpriteCanvasViewport, SpriteEditorState,
 };
 
+struct SaveAssetRequest<'a> {
+    json_path: &'a std::path::Path,
+    png_path: &'a std::path::Path,
+    png_filename: &'a str,
+    name: &'a str,
+    kind: SpriteAssetKind,
+    canvas_width: u32,
+    canvas_height: u32,
+    pixels: &'a [u8],
+    source_metadata_path: Option<&'a std::path::Path>,
+}
+
 impl SpriteEditorState {
     /// Reset canvas state with a new canvas. Sets common defaults.
     fn reset_canvas_state(&mut self, canvas: SpriteCanvas, dirty: bool) {
@@ -328,17 +340,17 @@ impl SpriteEditorState {
         let pixels = canvas.pixels().to_vec();
         let source_metadata_path = cs.active_sprite.clone();
 
-        self.save_asset_to_paths(
-            &json_path,
-            &png_path,
-            &png_filename,
-            &name,
-            save_asset_kind,
+        self.save_asset_to_paths(SaveAssetRequest {
+            json_path: &json_path,
+            png_path: &png_path,
+            png_filename: &png_filename,
+            name: &name,
+            kind: save_asset_kind,
             canvas_width,
             canvas_height,
-            &pixels,
-            source_metadata_path.as_deref().map(std::path::Path::new),
-        )
+            pixels: &pixels,
+            source_metadata_path: source_metadata_path.as_deref().map(std::path::Path::new),
+        })
     }
 
     /// Save the current canvas back to its existing sprite asset paths.
@@ -369,50 +381,47 @@ impl SpriteEditorState {
             .unwrap_or_else(|| std::path::Path::new("."))
             .join(&png_filename);
 
-        self.save_asset_to_paths(
-            &json_path,
-            &png_path,
-            &png_filename,
-            &name,
-            save_asset_kind,
+        self.save_asset_to_paths(SaveAssetRequest {
+            json_path: &json_path,
+            png_path: &png_path,
+            png_filename: &png_filename,
+            name: &name,
+            kind: save_asset_kind,
             canvas_width,
             canvas_height,
-            &pixels,
-            Some(&json_path),
-        )
+            pixels: &pixels,
+            source_metadata_path: Some(&json_path),
+        })
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn save_asset_to_paths(
-        &mut self,
-        json_path: &std::path::Path,
-        png_path: &std::path::Path,
-        png_filename: &str,
-        name: &str,
-        kind: SpriteAssetKind,
-        canvas_width: u32,
-        canvas_height: u32,
-        pixels: &[u8],
-        source_metadata_path: Option<&std::path::Path>,
-    ) -> Result<(), String> {
-        toki_core::graphics::image::save_image_rgba8(png_path, canvas_width, canvas_height, pixels)
-            .map_err(|e| format!("Failed to save PNG: {e}"))?;
+    fn save_asset_to_paths(&mut self, request: SaveAssetRequest<'_>) -> Result<(), String> {
+        toki_core::graphics::image::save_image_rgba8(
+            request.png_path,
+            request.canvas_width,
+            request.canvas_height,
+            request.pixels,
+        )
+        .map_err(|e| format!("Failed to save PNG: {e}"))?;
 
         self.save_metadata(
-            json_path,
-            png_filename,
-            kind,
-            glam::UVec2::new(canvas_width, canvas_height),
-            source_metadata_path,
+            request.json_path,
+            request.png_filename,
+            request.kind,
+            glam::UVec2::new(request.canvas_width, request.canvas_height),
+            request.source_metadata_path,
         )?;
-        let saved_aliases =
-            self.read_saved_cell_aliases(json_path, kind, canvas_width, canvas_height);
+        let saved_aliases = self.read_saved_cell_aliases(
+            request.json_path,
+            request.kind,
+            request.canvas_width,
+            request.canvas_height,
+        );
 
         let cs = self.active_mut();
-        cs.active_sprite = Some(json_path.to_string_lossy().to_string());
-        cs.asset_kind = Some(kind);
-        cs.save_asset_name = name.to_string();
-        cs.save_asset_kind = kind;
+        cs.active_sprite = Some(request.json_path.to_string_lossy().to_string());
+        cs.asset_kind = Some(request.kind);
+        cs.save_asset_name = request.name.to_string();
+        cs.save_asset_kind = request.kind;
         cs.original_cell_aliases = saved_aliases;
         cs.dirty = false;
         self.show_save_dialog = false;

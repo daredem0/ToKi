@@ -199,6 +199,96 @@ struct App {
 }
 
 impl App {
+    fn build_camera_system(
+        launch_options: &RuntimeLaunchOptions,
+        game_system: &GameManager,
+    ) -> CameraManager {
+        let resolution_width = launch_options.display.resolution_width;
+        let resolution_height = launch_options.display.resolution_height;
+        let zoom_factor = launch_options.display.zoom_factor();
+        let mut camera =
+            Camera::with_resolution_and_zoom(resolution_width, resolution_height, zoom_factor);
+        camera.center_on(glam::IVec2::new(
+            (resolution_width / 2) as i32,
+            (resolution_height / 2) as i32,
+        ));
+
+        let controller = if let Some(player_id) = game_system.player_id() {
+            CameraController {
+                mode: CameraMode::FollowEntity(player_id),
+            }
+        } else {
+            CameraController {
+                mode: CameraMode::FreeScroll,
+            }
+        };
+        CameraManager::new(camera, controller)
+    }
+
+    fn resolve_audio_root(
+        launch_options: &RuntimeLaunchOptions,
+        pack_mount: Option<&tempfile::TempDir>,
+    ) -> std::path::PathBuf {
+        pack_mount
+            .map(tempfile::TempDir::path)
+            .or(launch_options.project_path.as_deref())
+            .map(std::path::Path::to_path_buf)
+            .or_else(|| std::env::current_dir().ok())
+            .expect("Failed to resolve audio root path")
+    }
+
+    fn build_audio_system(
+        launch_options: &RuntimeLaunchOptions,
+        pack_mount: Option<&tempfile::TempDir>,
+        asset_load_plan: &RuntimeAssetLoadPlan,
+    ) -> AudioManager {
+        let audio_root = Self::resolve_audio_root(launch_options, pack_mount);
+        let mut audio_system = AudioManager::new_with_assets_root_and_preload_names(
+            audio_root,
+            &asset_load_plan.preloaded_sfx_names,
+        )
+        .expect("Failed to initialize audio system");
+        audio_system.set_master_volume_percent(launch_options.audio_mix.master_percent);
+        audio_system.set_channel_volume_percent("music", launch_options.audio_mix.music_percent);
+        audio_system.set_channel_volume_percent("music_a", launch_options.audio_mix.music_percent);
+        audio_system.set_channel_volume_percent("music_b", launch_options.audio_mix.music_percent);
+        audio_system
+            .set_channel_volume_percent("movement", launch_options.audio_mix.movement_percent);
+        audio_system
+            .set_channel_volume_percent("collision", launch_options.audio_mix.collision_percent);
+        audio_system
+    }
+
+    fn prime_initial_scene_music(
+        game_system: &GameManager,
+        scene_transition: &mut SceneTransitionController,
+        audio_system: &mut AudioManager,
+        launch_options: &RuntimeLaunchOptions,
+    ) {
+        if let Some(track_id) = game_system
+            .active_scene()
+            .and_then(|scene| scene.background_music_track_id.as_deref())
+        {
+            if let Err(error) = scene_transition.prime_scene_music(
+                audio_system,
+                Some(track_id),
+                launch_options.audio_mix.music_percent,
+            ) {
+                tracing::warn!(
+                    "Failed to start initial scene background music '{track_id}': {error}"
+                );
+            }
+        }
+    }
+
+    fn build_frame_limiter(launch_options: &RuntimeLaunchOptions) -> FrameLimiter {
+        if launch_options.display.vsync {
+            FrameLimiter::new_unlimited()
+        } else {
+            FrameLimiter::new_with_target_fps(launch_options.display.target_fps)
+        }
+    }
+
     fn resolved_post_process_settings(
         &self,
     ) -> toki_core::project_runtime::ResolvedPostProcessSettings {
@@ -221,72 +311,22 @@ impl App {
         let (resources, game_state, dialogs, pack_mount, asset_load_plan, decoded_project_cache) =
             Self::build_startup_state(&launch_options);
         let game_system = GameManager::new(game_state);
-
-        let resolution_width = launch_options.display.resolution_width;
-        let resolution_height = launch_options.display.resolution_height;
-        let zoom_factor = launch_options.display.zoom_factor();
-        let mut camera =
-            Camera::with_resolution_and_zoom(resolution_width, resolution_height, zoom_factor);
-        camera.center_on(glam::IVec2::new(
-            (resolution_width / 2) as i32,
-            (resolution_height / 2) as i32,
-        ));
-
-        let cam_controller = if let Some(player_id) = game_system.player_id() {
-            CameraController {
-                mode: CameraMode::FollowEntity(player_id),
-            }
-        } else {
-            CameraController {
-                mode: CameraMode::FreeScroll,
-            }
-        };
-        let camera_system = CameraManager::new(camera, cam_controller);
-        let audio_root = pack_mount
-            .as_ref()
-            .map(tempfile::TempDir::path)
-            .or(launch_options.project_path.as_deref())
-            .map(std::path::Path::to_path_buf)
-            .or_else(|| std::env::current_dir().ok())
-            .expect("Failed to resolve audio root path");
-        let mut audio_system = AudioManager::new_with_assets_root_and_preload_names(
-            audio_root,
-            &asset_load_plan.preloaded_sfx_names,
-        )
-        .expect("Failed to initialize audio system");
-        audio_system.set_master_volume_percent(launch_options.audio_mix.master_percent);
-        audio_system.set_channel_volume_percent("music", launch_options.audio_mix.music_percent);
-        audio_system.set_channel_volume_percent("music_a", launch_options.audio_mix.music_percent);
-        audio_system.set_channel_volume_percent("music_b", launch_options.audio_mix.music_percent);
-        audio_system
-            .set_channel_volume_percent("movement", launch_options.audio_mix.movement_percent);
-        audio_system
-            .set_channel_volume_percent("collision", launch_options.audio_mix.collision_percent);
+        let camera_system = Self::build_camera_system(&launch_options, &game_system);
+        let mut audio_system =
+            Self::build_audio_system(&launch_options, pack_mount.as_ref(), &asset_load_plan);
         let menu_system = MenuController::new(launch_options.menu.clone());
         let dialog_system = DialogController::new(dialogs);
         let mut scene_transition =
             SceneTransitionController::new(launch_options.transition.clone());
-        if let Some(track_id) = game_system
-            .active_scene()
-            .and_then(|scene| scene.background_music_track_id.as_deref())
-        {
-            if let Err(error) = scene_transition.prime_scene_music(
-                &mut audio_system,
-                Some(track_id),
-                launch_options.audio_mix.music_percent,
-            ) {
-                tracing::warn!(
-                    "Failed to start initial scene background music '{track_id}': {error}"
-                );
-            }
-        }
-
-        // Frame limiter: only active when vsync is disabled
-        let frame_limiter = if launch_options.display.vsync {
-            FrameLimiter::new_unlimited()
-        } else {
-            FrameLimiter::new_with_target_fps(launch_options.display.target_fps)
-        };
+        Self::prime_initial_scene_music(
+            &game_system,
+            &mut scene_transition,
+            &mut audio_system,
+            &launch_options,
+        );
+        let frame_limiter = Self::build_frame_limiter(&launch_options);
+        let resolution_width = launch_options.display.resolution_width;
+        let resolution_height = launch_options.display.resolution_height;
 
         Self {
             // Core systems

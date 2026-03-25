@@ -172,9 +172,11 @@ impl BehaviorUpdate for IdleWanderHandler {
             } => self.handle_walking(
                 entity,
                 entity_id,
-                current_position,
-                *direction,
-                *remaining_distance,
+                WalkStep {
+                    current_position,
+                    direction: *direction,
+                    remaining_distance: *remaining_distance,
+                },
                 ctx,
                 ai_state,
             ),
@@ -182,32 +184,37 @@ impl BehaviorUpdate for IdleWanderHandler {
     }
 }
 
+struct WalkStep {
+    current_position: IVec2,
+    direction: IVec2,
+    remaining_distance: f32,
+}
+
 impl IdleWanderHandler {
-    #[allow(clippy::too_many_arguments)]
     fn handle_walking(
         &self,
         entity: &Entity,
         entity_id: EntityId,
-        current_position: IVec2,
-        direction: IVec2,
-        remaining_distance: f32,
+        step: WalkStep,
         ctx: &AiContext,
         ai_state: &mut AiRuntimeState,
     ) -> Option<AiUpdateResult> {
-        let can_move = preview_intended_position(entity, current_position, direction, ctx)
-            .is_some_and(|candidate| {
-                candidate == current_position || ctx.is_movement_valid(entity, entity_id, candidate)
-            });
-        let new_remaining = remaining_distance - entity.attributes.speed.max(0.0);
+        let can_move =
+            preview_intended_position(entity, step.current_position, step.direction, ctx)
+                .is_some_and(|candidate| {
+                    candidate == step.current_position
+                        || ctx.is_movement_valid(entity, entity_id, candidate)
+                });
+        let new_remaining = step.remaining_distance - entity.attributes.speed.max(0.0);
 
         if can_move && new_remaining > 0.0 {
             ai_state.wander_phase = WanderPhase::Walking {
-                direction,
+                direction: step.direction,
                 remaining_distance: new_remaining,
             };
             return Some(build_movement_intent_result(
                 entity_id,
-                Some(direction),
+                Some(step.direction),
                 true,
             ));
         }
@@ -218,7 +225,7 @@ impl IdleWanderHandler {
         if can_move {
             Some(build_movement_intent_result(
                 entity_id,
-                Some(direction),
+                Some(step.direction),
                 true,
             ))
         } else {

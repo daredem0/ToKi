@@ -7,7 +7,6 @@ use crate::wgpu_utils::{create_bind_group_layout, create_shader_module};
 use crate::RenderError;
 use bytemuck::{Pod, Zeroable};
 use toki_core::graphics::vertex::QuadVertex;
-use wgpu::util::DeviceExt;
 use wgpu::{Device, Queue, RenderPass, RenderPipeline as WgpuRenderPipeline};
 
 #[repr(C)]
@@ -22,6 +21,7 @@ pub struct TilemapPipeline {
     bind_group: wgpu::BindGroup,
     uniform_buffer: wgpu::Buffer,
     vertex_buffer: Option<wgpu::Buffer>,
+    vertex_buffer_capacity: usize,
     vertex_count: usize,
 }
 
@@ -75,26 +75,40 @@ impl TilemapPipeline {
             bind_group,
             uniform_buffer,
             vertex_buffer: None,
+            vertex_buffer_capacity: 0,
             vertex_count: 0,
         })
     }
 
-    pub fn update_vertices(&mut self, device: &Device, vertices: &[QuadVertex]) {
+    pub fn update_vertices(&mut self, device: &Device, queue: &Queue, vertices: &[QuadVertex]) {
         if vertices.is_empty() {
             self.vertex_buffer = None;
+            self.vertex_buffer_capacity = 0;
             self.vertex_count = 0;
             return;
         }
 
         let vertex_data = bytemuck::cast_slice(vertices);
+        let required_capacity = vertex_data.len();
+        let needs_reallocation = self
+            .vertex_buffer
+            .as_ref()
+            .is_none_or(|_| self.vertex_buffer_capacity < required_capacity);
 
-        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Tilemap Vertex Buffer"),
-            contents: vertex_data,
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        if needs_reallocation {
+            let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Tilemap Vertex Buffer"),
+                size: required_capacity as u64,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            self.vertex_buffer = Some(buffer);
+            self.vertex_buffer_capacity = required_capacity;
+        }
 
-        self.vertex_buffer = Some(buffer);
+        if let Some(buffer) = &self.vertex_buffer {
+            queue.write_buffer(buffer, 0, vertex_data);
+        }
         self.vertex_count = vertices.len();
     }
 

@@ -1,3 +1,4 @@
+use anyhow::Result;
 use kira::{
     sound::static_sound::{StaticSoundData, StaticSoundHandle},
     sound::streaming::{StreamingSoundData, StreamingSoundHandle, StreamingSoundSettings},
@@ -64,10 +65,7 @@ impl AudioAssetCache {
         }
     }
 
-    fn scan_and_preload_sfx(
-        &mut self,
-        preload_names: &[String],
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn scan_and_preload_sfx(&mut self, preload_names: &[String]) -> Result<()> {
         let sfx_dir = self.assets_root.join("assets").join("audio").join("sfx");
 
         if !Path::new(&sfx_dir).exists() {
@@ -100,7 +98,7 @@ impl AudioAssetCache {
         Ok(())
     }
 
-    fn scan_music_files(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn scan_music_files(&mut self) -> Result<()> {
         let music_dir = self.assets_root.join("assets").join("audio").join("music");
 
         if !Path::new(&music_dir).exists() {
@@ -117,7 +115,7 @@ impl AudioAssetCache {
         Ok(())
     }
 
-    fn preload_sound(&mut self, name: &str, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    fn preload_sound(&mut self, name: &str, path: &str) -> Result<()> {
         let sound_data = StaticSoundData::from_file(path)?;
         self.preloaded_sounds.insert(name.to_string(), sound_data);
         tracing::trace!("Preloaded SFX: {}", name);
@@ -320,17 +318,14 @@ impl AudioPlaybackState {
         self.channels.get_mut(channel)
     }
 
-    fn play_static_sound(
-        &mut self,
-        sound_data: StaticSoundData,
-    ) -> Result<StaticSoundHandle, Box<dyn std::error::Error>> {
+    fn play_static_sound(&mut self, sound_data: StaticSoundData) -> Result<StaticSoundHandle> {
         Ok(self.manager.play(sound_data)?)
     }
 
     fn play_streaming_sound(
         &mut self,
         sound_data: StreamingSoundData<FromFileError>,
-    ) -> Result<StreamingSoundHandle<FromFileError>, Box<dyn std::error::Error>> {
+    ) -> Result<StreamingSoundHandle<FromFileError>> {
         Ok(self.manager.play(sound_data)?)
     }
 }
@@ -341,14 +336,12 @@ pub struct AudioManager {
 }
 
 impl AudioManager {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new() -> Result<Self> {
         let current_dir = std::env::current_dir()?;
         Self::new_with_assets_root(current_dir)
     }
 
-    pub fn new_with_assets_root(
-        assets_root: impl Into<PathBuf>,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new_with_assets_root(assets_root: impl Into<PathBuf>) -> Result<Self> {
         let preload_names = common_preloaded_sfx_names();
         Self::new_with_assets_root_and_preload_names(assets_root, &preload_names)
     }
@@ -356,7 +349,7 @@ impl AudioManager {
     pub fn new_with_assets_root_and_preload_names(
         assets_root: impl Into<PathBuf>,
         preload_names: &[String],
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    ) -> Result<Self> {
         let manager = KiraAudioManager::new(AudioManagerSettings::default())?;
         let assets_root = assets_root.into();
 
@@ -397,11 +390,7 @@ impl AudioManager {
     }
 
     /// Play sound in a specific channel with channel policy enforcement
-    pub fn play_sound_in_channel(
-        &mut self,
-        channel: &str,
-        name: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn play_sound_in_channel(&mut self, channel: &str, name: &str) -> Result<()> {
         self.play_sound_in_channel_with_gain(channel, name, 1.0)
     }
 
@@ -410,7 +399,7 @@ impl AudioManager {
         channel: &str,
         name: &str,
         gain: f32,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<()> {
         if gain <= 0.0 {
             return Ok(());
         }
@@ -551,7 +540,7 @@ impl AudioManager {
         channel: &str,
         name: &str,
         volume: f32,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<()> {
         self.playback.cleanup_finished_sounds();
 
         // Get or create channel with default Exclusive policy for music
@@ -649,16 +638,12 @@ impl AudioManager {
     }
 
     /// Legacy method - plays sound with default overlap behavior
-    pub fn play_sound(&mut self, name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn play_sound(&mut self, name: &str) -> Result<()> {
         self.play_sound_in_channel("default", name)
     }
 
     /// Legacy method - plays background music with exclusive behavior
-    pub fn play_background_music(
-        &mut self,
-        name: &str,
-        volume: f32,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn play_background_music(&mut self, name: &str, volume: f32) -> Result<()> {
         self.play_background_music_in_channel("music", name, volume)
     }
 

@@ -24,7 +24,7 @@ impl AiSystem {
         let entity = ctx.entity_manager.get_entity(entity_id)?;
         let current_position = entity.position;
         let detection_radius = entity.attributes.ai_config.detection_radius;
-        let definition_name = entity.definition_name.clone();
+        let definition_name = entity.definition_name.as_deref();
 
         // Handle separation state first
         if let Some(result) = self.handle_separation(entity, entity_id, ctx) {
@@ -35,7 +35,7 @@ impl AiSystem {
             self.is_player_in_range(player_position, current_position, detection_radius);
         let mate = self.find_compatible_entity(
             entity_id,
-            &definition_name,
+            definition_name,
             ctx.entity_manager,
             detection_radius,
         );
@@ -79,11 +79,11 @@ impl AiSystem {
     fn find_compatible_entity(
         &self,
         entity_id: EntityId,
-        definition_name: &Option<String>,
+        definition_name: Option<&str>,
         entity_manager: &EntityManager,
         detection_radius: u32,
     ) -> Option<EntityId> {
-        let def_name = definition_name.as_ref()?;
+        let def_name = definition_name?;
         let entity = entity_manager.get_entity(entity_id)?;
         let current_pos = entity.position;
         let entity_kind = entity.entity_kind;
@@ -116,7 +116,7 @@ impl AiSystem {
     ) -> Option<AiUpdateResult> {
         let state = self.entity_states.get(&entity_id)?;
         let separation = state.separation_state.as_ref()?;
-        let other_ids = separation.other_entity_ids.clone();
+        let other_ids = &separation.other_entity_ids;
         let required_distance = separation.required_distance;
 
         let closest = other_ids

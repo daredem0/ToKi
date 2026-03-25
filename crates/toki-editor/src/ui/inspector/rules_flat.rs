@@ -7,6 +7,16 @@ struct RuleActionEditorContext<'a> {
     action_index: usize,
 }
 
+pub(in super::super) struct RuleEditorContext<'a> {
+    pub scene_name: &'a str,
+    pub rule_index: usize,
+    pub validation_issues: &'a [RuleValidationIssue],
+    pub audio_choices: &'a RuleAudioChoices,
+    pub scenes: &'a [toki_core::Scene],
+    pub available_dialog_outcomes: &'a std::collections::BTreeMap<String, Vec<String>>,
+    pub map_size: Option<(u32, u32)>,
+}
+
 impl RuleActionEditorContext<'_> {
     fn id_salt(&self) -> String {
         format!(
@@ -17,18 +27,20 @@ impl RuleActionEditorContext<'_> {
 }
 
 impl InspectorSystem {
-    #[allow(clippy::too_many_arguments)]
-    pub(in super::super) fn render_rule_editor(
+    pub(super) fn render_rule_editor(
         ui: &mut egui::Ui,
-        scene_name: &str,
-        rule_index: usize,
         rule: &mut Rule,
-        validation_issues: &[RuleValidationIssue],
-        audio_choices: &RuleAudioChoices,
-        scenes: &[toki_core::Scene],
-        available_dialog_outcomes: &std::collections::BTreeMap<String, Vec<String>>,
-        map_size: Option<(u32, u32)>,
+        ctx: RuleEditorContext<'_>,
     ) -> RuleEditorOutcome {
+        let RuleEditorContext {
+            scene_name,
+            rule_index,
+            validation_issues,
+            audio_choices,
+            scenes,
+            available_dialog_outcomes,
+            map_size,
+        } = ctx;
         let mut outcome = RuleEditorOutcome::default();
         let has_rule_issues = validation_issues
             .iter()

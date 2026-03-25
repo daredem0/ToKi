@@ -18,7 +18,7 @@ use crate::ui::editor_ui::Selection;
 
 pub use entity::EntityInspector;
 pub use entity_definition::EntityDefinitionInspector;
-pub use map::{MapInspector, StandaloneMapInspector};
+pub use map::MapInspector;
 pub use menu::MenuSelectionInspector;
 pub use rule_graph_node::RuleGraphNodeInspector;
 pub use scene::SceneInspector;
@@ -53,7 +53,7 @@ pub fn create_inspector_for_selection(selection: Option<&Selection>) -> Box<dyn 
         }
         Some(Selection::Entity(entity_id)) => Box::new(EntityInspector::new(*entity_id)),
         Some(Selection::StandaloneMap(map_name)) => {
-            Box::new(StandaloneMapInspector::new(map_name.clone()))
+            Box::new(MapInspector::standalone(map_name.clone()))
         }
         Some(Selection::EntityDefinition(entity_name)) => {
             Box::new(EntityDefinitionInspector::new(entity_name.clone()))

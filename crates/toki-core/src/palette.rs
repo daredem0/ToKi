@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
+use std::sync::LazyLock;
 
 use crate::graphics::image::DecodedImage;
 use crate::CoreError;
@@ -57,7 +58,7 @@ impl std::error::Error for IndexedImageValidation {}
 
 pub type IndexedImageValidationError = IndexedImageValidation;
 
-pub fn builtin_palettes() -> BTreeMap<String, Palette4> {
+static BUILTIN_PALETTES: LazyLock<BTreeMap<String, Palette4>> = LazyLock::new(|| {
     [
         (
             "gb_default".to_string(),
@@ -107,6 +108,10 @@ pub fn builtin_palettes() -> BTreeMap<String, Palette4> {
     ]
     .into_iter()
     .collect()
+});
+
+pub fn builtin_palettes() -> BTreeMap<String, Palette4> {
+    BUILTIN_PALETTES.clone()
 }
 
 pub fn resolve_palette(
@@ -116,7 +121,7 @@ pub fn resolve_palette(
     project_palettes
         .get(palette_id)
         .copied()
-        .or_else(|| builtin_palettes().get(palette_id).copied())
+        .or_else(|| BUILTIN_PALETTES.get(palette_id).copied())
 }
 
 pub fn load_palette_asset_from_path(path: &Path) -> Result<Palette4, CoreError> {

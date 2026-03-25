@@ -10,6 +10,7 @@ mod toolbar;
 mod widgets;
 
 use crate::project::Project;
+use crate::ui::widgets::separators::render_vertical_separator;
 use crate::ui::EditorUI;
 
 /// Renders the entity editor panel
@@ -86,29 +87,4 @@ fn render_main_content(
             },
         );
     });
-}
-
-/// Render a vertical draggable separator
-fn render_vertical_separator(ui: &mut egui::Ui, height: f32) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(8.0, height), egui::Sense::drag());
-
-    let color = if response.dragged() {
-        egui::Color32::from_gray(180)
-    } else if response.hovered() {
-        egui::Color32::from_gray(140)
-    } else {
-        egui::Color32::from_gray(80)
-    };
-
-    ui.painter().rect_filled(
-        egui::Rect::from_center_size(rect.center(), egui::vec2(2.0, height)),
-        0.0,
-        color,
-    );
-
-    if response.hovered() || response.dragged() {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
-    }
-
-    response
 }

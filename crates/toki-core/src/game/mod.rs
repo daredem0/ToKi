@@ -446,11 +446,13 @@ impl GameState {
             self.apply_accumulated_movement_scaled(
                 ai_result.entity_id,
                 direction,
-                world_bounds,
-                tilemap,
-                atlas,
-                result,
-                1.0,
+                movement::MovementStepContext {
+                    world_bounds,
+                    tilemap,
+                    atlas,
+                    result,
+                    time_scale: 1.0,
+                },
             );
 
             let Some(final_position) = self

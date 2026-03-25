@@ -2,17 +2,19 @@
 
 use super::*;
 
+pub(in super::super) struct RuleGraphActionEditorContext<'a> {
+    pub scene_name: &'a str,
+    pub node_key: &'a str,
+    pub audio_choices: &'a RuleAudioChoices,
+    pub available_dialog_outcomes: &'a std::collections::BTreeMap<String, Vec<String>>,
+    pub scenes: &'a [toki_core::Scene],
+}
+
 impl InspectorSystem {
-    #[allow(clippy::too_many_arguments)]
-    pub(in super::super) fn render_rule_graph_action_editor(
+    pub(super) fn render_rule_graph_action_editor(
         ui: &mut egui::Ui,
-        scene_name: &str,
-        node_key: &str,
         action: &mut RuleAction,
-        _validation_issues: &[RuleValidationIssue],
-        audio_choices: &RuleAudioChoices,
-        available_dialog_outcomes: &std::collections::BTreeMap<String, Vec<String>>,
-        scenes: &[toki_core::Scene],
+        ctx: RuleGraphActionEditorContext<'_>,
     ) -> bool {
         let mut changed = false;
         let current_kind = Self::action_kind(action);
@@ -21,7 +23,7 @@ impl InspectorSystem {
             ui.label("Type:");
             egui::ComboBox::from_id_salt(format!(
                 "graph_node_action_kind_{}_{}",
-                scene_name, node_key
+                ctx.scene_name, ctx.node_key
             ))
             .selected_text(Self::action_kind_label(current_kind))
             .show_ui(ui, |ui| {
@@ -43,12 +45,12 @@ impl InspectorSystem {
 
         changed |= Self::render_action_parameters(
             ui,
-            scene_name,
-            node_key,
+            ctx.scene_name,
+            ctx.node_key,
             action,
-            audio_choices,
-            available_dialog_outcomes,
-            scenes,
+            ctx.audio_choices,
+            ctx.available_dialog_outcomes,
+            ctx.scenes,
         );
 
         changed

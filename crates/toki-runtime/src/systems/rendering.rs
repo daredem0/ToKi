@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use toki_core::cache_utils::clone_cached_or_load;
 use toki_core::fonts::find_font_files;
 use toki_core::graphics::image::DecodedImage;
 use toki_core::graphics::vertex::QuadVertex;
@@ -10,7 +11,10 @@ use toki_core::sprite::SpriteFrame;
 use toki_core::sprite_render::{ResolvedSpriteRenderInstance, SpriteRenderMaterial};
 use toki_core::text::TextItem;
 use toki_core::ui::UiComposition;
-use toki_render::{GpuState, RenderBackend};
+use toki_render::{
+    FrameLifecycle, GpuState, RenderBackend, ShapeRenderer, SpriteRenderer, TextRenderer,
+    TextureLoader,
+};
 use winit::window::Window;
 
 /// Rendering system that manages GPU state and projection calculations.
@@ -34,6 +38,14 @@ impl Default for RenderingSystem {
 }
 
 impl RenderingSystem {
+    fn backend_mut(
+        &mut self,
+    ) -> Result<&mut (dyn RenderBackend + 'static), toki_render::RenderError> {
+        self.backend
+            .as_deref_mut()
+            .ok_or_else(|| toki_render::RenderError::Other("GPU not initialized".to_string()))
+    }
+
     /// Create a new RenderingSystem with default projection parameters
     pub fn new() -> Self {
         Self {
@@ -131,30 +143,18 @@ impl RenderingSystem {
         if self.loaded_tilemap_texture_path.as_ref() == Some(&texture_path) {
             return Ok(());
         }
-        if let Some(backend) = &mut self.backend {
-            backend.load_tilemap_texture(texture_path.clone())?;
-            self.loaded_tilemap_texture_path = Some(texture_path);
-            Ok(())
-        } else {
-            Err(toki_render::RenderError::Other(
-                "GPU not initialized".to_string(),
-            ))
-        }
+        TextureLoader::load_tilemap_texture(self.backend_mut()?, texture_path.clone())?;
+        self.loaded_tilemap_texture_path = Some(texture_path);
+        Ok(())
     }
 
     pub fn load_tilemap_texture_rgba8(
         &mut self,
         image: &DecodedImage,
     ) -> Result<(), toki_render::RenderError> {
-        if let Some(backend) = &mut self.backend {
-            backend.load_tilemap_texture_rgba8(image)?;
-            self.loaded_tilemap_texture_path = None;
-            Ok(())
-        } else {
-            Err(toki_render::RenderError::Other(
-                "GPU not initialized".to_string(),
-            ))
-        }
+        TextureLoader::load_tilemap_texture_rgba8(self.backend_mut()?, image)?;
+        self.loaded_tilemap_texture_path = None;
+        Ok(())
     }
 
     /// Load new sprite texture at runtime
@@ -165,30 +165,18 @@ impl RenderingSystem {
         if self.loaded_sprite_texture_path.as_ref() == Some(&texture_path) {
             return Ok(());
         }
-        if let Some(backend) = &mut self.backend {
-            backend.load_sprite_texture(texture_path.clone())?;
-            self.loaded_sprite_texture_path = Some(texture_path);
-            Ok(())
-        } else {
-            Err(toki_render::RenderError::Other(
-                "GPU not initialized".to_string(),
-            ))
-        }
+        TextureLoader::load_sprite_texture(self.backend_mut()?, texture_path.clone())?;
+        self.loaded_sprite_texture_path = Some(texture_path);
+        Ok(())
     }
 
     pub fn load_sprite_texture_rgba8(
         &mut self,
         image: &DecodedImage,
     ) -> Result<(), toki_render::RenderError> {
-        if let Some(backend) = &mut self.backend {
-            backend.load_sprite_texture_rgba8(image)?;
-            self.loaded_sprite_texture_path = None;
-            Ok(())
-        } else {
-            Err(toki_render::RenderError::Other(
-                "GPU not initialized".to_string(),
-            ))
-        }
+        TextureLoader::load_sprite_texture_rgba8(self.backend_mut()?, image)?;
+        self.loaded_sprite_texture_path = None;
+        Ok(())
     }
 
     /// Load font from a specific file path.
@@ -196,13 +184,7 @@ impl RenderingSystem {
         &mut self,
         font_path: std::path::PathBuf,
     ) -> Result<(), toki_render::RenderError> {
-        if let Some(backend) = &mut self.backend {
-            backend.load_font_file(font_path)
-        } else {
-            Err(toki_render::RenderError::Other(
-                "GPU not initialized".to_string(),
-            ))
-        }
+        TextureLoader::load_font_file(self.backend_mut()?, font_path)
     }
 
     /// Helper to load textures from a project assets directory
@@ -253,26 +235,26 @@ impl RenderingSystem {
     pub fn update_projection(&mut self, view_matrix: glam::Mat4) {
         let projection = self.calculate_projection();
         if let Some(backend) = &mut self.backend {
-            backend.update_projection(projection * view_matrix);
+            FrameLifecycle::update_projection(backend.as_mut(), projection * view_matrix);
         }
     }
 
     pub fn set_post_process_settings(&mut self, settings: ResolvedPostProcessSettings) {
         if let Some(backend) = &mut self.backend {
-            backend.set_post_process_settings(settings);
+            FrameLifecycle::set_post_process_settings(backend.as_mut(), settings);
         }
     }
 
     pub fn set_vsync(&mut self, enabled: bool) {
         if let Some(backend) = &mut self.backend {
-            backend.set_vsync(enabled);
+            FrameLifecycle::set_vsync(backend.as_mut(), enabled);
         }
     }
 
     /// Resize GPU render targets
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if let Some(backend) = &mut self.backend {
-            backend.resize(new_size);
+            FrameLifecycle::resize(backend.as_mut(), new_size);
         }
         self.update_window_size(new_size);
     }
@@ -280,7 +262,7 @@ impl RenderingSystem {
     /// Draw the current frame
     pub fn draw(&mut self) {
         if let Some(backend) = &mut self.backend {
-            backend.draw();
+            FrameLifecycle::draw(backend.as_mut());
         }
     }
 
@@ -291,7 +273,7 @@ impl RenderingSystem {
 
     pub fn set_tilemap_render_enabled(&mut self, enabled: bool) {
         if let Some(backend) = &mut self.backend {
-            backend.set_tilemap_render_enabled(enabled);
+            FrameLifecycle::set_tilemap_render_enabled(backend.as_mut(), enabled);
         }
     }
 
@@ -302,13 +284,13 @@ impl RenderingSystem {
 
     pub fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
         if let Some(backend) = &mut self.backend {
-            backend.update_tilemap_vertices(vertices);
+            FrameLifecycle::update_tilemap_vertices(backend.as_mut(), vertices);
         }
     }
 
     pub fn clear_sprites(&mut self) {
         if let Some(backend) = &mut self.backend {
-            backend.clear_sprites();
+            SpriteRenderer::clear_sprites(backend.as_mut());
         }
     }
 
@@ -320,7 +302,7 @@ impl RenderingSystem {
         flip_x: bool,
     ) {
         if let Some(backend) = &mut self.backend {
-            backend.add_sprite(frame, position, size, flip_x);
+            SpriteRenderer::add_sprite(backend.as_mut(), frame, position, size, flip_x);
         }
     }
 
@@ -333,7 +315,14 @@ impl RenderingSystem {
         flip_x: bool,
     ) {
         if let Some(backend) = &mut self.backend {
-            backend.add_sprite_with_texture(texture_path, frame, position, size, flip_x);
+            SpriteRenderer::add_sprite_with_texture(
+                backend.as_mut(),
+                texture_path,
+                frame,
+                position,
+                size,
+                flip_x,
+            );
         }
     }
 
@@ -347,7 +336,8 @@ impl RenderingSystem {
         flip_x: bool,
     ) {
         if let Some(backend) = &mut self.backend {
-            backend.add_sprite_with_texture_rgba8(
+            SpriteRenderer::add_sprite_with_texture_rgba8(
+                backend.as_mut(),
                 texture_key,
                 image,
                 frame,
@@ -377,42 +367,40 @@ impl RenderingSystem {
                 },
             ) => {
                 let texture_key = palette_texture_key(texture_path.as_path(), palette_id.as_str());
-                let image = if let Some(image) = self.recolored_sprite_images.get(&texture_key) {
-                    image.clone()
-                } else {
-                    let decoded = match self.decoded_sprite_images.get(texture_path) {
-                        Some(image) => image.clone(),
-                        None => match toki_core::graphics::image::load_image_rgba8(texture_path) {
-                            Ok(image) => {
+                let image = match clone_cached_or_load(
+                    self.recolored_sprite_images.get(&texture_key).cloned(),
+                    || {
+                        let decoded = clone_cached_or_load(
+                            self.decoded_sprite_images.get(texture_path).cloned(),
+                            || toki_core::graphics::image::load_image_rgba8(texture_path),
+                            |image| {
                                 self.decoded_sprite_images
-                                    .insert(texture_path.clone(), image.clone());
-                                image
-                            }
-                            Err(error) => {
-                                tracing::warn!(
-                                    "Failed to decode indexed sprite texture '{}': {}",
-                                    texture_path.display(),
-                                    error
-                                );
-                                return;
-                            }
-                        },
-                    };
-                    let recolored = match recolor_indexed_image(&decoded, *palette) {
-                        Ok(image) => image,
-                        Err(error) => {
+                                    .insert(texture_path.clone(), image);
+                            },
+                        )
+                        .map_err(|error| {
+                            tracing::warn!(
+                                "Failed to decode indexed sprite texture '{}': {}",
+                                texture_path.display(),
+                                error
+                            );
+                        })?;
+                        recolor_indexed_image(&decoded, *palette).map_err(|error| {
                             tracing::warn!(
                                 "Indexed sprite texture '{}' failed validation for palette '{}': {}",
                                 texture_path.display(),
                                 palette_id,
                                 error
                             );
-                            return;
-                        }
-                    };
-                    self.recolored_sprite_images
-                        .insert(texture_key.clone(), recolored.clone());
-                    recolored
+                        })
+                    },
+                    |image| {
+                        self.recolored_sprite_images
+                            .insert(texture_key.clone(), image);
+                    },
+                ) {
+                    Ok(image) => image,
+                    Err(()) => return,
                 };
 
                 self.add_sprite_with_texture_rgba8(
@@ -432,19 +420,19 @@ impl RenderingSystem {
 
     pub fn clear_text_items(&mut self) {
         if let Some(backend) = &mut self.backend {
-            backend.clear_text_items();
+            TextRenderer::clear_text_items(backend.as_mut());
         }
     }
 
     pub fn add_text_item(&mut self, text: TextItem) {
         if let Some(backend) = &mut self.backend {
-            backend.add_text_item(text);
+            TextRenderer::add_text_item(backend.as_mut(), text);
         }
     }
 
     pub fn clear_world_underlay_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
-            backend.clear_world_underlay_shapes();
+            ShapeRenderer::clear_world_underlay_shapes(backend.as_mut());
         }
     }
 
@@ -457,7 +445,7 @@ impl RenderingSystem {
         color: [f32; 4],
     ) {
         if let Some(backend) = &mut self.backend {
-            backend.add_world_underlay_rect(x, y, width, height, color);
+            ShapeRenderer::add_world_underlay_rect(backend.as_mut(), x, y, width, height, color);
         }
     }
 
@@ -470,13 +458,20 @@ impl RenderingSystem {
         color: [f32; 4],
     ) {
         if let Some(backend) = &mut self.backend {
-            backend.add_filled_world_underlay_rect(x, y, width, height, color);
+            ShapeRenderer::add_filled_world_underlay_rect(
+                backend.as_mut(),
+                x,
+                y,
+                width,
+                height,
+                color,
+            );
         }
     }
 
     pub fn finalize_world_underlay_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
-            backend.finalize_world_underlay_shapes();
+            ShapeRenderer::finalize_world_underlay_shapes(backend.as_mut());
         }
     }
 
@@ -509,13 +504,13 @@ impl RenderingSystem {
 
     pub fn clear_debug_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
-            backend.clear_debug_shapes();
+            ShapeRenderer::clear_debug_shapes(backend.as_mut());
         }
     }
 
     pub fn add_debug_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
         if let Some(backend) = &mut self.backend {
-            backend.add_debug_rect(x, y, width, height, color);
+            ShapeRenderer::add_debug_rect(backend.as_mut(), x, y, width, height, color);
         }
     }
 
@@ -528,37 +523,37 @@ impl RenderingSystem {
         color: [f32; 4],
     ) {
         if let Some(backend) = &mut self.backend {
-            backend.add_filled_debug_rect(x, y, width, height, color);
+            ShapeRenderer::add_filled_debug_rect(backend.as_mut(), x, y, width, height, color);
         }
     }
 
     pub fn finalize_debug_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
-            backend.finalize_debug_shapes();
+            ShapeRenderer::finalize_debug_shapes(backend.as_mut());
         }
     }
 
     pub fn clear_ui_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
-            backend.clear_ui_shapes();
+            ShapeRenderer::clear_ui_shapes(backend.as_mut());
         }
     }
 
     pub fn add_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
         if let Some(backend) = &mut self.backend {
-            backend.add_ui_rect(x, y, width, height, color);
+            ShapeRenderer::add_ui_rect(backend.as_mut(), x, y, width, height, color);
         }
     }
 
     pub fn add_filled_ui_rect(&mut self, x: f32, y: f32, width: f32, height: f32, color: [f32; 4]) {
         if let Some(backend) = &mut self.backend {
-            backend.add_filled_ui_rect(x, y, width, height, color);
+            ShapeRenderer::add_filled_ui_rect(backend.as_mut(), x, y, width, height, color);
         }
     }
 
     pub fn finalize_ui_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
-            backend.finalize_ui_shapes();
+            ShapeRenderer::finalize_ui_shapes(backend.as_mut());
         }
     }
 }

@@ -101,6 +101,18 @@ enum SceneSpriteBatchKey {
     Textured(String),
 }
 
+enum SceneSpriteTextureSource<'a> {
+    Default,
+    File {
+        key: String,
+        path: std::path::PathBuf,
+    },
+    Rgba8 {
+        key: String,
+        image: &'a DecodedImage,
+    },
+}
+
 impl SceneRenderer {
     pub fn new(
         device: wgpu::Device,
@@ -211,16 +223,12 @@ impl SceneRenderer {
         append_ordered_draw_batch(&mut self.sprite_draw_batches, key, start);
     }
 
-    fn add_sprite_instance(&mut self, sprite: &SpriteInstance) {
-        let render_instance = SpriteRenderInstance {
-            frame: sprite.frame,
-            position: sprite.position.as_vec2(),
-            size: sprite.size.as_vec2(),
-            flip_x: sprite.flip_x,
-        };
-
+    fn resolve_sprite_texture_source<'a>(
+        &self,
+        sprite: &'a SpriteInstance,
+    ) -> SceneSpriteTextureSource<'a> {
         if let Some(image) = &sprite.texture_image {
-            let cache_key = sprite
+            let key = sprite
                 .texture_cache_key
                 .clone()
                 .or_else(|| {
@@ -237,76 +245,94 @@ impl SceneRenderer {
                         self.sprite_pipelines_by_texture.len()
                     )
                 });
-            let batch_key = SceneSpriteBatchKey::Textured(cache_key.clone());
-            let instance_index = self
-                .sprite_pipelines_by_texture
-                .get(&cache_key)
-                .map(|pipeline| pipeline.instance_count())
-                .unwrap_or(0);
-            if !self.sprite_pipelines_by_texture.contains_key(&cache_key) {
-                match SpritePipeline::new(
-                    &self.device,
-                    &self.queue,
-                    wgpu::TextureFormat::Bgra8UnormSrgb,
-                    TextureSource::rgba8(image),
-                ) {
-                    Ok(pipeline) => {
-                        self.sprite_pipelines_by_texture
-                            .insert(cache_key.clone(), pipeline);
-                    }
-                    Err(error) => {
-                        tracing::warn!(
-                            texture_key = %cache_key,
-                            "Skipping inline RGBA8 sprite with failed texture pipeline creation: {error}"
-                        );
-                        return;
-                    }
-                }
-            }
-            if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(&cache_key) {
-                pipeline.update_projection(&self.queue, self.current_projection);
-                pipeline.add_sprite(render_instance);
-                self.record_sprite_draw_batch(batch_key, instance_index);
-            }
+            SceneSpriteTextureSource::Rgba8 { key, image }
         } else if let Some(texture_path) = &sprite.texture_path {
-            let texture_key = texture_path.to_string_lossy().to_string();
-            let instance_index = self
-                .sprite_pipelines_by_texture
-                .get(&texture_key)
-                .map(|pipeline| pipeline.instance_count())
-                .unwrap_or(0);
-            if !self.sprite_pipelines_by_texture.contains_key(&texture_key) {
-                match SpritePipeline::new(
-                    &self.device,
-                    &self.queue,
-                    wgpu::TextureFormat::Bgra8UnormSrgb,
-                    TextureSource::path(texture_path.clone()),
-                ) {
-                    Ok(pipeline) => {
-                        self.sprite_pipelines_by_texture
-                            .insert(texture_key.clone(), pipeline);
-                    }
-                    Err(error) => {
-                        tracing::warn!(
-                            texture_path = %texture_path.display(),
-                            "Skipping sprite with failed texture pipeline creation: {error}"
-                        );
-                        return;
-                    }
-                }
-            }
-            if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(&texture_key) {
-                pipeline.update_projection(&self.queue, self.current_projection);
-                pipeline.add_sprite(render_instance);
-                self.record_sprite_draw_batch(
-                    SceneSpriteBatchKey::Textured(texture_key),
-                    instance_index,
-                );
+            SceneSpriteTextureSource::File {
+                key: texture_path.to_string_lossy().to_string(),
+                path: texture_path.clone(),
             }
         } else {
-            let instance_index = self.sprite_pipeline.instance_count();
-            self.sprite_pipeline.add_sprite(render_instance);
-            self.record_sprite_draw_batch(SceneSpriteBatchKey::Default, instance_index);
+            SceneSpriteTextureSource::Default
+        }
+    }
+
+    fn ensure_textured_sprite_pipeline(
+        &mut self,
+        texture_key: &str,
+        texture_source: TextureSource<'_>,
+    ) -> bool {
+        if self.sprite_pipelines_by_texture.contains_key(texture_key) {
+            return true;
+        }
+        match SpritePipeline::new(
+            &self.device,
+            &self.queue,
+            wgpu::TextureFormat::Bgra8UnormSrgb,
+            texture_source,
+        ) {
+            Ok(pipeline) => {
+                self.sprite_pipelines_by_texture
+                    .insert(texture_key.to_string(), pipeline);
+                true
+            }
+            Err(error) => {
+                tracing::warn!(
+                    texture_key = %texture_key,
+                    "Skipping sprite with failed texture pipeline creation: {error}"
+                );
+                false
+            }
+        }
+    }
+
+    fn add_textured_sprite_instance(
+        &mut self,
+        texture_key: String,
+        texture_source: TextureSource<'_>,
+        render_instance: SpriteRenderInstance,
+    ) {
+        let instance_index = self
+            .sprite_pipelines_by_texture
+            .get(&texture_key)
+            .map(|pipeline| pipeline.instance_count())
+            .unwrap_or(0);
+        if !self.ensure_textured_sprite_pipeline(&texture_key, texture_source) {
+            return;
+        }
+        if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(&texture_key) {
+            pipeline.update_projection(&self.queue, self.current_projection);
+            pipeline.add_sprite(render_instance);
+            self.record_sprite_draw_batch(
+                SceneSpriteBatchKey::Textured(texture_key),
+                instance_index,
+            );
+        }
+    }
+
+    fn add_sprite_instance(&mut self, sprite: &SpriteInstance) {
+        let render_instance = SpriteRenderInstance {
+            frame: sprite.frame,
+            position: sprite.position.as_vec2(),
+            size: sprite.size.as_vec2(),
+            flip_x: sprite.flip_x,
+        };
+
+        match self.resolve_sprite_texture_source(sprite) {
+            SceneSpriteTextureSource::Default => {
+                let instance_index = self.sprite_pipeline.instance_count();
+                self.sprite_pipeline.add_sprite(render_instance);
+                self.record_sprite_draw_batch(SceneSpriteBatchKey::Default, instance_index);
+            }
+            SceneSpriteTextureSource::File { key, path } => {
+                self.add_textured_sprite_instance(key, TextureSource::path(path), render_instance);
+            }
+            SceneSpriteTextureSource::Rgba8 { key, image } => {
+                self.add_textured_sprite_instance(
+                    key,
+                    TextureSource::rgba8(image),
+                    render_instance,
+                );
+            }
         }
     }
 
@@ -396,7 +422,7 @@ impl SceneRenderer {
             };
             tracing::trace!("Updating tilemap pipeline with {} vertices", vertices.len());
             self.tilemap_pipeline
-                .update_vertices(&self.device, &vertices);
+                .update_vertices(&self.device, &self.queue, &vertices);
         } else {
             tracing::trace!("No tilemap or atlas to render");
         }

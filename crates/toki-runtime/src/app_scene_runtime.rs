@@ -26,35 +26,39 @@ pub(super) struct SceneRuntimeCoordinator<'a> {
     content_root: Option<PathBuf>,
 }
 
+pub(super) struct SceneRuntimeRefs<'a> {
+    pub game_system: &'a mut GameManager,
+    pub camera_system: &'a mut CameraManager,
+    pub resources: &'a mut ResourceManager,
+    pub rendering: &'a mut RenderingSystem,
+    pub audio_system: &'a mut AudioManager,
+    pub decoded_project_cache: &'a mut DecodedProjectCache,
+    pub asset_load_plan: &'a mut RuntimeAssetLoadPlan,
+    pub scene_transition: &'a mut SceneTransitionController,
+}
+
+pub(super) struct SceneRuntimeSettings<'a> {
+    pub audio_mix: &'a RuntimeAudioMixOptions,
+    pub scene_persistence: bool,
+    pub indexed_palette_override: Option<String>,
+    pub content_root: Option<PathBuf>,
+}
+
 impl<'a> SceneRuntimeCoordinator<'a> {
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn new(
-        game_system: &'a mut GameManager,
-        camera_system: &'a mut CameraManager,
-        resources: &'a mut ResourceManager,
-        rendering: &'a mut RenderingSystem,
-        audio_system: &'a mut AudioManager,
-        decoded_project_cache: &'a mut DecodedProjectCache,
-        asset_load_plan: &'a mut RuntimeAssetLoadPlan,
-        scene_transition: &'a mut SceneTransitionController,
-        audio_mix: &'a RuntimeAudioMixOptions,
-        scene_persistence: bool,
-        indexed_palette_override: Option<String>,
-        content_root: Option<PathBuf>,
-    ) -> Self {
+    pub(super) fn new(refs: SceneRuntimeRefs<'a>, settings: SceneRuntimeSettings<'a>) -> Self {
         Self {
-            game_system,
-            camera_system,
-            resources,
-            rendering,
-            audio_system,
-            decoded_project_cache,
-            asset_load_plan,
-            scene_transition,
-            audio_mix,
-            scene_persistence,
-            indexed_palette_override,
-            content_root,
+            game_system: refs.game_system,
+            camera_system: refs.camera_system,
+            resources: refs.resources,
+            rendering: refs.rendering,
+            audio_system: refs.audio_system,
+            decoded_project_cache: refs.decoded_project_cache,
+            asset_load_plan: refs.asset_load_plan,
+            scene_transition: refs.scene_transition,
+            audio_mix: settings.audio_mix,
+            scene_persistence: settings.scene_persistence,
+            indexed_palette_override: settings.indexed_palette_override,
+            content_root: settings.content_root,
         }
     }
 
@@ -246,18 +250,26 @@ impl App {
     pub(super) fn reload_runtime_render_textures(&mut self, scene_name: &str) {
         let content_root = self.content_root_path().map(std::path::Path::to_path_buf);
         SceneRuntimeCoordinator::new(
-            &mut self.game_system,
-            &mut self.camera_system,
-            &mut self.resources,
-            &mut self.rendering,
-            &mut self.audio_system,
-            &mut self.decoded_project_cache,
-            &mut self.asset_load_plan,
-            &mut self.scene_transition,
-            &self.launch_options.audio_mix,
-            self.launch_options.scene_persistence,
-            self.launch_options.display.indexed_palette_override.clone(),
-            content_root,
+            SceneRuntimeRefs {
+                game_system: &mut self.game_system,
+                camera_system: &mut self.camera_system,
+                resources: &mut self.resources,
+                rendering: &mut self.rendering,
+                audio_system: &mut self.audio_system,
+                decoded_project_cache: &mut self.decoded_project_cache,
+                asset_load_plan: &mut self.asset_load_plan,
+                scene_transition: &mut self.scene_transition,
+            },
+            SceneRuntimeSettings {
+                audio_mix: &self.launch_options.audio_mix,
+                scene_persistence: self.launch_options.scene_persistence,
+                indexed_palette_override: self
+                    .launch_options
+                    .display
+                    .indexed_palette_override
+                    .clone(),
+                content_root,
+            },
         )
         .reload_runtime_render_textures(scene_name);
     }

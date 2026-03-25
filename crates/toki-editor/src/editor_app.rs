@@ -394,7 +394,10 @@ impl ApplicationHandler for EditorApp {
             self.session.startup_project_auto_open_done = true;
             if self.core.config.has_project_path() {
                 tracing::info!("Auto-opening last project from config on startup");
-                self.core.ui.project.open_project_requested = true;
+                self.core
+                    .ui
+                    .project
+                    .request(crate::ui::editor_ui::ProjectRequest::OpenProject);
             }
         }
         window.request_redraw();
@@ -429,7 +432,7 @@ impl ApplicationHandler for EditorApp {
 
             WindowEvent::KeyboardInput { event, .. } => {
                 if event.state.is_pressed() {
-                    let active_viewport = match self.core.ui.center_panel_tab {
+                    let active_viewport = match self.core.ui.workspace.center_panel_tab {
                         CenterPanelTab::SceneViewport => self.viewports.scene.as_mut(),
                         CenterPanelTab::MapEditor => self.viewports.map_editor.as_mut(),
                         CenterPanelTab::SceneGraph
@@ -495,7 +498,8 @@ impl ApplicationHandler for EditorApp {
                             }
                             EditorShortcutAction::Copy => {
                                 // Copy only applies to sprite editor
-                                if self.core.ui.center_panel_tab == CenterPanelTab::SpriteEditor
+                                if self.core.ui.workspace.center_panel_tab
+                                    == CenterPanelTab::SpriteEditor
                                     && self.core.ui.sprite.copy_selection()
                                 {
                                     tracing::info!("Sprite editor: copied selection to clipboard");
@@ -503,7 +507,9 @@ impl ApplicationHandler for EditorApp {
                             }
                             EditorShortcutAction::Paste => {
                                 // Paste only applies to sprite editor
-                                if self.core.ui.center_panel_tab == CenterPanelTab::SpriteEditor {
+                                if self.core.ui.workspace.center_panel_tab
+                                    == CenterPanelTab::SpriteEditor
+                                {
                                     let side = self.core.ui.sprite.active_canvas;
                                     // Use (0, 0) as fallback if no cursor position
                                     if self
@@ -758,7 +764,7 @@ impl EditorApp {
             return;
         };
 
-        match self.core.ui.center_panel_tab {
+        match self.core.ui.workspace.center_panel_tab {
             CenterPanelTab::SceneViewport => {
                 let scene_player_overlay_sprites =
                     scene_overlays::build_scene_player_overlay_sprites(
@@ -946,15 +952,17 @@ impl EditorApp {
         egui_ctx.run(raw_input, |ctx| {
             self.core.ui.render(
                 ctx,
-                self.viewports.scene.as_mut(),
-                self.viewports.map_editor.as_mut(),
-                current_project.as_deref_mut(),
-                project_assets.as_deref_mut(),
-                available_map_names.clone(),
-                Some(&mut self.core.config),
-                self.log_capture.as_ref(),
-                None,
-                self.resources.busy_logo_texture.as_ref(),
+                crate::ui::editor_ui::EditorRenderContext {
+                    scene_viewport: self.viewports.scene.as_mut(),
+                    map_editor_viewport: self.viewports.map_editor.as_mut(),
+                    project: current_project.as_deref_mut(),
+                    project_assets: project_assets.as_deref_mut(),
+                    available_map_names: available_map_names.clone(),
+                    config: Some(&mut self.core.config),
+                    log_capture: self.log_capture.as_ref(),
+                    renderer: None,
+                    busy_logo_texture: self.resources.busy_logo_texture.as_ref(),
+                },
             );
         })
     }

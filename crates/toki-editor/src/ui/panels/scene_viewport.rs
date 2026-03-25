@@ -27,10 +27,10 @@ impl PanelSystem {
             ui.horizontal(|ui| {
                 toolbar_changed = Self::render_grid_toolbar_contents(ui, cfg);
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.checkbox(&mut ui_state.viewport_cursor_show_tiles, "P/T");
+                    ui.checkbox(&mut ui_state.viewport_cursor.show_tiles, "P/T");
                     ui.label(Self::viewport_cursor_status_label(
-                        ui_state.viewport_cursor_world_position,
-                        ui_state.viewport_cursor_show_tiles,
+                        ui_state.viewport_cursor.world_position,
+                        ui_state.viewport_cursor.show_tiles,
                         grid_size,
                     ));
                 });

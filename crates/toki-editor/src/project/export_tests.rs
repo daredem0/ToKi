@@ -5,17 +5,79 @@ use std::io::{Read, Seek, SeekFrom};
 use toki_core::pack::{PackAssetType, PackCompression, PakManifest, PAK_MAGIC, PAK_VERSION};
 use toki_core::project_runtime::RuntimeConfigFile;
 
+struct TestProjectBuilder {
+    root: std::path::PathBuf,
+}
+
+impl TestProjectBuilder {
+    fn new(parent: &std::path::Path, name: &str) -> Self {
+        let root = parent.join(name);
+        Self { root }
+    }
+
+    fn root(&self) -> &std::path::Path {
+        &self.root
+    }
+
+    fn create_dir(&self, relative: &str) {
+        fs::create_dir_all(self.root.join(relative)).expect("test project dir");
+    }
+
+    fn write(&self, relative: &str, contents: impl AsRef<[u8]>) {
+        let path = self.root.join(relative);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("test project parent dir");
+        }
+        fs::write(path, contents).expect("test project file");
+    }
+
+    fn runtime_binary(parent: &std::path::Path) -> std::path::PathBuf {
+        let runtime_bin = parent.join(if cfg!(target_os = "windows") {
+            "toki-runtime.exe"
+        } else {
+            "toki-runtime"
+        });
+        fs::write(&runtime_bin, "runtime-binary").expect("runtime");
+        runtime_bin
+    }
+}
+
+fn read_pak_manifest(pak_path: &std::path::Path) -> PakManifest {
+    let mut pak_file = fs::File::open(pak_path).expect("open pak");
+    let mut magic = [0u8; 8];
+    pak_file.read_exact(&mut magic).expect("read magic");
+    assert_eq!(&magic, PAK_MAGIC);
+
+    let mut index_offset_buf = [0u8; 8];
+    let mut index_size_buf = [0u8; 8];
+    pak_file
+        .read_exact(&mut index_offset_buf)
+        .expect("read offset");
+    pak_file.read_exact(&mut index_size_buf).expect("read size");
+    let index_offset = u64::from_le_bytes(index_offset_buf);
+    let index_size = u64::from_le_bytes(index_size_buf);
+    assert!(index_offset > 0);
+    assert!(index_size > 0);
+
+    pak_file
+        .seek(SeekFrom::Start(index_offset))
+        .expect("seek index");
+    let mut index_bytes = vec![0u8; index_size as usize];
+    pak_file.read_exact(&mut index_bytes).expect("read index");
+    serde_json::from_slice(&index_bytes).expect("manifest")
+}
+
 #[test]
 fn collect_source_files_returns_sorted_relative_paths() {
     let temp = tempfile::tempdir().expect("temp dir");
-    let project_root = temp.path().join("MyGame");
-    fs::create_dir_all(project_root.join("assets/sprites")).expect("assets dir");
-    fs::create_dir_all(project_root.join("scenes")).expect("scenes dir");
-    fs::write(project_root.join("project.toml"), "name = 'MyGame'").expect("project");
-    fs::write(project_root.join("scenes/main.json"), "{}").expect("scene");
-    fs::write(project_root.join("assets/sprites/a.png"), "a").expect("asset");
+    let project = TestProjectBuilder::new(temp.path(), "MyGame");
+    project.create_dir("assets/sprites");
+    project.create_dir("scenes");
+    project.write("project.toml", "name = 'MyGame'");
+    project.write("scenes/main.json", "{}");
+    project.write("assets/sprites/a.png", "a");
 
-    let files = collect_source_files(&project_root, None).expect("collect files");
+    let files = collect_source_files(project.root(), None).expect("collect files");
     let relative = files
         .iter()
         .map(|f| f.relative_path.to_string_lossy().replace('\\', "/"))
@@ -34,21 +96,16 @@ fn collect_source_files_returns_sorted_relative_paths() {
 fn export_hybrid_bundle_writes_runtime_and_pak_manifest() {
     let temp = tempfile::tempdir().expect("temp dir");
     let parent = temp.path();
-    let project_root = parent.join("MyGame");
-    fs::create_dir_all(project_root.join("assets/audio")).expect("assets dir");
-    fs::create_dir_all(project_root.join("scenes")).expect("scenes dir");
-    fs::write(project_root.join("project.toml"), "name = 'MyGame'").expect("project");
-    fs::write(project_root.join("scenes/main.json"), "{\"name\":\"main\"}").expect("scene");
-    fs::write(project_root.join("assets/audio/test.ogg"), "audio").expect("audio");
+    let project_builder = TestProjectBuilder::new(parent, "MyGame");
+    project_builder.create_dir("assets/audio");
+    project_builder.create_dir("scenes");
+    project_builder.write("project.toml", "name = 'MyGame'");
+    project_builder.write("scenes/main.json", "{\"name\":\"main\"}");
+    project_builder.write("assets/audio/test.ogg", "audio");
 
-    let runtime_bin = parent.join(if cfg!(target_os = "windows") {
-        "toki-runtime.exe"
-    } else {
-        "toki-runtime"
-    });
-    fs::write(&runtime_bin, "runtime-binary").expect("runtime");
+    let runtime_bin = TestProjectBuilder::runtime_binary(parent);
 
-    let project = Project::new("MyGame".to_string(), project_root.clone());
+    let project = Project::new("MyGame".to_string(), project_builder.root().to_path_buf());
     let mut project = project;
     project.metadata.runtime.audio.master_percent = 80;
     project.metadata.runtime.audio.music_percent = 65;
@@ -98,28 +155,7 @@ fn export_hybrid_bundle_writes_runtime_and_pak_manifest() {
     assert!(root_entries.contains(&"LICENSE-TOKI.md".to_string()));
     assert!(root_entries.contains(&"THIRD_PARTY_LICENSES.md".to_string()));
 
-    let mut pak_file = fs::File::open(&pak_path).expect("open pak");
-    let mut magic = [0u8; 8];
-    pak_file.read_exact(&mut magic).expect("read magic");
-    assert_eq!(&magic, PAK_MAGIC);
-
-    let mut index_offset_buf = [0u8; 8];
-    let mut index_size_buf = [0u8; 8];
-    pak_file
-        .read_exact(&mut index_offset_buf)
-        .expect("read offset");
-    pak_file.read_exact(&mut index_size_buf).expect("read size");
-    let index_offset = u64::from_le_bytes(index_offset_buf);
-    let index_size = u64::from_le_bytes(index_size_buf);
-    assert!(index_offset > 0);
-    assert!(index_size > 0);
-
-    pak_file
-        .seek(SeekFrom::Start(index_offset))
-        .expect("seek index");
-    let mut index_bytes = vec![0u8; index_size as usize];
-    pak_file.read_exact(&mut index_bytes).expect("read index");
-    let manifest: PakManifest = serde_json::from_slice(&index_bytes).expect("manifest");
+    let manifest = read_pak_manifest(&pak_path);
     assert_eq!(manifest.version, PAK_VERSION);
     assert!(manifest
         .entries
@@ -236,80 +272,48 @@ fn export_hybrid_bundle_writes_runtime_and_pak_manifest() {
 fn export_hybrid_bundle_uses_safe_bundle_directory_suffix() {
     let temp = tempfile::tempdir().expect("temp dir");
     let parent = temp.path();
-    let project_root = parent.join("MyGame");
-    fs::create_dir_all(project_root.join("assets")).expect("assets");
-    fs::write(project_root.join("project.toml"), "name='MyGame'").expect("project");
-    fs::write(project_root.join("assets/file.txt"), "payload").expect("asset");
+    let project_builder = TestProjectBuilder::new(parent, "MyGame");
+    project_builder.create_dir("assets");
+    project_builder.write("project.toml", "name='MyGame'");
+    project_builder.write("assets/file.txt", "payload");
 
-    let runtime_bin = parent.join(if cfg!(target_os = "windows") {
-        "toki-runtime.exe"
-    } else {
-        "toki-runtime"
-    });
-    fs::write(&runtime_bin, "runtime-binary").expect("runtime");
+    let runtime_bin = TestProjectBuilder::runtime_binary(parent);
 
-    let project = Project::new("MyGame".to_string(), project_root.clone());
+    let project = Project::new("MyGame".to_string(), project_builder.root().to_path_buf());
     let bundle_dir = export_hybrid_bundle(&project, &runtime_bin, parent, Some("Main Scene"), 3000)
         .expect("bundle export");
 
     assert_eq!(bundle_dir, parent.join("MyGame-bundle"));
-    assert!(project_root.join("project.toml").exists());
-    assert!(project_root.join("assets/file.txt").exists());
+    assert!(project_builder.root().join("project.toml").exists());
+    assert!(project_builder.root().join("assets/file.txt").exists());
 }
 
 #[test]
 fn export_hybrid_bundle_compresses_text_assets_and_stores_already_compressed_assets() {
     let temp = tempfile::tempdir().expect("temp dir");
     let parent = temp.path();
-    let project_root = parent.join("MyGame");
-    fs::create_dir_all(project_root.join("assets/sprites")).expect("sprites dir");
-    fs::create_dir_all(project_root.join("scenes")).expect("scenes dir");
-    fs::write(
-        project_root.join("project.toml"),
-        "name='MyGame'\nversion='1'",
-    )
-    .expect("project");
+    let project_builder = TestProjectBuilder::new(parent, "MyGame");
+    project_builder.create_dir("assets/sprites");
+    project_builder.create_dir("scenes");
+    project_builder.write("project.toml", "name='MyGame'\nversion='1'");
     let repeated_entities = (0..128)
         .map(|index| format!("{{\"id\":{index},\"type\":\"npc\",\"x\":0,\"y\":0}}"))
         .collect::<Vec<_>>()
         .join(",");
-    fs::write(
-        project_root.join("scenes/main.json"),
+    project_builder.write(
+        "scenes/main.json",
         format!("{{\"name\":\"main\",\"maps\":[],\"entities\":[{repeated_entities}]}}"),
-    )
-    .expect("scene");
-    fs::write(
-        project_root.join("assets/sprites/a.png"),
-        [137u8, 80, 78, 71, 13, 10, 26, 10],
-    )
-    .expect("png");
+    );
+    project_builder.write("assets/sprites/a.png", [137u8, 80, 78, 71, 13, 10, 26, 10]);
 
-    let runtime_bin = parent.join(if cfg!(target_os = "windows") {
-        "toki-runtime.exe"
-    } else {
-        "toki-runtime"
-    });
-    fs::write(&runtime_bin, "runtime-binary").expect("runtime");
+    let runtime_bin = TestProjectBuilder::runtime_binary(parent);
 
-    let project = Project::new("MyGame".to_string(), project_root.clone());
+    let project = Project::new("MyGame".to_string(), project_builder.root().to_path_buf());
     let bundle_dir = export_hybrid_bundle(&project, &runtime_bin, parent, Some("Main Scene"), 3000)
         .expect("bundle export");
 
     let pak_path = bundle_dir.join("game.toki.pak");
-    let mut pak_file = fs::File::open(&pak_path).expect("open pak");
-    pak_file.seek(SeekFrom::Start(8)).expect("seek header");
-    let mut index_offset_buf = [0u8; 8];
-    let mut index_size_buf = [0u8; 8];
-    pak_file.read_exact(&mut index_offset_buf).expect("offset");
-    pak_file.read_exact(&mut index_size_buf).expect("size");
-    let index_offset = u64::from_le_bytes(index_offset_buf);
-    let index_size = u64::from_le_bytes(index_size_buf);
-    pak_file
-        .seek(SeekFrom::Start(index_offset))
-        .expect("seek index");
-    let mut index_bytes = vec![0u8; index_size as usize];
-    pak_file.read_exact(&mut index_bytes).expect("read index");
-    let manifest: PakManifest = serde_json::from_slice(&index_bytes).expect("manifest");
+    let manifest = read_pak_manifest(&pak_path);
 
     let scene_entry = manifest
         .entries

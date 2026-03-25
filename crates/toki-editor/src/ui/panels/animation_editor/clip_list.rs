@@ -1,6 +1,6 @@
 //! Clip list panel.
 
-use super::separators;
+use crate::ui::widgets::separators;
 use crate::ui::EditorUI;
 
 pub fn render_clip_list(ui: &mut egui::Ui, ui_state: &mut EditorUI) {

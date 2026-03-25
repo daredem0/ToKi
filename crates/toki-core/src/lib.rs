@@ -13,6 +13,7 @@ pub mod math {
 }
 pub mod errors;
 pub use errors::CoreError;
+pub mod cache_utils;
 pub mod dialog;
 pub mod dialog_runtime;
 pub mod pack;

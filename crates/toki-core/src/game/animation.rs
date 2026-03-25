@@ -9,6 +9,58 @@ pub(super) enum FacingDirection {
     Right,
 }
 
+impl FacingDirection {
+    pub(super) fn to_ivec2(self) -> glam::IVec2 {
+        match self {
+            Self::Down => glam::IVec2::new(0, 1),
+            Self::Up => glam::IVec2::new(0, -1),
+            Self::Left => glam::IVec2::new(-1, 0),
+            Self::Right => glam::IVec2::new(1, 0),
+        }
+    }
+
+    pub(super) fn offset_bounds(
+        self,
+        origin: glam::IVec2,
+        size: glam::UVec2,
+        distance: i32,
+    ) -> (glam::IVec2, glam::UVec2) {
+        match self {
+            Self::Down => (glam::IVec2::new(origin.x, origin.y + distance), size),
+            Self::Up => (glam::IVec2::new(origin.x, origin.y - distance), size),
+            Self::Left => (glam::IVec2::new(origin.x - distance, origin.y), size),
+            Self::Right => (glam::IVec2::new(origin.x + distance, origin.y), size),
+        }
+    }
+
+    pub(super) fn reach_bounds(
+        self,
+        origin: glam::IVec2,
+        size: glam::UVec2,
+        reach: i32,
+    ) -> (glam::IVec2, glam::UVec2) {
+        let reach = reach.max(1);
+        match self {
+            Self::Up => (
+                glam::IVec2::new(origin.x, origin.y - reach),
+                glam::UVec2::new(size.x, reach as u32),
+            ),
+            Self::Down => (
+                glam::IVec2::new(origin.x, origin.y + size.y as i32),
+                glam::UVec2::new(size.x, reach as u32),
+            ),
+            Self::Left => (
+                glam::IVec2::new(origin.x - reach, origin.y),
+                glam::UVec2::new(reach as u32, size.y),
+            ),
+            Self::Right => (
+                glam::IVec2::new(origin.x + size.x as i32, origin.y),
+                glam::UVec2::new(reach as u32, size.y),
+            ),
+        }
+    }
+}
+
 impl GameState {
     pub(super) fn facing_from_delta(delta: glam::IVec2) -> Option<FacingDirection> {
         if delta == glam::IVec2::ZERO {

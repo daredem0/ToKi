@@ -1,6 +1,6 @@
 use super::*;
 use crate::editor_services::graph_metadata;
-use crate::ui::editor_ui::DialogEditorState;
+use crate::ui::editor_ui::{DialogEditorState, ProjectRequest};
 
 impl EditorApp {
     pub(super) fn refresh_project_assets_after_rescan(&mut self) {
@@ -196,8 +196,6 @@ impl EditorApp {
     }
 
     pub(super) fn handle_open_project_request(&mut self) {
-        self.core.ui.project.open_project_requested = false;
-
         let project_path = if let Some(config_path) = &self.core.config.project_path {
             tracing::info!("Opening project from config: {:?}", config_path);
             Some(config_path.clone())
@@ -215,8 +213,6 @@ impl EditorApp {
     }
 
     pub(super) fn handle_browse_for_project_request(&mut self) {
-        self.core.ui.project.browse_for_project_requested = false;
-
         if let Some(project_path) = rfd::FileDialog::new()
             .set_title("Browse for ToKi Project")
             .add_filter("ToKi Project", &["toki"])
@@ -228,8 +224,6 @@ impl EditorApp {
     }
 
     pub(super) fn handle_save_project_request(&mut self) {
-        self.core.ui.project.save_project_requested = false;
-
         if let Some(project) = self.core.project_manager.current_project.as_mut() {
             graph_metadata::copy_ui_into_project(&self.core.ui, project);
         }
@@ -247,8 +241,6 @@ impl EditorApp {
     }
 
     pub(super) fn handle_reload_project_assets_request(&mut self) {
-        self.core.ui.project.reload_project_assets_requested = false;
-
         if let Err(error) = self.core.project_manager.rescan_assets() {
             tracing::error!("Failed to reload project assets: {}", error);
             return;
@@ -259,8 +251,6 @@ impl EditorApp {
     }
 
     pub(super) fn handle_init_project_request(&mut self) {
-        self.core.ui.project.init_config_requested = false;
-
         match EditorConfig::init_default_config() {
             Ok(new_config) => {
                 self.core.config = new_config;
@@ -282,8 +272,12 @@ impl EditorApp {
             }
         }
 
-        if self.core.ui.project.new_project_requested {
-            self.core.ui.project.new_project_requested = false;
+        if self
+            .core
+            .ui
+            .project
+            .take_request(ProjectRequest::NewProject)
+        {
             let suggested_parent = self
                 .core
                 .config
@@ -302,8 +296,12 @@ impl EditorApp {
             );
         }
 
-        if self.core.ui.project.new_top_down_project_requested {
-            self.core.ui.project.new_top_down_project_requested = false;
+        if self
+            .core
+            .ui
+            .project
+            .take_request(ProjectRequest::NewTopDownProject)
+        {
             let suggested_parent = self
                 .core
                 .config
@@ -326,38 +324,71 @@ impl EditorApp {
             self.handle_new_project_requested(request.template, request.parent_path, request.name);
         }
 
-        if self.core.ui.project.open_project_requested {
+        if self
+            .core
+            .ui
+            .project
+            .take_request(ProjectRequest::OpenProject)
+        {
             self.handle_open_project_request();
         }
 
-        if self.core.ui.project.browse_for_project_requested {
+        if self
+            .core
+            .ui
+            .project
+            .take_request(ProjectRequest::BrowseForProject)
+        {
             self.handle_browse_for_project_request();
         }
 
-        if self.core.ui.project.reload_project_assets_requested {
+        if self
+            .core
+            .ui
+            .project
+            .take_request(ProjectRequest::ReloadProjectAssets)
+        {
             self.handle_reload_project_assets_request();
         }
 
-        if self.core.ui.project.save_project_requested {
+        if self
+            .core
+            .ui
+            .project
+            .take_request(ProjectRequest::SaveProject)
+        {
             self.handle_save_project_request();
         }
 
-        if self.core.ui.project.export_project_requested {
+        if self
+            .core
+            .ui
+            .project
+            .take_request(ProjectRequest::ExportProject)
+        {
             self.handle_export_project_request();
         }
 
-        if self.core.ui.project.init_config_requested {
+        if self
+            .core
+            .ui
+            .project
+            .take_request(ProjectRequest::InitConfig)
+        {
             self.handle_init_project_request();
         }
 
-        if self.core.ui.project.validate_assets_requested {
+        if self
+            .core
+            .ui
+            .project
+            .take_request(ProjectRequest::ValidateAssets)
+        {
             self.handle_validate_assets_request();
         }
     }
 
     pub(super) fn handle_validate_assets_request(&mut self) {
-        self.core.ui.project.validate_assets_requested = false;
-
         if self.background_tasks.is_running() {
             tracing::warn!("Cannot validate assets: another background task is running");
             return;

@@ -15,6 +15,14 @@ struct MovementCollisionResult {
     collided_with: Option<EntityId>,
 }
 
+pub(super) struct MovementStepContext<'a> {
+    pub world_bounds: glam::UVec2,
+    pub tilemap: &'a TileMap,
+    pub atlas: &'a AtlasMeta,
+    pub result: &'a mut GameUpdateResult<AudioEvent>,
+    pub time_scale: f32,
+}
+
 impl GameState {
     fn clamp_entity_position_to_world_bounds(
         entity: &crate::entity::Entity,
@@ -78,16 +86,11 @@ impl GameState {
         whole_pixels
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn apply_accumulated_movement_scaled(
         &mut self,
         entity_id: EntityId,
         direction: glam::IVec2,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
-        result: &mut GameUpdateResult<AudioEvent>,
-        time_scale: f32,
+        ctx: MovementStepContext<'_>,
     ) -> bool {
         let (current_position, accumulator, new_position) = {
             let Some(entity) = self.entity_manager.get_entity(entity_id) else {
@@ -95,7 +98,7 @@ impl GameState {
             };
 
             let current_position = entity.position;
-            let entity_speed = entity.attributes.speed * time_scale;
+            let entity_speed = entity.attributes.speed * ctx.time_scale;
             let mut accumulator = entity.movement_accumulator;
 
             let pixels_x =
@@ -109,7 +112,7 @@ impl GameState {
                 Some(Self::clamp_entity_position_to_world_bounds(
                     entity,
                     glam::IVec2::new(current_position.x + pixels_x, current_position.y + pixels_y),
-                    world_bounds,
+                    ctx.world_bounds,
                 ))
             };
 
@@ -131,10 +134,14 @@ impl GameState {
 
         // Check for collisions and identify the colliding entity if any
         let collision_result =
-            self.check_movement_collision(entity_id, new_position, tilemap, atlas);
+            self.check_movement_collision(entity_id, new_position, ctx.tilemap, ctx.atlas);
 
         if collision_result.blocked {
-            self.handle_entity_collision_blocked(entity_id, collision_result.collided_with, result);
+            self.handle_entity_collision_blocked(
+                entity_id,
+                collision_result.collided_with,
+                ctx.result,
+            );
             false
         } else {
             if let Some((entity, entity_audio)) =
@@ -409,11 +416,13 @@ impl GameState {
             self.apply_accumulated_movement_scaled(
                 entity_id,
                 direction,
-                world_bounds,
-                tilemap,
-                atlas,
-                &mut result,
-                time_scale,
+                MovementStepContext {
+                    world_bounds,
+                    tilemap,
+                    atlas,
+                    result: &mut result,
+                    time_scale,
+                },
             );
         }
 

@@ -10,6 +10,7 @@ pub mod panel_layout;
 pub mod panels;
 pub mod sprite_editor;
 pub mod undo_redo;
+pub mod widgets;
 
 pub(crate) use crate::rule_graph;
 pub use editor_ui::EditorUI;

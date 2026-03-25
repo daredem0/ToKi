@@ -68,6 +68,129 @@ fn default_texture_path() -> PathBuf {
 }
 
 impl GpuState {
+    fn new_internal(
+        window: Arc<Window>,
+        vsync: bool,
+        tilemap_texture: TextureSource<'_>,
+        sprite_texture: TextureSource<'_>,
+    ) -> Result<Self, RenderError> {
+        let (device, queue, surface, config, supported_present_modes) =
+            create_device_and_surface(Arc::clone(&window), vsync)?;
+        let tilemap_pipeline =
+            TilemapPipeline::new(&device, &queue, config.format, tilemap_texture)?;
+        let sprite_pipeline = SpritePipeline::new(&device, &queue, config.format, sprite_texture)?;
+        let world_underlay_pipeline = DebugPipeline::new(&device, config.format);
+        let debug_pipeline = DebugPipeline::new(&device, config.format);
+        let ui_rect_pipeline = DebugPipeline::new(&device, config.format);
+        let ui_debug_pipeline = DebugPipeline::new(&device, config.format);
+        let post_process_pipeline = PostProcessPipeline::new(&device, config.format);
+        let text_renderer = GlyphonTextRenderer::new(&device, &queue, config.format);
+
+        Ok(Self {
+            surface,
+            config,
+            supported_present_modes,
+            device,
+            queue,
+            tilemap_pipeline,
+            sprite_pipeline,
+            sprite_pipelines_by_texture: BTreeMap::new(),
+            sprite_draw_batches: Vec::new(),
+            world_underlay_pipeline,
+            debug_pipeline,
+            ui_rect_pipeline,
+            ui_debug_pipeline,
+            post_process_pipeline,
+            post_process_target: None,
+            post_process_settings: Self::default_post_process_settings(),
+            text_renderer,
+            text_items: Vec::new(),
+            tilemap_render_enabled: true,
+            current_mvp: glam::Mat4::IDENTITY,
+        })
+    }
+
+    fn build_sprite_instance(
+        frame: SpriteFrame,
+        pos: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    ) -> SpriteInstance {
+        SpriteInstance {
+            frame,
+            position: pos.as_vec2(),
+            size: size.as_vec2(),
+            flip_x,
+        }
+    }
+
+    fn add_default_sprite(
+        &mut self,
+        frame: SpriteFrame,
+        pos: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    ) {
+        let instance = Self::build_sprite_instance(frame, pos, size, flip_x);
+        let instance_index = self.sprite_pipeline.instance_count();
+        self.sprite_pipeline.add_sprite(instance);
+        self.record_sprite_draw_batch(GpuSpriteBatchKey::Default, instance_index);
+    }
+
+    fn ensure_textured_sprite_pipeline(
+        &mut self,
+        texture_key: &Path,
+        texture_source: TextureSource<'_>,
+    ) -> bool {
+        if self.sprite_pipelines_by_texture.contains_key(texture_key) {
+            return true;
+        }
+        match SpritePipeline::new(
+            &self.device,
+            &self.queue,
+            self.config.format,
+            texture_source,
+        ) {
+            Ok(pipeline) => {
+                self.sprite_pipelines_by_texture
+                    .insert(texture_key.to_path_buf(), pipeline);
+                true
+            }
+            Err(error) => {
+                tracing::warn!(
+                    texture_key = %texture_key.display(),
+                    "Skipping sprite with failed texture pipeline creation: {error}"
+                );
+                false
+            }
+        }
+    }
+
+    fn add_textured_sprite(
+        &mut self,
+        texture_key: PathBuf,
+        texture_source: TextureSource<'_>,
+        frame: SpriteFrame,
+        pos: glam::IVec2,
+        size: glam::UVec2,
+        flip_x: bool,
+    ) {
+        let instance = Self::build_sprite_instance(frame, pos, size, flip_x);
+        let instance_index = self
+            .sprite_pipelines_by_texture
+            .get(&texture_key)
+            .map(|pipeline| pipeline.instance_count())
+            .unwrap_or(0);
+        if !self.ensure_textured_sprite_pipeline(&texture_key, texture_source) {
+            return;
+        }
+        if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(&texture_key) {
+            pipeline.update_projection(&self.queue, self.current_mvp);
+            pipeline.add_sprite(instance);
+            self.record_sprite_draw_batch(GpuSpriteBatchKey::Textured(texture_key), instance_index);
+        }
+    }
+
     fn default_post_process_settings() -> ResolvedPostProcessSettings {
         ResolvedPostProcessSettings {
             mode: PostProcessMode::None,
@@ -163,15 +286,7 @@ impl GpuState {
     }
 
     pub fn add_sprite(&mut self, frame: SpriteFrame, pos: glam::IVec2, size: glam::UVec2) {
-        let instance = SpriteInstance {
-            frame,
-            position: pos.as_vec2(), // Convert to float for GPU
-            size: size.as_vec2(),    // Convert to float for GPU
-            flip_x: false,
-        };
-        let instance_index = self.sprite_pipeline.instance_count();
-        self.sprite_pipeline.add_sprite(instance);
-        self.record_sprite_draw_batch(GpuSpriteBatchKey::Default, instance_index);
+        self.add_default_sprite(frame, pos, size, false);
     }
 
     pub fn add_sprite_flipped(
@@ -181,15 +296,7 @@ impl GpuState {
         size: glam::UVec2,
         flip_x: bool,
     ) {
-        let instance = SpriteInstance {
-            frame,
-            position: pos.as_vec2(),
-            size: size.as_vec2(),
-            flip_x,
-        };
-        let instance_index = self.sprite_pipeline.instance_count();
-        self.sprite_pipeline.add_sprite(instance);
-        self.record_sprite_draw_batch(GpuSpriteBatchKey::Default, instance_index);
+        self.add_default_sprite(frame, pos, size, flip_x);
     }
 
     pub fn add_sprite_with_texture(
@@ -199,45 +306,14 @@ impl GpuState {
         pos: glam::IVec2,
         size: glam::UVec2,
     ) {
-        let instance = SpriteInstance {
+        self.add_textured_sprite(
+            texture_path.clone(),
+            TextureSource::path(texture_path),
             frame,
-            position: pos.as_vec2(),
-            size: size.as_vec2(),
-            flip_x: false,
-        };
-        let instance_index = self
-            .sprite_pipelines_by_texture
-            .get(&texture_path)
-            .map(|pipeline| pipeline.instance_count())
-            .unwrap_or(0);
-        if !self.sprite_pipelines_by_texture.contains_key(&texture_path) {
-            match SpritePipeline::new(
-                &self.device,
-                &self.queue,
-                self.config.format,
-                TextureSource::path(texture_path.clone()),
-            ) {
-                Ok(pipeline) => {
-                    self.sprite_pipelines_by_texture
-                        .insert(texture_path.clone(), pipeline);
-                }
-                Err(error) => {
-                    tracing::warn!(
-                        texture_path = %texture_path.display(),
-                        "Skipping sprite with failed texture pipeline creation: {error}"
-                    );
-                    return;
-                }
-            }
-        }
-        if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(&texture_path) {
-            pipeline.update_projection(&self.queue, self.current_mvp);
-            pipeline.add_sprite(instance);
-            self.record_sprite_draw_batch(
-                GpuSpriteBatchKey::Textured(texture_path),
-                instance_index,
-            );
-        }
+            pos,
+            size,
+            false,
+        );
     }
 
     pub fn add_sprite_with_texture_flipped(
@@ -248,45 +324,14 @@ impl GpuState {
         size: glam::UVec2,
         flip_x: bool,
     ) {
-        let instance = SpriteInstance {
+        self.add_textured_sprite(
+            texture_path.clone(),
+            TextureSource::path(texture_path),
             frame,
-            position: pos.as_vec2(),
-            size: size.as_vec2(),
+            pos,
+            size,
             flip_x,
-        };
-        let instance_index = self
-            .sprite_pipelines_by_texture
-            .get(&texture_path)
-            .map(|pipeline| pipeline.instance_count())
-            .unwrap_or(0);
-        if !self.sprite_pipelines_by_texture.contains_key(&texture_path) {
-            match SpritePipeline::new(
-                &self.device,
-                &self.queue,
-                self.config.format,
-                TextureSource::path(texture_path.clone()),
-            ) {
-                Ok(pipeline) => {
-                    self.sprite_pipelines_by_texture
-                        .insert(texture_path.clone(), pipeline);
-                }
-                Err(error) => {
-                    tracing::warn!(
-                        texture_path = %texture_path.display(),
-                        "Skipping flipped sprite with failed texture pipeline creation: {error}"
-                    );
-                    return;
-                }
-            }
-        }
-        if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(&texture_path) {
-            pipeline.update_projection(&self.queue, self.current_mvp);
-            pipeline.add_sprite(instance);
-            self.record_sprite_draw_batch(
-                GpuSpriteBatchKey::Textured(texture_path),
-                instance_index,
-            );
-        }
+        );
     }
 
     pub fn add_sprite_with_texture_rgba8(
@@ -298,42 +343,14 @@ impl GpuState {
         size: glam::UVec2,
         flip_x: bool,
     ) {
-        let instance = SpriteInstance {
+        self.add_textured_sprite(
+            texture_key.clone(),
+            TextureSource::rgba8(image),
             frame,
-            position: pos.as_vec2(),
-            size: size.as_vec2(),
+            pos,
+            size,
             flip_x,
-        };
-        let instance_index = self
-            .sprite_pipelines_by_texture
-            .get(&texture_key)
-            .map(|pipeline| pipeline.instance_count())
-            .unwrap_or(0);
-        if !self.sprite_pipelines_by_texture.contains_key(&texture_key) {
-            match SpritePipeline::new(
-                &self.device,
-                &self.queue,
-                self.config.format,
-                TextureSource::rgba8(image),
-            ) {
-                Ok(pipeline) => {
-                    self.sprite_pipelines_by_texture
-                        .insert(texture_key.clone(), pipeline);
-                }
-                Err(error) => {
-                    tracing::warn!(
-                        texture_key = %texture_key.display(),
-                        "Skipping RGBA8 sprite with failed texture pipeline creation: {error}"
-                    );
-                    return;
-                }
-            }
-        }
-        if let Some(pipeline) = self.sprite_pipelines_by_texture.get_mut(&texture_key) {
-            pipeline.update_projection(&self.queue, self.current_mvp);
-            pipeline.add_sprite(instance);
-            self.record_sprite_draw_batch(GpuSpriteBatchKey::Textured(texture_key), instance_index);
-        }
+        );
     }
 
     pub fn clear_sprites(&mut self) {
@@ -454,52 +471,12 @@ impl GpuState {
     }
 
     pub fn new(window: Arc<Window>, vsync: bool) -> Result<Self, RenderError> {
-        let (device, queue, surface, config, supported_present_modes) =
-            create_device_and_surface(Arc::clone(&window), vsync)?;
-
-        let tilemap_pipeline = TilemapPipeline::new(
-            &device,
-            &queue,
-            config.format,
+        Self::new_internal(
+            window,
+            vsync,
             TextureSource::path(default_texture_path()),
-        )?;
-
-        let sprite_pipeline = SpritePipeline::new(
-            &device,
-            &queue,
-            config.format,
             TextureSource::path(default_texture_path()),
-        )?;
-
-        let world_underlay_pipeline = DebugPipeline::new(&device, config.format);
-        let debug_pipeline = DebugPipeline::new(&device, config.format);
-        let ui_rect_pipeline = DebugPipeline::new(&device, config.format);
-        let ui_debug_pipeline = DebugPipeline::new(&device, config.format);
-        let post_process_pipeline = PostProcessPipeline::new(&device, config.format);
-        let text_renderer = GlyphonTextRenderer::new(&device, &queue, config.format);
-
-        Ok(Self {
-            surface,
-            config,
-            supported_present_modes,
-            device,
-            queue,
-            tilemap_pipeline,
-            sprite_pipeline,
-            sprite_pipelines_by_texture: BTreeMap::new(),
-            sprite_draw_batches: Vec::new(),
-            world_underlay_pipeline,
-            debug_pipeline,
-            ui_rect_pipeline,
-            ui_debug_pipeline,
-            post_process_pipeline,
-            post_process_target: None,
-            post_process_settings: Self::default_post_process_settings(),
-            text_renderer,
-            text_items: Vec::new(),
-            tilemap_render_enabled: true,
-            current_mvp: glam::Mat4::IDENTITY,
-        })
+        )
     }
 
     /// Load a new tilemap texture at runtime
@@ -568,56 +545,15 @@ impl GpuState {
         tilemap_texture: Option<PathBuf>,
         sprite_texture: Option<PathBuf>,
     ) -> Result<Self, crate::RenderError> {
-        let (device, queue, surface, config, supported_present_modes) =
-            create_device_and_surface(Arc::clone(&window), vsync)?;
-
         // Use provided textures; otherwise fall back to a generated 1x1 white texture.
         let tilemap_path = tilemap_texture.unwrap_or_else(default_texture_path);
         let sprite_path = sprite_texture.unwrap_or_else(default_texture_path);
-
-        let tilemap_pipeline = TilemapPipeline::new(
-            &device,
-            &queue,
-            config.format,
+        Self::new_internal(
+            window,
+            vsync,
             TextureSource::path(tilemap_path),
-        )?;
-
-        let sprite_pipeline = SpritePipeline::new(
-            &device,
-            &queue,
-            config.format,
             TextureSource::path(sprite_path),
-        )?;
-
-        let world_underlay_pipeline = DebugPipeline::new(&device, config.format);
-        let debug_pipeline = DebugPipeline::new(&device, config.format);
-        let ui_rect_pipeline = DebugPipeline::new(&device, config.format);
-        let ui_debug_pipeline = DebugPipeline::new(&device, config.format);
-        let post_process_pipeline = PostProcessPipeline::new(&device, config.format);
-        let text_renderer = GlyphonTextRenderer::new(&device, &queue, config.format);
-
-        Ok(Self {
-            surface,
-            config,
-            supported_present_modes,
-            device,
-            queue,
-            tilemap_pipeline,
-            sprite_pipeline,
-            sprite_pipelines_by_texture: BTreeMap::new(),
-            sprite_draw_batches: Vec::new(),
-            world_underlay_pipeline,
-            debug_pipeline,
-            ui_rect_pipeline,
-            ui_debug_pipeline,
-            post_process_pipeline,
-            post_process_target: None,
-            post_process_settings: Self::default_post_process_settings(),
-            text_renderer,
-            text_items: Vec::new(),
-            tilemap_render_enabled: true,
-            current_mvp: glam::Mat4::IDENTITY,
-        })
+        )
     }
 
     pub fn set_tilemap_render_enabled(&mut self, enabled: bool) {
@@ -638,7 +574,7 @@ impl GpuState {
 
     pub fn update_tilemap_vertices(&mut self, vertices: &[QuadVertex]) {
         self.tilemap_pipeline
-            .update_vertices(&self.device, vertices);
+            .update_vertices(&self.device, &self.queue, vertices);
     }
 
     pub fn update_projection(&mut self, mvp: glam::Mat4) {

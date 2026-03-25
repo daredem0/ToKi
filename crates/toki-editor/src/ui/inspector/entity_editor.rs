@@ -37,7 +37,8 @@ impl InspectorSystem {
 
         if ui.button("Open in Animation Editor").clicked() {
             // Switch to animation editor tab (entity stays selected)
-            ui_state.center_panel_tab = crate::ui::editor_ui::CenterPanelTab::AnimationEditor;
+            ui_state.workspace.center_panel_tab =
+                crate::ui::editor_ui::CenterPanelTab::AnimationEditor;
         }
 
         ui.separator();
