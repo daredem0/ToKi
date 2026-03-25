@@ -35,7 +35,7 @@ impl SpriteEditorState {
             after: canvas.clone(),
         });
         cs.dirty = true;
-        cs.canvas_texture = None;
+        cs.canvas_texture_dirty = true;
         true
     }
 
@@ -79,7 +79,7 @@ impl SpriteEditorState {
             }
         }
         cs.dirty = true;
-        cs.canvas_texture = None;
+        cs.canvas_texture_dirty = true;
         true
     }
 
@@ -108,7 +108,7 @@ impl SpriteEditorState {
             after: new_canvas,
         });
         cs.dirty = true;
-        cs.canvas_texture = None;
+        cs.canvas_texture_dirty = true;
         true
     }
 
@@ -137,7 +137,7 @@ impl SpriteEditorState {
             after: new_canvas,
         });
         cs.dirty = true;
-        cs.canvas_texture = None;
+        cs.canvas_texture_dirty = true;
         true
     }
 
@@ -219,7 +219,7 @@ impl SpriteEditorState {
         }
 
         cs.dirty = true;
-        cs.canvas_texture = None;
+        cs.canvas_texture_dirty = true;
         true
     }
 
@@ -253,7 +253,7 @@ impl SpriteEditorState {
             after: new_canvas,
         });
         cs.dirty = true;
-        cs.canvas_texture = None;
+        cs.canvas_texture_dirty = true;
         true
     }
 
@@ -287,7 +287,7 @@ impl SpriteEditorState {
             after: new_canvas,
         });
         cs.dirty = true;
-        cs.canvas_texture = None;
+        cs.canvas_texture_dirty = true;
         true
     }
 
@@ -327,7 +327,7 @@ impl SpriteEditorState {
         }
 
         cs.dirty = true;
-        cs.canvas_texture = None;
+        cs.canvas_texture_dirty = true;
         true
     }
 
@@ -367,7 +367,7 @@ impl SpriteEditorState {
         }
 
         cs.dirty = true;
-        cs.canvas_texture = None;
+        cs.canvas_texture_dirty = true;
         true
     }
 
@@ -406,7 +406,7 @@ impl SpriteEditorState {
             after: canvas.clone(),
         });
         cs.dirty = true;
-        cs.canvas_texture = None;
+        cs.canvas_texture_dirty = true;
         true
     }
 
@@ -451,7 +451,7 @@ impl SpriteEditorState {
             after: new_canvas,
         });
         cs.dirty = true;
-        cs.canvas_texture = None;
+        cs.canvas_texture_dirty = true;
         true
     }
 

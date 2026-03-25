@@ -206,9 +206,11 @@ pub fn ensure_canvas_texture_for_side(
     ctx: &egui::Context,
     side: CanvasSide,
 ) {
-    if ui_state.sprite.canvas_state(side).canvas_texture.is_some() {
+    let cs = ui_state.sprite.canvas_state(side);
+    if cs.canvas_texture.is_some() && !cs.canvas_texture_dirty {
         return;
     }
+    ui_state.sprite.canvas_state_mut(side).canvas_texture_dirty = false;
 
     let Some(canvas) = &ui_state.sprite.canvas_state(side).canvas else {
         return;
@@ -239,11 +241,11 @@ pub fn ensure_canvas_texture_for_side(
 }
 
 pub fn invalidate_canvas_texture(ui_state: &mut EditorUI) {
-    ui_state.sprite.active_mut().canvas_texture = None;
+    ui_state.sprite.active_mut().canvas_texture_dirty = true;
 }
 
 pub fn invalidate_canvas_texture_for_side(ui_state: &mut EditorUI, side: CanvasSide) {
-    ui_state.sprite.canvas_state_mut(side).canvas_texture = None;
+    ui_state.sprite.canvas_state_mut(side).canvas_texture_dirty = true;
 }
 
 fn canvas_display_pixels(

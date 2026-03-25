@@ -71,6 +71,10 @@ pub struct CanvasState {
     pub cursor_canvas_pos: Option<glam::IVec2>,
     /// Cached texture handle for canvas preview
     pub canvas_texture: Option<egui::TextureHandle>,
+    /// When true, the canvas texture will be recreated next frame instead of
+    /// being dropped immediately (which would crash if the current frame already
+    /// submitted draw commands referencing the old texture).
+    pub canvas_texture_dirty: bool,
     /// Asset kind being created/edited
     pub asset_kind: Option<SpriteAssetKind>,
     /// Grid cell size for sheet editing (width, height in pixels)
@@ -110,6 +114,7 @@ impl Default for CanvasState {
             show_grid: true,
             cursor_canvas_pos: None,
             canvas_texture: None,
+            canvas_texture_dirty: false,
             asset_kind: None,
             cell_size: glam::UVec2::new(16, 16),
             selected_cell: None,
