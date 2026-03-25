@@ -134,6 +134,9 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             ui.toggle_value(&mut ui_state.sprite.symmetry_horizontal, "Horizontal");
             ui.toggle_value(&mut ui_state.sprite.symmetry_vertical, "Vertical");
         });
+        if ui_state.sprite.is_sheet() {
+            ui.checkbox(&mut ui_state.sprite.symmetry_per_tile, "Per tile");
+        }
     }
 
     ui.separator();
