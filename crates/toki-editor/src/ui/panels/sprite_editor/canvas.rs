@@ -1,7 +1,7 @@
 //! Canvas rendering and drawing operations.
 
 use crate::ui::editor_ui::{CanvasSide, SelectionMask, SpriteCanvas, SpriteCanvasViewport};
-use crate::ui::sprite_editor::preview_indexed_color;
+use crate::ui::sprite_editor::{preview_indexed_color, FloatingSelection};
 use crate::ui::EditorUI;
 use toki_core::assets::atlas::ColorMode;
 use toki_core::palette::Palette4;
@@ -78,6 +78,7 @@ pub fn render_canvas_viewport(
             ui_state.sprite.active_mut().viewport.zoom_out();
         }
 
+        handle_floating_shortcuts(ui_state, ui);
         handle_tool_shortcuts(ui_state, ui);
         handle_undo_redo_shortcuts(ui_state, ui);
     }
@@ -161,9 +162,11 @@ pub fn render_canvas_viewport(
         );
     }
 
-    // Draw selection overlay
+    // Draw floating selection overlay OR static selection overlay
     let canvas_state = ui_state.sprite.canvas_state(render_side);
-    if let Some(selection) = &canvas_state.selection {
+    if let Some(floating) = &canvas_state.floating {
+        draw_floating_selection(&painter, rect, &canvas_state.viewport, floating);
+    } else if let Some(selection) = &canvas_state.selection {
         draw_selection_mask(&painter, rect, &canvas_state.viewport, selection);
     }
 
@@ -246,6 +249,32 @@ pub fn invalidate_canvas_texture(ui_state: &mut EditorUI) {
 
 pub fn invalidate_canvas_texture_for_side(ui_state: &mut EditorUI, side: CanvasSide) {
     ui_state.sprite.canvas_state_mut(side).canvas_texture_dirty = true;
+}
+
+fn handle_floating_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
+    if ui_state.sprite.has_floating() {
+        if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+            ui_state.sprite.commit_floating();
+            invalidate_canvas_texture(ui_state);
+        }
+        if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            ui_state.sprite.cancel_floating();
+            invalidate_canvas_texture(ui_state);
+        }
+        let arrow_keys = [
+            (egui::Key::ArrowUp, glam::IVec2::new(0, -1)),
+            (egui::Key::ArrowDown, glam::IVec2::new(0, 1)),
+            (egui::Key::ArrowLeft, glam::IVec2::new(-1, 0)),
+            (egui::Key::ArrowRight, glam::IVec2::new(1, 0)),
+        ];
+        for (key, delta) in arrow_keys {
+            if ui.input(|i| i.key_pressed(key)) {
+                ui_state.sprite.nudge_floating(delta);
+            }
+        }
+    } else if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        ui_state.sprite.active_mut().selection = None;
+    }
 }
 
 fn canvas_display_pixels(
@@ -535,6 +564,81 @@ fn draw_selection_mask(
                     [egui::pos2(pixel_max.x, pixel_min.y), egui::pos2(pixel_max.x, pixel_max.y)],
                     stroke,
                 );
+            }
+        }
+    }
+}
+
+fn draw_floating_selection(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    viewport: &SpriteCanvasViewport,
+    floating: &FloatingSelection,
+) {
+    let zoom = viewport.zoom;
+    let pan = viewport.pan;
+    let canvas_screen_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
+
+    // Draw floating pixels
+    draw_floating_pixels(painter, canvas_screen_min, zoom, floating);
+
+    // Draw marching-ants border around the floating mask
+    let mask_stroke = egui::Stroke::new(1.0, egui::Color32::from_rgb(100, 150, 255));
+    draw_offset_mask_border(painter, canvas_screen_min, zoom, floating, mask_stroke);
+}
+
+fn draw_floating_pixels(
+    painter: &egui::Painter,
+    canvas_screen_min: egui::Pos2,
+    zoom: f32,
+    floating: &FloatingSelection,
+) {
+    for y in 0..floating.pixels.height {
+        for x in 0..floating.pixels.width {
+            let Some(color) = floating.pixels.get_pixel(x, y) else {
+                continue;
+            };
+            if color.a == 0 {
+                continue;
+            }
+            let sx = canvas_screen_min.x + (floating.offset.x + x as i32) as f32 * zoom;
+            let sy = canvas_screen_min.y + (floating.offset.y + y as i32) as f32 * zoom;
+            let pixel_rect =
+                egui::Rect::from_min_size(egui::pos2(sx, sy), egui::vec2(zoom, zoom));
+            painter.rect_filled(pixel_rect, 0.0, color.to_color32());
+        }
+    }
+}
+
+fn draw_offset_mask_border(
+    painter: &egui::Painter,
+    canvas_screen_min: egui::Pos2,
+    zoom: f32,
+    floating: &FloatingSelection,
+    stroke: egui::Stroke,
+) {
+    let mask = &floating.mask;
+    for y in 0..mask.height {
+        for x in 0..mask.width {
+            if !mask.is_selected(x, y) {
+                continue;
+            }
+            let sx = canvas_screen_min.x + (floating.offset.x + x as i32) as f32 * zoom;
+            let sy = canvas_screen_min.y + (floating.offset.y + y as i32) as f32 * zoom;
+            let p_min = egui::pos2(sx, sy);
+            let p_max = egui::pos2(sx + zoom, sy + zoom);
+
+            if y == 0 || !mask.is_selected(x, y - 1) {
+                painter.line_segment([egui::pos2(p_min.x, p_min.y), egui::pos2(p_max.x, p_min.y)], stroke);
+            }
+            if y + 1 >= mask.height || !mask.is_selected(x, y + 1) {
+                painter.line_segment([egui::pos2(p_min.x, p_max.y), egui::pos2(p_max.x, p_max.y)], stroke);
+            }
+            if x == 0 || !mask.is_selected(x - 1, y) {
+                painter.line_segment([egui::pos2(p_min.x, p_min.y), egui::pos2(p_min.x, p_max.y)], stroke);
+            }
+            if x + 1 >= mask.width || !mask.is_selected(x + 1, y) {
+                painter.line_segment([egui::pos2(p_max.x, p_min.y), egui::pos2(p_max.x, p_max.y)], stroke);
             }
         }
     }

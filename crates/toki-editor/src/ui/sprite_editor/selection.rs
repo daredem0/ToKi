@@ -1,5 +1,8 @@
 //! Selection state for the sprite canvas.
 
+use super::canvas::SpriteCanvas;
+use super::types::PixelColor;
+
 /// Per-pixel selection mask covering the full canvas.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectionMask {
@@ -106,6 +109,25 @@ impl SelectionMask {
         }
     }
 
+    /// Create a canvas-sized mask by translating this local mask to the given offset.
+    /// Pixels that fall outside the canvas bounds are clipped.
+    pub fn translated_to_canvas(&self, canvas_w: u32, canvas_h: u32, offset: glam::IVec2) -> Self {
+        let mut result = Self::new(canvas_w, canvas_h);
+        for y in 0..self.height {
+            for x in 0..self.width {
+                if !self.is_selected(x, y) {
+                    continue;
+                }
+                let cx = offset.x + x as i32;
+                let cy = offset.y + y as i32;
+                if cx >= 0 && cy >= 0 {
+                    result.set(cx as u32, cy as u32, true);
+                }
+            }
+        }
+        result
+    }
+
     fn index(&self, x: u32, y: u32) -> Option<usize> {
         (x < self.width && y < self.height).then_some((y * self.width + x) as usize)
     }
@@ -134,5 +156,42 @@ impl SpriteSelection {
     #[allow(dead_code)]
     pub fn contains(&self, px: u32, py: u32) -> bool {
         px >= self.x && px < self.x + self.width && py >= self.y && py < self.y + self.height
+    }
+}
+
+/// Extract the selected pixels from a canvas into a new bounding-rect-sized canvas.
+/// Unselected pixels within the bounding rect are transparent.
+pub fn extract_masked_selection(
+    canvas: &SpriteCanvas,
+    selection: &SelectionMask,
+) -> Option<SpriteCanvas> {
+    let bounds = selection.bounding_rect()?;
+    let mut result = SpriteCanvas::new(bounds.width, bounds.height);
+    for y in 0..bounds.height {
+        for x in 0..bounds.width {
+            let src_x = bounds.x + x;
+            let src_y = bounds.y + y;
+            if !selection.is_selected(src_x, src_y) {
+                continue;
+            }
+            if let Some(color) = canvas.get_pixel(src_x, src_y) {
+                result.set_pixel(x, y, color);
+            }
+        }
+    }
+    Some(result)
+}
+
+/// Clear selected pixels to transparent on the canvas.
+pub fn clear_masked_pixels(canvas: &mut SpriteCanvas, selection: &SelectionMask) {
+    let Some(bounds) = selection.bounding_rect() else {
+        return;
+    };
+    for y in bounds.y..(bounds.y + bounds.height) {
+        for x in bounds.x..(bounds.x + bounds.width) {
+            if selection.is_selected(x, y) {
+                canvas.set_pixel(x, y, PixelColor::transparent());
+            }
+        }
     }
 }

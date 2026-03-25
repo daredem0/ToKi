@@ -172,6 +172,52 @@ fn handle_select_tool(
     ctx: &egui::Context,
     canvas_pos: glam::IVec2,
 ) {
+    // If floating, handle move-drag
+    if ui_state.sprite.has_floating() {
+        handle_floating_drag(ui_state, response, ctx, canvas_pos);
+        return;
+    }
+
+    handle_selection_drag(ui_state, response, rect, ctx, canvas_pos);
+}
+
+fn handle_floating_drag(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    ctx: &egui::Context,
+    _canvas_pos: glam::IVec2,
+) {
+    if response.dragged_by(egui::PointerButton::Primary) {
+        let delta = response.drag_delta();
+        let zoom = ui_state.sprite.active().viewport.zoom;
+        // Convert screen-space drag delta to canvas-space pixel delta
+        let dx = (delta.x / zoom).round() as i32;
+        let dy = (delta.y / zoom).round() as i32;
+        if dx != 0 || dy != 0 {
+            ui_state.sprite.nudge_floating(glam::IVec2::new(dx, dy));
+        }
+    }
+
+    // Click outside floating → commit and clear
+    let primary_released = ctx.input(|input| input.pointer.primary_released());
+    if primary_released && !response.dragged() {
+        ui_state.sprite.commit_floating();
+        invalidate_canvas_texture(ui_state);
+    }
+
+    if response.clicked_by(egui::PointerButton::Secondary) {
+        ui_state.sprite.cancel_floating();
+        invalidate_canvas_texture(ui_state);
+    }
+}
+
+fn handle_selection_drag(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    rect: egui::Rect,
+    ctx: &egui::Context,
+    canvas_pos: glam::IVec2,
+) {
     let selection_mode = current_selection_mode(ctx);
     let primary_pressed_in_rect = response.hovered()
         && ctx.input(|input| input.pointer.primary_pressed())
@@ -180,6 +226,15 @@ fn handle_select_tool(
             .is_some_and(|pointer_pos| rect.contains(pointer_pos));
 
     if primary_pressed_in_rect {
+        // If clicking inside existing selection without modifiers, start a move
+        if selection_mode == SelectionModifyMode::Replace
+            && is_click_inside_selection(ui_state, canvas_pos)
+        {
+            ui_state.sprite.lift_selection();
+            invalidate_canvas_texture(ui_state);
+            return;
+        }
+
         let existing_selection = ui_state.sprite.active().selection.clone();
         let active = ui_state.sprite.active_mut();
         active.selection_start_pos = Some(canvas_pos);
@@ -192,8 +247,6 @@ fn handle_select_tool(
         }
     }
 
-    // Use primary_released to detect click/drag-end reliably even with modifier keys held,
-    // since egui's clicked_by() may not fire when Ctrl or Shift are pressed.
     let primary_released = ctx.input(|input| input.pointer.primary_released());
     if primary_released {
         if let Some(start) = ui_state.sprite.active_mut().selection_start_pos.take() {
@@ -202,11 +255,22 @@ fn handle_select_tool(
         }
     }
 
-    // Clear selection with right-click
     if response.clicked_by(egui::PointerButton::Secondary) {
         ui_state.sprite.active_mut().selection = None;
         ui_state.sprite.active_mut().selection_drag_base = None;
     }
+}
+
+fn is_click_inside_selection(ui_state: &EditorUI, pos: glam::IVec2) -> bool {
+    if pos.x < 0 || pos.y < 0 {
+        return false;
+    }
+    ui_state
+        .sprite
+        .active()
+        .selection
+        .as_ref()
+        .is_some_and(|sel| sel.is_selected(pos.x as u32, pos.y as u32))
 }
 
 fn handle_magic_wand_tool(
@@ -460,38 +524,24 @@ fn effective_paint_color(
 pub fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
     use SpriteEditorTool::*;
 
-    if ui.input(|i| i.key_pressed(egui::Key::B)) {
-        ui_state.sprite.tool = Brush;
-    }
-    if ui.input(|i| i.key_pressed(egui::Key::E)) {
-        ui_state.sprite.tool = Eraser;
-    }
-    if ui.input(|i| i.key_pressed(egui::Key::G)) {
-        ui_state.sprite.tool = Fill;
-    }
-    if ui.input(|i| i.key_pressed(egui::Key::I)) {
-        ui_state.sprite.tool = Eyedropper;
-    }
-    if ui.input(|i| i.key_pressed(egui::Key::M)) {
-        ui_state.sprite.tool = Select;
-    }
-    if ui.input(|i| i.key_pressed(egui::Key::D)) {
-        ui_state.sprite.tool = Drag;
-    }
-    if ui.input(|i| i.key_pressed(egui::Key::L)) {
-        ui_state.sprite.tool = Line;
-    }
-    if ui.input(|i| i.key_pressed(egui::Key::W)) {
-        ui_state.sprite.tool = MagicWand;
-    }
-    if ui.input(|i| i.key_pressed(egui::Key::K)) {
-        ui_state.sprite.tool = MagicErase;
-    }
-    if ui.input(|i| i.key_pressed(egui::Key::O)) {
-        ui_state.sprite.tool = AddOutline;
-    }
-    if ui.input(|i| i.key_pressed(egui::Key::H)) {
-        ui_state.sprite.tool = AddShadow;
+    let tool_keys: &[(egui::Key, SpriteEditorTool)] = &[
+        (egui::Key::B, Brush),
+        (egui::Key::E, Eraser),
+        (egui::Key::G, Fill),
+        (egui::Key::I, Eyedropper),
+        (egui::Key::M, Select),
+        (egui::Key::D, Drag),
+        (egui::Key::L, Line),
+        (egui::Key::W, MagicWand),
+        (egui::Key::K, MagicErase),
+        (egui::Key::O, AddOutline),
+        (egui::Key::H, AddShadow),
+    ];
+
+    for &(key, tool) in tool_keys {
+        if ui.input(|i| i.key_pressed(key)) {
+            ui_state.sprite.set_tool(tool);
+        }
     }
 
     // Brush size

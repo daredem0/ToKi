@@ -5,12 +5,14 @@
 
 mod canvas;
 mod dual_canvas;
+mod floating;
 mod history;
 mod selection;
 mod state;
 mod state_canvas;
 mod state_cells;
 mod state_file_io;
+mod state_floating;
 mod state_history;
 mod types;
 mod viewport;
@@ -19,6 +21,9 @@ mod viewport;
 pub use canvas::SpriteCanvas;
 pub use dual_canvas::{CanvasSide, CanvasState, DualCanvasLayout};
 pub use history::{SpriteEditCommand, SpriteEditorHistory};
+pub use floating::FloatingSelection;
+#[cfg(test)]
+pub use selection::{clear_masked_pixels, extract_masked_selection};
 pub use selection::{SelectionMask, SpriteSelection};
 pub use state::SpriteEditorState;
 pub use types::{

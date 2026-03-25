@@ -1,6 +1,7 @@
 //! Dual canvas layout and per-canvas state.
 
 use super::canvas::SpriteCanvas;
+use super::floating::FloatingSelection;
 use super::history::SpriteEditorHistory;
 use super::selection::SelectionMask;
 use super::types::SpriteAssetKind;
@@ -99,6 +100,8 @@ pub struct CanvasState {
     pub original_cell_aliases: Option<Vec<Vec<String>>>,
     /// Swap target cell index (for cell reordering UI)
     pub swap_target_cell: u32,
+    /// Floating selection (pixels lifted off the canvas for repositioning).
+    pub floating: Option<FloatingSelection>,
 }
 
 impl Default for CanvasState {
@@ -127,6 +130,7 @@ impl Default for CanvasState {
             save_asset_kind: SpriteAssetKind::ObjectSheet,
             original_cell_aliases: None,
             swap_target_cell: 0,
+            floating: None,
         }
     }
 }
