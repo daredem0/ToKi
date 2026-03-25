@@ -41,7 +41,7 @@ impl SpriteEditorState {
 
     pub fn invalidate_all_canvas_textures(&mut self) {
         for canvas in &mut self.canvases {
-            canvas.canvas_texture = None;
+            canvas.canvas_texture_dirty = true;
         }
     }
 

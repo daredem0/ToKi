@@ -26,7 +26,7 @@ impl SpriteEditorState {
         let cs = self.active_mut();
         if let Some(before) = cs.history.take_undo() {
             cs.canvas = Some(before);
-            cs.canvas_texture = None;
+            cs.canvas_texture_dirty = true;
             true
         } else {
             false
@@ -38,7 +38,7 @@ impl SpriteEditorState {
         let cs = self.active_mut();
         if let Some(after) = cs.history.take_redo() {
             cs.canvas = Some(after);
-            cs.canvas_texture = None;
+            cs.canvas_texture_dirty = true;
             true
         } else {
             false
@@ -82,7 +82,6 @@ impl SpriteEditorState {
         };
         clear_masked_pixels(canvas, &selection);
         cs.dirty = true;
-        cs.canvas_texture = None;
         self.push_undo_state(before);
         true
     }
@@ -107,7 +106,6 @@ impl SpriteEditorState {
         };
         clear_masked_pixels(canvas, &selection);
         cs.dirty = true;
-        cs.canvas_texture = None;
         self.push_undo_state(before);
         true
     }
@@ -139,7 +137,7 @@ impl SpriteEditorState {
         if let Some(canvas) = &mut cs.canvas {
             canvas.blit(&to_paste, paste_pos.x, paste_pos.y);
             cs.dirty = true;
-            cs.canvas_texture = None;
+            cs.canvas_texture_dirty = true;
         }
 
         // Push undo state with before and after
@@ -182,7 +180,7 @@ impl SpriteEditorState {
         if changed {
             let cs = self.active_mut();
             cs.dirty = true;
-            cs.canvas_texture = None;
+            cs.canvas_texture_dirty = true;
             self.push_undo_state(before);
             true
         } else {
