@@ -32,6 +32,12 @@ pub struct SpriteEditorState {
     pub selected_palette_id: Option<String>,
     /// Brush size in pixels (shared across canvases)
     pub brush_size: u32,
+    /// Whether shape tools (rectangle, ellipse) draw filled or outline
+    pub shape_filled: bool,
+    /// Mirror brush strokes horizontally (across vertical axis)
+    pub symmetry_horizontal: bool,
+    /// Mirror brush strokes vertically (across horizontal axis)
+    pub symmetry_vertical: bool,
     /// Recent colors palette (shared across canvases)
     pub recent_colors: Vec<PixelColor>,
     /// Maximum recent colors to remember
@@ -101,6 +107,9 @@ impl Default for SpriteEditorState {
             color_mode: ColorMode::TrueColor,
             selected_palette_id: None,
             brush_size: 1,
+            shape_filled: false,
+            symmetry_horizontal: false,
+            symmetry_vertical: false,
             recent_colors: Vec::new(),
             max_recent_colors: 16,
             show_new_canvas_dialog: false,

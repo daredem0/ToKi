@@ -24,6 +24,10 @@ pub enum SpriteEditorTool {
     AddOutline,
     /// Add a ground shadow below the clicked connected sprite region within the clicked tile
     AddShadow,
+    /// Draw a rectangle (outline or filled)
+    Rectangle,
+    /// Draw an ellipse (outline or filled)
+    Ellipse,
 }
 
 /// Type of sprite asset being edited

@@ -1,9 +1,11 @@
 //! Sprite editor tool interaction handling.
 
 use crate::ui::editor_ui::{SelectionMask, SpriteEditorTool, SpriteSelection};
+use crate::ui::interactions::sprite_paint::{ShapeParams, SymmetryBounds, SymmetryConfig};
 use crate::ui::interactions::SpritePaintInteraction;
 use crate::ui::sprite_editor::{canonical_indexed_color, indexed_slot_for_authored_color};
 use crate::ui::EditorUI;
+use glam::UVec2;
 use toki_core::assets::atlas::ColorMode;
 use toki_core::palette::Palette4;
 
@@ -31,6 +33,8 @@ pub fn handle_tool_interaction(
         SpriteEditorTool::MagicErase => handle_magic_erase_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::AddOutline => handle_add_outline_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::AddShadow => handle_add_shadow_tool(ui_state, response, canvas_pos),
+        SpriteEditorTool::Rectangle => handle_shape_tool(ui_state, response, canvas_pos, ShapeKind::Rectangle),
+        SpriteEditorTool::Ellipse => handle_shape_tool(ui_state, response, canvas_pos, ShapeKind::Ellipse),
     }
 }
 
@@ -66,8 +70,9 @@ fn handle_brush_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_
             selected_palette(ui_state),
         );
         let brush_size = ui_state.sprite.brush_size;
+        let sym = symmetry_config(ui_state);
         if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
-            if SpritePaintInteraction::paint_brush(canvas, canvas_pos, color, brush_size) {
+            if SpritePaintInteraction::paint_brush_symmetric(canvas, canvas_pos, color, brush_size, &sym) {
                 ui_state.sprite.active_mut().dirty = true;
                 invalidate_canvas_texture(ui_state);
             }
@@ -86,8 +91,9 @@ fn handle_eraser_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas
 
     if response.dragged_by(egui::PointerButton::Primary) || response.clicked() {
         let brush_size = ui_state.sprite.brush_size;
+        let sym = symmetry_config(ui_state);
         if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
-            if SpritePaintInteraction::erase_brush(canvas, canvas_pos, brush_size) {
+            if SpritePaintInteraction::erase_brush_symmetric(canvas, canvas_pos, brush_size, &sym) {
                 ui_state.sprite.active_mut().dirty = true;
                 invalidate_canvas_texture(ui_state);
             }
@@ -141,27 +147,80 @@ fn handle_eyedropper_tool(
 }
 
 fn handle_line_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
+    handle_shape_tool(ui_state, response, canvas_pos, ShapeKind::Line);
+}
+
+#[derive(Clone, Copy)]
+enum ShapeKind {
+    Line,
+    Rectangle,
+    Ellipse,
+}
+
+fn handle_shape_tool(
+    ui_state: &mut EditorUI,
+    response: &egui::Response,
+    canvas_pos: glam::IVec2,
+    kind: ShapeKind,
+) {
     if response.drag_started_by(egui::PointerButton::Primary) {
         ui_state.sprite.active_mut().line_start_pos = Some(canvas_pos);
         start_paint_stroke(ui_state);
     }
 
+    // Live preview during drag
+    if response.dragged_by(egui::PointerButton::Primary) {
+        preview_shape(ui_state, canvas_pos, kind);
+    }
+
     if response.drag_stopped_by(egui::PointerButton::Primary) {
-        let color = effective_paint_color(
+        // Restore and draw final shape
+        preview_shape(ui_state, canvas_pos, kind);
+        ui_state.sprite.active_mut().line_start_pos = None;
+        finish_paint_stroke(ui_state);
+    }
+}
+
+fn preview_shape(ui_state: &mut EditorUI, canvas_pos: glam::IVec2, kind: ShapeKind) {
+    let Some(start) = ui_state.sprite.active().line_start_pos else {
+        return;
+    };
+
+    // Restore canvas to pre-stroke state before redrawing
+    if let Some(before) = &ui_state.sprite.active().canvas_before_stroke {
+        ui_state.sprite.active_mut().canvas = Some(before.clone());
+    }
+
+    let params = build_shape_params(ui_state, start, canvas_pos);
+    let sym = symmetry_config(ui_state);
+    if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
+        let changed = match kind {
+            ShapeKind::Line => SpritePaintInteraction::draw_line_symmetric(canvas, &params, &sym),
+            ShapeKind::Rectangle => SpritePaintInteraction::draw_rectangle_symmetric(canvas, &params, &sym),
+            ShapeKind::Ellipse => SpritePaintInteraction::draw_ellipse_symmetric(canvas, &params, &sym),
+        };
+        if changed {
+            ui_state.sprite.active_mut().dirty = true;
+            invalidate_canvas_texture(ui_state);
+        }
+    }
+}
+
+fn build_shape_params(
+    ui_state: &EditorUI,
+    start: glam::IVec2,
+    end: glam::IVec2,
+) -> ShapeParams {
+    ShapeParams {
+        start,
+        end,
+        color: effective_paint_color(
             ui_state.sprite.color_mode,
             ui_state.sprite.foreground_color,
             selected_palette(ui_state),
-        );
-        let brush_size = ui_state.sprite.brush_size;
-        if let Some(start) = ui_state.sprite.active_mut().line_start_pos.take() {
-            if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
-                if SpritePaintInteraction::draw_line(canvas, start, canvas_pos, color, brush_size) {
-                    ui_state.sprite.active_mut().dirty = true;
-                    invalidate_canvas_texture(ui_state);
-                }
-            }
-        }
-        finish_paint_stroke(ui_state);
+        ),
+        brush_size: ui_state.sprite.brush_size,
+        filled: ui_state.sprite.shape_filled,
     }
 }
 
@@ -521,6 +580,29 @@ fn effective_paint_color(
         .unwrap_or_else(|| canonical_indexed_color(3))
 }
 
+fn symmetry_config(ui_state: &EditorUI) -> SymmetryConfig {
+    let (origin, size) = compute_symmetry_bounds(ui_state);
+    SymmetryConfig {
+        bounds: SymmetryBounds { origin, size },
+        horizontal: ui_state.sprite.symmetry_horizontal,
+        vertical: ui_state.sprite.symmetry_vertical,
+    }
+}
+
+fn compute_symmetry_bounds(ui_state: &EditorUI) -> (UVec2, UVec2) {
+    // In sheet mode with a selected cell, mirror within that cell
+    if ui_state.sprite.is_sheet() {
+        if let Some(cell_idx) = ui_state.sprite.active().selected_cell {
+            if let Some((sx, sy, ex, ey)) = ui_state.sprite.cell_bounds(cell_idx) {
+                return (UVec2::new(sx, sy), UVec2::new(ex - sx, ey - sy));
+            }
+        }
+    }
+    // Otherwise mirror within the full canvas
+    let (w, h) = ui_state.sprite.canvas_dimensions().unwrap_or((1, 1));
+    (UVec2::ZERO, UVec2::new(w, h))
+}
+
 pub fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
     use SpriteEditorTool::*;
 
@@ -536,6 +618,8 @@ pub fn handle_tool_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
         (egui::Key::K, MagicErase),
         (egui::Key::O, AddOutline),
         (egui::Key::H, AddShadow),
+        (egui::Key::R, Rectangle),
+        (egui::Key::C, Ellipse),
     ];
 
     for &(key, tool) in tool_keys {

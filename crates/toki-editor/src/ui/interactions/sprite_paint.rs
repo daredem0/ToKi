@@ -1,6 +1,66 @@
 use crate::ui::editor_ui::{PixelColor, SpriteCanvas};
 use glam::{IVec2, UVec2};
 
+/// Bounds within which symmetry mirroring is computed.
+pub struct SymmetryBounds {
+    pub origin: UVec2,
+    pub size: UVec2,
+}
+
+impl SymmetryBounds {
+    pub fn mirror_x(&self, pos: IVec2) -> IVec2 {
+        let local_x = pos.x - self.origin.x as i32;
+        let mirrored_x = (self.size.x as i32 - 1) - local_x + self.origin.x as i32;
+        IVec2::new(mirrored_x, pos.y)
+    }
+
+    pub fn mirror_y(&self, pos: IVec2) -> IVec2 {
+        let local_y = pos.y - self.origin.y as i32;
+        let mirrored_y = (self.size.y as i32 - 1) - local_y + self.origin.y as i32;
+        IVec2::new(pos.x, mirrored_y)
+    }
+
+    /// Returns all positions to paint for the given symmetry flags (deduplicated).
+    pub fn mirror_positions(&self, pos: IVec2, horizontal: bool, vertical: bool) -> Vec<IVec2> {
+        let mut positions = vec![pos];
+        if horizontal {
+            let mx = self.mirror_x(pos);
+            if !positions.contains(&mx) {
+                positions.push(mx);
+            }
+        }
+        if vertical {
+            let my = self.mirror_y(pos);
+            if !positions.contains(&my) {
+                positions.push(my);
+            }
+        }
+        if horizontal && vertical {
+            let mxy = self.mirror_y(self.mirror_x(pos));
+            if !positions.contains(&mxy) {
+                positions.push(mxy);
+            }
+        }
+        positions
+    }
+}
+
+/// Configuration for symmetric drawing operations.
+pub struct SymmetryConfig {
+    pub bounds: SymmetryBounds,
+    pub horizontal: bool,
+    pub vertical: bool,
+}
+
+/// Parameters for shape drawing operations (line, rectangle, ellipse).
+pub struct ShapeParams {
+    pub start: IVec2,
+    pub end: IVec2,
+    pub color: PixelColor,
+    pub brush_size: u32,
+    pub filled: bool,
+}
+
 pub struct SpritePaintInteraction;
 
 impl SpritePaintInteraction {
@@ -506,6 +566,177 @@ impl SpritePaintInteraction {
         changed
     }
 
+    /// Draw a rectangle on the canvas using `ShapeParams`.
+    /// Outline mode draws 4 edges using `draw_line`. Filled mode paints all interior pixels.
+    pub fn draw_rectangle(canvas: &mut SpriteCanvas, params: &ShapeParams) -> bool {
+        let min = IVec2::new(params.start.x.min(params.end.x), params.start.y.min(params.end.y));
+        let max = IVec2::new(params.start.x.max(params.end.x), params.start.y.max(params.end.y));
+        if params.filled {
+            return Self::draw_rectangle_filled(canvas, min, max, params.color, params.brush_size);
+        }
+        Self::draw_rectangle_outline(canvas, min, max, params.color, params.brush_size)
+    }
+
+    fn draw_rectangle_outline(
+        canvas: &mut SpriteCanvas,
+        min: IVec2,
+        max: IVec2,
+        color: PixelColor,
+        brush_size: u32,
+    ) -> bool {
+        let tl = min;
+        let tr = IVec2::new(max.x, min.y);
+        let bl = IVec2::new(min.x, max.y);
+        let br = max;
+        let mut changed = false;
+        changed |= Self::draw_line(canvas, tl, tr, color, brush_size);
+        changed |= Self::draw_line(canvas, bl, br, color, brush_size);
+        changed |= Self::draw_line(canvas, tl, bl, color, brush_size);
+        changed |= Self::draw_line(canvas, tr, br, color, brush_size);
+        changed
+    }
+
+    fn draw_rectangle_filled(
+        canvas: &mut SpriteCanvas,
+        min: IVec2,
+        max: IVec2,
+        color: PixelColor,
+        brush_size: u32,
+    ) -> bool {
+        let mut changed = false;
+        for y in min.y..=max.y {
+            changed |= Self::draw_line(canvas, IVec2::new(min.x, y), IVec2::new(max.x, y), color, brush_size);
+        }
+        changed
+    }
+
+    /// Draw an ellipse on the canvas using `ShapeParams`.
+    /// Outline mode draws boundary pixels. Filled mode fills interior with horizontal spans.
+    pub fn draw_ellipse(canvas: &mut SpriteCanvas, params: &ShapeParams) -> bool {
+        let min = IVec2::new(params.start.x.min(params.end.x), params.start.y.min(params.end.y));
+        let max = IVec2::new(params.start.x.max(params.end.x), params.start.y.max(params.end.y));
+        let cx = (min.x + max.x) / 2;
+        let cy = (min.y + max.y) / 2;
+        let rx = (max.x - min.x) / 2;
+        let ry = (max.y - min.y) / 2;
+
+        if rx == 0 && ry == 0 {
+            return Self::paint_brush(canvas, IVec2::new(cx, cy), params.color, params.brush_size);
+        }
+        if rx == 0 {
+            return Self::draw_line(canvas, IVec2::new(cx, min.y), IVec2::new(cx, max.y), params.color, params.brush_size);
+        }
+        if ry == 0 {
+            return Self::draw_line(canvas, IVec2::new(min.x, cy), IVec2::new(max.x, cy), params.color, params.brush_size);
+        }
+
+        if params.filled {
+            draw_ellipse_filled(canvas, cx, cy, rx, ry, params.color, params.brush_size)
+        } else {
+            draw_ellipse_outline(canvas, cx, cy, rx, ry, params.color, params.brush_size)
+        }
+    }
+
+    /// Paint with symmetry. Paints at all mirrored positions.
+    pub fn paint_brush_symmetric(
+        canvas: &mut SpriteCanvas,
+        center_pos: IVec2,
+        color: PixelColor,
+        brush_size: u32,
+        symmetry: &SymmetryConfig,
+    ) -> bool {
+        let positions = symmetry.bounds.mirror_positions(
+            center_pos, symmetry.horizontal, symmetry.vertical,
+        );
+        let mut changed = false;
+        for pos in positions {
+            changed |= Self::paint_brush(canvas, pos, color, brush_size);
+        }
+        changed
+    }
+
+    /// Erase with symmetry. Erases at all mirrored positions.
+    pub fn erase_brush_symmetric(
+        canvas: &mut SpriteCanvas,
+        center_pos: IVec2,
+        brush_size: u32,
+        symmetry: &SymmetryConfig,
+    ) -> bool {
+        let positions = symmetry.bounds.mirror_positions(
+            center_pos, symmetry.horizontal, symmetry.vertical,
+        );
+        let mut changed = false;
+        for pos in positions {
+            changed |= Self::erase_brush(canvas, pos, brush_size);
+        }
+        changed
+    }
+
+    /// Draw a line with symmetry. Draws at all mirrored start/end pairs.
+    pub fn draw_line_symmetric(
+        canvas: &mut SpriteCanvas,
+        params: &ShapeParams,
+        symmetry: &SymmetryConfig,
+    ) -> bool {
+        let starts = symmetry.bounds.mirror_positions(
+            params.start, symmetry.horizontal, symmetry.vertical,
+        );
+        let ends = symmetry.bounds.mirror_positions(
+            params.end, symmetry.horizontal, symmetry.vertical,
+        );
+        let mut changed = false;
+        for (s, e) in starts.iter().zip(ends.iter()) {
+            changed |= Self::draw_line(canvas, *s, *e, params.color, params.brush_size);
+        }
+        changed
+    }
+
+    /// Draw a rectangle with symmetry.
+    pub fn draw_rectangle_symmetric(
+        canvas: &mut SpriteCanvas,
+        params: &ShapeParams,
+        symmetry: &SymmetryConfig,
+    ) -> bool {
+        let starts = symmetry.bounds.mirror_positions(
+            params.start, symmetry.horizontal, symmetry.vertical,
+        );
+        let ends = symmetry.bounds.mirror_positions(
+            params.end, symmetry.horizontal, symmetry.vertical,
+        );
+        let mut changed = false;
+        for (s, e) in starts.iter().zip(ends.iter()) {
+            let mirrored = ShapeParams {
+                start: *s, end: *e, color: params.color,
+                brush_size: params.brush_size, filled: params.filled,
+            };
+            changed |= Self::draw_rectangle(canvas, &mirrored);
+        }
+        changed
+    }
+
+    /// Draw an ellipse with symmetry.
+    pub fn draw_ellipse_symmetric(
+        canvas: &mut SpriteCanvas,
+        params: &ShapeParams,
+        symmetry: &SymmetryConfig,
+    ) -> bool {
+        let starts = symmetry.bounds.mirror_positions(
+            params.start, symmetry.horizontal, symmetry.vertical,
+        );
+        let ends = symmetry.bounds.mirror_positions(
+            params.end, symmetry.horizontal, symmetry.vertical,
+        );
+        let mut changed = false;
+        for (s, e) in starts.iter().zip(ends.iter()) {
+            let mirrored = ShapeParams {
+                start: *s, end: *e, color: params.color,
+                brush_size: params.brush_size, filled: params.filled,
+            };
+            changed |= Self::draw_ellipse(canvas, &mirrored);
+        }
+        changed
+    }
+
     /// Pick color from canvas at the given position.
     pub fn pick_color(canvas: &SpriteCanvas, pos: IVec2) -> Option<PixelColor> {
         if pos.x < 0 || pos.y < 0 {
@@ -513,6 +744,122 @@ impl SpritePaintInteraction {
         }
         canvas.get_pixel(pos.x as u32, pos.y as u32)
     }
+}
+
+/// Draw ellipse outline using the midpoint algorithm.
+fn draw_ellipse_outline(
+    canvas: &mut SpriteCanvas,
+    cx: i32,
+    cy: i32,
+    rx: i32,
+    ry: i32,
+    color: PixelColor,
+    brush_size: u32,
+) -> bool {
+    let mut changed = false;
+    for p in midpoint_ellipse_points(rx, ry) {
+        changed |= SpritePaintInteraction::paint_brush(
+            canvas,
+            IVec2::new(cx + p.x, cy + p.y),
+            color,
+            brush_size,
+        );
+    }
+    changed
+}
+
+/// Draw filled ellipse using horizontal spans between boundary points.
+fn draw_ellipse_filled(
+    canvas: &mut SpriteCanvas,
+    cx: i32,
+    cy: i32,
+    rx: i32,
+    ry: i32,
+    color: PixelColor,
+    brush_size: u32,
+) -> bool {
+    let mut changed = false;
+    let spans = ellipse_horizontal_spans(rx, ry);
+    for (dy, x_extent) in spans {
+        changed |= SpritePaintInteraction::draw_line(
+            canvas,
+            IVec2::new(cx - x_extent, cy + dy),
+            IVec2::new(cx + x_extent, cy + dy),
+            color,
+            brush_size,
+        );
+        if dy != 0 {
+            changed |= SpritePaintInteraction::draw_line(
+                canvas,
+                IVec2::new(cx - x_extent, cy - dy),
+                IVec2::new(cx + x_extent, cy - dy),
+                color,
+                brush_size,
+            );
+        }
+    }
+    changed
+}
+
+/// Compute boundary points for an ellipse using the midpoint algorithm.
+/// Returns offsets relative to center (all 4 quadrants).
+fn midpoint_ellipse_points(rx: i32, ry: i32) -> Vec<IVec2> {
+    let mut points = Vec::new();
+    let (rx2, ry2) = (rx as i64 * rx as i64, ry as i64 * ry as i64);
+    let (mut x, mut y) = (0i32, ry);
+
+    // Region 1: slope < 1
+    let mut d1 = ry2 - rx2 * ry as i64 + rx2 / 4;
+    while 2 * ry2 * x as i64 <= 2 * rx2 * y as i64 {
+        push_four_quadrants(&mut points, x, y);
+        x += 1;
+        if d1 < 0 {
+            d1 += 2 * ry2 * x as i64 + ry2;
+        } else {
+            y -= 1;
+            d1 += 2 * ry2 * x as i64 - 2 * rx2 * y as i64 + ry2;
+        }
+    }
+
+    // Region 2: slope >= 1
+    let mut d2 = ry2 * (x as i64 * 2 + 1).pow(2) / 4 + rx2 * (y as i64 - 1).pow(2) - rx2 * ry2;
+    while y >= 0 {
+        push_four_quadrants(&mut points, x, y);
+        y -= 1;
+        if d2 > 0 {
+            d2 += rx2 - 2 * rx2 * y as i64;
+        } else {
+            x += 1;
+            d2 += 2 * ry2 * x as i64 - 2 * rx2 * y as i64 + rx2;
+        }
+    }
+    points
+}
+
+fn push_four_quadrants(points: &mut Vec<IVec2>, x: i32, y: i32) {
+    points.push(IVec2::new(x, y));
+    if x != 0 {
+        points.push(IVec2::new(-x, y));
+    }
+    if y != 0 {
+        points.push(IVec2::new(x, -y));
+    }
+    if x != 0 && y != 0 {
+        points.push(IVec2::new(-x, -y));
+    }
+}
+
+/// Compute horizontal spans for a filled ellipse.
+/// Returns (dy, x_extent) pairs where dy >= 0, and the span goes from -x_extent to +x_extent.
+fn ellipse_horizontal_spans(rx: i32, ry: i32) -> Vec<(i32, i32)> {
+    let mut max_x_for_y = vec![0i32; (ry + 1) as usize];
+    for point in midpoint_ellipse_points(rx, ry) {
+        let ay = point.y.unsigned_abs() as usize;
+        if ay < max_x_for_y.len() {
+            max_x_for_y[ay] = max_x_for_y[ay].max(point.x.abs());
+        }
+    }
+    max_x_for_y.into_iter().enumerate().map(|(dy, x)| (dy as i32, x)).collect()
 }
 
 #[cfg(test)]

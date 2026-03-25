@@ -39,6 +39,10 @@ fn render_tool_palette(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
             (SpriteEditorTool::MagicErase, "Magic Erase"),
         ],
         &[
+            (SpriteEditorTool::Rectangle, "Rect"),
+            (SpriteEditorTool::Ellipse, "Ellipse"),
+        ],
+        &[
             (SpriteEditorTool::AddOutline, "Add Outline"),
             (SpriteEditorTool::AddShadow, "Add Shadow"),
         ],
@@ -103,6 +107,33 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         SpriteEditorTool::AddShadow => {
             ui.label("Click a sprite to add a ground shadow of the current color inside the clicked tile.");
         }
+        SpriteEditorTool::Rectangle => {
+            ui.label("Click and drag to draw a rectangle.");
+            render_brush_size(ui, ui_state);
+            ui.checkbox(&mut ui_state.sprite.shape_filled, "Filled");
+        }
+        SpriteEditorTool::Ellipse => {
+            ui.label("Click and drag to draw an ellipse.");
+            render_brush_size(ui, ui_state);
+            ui.checkbox(&mut ui_state.sprite.shape_filled, "Filled");
+        }
+    }
+
+    // Symmetry controls for painting tools
+    if matches!(
+        ui_state.sprite.tool,
+        SpriteEditorTool::Brush
+            | SpriteEditorTool::Eraser
+            | SpriteEditorTool::Line
+            | SpriteEditorTool::Rectangle
+            | SpriteEditorTool::Ellipse
+    ) {
+        ui.separator();
+        ui.label("Symmetry:");
+        ui.horizontal(|ui| {
+            ui.toggle_value(&mut ui_state.sprite.symmetry_horizontal, "Horizontal");
+            ui.toggle_value(&mut ui_state.sprite.symmetry_vertical, "Vertical");
+        });
     }
 
     ui.separator();
