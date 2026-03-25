@@ -1,6 +1,8 @@
 //! Cell operations and canvas transforms for SpriteEditorState.
 
-use super::{PixelColor, ResizeAnchor, SpriteCanvas, SpriteEditCommand, SpriteEditorState};
+use super::{
+    PixelColor, ResizeAnchor, SelectionMask, SpriteCanvas, SpriteEditCommand, SpriteEditorState,
+};
 
 impl SpriteEditorState {
     /// Clear the selected cell to transparent pixels
@@ -223,6 +225,10 @@ impl SpriteEditorState {
 
     /// Flip the entire canvas horizontally
     pub fn flip_horizontal(&mut self) -> bool {
+        if self.active().selection.is_some() {
+            return self.transform_selection(SelectionTransform::FlipHorizontal);
+        }
+
         let cs = self.active_mut();
         let Some(canvas) = &cs.canvas else {
             return false;
@@ -253,6 +259,10 @@ impl SpriteEditorState {
 
     /// Flip the entire canvas vertically
     pub fn flip_vertical(&mut self) -> bool {
+        if self.active().selection.is_some() {
+            return self.transform_selection(SelectionTransform::FlipVertical);
+        }
+
         let cs = self.active_mut();
         let Some(canvas) = &cs.canvas else {
             return false;
@@ -283,6 +293,10 @@ impl SpriteEditorState {
 
     /// Rotate the entire canvas 90° clockwise
     pub fn rotate_clockwise(&mut self) -> bool {
+        if self.active().selection.is_some() {
+            return self.transform_selection(SelectionTransform::RotateClockwise);
+        }
+
         let is_sheet = self.is_sheet();
         let cs = self.active_mut();
         let Some(canvas) = &cs.canvas else {
@@ -319,6 +333,10 @@ impl SpriteEditorState {
 
     /// Rotate the entire canvas 90° counter-clockwise
     pub fn rotate_counter_clockwise(&mut self) -> bool {
+        if self.active().selection.is_some() {
+            return self.transform_selection(SelectionTransform::RotateCounterClockwise);
+        }
+
         let is_sheet = self.is_sheet();
         let cs = self.active_mut();
         let Some(canvas) = &cs.canvas else {
@@ -348,6 +366,45 @@ impl SpriteEditorState {
             std::mem::swap(&mut cs.cell_size.x, &mut cs.cell_size.y);
         }
 
+        cs.dirty = true;
+        cs.canvas_texture = None;
+        true
+    }
+
+    fn transform_selection(&mut self, transform: SelectionTransform) -> bool {
+        let selection = match self.active().selection.clone() {
+            Some(selection) => selection,
+            None => return false,
+        };
+        let bounds = match selection.bounding_rect() {
+            Some(bounds) => bounds,
+            None => return false,
+        };
+
+        if transform.requires_square() && bounds.width != bounds.height {
+            return false;
+        }
+
+        let before = match self.active().canvas.clone() {
+            Some(canvas) => canvas,
+            None => return false,
+        };
+        let transformed_pixels = transform_selected_pixels(&before, &selection, bounds, transform);
+        let transformed_selection =
+            transform_selection_mask(&selection, bounds, transform, before.width, before.height);
+
+        let cs = self.active_mut();
+        let Some(canvas) = &mut cs.canvas else {
+            return false;
+        };
+
+        clear_selection_pixels(canvas, &selection);
+        canvas.blit(&transformed_pixels, bounds.x as i32, bounds.y as i32);
+        cs.selection = Some(transformed_selection);
+        cs.history.push(SpriteEditCommand {
+            before,
+            after: canvas.clone(),
+        });
         cs.dirty = true;
         cs.canvas_texture = None;
         true
@@ -412,6 +469,102 @@ impl SpriteEditorState {
 }
 
 // Helper functions
+
+#[derive(Debug, Clone, Copy)]
+enum SelectionTransform {
+    FlipHorizontal,
+    FlipVertical,
+    RotateClockwise,
+    RotateCounterClockwise,
+}
+
+impl SelectionTransform {
+    fn requires_square(self) -> bool {
+        matches!(
+            self,
+            Self::RotateClockwise | Self::RotateCounterClockwise
+        )
+    }
+}
+
+fn clear_selection_pixels(canvas: &mut SpriteCanvas, selection: &SelectionMask) {
+    if let Some(bounds) = selection.bounding_rect() {
+        for y in bounds.y..(bounds.y + bounds.height) {
+            for x in bounds.x..(bounds.x + bounds.width) {
+                if selection.is_selected(x, y) {
+                    canvas.set_pixel(x, y, PixelColor::transparent());
+                }
+            }
+        }
+    }
+}
+
+fn transform_selected_pixels(
+    canvas: &SpriteCanvas,
+    selection: &SelectionMask,
+    bounds: super::SpriteSelection,
+    transform: SelectionTransform,
+) -> SpriteCanvas {
+    let mut transformed = SpriteCanvas::new(bounds.width, bounds.height);
+
+    for y in 0..bounds.height {
+        for x in 0..bounds.width {
+            let src_x = bounds.x + x;
+            let src_y = bounds.y + y;
+            if !selection.is_selected(src_x, src_y) {
+                continue;
+            }
+
+            let Some(color) = canvas.get_pixel(src_x, src_y) else {
+                continue;
+            };
+            let (dst_x, dst_y) = transform_relative_position(x, y, bounds.width, bounds.height, transform);
+            transformed.set_pixel(dst_x, dst_y, color);
+        }
+    }
+
+    transformed
+}
+
+fn transform_selection_mask(
+    selection: &SelectionMask,
+    bounds: super::SpriteSelection,
+    transform: SelectionTransform,
+    canvas_width: u32,
+    canvas_height: u32,
+) -> SelectionMask {
+    let mut transformed = SelectionMask::new(canvas_width, canvas_height);
+
+    for y in 0..bounds.height {
+        for x in 0..bounds.width {
+            let src_x = bounds.x + x;
+            let src_y = bounds.y + y;
+            if !selection.is_selected(src_x, src_y) {
+                continue;
+            }
+
+            let (dst_x, dst_y) = transform_relative_position(x, y, bounds.width, bounds.height, transform);
+            transformed.select_pixel(bounds.x + dst_x, bounds.y + dst_y);
+        }
+    }
+
+    transformed
+}
+
+fn transform_relative_position(
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    transform: SelectionTransform,
+) -> (u32, u32) {
+    match transform {
+        SelectionTransform::FlipHorizontal => (width - 1 - x, y),
+        SelectionTransform::FlipVertical => (x, height - 1 - y),
+        SelectionTransform::RotateClockwise => (height - 1 - y, x),
+        SelectionTransform::RotateCounterClockwise => (y, width - 1 - x),
+    }
+}
 
 fn read_cell_pixels(
     canvas: &SpriteCanvas,

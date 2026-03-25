@@ -310,23 +310,31 @@ fn sprite_canvas_viewport_canvas_to_screen_conversion() {
 }
 
 // ============================================================================
-// SpriteSelection Tests
+// SelectionMask Tests
 // ============================================================================
 
 #[test]
-fn sprite_selection_contains_works() {
-    let sel = SpriteSelection::new(5, 10, 20, 15);
+fn selection_mask_tracks_pixels_and_bounding_rect() {
+    let mut selection = SelectionMask::new(8, 8);
+    assert!(selection.is_empty());
 
-    // Inside
-    assert!(sel.contains(5, 10));
-    assert!(sel.contains(24, 24));
-    assert!(sel.contains(15, 17));
+    selection.select_pixel(5, 2);
+    selection.select_pixel(3, 6);
 
-    // Outside
-    assert!(!sel.contains(4, 10));
-    assert!(!sel.contains(5, 9));
-    assert!(!sel.contains(25, 10));
-    assert!(!sel.contains(5, 25));
+    assert!(selection.is_selected(5, 2));
+    assert!(selection.is_selected(3, 6));
+    assert_eq!(selection.bounding_rect(), Some(SpriteSelection::new(3, 2, 3, 5)));
+}
+
+#[test]
+fn selection_mask_select_and_deselect_rect_updates_contents() {
+    let mut selection = SelectionMask::new(6, 6);
+    selection.select_rect(1, 1, 3, 3);
+    selection.deselect_rect(2, 2, 1, 1);
+
+    assert!(selection.is_selected(1, 1));
+    assert!(selection.is_selected(3, 3));
+    assert!(!selection.is_selected(2, 2));
 }
 
 // ============================================================================
@@ -1284,6 +1292,29 @@ fn sprite_editor_state_flip_horizontal() {
 }
 
 #[test]
+fn sprite_editor_state_flip_horizontal_only_affects_selected_region() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(4, 2);
+
+    if let Some(canvas) = &mut state.active_mut().canvas {
+        canvas.set_pixel(0, 0, PixelColor::rgb(255, 0, 0));
+        canvas.set_pixel(1, 0, PixelColor::rgb(0, 255, 0));
+        canvas.set_pixel(3, 0, PixelColor::rgb(0, 0, 255));
+    }
+
+    let mut selection = SelectionMask::new(4, 2);
+    selection.select_rect(0, 0, 2, 1);
+    state.active_mut().selection = Some(selection);
+
+    assert!(state.flip_horizontal());
+
+    let canvas = state.active().canvas.as_ref().unwrap();
+    assert_eq!(canvas.get_pixel(0, 0), Some(PixelColor::rgb(0, 255, 0)));
+    assert_eq!(canvas.get_pixel(1, 0), Some(PixelColor::rgb(255, 0, 0)));
+    assert_eq!(canvas.get_pixel(3, 0), Some(PixelColor::rgb(0, 0, 255)));
+}
+
+#[test]
 fn sprite_editor_state_flip_vertical() {
     let mut state = SpriteEditorState::default();
     state.new_canvas(2, 4);
@@ -1324,6 +1355,44 @@ fn sprite_editor_state_rotate_clockwise() {
         assert_eq!(canvas.get_pixel(1, 0), Some(PixelColor::rgb(255, 0, 0)));
     }
     assert!(state.active().dirty);
+}
+
+#[test]
+fn sprite_editor_state_rotate_clockwise_only_affects_square_selection() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(4, 4);
+
+    if let Some(canvas) = &mut state.active_mut().canvas {
+        canvas.set_pixel(1, 1, PixelColor::rgb(255, 0, 0));
+        canvas.set_pixel(2, 1, PixelColor::rgb(0, 255, 0));
+        canvas.set_pixel(3, 3, PixelColor::rgb(0, 0, 255));
+    }
+
+    let mut selection = SelectionMask::new(4, 4);
+    selection.select_rect(1, 1, 2, 2);
+    state.active_mut().selection = Some(selection);
+
+    assert!(state.rotate_clockwise());
+
+    let canvas = state.active().canvas.as_ref().unwrap();
+    assert_eq!(canvas.get_pixel(2, 1), Some(PixelColor::rgb(255, 0, 0)));
+    assert_eq!(canvas.get_pixel(2, 2), Some(PixelColor::rgb(0, 255, 0)));
+    assert_eq!(canvas.get_pixel(3, 3), Some(PixelColor::rgb(0, 0, 255)));
+    assert_eq!(state.canvas_dimensions(), Some((4, 4)));
+}
+
+#[test]
+fn sprite_editor_state_rotate_clockwise_rejects_non_square_selection() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(4, 4);
+
+    let before = state.active().canvas.clone().unwrap();
+    let mut selection = SelectionMask::new(4, 4);
+    selection.select_rect(0, 0, 2, 3);
+    state.active_mut().selection = Some(selection);
+
+    assert!(!state.rotate_clockwise());
+    assert_eq!(state.active().canvas.as_ref().unwrap(), &before);
 }
 
 #[test]
@@ -1409,8 +1478,6 @@ fn sprite_editor_state_resize_zero_size_fails() {
 
 #[test]
 fn sprite_editor_copy_selection_copies_to_clipboard() {
-    use super::SpriteSelection;
-
     let mut state = SpriteEditorState::default();
     state.new_canvas(8, 8);
 
@@ -1420,7 +1487,9 @@ fn sprite_editor_copy_selection_copies_to_clipboard() {
     }
 
     // Create a selection covering the red square
-    state.active_mut().selection = Some(SpriteSelection::new(2, 2, 2, 2));
+    let mut selection = SelectionMask::new(8, 8);
+    selection.select_rect(2, 2, 2, 2);
+    state.active_mut().selection = Some(selection);
 
     // Copy should succeed
     assert!(state.copy_selection());
@@ -1448,8 +1517,33 @@ fn sprite_editor_copy_without_selection_fails() {
 }
 
 #[test]
+fn sprite_editor_copy_selection_only_copies_masked_pixels() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(4, 4);
+
+    if let Some(canvas) = &mut state.active_mut().canvas {
+        canvas.fill_rect(1, 1, 2, 2, PixelColor::rgb(255, 0, 0));
+    }
+
+    let mut selection = SelectionMask::new(4, 4);
+    selection.select_pixel(1, 1);
+    selection.select_pixel(2, 2);
+    state.active_mut().selection = Some(selection);
+
+    assert!(state.copy_selection());
+
+    let clipboard = state.clipboard.as_ref().unwrap();
+    assert_eq!(clipboard.width, 2);
+    assert_eq!(clipboard.height, 2);
+    assert_eq!(clipboard.get_pixel(0, 0), Some(PixelColor::rgb(255, 0, 0)));
+    assert_eq!(clipboard.get_pixel(1, 0), Some(PixelColor::transparent()));
+    assert_eq!(clipboard.get_pixel(0, 1), Some(PixelColor::transparent()));
+    assert_eq!(clipboard.get_pixel(1, 1), Some(PixelColor::rgb(255, 0, 0)));
+}
+
+#[test]
 fn sprite_editor_paste_at_cursor() {
-    use super::{CanvasSide, SpriteSelection};
+    use super::CanvasSide;
 
     let mut state = SpriteEditorState::default();
     state.new_canvas(8, 8);
@@ -1458,7 +1552,9 @@ fn sprite_editor_paste_at_cursor() {
     if let Some(canvas) = &mut state.active_mut().canvas {
         canvas.fill_rect(0, 0, 2, 2, PixelColor::rgb(255, 0, 0));
     }
-    state.active_mut().selection = Some(SpriteSelection::new(0, 0, 2, 2));
+    let mut selection = SelectionMask::new(8, 8);
+    selection.select_rect(0, 0, 2, 2);
+    state.active_mut().selection = Some(selection);
     assert!(state.copy_selection());
 
     // Set cursor position for paste
@@ -1480,13 +1576,15 @@ fn sprite_editor_paste_at_cursor() {
 
 #[test]
 fn sprite_editor_paste_without_cursor_fails() {
-    use super::{CanvasSide, SpriteSelection};
+    use super::CanvasSide;
 
     let mut state = SpriteEditorState::default();
     state.new_canvas(8, 8);
 
     // Copy something
-    state.active_mut().selection = Some(SpriteSelection::new(0, 0, 2, 2));
+    let mut selection = SelectionMask::new(8, 8);
+    selection.select_rect(0, 0, 2, 2);
+    state.active_mut().selection = Some(selection);
     state.copy_selection();
 
     // No cursor position
@@ -1511,7 +1609,7 @@ fn sprite_editor_paste_without_clipboard_fails() {
 
 #[test]
 fn sprite_editor_paste_centers_in_selected_cell() {
-    use super::{CanvasSide, SpriteSelection};
+    use super::CanvasSide;
 
     let mut state = SpriteEditorState::default();
     // Create a 16x16 sheet with 8x8 cells (2x2 grid)
@@ -1521,7 +1619,9 @@ fn sprite_editor_paste_centers_in_selected_cell() {
     if let Some(canvas) = &mut state.active_mut().canvas {
         canvas.fill_rect(0, 0, 2, 2, PixelColor::rgb(255, 0, 0));
     }
-    state.active_mut().selection = Some(SpriteSelection::new(0, 0, 2, 2));
+    let mut selection = SelectionMask::new(16, 16);
+    selection.select_rect(0, 0, 2, 2);
+    state.active_mut().selection = Some(selection);
     assert!(state.copy_selection());
 
     // Select cell 3 (bottom-right, at position 8,8)
@@ -1543,7 +1643,7 @@ fn sprite_editor_paste_centers_in_selected_cell() {
 
 #[test]
 fn sprite_editor_paste_scales_to_fit_cell() {
-    use super::{CanvasSide, SpriteSelection};
+    use super::CanvasSide;
 
     let mut state = SpriteEditorState::default();
     // Create a 16x16 sheet with 4x4 cells (4x4 grid)
@@ -1553,7 +1653,9 @@ fn sprite_editor_paste_scales_to_fit_cell() {
     if let Some(canvas) = &mut state.active_mut().canvas {
         canvas.fill_rect(0, 0, 8, 8, PixelColor::rgb(255, 0, 0));
     }
-    state.active_mut().selection = Some(SpriteSelection::new(0, 0, 8, 8));
+    let mut selection = SelectionMask::new(16, 16);
+    selection.select_rect(0, 0, 8, 8);
+    state.active_mut().selection = Some(selection);
     assert!(state.copy_selection());
 
     // Verify clipboard is 8x8
@@ -1573,6 +1675,55 @@ fn sprite_editor_paste_scales_to_fit_cell() {
         assert_eq!(canvas.get_pixel(12, 12), Some(PixelColor::rgb(255, 0, 0)));
         assert_eq!(canvas.get_pixel(15, 15), Some(PixelColor::rgb(255, 0, 0)));
     }
+}
+
+#[test]
+fn sprite_editor_cut_selection_copies_then_clears_only_selected_pixels() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(4, 4);
+
+    if let Some(canvas) = &mut state.active_mut().canvas {
+        canvas.fill_rect(1, 1, 2, 2, PixelColor::rgb(255, 0, 0));
+    }
+
+    let mut selection = SelectionMask::new(4, 4);
+    selection.select_pixel(1, 1);
+    selection.select_pixel(2, 2);
+    state.active_mut().selection = Some(selection);
+
+    assert!(state.cut_selection());
+
+    let canvas = state.active().canvas.as_ref().unwrap();
+    assert_eq!(canvas.get_pixel(1, 1), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(2, 2), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(1, 2), Some(PixelColor::rgb(255, 0, 0)));
+    assert_eq!(canvas.get_pixel(2, 1), Some(PixelColor::rgb(255, 0, 0)));
+    assert!(state.clipboard.is_some());
+    assert!(state.active().history.can_undo());
+}
+
+#[test]
+fn sprite_editor_delete_selection_clears_only_selected_pixels() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(4, 4);
+
+    if let Some(canvas) = &mut state.active_mut().canvas {
+        canvas.fill_rect(1, 1, 2, 2, PixelColor::rgb(255, 0, 0));
+    }
+
+    let mut selection = SelectionMask::new(4, 4);
+    selection.select_pixel(1, 1);
+    selection.select_pixel(2, 2);
+    state.active_mut().selection = Some(selection);
+
+    assert!(state.delete_selection());
+
+    let canvas = state.active().canvas.as_ref().unwrap();
+    assert_eq!(canvas.get_pixel(1, 1), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(2, 2), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(1, 2), Some(PixelColor::rgb(255, 0, 0)));
+    assert_eq!(canvas.get_pixel(2, 1), Some(PixelColor::rgb(255, 0, 0)));
+    assert!(state.active().history.can_undo());
 }
 
 #[test]

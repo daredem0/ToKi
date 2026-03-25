@@ -54,12 +54,61 @@ impl SpriteEditorState {
         let Some(canvas) = &cs.canvas else {
             return false;
         };
-        let Some(copied) =
-            canvas.extract_region(selection.x, selection.y, selection.width, selection.height)
-        else {
+        let Some(copied) = extract_masked_selection(canvas, selection) else {
             return false;
         };
         self.clipboard = Some(copied);
+        true
+    }
+
+    /// Cut the selected pixels into the clipboard and clear them from the canvas.
+    pub fn cut_selection(&mut self) -> bool {
+        let selection = match self.active().selection.clone() {
+            Some(selection) => selection,
+            None => return false,
+        };
+        let before = match self.active().canvas.clone() {
+            Some(canvas) => canvas,
+            None => return false,
+        };
+        let Some(copied) = extract_masked_selection(&before, &selection) else {
+            return false;
+        };
+
+        self.clipboard = Some(copied);
+        let cs = self.active_mut();
+        let Some(canvas) = &mut cs.canvas else {
+            return false;
+        };
+        clear_masked_pixels(canvas, &selection);
+        cs.dirty = true;
+        cs.canvas_texture = None;
+        self.push_undo_state(before);
+        true
+    }
+
+    /// Delete the selected pixels without copying them.
+    pub fn delete_selection(&mut self) -> bool {
+        let selection = match self.active().selection.clone() {
+            Some(selection) => selection,
+            None => return false,
+        };
+        let before = match self.active().canvas.clone() {
+            Some(canvas) => canvas,
+            None => return false,
+        };
+        if selection.is_empty() {
+            return false;
+        }
+
+        let cs = self.active_mut();
+        let Some(canvas) = &mut cs.canvas else {
+            return false;
+        };
+        clear_masked_pixels(canvas, &selection);
+        cs.dirty = true;
+        cs.canvas_texture = None;
+        self.push_undo_state(before);
         true
     }
 
@@ -194,5 +243,37 @@ impl SpriteEditorState {
         let center_y = cell_y as i32 + (cell_h as i32 - scaled.height as i32) / 2;
 
         Some((scaled, Some(glam::IVec2::new(center_x, center_y))))
+    }
+}
+
+fn extract_masked_selection(
+    canvas: &SpriteCanvas,
+    selection: &super::SelectionMask,
+) -> Option<SpriteCanvas> {
+    let bounds = selection.bounding_rect()?;
+    let mut result = SpriteCanvas::new(bounds.width, bounds.height);
+    for y in 0..bounds.height {
+        for x in 0..bounds.width {
+            let src_x = bounds.x + x;
+            let src_y = bounds.y + y;
+            if selection.is_selected(src_x, src_y) {
+                if let Some(color) = canvas.get_pixel(src_x, src_y) {
+                    result.set_pixel(x, y, color);
+                }
+            }
+        }
+    }
+    Some(result)
+}
+
+fn clear_masked_pixels(canvas: &mut SpriteCanvas, selection: &super::SelectionMask) {
+    if let Some(bounds) = selection.bounding_rect() {
+        for y in bounds.y..(bounds.y + bounds.height) {
+            for x in bounds.x..(bounds.x + bounds.width) {
+                if selection.is_selected(x, y) {
+                    canvas.set_pixel(x, y, super::PixelColor::transparent());
+                }
+            }
+        }
     }
 }

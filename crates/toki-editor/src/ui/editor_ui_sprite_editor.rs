@@ -11,8 +11,8 @@ use super::EditorUI;
 pub(crate) use crate::ui::sprite_editor::{
     canonical_indexed_color, indexed_slot_for_authored_color, nearest_palette_slot, CanvasSide,
     CanvasState, DiscoveredSpriteAsset, DualCanvasLayout, PixelColor, ResizeAnchor,
-    SpriteAssetKind, SpriteCanvas, SpriteCanvasViewport, SpriteEditCommand, SpriteEditorHistory,
-    SpriteEditorState, SpriteEditorTool, SpriteSelection,
+    SelectionMask, SpriteAssetKind, SpriteCanvas, SpriteCanvasViewport, SpriteEditCommand,
+    SpriteEditorHistory, SpriteEditorState, SpriteEditorTool, SpriteSelection,
 };
 
 impl EditorUI {
