@@ -192,9 +192,10 @@ fn handle_select_tool(
         }
     }
 
-    if response.clicked_by(egui::PointerButton::Primary)
-        || response.drag_stopped_by(egui::PointerButton::Primary)
-    {
+    // Use primary_released to detect click/drag-end reliably even with modifier keys held,
+    // since egui's clicked_by() may not fire when Ctrl or Shift are pressed.
+    let primary_released = ctx.input(|input| input.pointer.primary_released());
+    if primary_released {
         if let Some(start) = ui_state.sprite.active_mut().selection_start_pos.take() {
             apply_drag_selection(ui_state, start, canvas_pos, selection_mode);
             ui_state.sprite.active_mut().selection_drag_base = None;
