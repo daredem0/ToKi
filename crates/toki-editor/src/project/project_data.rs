@@ -33,7 +33,7 @@ pub struct ProjectMetadata {
     pub runtime: RuntimeSettings,
     /// Editor-specific settings
     #[serde(default)]
-    pub editor: EditorSettings,
+    pub editor: ProjectEditorMetadata,
 }
 
 /// Core project configuration
@@ -67,7 +67,7 @@ pub struct AssetConfig {
 
 /// Editor-specific settings
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct EditorSettings {
+pub struct ProjectEditorMetadata {
     /// Last opened scene
     pub last_scene: Option<String>,
     /// Recent files
@@ -157,7 +157,7 @@ impl Project {
             },
             assets: AssetConfig::default(),
             runtime: RuntimeSettings::default(),
-            editor: EditorSettings::default(),
+            editor: ProjectEditorMetadata::default(),
         };
 
         Self {

@@ -31,7 +31,7 @@ fn make_unique_temp_dir() -> std::path::PathBuf {
     dir
 }
 
-fn load_project_scene(project_path: &std::path::Path, scene_name: &str) -> Result<Scene, String> {
+fn load_project_scene(project_path: &std::path::Path, scene_name: &str) -> anyhow::Result<Scene> {
     let mut decoded_project_cache = super::DecodedProjectCache::default();
     App::load_project_scene_with_cache(project_path, scene_name, &mut decoded_project_cache)
 }
@@ -266,6 +266,7 @@ fn load_project_scene_returns_error_for_invalid_json() {
 
     let error =
         load_project_scene(&project_dir, "Broken").expect_err("invalid scene json should fail");
+    let error = error.to_string();
     assert!(error.contains("Could not parse scene file"));
 }
 
@@ -276,7 +277,10 @@ fn load_project_scene_returns_error_for_missing_scene_file() {
 
     let error = load_project_scene(&project_dir, "DoesNotExist")
         .expect_err("missing scene file should fail");
-    assert!(error.contains("Could not resolve scene file"));
+    let error = error.to_string();
+    assert!(error
+        .to_lowercase()
+        .contains("could not resolve scene file"));
 }
 
 #[test]
@@ -691,7 +695,7 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
             _channel: &str,
             _track_id: &str,
             _volume: f32,
-        ) -> Result<(), Box<dyn std::error::Error>> {
+        ) -> anyhow::Result<()> {
             Ok(())
         }
 

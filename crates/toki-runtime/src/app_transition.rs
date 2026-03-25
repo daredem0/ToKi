@@ -1,5 +1,6 @@
 use crate::app::RuntimeTransitionOptions;
 use crate::systems::AudioManager;
+use anyhow::Result;
 use toki_core::SceneSwitchRequest;
 
 const BASE_MUSIC_GAIN: f32 = 0.3;
@@ -12,7 +13,7 @@ pub(crate) trait TransitionAudioSink {
         channel: &str,
         track_id: &str,
         volume: f32,
-    ) -> Result<(), Box<dyn std::error::Error>>;
+    ) -> Result<()>;
     fn set_channel_volume_percent(&mut self, channel: &str, percent: u8);
     fn stop_channel(&mut self, channel: &str);
 }
@@ -23,7 +24,7 @@ impl TransitionAudioSink for AudioManager {
         channel: &str,
         track_id: &str,
         volume: f32,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<()> {
         self.play_background_music_in_channel(channel, track_id, volume)
     }
 
@@ -150,7 +151,7 @@ impl SceneTransitionController {
         audio: &mut impl TransitionAudioSink,
         track_id: Option<&str>,
         base_music_percent: u8,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<()> {
         audio.set_channel_volume_percent(MUSIC_CHANNEL_A, 0);
         audio.set_channel_volume_percent(MUSIC_CHANNEL_B, 0);
 
@@ -173,7 +174,7 @@ impl SceneTransitionController {
         audio: &mut impl TransitionAudioSink,
         track_id: Option<&str>,
         base_music_percent: u8,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<()> {
         if self.is_active() {
             return Ok(());
         }
@@ -345,7 +346,7 @@ mod tests {
             channel: &str,
             track_id: &str,
             volume: f32,
-        ) -> Result<(), Box<dyn std::error::Error>> {
+        ) -> Result<()> {
             self.plays
                 .push((channel.to_string(), track_id.to_string(), volume));
             Ok(())

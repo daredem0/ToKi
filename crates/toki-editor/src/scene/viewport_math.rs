@@ -1,32 +1,5 @@
 use super::ViewportSizingMode;
-use crate::editor_viewport::{
-    compute_display_rect as shared_compute_display_rect,
-    screen_to_world_from_camera as shared_screen_to_world_from_camera,
-};
-
-pub(super) fn compute_display_rect(
-    outer_rect: egui::Rect,
-    viewport_size: (u32, u32),
-    responsive: bool,
-) -> egui::Rect {
-    shared_compute_display_rect(outer_rect, viewport_size, responsive)
-}
-
-pub(super) fn screen_to_world_from_camera(
-    screen_pos: egui::Pos2,
-    display_rect: egui::Rect,
-    viewport_size: (u32, u32),
-    camera_position: glam::IVec2,
-    camera_scale: f32,
-) -> glam::Vec2 {
-    shared_screen_to_world_from_camera(
-        screen_pos,
-        display_rect,
-        viewport_size,
-        camera_position,
-        camera_scale,
-    )
-}
+pub(super) use crate::editor_viewport::{compute_display_rect, screen_to_world_from_camera};
 
 pub(super) fn world_to_i32_floor(world_pos: glam::Vec2) -> glam::IVec2 {
     glam::IVec2::new(world_pos.x.floor() as i32, world_pos.y.floor() as i32)

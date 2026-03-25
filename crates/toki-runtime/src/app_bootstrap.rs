@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use anyhow::Context;
 use toki_core::dialog::DialogTree;
 use toki_core::entity::EntityDefinition;
 use toki_core::project_assets::{
@@ -92,6 +93,29 @@ impl<'a> StartupCoordinator<'a> {
         Self { launch_options }
     }
 
+    fn load_with_policy<T>(
+        error_policy: StartupErrorPolicy,
+        project_path: &Path,
+        content_kind: &str,
+        result: anyhow::Result<Vec<T>>,
+    ) -> anyhow::Result<Vec<T>> {
+        match result {
+            Ok(items) => Ok(items),
+            Err(error) => match error_policy {
+                StartupErrorPolicy::Strict => Err(error),
+                StartupErrorPolicy::Lenient => {
+                    tracing::error!(
+                        "Failed to preload {} from '{}': {}",
+                        content_kind,
+                        project_path.display(),
+                        error
+                    );
+                    Ok(Vec::new())
+                }
+            },
+        }
+    }
+
     fn build(&self) -> StartupBundle {
         if let Some(pack_path) = &self.launch_options.pack_path {
             return self.build_from_pack(pack_path).unwrap_or_else(|error| {
@@ -162,7 +186,7 @@ impl<'a> StartupCoordinator<'a> {
         startup_root: ResolvedStartupRoot,
         error_policy: StartupErrorPolicy,
         decoded_project_cache: &mut DecodedProjectCache,
-    ) -> Result<StartupBundle, String> {
+    ) -> anyhow::Result<StartupBundle> {
         let project_path = startup_root.root_path.clone();
         let preloaded =
             self.preload_project_content(&project_path, error_policy, decoded_project_cache)?;
@@ -175,7 +199,7 @@ impl<'a> StartupCoordinator<'a> {
             map_name.as_deref(),
             decoded_project_cache,
         )
-        .map_err(|error| error.to_string())?;
+        .context("failed to load project resources")?;
         let mut resources = resources;
         if self
             .launch_options
@@ -212,56 +236,27 @@ impl<'a> StartupCoordinator<'a> {
         project_path: &Path,
         error_policy: StartupErrorPolicy,
         decoded_project_cache: &mut DecodedProjectCache,
-    ) -> Result<PreloadedProjectContent, String> {
-        let scenes =
-            match App::load_all_project_scenes_with_cache(project_path, decoded_project_cache) {
-                Ok(scenes) => scenes,
-                Err(error) => match error_policy {
-                    StartupErrorPolicy::Strict => return Err(error),
-                    StartupErrorPolicy::Lenient => {
-                        tracing::error!(
-                            "Failed to preload project scenes from '{}': {}",
-                            project_path.display(),
-                            error
-                        );
-                        Vec::new()
-                    }
-                },
-            };
-
-        let entity_definitions = match App::load_project_entity_definitions_with_cache(
+    ) -> anyhow::Result<PreloadedProjectContent> {
+        let scenes = Self::load_with_policy(
+            error_policy,
             project_path,
-            decoded_project_cache,
-        ) {
-            Ok(definitions) => definitions,
-            Err(error) => match error_policy {
-                StartupErrorPolicy::Strict => return Err(error),
-                StartupErrorPolicy::Lenient => {
-                    tracing::error!(
-                        "Failed to preload entity definitions from '{}': {}",
-                        project_path.display(),
-                        error
-                    );
-                    Vec::new()
-                }
-            },
-        };
+            "project scenes",
+            App::load_all_project_scenes_with_cache(project_path, decoded_project_cache),
+        )?;
 
-        let dialogs =
-            match App::load_project_dialogs_with_cache(project_path, decoded_project_cache) {
-                Ok(dialogs) => dialogs,
-                Err(error) => match error_policy {
-                    StartupErrorPolicy::Strict => return Err(error),
-                    StartupErrorPolicy::Lenient => {
-                        tracing::error!(
-                            "Failed to preload dialogs from '{}': {}",
-                            project_path.display(),
-                            error
-                        );
-                        Vec::new()
-                    }
-                },
-            };
+        let entity_definitions = Self::load_with_policy(
+            error_policy,
+            project_path,
+            "entity definitions",
+            App::load_project_entity_definitions_with_cache(project_path, decoded_project_cache),
+        )?;
+
+        let dialogs = Self::load_with_policy(
+            error_policy,
+            project_path,
+            "dialogs",
+            App::load_project_dialogs_with_cache(project_path, decoded_project_cache),
+        )?;
 
         Ok(PreloadedProjectContent {
             scenes,
@@ -326,21 +321,31 @@ impl App {
         project_path: &Path,
         scene_name: &str,
         decoded_project_cache: &mut DecodedProjectCache,
-    ) -> Result<Scene, String> {
+    ) -> anyhow::Result<Scene> {
         let scene_path = resolve_project_scene_path(project_path, scene_name)
-            .ok_or_else(|| format!("Could not resolve scene file for '{}'", scene_name))?;
-        decoded_project_cache.load_scene_from_path(&scene_path)
+            .with_context(|| format!("could not resolve scene file for '{scene_name}'"))?;
+        decoded_project_cache
+            .load_scene_from_path(&scene_path)
+            .map_err(anyhow::Error::msg)
     }
 
     pub(super) fn load_all_project_scenes_with_cache(
         project_path: &Path,
         decoded_project_cache: &mut DecodedProjectCache,
-    ) -> Result<Vec<Scene>, String> {
-        let scene_paths =
-            discover_project_scene_paths(project_path).map_err(|error| error.to_string())?;
+    ) -> anyhow::Result<Vec<Scene>> {
+        let scene_paths = discover_project_scene_paths(project_path).with_context(|| {
+            format!(
+                "failed to discover scenes under '{}'",
+                project_path.display()
+            )
+        })?;
         let mut scenes = Vec::new();
         for (_, path) in scene_paths {
-            scenes.push(decoded_project_cache.load_scene_from_path(&path)?);
+            scenes.push(
+                decoded_project_cache
+                    .load_scene_from_path(&path)
+                    .map_err(anyhow::Error::msg)?,
+            );
         }
         scenes.sort_by(|left, right| left.name.cmp(&right.name));
         Ok(scenes)
@@ -349,15 +354,20 @@ impl App {
     pub(super) fn load_project_entity_definitions_with_cache(
         project_path: &Path,
         decoded_project_cache: &mut DecodedProjectCache,
-    ) -> Result<Vec<EntityDefinition>, String> {
+    ) -> anyhow::Result<Vec<EntityDefinition>> {
         let definition_paths = discover_project_entity_definition_paths(project_path)
-            .map_err(|error| error.to_string())?;
+            .with_context(|| {
+                format!(
+                    "failed to discover entity definitions under '{}'",
+                    project_path.display()
+                )
+            })?;
         let mut definitions = Vec::new();
         for path in definition_paths {
             definitions.push(
                 decoded_project_cache
                     .load_entity_definition_from_path(&path)
-                    .map_err(|error| error.to_string())?,
+                    .map_err(anyhow::Error::msg)?,
             );
         }
         definitions.sort_by(|left, right| left.name.cmp(&right.name));
@@ -367,15 +377,19 @@ impl App {
     pub(super) fn load_project_dialogs_with_cache(
         project_path: &Path,
         decoded_project_cache: &mut DecodedProjectCache,
-    ) -> Result<Vec<DialogTree>, String> {
-        let dialog_paths =
-            discover_project_dialog_paths(project_path).map_err(|error| error.to_string())?;
+    ) -> anyhow::Result<Vec<DialogTree>> {
+        let dialog_paths = discover_project_dialog_paths(project_path).with_context(|| {
+            format!(
+                "failed to discover dialogs under '{}'",
+                project_path.display()
+            )
+        })?;
         let mut dialogs = Vec::new();
         for path in dialog_paths {
             dialogs.push(
                 decoded_project_cache
                     .load_dialog_from_path(&path)
-                    .map_err(|error| error.to_string())?,
+                    .map_err(anyhow::Error::msg)?,
             );
         }
         dialogs.sort_by(|left, right| left.id.cmp(&right.id));
@@ -552,6 +566,7 @@ mod tests {
         let error = coordinator
             .preload_project_content(temp.path(), StartupErrorPolicy::Strict, &mut cache)
             .expect_err("strict preload should fail");
+        let error = error.to_string();
         assert!(error.contains("broken.json") || error.contains("Failed to parse scene"));
     }
 }

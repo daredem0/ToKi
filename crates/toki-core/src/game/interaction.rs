@@ -147,33 +147,8 @@ impl GameState {
         interactable_size: glam::UVec2,
         interaction_reach: i32,
     ) -> bool {
-        use super::animation::FacingDirection;
-
-        let reach = interaction_reach.max(1);
-
-        // Create a reach box in the direction the player is facing
-        let (reach_pos, reach_size) = match player_facing {
-            FacingDirection::Up => {
-                let pos = glam::IVec2::new(player_pos.x, player_pos.y - reach);
-                let size = glam::UVec2::new(player_size.x, reach as u32);
-                (pos, size)
-            }
-            FacingDirection::Down => {
-                let pos = glam::IVec2::new(player_pos.x, player_pos.y + player_size.y as i32);
-                let size = glam::UVec2::new(player_size.x, reach as u32);
-                (pos, size)
-            }
-            FacingDirection::Left => {
-                let pos = glam::IVec2::new(player_pos.x - reach, player_pos.y);
-                let size = glam::UVec2::new(reach as u32, player_size.y);
-                (pos, size)
-            }
-            FacingDirection::Right => {
-                let pos = glam::IVec2::new(player_pos.x + player_size.x as i32, player_pos.y);
-                let size = glam::UVec2::new(reach as u32, player_size.y);
-                (pos, size)
-            }
-        };
+        let (reach_pos, reach_size) =
+            player_facing.reach_bounds(player_pos, player_size, interaction_reach);
 
         collision::aabb_overlap(reach_pos, reach_size, interactable_pos, interactable_size)
     }

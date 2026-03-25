@@ -11,7 +11,9 @@ mod texture;
 mod vertex;
 pub mod wgpu_utils;
 
-pub use backend::RenderBackend;
+pub use backend::{
+    FrameLifecycle, RenderBackend, ShapeRenderer, SpriteRenderer, TextRenderer, TextureLoader,
+};
 pub use errors::RenderError;
 pub use gpu::GpuState;
 pub use pipelines::{

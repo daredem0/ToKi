@@ -9,12 +9,7 @@ use super::{GameState, InputAction};
 
 impl GameState {
     fn facing_vector(facing: FacingDirection) -> glam::IVec2 {
-        match facing {
-            FacingDirection::Down => glam::IVec2::new(0, 1),
-            FacingDirection::Up => glam::IVec2::new(0, -1),
-            FacingDirection::Left => glam::IVec2::new(-1, 0),
-            FacingDirection::Right => glam::IVec2::new(1, 0),
-        }
+        facing.to_ivec2()
     }
 
     fn primary_action_damage_for_entity(entity: &Entity) -> i32 {
@@ -30,12 +25,7 @@ impl GameState {
         facing: FacingDirection,
     ) -> (glam::IVec2, glam::UVec2) {
         let (origin, size) = entity.interaction_bounds();
-        match facing {
-            FacingDirection::Down => (glam::IVec2::new(origin.x, origin.y + size.y as i32), size),
-            FacingDirection::Up => (glam::IVec2::new(origin.x, origin.y - size.y as i32), size),
-            FacingDirection::Left => (glam::IVec2::new(origin.x - size.x as i32, origin.y), size),
-            FacingDirection::Right => (glam::IVec2::new(origin.x + size.x as i32, origin.y), size),
-        }
+        facing.offset_bounds(origin, size, size.y.max(size.x) as i32)
     }
 
     fn collect_primary_action_stat_changes(

@@ -53,14 +53,16 @@ impl InspectorSystem {
         for (rule_index, rule) in rule_set.rules.iter_mut().enumerate() {
             let outcome = Self::render_rule_editor(
                 ui,
-                scene_name,
-                rule_index,
                 rule,
-                &validation_issues,
-                &audio_choices,
-                scenes,
-                available_dialog_outcomes,
-                map_size,
+                rules_flat::RuleEditorContext {
+                    scene_name,
+                    rule_index,
+                    validation_issues: &validation_issues,
+                    audio_choices: &audio_choices,
+                    scenes,
+                    available_dialog_outcomes,
+                    map_size,
+                },
             );
             changed |= outcome.changed;
             if pending_command.is_none() {

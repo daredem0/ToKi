@@ -213,13 +213,14 @@ impl InspectorSystem {
         let mut edited_action = action.clone();
         let changed = Self::render_rule_graph_action_editor(
             ui,
-            params.scene_name,
-            params.node_key,
             &mut edited_action,
-            &ctx.validation_issues,
-            &ctx.audio_choices,
-            &ui_state.project.available_dialog_outcomes,
-            &ui_state.scenes,
+            action_editor::RuleGraphActionEditorContext {
+                scene_name: params.scene_name,
+                node_key: params.node_key,
+                audio_choices: &ctx.audio_choices,
+                available_dialog_outcomes: &ui_state.project.available_dialog_outcomes,
+                scenes: &ui_state.scenes,
+            },
         );
 
         if changed && edited_action != *action {

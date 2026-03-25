@@ -152,66 +152,94 @@ fn apply_runtime_config(
     if launch_options.scene_name.is_none() {
         launch_options.scene_name = config.startup.and_then(|startup| startup.scene);
     }
-    if launch_options.pack_path.is_none() {
-        if let Some(pack) = config.pack {
-            if pack.enabled {
-                launch_options.pack_path = Some(config_dir.join(pack.path));
-            }
-        }
-    }
-    if let Some(splash) = config.splash {
-        if let Some(duration_ms) = splash.duration_ms {
-            launch_options.splash.duration_ms = duration_ms;
-        }
-    }
-    if let Some(audio) = config.audio {
-        if let Some(master_percent) = audio.master_percent {
-            launch_options.audio_mix.master_percent = master_percent.min(100);
-        }
-        if let Some(music_percent) = audio.music_percent {
-            launch_options.audio_mix.music_percent = music_percent.min(100);
-        }
-        if let Some(movement_percent) = audio.movement_percent {
-            launch_options.audio_mix.movement_percent = movement_percent.min(100);
-        }
-        if let Some(collision_percent) = audio.collision_percent {
-            launch_options.audio_mix.collision_percent = collision_percent.min(100);
-        }
-    }
-    if let Some(display) = config.display {
-        if let Some(show_entity_health_bars) = display.show_entity_health_bars {
-            launch_options.display.show_entity_health_bars = show_entity_health_bars;
-        }
-        if let Some(show_ground_shadows) = display.show_ground_shadows {
-            launch_options.display.show_ground_shadows = show_ground_shadows;
-        }
-        if display.indexed_palette_override.is_some() {
-            launch_options.display.indexed_palette_override = display.indexed_palette_override;
-        }
-        if let Some(post_process) = display.post_process {
-            launch_options.display.post_process = post_process;
-        }
-        if let Some(resolution_width) = display.resolution_width {
-            launch_options.display.resolution_width = resolution_width;
-        }
-        if let Some(resolution_height) = display.resolution_height {
-            launch_options.display.resolution_height = resolution_height;
-        }
-        if let Some(zoom_percent) = display.zoom_percent {
-            launch_options.display.zoom_percent = zoom_percent;
-        }
-        if let Some(vsync) = display.vsync {
-            launch_options.display.vsync = vsync;
-        }
-        if let Some(target_fps) = display.target_fps {
-            launch_options.display.target_fps = target_fps;
-        }
-        if let Some(timing_mode) = display.timing_mode {
-            launch_options.display.timing_mode = timing_mode;
-        }
-    }
+    apply_pack_config(launch_options, config.pack, config_dir);
+    apply_splash_config(launch_options, config.splash);
+    apply_audio_config(launch_options, config.audio);
+    apply_display_config(launch_options, config.display);
     if let Some(menu) = config.menu {
         launch_options.menu = menu;
+    }
+}
+
+fn apply_pack_config(
+    launch_options: &mut RuntimeLaunchOptions,
+    pack: Option<toki_core::project_runtime::RuntimeConfigPack>,
+    config_dir: &std::path::Path,
+) {
+    let Some(pack) = pack else {
+        return;
+    };
+    if launch_options.pack_path.is_none() && pack.enabled {
+        launch_options.pack_path = Some(config_dir.join(pack.path));
+    }
+}
+
+fn apply_splash_config(
+    launch_options: &mut RuntimeLaunchOptions,
+    splash: Option<toki_core::project_runtime::RuntimeConfigSplash>,
+) {
+    if let Some(duration_ms) = splash.and_then(|splash| splash.duration_ms) {
+        launch_options.splash.duration_ms = duration_ms;
+    }
+}
+
+fn apply_audio_config(
+    launch_options: &mut RuntimeLaunchOptions,
+    audio: Option<toki_core::project_runtime::RuntimeConfigAudio>,
+) {
+    let Some(audio) = audio else {
+        return;
+    };
+    if let Some(master_percent) = audio.master_percent {
+        launch_options.audio_mix.master_percent = master_percent.min(100);
+    }
+    if let Some(music_percent) = audio.music_percent {
+        launch_options.audio_mix.music_percent = music_percent.min(100);
+    }
+    if let Some(movement_percent) = audio.movement_percent {
+        launch_options.audio_mix.movement_percent = movement_percent.min(100);
+    }
+    if let Some(collision_percent) = audio.collision_percent {
+        launch_options.audio_mix.collision_percent = collision_percent.min(100);
+    }
+}
+
+fn apply_display_config(
+    launch_options: &mut RuntimeLaunchOptions,
+    display: Option<toki_core::project_runtime::RuntimeConfigDisplay>,
+) {
+    let Some(display) = display else {
+        return;
+    };
+    if let Some(show_entity_health_bars) = display.show_entity_health_bars {
+        launch_options.display.show_entity_health_bars = show_entity_health_bars;
+    }
+    if let Some(show_ground_shadows) = display.show_ground_shadows {
+        launch_options.display.show_ground_shadows = show_ground_shadows;
+    }
+    if display.indexed_palette_override.is_some() {
+        launch_options.display.indexed_palette_override = display.indexed_palette_override;
+    }
+    if let Some(post_process) = display.post_process {
+        launch_options.display.post_process = post_process;
+    }
+    if let Some(resolution_width) = display.resolution_width {
+        launch_options.display.resolution_width = resolution_width;
+    }
+    if let Some(resolution_height) = display.resolution_height {
+        launch_options.display.resolution_height = resolution_height;
+    }
+    if let Some(zoom_percent) = display.zoom_percent {
+        launch_options.display.zoom_percent = zoom_percent;
+    }
+    if let Some(vsync) = display.vsync {
+        launch_options.display.vsync = vsync;
+    }
+    if let Some(target_fps) = display.target_fps {
+        launch_options.display.target_fps = target_fps;
+    }
+    if let Some(timing_mode) = display.timing_mode {
+        launch_options.display.timing_mode = timing_mode;
     }
 }
 

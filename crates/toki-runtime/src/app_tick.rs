@@ -4,10 +4,36 @@ use toki_core::camera::RuntimeState;
 use toki_core::{EventHandler, GameUpdateResult, DEFAULT_TIMESTEP_MS};
 
 use super::app_presenter::{render_scene_transition_overlay, WorldFramePresenter};
-use super::app_scene_runtime::SceneRuntimeCoordinator;
+use super::app_scene_runtime::{SceneRuntimeCoordinator, SceneRuntimeRefs, SceneRuntimeSettings};
 use super::App;
 
 impl App {
+    fn create_scene_runtime_coordinator(&mut self) -> SceneRuntimeCoordinator<'_> {
+        let content_root = self.content_root_path().map(std::path::Path::to_path_buf);
+        SceneRuntimeCoordinator::new(
+            SceneRuntimeRefs {
+                game_system: &mut self.game_system,
+                camera_system: &mut self.camera_system,
+                resources: &mut self.resources,
+                rendering: &mut self.rendering,
+                audio_system: &mut self.audio_system,
+                decoded_project_cache: &mut self.decoded_project_cache,
+                asset_load_plan: &mut self.asset_load_plan,
+                scene_transition: &mut self.scene_transition,
+            },
+            SceneRuntimeSettings {
+                audio_mix: &self.launch_options.audio_mix,
+                scene_persistence: self.launch_options.scene_persistence,
+                indexed_palette_override: self
+                    .launch_options
+                    .display
+                    .indexed_palette_override
+                    .clone(),
+                content_root,
+            },
+        )
+    }
+
     pub(super) fn tick(&mut self) {
         self.tick_internal(None)
     }
@@ -25,7 +51,7 @@ impl App {
             self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
             self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
         );
-        let game_result =
+        let mut game_result =
             if self.should_gate_gameplay_for_menu() || self.scene_transition.is_active() {
                 GameUpdateResult::new()
             } else if let Some(delta) = delta_ms {
@@ -53,45 +79,17 @@ impl App {
             self.audio_system.handle(event);
         }
 
-        if let Some(request) = game_result.dialog_start_request.clone() {
+        if let Some(request) = game_result.dialog_start_request.take() {
             self.apply_dialog_start_request(request);
         }
 
-        if let Some(request) = game_result.scene_switch_request.clone() {
-            let content_root = self.content_root_path().map(std::path::Path::to_path_buf);
-            let mut coordinator = SceneRuntimeCoordinator::new(
-                &mut self.game_system,
-                &mut self.camera_system,
-                &mut self.resources,
-                &mut self.rendering,
-                &mut self.audio_system,
-                &mut self.decoded_project_cache,
-                &mut self.asset_load_plan,
-                &mut self.scene_transition,
-                &self.launch_options.audio_mix,
-                self.launch_options.scene_persistence,
-                self.launch_options.display.indexed_palette_override.clone(),
-                content_root,
-            );
+        if let Some(request) = game_result.scene_switch_request.take() {
+            let mut coordinator = self.create_scene_runtime_coordinator();
             coordinator.queue_scene_switch_request(request);
         }
 
         {
-            let content_root = self.content_root_path().map(std::path::Path::to_path_buf);
-            let mut coordinator = SceneRuntimeCoordinator::new(
-                &mut self.game_system,
-                &mut self.camera_system,
-                &mut self.resources,
-                &mut self.rendering,
-                &mut self.audio_system,
-                &mut self.decoded_project_cache,
-                &mut self.asset_load_plan,
-                &mut self.scene_transition,
-                &self.launch_options.audio_mix,
-                self.launch_options.scene_persistence,
-                self.launch_options.display.indexed_palette_override.clone(),
-                content_root,
-            );
+            let mut coordinator = self.create_scene_runtime_coordinator();
             coordinator.advance_scene_transition(transition_delta_ms);
         }
         world_bounds = glam::UVec2::new(

@@ -359,32 +359,34 @@ impl InspectorSystem {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.selectable_value(
-                        &mut ui_state.right_panel_tab,
+                        &mut ui_state.workspace.right_panel_tab,
                         super::editor_ui::RightPanelTab::Inspector,
                         "Inspector",
                     );
                     ui.selectable_value(
-                        &mut ui_state.right_panel_tab,
+                        &mut ui_state.workspace.right_panel_tab,
                         super::editor_ui::RightPanelTab::Project,
                         "Project",
                     );
                 });
                 ui.separator();
 
-                egui::ScrollArea::vertical().show(ui, |ui| match ui_state.right_panel_tab {
-                    super::editor_ui::RightPanelTab::Inspector => {
-                        Self::render_selection_inspector_contents(
-                            ui_state,
-                            ui,
-                            ctx,
-                            game_state,
-                            project,
-                            project_assets,
-                            config,
-                        );
-                    }
-                    super::editor_ui::RightPanelTab::Project => {
-                        Self::render_project_settings_panel(ui_state, ui, project, config);
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    match ui_state.workspace.right_panel_tab {
+                        super::editor_ui::RightPanelTab::Inspector => {
+                            Self::render_selection_inspector_contents(
+                                ui_state,
+                                ui,
+                                ctx,
+                                game_state,
+                                project,
+                                project_assets,
+                                config,
+                            );
+                        }
+                        super::editor_ui::RightPanelTab::Project => {
+                            Self::render_project_settings_panel(ui_state, ui, project, config);
+                        }
                     }
                 });
             });
@@ -400,32 +402,33 @@ impl InspectorSystem {
         config: Option<&EditorConfig>,
     ) {
         // Handle special editor modes first
-        if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::MapEditor {
+        if ui_state.workspace.center_panel_tab == super::editor_ui::CenterPanelTab::MapEditor {
             Self::render_map_editor_command_palette(ui_state, ui, ctx, config);
             return;
         }
 
-        if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::MenuEditor {
+        if ui_state.workspace.center_panel_tab == super::editor_ui::CenterPanelTab::MenuEditor {
             Self::render_menu_editor_inspector(ui_state, ui, project);
             return;
         }
 
-        if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::DialogEditor {
+        if ui_state.workspace.center_panel_tab == super::editor_ui::CenterPanelTab::DialogEditor {
             Self::render_dialog_editor_inspector(ui_state, ui, project, project_assets);
             return;
         }
 
-        if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::SpriteEditor {
+        if ui_state.workspace.center_panel_tab == super::editor_ui::CenterPanelTab::SpriteEditor {
             Self::render_sprite_editor_inspector(ui_state, ui, ctx);
             return;
         }
 
-        if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::AnimationEditor {
+        if ui_state.workspace.center_panel_tab == super::editor_ui::CenterPanelTab::AnimationEditor
+        {
             Self::render_animation_editor_inspector(ui_state, ui);
             return;
         }
 
-        if ui_state.center_panel_tab == super::editor_ui::CenterPanelTab::EntityEditor {
+        if ui_state.workspace.center_panel_tab == super::editor_ui::CenterPanelTab::EntityEditor {
             Self::render_entity_editor_inspector(ui_state, ui);
             return;
         }

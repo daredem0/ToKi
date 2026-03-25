@@ -1,6 +1,6 @@
 use super::inspector::InspectorSystem;
 use super::menus::MenuSystem;
-use super::panels::PanelSystem;
+use super::panels::{PanelSystem, ViewportPanelContext};
 use super::rule_graph::RuleGraph;
 use super::undo_redo::UndoRedoHistory;
 use crate::editor_tab_strip::EditorTabStripState;
@@ -135,6 +135,37 @@ pub struct EntitySelectionState {
     ids: Vec<EntityId>,
 }
 
+#[derive(Debug, Clone)]
+pub struct WorkspaceUiState {
+    pub right_panel_tab: RightPanelTab,
+    pub center_panel_tab: CenterPanelTab,
+    pub center_panel_tab_strip: EditorTabStripState,
+}
+
+impl Default for WorkspaceUiState {
+    fn default() -> Self {
+        Self {
+            right_panel_tab: RightPanelTab::Inspector,
+            center_panel_tab: CenterPanelTab::SceneViewport,
+            center_panel_tab_strip: EditorTabStripState::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MultiEntityInspectorState {
+    pub render_layer_input: i64,
+    pub delta_x_input: i32,
+    pub delta_y_input: i32,
+    pub selection_signature: Vec<EntityId>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ViewportCursorState {
+    pub world_position: Option<glam::IVec2>,
+    pub show_tiles: bool,
+}
+
 /// UI panel visibility and editor lifecycle flags
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UIVisibilityState {
@@ -164,17 +195,8 @@ impl Default for UIVisibilityState {
 /// Project management state: project lifecycle, dialogs, and background tasks
 #[derive(Debug, Clone)]
 pub struct ProjectEditorState {
-    // Project request flags
-    pub new_project_requested: bool,
-    pub new_top_down_project_requested: bool,
-    pub open_project_requested: bool,
-    pub browse_for_project_requested: bool,
-    pub reload_project_assets_requested: bool,
-    pub save_project_requested: bool,
-    pub export_project_requested: bool,
-    pub play_scene_requested: bool,
-    pub init_config_requested: bool,
-    pub validate_assets_requested: bool,
+    // Pending project request
+    pub pending_request: Option<ProjectRequest>,
 
     // New project dialog state
     pub show_new_project_dialog: bool,
@@ -199,16 +221,7 @@ pub struct ProjectEditorState {
 impl Default for ProjectEditorState {
     fn default() -> Self {
         Self {
-            new_project_requested: false,
-            new_top_down_project_requested: false,
-            open_project_requested: false,
-            browse_for_project_requested: false,
-            reload_project_assets_requested: false,
-            save_project_requested: false,
-            export_project_requested: false,
-            play_scene_requested: false,
-            init_config_requested: false,
-            validate_assets_requested: false,
+            pending_request: None,
             show_new_project_dialog: false,
             new_project_template: ProjectTemplateKind::Empty,
             new_project_parent_directory: None,
@@ -232,7 +245,34 @@ pub enum EditorConfirmation {
     ExitEditor,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectRequest {
+    NewProject,
+    NewTopDownProject,
+    OpenProject,
+    BrowseForProject,
+    ReloadProjectAssets,
+    SaveProject,
+    ExportProject,
+    PlayScene,
+    InitConfig,
+    ValidateAssets,
+}
+
 impl ProjectEditorState {
+    pub fn request(&mut self, request: ProjectRequest) {
+        self.pending_request = Some(request);
+    }
+
+    pub fn take_request(&mut self, request: ProjectRequest) -> bool {
+        if self.pending_request == Some(request) {
+            self.pending_request = None;
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn set_available_palettes(&mut self, project_palettes: &BTreeMap<String, Palette4>) {
         let mut palettes = builtin_palettes();
         palettes.extend(
@@ -510,7 +550,7 @@ pub struct EditorUI {
     // Project management
     pub project: ProjectEditorState,
 
-    pub right_panel_tab: RightPanelTab,
+    pub workspace: WorkspaceUiState,
 
     // Map editor state
     pub map: MapEditorState,
@@ -530,22 +570,27 @@ pub struct EditorUI {
     // Entity placement system
     pub placement: PlacementState,
 
-    pub center_panel_tab: CenterPanelTab, // Active tab in center workspace
-
     // Scene graph editor state
     pub graph: GraphEditorState,
 
     pub command_history: UndoRedoHistory, // Undo/redo command history for scene mutations
 
     // Multi-entity inspector draft state
-    pub multi_entity_render_layer_input: i64,
-    pub multi_entity_delta_x_input: i32,
-    pub multi_entity_delta_y_input: i32,
-    pub multi_entity_inspector_selection_signature: Vec<EntityId>,
+    pub multi_entity: MultiEntityInspectorState,
     pub menu_preview_font_families: Vec<String>,
-    pub viewport_cursor_world_position: Option<glam::IVec2>,
-    pub viewport_cursor_show_tiles: bool,
-    pub center_panel_tab_strip: EditorTabStripState,
+    pub viewport_cursor: ViewportCursorState,
+}
+
+pub struct EditorRenderContext<'a> {
+    pub scene_viewport: Option<&'a mut SceneViewport>,
+    pub map_editor_viewport: Option<&'a mut SceneViewport>,
+    pub project: Option<&'a mut crate::project::Project>,
+    pub project_assets: Option<&'a mut crate::project::ProjectAssets>,
+    pub available_map_names: Option<Vec<String>>,
+    pub config: Option<&'a mut crate::config::EditorConfig>,
+    pub log_capture: Option<&'a crate::logging::LogCapture>,
+    pub renderer: Option<&'a mut egui_wgpu::Renderer>,
+    pub busy_logo_texture: Option<&'a egui::TextureHandle>,
 }
 
 impl EditorUI {
@@ -566,7 +611,7 @@ impl EditorUI {
             // Project management
             project: ProjectEditorState::default(),
 
-            right_panel_tab: RightPanelTab::Inspector,
+            workspace: WorkspaceUiState::default(),
 
             // Map editor state
             map: MapEditorState::default(),
@@ -586,29 +631,22 @@ impl EditorUI {
             // Entity placement system
             placement: PlacementState::default(),
 
-            center_panel_tab: CenterPanelTab::SceneViewport,
-
             // Scene graph editor state
             graph: GraphEditorState::default(),
 
             command_history: UndoRedoHistory::default(),
-            multi_entity_render_layer_input: 0,
-            multi_entity_delta_x_input: 0,
-            multi_entity_delta_y_input: 0,
-            multi_entity_inspector_selection_signature: Vec::new(),
+            multi_entity: MultiEntityInspectorState::default(),
             menu_preview_font_families: vec![
                 "Sans".to_string(),
                 "Serif".to_string(),
                 "Mono".to_string(),
             ],
-            viewport_cursor_world_position: None,
-            viewport_cursor_show_tiles: false,
-            center_panel_tab_strip: EditorTabStripState::default(),
+            viewport_cursor: ViewportCursorState::default(),
         }
     }
 
     pub fn remember_viewport_cursor_world_position(&mut self, world_pos: glam::Vec2) {
-        self.viewport_cursor_world_position = Some(glam::IVec2::new(
+        self.viewport_cursor.world_position = Some(glam::IVec2::new(
             world_pos.x.floor() as i32,
             world_pos.y.floor() as i32,
         ));
@@ -786,36 +824,23 @@ impl EditorUI {
     }
 
     /// Render the entire UI
-    #[allow(clippy::too_many_arguments)]
-    pub fn render(
-        &mut self,
-        ctx: &egui::Context,
-        scene_viewport: Option<&mut SceneViewport>,
-        map_editor_viewport: Option<&mut SceneViewport>,
-        mut project: Option<&mut crate::project::Project>,
-        mut project_assets: Option<&mut crate::project::ProjectAssets>,
-        available_map_names: Option<Vec<String>>,
-        config: Option<&mut crate::config::EditorConfig>,
-        log_capture: Option<&crate::logging::LogCapture>,
-        renderer: Option<&mut egui_wgpu::Renderer>,
-        busy_logo_texture: Option<&egui::TextureHandle>,
-    ) {
-        let config_readonly = config.as_deref();
+    pub fn render(&mut self, ctx: &egui::Context, mut render_ctx: EditorRenderContext<'_>) {
+        let config_readonly = render_ctx.config.as_deref();
         MenuSystem::render_top_menu(
             self,
             ctx,
-            project.as_deref_mut(),
+            render_ctx.project.as_deref_mut(),
             config_readonly,
-            busy_logo_texture,
+            render_ctx.busy_logo_texture,
         );
 
         // Render log panel first to claim full width at bottom
         if self.visibility.show_console {
-            PanelSystem::render_log_panel(self, ctx, log_capture);
+            PanelSystem::render_log_panel(self, ctx, render_ctx.log_capture);
         }
 
         // Render hierarchy and inspector panels
-        let game_state = scene_viewport.as_ref().map(|v| v.game_state());
+        let game_state = render_ctx.scene_viewport.as_ref().map(|v| v.game_state());
 
         if self.visibility.show_hierarchy {
             self.render_hierarchy_and_maps_combined_panel(ctx, game_state, config_readonly);
@@ -826,27 +851,29 @@ impl EditorUI {
                 self,
                 ctx,
                 game_state,
-                project.as_deref_mut(),
-                project_assets.as_deref_mut(),
+                render_ctx.project.as_deref_mut(),
+                render_ctx.project_assets.as_deref_mut(),
                 config_readonly,
             );
         }
 
-        if self.center_panel_tab == CenterPanelTab::MenuEditor {
-            self.sync_menu_editor_selection(project.as_deref());
+        if self.workspace.center_panel_tab == CenterPanelTab::MenuEditor {
+            self.sync_menu_editor_selection(render_ctx.project.as_deref());
         }
 
         // Render viewport last (mutable access)
         PanelSystem::render_viewport(
             self,
             ctx,
-            scene_viewport,
-            map_editor_viewport,
-            project,
-            project_assets,
-            available_map_names,
-            config,
-            renderer,
+            ViewportPanelContext {
+                scene_viewport: render_ctx.scene_viewport,
+                map_editor_viewport: render_ctx.map_editor_viewport,
+                project: render_ctx.project,
+                project_assets: render_ctx.project_assets,
+                available_map_names: render_ctx.available_map_names,
+                config: render_ctx.config,
+                renderer: render_ctx.renderer,
+            },
         );
     }
 

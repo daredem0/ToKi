@@ -41,6 +41,17 @@ pub struct ResourceManager {
     indexed_palette_override: Option<String>,
 }
 
+pub struct PreloadedResources {
+    pub terrain_atlas: AtlasMeta,
+    pub sprite_atlases: SpriteAtlasRegistry,
+    pub sprite_texture_paths: SpriteTextureRegistry,
+    pub object_sheets: ObjectSheetRegistry,
+    pub object_texture_paths: ObjectTextureRegistry,
+    pub tilemap: TileMap,
+    pub project_palettes: BTreeMap<String, Palette4>,
+    pub indexed_palette_override: Option<String>,
+}
+
 impl ResourceManager {
     /// Load all game resources from their respective files
     pub fn load_all() -> Result<Self, RenderError> {
@@ -129,26 +140,16 @@ impl ResourceManager {
         ))
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn from_preloaded(
-        terrain_atlas: AtlasMeta,
-        sprite_atlases: SpriteAtlasRegistry,
-        sprite_texture_paths: SpriteTextureRegistry,
-        object_sheets: ObjectSheetRegistry,
-        object_texture_paths: ObjectTextureRegistry,
-        tilemap: TileMap,
-        project_palettes: BTreeMap<String, Palette4>,
-        indexed_palette_override: Option<String>,
-    ) -> Self {
+    pub fn from_preloaded(preloaded: PreloadedResources) -> Self {
         Self {
-            terrain_atlas,
-            sprite_atlases,
-            sprite_texture_paths,
-            object_sheets,
-            object_texture_paths,
-            tilemap,
-            project_palettes,
-            indexed_palette_override,
+            terrain_atlas: preloaded.terrain_atlas,
+            sprite_atlases: preloaded.sprite_atlases,
+            sprite_texture_paths: preloaded.sprite_texture_paths,
+            object_sheets: preloaded.object_sheets,
+            object_texture_paths: preloaded.object_texture_paths,
+            tilemap: preloaded.tilemap,
+            project_palettes: preloaded.project_palettes,
+            indexed_palette_override: preloaded.indexed_palette_override,
         }
     }
 

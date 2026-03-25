@@ -3,6 +3,17 @@
 use crate::editor_sprite_preview::{load_texture_preview_image, texture_preview_cache_key};
 use crate::ui::EditorUI;
 
+struct AtlasGridGeometry {
+    rect: egui::Rect,
+    canvas_screen_min: egui::Pos2,
+    canvas_screen_max: egui::Pos2,
+    cell_w: u32,
+    cell_h: u32,
+    cols: u32,
+    rows: u32,
+    zoom: f32,
+}
+
 pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::Context) {
     let atlas_name = ui_state.animation.authoring.atlas_name.clone();
     if atlas_name.is_empty() {
@@ -123,6 +134,16 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
         canvas_screen_min.y + img_h as f32 * zoom,
     );
     let canvas_screen_rect = egui::Rect::from_min_max(canvas_screen_min, canvas_screen_max);
+    let geometry = AtlasGridGeometry {
+        rect,
+        canvas_screen_min,
+        canvas_screen_max,
+        cell_w,
+        cell_h,
+        cols,
+        rows,
+        zoom,
+    };
 
     // Draw the atlas image
     painter.image(
@@ -133,29 +154,10 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
     );
 
     // Draw cell grid overlay
-    draw_cell_grid(
-        &painter,
-        rect,
-        canvas_screen_min,
-        canvas_screen_max,
-        cell_w,
-        cell_h,
-        cols,
-        rows,
-        zoom,
-    );
+    draw_cell_grid(&painter, &geometry);
 
     // Highlight cells that are in the current clip
-    highlight_clip_frames(
-        ui_state,
-        &painter,
-        canvas_screen_min,
-        cell_w,
-        cell_h,
-        cols,
-        rows,
-        zoom,
-    );
+    highlight_clip_frames(ui_state, &painter, &geometry);
 
     // Highlight hovered cell and handle clicks
     let add_frame = handle_cell_interaction(
@@ -163,12 +165,7 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
         &painter,
         &response,
         cursor_canvas_pos,
-        canvas_screen_min,
-        cell_w,
-        cell_h,
-        cols,
-        rows,
-        zoom,
+        &geometry,
         has_selected_clip,
     );
 
@@ -186,31 +183,20 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
     );
 }
 
-#[allow(clippy::too_many_arguments)]
-fn draw_cell_grid(
-    painter: &egui::Painter,
-    rect: egui::Rect,
-    canvas_screen_min: egui::Pos2,
-    canvas_screen_max: egui::Pos2,
-    cell_w: u32,
-    cell_h: u32,
-    cols: u32,
-    rows: u32,
-    zoom: f32,
-) {
+fn draw_cell_grid(painter: &egui::Painter, geometry: &AtlasGridGeometry) {
     let grid_stroke = egui::Stroke::new(
         1.0,
         egui::Color32::from_rgba_unmultiplied(255, 200, 50, 150),
     );
 
     // Vertical lines
-    for col in 0..=cols {
-        let x = canvas_screen_min.x + (col * cell_w) as f32 * zoom;
-        if x >= rect.left() && x <= rect.right() {
+    for col in 0..=geometry.cols {
+        let x = geometry.canvas_screen_min.x + (col * geometry.cell_w) as f32 * geometry.zoom;
+        if x >= geometry.rect.left() && x <= geometry.rect.right() {
             painter.line_segment(
                 [
-                    egui::pos2(x, rect.top().max(canvas_screen_min.y)),
-                    egui::pos2(x, rect.bottom().min(canvas_screen_max.y)),
+                    egui::pos2(x, geometry.rect.top().max(geometry.canvas_screen_min.y)),
+                    egui::pos2(x, geometry.rect.bottom().min(geometry.canvas_screen_max.y)),
                 ],
                 grid_stroke,
             );
@@ -218,13 +204,13 @@ fn draw_cell_grid(
     }
 
     // Horizontal lines
-    for row in 0..=rows {
-        let y = canvas_screen_min.y + (row * cell_h) as f32 * zoom;
-        if y >= rect.top() && y <= rect.bottom() {
+    for row in 0..=geometry.rows {
+        let y = geometry.canvas_screen_min.y + (row * geometry.cell_h) as f32 * geometry.zoom;
+        if y >= geometry.rect.top() && y <= geometry.rect.bottom() {
             painter.line_segment(
                 [
-                    egui::pos2(rect.left().max(canvas_screen_min.x), y),
-                    egui::pos2(rect.right().min(canvas_screen_max.x), y),
+                    egui::pos2(geometry.rect.left().max(geometry.canvas_screen_min.x), y),
+                    egui::pos2(geometry.rect.right().min(geometry.canvas_screen_max.x), y),
                 ],
                 grid_stroke,
             );
@@ -232,29 +218,23 @@ fn draw_cell_grid(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn highlight_clip_frames(
     ui_state: &EditorUI,
     painter: &egui::Painter,
-    canvas_screen_min: egui::Pos2,
-    cell_w: u32,
-    cell_h: u32,
-    cols: u32,
-    rows: u32,
-    zoom: f32,
+    geometry: &AtlasGridGeometry,
 ) {
     if let Some(clip) = ui_state.animation.authoring.selected_clip() {
         for frame in &clip.frames {
             let col = frame.position[0];
             let row = frame.position[1];
-            if col < cols && row < rows {
+            if col < geometry.cols && row < geometry.rows {
                 let cell_min = egui::pos2(
-                    canvas_screen_min.x + (col * cell_w) as f32 * zoom,
-                    canvas_screen_min.y + (row * cell_h) as f32 * zoom,
+                    geometry.canvas_screen_min.x + (col * geometry.cell_w) as f32 * geometry.zoom,
+                    geometry.canvas_screen_min.y + (row * geometry.cell_h) as f32 * geometry.zoom,
                 );
                 let cell_max = egui::pos2(
-                    cell_min.x + cell_w as f32 * zoom,
-                    cell_min.y + cell_h as f32 * zoom,
+                    cell_min.x + geometry.cell_w as f32 * geometry.zoom,
+                    cell_min.y + geometry.cell_h as f32 * geometry.zoom,
                 );
                 let cell_rect = egui::Rect::from_min_max(cell_min, cell_max);
                 painter.rect_filled(
@@ -267,34 +247,28 @@ fn highlight_clip_frames(
     }
 }
 
-#[expect(clippy::too_many_arguments)]
 fn handle_cell_interaction(
     _ui_state: &EditorUI,
     painter: &egui::Painter,
     response: &egui::Response,
     cursor_canvas_pos: Option<glam::IVec2>,
-    canvas_screen_min: egui::Pos2,
-    cell_w: u32,
-    cell_h: u32,
-    cols: u32,
-    rows: u32,
-    zoom: f32,
+    geometry: &AtlasGridGeometry,
     has_selected_clip: bool,
 ) -> Option<(u32, u32)> {
     let mut add_frame: Option<(u32, u32)> = None;
 
     if let Some(canvas_pos) = cursor_canvas_pos {
         if canvas_pos.x >= 0 && canvas_pos.y >= 0 {
-            let col = (canvas_pos.x as u32) / cell_w;
-            let row = (canvas_pos.y as u32) / cell_h;
-            if col < cols && row < rows {
+            let col = (canvas_pos.x as u32) / geometry.cell_w;
+            let row = (canvas_pos.y as u32) / geometry.cell_h;
+            if col < geometry.cols && row < geometry.rows {
                 let cell_min = egui::pos2(
-                    canvas_screen_min.x + (col * cell_w) as f32 * zoom,
-                    canvas_screen_min.y + (row * cell_h) as f32 * zoom,
+                    geometry.canvas_screen_min.x + (col * geometry.cell_w) as f32 * geometry.zoom,
+                    geometry.canvas_screen_min.y + (row * geometry.cell_h) as f32 * geometry.zoom,
                 );
                 let cell_max = egui::pos2(
-                    cell_min.x + cell_w as f32 * zoom,
-                    cell_min.y + cell_h as f32 * zoom,
+                    cell_min.x + geometry.cell_w as f32 * geometry.zoom,
+                    cell_min.y + geometry.cell_h as f32 * geometry.zoom,
                 );
                 let cell_rect = egui::Rect::from_min_max(cell_min, cell_max);
 

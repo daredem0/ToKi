@@ -44,11 +44,11 @@ impl InspectorSystem {
         }
 
         let common = Self::collect_multi_entity_common_state(&selected_entities);
-        if ui_state.multi_entity_inspector_selection_signature != selected_ids {
-            ui_state.multi_entity_inspector_selection_signature = selected_ids;
-            ui_state.multi_entity_render_layer_input = common.render_layer.unwrap_or(0) as i64;
-            ui_state.multi_entity_delta_x_input = 0;
-            ui_state.multi_entity_delta_y_input = 0;
+        if ui_state.multi_entity.selection_signature != selected_ids {
+            ui_state.multi_entity.selection_signature = selected_ids;
+            ui_state.multi_entity.render_layer_input = common.render_layer.unwrap_or(0) as i64;
+            ui_state.multi_entity.delta_x_input = 0;
+            ui_state.multi_entity.delta_y_input = 0;
         }
 
         ui.label("Batch edit selected scene entities");
@@ -267,11 +267,12 @@ fn render_render_layer_row(
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| "Mixed".to_string())
         ));
-        ui.add(egui::DragValue::new(&mut ui_state.multi_entity_render_layer_input).speed(1.0));
+        ui.add(egui::DragValue::new(&mut ui_state.multi_entity.render_layer_input).speed(1.0));
         if ui.button("Apply Layer").clicked() {
             edit.set_render_layer = Some(
                 ui_state
-                    .multi_entity_render_layer_input
+                    .multi_entity
+                    .render_layer_input
                     .clamp(i32::MIN as i64, i32::MAX as i64) as i32,
             );
         }
@@ -285,18 +286,18 @@ fn render_position_delta_row(
 ) {
     ui.horizontal(|ui| {
         ui.label("Position Delta:");
-        ui.add(egui::DragValue::new(&mut ui_state.multi_entity_delta_x_input).speed(1.0));
-        ui.add(egui::DragValue::new(&mut ui_state.multi_entity_delta_y_input).speed(1.0));
+        ui.add(egui::DragValue::new(&mut ui_state.multi_entity.delta_x_input).speed(1.0));
+        ui.add(egui::DragValue::new(&mut ui_state.multi_entity.delta_y_input).speed(1.0));
         if ui.button("Apply Delta").clicked() {
             let delta = glam::IVec2::new(
-                ui_state.multi_entity_delta_x_input,
-                ui_state.multi_entity_delta_y_input,
+                ui_state.multi_entity.delta_x_input,
+                ui_state.multi_entity.delta_y_input,
             );
             if delta != glam::IVec2::ZERO {
                 edit.position_delta = Some(delta);
             }
-            ui_state.multi_entity_delta_x_input = 0;
-            ui_state.multi_entity_delta_y_input = 0;
+            ui_state.multi_entity.delta_x_input = 0;
+            ui_state.multi_entity.delta_y_input = 0;
         }
     });
 }

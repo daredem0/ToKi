@@ -1,6 +1,3 @@
-//! Draggable separator widgets.
-
-/// Render a vertical draggable separator
 pub fn render_vertical_separator(ui: &mut egui::Ui, height: f32) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(egui::vec2(8.0, height), egui::Sense::drag());
 
@@ -25,7 +22,6 @@ pub fn render_vertical_separator(ui: &mut egui::Ui, height: f32) -> egui::Respon
     response
 }
 
-/// Render a horizontal draggable separator
 pub fn render_horizontal_separator(ui: &mut egui::Ui, width: f32) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 8.0), egui::Sense::drag());
 

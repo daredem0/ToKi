@@ -21,7 +21,9 @@ pub fn execute_with_project(
 }
 
 pub fn undo(ui_state: &mut EditorUI) -> bool {
-    if ui_state.center_panel_tab == CenterPanelTab::MapEditor && ui_state.map.history.can_undo() {
+    if ui_state.workspace.center_panel_tab == CenterPanelTab::MapEditor
+        && ui_state.map.history.can_undo()
+    {
         let mut history = std::mem::take(&mut ui_state.map.history);
         let undone = history.undo(ui_state);
         ui_state.map.history = history;
@@ -35,7 +37,9 @@ pub fn undo(ui_state: &mut EditorUI) -> bool {
 }
 
 pub fn undo_with_project(ui_state: &mut EditorUI, project: &mut Project) -> bool {
-    if ui_state.center_panel_tab == CenterPanelTab::MapEditor && ui_state.map.history.can_undo() {
+    if ui_state.workspace.center_panel_tab == CenterPanelTab::MapEditor
+        && ui_state.map.history.can_undo()
+    {
         let mut history = std::mem::take(&mut ui_state.map.history);
         let undone = history.undo(ui_state);
         ui_state.map.history = history;
@@ -49,7 +53,9 @@ pub fn undo_with_project(ui_state: &mut EditorUI, project: &mut Project) -> bool
 }
 
 pub fn redo(ui_state: &mut EditorUI) -> bool {
-    if ui_state.center_panel_tab == CenterPanelTab::MapEditor && ui_state.map.history.can_redo() {
+    if ui_state.workspace.center_panel_tab == CenterPanelTab::MapEditor
+        && ui_state.map.history.can_redo()
+    {
         let mut history = std::mem::take(&mut ui_state.map.history);
         let redone = history.redo(ui_state);
         ui_state.map.history = history;
@@ -63,7 +69,9 @@ pub fn redo(ui_state: &mut EditorUI) -> bool {
 }
 
 pub fn redo_with_project(ui_state: &mut EditorUI, project: &mut Project) -> bool {
-    if ui_state.center_panel_tab == CenterPanelTab::MapEditor && ui_state.map.history.can_redo() {
+    if ui_state.workspace.center_panel_tab == CenterPanelTab::MapEditor
+        && ui_state.map.history.can_redo()
+    {
         let mut history = std::mem::take(&mut ui_state.map.history);
         let redone = history.redo(ui_state);
         ui_state.map.history = history;
@@ -77,7 +85,7 @@ pub fn redo_with_project(ui_state: &mut EditorUI, project: &mut Project) -> bool
 }
 
 pub fn can_undo(ui_state: &EditorUI) -> bool {
-    if ui_state.center_panel_tab == CenterPanelTab::MapEditor {
+    if ui_state.workspace.center_panel_tab == CenterPanelTab::MapEditor {
         ui_state.map.history.can_undo()
     } else {
         ui_state.command_history.can_undo()
@@ -85,7 +93,7 @@ pub fn can_undo(ui_state: &EditorUI) -> bool {
 }
 
 pub fn can_redo(ui_state: &EditorUI) -> bool {
-    if ui_state.center_panel_tab == CenterPanelTab::MapEditor {
+    if ui_state.workspace.center_panel_tab == CenterPanelTab::MapEditor {
         ui_state.map.history.can_redo()
     } else {
         ui_state.command_history.can_redo()

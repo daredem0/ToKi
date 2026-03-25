@@ -1,6 +1,6 @@
 use crate::config::EditorConfig;
 use crate::editor_services::commands as editor_commands;
-use crate::ui::editor_ui::EditorConfirmation;
+use crate::ui::editor_ui::{EditorConfirmation, ProjectRequest};
 use crate::ui::inspector::build_delete_scene_command;
 
 /// Handles all menu bar rendering for the editor
@@ -21,11 +21,11 @@ impl MenuSystem {
                 ui.menu_button("File", |ui| {
                     if ui.button("New Empty Project...").clicked() {
                         tracing::info!("New Empty Project clicked");
-                        ui_state.project.new_project_requested = true;
+                        ui_state.project.request(ProjectRequest::NewProject);
                     }
                     if ui.button("New Top-Down Starter...").clicked() {
                         tracing::info!("New Top-Down Starter clicked");
-                        ui_state.project.new_top_down_project_requested = true;
+                        ui_state.project.request(ProjectRequest::NewTopDownProject);
                     }
 
                     // Auto-open the project from config
@@ -35,25 +35,25 @@ impl MenuSystem {
                                 tracing::info!(
                                     "Open Project clicked - opening project from config"
                                 );
-                                ui_state.project.open_project_requested = true;
+                                ui_state.project.request(ProjectRequest::OpenProject);
                             }
                             if ui.button("Browse for Project...").clicked() {
                                 tracing::info!("Browse for Project clicked");
-                                ui_state.project.browse_for_project_requested = true;
+                                ui_state.project.request(ProjectRequest::BrowseForProject);
                             }
                         } else if ui.button("Open Project...").clicked() {
                             tracing::info!("Open Project... clicked - no project path in config");
-                            ui_state.project.browse_for_project_requested = true;
+                            ui_state.project.request(ProjectRequest::BrowseForProject);
                         }
                     } else if ui.button("Open Project...").clicked() {
                         tracing::info!("Open Project... clicked - no config available");
-                        ui_state.project.browse_for_project_requested = true;
+                        ui_state.project.request(ProjectRequest::BrowseForProject);
                     }
 
                     ui.separator();
                     if ui.button("Save Project").clicked() {
                         tracing::info!("Save Project clicked");
-                        ui_state.project.save_project_requested = true;
+                        ui_state.project.request(ProjectRequest::SaveProject);
                     }
                     if ui
                         .add_enabled(
@@ -63,7 +63,9 @@ impl MenuSystem {
                         .clicked()
                     {
                         tracing::info!("Reload Project Assets clicked");
-                        ui_state.project.reload_project_assets_requested = true;
+                        ui_state
+                            .project
+                            .request(ProjectRequest::ReloadProjectAssets);
                     }
                     if ui
                         .add_enabled(
@@ -83,7 +85,7 @@ impl MenuSystem {
                         .clicked()
                     {
                         tracing::info!("Export Game clicked");
-                        ui_state.project.export_project_requested = true;
+                        ui_state.project.request(ProjectRequest::ExportProject);
                     }
                     ui.separator();
                     if ui.button("Create Test Entities").clicked() {
@@ -93,7 +95,7 @@ impl MenuSystem {
                     ui.separator();
                     if ui.button("Init Config").clicked() {
                         tracing::info!("Init Config clicked");
-                        ui_state.project.init_config_requested = true;
+                        ui_state.project.request(ProjectRequest::InitConfig);
                     }
                     ui.separator();
                     if ui.button("Exit").clicked() {
@@ -138,7 +140,7 @@ impl MenuSystem {
                         .clicked()
                     {
                         tracing::info!("Validate Project Assets clicked");
-                        ui_state.project.validate_assets_requested = true;
+                        ui_state.project.request(ProjectRequest::ValidateAssets);
                     }
                 });
 
@@ -160,7 +162,7 @@ impl MenuSystem {
                     .add_enabled(can_play_scene, egui::Button::new("▶ Play Scene"))
                     .clicked()
                 {
-                    ui_state.project.play_scene_requested = true;
+                    ui_state.project.request(ProjectRequest::PlayScene);
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

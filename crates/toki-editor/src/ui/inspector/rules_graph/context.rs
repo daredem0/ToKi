@@ -7,7 +7,7 @@ use crate::ui::inspector::InspectorSystem;
 use crate::ui::rule_graph::RuleGraph;
 use crate::ui::EditorUI;
 
-use super::super::{RuleAudioChoices, RuleValidationIssue};
+use super::super::RuleAudioChoices;
 
 /// Parameters for node editing operations.
 pub(super) struct NodeEditParams<'a> {
@@ -24,7 +24,6 @@ pub(super) struct NodeEditorContext {
     pub before_layout: Option<SceneGraphLayout>,
     pub node_badges: std::collections::HashMap<u64, String>,
     pub audio_choices: RuleAudioChoices,
-    pub validation_issues: Vec<RuleValidationIssue>,
 }
 
 impl NodeEditorContext {
@@ -49,8 +48,6 @@ impl NodeEditorContext {
             .unwrap_or_else(|| RuleGraph::from_rule_set(&scene_rules));
         let node_badges = rule_graph_node_badges(&graph);
         let audio_choices = InspectorSystem::load_rule_audio_choices(config);
-        let validation_issues = InspectorSystem::validate_rule_set(&scene_rules);
-
         let ctx = Self {
             scene_index,
             before_rules,
@@ -58,7 +55,6 @@ impl NodeEditorContext {
             before_layout,
             node_badges,
             audio_choices,
-            validation_issues,
         };
 
         Some((graph, ctx))

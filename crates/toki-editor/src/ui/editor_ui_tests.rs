@@ -4,7 +4,7 @@ use toki_core::entity::{EntityAttributes, EntityKind};
 use toki_core::menu::{MenuItemDefinition, MenuScreenDefinition, UiAction};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 
-use super::{EditorUI, MapEditorDraft, Selection};
+use super::{EditorUI, MapEditorDraft, ProjectRequest, Selection};
 use crate::project::Project;
 use crate::ui::rule_graph::RuleGraph;
 use crate::ui::undo_redo::EditorCommand;
@@ -24,6 +24,35 @@ fn sample_entity(id: u32, position: IVec2) -> toki_core::entity::Entity {
         movement_accumulator: glam::Vec2::ZERO,
         tags: Vec::new(),
     }
+}
+
+#[test]
+fn editor_ui_groups_workspace_state_defaults() {
+    let ui = EditorUI::new();
+
+    assert_eq!(
+        ui.workspace.center_panel_tab,
+        super::CenterPanelTab::SceneViewport
+    );
+    assert_eq!(
+        ui.workspace.right_panel_tab,
+        super::RightPanelTab::Inspector
+    );
+}
+
+#[test]
+fn editor_ui_groups_multi_entity_and_cursor_state() {
+    let mut ui = EditorUI::new();
+
+    assert_eq!(ui.multi_entity.render_layer_input, 0);
+    assert_eq!(ui.multi_entity.delta_x_input, 0);
+    assert_eq!(ui.multi_entity.delta_y_input, 0);
+    assert!(ui.multi_entity.selection_signature.is_empty());
+    assert_eq!(ui.viewport_cursor.world_position, None);
+    assert!(!ui.viewport_cursor.show_tiles);
+
+    ui.remember_viewport_cursor_world_position(glam::vec2(10.8, 4.2));
+    assert_eq!(ui.viewport_cursor.world_position, Some(IVec2::new(10, 4)));
 }
 
 #[test]
@@ -516,7 +545,7 @@ fn queue_map_editor_object_property_edit_updates_selected_object_info() {
 #[test]
 fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
     let mut ui = EditorUI::new();
-    ui.center_panel_tab = super::CenterPanelTab::MapEditor;
+    ui.workspace.center_panel_tab = super::CenterPanelTab::MapEditor;
     ui.set_map_editor_draft(MapEditorDraft {
         name: "draft_map".to_string(),
         tilemap: toki_core::assets::tilemap::TileMap {
@@ -562,7 +591,7 @@ fn map_editor_can_undo_prefers_map_history_when_map_editor_tab_is_active() {
         "Main Scene",
         sample_entity(1, IVec2::new(0, 0))
     )));
-    ui.center_panel_tab = super::CenterPanelTab::MapEditor;
+    ui.workspace.center_panel_tab = super::CenterPanelTab::MapEditor;
     assert!(!ui.can_undo());
 
     ui.set_map_editor_draft(MapEditorDraft {
@@ -760,20 +789,10 @@ fn entity_move_drag_lifecycle() {
 fn project_editor_state_defaults() {
     let ui = EditorUI::new();
 
-    // All project request flags should be false by default
-    assert!(!ui.project.new_project_requested);
-    assert!(!ui.project.new_top_down_project_requested);
+    assert!(ui.project.pending_request.is_none());
     assert!(!ui.project.show_new_project_dialog);
-    assert!(!ui.project.open_project_requested);
-    assert!(!ui.project.browse_for_project_requested);
-    assert!(!ui.project.reload_project_assets_requested);
-    assert!(!ui.project.save_project_requested);
-    assert!(!ui.project.export_project_requested);
-    assert!(!ui.project.play_scene_requested);
-    assert!(!ui.project.init_config_requested);
     assert!(!ui.project.background_task_running);
     assert!(!ui.project.cancel_background_task_requested);
-    assert!(!ui.project.validate_assets_requested);
 
     // Other project state defaults
     assert_eq!(ui.project.new_project_name, "NewProject");
@@ -781,6 +800,18 @@ fn project_editor_state_defaults() {
     assert!(ui.project.new_project_submit_requested.is_none());
     assert!(ui.project.background_task_status.is_none());
     assert!(ui.project.window_title.is_some());
+}
+
+#[test]
+fn project_editor_state_pending_request_round_trips() {
+    let mut ui = EditorUI::new();
+    ui.project.request(ProjectRequest::SaveProject);
+    assert_eq!(
+        ui.project.pending_request,
+        Some(ProjectRequest::SaveProject)
+    );
+    assert!(ui.project.take_request(ProjectRequest::SaveProject));
+    assert!(ui.project.pending_request.is_none());
 }
 
 #[test]

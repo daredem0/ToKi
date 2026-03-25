@@ -50,6 +50,16 @@ mod sprite_editor;
 /// Handles panel rendering for the editor (viewport and log panels)
 pub struct PanelSystem;
 
+pub struct ViewportPanelContext<'a> {
+    pub scene_viewport: Option<&'a mut SceneViewport>,
+    pub map_editor_viewport: Option<&'a mut SceneViewport>,
+    pub project: Option<&'a mut crate::project::Project>,
+    pub project_assets: Option<&'a mut crate::project::ProjectAssets>,
+    pub available_map_names: Option<Vec<String>>,
+    pub config: Option<&'a mut EditorConfig>,
+    pub renderer: Option<&'a mut egui_wgpu::Renderer>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum GraphValidationSeverity {
     Error,
@@ -151,76 +161,75 @@ impl PanelSystem {
     }
 
     /// Renders the main scene viewport panel in the center of the screen
-    #[allow(clippy::too_many_arguments)]
     pub fn render_viewport(
         ui_state: &mut super::EditorUI,
         ctx: &egui::Context,
-        scene_viewport: Option<&mut SceneViewport>,
-        map_editor_viewport: Option<&mut SceneViewport>,
-        project: Option<&mut crate::project::Project>,
-        project_assets: Option<&mut crate::project::ProjectAssets>,
-        available_map_names: Option<Vec<String>>,
-        config: Option<&mut EditorConfig>,
-        renderer: Option<&mut egui_wgpu::Renderer>,
+        panel_ctx: ViewportPanelContext<'_>,
     ) {
         egui::CentralPanel::default().show(ctx, |ui| {
             render_tab_strip(
                 ui,
                 "center_panel_tabs",
-                &mut ui_state.center_panel_tab_strip,
-                &mut ui_state.center_panel_tab,
+                &mut ui_state.workspace.center_panel_tab_strip,
+                &mut ui_state.workspace.center_panel_tab,
                 &Self::center_panel_tabs(),
             );
             ui.separator();
 
-            if ui_state.center_panel_tab == CenterPanelTab::SceneGraph {
-                Self::render_scene_graph(ui, ui_state, false, config.as_deref());
+            if ui_state.workspace.center_panel_tab == CenterPanelTab::SceneGraph {
+                Self::render_scene_graph(ui, ui_state, false, panel_ctx.config.as_deref());
                 return;
             }
 
-            if ui_state.center_panel_tab == CenterPanelTab::SceneRules {
-                Self::render_scene_graph(ui, ui_state, true, config.as_deref());
+            if ui_state.workspace.center_panel_tab == CenterPanelTab::SceneRules {
+                Self::render_scene_graph(ui, ui_state, true, panel_ctx.config.as_deref());
                 return;
             }
 
-            if ui_state.center_panel_tab == CenterPanelTab::MapEditor {
+            if ui_state.workspace.center_panel_tab == CenterPanelTab::MapEditor {
                 Self::render_map_editor(
                     ui,
                     ui_state,
-                    map_editor_viewport,
-                    available_map_names,
-                    config,
-                    renderer,
+                    panel_ctx.map_editor_viewport,
+                    panel_ctx.available_map_names,
+                    panel_ctx.config,
+                    panel_ctx.renderer,
                 );
                 return;
             }
 
-            if ui_state.center_panel_tab == CenterPanelTab::MenuEditor {
-                menu_editor::render_menu_editor(ui, ui_state, project);
+            if ui_state.workspace.center_panel_tab == CenterPanelTab::MenuEditor {
+                menu_editor::render_menu_editor(ui, ui_state, panel_ctx.project);
                 return;
             }
 
-            if ui_state.center_panel_tab == CenterPanelTab::DialogEditor {
-                dialog_editor::render_dialog_editor(ui, ui_state, project_assets);
+            if ui_state.workspace.center_panel_tab == CenterPanelTab::DialogEditor {
+                dialog_editor::render_dialog_editor(ui, ui_state, panel_ctx.project_assets);
                 return;
             }
 
-            if ui_state.center_panel_tab == CenterPanelTab::SpriteEditor {
-                sprite_editor::render_sprite_editor(ui, ui_state, ctx, project);
+            if ui_state.workspace.center_panel_tab == CenterPanelTab::SpriteEditor {
+                sprite_editor::render_sprite_editor(ui, ui_state, ctx, panel_ctx.project);
                 return;
             }
 
-            if ui_state.center_panel_tab == CenterPanelTab::AnimationEditor {
-                animation_editor::render_animation_editor(ui, ui_state, ctx, project);
+            if ui_state.workspace.center_panel_tab == CenterPanelTab::AnimationEditor {
+                animation_editor::render_animation_editor(ui, ui_state, ctx, panel_ctx.project);
                 return;
             }
 
-            if ui_state.center_panel_tab == CenterPanelTab::EntityEditor {
-                entity_editor::render_entity_editor(ui, ui_state, ctx, project);
+            if ui_state.workspace.center_panel_tab == CenterPanelTab::EntityEditor {
+                entity_editor::render_entity_editor(ui, ui_state, ctx, panel_ctx.project);
                 return;
             }
 
-            Self::render_scene_viewport_tab(ui, ui_state, scene_viewport, config, renderer);
+            Self::render_scene_viewport_tab(
+                ui,
+                ui_state,
+                panel_ctx.scene_viewport,
+                panel_ctx.config,
+                panel_ctx.renderer,
+            );
         });
     }
 

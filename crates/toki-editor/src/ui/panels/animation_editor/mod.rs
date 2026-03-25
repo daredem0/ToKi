@@ -12,20 +12,18 @@
 //! - `frame_sequence`: Frame sequence panel
 //! - `io`: Entity and atlas loading/saving
 //! - `dialogs`: New clip dialog
-//! - `separators`: Draggable separator widgets
-
 mod atlas_grid;
 mod clip_list;
 mod dialogs;
 mod frame_sequence;
 mod io;
 mod preview;
-mod separators;
 mod toolbar;
 
 use crate::editor_sprite_preview::resolve_indexed_preview_palette;
 use crate::project::Project;
 use crate::ui::editor_ui::Selection;
+use crate::ui::widgets::separators::{render_horizontal_separator, render_vertical_separator};
 use crate::ui::EditorUI;
 use std::path::Path;
 
@@ -137,7 +135,7 @@ fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
         );
 
         // Draggable separator between clip list and center
-        let sep_response = separators::render_vertical_separator(ui, available_height);
+        let sep_response = render_vertical_separator(ui, available_height);
         if sep_response.dragged() {
             ui_state.animation.clip_list_width = (ui_state.animation.clip_list_width
                 + sep_response.drag_delta().x)
@@ -154,7 +152,7 @@ fn render_editor_content(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
         );
 
         // Draggable separator between center and frame sequence
-        let sep_response = separators::render_vertical_separator(ui, available_height);
+        let sep_response = render_vertical_separator(ui, available_height);
         if sep_response.dragged() {
             // Dragging right makes frame panel smaller
             ui_state.animation.frame_sequence_width = (ui_state.animation.frame_sequence_width
@@ -191,7 +189,7 @@ fn render_center_panel(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui::C
     });
 
     // Draggable separator between preview and atlas
-    let sep_response = separators::render_horizontal_separator(ui, available_width);
+    let sep_response = render_horizontal_separator(ui, available_width);
     if sep_response.dragged() {
         ui_state.animation.preview_height = (ui_state.animation.preview_height
             + sep_response.drag_delta().y)

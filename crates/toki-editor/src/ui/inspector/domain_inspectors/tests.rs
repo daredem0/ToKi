@@ -97,7 +97,7 @@ fn map_inspector_has_correct_name() {
 
 #[test]
 fn standalone_map_inspector_has_correct_name() {
-    let inspector = StandaloneMapInspector::new("standalone".to_string());
+    let inspector = MapInspector::standalone("standalone".to_string());
     assert_eq!(inspector.name(), "StandaloneMap");
 }
 

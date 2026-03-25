@@ -147,6 +147,7 @@ impl InspectorSystem {
         *action = shared_default_rule_action(action_kind);
     }
 
+    #[cfg(test)]
     pub(in super::super) fn validate_rule_set(rule_set: &RuleSet) -> Vec<RuleValidationIssue> {
         Self::validate_rule_set_for_scene(rule_set, "", &[])
     }
