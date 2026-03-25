@@ -107,6 +107,15 @@ impl SpriteEditorState {
         self.tool = tool;
     }
 
+    /// Lift the selection into a float (if not already floating) and nudge by `delta`.
+    /// This is the arrow-key workflow: one keypress lifts and moves in a single step.
+    pub fn lift_and_nudge(&mut self, delta: glam::IVec2) {
+        if !self.has_floating() && !self.lift_selection() {
+            return;
+        }
+        self.nudge_floating(delta);
+    }
+
     /// Move the floating selection by `delta` pixels.
     pub fn nudge_floating(&mut self, delta: glam::IVec2) {
         if let Some(floating) = &mut self.active_mut().floating {

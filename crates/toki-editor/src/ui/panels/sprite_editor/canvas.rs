@@ -261,6 +261,15 @@ fn handle_floating_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
             ui_state.sprite.cancel_floating();
             invalidate_canvas_texture(ui_state);
         }
+    } else if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        ui_state.sprite.active_mut().selection = None;
+    }
+
+    // Arrow keys: lift selection into float (if needed) and nudge.
+    // Works whether a float already exists or just a selection.
+    let has_selection_or_float =
+        ui_state.sprite.has_floating() || ui_state.sprite.active().selection.is_some();
+    if has_selection_or_float {
         let arrow_keys = [
             (egui::Key::ArrowUp, glam::IVec2::new(0, -1)),
             (egui::Key::ArrowDown, glam::IVec2::new(0, 1)),
@@ -269,11 +278,10 @@ fn handle_floating_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
         ];
         for (key, delta) in arrow_keys {
             if ui.input(|i| i.key_pressed(key)) {
-                ui_state.sprite.nudge_floating(delta);
+                ui_state.sprite.lift_and_nudge(delta);
+                invalidate_canvas_texture(ui_state);
             }
         }
-    } else if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-        ui_state.sprite.active_mut().selection = None;
     }
 }
 
