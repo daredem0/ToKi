@@ -590,11 +590,15 @@ fn symmetry_config(ui_state: &EditorUI) -> SymmetryConfig {
 }
 
 fn compute_symmetry_bounds(ui_state: &EditorUI) -> (UVec2, UVec2) {
-    // In sheet mode with a selected cell, mirror within that cell
-    if ui_state.sprite.is_sheet() {
-        if let Some(cell_idx) = ui_state.sprite.active().selected_cell {
-            if let Some((sx, sy, ex, ey)) = ui_state.sprite.cell_bounds(cell_idx) {
-                return (UVec2::new(sx, sy), UVec2::new(ex - sx, ey - sy));
+    // In sheet mode with per-tile enabled, mirror within the tile under the cursor
+    if ui_state.sprite.symmetry_per_tile && ui_state.sprite.is_sheet() {
+        if let Some(pos) = ui_state.sprite.active().cursor_canvas_pos {
+            if pos.x >= 0 && pos.y >= 0 {
+                if let Some(cell_idx) = ui_state.sprite.cell_at_position(pos.x as u32, pos.y as u32) {
+                    if let Some((sx, sy, ex, ey)) = ui_state.sprite.cell_bounds(cell_idx) {
+                        return (UVec2::new(sx, sy), UVec2::new(ex - sx, ey - sy));
+                    }
+                }
             }
         }
     }

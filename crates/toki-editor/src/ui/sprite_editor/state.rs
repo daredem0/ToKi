@@ -38,6 +38,8 @@ pub struct SpriteEditorState {
     pub symmetry_horizontal: bool,
     /// Mirror brush strokes vertically (across horizontal axis)
     pub symmetry_vertical: bool,
+    /// When true, symmetry applies per-tile (under cursor) instead of full canvas
+    pub symmetry_per_tile: bool,
     /// Recent colors palette (shared across canvases)
     pub recent_colors: Vec<PixelColor>,
     /// Maximum recent colors to remember
@@ -110,6 +112,7 @@ impl Default for SpriteEditorState {
             shape_filled: false,
             symmetry_horizontal: false,
             symmetry_vertical: false,
+            symmetry_per_tile: false,
             recent_colors: Vec::new(),
             max_recent_colors: 16,
             show_new_canvas_dialog: false,
