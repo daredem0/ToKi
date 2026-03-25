@@ -2239,6 +2239,48 @@ fn nudge_does_not_push_undo() {
     assert!(!state.active().history.can_undo());
 }
 
+#[test]
+fn lift_and_nudge_lifts_then_moves_in_one_step() {
+    let mut state = setup_canvas_with_selection();
+    let red = PixelColor::rgb(255, 0, 0);
+
+    // No float exists yet, just a selection
+    assert!(!state.has_floating());
+
+    state.lift_and_nudge(glam::IVec2::new(1, 0));
+
+    // Should now have a floating selection, offset moved by (1,0)
+    assert!(state.has_floating());
+    let floating = state.active().floating.as_ref().unwrap();
+    assert_eq!(floating.offset, glam::IVec2::new(3, 2));
+
+    // Canvas should have pixels cleared at original position
+    let canvas = state.active().canvas.as_ref().unwrap();
+    assert_eq!(canvas.get_pixel(2, 2), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn lift_and_nudge_just_nudges_when_already_floating() {
+    let mut state = setup_canvas_with_selection();
+    state.lift_selection();
+    let initial_offset = state.active().floating.as_ref().unwrap().offset;
+
+    state.lift_and_nudge(glam::IVec2::new(0, -1));
+
+    let floating = state.active().floating.as_ref().unwrap();
+    assert_eq!(floating.offset, initial_offset + glam::IVec2::new(0, -1));
+}
+
+#[test]
+fn lift_and_nudge_no_op_without_selection_or_float() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+
+    // Should not panic, should not create a float
+    state.lift_and_nudge(glam::IVec2::new(1, 0));
+    assert!(!state.has_floating());
+}
+
 // --- paste creates float tests ---
 
 #[test]
