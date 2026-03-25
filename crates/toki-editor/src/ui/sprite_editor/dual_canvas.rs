@@ -2,7 +2,7 @@
 
 use super::canvas::SpriteCanvas;
 use super::history::SpriteEditorHistory;
-use super::selection::SpriteSelection;
+use super::selection::SelectionMask;
 use super::types::SpriteAssetKind;
 use super::viewport::SpriteCanvasViewport;
 
@@ -59,8 +59,10 @@ pub struct CanvasState {
     pub viewport: SpriteCanvasViewport,
     /// Has unsaved changes
     pub dirty: bool,
-    /// Selection rectangle (if any)
-    pub selection: Option<SpriteSelection>,
+    /// Per-pixel selection mask (if any)
+    pub selection: Option<SelectionMask>,
+    /// Baseline selection captured when starting a selection drag.
+    pub selection_drag_base: Option<SelectionMask>,
     /// Local undo/redo history
     pub history: SpriteEditorHistory,
     /// Show pixel grid overlay
@@ -103,6 +105,7 @@ impl Default for CanvasState {
             viewport: SpriteCanvasViewport::default(),
             dirty: false,
             selection: None,
+            selection_drag_base: None,
             history: SpriteEditorHistory::new(50),
             show_grid: true,
             cursor_canvas_pos: None,

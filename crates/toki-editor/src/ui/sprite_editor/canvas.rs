@@ -1,6 +1,6 @@
 //! In-memory canvas for pixel editing.
 
-use super::types::PixelColor;
+use super::{selection::SelectionMask, types::PixelColor};
 
 /// In-memory canvas for pixel editing
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -109,6 +109,7 @@ impl SpriteCanvas {
     }
 
     /// Extract a rectangular region as a new canvas
+    #[allow(dead_code)]
     pub fn extract_region(&self, x: u32, y: u32, width: u32, height: u32) -> Option<Self> {
         if width == 0 || height == 0 {
             return None;
@@ -185,11 +186,24 @@ impl SpriteCanvas {
     /// Uses 8-connectivity (includes diagonals) for better sprite selection.
     /// Returns the bounding box (x, y, width, height) of all connected pixels,
     /// or None if the starting pixel is transparent or out of bounds.
+    #[allow(dead_code)]
     pub fn find_connected_sprite(
         &self,
         start_x: u32,
         start_y: u32,
     ) -> Option<(u32, u32, u32, u32)> {
+        self.find_connected_selection_mask(start_x, start_y)
+            .and_then(|selection| selection.bounding_rect())
+            .map(|bounds| (bounds.x, bounds.y, bounds.width, bounds.height))
+    }
+
+    /// Find all non-transparent pixels connected to the given starting point and
+    /// return them as a full-canvas selection mask.
+    pub fn find_connected_selection_mask(
+        &self,
+        start_x: u32,
+        start_y: u32,
+    ) -> Option<SelectionMask> {
         // Check bounds
         if start_x >= self.width || start_y >= self.height {
             return None;
@@ -201,12 +215,9 @@ impl SpriteCanvas {
             return None;
         }
 
-        // Track visited pixels and bounding box
+        // Track visited pixels and selected region
         let mut visited = vec![false; (self.width * self.height) as usize];
-        let mut min_x = start_x;
-        let mut max_x = start_x;
-        let mut min_y = start_y;
-        let mut max_y = start_y;
+        let mut selection = SelectionMask::new(self.width, self.height);
 
         // Flood fill using a stack (8-connectivity)
         let mut stack = vec![(start_x, start_y)];
@@ -224,11 +235,7 @@ impl SpriteCanvas {
                     continue;
                 }
 
-                // Update bounding box
-                min_x = min_x.min(x);
-                max_x = max_x.max(x);
-                min_y = min_y.min(y);
-                max_y = max_y.max(y);
+                selection.select_pixel(x, y);
 
                 // Add 8 neighbors to stack
                 for dy in -1i32..=1 {
@@ -253,9 +260,6 @@ impl SpriteCanvas {
             }
         }
 
-        // Return bounding box
-        let width = max_x - min_x + 1;
-        let height = max_y - min_y + 1;
-        Some((min_x, min_y, width, height))
+        (!selection.is_empty()).then_some(selection)
     }
 }

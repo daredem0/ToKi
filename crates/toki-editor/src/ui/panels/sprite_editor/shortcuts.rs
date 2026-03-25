@@ -23,9 +23,10 @@ pub fn handle_undo_redo_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
 }
 
 pub fn handle_copy_paste_shortcuts(ui_state: &mut EditorUI, ctx: &egui::Context) {
-    let (ctrl, c_pressed, v_pressed) = ctx.input(|i| {
+    let (ctrl, c_pressed, x_pressed, v_pressed, delete_pressed) = ctx.input(|i| {
         let ctrl = i.modifiers.ctrl || i.modifiers.mac_cmd;
         let mut c_pressed = false;
+        let mut x_pressed = false;
         let mut v_pressed = false;
 
         for event in &i.events {
@@ -39,6 +40,7 @@ pub fn handle_copy_paste_shortcuts(ui_state: &mut EditorUI, ctx: &egui::Context)
                 if *pressed && (modifiers.ctrl || modifiers.mac_cmd) {
                     match key {
                         egui::Key::C => c_pressed = true,
+                        egui::Key::X => x_pressed = true,
                         egui::Key::V => v_pressed = true,
                         _ => {}
                     }
@@ -46,64 +48,31 @@ pub fn handle_copy_paste_shortcuts(ui_state: &mut EditorUI, ctx: &egui::Context)
             }
         }
 
-        (ctrl, c_pressed, v_pressed)
+        (ctrl, c_pressed, x_pressed, v_pressed, i.key_pressed(egui::Key::Delete))
     });
-
-    if c_pressed || v_pressed {
-        tracing::info!(
-            "Key pressed (via events): C={}, V={}, Ctrl={}",
-            c_pressed,
-            v_pressed,
-            ctrl
-        );
-    }
 
     // Ctrl+C for copy
     if ctrl && c_pressed {
-        let has_selection = ui_state.sprite.active().selection.is_some();
-        let has_canvas = ui_state.sprite.active().canvas.is_some();
-        tracing::info!(
-            "Copy attempt: has_selection={}, has_canvas={}",
-            has_selection,
-            has_canvas
-        );
+        ui_state.sprite.copy_selection();
+    }
 
-        if let Some(sel) = &ui_state.sprite.active().selection {
-            tracing::info!(
-                "Selection: x={}, y={}, w={}, h={}",
-                sel.x,
-                sel.y,
-                sel.width,
-                sel.height
-            );
-        }
+    // Ctrl+X for cut
+    if ctrl && x_pressed && ui_state.sprite.cut_selection() {
+        invalidate_canvas_texture(ui_state);
+    }
 
-        if ui_state.sprite.copy_selection() {
-            tracing::info!("Copy successful - clipboard has content");
-        } else {
-            tracing::warn!("Copy failed - no selection or no canvas");
-        }
+    // Delete for clearing selected pixels
+    if delete_pressed && ui_state.sprite.delete_selection() {
+        invalidate_canvas_texture(ui_state);
     }
 
     // Ctrl+V for paste
     if ctrl && v_pressed {
-        let has_clipboard = ui_state.sprite.clipboard.is_some();
         let hovered = find_hovered_canvas(ui_state);
         let paste_side = hovered.unwrap_or(ui_state.sprite.active_canvas);
         let cursor_pos = ui_state.sprite.canvas_state(paste_side).cursor_canvas_pos;
-        let has_canvas = ui_state.sprite.canvas_state(paste_side).canvas.is_some();
-
-        tracing::info!(
-            "Paste attempt: has_clipboard={}, hovered={:?}, paste_side={:?}, cursor_pos={:?}, has_canvas={}",
-            has_clipboard,
-            hovered,
-            paste_side,
-            cursor_pos,
-            has_canvas
-        );
 
         if cursor_pos.is_none() {
-            tracing::info!("No cursor position, using (0, 0) fallback");
             ui_state
                 .sprite
                 .canvas_state_mut(paste_side)
@@ -112,9 +81,6 @@ pub fn handle_copy_paste_shortcuts(ui_state: &mut EditorUI, ctx: &egui::Context)
 
         if ui_state.sprite.paste_at_cursor(paste_side) {
             invalidate_canvas_texture_for_side(ui_state, paste_side);
-            tracing::info!("Paste successful to {:?}", paste_side);
-        } else {
-            tracing::warn!("Paste failed - check clipboard and canvas state");
         }
     }
 }

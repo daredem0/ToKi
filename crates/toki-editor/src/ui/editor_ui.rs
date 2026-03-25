@@ -45,8 +45,8 @@ pub(crate) use editor_ui_map_editor::{
     MapEditorTileInfo, MapEditorTool, MapObjectMoveDragState, NewMapRequest,
 };
 pub(crate) use editor_ui_sprite_editor::{
-    CanvasSide, DualCanvasLayout, PixelColor, ResizeAnchor, SpriteAssetKind, SpriteCanvas,
-    SpriteCanvasViewport, SpriteEditorState, SpriteEditorTool, SpriteSelection,
+    CanvasSide, DualCanvasLayout, PixelColor, ResizeAnchor, SelectionMask, SpriteAssetKind,
+    SpriteCanvas, SpriteCanvasViewport, SpriteEditorState, SpriteEditorTool, SpriteSelection,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;

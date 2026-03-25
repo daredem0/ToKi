@@ -1,6 +1,6 @@
 //! Canvas rendering and drawing operations.
 
-use crate::ui::editor_ui::{CanvasSide, SpriteCanvas, SpriteCanvasViewport, SpriteSelection};
+use crate::ui::editor_ui::{CanvasSide, SelectionMask, SpriteCanvas, SpriteCanvasViewport};
 use crate::ui::sprite_editor::preview_indexed_color;
 use crate::ui::EditorUI;
 use toki_core::assets::atlas::ColorMode;
@@ -161,10 +161,10 @@ pub fn render_canvas_viewport(
         );
     }
 
-    // Draw selection rectangle
+    // Draw selection overlay
     let canvas_state = ui_state.sprite.canvas_state(render_side);
     if let Some(selection) = &canvas_state.selection {
-        draw_selection_rect(&painter, rect, &canvas_state.viewport, selection);
+        draw_selection_mask(&painter, rect, &canvas_state.viewport, selection);
     }
 
     // Status bar
@@ -486,32 +486,56 @@ fn draw_cell_grid(
     }
 }
 
-fn draw_selection_rect(
+fn draw_selection_mask(
     painter: &egui::Painter,
     rect: egui::Rect,
     viewport: &SpriteCanvasViewport,
-    selection: &SpriteSelection,
+    selection: &SelectionMask,
 ) {
     let zoom = viewport.zoom;
     let pan = viewport.pan;
 
     let canvas_screen_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
-
-    let sel_min = egui::pos2(
-        canvas_screen_min.x + selection.x as f32 * zoom,
-        canvas_screen_min.y + selection.y as f32 * zoom,
-    );
-    let sel_max = egui::pos2(
-        sel_min.x + selection.width as f32 * zoom,
-        sel_min.y + selection.height as f32 * zoom,
-    );
-    let sel_rect = egui::Rect::from_min_max(sel_min, sel_max);
-
-    let fill = egui::Color32::from_rgba_unmultiplied(100, 150, 255, 50);
     let stroke = egui::Stroke::new(1.0, egui::Color32::from_rgb(100, 150, 255));
 
-    painter.rect_filled(sel_rect, 0.0, fill);
-    painter.rect_stroke(sel_rect, 0.0, stroke, egui::StrokeKind::Outside);
+    for y in 0..selection.height {
+        for x in 0..selection.width {
+            if !selection.is_selected(x, y) {
+                continue;
+            }
+
+            let pixel_min = egui::pos2(
+                canvas_screen_min.x + x as f32 * zoom,
+                canvas_screen_min.y + y as f32 * zoom,
+            );
+            let pixel_max = egui::pos2(pixel_min.x + zoom, pixel_min.y + zoom);
+
+            if y == 0 || !selection.is_selected(x, y - 1) {
+                painter.line_segment(
+                    [egui::pos2(pixel_min.x, pixel_min.y), egui::pos2(pixel_max.x, pixel_min.y)],
+                    stroke,
+                );
+            }
+            if y + 1 >= selection.height || !selection.is_selected(x, y + 1) {
+                painter.line_segment(
+                    [egui::pos2(pixel_min.x, pixel_max.y), egui::pos2(pixel_max.x, pixel_max.y)],
+                    stroke,
+                );
+            }
+            if x == 0 || !selection.is_selected(x - 1, y) {
+                painter.line_segment(
+                    [egui::pos2(pixel_min.x, pixel_min.y), egui::pos2(pixel_min.x, pixel_max.y)],
+                    stroke,
+                );
+            }
+            if x + 1 >= selection.width || !selection.is_selected(x + 1, y) {
+                painter.line_segment(
+                    [egui::pos2(pixel_max.x, pixel_min.y), egui::pos2(pixel_max.x, pixel_max.y)],
+                    stroke,
+                );
+            }
+        }
+    }
 }
 
 fn hovered_pixel_screen_rect(

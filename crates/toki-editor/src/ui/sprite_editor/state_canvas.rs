@@ -64,6 +64,7 @@ impl SpriteEditorState {
         cs.dirty = true;
         cs.history.clear();
         cs.selection = None;
+        cs.selection_drag_base = None;
         cs.canvas_texture = None;
         cs.viewport = SpriteCanvasViewport::default();
         cs.original_cell_aliases = None;
@@ -84,6 +85,7 @@ impl SpriteEditorState {
         cs.dirty = true;
         cs.history.clear();
         cs.selection = None;
+        cs.selection_drag_base = None;
         cs.canvas_texture = None;
         cs.viewport = SpriteCanvasViewport::default();
         cs.original_cell_aliases = None;
@@ -152,6 +154,7 @@ impl SpriteEditorState {
         cs.dirty = true;
         cs.history.clear();
         cs.selection = None;
+        cs.selection_drag_base = None;
         cs.canvas_texture = None;
         cs.viewport = SpriteCanvasViewport::default();
         cs.cell_size = glam::UVec2::new(cell_width, cell_height);

@@ -1,6 +1,6 @@
 //! Sprite editor tool interaction handling.
 
-use crate::ui::editor_ui::{SpriteEditorTool, SpriteSelection};
+use crate::ui::editor_ui::{SelectionMask, SpriteEditorTool, SpriteSelection};
 use crate::ui::interactions::SpritePaintInteraction;
 use crate::ui::sprite_editor::{canonical_indexed_color, indexed_slot_for_authored_color};
 use crate::ui::EditorUI;
@@ -172,6 +172,7 @@ fn handle_select_tool(
     ctx: &egui::Context,
     canvas_pos: glam::IVec2,
 ) {
+    let selection_mode = current_selection_mode(ctx);
     let primary_pressed_in_rect = response.hovered()
         && ctx.input(|input| input.pointer.primary_pressed())
         && ctx
@@ -179,40 +180,31 @@ fn handle_select_tool(
             .is_some_and(|pointer_pos| rect.contains(pointer_pos));
 
     if primary_pressed_in_rect {
-        tracing::info!("Select tool: drag started at {:?}", canvas_pos);
-        ui_state.sprite.active_mut().selection_start_pos = Some(canvas_pos);
-        ui_state.sprite.active_mut().selection = None;
+        let existing_selection = ui_state.sprite.active().selection.clone();
+        let active = ui_state.sprite.active_mut();
+        active.selection_start_pos = Some(canvas_pos);
+        active.selection_drag_base = existing_selection;
     }
 
     if response.dragged_by(egui::PointerButton::Primary) {
         if let Some(start) = ui_state.sprite.active().selection_start_pos {
-            ui_state.sprite.active_mut().selection = Some(create_selection(start, canvas_pos));
+            apply_drag_selection(ui_state, start, canvas_pos, selection_mode);
         }
     }
 
-    if response.drag_stopped_by(egui::PointerButton::Primary) {
+    if response.clicked_by(egui::PointerButton::Primary)
+        || response.drag_stopped_by(egui::PointerButton::Primary)
+    {
         if let Some(start) = ui_state.sprite.active_mut().selection_start_pos.take() {
-            let selection = create_selection(start, canvas_pos);
-            if selection.width > 0 && selection.height > 0 {
-                tracing::info!(
-                    "Select tool: created selection x={}, y={}, w={}, h={}",
-                    selection.x,
-                    selection.y,
-                    selection.width,
-                    selection.height
-                );
-                ui_state.sprite.active_mut().selection = Some(selection);
-            } else {
-                tracing::info!("Select tool: selection too small, discarded");
-                ui_state.sprite.active_mut().selection = None;
-            }
+            apply_drag_selection(ui_state, start, canvas_pos, selection_mode);
+            ui_state.sprite.active_mut().selection_drag_base = None;
         }
     }
 
     // Clear selection with right-click
     if response.clicked_by(egui::PointerButton::Secondary) {
-        tracing::info!("Select tool: selection cleared by right-click");
         ui_state.sprite.active_mut().selection = None;
+        ui_state.sprite.active_mut().selection_drag_base = None;
     }
 }
 
@@ -225,20 +217,16 @@ fn handle_magic_wand_tool(
         if let Some(canvas) = &ui_state.sprite.active().canvas {
             let x = canvas_pos.x as u32;
             let y = canvas_pos.y as u32;
+            let selection_mode = current_selection_mode(&response.ctx);
 
-            if let Some((sel_x, sel_y, sel_w, sel_h)) = canvas.find_connected_sprite(x, y) {
-                tracing::info!(
-                    "Magic wand: selected sprite at ({}, {}) with size {}x{}",
-                    sel_x,
-                    sel_y,
-                    sel_w,
-                    sel_h
-                );
+            if let Some(mask) = canvas.find_connected_selection_mask(x, y) {
+                let base = ui_state.sprite.active().selection.clone();
                 ui_state.sprite.active_mut().selection =
-                    Some(SpriteSelection::new(sel_x, sel_y, sel_w, sel_h));
-            } else {
-                tracing::info!("Magic wand: clicked on transparent pixel, clearing selection");
+                    merge_selection_masks(base.as_ref(), &mask, selection_mode);
+            } else if selection_mode == SelectionModifyMode::Replace {
                 ui_state.sprite.active_mut().selection = None;
+            } else {
+                // Keep the existing selection on transparent clicks when adding/subtracting.
             }
         }
     }
@@ -356,6 +344,66 @@ fn clicked_tile_bounds(
 
     let (width, height) = ui_state.sprite.canvas_dimensions()?;
     Some((glam::UVec2::ZERO, glam::UVec2::new(width, height)))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SelectionModifyMode {
+    Replace,
+    Add,
+    Subtract,
+}
+
+fn current_selection_mode(ctx: &egui::Context) -> SelectionModifyMode {
+    ctx.input(|input| {
+        if input.modifiers.ctrl || input.modifiers.mac_cmd {
+            SelectionModifyMode::Subtract
+        } else if input.modifiers.shift {
+            SelectionModifyMode::Add
+        } else {
+            SelectionModifyMode::Replace
+        }
+    })
+}
+
+fn apply_drag_selection(
+    ui_state: &mut EditorUI,
+    start: glam::IVec2,
+    end: glam::IVec2,
+    mode: SelectionModifyMode,
+) {
+    let Some((canvas_width, canvas_height)) = ui_state.sprite.canvas_dimensions() else {
+        return;
+    };
+    let selection_rect = create_selection(start, end);
+    let drag_mask = selection_mask_from_rect(canvas_width, canvas_height, selection_rect);
+    let base = ui_state.sprite.active().selection_drag_base.clone();
+    ui_state.sprite.active_mut().selection = merge_selection_masks(base.as_ref(), &drag_mask, mode);
+}
+
+fn selection_mask_from_rect(width: u32, height: u32, rect: SpriteSelection) -> SelectionMask {
+    let mut selection = SelectionMask::new(width, height);
+    selection.select_rect(rect.x, rect.y, rect.width, rect.height);
+    selection
+}
+
+fn merge_selection_masks(
+    base: Option<&SelectionMask>,
+    incoming: &SelectionMask,
+    mode: SelectionModifyMode,
+) -> Option<SelectionMask> {
+    let mut merged = match mode {
+        SelectionModifyMode::Replace => SelectionMask::new(incoming.width, incoming.height),
+        SelectionModifyMode::Add | SelectionModifyMode::Subtract => base
+            .cloned()
+            .unwrap_or_else(|| SelectionMask::new(incoming.width, incoming.height)),
+    };
+
+    match mode {
+        SelectionModifyMode::Replace | SelectionModifyMode::Add => merged.union_with(incoming),
+        SelectionModifyMode::Subtract => merged.subtract(incoming),
+    }
+
+    (!merged.is_empty()).then_some(merged)
 }
 
 fn create_selection(start: glam::IVec2, end: glam::IVec2) -> SpriteSelection {
