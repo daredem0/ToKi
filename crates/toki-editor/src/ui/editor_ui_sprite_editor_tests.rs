@@ -337,6 +337,95 @@ fn selection_mask_select_and_deselect_rect_updates_contents() {
     assert!(!selection.is_selected(2, 2));
 }
 
+#[test]
+fn selection_mask_translated_to_canvas_basic() {
+    let mut local = SelectionMask::new(2, 2);
+    local.select_rect(0, 0, 2, 2);
+
+    let result = local.translated_to_canvas(8, 8, glam::IVec2::new(3, 3));
+
+    assert_eq!(result.width, 8);
+    assert_eq!(result.height, 8);
+    assert!(result.is_selected(3, 3));
+    assert!(result.is_selected(4, 4));
+    assert!(result.is_selected(3, 4));
+    assert!(result.is_selected(4, 3));
+    assert!(!result.is_selected(2, 3));
+    assert!(!result.is_selected(5, 5));
+}
+
+#[test]
+fn selection_mask_translated_to_canvas_clips_negative() {
+    let mut local = SelectionMask::new(2, 2);
+    local.select_rect(0, 0, 2, 2);
+
+    let result = local.translated_to_canvas(4, 4, glam::IVec2::new(-1, -1));
+
+    // Only local (1,1) maps to canvas (0,0)
+    assert!(result.is_selected(0, 0));
+    assert!(!result.is_selected(1, 0));
+    assert!(!result.is_selected(0, 1));
+}
+
+#[test]
+fn selection_mask_translated_to_canvas_clips_overflow() {
+    let mut local = SelectionMask::new(2, 2);
+    local.select_rect(0, 0, 2, 2);
+
+    let result = local.translated_to_canvas(8, 8, glam::IVec2::new(7, 7));
+
+    // Only local (0,0) maps to canvas (7,7); (8,8) is out of bounds
+    assert!(result.is_selected(7, 7));
+    assert!(!result.is_selected(6, 7));
+}
+
+// ============================================================================
+// Selection helper function tests
+// ============================================================================
+
+#[test]
+fn extract_masked_selection_copies_only_selected_pixels() {
+    use crate::ui::sprite_editor::extract_masked_selection;
+
+    let mut canvas = SpriteCanvas::new(4, 4);
+    let red = PixelColor::rgb(255, 0, 0);
+    let blue = PixelColor::rgb(0, 0, 255);
+    canvas.set_pixel(1, 1, red);
+    canvas.set_pixel(2, 2, blue);
+    canvas.set_pixel(3, 3, red); // not selected
+
+    let mut mask = SelectionMask::new(4, 4);
+    mask.select_pixel(1, 1);
+    mask.select_pixel(2, 2);
+
+    let result = extract_masked_selection(&canvas, &mask).unwrap();
+    assert_eq!(result.width, 2);
+    assert_eq!(result.height, 2);
+    assert_eq!(result.get_pixel(0, 0), Some(red));
+    assert_eq!(result.get_pixel(1, 1), Some(blue));
+    // Unselected within bounding rect should be transparent
+    assert_eq!(result.get_pixel(1, 0), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn clear_masked_pixels_clears_only_selected() {
+    use crate::ui::sprite_editor::clear_masked_pixels;
+
+    let red = PixelColor::rgb(255, 0, 0);
+    let mut canvas = SpriteCanvas::filled(4, 4, red);
+
+    let mut mask = SelectionMask::new(4, 4);
+    mask.select_pixel(1, 1);
+    mask.select_pixel(2, 2);
+
+    clear_masked_pixels(&mut canvas, &mask);
+
+    assert_eq!(canvas.get_pixel(1, 1), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(2, 2), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(0, 0), Some(red));
+    assert_eq!(canvas.get_pixel(3, 3), Some(red));
+}
+
 // ============================================================================
 // SpriteEditorHistory Tests
 // ============================================================================
@@ -1560,8 +1649,10 @@ fn sprite_editor_paste_at_cursor() {
     // Set cursor position for paste
     state.active_mut().cursor_canvas_pos = Some(glam::IVec2::new(4, 4));
 
-    // Paste should succeed
+    // Paste creates a floating selection
     assert!(state.paste_at_cursor(CanvasSide::Left));
+    // Commit the float to stamp pixels
+    assert!(state.commit_floating());
 
     // Check pixels were pasted at (4,4)
     if let Some(canvas) = &state.active().canvas {
@@ -1628,8 +1719,8 @@ fn sprite_editor_paste_centers_in_selected_cell() {
     state.active_mut().selected_cell = Some(3);
 
     // Paste - should center the 2x2 clipboard in the 8x8 cell
-    // Cell 3 starts at (8, 8), center position should be (8 + (8-2)/2, 8 + (8-2)/2) = (11, 11)
     assert!(state.paste_at_cursor(CanvasSide::Left));
+    assert!(state.commit_floating());
 
     // Check that pixels were pasted centered in cell 3
     if let Some(canvas) = &state.active().canvas {
@@ -1667,6 +1758,7 @@ fn sprite_editor_paste_scales_to_fit_cell() {
 
     // Paste - should scale the 8x8 clipboard down to 4x4 to fit the cell
     assert!(state.paste_at_cursor(CanvasSide::Left));
+    assert!(state.commit_floating());
 
     // Check that pixels were pasted in cell 15 (scaled down)
     // The 8x8 source scaled to 4x4 should fill the entire cell
@@ -1847,4 +1939,435 @@ fn sprite_canvas_find_connected_sprite_separate_sprites() {
     // Clicking sprite 2 should only select sprite 2
     let result = canvas.find_connected_sprite(10, 0);
     assert_eq!(result, Some((10, 0, 2, 2)));
+}
+
+// ============================================================================
+// Floating Selection Tests
+// ============================================================================
+
+fn setup_canvas_with_selection() -> SpriteEditorState {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+    let red = PixelColor::rgb(255, 0, 0);
+    if let Some(canvas) = &mut state.active_mut().canvas {
+        canvas.set_pixel(2, 2, red);
+        canvas.set_pixel(3, 3, red);
+    }
+    let mut mask = SelectionMask::new(8, 8);
+    mask.select_pixel(2, 2);
+    mask.select_pixel(3, 3);
+    state.active_mut().selection = Some(mask);
+    state
+}
+
+#[test]
+fn lift_selection_creates_floating_with_correct_pixels() {
+    let mut state = setup_canvas_with_selection();
+    let red = PixelColor::rgb(255, 0, 0);
+
+    assert!(state.lift_selection());
+
+    let floating = state.active().floating.as_ref().unwrap();
+    assert_eq!(floating.offset, glam::IVec2::new(2, 2));
+    assert_eq!(floating.pixels.width, 2);
+    assert_eq!(floating.pixels.height, 2);
+    assert_eq!(floating.pixels.get_pixel(0, 0), Some(red));
+    assert_eq!(floating.pixels.get_pixel(1, 1), Some(red));
+    assert_eq!(
+        floating.pixels.get_pixel(1, 0),
+        Some(PixelColor::transparent())
+    );
+}
+
+#[test]
+fn lift_selection_clears_lifted_pixels_from_canvas() {
+    let mut state = setup_canvas_with_selection();
+
+    state.lift_selection();
+
+    let canvas = state.active().canvas.as_ref().unwrap();
+    assert_eq!(canvas.get_pixel(2, 2), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(3, 3), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn lift_selection_clears_selection_mask() {
+    let mut state = setup_canvas_with_selection();
+
+    state.lift_selection();
+
+    assert!(state.active().selection.is_none());
+}
+
+#[test]
+fn lift_selection_stores_canvas_before_lift() {
+    let mut state = setup_canvas_with_selection();
+    let red = PixelColor::rgb(255, 0, 0);
+
+    state.lift_selection();
+
+    let floating = state.active().floating.as_ref().unwrap();
+    // canvas_before_lift should have the original red pixels
+    assert_eq!(
+        floating.canvas_before_lift.get_pixel(2, 2),
+        Some(red)
+    );
+    assert_eq!(
+        floating.canvas_before_lift.get_pixel(3, 3),
+        Some(red)
+    );
+}
+
+#[test]
+fn lift_selection_fails_without_selection() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+
+    assert!(!state.lift_selection());
+    assert!(state.active().floating.is_none());
+}
+
+#[test]
+fn lift_selection_fails_without_canvas() {
+    let mut state = SpriteEditorState::default();
+
+    assert!(!state.lift_selection());
+}
+
+#[test]
+fn lift_selection_marks_texture_dirty() {
+    let mut state = setup_canvas_with_selection();
+    state.active_mut().canvas_texture_dirty = false;
+
+    state.lift_selection();
+
+    assert!(state.active().canvas_texture_dirty);
+}
+
+// --- commit_floating tests ---
+
+#[test]
+fn commit_stamps_pixels_at_current_offset() {
+    let mut state = setup_canvas_with_selection();
+    let red = PixelColor::rgb(255, 0, 0);
+    state.lift_selection();
+
+    state.nudge_floating(glam::IVec2::new(2, 2));
+    assert!(state.commit_floating());
+
+    let canvas = state.active().canvas.as_ref().unwrap();
+    // Original position should be transparent (was cleared on lift)
+    assert_eq!(canvas.get_pixel(2, 2), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(3, 3), Some(PixelColor::transparent()));
+    // New position should have the red pixels
+    assert_eq!(canvas.get_pixel(4, 4), Some(red));
+    assert_eq!(canvas.get_pixel(5, 5), Some(red));
+}
+
+#[test]
+fn commit_pushes_one_undo_entry() {
+    let mut state = setup_canvas_with_selection();
+    state.lift_selection();
+    state.nudge_floating(glam::IVec2::new(1, 1));
+
+    state.commit_floating();
+
+    assert!(state.active().history.can_undo());
+}
+
+#[test]
+fn commit_clears_floating() {
+    let mut state = setup_canvas_with_selection();
+    state.lift_selection();
+
+    state.commit_floating();
+
+    assert!(state.active().floating.is_none());
+}
+
+#[test]
+fn commit_reconstructs_selection_at_new_position() {
+    let mut state = setup_canvas_with_selection();
+    state.lift_selection();
+    state.nudge_floating(glam::IVec2::new(2, 2));
+
+    state.commit_floating();
+
+    let selection = state.active().selection.as_ref().unwrap();
+    assert!(selection.is_selected(4, 4));
+    assert!(selection.is_selected(5, 5));
+    assert!(!selection.is_selected(2, 2));
+}
+
+#[test]
+fn commit_marks_dirty() {
+    let mut state = setup_canvas_with_selection();
+    state.lift_selection();
+    state.active_mut().dirty = false;
+    state.active_mut().canvas_texture_dirty = false;
+
+    state.commit_floating();
+
+    assert!(state.active().dirty);
+    assert!(state.active().canvas_texture_dirty);
+}
+
+#[test]
+fn commit_without_floating_returns_false() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+
+    assert!(!state.commit_floating());
+    assert!(!state.active().history.can_undo());
+}
+
+#[test]
+fn commit_then_undo_restores_pre_lift_canvas() {
+    let mut state = setup_canvas_with_selection();
+    let red = PixelColor::rgb(255, 0, 0);
+    state.lift_selection();
+    state.nudge_floating(glam::IVec2::new(2, 2));
+    state.commit_floating();
+
+    state.undo();
+
+    let canvas = state.active().canvas.as_ref().unwrap();
+    // Should be back to original (pre-lift) state with red at (2,2) and (3,3)
+    assert_eq!(canvas.get_pixel(2, 2), Some(red));
+    assert_eq!(canvas.get_pixel(3, 3), Some(red));
+    assert_eq!(canvas.get_pixel(4, 4), Some(PixelColor::transparent()));
+}
+
+// --- cancel_floating tests ---
+
+#[test]
+fn cancel_restores_original_canvas() {
+    let mut state = setup_canvas_with_selection();
+    let red = PixelColor::rgb(255, 0, 0);
+    state.lift_selection();
+    state.nudge_floating(glam::IVec2::new(2, 2));
+
+    assert!(state.cancel_floating());
+
+    let canvas = state.active().canvas.as_ref().unwrap();
+    assert_eq!(canvas.get_pixel(2, 2), Some(red));
+    assert_eq!(canvas.get_pixel(3, 3), Some(red));
+}
+
+#[test]
+fn cancel_does_not_push_undo() {
+    let mut state = setup_canvas_with_selection();
+    state.lift_selection();
+
+    state.cancel_floating();
+
+    assert!(!state.active().history.can_undo());
+}
+
+#[test]
+fn cancel_clears_floating() {
+    let mut state = setup_canvas_with_selection();
+    state.lift_selection();
+
+    state.cancel_floating();
+
+    assert!(state.active().floating.is_none());
+}
+
+#[test]
+fn cancel_restores_selection_at_original_position() {
+    let mut state = setup_canvas_with_selection();
+    state.lift_selection();
+    state.nudge_floating(glam::IVec2::new(2, 2));
+
+    state.cancel_floating();
+
+    let selection = state.active().selection.as_ref().unwrap();
+    assert!(selection.is_selected(2, 2));
+    assert!(selection.is_selected(3, 3));
+    assert!(!selection.is_selected(4, 4));
+}
+
+#[test]
+fn cancel_without_floating_returns_false() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+
+    assert!(!state.cancel_floating());
+}
+
+// --- nudge_floating tests ---
+
+#[test]
+fn nudge_moves_offset() {
+    let mut state = setup_canvas_with_selection();
+    state.lift_selection();
+
+    state.nudge_floating(glam::IVec2::new(1, -1));
+
+    let floating = state.active().floating.as_ref().unwrap();
+    assert_eq!(floating.offset, glam::IVec2::new(3, 1));
+}
+
+#[test]
+fn nudge_allows_negative_offset() {
+    let mut state = setup_canvas_with_selection();
+    state.lift_selection();
+
+    state.nudge_floating(glam::IVec2::new(-5, -5));
+
+    let floating = state.active().floating.as_ref().unwrap();
+    assert_eq!(floating.offset, glam::IVec2::new(-3, -3));
+}
+
+#[test]
+fn nudge_no_op_without_floating() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+
+    // Should not panic
+    state.nudge_floating(glam::IVec2::new(1, 1));
+}
+
+#[test]
+fn nudge_does_not_push_undo() {
+    let mut state = setup_canvas_with_selection();
+    state.lift_selection();
+
+    state.nudge_floating(glam::IVec2::new(1, 1));
+
+    assert!(!state.active().history.can_undo());
+}
+
+// --- paste creates float tests ---
+
+#[test]
+fn paste_creates_floating_instead_of_stamping() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+    let blue = PixelColor::rgb(0, 0, 255);
+    if let Some(canvas) = &mut state.active_mut().canvas {
+        canvas.fill_rect(0, 0, 2, 2, blue);
+    }
+    // Select and copy
+    let mut mask = SelectionMask::new(8, 8);
+    mask.select_rect(0, 0, 2, 2);
+    state.active_mut().selection = Some(mask);
+    state.copy_selection();
+    // Set cursor position for paste target
+    state.active_mut().cursor_canvas_pos = Some(glam::IVec2::new(4, 4));
+
+    state.paste_at_cursor(CanvasSide::Left);
+
+    // Should have a floating selection, NOT stamped onto canvas
+    assert!(state.active().floating.is_some());
+    let canvas = state.active().canvas.as_ref().unwrap();
+    // Paste target area should still be empty (not stamped yet)
+    assert_eq!(canvas.get_pixel(4, 4), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn paste_then_commit_stamps_pixels() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+    let blue = PixelColor::rgb(0, 0, 255);
+    if let Some(canvas) = &mut state.active_mut().canvas {
+        canvas.fill_rect(0, 0, 2, 2, blue);
+    }
+    let mut mask = SelectionMask::new(8, 8);
+    mask.select_rect(0, 0, 2, 2);
+    state.active_mut().selection = Some(mask);
+    state.copy_selection();
+    state.active_mut().cursor_canvas_pos = Some(glam::IVec2::new(4, 4));
+    state.paste_at_cursor(CanvasSide::Left);
+
+    state.commit_floating();
+
+    let canvas = state.active().canvas.as_ref().unwrap();
+    assert_eq!(canvas.get_pixel(4, 4), Some(blue));
+    assert_eq!(canvas.get_pixel(5, 5), Some(blue));
+}
+
+#[test]
+fn paste_then_cancel_leaves_canvas_unchanged() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+    let blue = PixelColor::rgb(0, 0, 255);
+    if let Some(canvas) = &mut state.active_mut().canvas {
+        canvas.fill_rect(0, 0, 2, 2, blue);
+    }
+    let mut mask = SelectionMask::new(8, 8);
+    mask.select_rect(0, 0, 2, 2);
+    state.active_mut().selection = Some(mask);
+    state.copy_selection();
+    state.active_mut().cursor_canvas_pos = Some(glam::IVec2::new(4, 4));
+
+    let canvas_before = state.active().canvas.clone().unwrap();
+    state.paste_at_cursor(CanvasSide::Left);
+    state.cancel_floating();
+
+    assert_eq!(state.active().canvas.as_ref().unwrap(), &canvas_before);
+}
+
+#[test]
+fn paste_auto_commits_existing_float() {
+    let mut state = setup_canvas_with_selection();
+    let red = PixelColor::rgb(255, 0, 0);
+    // Lift selection to create first float
+    state.lift_selection();
+    state.nudge_floating(glam::IVec2::new(1, 1));
+
+    // Copy something to clipboard for paste
+    state.clipboard = Some(SpriteCanvas::filled(1, 1, PixelColor::rgb(0, 255, 0)));
+    state.active_mut().cursor_canvas_pos = Some(glam::IVec2::new(0, 0));
+
+    state.paste_at_cursor(CanvasSide::Left);
+
+    // First float should have been committed (red pixels at nudged position)
+    let canvas = state.active().canvas.as_ref().unwrap();
+    assert_eq!(canvas.get_pixel(3, 3), Some(red));
+    assert_eq!(canvas.get_pixel(4, 4), Some(red));
+    // New float from paste should exist
+    assert!(state.active().floating.is_some());
+}
+
+#[test]
+fn paste_without_clipboard_returns_false() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+    state.active_mut().cursor_canvas_pos = Some(glam::IVec2::new(0, 0));
+
+    assert!(!state.paste_at_cursor(CanvasSide::Left));
+    assert!(state.active().floating.is_none());
+}
+
+// --- set_tool tests ---
+
+#[test]
+fn set_tool_commits_floating_before_switching() {
+    use super::SpriteEditorTool;
+    let mut state = setup_canvas_with_selection();
+    let red = PixelColor::rgb(255, 0, 0);
+    state.lift_selection();
+    state.nudge_floating(glam::IVec2::new(1, 1));
+
+    state.set_tool(SpriteEditorTool::Brush);
+
+    assert_eq!(state.tool, SpriteEditorTool::Brush);
+    assert!(state.active().floating.is_none());
+    let canvas = state.active().canvas.as_ref().unwrap();
+    assert_eq!(canvas.get_pixel(3, 3), Some(red));
+    assert_eq!(canvas.get_pixel(4, 4), Some(red));
+}
+
+#[test]
+fn set_tool_without_float_just_switches() {
+    use super::SpriteEditorTool;
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+
+    state.set_tool(SpriteEditorTool::Eraser);
+
+    assert_eq!(state.tool, SpriteEditorTool::Eraser);
+    assert!(!state.active().history.can_undo());
 }

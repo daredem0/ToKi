@@ -110,41 +110,46 @@ impl SpriteEditorState {
         true
     }
 
-    /// Paste clipboard contents at the best position on a specific canvas.
-    /// If a cell is selected, scales to fit and centers the paste in that cell.
-    /// Otherwise, uses the cursor position.
+    /// Paste clipboard contents as a floating selection on a specific canvas.
+    /// If a float already exists, it is committed first.
     pub fn paste_at_cursor(&mut self, side: CanvasSide) -> bool {
         let clipboard = match &self.clipboard {
             Some(c) => c.clone(),
             None => return false,
         };
+        // Ensure we're working on the correct side
+        self.set_active_canvas(side);
         let cs = self.canvas_state(side);
         if cs.canvas.is_none() {
             return false;
         }
 
-        // Prepare clipboard (possibly scaled) and position
+        // Auto-commit any existing float before creating a new one
+        if self.has_floating() {
+            self.commit_floating();
+        }
+
         let (to_paste, paste_pos) = self.prepare_paste(side, &clipboard);
         let Some(paste_pos) = paste_pos else {
             return false;
         };
 
-        // Store canvas state before paste
-        let before = self.canvas_state(side).canvas.clone().unwrap();
+        let canvas_before_lift = self.canvas_state(side).canvas.clone().unwrap();
 
-        // Perform the paste
+        // Build a fully-selected mask for the pasted content
+        let mut mask = super::SelectionMask::new(to_paste.width, to_paste.height);
+        mask.select_rect(0, 0, to_paste.width, to_paste.height);
+
         let cs = self.canvas_state_mut(side);
-        if let Some(canvas) = &mut cs.canvas {
-            canvas.blit(&to_paste, paste_pos.x, paste_pos.y);
-            cs.dirty = true;
-            cs.canvas_texture_dirty = true;
-        }
-
-        // Push undo state with before and after
-        let after = self.canvas_state(side).canvas.clone().unwrap();
-        self.canvas_state_mut(side)
-            .history
-            .push(SpriteEditCommand { before, after });
+        cs.floating = Some(super::FloatingSelection {
+            pixels: to_paste,
+            mask,
+            offset: paste_pos,
+            canvas_before_lift,
+            original_offset: paste_pos,
+        });
+        cs.selection = None;
+        cs.canvas_texture_dirty = true;
         true
     }
 
@@ -244,34 +249,4 @@ impl SpriteEditorState {
     }
 }
 
-fn extract_masked_selection(
-    canvas: &SpriteCanvas,
-    selection: &super::SelectionMask,
-) -> Option<SpriteCanvas> {
-    let bounds = selection.bounding_rect()?;
-    let mut result = SpriteCanvas::new(bounds.width, bounds.height);
-    for y in 0..bounds.height {
-        for x in 0..bounds.width {
-            let src_x = bounds.x + x;
-            let src_y = bounds.y + y;
-            if selection.is_selected(src_x, src_y) {
-                if let Some(color) = canvas.get_pixel(src_x, src_y) {
-                    result.set_pixel(x, y, color);
-                }
-            }
-        }
-    }
-    Some(result)
-}
-
-fn clear_masked_pixels(canvas: &mut SpriteCanvas, selection: &super::SelectionMask) {
-    if let Some(bounds) = selection.bounding_rect() {
-        for y in bounds.y..(bounds.y + bounds.height) {
-            for x in bounds.x..(bounds.x + bounds.width) {
-                if selection.is_selected(x, y) {
-                    canvas.set_pixel(x, y, super::PixelColor::transparent());
-                }
-            }
-        }
-    }
-}
+use super::selection::{clear_masked_pixels, extract_masked_selection};
