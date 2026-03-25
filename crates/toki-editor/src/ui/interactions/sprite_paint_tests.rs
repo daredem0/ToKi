@@ -561,3 +561,493 @@ fn pick_color_out_of_bounds_returns_none() {
     assert!(SpritePaintInteraction::pick_color(&canvas, IVec2::new(8, 0)).is_none());
     assert!(SpritePaintInteraction::pick_color(&canvas, IVec2::new(0, 8)).is_none());
 }
+
+// ============================================================================
+// Rectangle Tests
+// ============================================================================
+
+#[test]
+fn draw_rectangle_outline_basic() {
+    let mut canvas = create_test_canvas(10, 10);
+    let color = PixelColor::rgb(255, 0, 0);
+    let params = ShapeParams {
+        start: IVec2::new(1, 1),
+        end: IVec2::new(6, 6),
+        color,
+        brush_size: 1,
+        filled: false,
+    };
+
+    assert!(SpritePaintInteraction::draw_rectangle(&mut canvas, &params));
+
+    // Top edge
+    for x in 1..=6 {
+        assert_eq!(canvas.get_pixel(x, 1), Some(color), "Top edge at ({x}, 1)");
+    }
+    // Bottom edge
+    for x in 1..=6 {
+        assert_eq!(canvas.get_pixel(x, 6), Some(color), "Bottom edge at ({x}, 6)");
+    }
+    // Left edge
+    for y in 1..=6 {
+        assert_eq!(canvas.get_pixel(1, y), Some(color), "Left edge at (1, {y})");
+    }
+    // Right edge
+    for y in 1..=6 {
+        assert_eq!(canvas.get_pixel(6, y), Some(color), "Right edge at (6, {y})");
+    }
+    // Interior should be transparent
+    assert_eq!(canvas.get_pixel(3, 3), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(4, 4), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn draw_rectangle_outline_single_point() {
+    let mut canvas = create_test_canvas(8, 8);
+    let color = PixelColor::rgb(0, 255, 0);
+    let params = ShapeParams {
+        start: IVec2::new(4, 4),
+        end: IVec2::new(4, 4),
+        color,
+        brush_size: 1,
+        filled: false,
+    };
+
+    assert!(SpritePaintInteraction::draw_rectangle(&mut canvas, &params));
+    assert_eq!(canvas.get_pixel(4, 4), Some(color));
+}
+
+#[test]
+fn draw_rectangle_outline_backwards_coords() {
+    let color = PixelColor::rgb(0, 0, 255);
+    let params_forward = ShapeParams {
+        start: IVec2::new(1, 1),
+        end: IVec2::new(5, 5),
+        color,
+        brush_size: 1,
+        filled: false,
+    };
+    let params_backward = ShapeParams {
+        start: IVec2::new(5, 5),
+        end: IVec2::new(1, 1),
+        color,
+        brush_size: 1,
+        filled: false,
+    };
+
+    let mut canvas1 = create_test_canvas(8, 8);
+    let mut canvas2 = create_test_canvas(8, 8);
+    SpritePaintInteraction::draw_rectangle(&mut canvas1, &params_forward);
+    SpritePaintInteraction::draw_rectangle(&mut canvas2, &params_backward);
+
+    for y in 0..8 {
+        for x in 0..8 {
+            assert_eq!(
+                canvas1.get_pixel(x, y),
+                canvas2.get_pixel(x, y),
+                "Mismatch at ({x}, {y})"
+            );
+        }
+    }
+}
+
+#[test]
+fn draw_rectangle_outline_with_brush_size() {
+    let mut canvas = create_test_canvas(16, 16);
+    let color = PixelColor::rgb(255, 255, 0);
+    let params = ShapeParams {
+        start: IVec2::new(4, 4),
+        end: IVec2::new(11, 11),
+        color,
+        brush_size: 3,
+        filled: false,
+    };
+
+    SpritePaintInteraction::draw_rectangle(&mut canvas, &params);
+
+    // Top edge at y=4 should have pixels above it at y=3 due to brush_size=3
+    assert_eq!(canvas.get_pixel(4, 3), Some(color));
+    // Interior well inside should still be transparent
+    assert_eq!(canvas.get_pixel(7, 7), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn draw_rectangle_filled_basic() {
+    let mut canvas = create_test_canvas(10, 10);
+    let color = PixelColor::rgb(255, 0, 0);
+    let params = ShapeParams {
+        start: IVec2::new(2, 2),
+        end: IVec2::new(5, 5),
+        color,
+        brush_size: 1,
+        filled: true,
+    };
+
+    assert!(SpritePaintInteraction::draw_rectangle(&mut canvas, &params));
+
+    // All interior pixels painted
+    for y in 2..=5 {
+        for x in 2..=5 {
+            assert_eq!(canvas.get_pixel(x, y), Some(color), "Interior at ({x}, {y})");
+        }
+    }
+    // Outside should be transparent
+    assert_eq!(canvas.get_pixel(1, 2), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(6, 2), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn draw_rectangle_filled_single_pixel() {
+    let mut canvas = create_test_canvas(8, 8);
+    let color = PixelColor::rgb(0, 255, 0);
+    let params = ShapeParams {
+        start: IVec2::new(3, 3),
+        end: IVec2::new(3, 3),
+        color,
+        brush_size: 1,
+        filled: true,
+    };
+
+    assert!(SpritePaintInteraction::draw_rectangle(&mut canvas, &params));
+    assert_eq!(canvas.get_pixel(3, 3), Some(color));
+    assert_eq!(canvas.get_pixel(2, 3), Some(PixelColor::transparent()));
+}
+
+// ============================================================================
+// Ellipse Tests
+// ============================================================================
+
+#[test]
+fn draw_ellipse_outline_circle() {
+    let mut canvas = create_test_canvas(20, 20);
+    let color = PixelColor::rgb(255, 0, 0);
+    let params = ShapeParams {
+        start: IVec2::new(2, 2),
+        end: IVec2::new(17, 17),
+        color,
+        brush_size: 1,
+        filled: false,
+    };
+
+    assert!(SpritePaintInteraction::draw_ellipse(&mut canvas, &params));
+
+    // Boundary pixels should be painted (top/bottom/left/right of circle)
+    let cx = 9;
+    let cy = 9;
+    let r = 7; // (17-2)/2 = 7
+    // Top and bottom
+    assert_eq!(canvas.get_pixel(cx as u32, (cy - r) as u32), Some(color), "Top");
+    assert_eq!(canvas.get_pixel(cx as u32, (cy + r) as u32), Some(color), "Bottom");
+    // Left and right
+    assert_eq!(canvas.get_pixel((cx - r) as u32, cy as u32), Some(color), "Left");
+    assert_eq!(canvas.get_pixel((cx + r) as u32, cy as u32), Some(color), "Right");
+    // Center should be transparent (outline only)
+    assert_eq!(canvas.get_pixel(cx as u32, cy as u32), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn draw_ellipse_outline_wide() {
+    let mut canvas = create_test_canvas(20, 10);
+    let color = PixelColor::rgb(0, 255, 0);
+    // Bounding box (1,1)→(17,7): cx=9, cy=4, rx=8, ry=3
+    let params = ShapeParams {
+        start: IVec2::new(1, 1),
+        end: IVec2::new(17, 7),
+        color,
+        brush_size: 1,
+        filled: false,
+    };
+
+    assert!(SpritePaintInteraction::draw_ellipse(&mut canvas, &params));
+
+    let cy = 4u32;
+    // Horizontal extremes: cx±rx = 9±8 = 1 and 17
+    assert_eq!(canvas.get_pixel(1, cy), Some(color), "Left extreme");
+    assert_eq!(canvas.get_pixel(17, cy), Some(color), "Right extreme");
+    // Center should be transparent (outline)
+    assert_eq!(canvas.get_pixel(9, cy), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn draw_ellipse_outline_single_pixel() {
+    let mut canvas = create_test_canvas(8, 8);
+    let color = PixelColor::rgb(0, 0, 255);
+    let params = ShapeParams {
+        start: IVec2::new(4, 4),
+        end: IVec2::new(4, 4),
+        color,
+        brush_size: 1,
+        filled: false,
+    };
+
+    assert!(SpritePaintInteraction::draw_ellipse(&mut canvas, &params));
+    assert_eq!(canvas.get_pixel(4, 4), Some(color));
+}
+
+#[test]
+fn draw_ellipse_outline_backwards_coords() {
+    let color = PixelColor::rgb(255, 0, 255);
+    let params_fwd = ShapeParams {
+        start: IVec2::new(2, 2),
+        end: IVec2::new(12, 12),
+        color,
+        brush_size: 1,
+        filled: false,
+    };
+    let params_bwd = ShapeParams {
+        start: IVec2::new(12, 12),
+        end: IVec2::new(2, 2),
+        color,
+        brush_size: 1,
+        filled: false,
+    };
+
+    let mut canvas1 = create_test_canvas(16, 16);
+    let mut canvas2 = create_test_canvas(16, 16);
+    SpritePaintInteraction::draw_ellipse(&mut canvas1, &params_fwd);
+    SpritePaintInteraction::draw_ellipse(&mut canvas2, &params_bwd);
+
+    for y in 0..16 {
+        for x in 0..16 {
+            assert_eq!(canvas1.get_pixel(x, y), canvas2.get_pixel(x, y), "Mismatch at ({x}, {y})");
+        }
+    }
+}
+
+#[test]
+fn draw_ellipse_filled_circle() {
+    let mut canvas = create_test_canvas(20, 20);
+    let color = PixelColor::rgb(255, 0, 0);
+    let params = ShapeParams {
+        start: IVec2::new(2, 2),
+        end: IVec2::new(17, 17),
+        color,
+        brush_size: 1,
+        filled: true,
+    };
+
+    assert!(SpritePaintInteraction::draw_ellipse(&mut canvas, &params));
+
+    // Center should be painted (filled mode)
+    assert_eq!(canvas.get_pixel(9, 9), Some(color));
+    // Boundary should be painted too
+    assert_eq!(canvas.get_pixel(9, 2), Some(color));
+    // Corners outside the ellipse should be transparent
+    assert_eq!(canvas.get_pixel(2, 2), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(17, 17), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn draw_ellipse_filled_small() {
+    let mut canvas = create_test_canvas(10, 10);
+    let color = PixelColor::rgb(0, 0, 255);
+    let params = ShapeParams {
+        start: IVec2::new(2, 3),
+        end: IVec2::new(6, 5),
+        color,
+        brush_size: 1,
+        filled: true,
+    };
+
+    assert!(SpritePaintInteraction::draw_ellipse(&mut canvas, &params));
+
+    // Center should be filled
+    assert_eq!(canvas.get_pixel(4, 4), Some(color));
+    // Left and right extremes at center row
+    assert_eq!(canvas.get_pixel(2, 4), Some(color));
+    assert_eq!(canvas.get_pixel(6, 4), Some(color));
+}
+
+// ============================================================================
+// Symmetry Tests
+// ============================================================================
+
+fn full_canvas_symmetry(w: u32, h: u32, horizontal: bool, vertical: bool) -> SymmetryConfig {
+    SymmetryConfig {
+        bounds: SymmetryBounds {
+            origin: UVec2::new(0, 0),
+            size: UVec2::new(w, h),
+        },
+        horizontal,
+        vertical,
+    }
+}
+
+#[test]
+fn mirror_x_basic() {
+    let bounds = SymmetryBounds { origin: UVec2::new(0, 0), size: UVec2::new(16, 16) };
+    let result = bounds.mirror_x(IVec2::new(3, 5));
+    assert_eq!(result, IVec2::new(12, 5));
+}
+
+#[test]
+fn mirror_y_basic() {
+    let bounds = SymmetryBounds { origin: UVec2::new(0, 0), size: UVec2::new(16, 16) };
+    let result = bounds.mirror_y(IVec2::new(5, 3));
+    assert_eq!(result, IVec2::new(5, 12));
+}
+
+#[test]
+fn mirror_x_with_offset_bounds() {
+    // Sheet mode: cell at (16, 0) with size 16x16
+    let bounds = SymmetryBounds { origin: UVec2::new(16, 0), size: UVec2::new(16, 16) };
+    let result = bounds.mirror_x(IVec2::new(19, 5));
+    // local_x = 19 - 16 = 3, mirror = 15 - 3 = 12, result = 12 + 16 = 28
+    assert_eq!(result, IVec2::new(28, 5));
+}
+
+#[test]
+fn mirror_positions_both_axes() {
+    let bounds = SymmetryBounds { origin: UVec2::new(0, 0), size: UVec2::new(16, 16) };
+    let positions = bounds.mirror_positions(IVec2::new(3, 3), true, true);
+    assert_eq!(positions.len(), 4);
+    assert!(positions.contains(&IVec2::new(3, 3)));
+    assert!(positions.contains(&IVec2::new(12, 3)));
+    assert!(positions.contains(&IVec2::new(3, 12)));
+    assert!(positions.contains(&IVec2::new(12, 12)));
+}
+
+#[test]
+fn mirror_positions_on_axis_deduplicates() {
+    // For a 16-wide canvas, position 7 mirrors to 8 (different).
+    // But for an 8-wide canvas, position 3 mirrors to 4, and position 4 mirrors to 3.
+    // True on-axis: for a 15-wide canvas, position 7 mirrors to 7 (same).
+    let bounds = SymmetryBounds { origin: UVec2::new(0, 0), size: UVec2::new(15, 15) };
+    let positions = bounds.mirror_positions(IVec2::new(7, 7), true, true);
+    // 7 mirrors to 14-7=7, so all 4 positions collapse to 1
+    assert_eq!(positions.len(), 1);
+    assert!(positions.contains(&IVec2::new(7, 7)));
+}
+
+#[test]
+fn paint_brush_symmetric_horizontal() {
+    let mut canvas = create_test_canvas(16, 16);
+    let color = PixelColor::rgb(255, 0, 0);
+    let sym = full_canvas_symmetry(16, 16, true, false);
+
+    SpritePaintInteraction::paint_brush_symmetric(&mut canvas, IVec2::new(3, 5), color, 1, &sym);
+
+    assert_eq!(canvas.get_pixel(3, 5), Some(color));
+    assert_eq!(canvas.get_pixel(12, 5), Some(color));
+    assert_eq!(canvas.get_pixel(3, 10), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn paint_brush_symmetric_vertical() {
+    let mut canvas = create_test_canvas(16, 16);
+    let color = PixelColor::rgb(0, 255, 0);
+    let sym = full_canvas_symmetry(16, 16, false, true);
+
+    SpritePaintInteraction::paint_brush_symmetric(&mut canvas, IVec2::new(5, 3), color, 1, &sym);
+
+    assert_eq!(canvas.get_pixel(5, 3), Some(color));
+    assert_eq!(canvas.get_pixel(5, 12), Some(color));
+}
+
+#[test]
+fn paint_brush_symmetric_both() {
+    let mut canvas = create_test_canvas(16, 16);
+    let color = PixelColor::rgb(0, 0, 255);
+    let sym = full_canvas_symmetry(16, 16, true, true);
+
+    SpritePaintInteraction::paint_brush_symmetric(&mut canvas, IVec2::new(3, 3), color, 1, &sym);
+
+    assert_eq!(canvas.get_pixel(3, 3), Some(color));
+    assert_eq!(canvas.get_pixel(12, 3), Some(color));
+    assert_eq!(canvas.get_pixel(3, 12), Some(color));
+    assert_eq!(canvas.get_pixel(12, 12), Some(color));
+}
+
+#[test]
+fn paint_brush_symmetric_no_symmetry() {
+    let mut canvas = create_test_canvas(16, 16);
+    let color = PixelColor::rgb(255, 0, 0);
+    let sym = full_canvas_symmetry(16, 16, false, false);
+
+    SpritePaintInteraction::paint_brush_symmetric(&mut canvas, IVec2::new(3, 5), color, 1, &sym);
+
+    assert_eq!(canvas.get_pixel(3, 5), Some(color));
+    assert_eq!(canvas.get_pixel(12, 5), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn erase_brush_symmetric_horizontal() {
+    let color = PixelColor::rgb(255, 0, 0);
+    let mut canvas = SpriteCanvas::filled(16, 16, color);
+    let sym = full_canvas_symmetry(16, 16, true, false);
+
+    SpritePaintInteraction::erase_brush_symmetric(&mut canvas, IVec2::new(3, 5), 1, &sym);
+
+    assert_eq!(canvas.get_pixel(3, 5), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(12, 5), Some(PixelColor::transparent()));
+    assert_eq!(canvas.get_pixel(5, 5), Some(color));
+}
+
+#[test]
+fn paint_brush_symmetric_in_cell_bounds() {
+    let mut canvas = create_test_canvas(32, 16);
+    let color = PixelColor::rgb(255, 0, 0);
+    // Symmetry within cell at (16, 0) size 16x16
+    let sym = SymmetryConfig {
+        bounds: SymmetryBounds { origin: UVec2::new(16, 0), size: UVec2::new(16, 16) },
+        horizontal: true,
+        vertical: false,
+    };
+
+    SpritePaintInteraction::paint_brush_symmetric(&mut canvas, IVec2::new(19, 5), color, 1, &sym);
+
+    // Should paint at (19, 5) and mirror at (28, 5)
+    assert_eq!(canvas.get_pixel(19, 5), Some(color));
+    assert_eq!(canvas.get_pixel(28, 5), Some(color));
+    // Should NOT mirror at (12, 5) — that would be outside the cell bounds
+    assert_eq!(canvas.get_pixel(12, 5), Some(PixelColor::transparent()));
+}
+
+#[test]
+fn draw_line_symmetric_horizontal() {
+    let mut canvas = create_test_canvas(16, 16);
+    let color = PixelColor::rgb(255, 0, 0);
+    let sym = full_canvas_symmetry(16, 16, true, false);
+    let params = ShapeParams {
+        start: IVec2::new(1, 4),
+        end: IVec2::new(5, 4),
+        color,
+        brush_size: 1,
+        filled: false,
+    };
+
+    SpritePaintInteraction::draw_line_symmetric(&mut canvas, &params, &sym);
+
+    // Original line
+    assert_eq!(canvas.get_pixel(1, 4), Some(color));
+    assert_eq!(canvas.get_pixel(5, 4), Some(color));
+    // Mirrored line (x mirrored: 1→14, 5→10)
+    assert_eq!(canvas.get_pixel(14, 4), Some(color));
+    assert_eq!(canvas.get_pixel(10, 4), Some(color));
+}
+
+#[test]
+fn draw_rectangle_symmetric_both() {
+    let mut canvas = create_test_canvas(16, 16);
+    let color = PixelColor::rgb(0, 255, 0);
+    let sym = full_canvas_symmetry(16, 16, true, true);
+    let params = ShapeParams {
+        start: IVec2::new(1, 1),
+        end: IVec2::new(3, 3),
+        color,
+        brush_size: 1,
+        filled: true,
+    };
+
+    SpritePaintInteraction::draw_rectangle_symmetric(&mut canvas, &params, &sym);
+
+    // Original rectangle (top-left)
+    assert_eq!(canvas.get_pixel(1, 1), Some(color));
+    assert_eq!(canvas.get_pixel(3, 3), Some(color));
+    // Mirrored top-right
+    assert_eq!(canvas.get_pixel(14, 1), Some(color));
+    // Mirrored bottom-left
+    assert_eq!(canvas.get_pixel(1, 14), Some(color));
+    // Mirrored bottom-right
+    assert_eq!(canvas.get_pixel(14, 14), Some(color));
+}

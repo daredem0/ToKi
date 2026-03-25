@@ -129,5 +129,7 @@ fn tool_label(tool: SpriteEditorTool) -> &'static str {
         SpriteEditorTool::MagicErase => "Magic Erase",
         SpriteEditorTool::AddOutline => "Add Outline",
         SpriteEditorTool::AddShadow => "Add Shadow",
+        SpriteEditorTool::Rectangle => "Rectangle",
+        SpriteEditorTool::Ellipse => "Ellipse",
     }
 }

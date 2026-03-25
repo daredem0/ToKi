@@ -162,6 +162,21 @@ pub fn render_canvas_viewport(
         );
     }
 
+    // Draw symmetry guide lines
+    if ui_state.sprite.symmetry_horizontal || ui_state.sprite.symmetry_vertical {
+        let canvas_state = ui_state.sprite.canvas_state(render_side);
+        if let Some(canvas) = &canvas_state.canvas {
+            draw_symmetry_guides(
+                &painter,
+                rect,
+                &canvas_state.viewport,
+                canvas,
+                ui_state.sprite.symmetry_horizontal,
+                ui_state.sprite.symmetry_vertical,
+            );
+        }
+    }
+
     // Draw floating selection overlay OR static selection overlay
     let canvas_state = ui_state.sprite.canvas_state(render_side);
     if let Some(floating) = &canvas_state.floating {
@@ -574,6 +589,33 @@ fn draw_selection_mask(
                 );
             }
         }
+    }
+}
+
+fn draw_symmetry_guides(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    viewport: &SpriteCanvasViewport,
+    canvas: &SpriteCanvas,
+    horizontal: bool,
+    vertical: bool,
+) {
+    let zoom = viewport.zoom;
+    let pan = viewport.pan;
+    let canvas_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
+    let stroke = egui::Stroke::new(1.0, egui::Color32::from_rgba_unmultiplied(255, 100, 100, 160));
+
+    if horizontal {
+        let mid_x = canvas_min.x + (canvas.width as f32 / 2.0) * zoom;
+        let top = canvas_min.y.max(rect.top());
+        let bottom = (canvas_min.y + canvas.height as f32 * zoom).min(rect.bottom());
+        painter.line_segment([egui::pos2(mid_x, top), egui::pos2(mid_x, bottom)], stroke);
+    }
+    if vertical {
+        let mid_y = canvas_min.y + (canvas.height as f32 / 2.0) * zoom;
+        let left = canvas_min.x.max(rect.left());
+        let right = (canvas_min.x + canvas.width as f32 * zoom).min(rect.right());
+        painter.line_segment([egui::pos2(left, mid_y), egui::pos2(right, mid_y)], stroke);
     }
 }
 
