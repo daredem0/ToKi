@@ -21,7 +21,7 @@ mod viewport;
 pub use canvas::SpriteCanvas;
 pub use dual_canvas::{CanvasSide, CanvasState, DualCanvasLayout};
 pub use history::{SpriteEditCommand, SpriteEditorHistory};
-pub use floating::FloatingSelection;
+pub use floating::{FloatingOrigin, FloatingSelection};
 #[cfg(test)]
 pub use selection::{clear_masked_pixels, extract_masked_selection};
 pub use selection::{SelectionMask, SpriteSelection};

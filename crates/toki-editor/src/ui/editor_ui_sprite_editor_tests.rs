@@ -2242,7 +2242,6 @@ fn nudge_does_not_push_undo() {
 #[test]
 fn lift_and_nudge_lifts_then_moves_in_one_step() {
     let mut state = setup_canvas_with_selection();
-    let red = PixelColor::rgb(255, 0, 0);
 
     // No float exists yet, just a selection
     assert!(!state.has_floating());
@@ -2349,6 +2348,73 @@ fn paste_then_cancel_leaves_canvas_unchanged() {
     state.cancel_floating();
 
     assert_eq!(state.active().canvas.as_ref().unwrap(), &canvas_before);
+}
+
+#[test]
+fn paste_then_cancel_restores_previous_selection_exactly() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+    let blue = PixelColor::rgb(0, 0, 255);
+    if let Some(canvas) = &mut state.active_mut().canvas {
+        canvas.fill_rect(0, 0, 2, 2, blue);
+    }
+
+    let mut mask = SelectionMask::new(8, 8);
+    mask.select_rect(0, 0, 2, 2);
+    state.active_mut().selection = Some(mask.clone());
+    state.copy_selection();
+    state.active_mut().cursor_canvas_pos = Some(glam::IVec2::new(4, 4));
+
+    state.paste_at_cursor(CanvasSide::Left);
+    state.cancel_floating();
+
+    let selection = state.active().selection.as_ref().unwrap();
+    assert_eq!(selection, &mask);
+    assert!(selection.is_selected(0, 0));
+    assert!(selection.is_selected(1, 1));
+    assert!(!selection.is_selected(4, 4));
+}
+
+#[test]
+fn paste_then_cancel_without_prior_selection_restores_none() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+    state.clipboard = Some(SpriteCanvas::filled(2, 2, PixelColor::rgb(0, 0, 255)));
+    state.active_mut().cursor_canvas_pos = Some(glam::IVec2::new(4, 4));
+
+    state.paste_at_cursor(CanvasSide::Left);
+    state.cancel_floating();
+
+    assert!(state.active().selection.is_none());
+}
+
+#[test]
+fn paste_then_cancel_does_not_push_undo() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+    state.clipboard = Some(SpriteCanvas::filled(2, 2, PixelColor::rgb(0, 0, 255)));
+    state.active_mut().cursor_canvas_pos = Some(glam::IVec2::new(4, 4));
+
+    state.paste_at_cursor(CanvasSide::Left);
+    state.cancel_floating();
+
+    assert!(!state.active().history.can_undo());
+}
+
+#[test]
+fn paste_then_commit_selects_pasted_pixels_at_committed_position() {
+    let mut state = SpriteEditorState::default();
+    state.new_canvas(8, 8);
+    state.clipboard = Some(SpriteCanvas::filled(2, 2, PixelColor::rgb(0, 0, 255)));
+    state.active_mut().cursor_canvas_pos = Some(glam::IVec2::new(4, 4));
+
+    state.paste_at_cursor(CanvasSide::Left);
+    state.commit_floating();
+
+    let selection = state.active().selection.as_ref().unwrap();
+    assert!(selection.is_selected(4, 4));
+    assert!(selection.is_selected(5, 5));
+    assert!(!selection.is_selected(0, 0));
 }
 
 #[test]

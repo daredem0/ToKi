@@ -1,7 +1,9 @@
 //! Canvas rendering and drawing operations.
 
-use crate::ui::editor_ui::{CanvasSide, SelectionMask, SpriteCanvas, SpriteCanvasViewport};
-use crate::ui::sprite_editor::{preview_indexed_color, FloatingSelection};
+use crate::ui::editor_ui::{
+    CanvasSide, PixelColor, SelectionMask, SpriteCanvas, SpriteCanvasViewport,
+};
+use crate::ui::sprite_editor::{preview_indexed_color, FloatingOrigin, FloatingSelection};
 use crate::ui::EditorUI;
 use toki_core::assets::atlas::ColorMode;
 use toki_core::palette::Palette4;
@@ -728,9 +730,18 @@ fn draw_floating_pixels(
             let sy = canvas_screen_min.y + (floating.offset.y + y as i32) as f32 * zoom;
             let pixel_rect =
                 egui::Rect::from_min_size(egui::pos2(sx, sy), egui::vec2(zoom, zoom));
-            painter.rect_filled(pixel_rect, 0.0, color.to_color32());
+            painter.rect_filled(pixel_rect, 0.0, floating_preview_color(color, &floating.origin));
         }
     }
+}
+
+fn floating_preview_color(color: PixelColor, origin: &FloatingOrigin) -> egui::Color32 {
+    if !origin.is_paste_preview() {
+        return color.to_color32();
+    }
+
+    let alpha = ((u16::from(color.a) * 160) / 255) as u8;
+    egui::Color32::from_rgba_unmultiplied(color.r, color.g, color.b, alpha)
 }
 
 fn draw_offset_mask_border(
@@ -908,5 +919,31 @@ mod tests {
         let pixels = canvas_display_pixels(&canvas, ColorMode::PaletteIndexed, Some(palette));
 
         assert_eq!(pixels, canvas.pixels());
+    }
+
+    #[test]
+    fn floating_preview_color_keeps_full_alpha_for_lifted_selection() {
+        let color = PixelColor::new(10, 20, 30, 200);
+        let origin = FloatingOrigin::SelectionLift {
+            selection_before_float: SelectionMask::new(1, 1),
+        };
+
+        assert_eq!(
+            floating_preview_color(color, &origin),
+            egui::Color32::from_rgba_unmultiplied(10, 20, 30, 200)
+        );
+    }
+
+    #[test]
+    fn floating_preview_color_reduces_alpha_for_paste_preview() {
+        let color = PixelColor::new(10, 20, 30, 200);
+        let origin = FloatingOrigin::PastePreview {
+            selection_before_float: None,
+        };
+
+        assert_eq!(
+            floating_preview_color(color, &origin),
+            egui::Color32::from_rgba_unmultiplied(10, 20, 30, 125)
+        );
     }
 }

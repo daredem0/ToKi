@@ -10,8 +10,8 @@ use super::EditorUI;
 #[allow(unused_imports)]
 pub(crate) use crate::ui::sprite_editor::{
     canonical_indexed_color, indexed_slot_for_authored_color, nearest_palette_slot, CanvasSide,
-    CanvasState, DiscoveredSpriteAsset, DualCanvasLayout, FloatingSelection, PixelColor,
-    ResizeAnchor, SelectionMask, SpriteAssetKind, SpriteCanvas, SpriteCanvasViewport,
+    CanvasState, DiscoveredSpriteAsset, DualCanvasLayout, FloatingOrigin, FloatingSelection,
+    PixelColor, ResizeAnchor, SelectionMask, SpriteAssetKind, SpriteCanvas, SpriteCanvasViewport,
     SpriteEditCommand, SpriteEditorHistory, SpriteEditorState, SpriteEditorTool, SpriteSelection,
 };
 

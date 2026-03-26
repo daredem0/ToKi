@@ -1,6 +1,6 @@
 //! Floating selection operations for SpriteEditorState.
 
-use super::floating::FloatingSelection;
+use super::floating::{FloatingOrigin, FloatingSelection};
 use super::selection::{clear_masked_pixels, extract_masked_selection};
 use super::SpriteEditorState;
 
@@ -33,6 +33,7 @@ impl SpriteEditorState {
 
         let local_mask = build_local_mask(&selection, bounds);
         let offset = glam::IVec2::new(bounds.x as i32, bounds.y as i32);
+        let selection_before_float = selection.clone();
 
         let cs = self.active_mut();
         if let Some(canvas) = &mut cs.canvas {
@@ -44,7 +45,9 @@ impl SpriteEditorState {
             mask: local_mask,
             offset,
             canvas_before_lift,
-            original_offset: offset,
+            origin: FloatingOrigin::SelectionLift {
+                selection_before_float,
+            },
         });
         cs.selection = None;
         cs.canvas_texture_dirty = true;
@@ -86,15 +89,10 @@ impl SpriteEditorState {
             None => return false,
         };
 
-        let canvas_w = floating.canvas_before_lift.width;
-        let canvas_h = floating.canvas_before_lift.height;
+        let selection_before_float = floating.origin.selection_before_float().cloned();
         let cs = self.active_mut();
         cs.canvas = Some(floating.canvas_before_lift);
-        cs.selection = Some(
-            floating
-                .mask
-                .translated_to_canvas(canvas_w, canvas_h, floating.original_offset),
-        );
+        cs.selection = selection_before_float;
         cs.canvas_texture_dirty = true;
         true
     }

@@ -6,6 +6,36 @@
 use super::canvas::SpriteCanvas;
 use super::selection::SelectionMask;
 
+/// Why the floating pixels exist, which drives cancel/render behavior.
+#[derive(Debug, Clone)]
+pub enum FloatingOrigin {
+    /// Pixels were lifted from an existing selection.
+    SelectionLift {
+        selection_before_float: SelectionMask,
+    },
+    /// Pixels came from the clipboard and should restore the prior selection on cancel.
+    PastePreview {
+        selection_before_float: Option<SelectionMask>,
+    },
+}
+
+impl FloatingOrigin {
+    pub fn selection_before_float(&self) -> Option<&SelectionMask> {
+        match self {
+            Self::SelectionLift {
+                selection_before_float,
+            } => Some(selection_before_float),
+            Self::PastePreview {
+                selection_before_float,
+            } => selection_before_float.as_ref(),
+        }
+    }
+
+    pub fn is_paste_preview(&self) -> bool {
+        matches!(self, Self::PastePreview { .. })
+    }
+}
+
 /// Pixels lifted off the canvas into a movable overlay.
 /// Created by move-dragging a selection or by pasting from the clipboard.
 #[derive(Debug, Clone)]
@@ -18,6 +48,6 @@ pub struct FloatingSelection {
     pub offset: glam::IVec2,
     /// Canvas state before the lift, used for cancel and undo.
     pub canvas_before_lift: SpriteCanvas,
-    /// Offset at the time of lift, used by cancel to restore the original position.
-    pub original_offset: glam::IVec2,
+    /// Source-specific behavior for cancel/render semantics.
+    pub origin: FloatingOrigin,
 }

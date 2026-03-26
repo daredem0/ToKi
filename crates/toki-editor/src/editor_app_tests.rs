@@ -2,7 +2,7 @@ use super::EditorApp;
 use crate::project::assets::TilemapAsset;
 use crate::project::ProjectAssets;
 use crate::ui::editor_ui::EditorConfirmation;
-use crate::ui::editor_ui::{EntityMoveDragState, MapEditorDraft};
+use crate::ui::editor_ui::{CenterPanelTab, EntityMoveDragState, MapEditorDraft, SelectionMask};
 use glam::{IVec2, UVec2, Vec2};
 use std::collections::HashMap;
 use std::fs;
@@ -108,6 +108,38 @@ fn escape_requests_exit_confirmation_when_not_in_placement_mode() {
         app.core.ui.project.pending_confirmation,
         Some(EditorConfirmation::ExitEditor)
     );
+}
+
+#[test]
+fn escape_does_not_request_exit_when_sprite_editor_has_selection() {
+    let mut app = EditorApp::new(None);
+    app.core.ui.workspace.center_panel_tab = CenterPanelTab::SpriteEditor;
+    app.core.ui.sprite.new_canvas(8, 8);
+    let mut selection = SelectionMask::new(8, 8);
+    selection.select_pixel(1, 1);
+    app.core.ui.sprite.active_mut().selection = Some(selection);
+
+    app.handle_escape_key();
+
+    assert!(app.core.ui.project.pending_confirmation.is_none());
+}
+
+#[test]
+fn escape_does_not_request_exit_when_sprite_editor_has_floating_selection() {
+    let mut app = EditorApp::new(None);
+    app.core.ui.workspace.center_panel_tab = CenterPanelTab::SpriteEditor;
+    app.core.ui.sprite.new_canvas(8, 8);
+    if let Some(canvas) = &mut app.core.ui.sprite.active_mut().canvas {
+        canvas.set_pixel(1, 1, crate::ui::editor_ui::PixelColor::rgb(255, 0, 0));
+    }
+    let mut selection = SelectionMask::new(8, 8);
+    selection.select_pixel(1, 1);
+    app.core.ui.sprite.active_mut().selection = Some(selection);
+    assert!(app.core.ui.sprite.lift_selection());
+
+    app.handle_escape_key();
+
+    assert!(app.core.ui.project.pending_confirmation.is_none());
 }
 
 #[test]
