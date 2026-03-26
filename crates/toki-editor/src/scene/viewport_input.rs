@@ -35,7 +35,7 @@ impl SceneViewport {
     pub fn start_camera_drag(&mut self, mouse_pos: glam::Vec2) {
         self.is_dragging_camera = true;
         self.last_mouse_pos = Some(mouse_pos);
-        tracing::info!("Started camera drag at: {:?}", mouse_pos);
+        tracing::debug!("Started camera drag at: {:?}", mouse_pos);
     }
 
     pub fn update_camera_drag(&mut self, mouse_pos: glam::Vec2, pan_speed: f32) {
@@ -64,7 +64,7 @@ impl SceneViewport {
 
     pub fn stop_camera_drag(&mut self) {
         if self.is_dragging_camera {
-            tracing::info!("Stopped camera drag");
+            tracing::debug!("Stopped camera drag");
             self.is_dragging_camera = false;
             self.last_mouse_pos = None;
         }

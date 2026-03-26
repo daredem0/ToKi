@@ -460,7 +460,7 @@ impl ApplicationHandler for EditorApp {
                         | CenterPanelTab::EntityEditor => None,
                     };
                     if let Some(viewport) = active_viewport {
-                        tracing::debug!("Passing logical key {:?} to viewport", event.logical_key);
+                        tracing::trace!("Passing logical key {:?} to viewport", event.logical_key);
                         if viewport.handle_keyboard_input(
                             &event.logical_key,
                             Modifiers::from(self.modifiers),
@@ -492,7 +492,7 @@ impl ApplicationHandler for EditorApp {
                                     })
                                     .unwrap_or_else(|| editor_commands::undo(&mut self.core.ui));
                                 if undone {
-                                    tracing::info!("Undo applied via Ctrl+Z");
+                                    tracing::debug!("Undo applied via Ctrl+Z");
                                 }
                             }
                             EditorShortcutAction::Redo => {
@@ -509,7 +509,7 @@ impl ApplicationHandler for EditorApp {
                                     })
                                     .unwrap_or_else(|| editor_commands::redo(&mut self.core.ui));
                                 if redone {
-                                    tracing::info!("Redo applied via Ctrl+Y/Ctrl+Shift+Z");
+                                    tracing::debug!("Redo applied via Ctrl+Y/Ctrl+Shift+Z");
                                 }
                             }
                             EditorShortcutAction::Copy => {
@@ -518,7 +518,7 @@ impl ApplicationHandler for EditorApp {
                                     == CenterPanelTab::SpriteEditor
                                     && self.core.ui.sprite.copy_selection()
                                 {
-                                    tracing::info!("Sprite editor: copied selection to clipboard");
+                                    tracing::debug!("Sprite editor: copied selection to clipboard");
                                 }
                             }
                             EditorShortcutAction::Paste => {

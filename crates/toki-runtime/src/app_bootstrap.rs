@@ -129,6 +129,7 @@ impl<'a> StartupCoordinator<'a> {
 
         let mut decoded_project_cache = DecodedProjectCache::default();
         if let Some(project_path) = &self.launch_options.project_path {
+            tracing::info!("Loading project from: {}", project_path.display());
             let startup_root = ResolvedStartupRoot::project(project_path.clone());
             match self.build_from_content_root(
                 startup_root,

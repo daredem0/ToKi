@@ -122,9 +122,9 @@ impl SceneRenderer {
         sprite_texture: Option<std::path::PathBuf>,
     ) -> Result<Self, RenderError> {
         tracing::info!("Creating new SceneRenderer");
-        tracing::info!("Surface format: {:?}", surface_format);
-        tracing::info!("Tilemap texture: {:?}", tilemap_texture);
-        tracing::info!("Sprite texture: {:?}", sprite_texture);
+        tracing::debug!("Surface format: {:?}", surface_format);
+        tracing::debug!("Tilemap texture: {:?}", tilemap_texture);
+        tracing::debug!("Sprite texture: {:?}", sprite_texture);
         let tilemap_source = tilemap_texture
             .map(TextureSource::path)
             .unwrap_or_else(TextureSource::placeholder);

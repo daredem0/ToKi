@@ -20,11 +20,11 @@ impl MenuSystem {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     if ui.button("New Empty Project...").clicked() {
-                        tracing::info!("New Empty Project clicked");
+                        tracing::debug!("New Empty Project clicked");
                         ui_state.project.request(ProjectRequest::NewProject);
                     }
                     if ui.button("New Top-Down Starter...").clicked() {
-                        tracing::info!("New Top-Down Starter clicked");
+                        tracing::debug!("New Top-Down Starter clicked");
                         ui_state.project.request(ProjectRequest::NewTopDownProject);
                     }
 
@@ -32,27 +32,27 @@ impl MenuSystem {
                     if let Some(config) = config {
                         if config.has_project_path() {
                             if ui.button("Open Project").clicked() {
-                                tracing::info!(
+                                tracing::debug!(
                                     "Open Project clicked - opening project from config"
                                 );
                                 ui_state.project.request(ProjectRequest::OpenProject);
                             }
                             if ui.button("Browse for Project...").clicked() {
-                                tracing::info!("Browse for Project clicked");
+                                tracing::debug!("Browse for Project clicked");
                                 ui_state.project.request(ProjectRequest::BrowseForProject);
                             }
                         } else if ui.button("Open Project...").clicked() {
-                            tracing::info!("Open Project... clicked - no project path in config");
+                            tracing::debug!("Open Project... clicked - no project path in config");
                             ui_state.project.request(ProjectRequest::BrowseForProject);
                         }
                     } else if ui.button("Open Project...").clicked() {
-                        tracing::info!("Open Project... clicked - no config available");
+                        tracing::debug!("Open Project... clicked - no config available");
                         ui_state.project.request(ProjectRequest::BrowseForProject);
                     }
 
                     ui.separator();
                     if ui.button("Save Project").clicked() {
-                        tracing::info!("Save Project clicked");
+                        tracing::debug!("Save Project clicked");
                         ui_state.project.request(ProjectRequest::SaveProject);
                     }
                     if ui
@@ -62,7 +62,7 @@ impl MenuSystem {
                         )
                         .clicked()
                     {
-                        tracing::info!("Reload Project Assets clicked");
+                        tracing::debug!("Reload Project Assets clicked");
                         ui_state
                             .project
                             .request(ProjectRequest::ReloadProjectAssets);
@@ -74,7 +74,7 @@ impl MenuSystem {
                         )
                         .clicked()
                     {
-                        tracing::info!("Save Map clicked");
+                        tracing::debug!("Save Map clicked");
                         ui_state.map.save_requested = true;
                     }
                     if ui
@@ -84,22 +84,22 @@ impl MenuSystem {
                         )
                         .clicked()
                     {
-                        tracing::info!("Export Game clicked");
+                        tracing::debug!("Export Game clicked");
                         ui_state.project.request(ProjectRequest::ExportProject);
                     }
                     ui.separator();
                     if ui.button("Create Test Entities").clicked() {
-                        tracing::info!("Create Test Entities clicked");
+                        tracing::debug!("Create Test Entities clicked");
                         ui_state.visibility.create_test_entities = true;
                     }
                     ui.separator();
                     if ui.button("Init Config").clicked() {
-                        tracing::info!("Init Config clicked");
+                        tracing::debug!("Init Config clicked");
                         ui_state.project.request(ProjectRequest::InitConfig);
                     }
                     ui.separator();
                     if ui.button("Exit").clicked() {
-                        tracing::info!("Exit clicked");
+                        tracing::debug!("Exit clicked");
                         ui_state.visibility.should_exit = true;
                     }
                 });
@@ -116,7 +116,7 @@ impl MenuSystem {
                             .map(|project| editor_commands::undo_with_project(ui_state, project))
                             .unwrap_or_else(|| editor_commands::undo(ui_state))
                     {
-                        tracing::info!("Undo command applied");
+                        tracing::debug!("Undo command applied");
                     }
                     if ui
                         .add_enabled(
@@ -129,7 +129,7 @@ impl MenuSystem {
                             .map(|project| editor_commands::redo_with_project(ui_state, project))
                             .unwrap_or_else(|| editor_commands::redo(ui_state))
                     {
-                        tracing::info!("Redo command applied");
+                        tracing::debug!("Redo command applied");
                     }
                     ui.separator();
                     if ui
@@ -139,7 +139,7 @@ impl MenuSystem {
                         )
                         .clicked()
                     {
-                        tracing::info!("Validate Project Assets clicked");
+                        tracing::debug!("Validate Project Assets clicked");
                         ui_state.project.request(ProjectRequest::ValidateAssets);
                     }
                 });

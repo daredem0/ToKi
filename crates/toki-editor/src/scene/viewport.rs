@@ -442,8 +442,6 @@ impl SceneViewport {
                         egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
                         egui::Color32::WHITE,
                     );
-                    // Only log occasionally to avoid spam
-                    // tracing::debug!("Displayed pre-rendered texture in viewport with aspect ratio preservation");
                 } else {
                     // Show status instead of error - this is normal during initialization
                     self.render_debug_status(ui, rect, "Texture rendering in progress...");
@@ -639,7 +637,7 @@ impl SceneViewport {
         if (next_scale - self.editor_zoom_scale).abs() > f32::EPSILON {
             self.editor_zoom_scale = next_scale;
             self.mark_dirty();
-            tracing::info!("Zoomed in to editor scale {}", self.editor_zoom_scale);
+            tracing::debug!("Zoomed in to editor scale {}", self.editor_zoom_scale);
         } else {
             tracing::trace!("Already at minimum zoom level: {}", self.editor_zoom_scale);
         }
@@ -651,7 +649,7 @@ impl SceneViewport {
         if (next_scale - self.editor_zoom_scale).abs() > f32::EPSILON {
             self.editor_zoom_scale = next_scale;
             self.mark_dirty();
-            tracing::info!("Zoomed out to editor scale {}", self.editor_zoom_scale);
+            tracing::debug!("Zoomed out to editor scale {}", self.editor_zoom_scale);
         } else {
             tracing::trace!("Already at maximum zoom level: {}", self.editor_zoom_scale);
         }
@@ -675,35 +673,22 @@ impl SceneViewport {
                     let ch_str = ch.as_str();
                     match ch_str {
                         "+" => {
-                            tracing::info!("Zoom in key pressed (+)");
+                            tracing::debug!("Zoom in key pressed (+)");
                             self.zoom_in();
                             return true;
                         }
                         "-" => {
-                            tracing::info!("Zoom out key pressed (-)");
+                            tracing::debug!("Zoom out key pressed (-)");
                             self.zoom_out();
                             return true;
                         }
-                        _ => {
-                            tracing::trace!("Viewport: Unhandled character key '{}'", ch_str);
-                        }
+                        _ => {}
                     }
                 }
-                winit::keyboard::Key::Named(named_key) => {
-                    match named_key {
-                        winit::keyboard::NamedKey::ArrowUp => {
-                            // Could add camera panning here in the future
-                            tracing::trace!("Viewport: Arrow key up (not handled)");
-                        }
-                        _ => {
-                            tracing::trace!("Viewport: Unhandled named key {:?}", named_key);
-                        }
-                    }
-                }
-                _ => {
-                    tracing::trace!("Viewport: Unhandled key type {:?}", logical_key);
-                }
+                winit::keyboard::Key::Named(_) => {} // Future: camera panning via arrow keys
+                _ => {}
             }
+            tracing::trace!("Viewport: Unhandled key {:?}", logical_key);
         }
         false // Event not handled
     }
