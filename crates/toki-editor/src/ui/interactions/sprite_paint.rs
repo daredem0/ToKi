@@ -1,4 +1,5 @@
 use crate::ui::editor_ui::{PixelColor, SpriteCanvas};
+use crate::ui::sprite_editor::DitherPattern;
 use glam::{IVec2, UVec2};
 
 /// Bounds within which symmetry mirroring is computed.
@@ -638,6 +639,7 @@ impl SpritePaintInteraction {
     }
 
     /// Paint with symmetry. Paints at all mirrored positions.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn paint_brush_symmetric(
         canvas: &mut SpriteCanvas,
         center_pos: IVec2,
@@ -733,6 +735,48 @@ impl SpritePaintInteraction {
                 brush_size: params.brush_size, filled: params.filled,
             };
             changed |= Self::draw_ellipse(canvas, &mirrored);
+        }
+        changed
+    }
+
+    /// Paint with dithering. Skips pixels where the dither pattern says no.
+    pub fn paint_brush_dithered(
+        canvas: &mut SpriteCanvas,
+        center_pos: IVec2,
+        color: PixelColor,
+        brush_size: u32,
+        pattern: DitherPattern,
+    ) -> bool {
+        let Some((start, end)) = Self::brush_footprint_bounds(canvas, center_pos, brush_size)
+        else {
+            return false;
+        };
+        let mut changed = false;
+        for y in start.y..end.y {
+            for x in start.x..end.x {
+                if should_dither(x, y, pattern) {
+                    changed |= canvas.set_pixel(x, y, color);
+                }
+            }
+        }
+        changed
+    }
+
+    /// Paint with dithering and symmetry combined.
+    pub fn paint_brush_dithered_symmetric(
+        canvas: &mut SpriteCanvas,
+        center_pos: IVec2,
+        color: PixelColor,
+        brush_size: u32,
+        pattern: DitherPattern,
+        symmetry: &SymmetryConfig,
+    ) -> bool {
+        let positions = symmetry.bounds.mirror_positions(
+            center_pos, symmetry.horizontal, symmetry.vertical,
+        );
+        let mut changed = false;
+        for pos in positions {
+            changed |= Self::paint_brush_dithered(canvas, pos, color, brush_size, pattern);
         }
         changed
     }
@@ -860,6 +904,17 @@ fn ellipse_horizontal_spans(rx: i32, ry: i32) -> Vec<(i32, i32)> {
         }
     }
     max_x_for_y.into_iter().enumerate().map(|(dy, x)| (dy as i32, x)).collect()
+}
+
+/// Check if a pixel should be painted for the given dither pattern.
+/// Uses canvas-global coordinates so patterns are consistent across strokes.
+pub fn should_dither(x: u32, y: u32, pattern: DitherPattern) -> bool {
+    match pattern {
+        DitherPattern::None => true,
+        DitherPattern::Checker50 => (x + y).is_multiple_of(2),
+        DitherPattern::Checker25 => x.is_multiple_of(2) && y.is_multiple_of(2),
+        DitherPattern::Checker75 => x.is_multiple_of(2) || y.is_multiple_of(2),
+    }
 }
 
 #[cfg(test)]

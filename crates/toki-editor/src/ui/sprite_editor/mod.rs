@@ -28,7 +28,7 @@ pub use selection::{SelectionMask, SpriteSelection};
 pub use state::SpriteEditorState;
 pub use types::{
     canonical_indexed_color, indexed_slot_for_authored_color, nearest_palette_slot,
-    preview_indexed_color, DiscoveredSpriteAsset, PixelColor, ResizeAnchor, SpriteAssetKind,
-    SpriteEditorTool,
+    preview_indexed_color, DitherPattern, DiscoveredSpriteAsset, PixelColor, ResizeAnchor,
+    SpriteAssetKind, SpriteEditorTool,
 };
 pub use viewport::SpriteCanvasViewport;

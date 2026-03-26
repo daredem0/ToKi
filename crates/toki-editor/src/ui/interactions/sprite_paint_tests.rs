@@ -1051,3 +1051,146 @@ fn draw_rectangle_symmetric_both() {
     // Mirrored bottom-right
     assert_eq!(canvas.get_pixel(14, 14), Some(color));
 }
+
+// ============================================================================
+// Dithering Tests
+// ============================================================================
+
+#[test]
+fn should_dither_none_always_true() {
+    use crate::ui::sprite_editor::DitherPattern;
+    for y in 0..4 {
+        for x in 0..4 {
+            assert!(should_dither(x, y, DitherPattern::None), "({x}, {y})");
+        }
+    }
+}
+
+#[test]
+fn should_dither_checker50_alternates() {
+    use crate::ui::sprite_editor::DitherPattern;
+    assert!(should_dither(0, 0, DitherPattern::Checker50));
+    assert!(!should_dither(1, 0, DitherPattern::Checker50));
+    assert!(!should_dither(0, 1, DitherPattern::Checker50));
+    assert!(should_dither(1, 1, DitherPattern::Checker50));
+}
+
+#[test]
+fn should_dither_checker25_sparse() {
+    use crate::ui::sprite_editor::DitherPattern;
+    let mut count = 0;
+    for y in 0..4 {
+        for x in 0..4 {
+            if should_dither(x, y, DitherPattern::Checker25) {
+                count += 1;
+            }
+        }
+    }
+    // 25% of 16 = 4 pixels
+    assert_eq!(count, 4);
+    // Specific positions
+    assert!(should_dither(0, 0, DitherPattern::Checker25));
+    assert!(!should_dither(1, 0, DitherPattern::Checker25));
+    assert!(!should_dither(0, 1, DitherPattern::Checker25));
+}
+
+#[test]
+fn should_dither_checker75_dense() {
+    use crate::ui::sprite_editor::DitherPattern;
+    let mut count = 0;
+    for y in 0..4 {
+        for x in 0..4 {
+            if should_dither(x, y, DitherPattern::Checker75) {
+                count += 1;
+            }
+        }
+    }
+    // 75% of 16 = 12 pixels
+    assert_eq!(count, 12);
+    // Only odd,odd positions should be false
+    assert!(!should_dither(1, 1, DitherPattern::Checker75));
+    assert!(!should_dither(3, 3, DitherPattern::Checker75));
+    assert!(should_dither(0, 0, DitherPattern::Checker75));
+    assert!(should_dither(1, 0, DitherPattern::Checker75));
+}
+
+#[test]
+fn paint_brush_dithered_none_paints_all() {
+    use crate::ui::sprite_editor::DitherPattern;
+    let mut canvas = create_test_canvas(10, 10);
+    let color = PixelColor::rgb(255, 0, 0);
+
+    SpritePaintInteraction::paint_brush_dithered(&mut canvas, IVec2::new(4, 4), color, 3, DitherPattern::None);
+
+    // All 9 pixels should be painted
+    for y in 3..=5 {
+        for x in 3..=5 {
+            assert_eq!(canvas.get_pixel(x, y), Some(color), "({x}, {y})");
+        }
+    }
+}
+
+#[test]
+fn paint_brush_dithered_checker50() {
+    use crate::ui::sprite_editor::DitherPattern;
+    let mut canvas = create_test_canvas(10, 10);
+    let color = PixelColor::rgb(255, 0, 0);
+
+    SpritePaintInteraction::paint_brush_dithered(&mut canvas, IVec2::new(4, 4), color, 3, DitherPattern::Checker50);
+
+    // Checkerboard within 3x3 area (3,3)→(5,5)
+    // (3,3) → 3+3=6 even → painted
+    assert_eq!(canvas.get_pixel(3, 3), Some(color));
+    // (4,3) → 4+3=7 odd → not painted
+    assert_eq!(canvas.get_pixel(4, 3), Some(PixelColor::transparent()));
+    // (4,4) → 4+4=8 even → painted
+    assert_eq!(canvas.get_pixel(4, 4), Some(color));
+}
+
+#[test]
+fn paint_brush_dithered_checker50_position_matters() {
+    use crate::ui::sprite_editor::DitherPattern;
+    let mut canvas = create_test_canvas(10, 10);
+    let color = PixelColor::rgb(255, 0, 0);
+
+    // Paint at (4,4) and (5,5) — both use canvas-global coords for dither
+    SpritePaintInteraction::paint_brush_dithered(&mut canvas, IVec2::new(4, 4), color, 1, DitherPattern::Checker50);
+    SpritePaintInteraction::paint_brush_dithered(&mut canvas, IVec2::new(5, 5), color, 1, DitherPattern::Checker50);
+
+    // (4,4) sum=8 even → painted
+    assert_eq!(canvas.get_pixel(4, 4), Some(color));
+    // (5,5) sum=10 even → painted
+    assert_eq!(canvas.get_pixel(5, 5), Some(color));
+}
+
+#[test]
+fn paint_brush_dithered_symmetric_horizontal() {
+    use crate::ui::sprite_editor::DitherPattern;
+    let mut canvas = create_test_canvas(16, 16);
+    let color = PixelColor::rgb(255, 0, 0);
+    let sym = full_canvas_symmetry(16, 16, true, false);
+
+    SpritePaintInteraction::paint_brush_dithered_symmetric(
+        &mut canvas, IVec2::new(3, 4), color, 1, DitherPattern::Checker50, &sym,
+    );
+
+    // (3,4) sum=7 odd → NOT painted
+    assert_eq!(canvas.get_pixel(3, 4), Some(PixelColor::transparent()));
+    // Mirrored (12,4) sum=16 even → painted
+    assert_eq!(canvas.get_pixel(12, 4), Some(color));
+}
+
+#[test]
+fn paint_brush_dithered_symmetric_no_symmetry() {
+    use crate::ui::sprite_editor::DitherPattern;
+    let mut canvas = create_test_canvas(16, 16);
+    let color = PixelColor::rgb(0, 255, 0);
+    let sym = full_canvas_symmetry(16, 16, false, false);
+
+    SpritePaintInteraction::paint_brush_dithered_symmetric(
+        &mut canvas, IVec2::new(4, 4), color, 1, DitherPattern::None, &sym,
+    );
+
+    assert_eq!(canvas.get_pixel(4, 4), Some(color));
+    assert_eq!(canvas.get_pixel(11, 4), Some(PixelColor::transparent()));
+}

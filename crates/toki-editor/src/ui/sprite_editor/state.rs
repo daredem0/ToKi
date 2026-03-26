@@ -2,7 +2,7 @@
 
 use super::{
     canonical_indexed_color, indexed_slot_for_authored_color, CanvasSide, CanvasState,
-    DiscoveredSpriteAsset, DualCanvasLayout, PixelColor, ResizeAnchor, SpriteCanvas,
+    DitherPattern, DiscoveredSpriteAsset, DualCanvasLayout, PixelColor, ResizeAnchor, SpriteCanvas,
     SpriteEditorTool,
 };
 use std::collections::BTreeMap;
@@ -34,6 +34,8 @@ pub struct SpriteEditorState {
     pub brush_size: u32,
     /// Whether shape tools (rectangle, ellipse) draw filled or outline
     pub shape_filled: bool,
+    /// Dithering pattern for brush tool
+    pub dither_pattern: DitherPattern,
     /// Mirror brush strokes horizontally (across vertical axis)
     pub symmetry_horizontal: bool,
     /// Mirror brush strokes vertically (across horizontal axis)
@@ -110,6 +112,7 @@ impl Default for SpriteEditorState {
             selected_palette_id: None,
             brush_size: 1,
             shape_filled: false,
+            dither_pattern: DitherPattern::None,
             symmetry_horizontal: false,
             symmetry_vertical: false,
             symmetry_per_tile: false,

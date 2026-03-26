@@ -75,6 +75,7 @@ fn render_tool_options(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         SpriteEditorTool::Brush => {
             ui.label("Click/drag to draw pixels.");
             render_brush_size(ui, ui_state);
+            render_dither_selector(ui, ui_state);
         }
         SpriteEditorTool::Eraser => {
             ui.label("Click/drag to erase pixels.");
@@ -285,6 +286,25 @@ fn render_brush_size(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     });
 }
 
+fn render_dither_selector(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
+    use crate::ui::sprite_editor::DitherPattern;
+
+    ui.horizontal(|ui| {
+        ui.label("Dither:");
+        egui::ComboBox::from_id_salt("dither_pattern")
+            .selected_text(ui_state.sprite.dither_pattern.label())
+            .show_ui(ui, |ui| {
+                for pattern in DitherPattern::ALL {
+                    ui.selectable_value(
+                        &mut ui_state.sprite.dither_pattern,
+                        pattern,
+                        pattern.label(),
+                    );
+                }
+            });
+    });
+}
+
 fn render_color_picker(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     use super::super::editor_ui::PixelColor;
 
@@ -447,6 +467,10 @@ fn render_viewport_controls(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.checkbox(
         &mut ui_state.sprite.active_mut().show_grid,
         "Show Pixel Grid",
+    );
+    ui.checkbox(
+        &mut ui_state.sprite.active_mut().tile_preview,
+        "Tile Preview",
     );
 
     if let Some(pos) = ui_state.sprite.active().cursor_canvas_pos {

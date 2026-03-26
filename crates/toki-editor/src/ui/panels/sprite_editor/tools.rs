@@ -70,9 +70,10 @@ fn handle_brush_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_
             selected_palette(ui_state),
         );
         let brush_size = ui_state.sprite.brush_size;
+        let pattern = ui_state.sprite.dither_pattern;
         let sym = symmetry_config(ui_state);
         if let Some(canvas) = &mut ui_state.sprite.active_mut().canvas {
-            if SpritePaintInteraction::paint_brush_symmetric(canvas, canvas_pos, color, brush_size, &sym) {
+            if SpritePaintInteraction::paint_brush_dithered_symmetric(canvas, canvas_pos, color, brush_size, pattern, &sym) {
                 ui_state.sprite.active_mut().dirty = true;
                 invalidate_canvas_texture(ui_state);
             }
