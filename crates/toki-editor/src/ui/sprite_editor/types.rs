@@ -177,6 +177,33 @@ pub fn nearest_palette_slot(color: PixelColor, palette: Palette4) -> usize {
         .unwrap_or(3)
 }
 
+/// Dithering pattern for brush tools.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DitherPattern {
+    /// No dithering — paint all pixels
+    #[default]
+    None,
+    /// 50% checkerboard — every other pixel
+    Checker50,
+    /// 25% sparse — 1 in 4 pixels
+    Checker25,
+    /// 75% dense — 3 in 4 pixels
+    Checker75,
+}
+
+impl DitherPattern {
+    pub const ALL: [Self; 4] = [Self::None, Self::Checker50, Self::Checker25, Self::Checker75];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::None => "None",
+            Self::Checker50 => "50% Checker",
+            Self::Checker25 => "25% Sparse",
+            Self::Checker75 => "75% Dense",
+        }
+    }
+}
+
 /// Anchor position for canvas resize operations
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ResizeAnchor {

@@ -127,6 +127,14 @@ pub fn render_canvas_viewport(
         draw_canvas_with_checkerboard(&painter, rect, &viewport, canvas, texture);
     }
 
+    // Draw tile preview (3x3 tiled copies)
+    let canvas_state = ui_state.sprite.canvas_state(render_side);
+    if canvas_state.tile_preview {
+        if let Some(canvas) = &canvas_state.canvas {
+            draw_tile_preview(&painter, rect, &canvas_state.viewport, canvas);
+        }
+    }
+
     // Draw pixel grid overlay
     let canvas_state = ui_state.sprite.canvas_state(render_side);
     if canvas_state.show_grid && canvas_state.viewport.zoom >= 4.0 {
@@ -405,6 +413,71 @@ fn draw_checkerboard(
             if clipped.width() > 0.0 && clipped.height() > 0.0 {
                 painter.rect_filled(clipped, 0.0, color);
             }
+        }
+    }
+}
+
+fn draw_tile_preview(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    viewport: &SpriteCanvasViewport,
+    canvas: &SpriteCanvas,
+) {
+    let zoom = viewport.zoom;
+    let pan = viewport.pan;
+    let canvas_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
+    let tile_w = canvas.width as f32 * zoom;
+    let tile_h = canvas.height as f32 * zoom;
+
+    // Render the canvas pixels directly for each of the 8 surrounding copies
+    let tint = egui::Color32::from_white_alpha(90);
+    let offsets: [(i32, i32); 8] = [
+        (-1, -1), (0, -1), (1, -1),
+        (-1, 0),           (1, 0),
+        (-1, 1),  (0, 1),  (1, 1),
+    ];
+
+    for (dx, dy) in offsets {
+        let copy_min = egui::pos2(
+            canvas_min.x + dx as f32 * tile_w,
+            canvas_min.y + dy as f32 * tile_h,
+        );
+        let copy_rect = egui::Rect::from_min_size(copy_min, egui::vec2(tile_w, tile_h));
+        if !copy_rect.intersects(rect) {
+            continue;
+        }
+        draw_tiled_copy(painter, rect, canvas, copy_min, zoom, tint);
+    }
+}
+
+fn draw_tiled_copy(
+    painter: &egui::Painter,
+    clip_rect: egui::Rect,
+    canvas: &SpriteCanvas,
+    origin: egui::Pos2,
+    zoom: f32,
+    tint: egui::Color32,
+) {
+    for y in 0..canvas.height {
+        for x in 0..canvas.width {
+            let Some(color) = canvas.get_pixel(x, y) else {
+                continue;
+            };
+            if color.a == 0 {
+                continue;
+            }
+            let px = origin.x + x as f32 * zoom;
+            let py = origin.y + y as f32 * zoom;
+            let pixel_rect = egui::Rect::from_min_size(egui::pos2(px, py), egui::vec2(zoom, zoom));
+            if !pixel_rect.intersects(clip_rect) {
+                continue;
+            }
+            // Blend pixel color with tint alpha
+            let blended = egui::Color32::from_rgba_unmultiplied(
+                color.r, color.g, color.b,
+                ((color.a as u16 * tint.a() as u16) / 255) as u8,
+            );
+            painter.rect_filled(pixel_rect, 0.0, blended);
         }
     }
 }
