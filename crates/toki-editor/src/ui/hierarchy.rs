@@ -113,7 +113,7 @@ impl HierarchySystem {
                                     let button = ui.selectable_label(is_selected, &entity_name);
 
                                     if button.clicked() {
-                                        tracing::info!(
+                                        tracing::debug!(
                                             "Entity '{}' clicked - entering placement mode",
                                             entity_name
                                         );
@@ -132,7 +132,7 @@ impl HierarchySystem {
 
                                         for scene_name in scene_names {
                                             if ui.button(&scene_name).clicked() {
-                                                tracing::info!(
+                                                tracing::debug!(
                                                     "Adding entity '{}' to scene '{}'",
                                                     entity_name,
                                                     scene_name
@@ -146,7 +146,7 @@ impl HierarchySystem {
                                         ui.separator();
                                         ui.label("Actions:");
                                         if ui.button("View Definition").clicked() {
-                                            tracing::info!(
+                                            tracing::debug!(
                                                 "View definition for entity: {}",
                                                 entity_name
                                             );

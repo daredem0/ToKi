@@ -29,7 +29,7 @@ pub fn create_texture_bindgroup(
             texture_label
         );
     } else {
-        tracing::debug!("Loading texture from: {}", texture_path.display());
+        tracing::trace!("Loading texture from: {}", texture_path.display());
     }
 
     let texture = GpuTexture::from_file(device, queue, texture_path, texture_label)?;
@@ -127,6 +127,14 @@ pub async fn create_device_and_surface_async(
         })
         .await
         .map_err(|_| RenderError::AdapterUnavailable)?;
+
+    let adapter_info = adapter.get_info();
+    tracing::info!(
+        "GPU adapter selected: {} ({:?}, driver: {})",
+        adapter_info.name,
+        adapter_info.backend,
+        adapter_info.driver
+    );
 
     // Request GPU device and command queue with proper features
     let (device, queue) = adapter

@@ -181,7 +181,7 @@ impl ProjectAssets {
             return Ok(());
         }
 
-        tracing::info!("🔍 Scanning for scenes in {:?}", scenes_dir);
+        tracing::debug!("🔍 Scanning for scenes in {:?}", scenes_dir);
 
         for entry in fs::read_dir(&scenes_dir)? {
             let entry = entry?;
@@ -195,7 +195,7 @@ impl ProjectAssets {
                     };
 
                     self.scenes.insert(stem.to_string(), scene_asset);
-                    tracing::info!("📄 Found scene file: '{}' at {:?}", stem, path);
+                    tracing::debug!("📄 Found scene file: '{}' at {:?}", stem, path);
                 }
             }
         }
@@ -211,7 +211,7 @@ impl ProjectAssets {
             return Ok(());
         }
 
-        tracing::info!("🔍 Scanning for tilemaps in {:?}", tilemaps_dir);
+        tracing::debug!("🔍 Scanning for tilemaps in {:?}", tilemaps_dir);
 
         for entry in fs::read_dir(&tilemaps_dir)? {
             let entry = entry?;
@@ -222,7 +222,7 @@ impl ProjectAssets {
                     let tilemap_asset = TilemapAsset { path: path.clone() };
 
                     self.tilemaps.insert(stem.to_string(), tilemap_asset);
-                    tracing::info!("🗺️ Found tilemap file: '{}' at {:?}", stem, path);
+                    tracing::debug!("🗺️ Found tilemap file: '{}' at {:?}", stem, path);
                 }
             }
         }
@@ -238,7 +238,7 @@ impl ProjectAssets {
             return Ok(());
         }
 
-        tracing::info!("🔍 Scanning for sprite atlases in {:?}", sprites_dir);
+        tracing::debug!("🔍 Scanning for sprite atlases in {:?}", sprites_dir);
 
         for entry in fs::read_dir(&sprites_dir)? {
             let entry = entry?;
@@ -251,14 +251,14 @@ impl ProjectAssets {
                             let atlas_asset = SpriteAtlasAsset { path: path.clone() };
 
                             self.sprite_atlases.insert(stem.to_string(), atlas_asset);
-                            tracing::info!("🎨 Found sprite atlas file: '{}' at {:?}", stem, path);
+                            tracing::debug!("🎨 Found sprite atlas file: '{}' at {:?}", stem, path);
                         }
                         SpriteMetadataFileKind::ObjectSheet => {
                             let object_sheet_asset = ObjectSheetAsset { path: path.clone() };
 
                             self.object_sheets
                                 .insert(stem.to_string(), object_sheet_asset);
-                            tracing::info!("🌿 Found object sheet file: '{}' at {:?}", stem, path);
+                            tracing::debug!("🌿 Found object sheet file: '{}' at {:?}", stem, path);
                         }
                         SpriteMetadataFileKind::Unknown => {
                             tracing::warn!(
@@ -305,7 +305,7 @@ impl ProjectAssets {
             return Ok(());
         }
 
-        tracing::info!("🔍 Scanning for palettes in {:?}", palettes_dir);
+        tracing::debug!("🔍 Scanning for palettes in {:?}", palettes_dir);
         for asset in discover_palette_assets(&palettes_dir)? {
             self.palettes.insert(
                 asset.name,
@@ -326,7 +326,7 @@ impl ProjectAssets {
             return Ok(());
         }
 
-        tracing::info!("🔍 Scanning for entity definitions in {:?}", entities_dir);
+        tracing::debug!("🔍 Scanning for entity definitions in {:?}", entities_dir);
 
         for entry in fs::read_dir(&entities_dir)? {
             let entry = entry?;
@@ -340,7 +340,7 @@ impl ProjectAssets {
                     };
 
                     self.entities.insert(stem.to_string(), entity_asset);
-                    tracing::info!("🧙 Found entity definition: '{}' at {:?}", stem, path);
+                    tracing::debug!("🧙 Found entity definition: '{}' at {:?}", stem, path);
                 }
             }
         }

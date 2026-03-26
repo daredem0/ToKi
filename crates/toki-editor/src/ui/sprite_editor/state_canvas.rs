@@ -58,6 +58,7 @@ impl SpriteEditorState {
 
     /// Create a new empty canvas on the active canvas
     pub fn new_canvas(&mut self, width: u32, height: u32) {
+        tracing::debug!("Creating new canvas: {}×{}", width, height);
         let cs = self.active_mut();
         cs.canvas = Some(SpriteCanvas::new(width, height));
         cs.active_sprite = None;

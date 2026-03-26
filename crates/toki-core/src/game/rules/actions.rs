@@ -26,6 +26,7 @@ impl GameState {
         context: &TriggerContext,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
+        tracing::debug!("Buffering rule action: {:?}", action);
         match action {
             RuleAction::PlaySound { channel, sound_id } => {
                 self.buffer_play_sound(channel, sound_id, command_buffer);

@@ -41,7 +41,7 @@ impl SelectionInteraction {
         ctrl_pressed: bool,
     ) {
         if let Some(entity_id) = clicked_entity {
-            tracing::info!("Selected entity {} via viewport click", entity_id);
+            tracing::debug!("Selected entity {} via viewport click", entity_id);
             if ctrl_pressed {
                 ui_state.toggle_entity_selection(entity_id);
             } else {
@@ -51,7 +51,7 @@ impl SelectionInteraction {
         }
 
         if let Some((scene_name, anchor_id)) = clicked_anchor {
-            tracing::info!("Selected scene anchor '{}' via viewport click", anchor_id);
+            tracing::debug!("Selected scene anchor '{}' via viewport click", anchor_id);
             ui_state.set_selection(crate::ui::editor_ui::Selection::SceneAnchor {
                 scene_name,
                 anchor_id,
@@ -63,7 +63,7 @@ impl SelectionInteraction {
             return;
         }
 
-        tracing::info!("Clearing selection - no entity under viewport click");
+        tracing::debug!("Clearing selection - no entity under viewport click");
         ui_state.clear_entity_selection();
     }
 

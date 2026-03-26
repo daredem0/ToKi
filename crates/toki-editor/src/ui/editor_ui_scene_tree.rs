@@ -61,7 +61,7 @@ impl EditorUI {
 
                         if response.clicked() {
                             selection_changes.push(super::Selection::Entity(entity.id));
-                            tracing::info!("Selected scene entity ID: {}", entity.id);
+                            tracing::debug!("Selected scene entity ID: {}", entity.id);
                         }
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -346,7 +346,7 @@ impl EditorUI {
 
             if scene_header_response.header_response.clicked() {
                 selection_changes.push(super::Selection::Scene(scene.name.clone()));
-                tracing::info!("Selected scene: {}", scene.name);
+                tracing::debug!("Selected scene: {}", scene.name);
             }
 
             scene_header_response.header_response.context_menu(|ui| {
@@ -355,7 +355,7 @@ impl EditorUI {
                         ui.label("✅ Active Scene");
                     } else if ui.button("🎯 Set as Active Scene").clicked() {
                         active_scene_change = Some(scene.name.clone());
-                        tracing::info!("Setting {} as active scene", scene.name);
+                        tracing::debug!("Setting {} as active scene", scene.name);
                         ui.close();
                     }
                 });
