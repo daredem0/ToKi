@@ -274,8 +274,24 @@ impl EditorApp {
             return;
         }
 
+        if self.escape_belongs_to_active_editor() {
+            tracing::info!("Escape handled by active editor transient state");
+            return;
+        }
+
         self.core.ui.project.pending_confirmation = Some(EditorConfirmation::ExitEditor);
         tracing::info!("Escape requested editor exit confirmation");
+    }
+
+    fn escape_belongs_to_active_editor(&self) -> bool {
+        use crate::ui::editor_ui::CenterPanelTab;
+
+        if self.core.ui.workspace.center_panel_tab == CenterPanelTab::SpriteEditor {
+            return self.core.ui.sprite.has_floating()
+                || self.core.ui.sprite.active().selection.is_some();
+        }
+
+        false
     }
 
     fn toggled_fullscreen_state(is_currently_fullscreen: bool) -> Option<Fullscreen> {

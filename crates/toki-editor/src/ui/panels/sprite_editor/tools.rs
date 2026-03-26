@@ -21,6 +21,12 @@ pub fn handle_tool_interaction(
         return;
     };
 
+    if should_intercept_canvas_input(ui_state.sprite.has_floating())
+        && handle_floating_canvas_interaction(ui_state, response, ctx)
+    {
+        return;
+    }
+
     match ui_state.sprite.tool {
         SpriteEditorTool::Drag => handle_drag_tool(ui_state, response, canvas_pos),
         SpriteEditorTool::Brush => handle_brush_tool(ui_state, response, canvas_pos),
@@ -36,6 +42,10 @@ pub fn handle_tool_interaction(
         SpriteEditorTool::Rectangle => handle_shape_tool(ui_state, response, canvas_pos, ShapeKind::Rectangle),
         SpriteEditorTool::Ellipse => handle_shape_tool(ui_state, response, canvas_pos, ShapeKind::Ellipse),
     }
+}
+
+fn should_intercept_canvas_input(has_floating: bool) -> bool {
+    has_floating
 }
 
 fn handle_drag_tool(ui_state: &mut EditorUI, response: &egui::Response, canvas_pos: glam::IVec2) {
@@ -232,22 +242,28 @@ fn handle_select_tool(
     ctx: &egui::Context,
     canvas_pos: glam::IVec2,
 ) {
-    // If floating, handle move-drag
-    if ui_state.sprite.has_floating() {
-        handle_floating_drag(ui_state, response, ctx, canvas_pos);
-        return;
-    }
-
     handle_selection_drag(ui_state, response, rect, ctx, canvas_pos);
 }
 
-fn handle_floating_drag(
+fn handle_floating_canvas_interaction(
     ui_state: &mut EditorUI,
     response: &egui::Response,
-    ctx: &egui::Context,
-    _canvas_pos: glam::IVec2,
-) {
+    _ctx: &egui::Context,
+) -> bool {
+    if !ui_state.sprite.has_floating() {
+        return false;
+    }
+
+    if response.clicked_by(egui::PointerButton::Secondary) {
+        ui_state.sprite.cancel_floating();
+        invalidate_canvas_texture(ui_state);
+        return true;
+    }
+
     if response.dragged_by(egui::PointerButton::Primary) {
+        if ui_state.sprite.tool != SpriteEditorTool::Select {
+            return true;
+        }
         let delta = response.drag_delta();
         let zoom = ui_state.sprite.active().viewport.zoom;
         // Convert screen-space drag delta to canvas-space pixel delta
@@ -256,19 +272,22 @@ fn handle_floating_drag(
         if dx != 0 || dy != 0 {
             ui_state.sprite.nudge_floating(glam::IVec2::new(dx, dy));
         }
+        return true;
     }
 
-    // Click outside floating → commit and clear
-    let primary_released = ctx.input(|input| input.pointer.primary_released());
-    if primary_released && !response.dragged() {
+    if response.drag_started_by(egui::PointerButton::Primary)
+        || response.drag_stopped_by(egui::PointerButton::Primary)
+    {
+        return true;
+    }
+
+    if response.clicked_by(egui::PointerButton::Primary) {
         ui_state.sprite.commit_floating();
         invalidate_canvas_texture(ui_state);
+        return true;
     }
 
-    if response.clicked_by(egui::PointerButton::Secondary) {
-        ui_state.sprite.cancel_floating();
-        invalidate_canvas_texture(ui_state);
-    }
+    false
 }
 
 fn handle_selection_drag(
@@ -703,5 +722,11 @@ mod tests {
             effective_paint_color(ColorMode::PaletteIndexed, PixelColor::rgb(1, 2, 3), None),
             canonical_indexed_color(3)
         );
+    }
+
+    #[test]
+    fn should_intercept_canvas_input_only_when_floating_exists() {
+        assert!(should_intercept_canvas_input(true));
+        assert!(!should_intercept_canvas_input(false));
     }
 }

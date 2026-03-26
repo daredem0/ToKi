@@ -135,6 +135,7 @@ impl SpriteEditorState {
         };
 
         let canvas_before_lift = self.canvas_state(side).canvas.clone().unwrap();
+        let selection_before_float = self.canvas_state(side).selection.clone();
 
         // Build a fully-selected mask for the pasted content
         let mut mask = super::SelectionMask::new(to_paste.width, to_paste.height);
@@ -146,7 +147,9 @@ impl SpriteEditorState {
             mask,
             offset: paste_pos,
             canvas_before_lift,
-            original_offset: paste_pos,
+            origin: super::FloatingOrigin::PastePreview {
+                selection_before_float,
+            },
         });
         cs.selection = None;
         cs.canvas_texture_dirty = true;
