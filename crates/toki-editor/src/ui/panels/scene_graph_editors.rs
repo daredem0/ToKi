@@ -4,6 +4,7 @@ use crate::rule_graph_ui::{
     RuleGraphSummaryStyle,
 };
 use toki_core::rules::InteractionMode;
+use toki_core::FlagValue;
 
 impl PanelSystem {
     pub(super) fn trigger_summary(trigger: RuleTrigger) -> String {
@@ -144,6 +145,20 @@ impl PanelSystem {
                         *min_count = count_i32.max(0) as u32;
                         changed = true;
                     }
+                });
+                changed
+            }
+            RuleCondition::FlagEquals { flag, value } => {
+                let mut changed = Self::edit_flag_name(ui, flag);
+                changed |= Self::edit_flag_value(ui, &format!("{id_prefix}::flag_value"), value);
+                changed
+            }
+            RuleCondition::FlagSet { flag } => Self::edit_flag_name(ui, flag),
+            RuleCondition::FlagGreaterThan { flag, value } => {
+                let mut changed = Self::edit_flag_name(ui, flag);
+                ui.horizontal(|ui| {
+                    ui.label("Threshold:");
+                    changed |= ui.add(egui::DragValue::new(value).speed(1.0)).changed();
                 });
                 changed
             }
@@ -340,7 +355,114 @@ impl PanelSystem {
                 });
                 changed
             }
+            RuleAction::SetFlag { flag, value } => {
+                let mut changed = Self::edit_flag_name(ui, flag);
+                changed |= Self::edit_flag_value(ui, &format!("{id_prefix}::flag_value"), value);
+                changed
+            }
+            RuleAction::IncrementFlag { flag, amount } => {
+                let mut changed = Self::edit_flag_name(ui, flag);
+                ui.horizontal(|ui| {
+                    ui.label("Amount:");
+                    changed |= ui.add(egui::DragValue::new(amount).speed(1.0)).changed();
+                });
+                changed
+            }
+            RuleAction::ClearFlag { flag } => Self::edit_flag_name(ui, flag),
+            RuleAction::SaveGame { slot } | RuleAction::LoadGame { slot } => {
+                Self::edit_save_slot(ui, slot)
+            }
         }
+    }
+
+    fn edit_flag_name(ui: &mut egui::Ui, flag: &mut String) -> bool {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Flag:");
+            changed |= ui.text_edit_singleline(flag).changed();
+        });
+        changed
+    }
+
+    fn edit_flag_value(ui: &mut egui::Ui, id_salt: &str, value: &mut FlagValue) -> bool {
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum FlagValueKind {
+            Bool,
+            Int,
+            String,
+        }
+
+        let mut changed = false;
+        let current_kind = match value {
+            FlagValue::Bool(_) => FlagValueKind::Bool,
+            FlagValue::Int(_) => FlagValueKind::Int,
+            FlagValue::String(_) => FlagValueKind::String,
+        };
+        let mut selected_kind = current_kind;
+        ui.horizontal(|ui| {
+            ui.label("Value Type:");
+            egui::ComboBox::from_id_salt((id_salt, "kind"))
+                .selected_text(match current_kind {
+                    FlagValueKind::Bool => "Bool",
+                    FlagValueKind::Int => "Int",
+                    FlagValueKind::String => "String",
+                })
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(&mut selected_kind, FlagValueKind::Bool, "Bool")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(&mut selected_kind, FlagValueKind::Int, "Int")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(&mut selected_kind, FlagValueKind::String, "String")
+                        .changed();
+                });
+        });
+        if selected_kind != current_kind {
+            *value = match selected_kind {
+                FlagValueKind::Bool => FlagValue::Bool(false),
+                FlagValueKind::Int => FlagValue::Int(0),
+                FlagValueKind::String => FlagValue::String(String::new()),
+            };
+        }
+        match value {
+            FlagValue::Bool(value) => {
+                ui.horizontal(|ui| {
+                    ui.label("Value:");
+                    changed |= ui.checkbox(value, "Enabled").changed();
+                });
+            }
+            FlagValue::Int(value) => {
+                ui.horizontal(|ui| {
+                    ui.label("Value:");
+                    changed |= ui.add(egui::DragValue::new(value).speed(1.0)).changed();
+                });
+            }
+            FlagValue::String(value) => {
+                ui.horizontal(|ui| {
+                    ui.label("Value:");
+                    changed |= ui.text_edit_singleline(value).changed();
+                });
+            }
+        }
+        changed
+    }
+
+    fn edit_save_slot(ui: &mut egui::Ui, slot: &mut u8) -> bool {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Slot:");
+            let mut slot_i32 = (*slot).clamp(1, 3) as i32;
+            if ui
+                .add(egui::DragValue::new(&mut slot_i32).speed(1.0).range(1..=3))
+                .changed()
+            {
+                *slot = slot_i32.clamp(1, 3) as u8;
+                changed = true;
+            }
+        });
+        changed
     }
 
     pub(super) fn edit_rule_target(

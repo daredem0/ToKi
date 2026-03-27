@@ -87,6 +87,10 @@ impl SceneManager {
         self.scenes.keys().map(|s| s.as_str()).collect()
     }
 
+    pub fn scene_entries(&self) -> impl Iterator<Item = (&str, &Scene)> {
+        self.scenes.iter().map(|(name, scene)| (name.as_str(), scene))
+    }
+
     /// Check if a scene exists
     pub fn has_scene(&self, scene_name: &str) -> bool {
         self.scenes.contains_key(scene_name)

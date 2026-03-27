@@ -21,6 +21,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::animation::AnimationState;
 use crate::entity::EntityId;
+use crate::flags::FlagValue;
 use crate::rules::{Rule, RuleSet, RuleSpawnEntityType};
 
 // Re-export submodules
@@ -128,6 +129,23 @@ pub(super) enum RuleCommand {
         entity_id: EntityId,
         tile_x: u32,
         tile_y: u32,
+    },
+    SetFlag {
+        flag: String,
+        value: FlagValue,
+    },
+    IncrementFlag {
+        flag: String,
+        amount: i32,
+    },
+    ClearFlag {
+        flag: String,
+    },
+    SaveGame {
+        slot: u8,
+    },
+    LoadGame {
+        slot: u8,
     },
 }
 

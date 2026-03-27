@@ -148,6 +148,21 @@ impl InspectorSystem {
                 changed |= Self::render_item_id_editor(ui, item_id);
                 changed |= Self::render_min_count_editor(ui, min_count);
             }
+            RuleCondition::FlagEquals { flag, value } => {
+                changed |= Self::render_flag_name_editor(ui, flag);
+                changed |= Self::render_flag_value_editor(
+                    ui,
+                    format!("graph_node_condition_flag_equals_{}_{}", scene_name, node_key),
+                    value,
+                );
+            }
+            RuleCondition::FlagSet { flag } => {
+                changed |= Self::render_flag_name_editor(ui, flag);
+            }
+            RuleCondition::FlagGreaterThan { flag, value } => {
+                changed |= Self::render_flag_name_editor(ui, flag);
+                changed |= Self::render_threshold_editor(ui, value);
+            }
         }
 
         changed

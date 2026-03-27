@@ -75,6 +75,12 @@ pub struct DialogStartRequest {
     pub context: DialogRuntimeContext,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PersistenceRequest {
+    SaveSlot { slot: u8 },
+    LoadSlot { slot: u8 },
+}
+
 /// Game update result that includes both state changes and events
 #[derive(Debug, Default)]
 pub struct GameUpdateResult<T: GameEvent> {
@@ -86,6 +92,8 @@ pub struct GameUpdateResult<T: GameEvent> {
     pub scene_switch_request: Option<SceneSwitchRequest>,
     /// Optional deferred dialog-start request to be applied by the runtime layer.
     pub dialog_start_request: Option<DialogStartRequest>,
+    /// Optional deferred save/load request to be applied by the runtime layer.
+    pub persistence_request: Option<PersistenceRequest>,
 }
 
 impl<T: GameEvent> GameUpdateResult<T> {
@@ -96,6 +104,7 @@ impl<T: GameEvent> GameUpdateResult<T> {
             events: Vec::new(),
             scene_switch_request: None,
             dialog_start_request: None,
+            persistence_request: None,
         }
     }
 
@@ -106,6 +115,7 @@ impl<T: GameEvent> GameUpdateResult<T> {
             events: Vec::new(),
             scene_switch_request: None,
             dialog_start_request: None,
+            persistence_request: None,
         }
     }
 
@@ -139,5 +149,13 @@ impl<T: GameEvent> GameUpdateResult<T> {
             dialog_id: dialog_id.into(),
             context,
         });
+    }
+
+    pub fn request_save_slot(&mut self, slot: u8) {
+        self.persistence_request = Some(PersistenceRequest::SaveSlot { slot });
+    }
+
+    pub fn request_load_slot(&mut self, slot: u8) {
+        self.persistence_request = Some(PersistenceRequest::LoadSlot { slot });
     }
 }

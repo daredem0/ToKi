@@ -5,6 +5,7 @@ use toki_core::dialog::{
     DialogBranch, DialogChoice, DialogCondition, DialogConditionTarget, DialogNode, DialogNodeKind,
 };
 use toki_core::entity::EntityKind;
+use toki_core::FlagValue;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DialogNodeKindSelection {
@@ -21,6 +22,9 @@ enum DialogConditionKind {
     HasInventoryItem,
     EntityHasTag,
     EntityIsKind,
+    FlagEquals,
+    FlagSet,
+    FlagGreaterThan,
 }
 
 pub(super) fn render_dialog_editor(
@@ -321,6 +325,9 @@ fn render_conditions(
                         DialogConditionKind::HasInventoryItem,
                         DialogConditionKind::EntityHasTag,
                         DialogConditionKind::EntityIsKind,
+                        DialogConditionKind::FlagEquals,
+                        DialogConditionKind::FlagSet,
+                        DialogConditionKind::FlagGreaterThan,
                     ] {
                         *dirty |= ui
                             .selectable_value(
@@ -399,9 +406,102 @@ fn render_conditions(
                             }
                         });
                 }
+                DialogCondition::FlagEquals { flag, value } => {
+                    *dirty |= render_flag_name(ui, flag);
+                    *dirty |= render_flag_value_editor(ui, (&id_salt, "flag_value", index), value);
+                }
+                DialogCondition::FlagSet { flag } => {
+                    *dirty |= render_flag_name(ui, flag);
+                }
+                DialogCondition::FlagGreaterThan { flag, value } => {
+                    *dirty |= render_flag_name(ui, flag);
+                    ui.horizontal(|ui| {
+                        ui.label("Threshold:");
+                        *dirty |= ui.add(egui::DragValue::new(value).speed(1.0)).changed();
+                    });
+                }
             }
         });
     }
+}
+
+fn render_flag_name(ui: &mut Ui, flag: &mut String) -> bool {
+    let mut changed = false;
+    ui.horizontal(|ui| {
+        ui.label("Flag:");
+        changed |= ui.text_edit_singleline(flag).changed();
+    });
+    changed
+}
+
+fn render_flag_value_editor(
+    ui: &mut Ui,
+    id_salt: impl std::hash::Hash,
+    value: &mut FlagValue,
+) -> bool {
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum FlagValueKind {
+        Bool,
+        Int,
+        String,
+    }
+
+    let mut changed = false;
+    let current_kind = match value {
+        FlagValue::Bool(_) => FlagValueKind::Bool,
+        FlagValue::Int(_) => FlagValueKind::Int,
+        FlagValue::String(_) => FlagValueKind::String,
+    };
+    let mut selected_kind = current_kind;
+
+    egui::ComboBox::from_id_salt((&id_salt, "kind"))
+        .selected_text(match current_kind {
+            FlagValueKind::Bool => "Bool",
+            FlagValueKind::Int => "Int",
+            FlagValueKind::String => "String",
+        })
+        .show_ui(ui, |ui| {
+            changed |= ui
+                .selectable_value(&mut selected_kind, FlagValueKind::Bool, "Bool")
+                .changed();
+            changed |= ui
+                .selectable_value(&mut selected_kind, FlagValueKind::Int, "Int")
+                .changed();
+            changed |= ui
+                .selectable_value(&mut selected_kind, FlagValueKind::String, "String")
+                .changed();
+        });
+
+    if selected_kind != current_kind {
+        *value = match selected_kind {
+            FlagValueKind::Bool => FlagValue::Bool(false),
+            FlagValueKind::Int => FlagValue::Int(0),
+            FlagValueKind::String => FlagValue::String(String::new()),
+        };
+    }
+
+    match value {
+        FlagValue::Bool(value) => {
+            ui.horizontal(|ui| {
+                ui.label("Value:");
+                changed |= ui.checkbox(value, "Enabled").changed();
+            });
+        }
+        FlagValue::Int(value) => {
+            ui.horizontal(|ui| {
+                ui.label("Value:");
+                changed |= ui.add(egui::DragValue::new(value).speed(1.0)).changed();
+            });
+        }
+        FlagValue::String(value) => {
+            ui.horizontal(|ui| {
+                ui.label("Value:");
+                changed |= ui.text_edit_singleline(value).changed();
+            });
+        }
+    }
+
+    changed
 }
 
 fn render_condition_target(
@@ -492,6 +592,9 @@ fn condition_kind(condition: &DialogCondition) -> DialogConditionKind {
         DialogCondition::HasInventoryItem { .. } => DialogConditionKind::HasInventoryItem,
         DialogCondition::EntityHasTag { .. } => DialogConditionKind::EntityHasTag,
         DialogCondition::EntityIsKind { .. } => DialogConditionKind::EntityIsKind,
+        DialogCondition::FlagEquals { .. } => DialogConditionKind::FlagEquals,
+        DialogCondition::FlagSet { .. } => DialogConditionKind::FlagSet,
+        DialogCondition::FlagGreaterThan { .. } => DialogConditionKind::FlagGreaterThan,
     }
 }
 
@@ -502,6 +605,9 @@ fn condition_kind_label(kind: DialogConditionKind) -> &'static str {
         DialogConditionKind::HasInventoryItem => "HasInventoryItem",
         DialogConditionKind::EntityHasTag => "EntityHasTag",
         DialogConditionKind::EntityIsKind => "EntityIsKind",
+        DialogConditionKind::FlagEquals => "FlagEquals",
+        DialogConditionKind::FlagSet => "FlagSet",
+        DialogConditionKind::FlagGreaterThan => "FlagGreaterThan",
     }
 }
 
@@ -527,6 +633,17 @@ fn default_condition(kind: DialogConditionKind) -> DialogCondition {
         DialogConditionKind::EntityIsKind => DialogCondition::EntityIsKind {
             target: DialogConditionTarget::Player,
             entity_kind: EntityKind::Npc,
+        },
+        DialogConditionKind::FlagEquals => DialogCondition::FlagEquals {
+            flag: String::new(),
+            value: FlagValue::Bool(false),
+        },
+        DialogConditionKind::FlagSet => DialogCondition::FlagSet {
+            flag: String::new(),
+        },
+        DialogConditionKind::FlagGreaterThan => DialogCondition::FlagGreaterThan {
+            flag: String::new(),
+            value: 0,
         },
     }
 }

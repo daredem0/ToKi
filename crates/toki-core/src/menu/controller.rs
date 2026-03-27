@@ -344,6 +344,8 @@ impl MenuController {
             UiAction::ExitRuntime => Some(UiCommand::ExitRuntime),
             UiAction::OpenAudioSettings => Some(UiCommand::OpenAudioSettings),
             UiAction::OpenGraphicsSettings => Some(UiCommand::OpenGraphicsSettings),
+            UiAction::SaveGame { slot } => Some(UiCommand::SaveGame { slot: *slot }),
+            UiAction::LoadGame { slot } => Some(UiCommand::LoadGame { slot: *slot }),
             UiAction::EmitEvent { event_id } => Some(UiCommand::EmitEvent {
                 event_id: event_id.clone(),
             }),

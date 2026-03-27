@@ -247,6 +247,11 @@ impl<'a> SceneRuntimeCoordinator<'a> {
 }
 
 impl App {
+    pub(super) fn refresh_runtime_after_scene_restore(&mut self) {
+        let mut coordinator = self.create_scene_runtime_coordinator();
+        coordinator.handle_runtime_scene_change();
+    }
+
     pub(super) fn reload_runtime_render_textures(&mut self, scene_name: &str) {
         let content_root = self.content_root_path().map(std::path::Path::to_path_buf);
         SceneRuntimeCoordinator::new(

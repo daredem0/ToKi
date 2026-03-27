@@ -2,7 +2,8 @@ use super::input_state::InputRuntimeState;
 use super::transition::SceneTransitionPlanner;
 use super::{GameState, RuleRuntimeState};
 use crate::ai::AiSystem;
-use crate::entity::{Entity, EntityDefinition, EntityId, EntityManager};
+use crate::entity::{ControlRole, Entity, EntityDefinition, EntityId, EntityKind, EntityManager};
+use crate::flags::GameFlags;
 use crate::rules::RuleSet;
 use crate::scene::Scene;
 use crate::scene_manager::SceneManager;
@@ -36,6 +37,8 @@ impl GameState {
             pending_stat_changes: Vec::new(),
             pending_despawns: Vec::new(),
             ai_delta_accumulator_ms: 0.0,
+            game_flags: GameFlags::default(),
+            play_time_ms: 0,
         }
     }
 
@@ -54,6 +57,8 @@ impl GameState {
             pending_stat_changes: Vec::new(),
             pending_despawns: Vec::new(),
             ai_delta_accumulator_ms: 0.0,
+            game_flags: GameFlags::default(),
+            play_time_ms: 0,
         }
     }
 
@@ -366,6 +371,69 @@ impl GameState {
         self.entity_manager = prepared.entity_manager;
         self.player_id = prepared.player_id;
         self.set_rules(prepared.rules);
+        Ok(())
+    }
+
+    pub fn restore_from_save_data(
+        &mut self,
+        save_data: &crate::serialization::SaveData,
+    ) -> Result<(), String> {
+        let scene_name = save_data.active_scene_name.trim();
+        if scene_name.is_empty() {
+            return Err("save data is missing an active scene name".to_string());
+        }
+
+        for persisted in &save_data.persisted_entities {
+            let Some(scene) = self.scene_manager.get_scene_mut(&persisted.scene_name) else {
+                continue;
+            };
+
+            match &persisted.entity {
+                Some(entity) => {
+                    if let Some(existing) = scene.get_entity_mut(persisted.entity_id) {
+                        *existing = entity.clone();
+                    } else {
+                        scene.add_entity(entity.clone());
+                    }
+                }
+                None => {
+                    scene.remove_entity(persisted.entity_id);
+                }
+            }
+        }
+
+        if let Some(scene) = self.scene_manager.get_scene_mut(scene_name) {
+            scene.camera_position = save_data.camera.position;
+            scene.camera_scale = save_data.camera.scale;
+        }
+
+        let scene = self
+            .scene_manager
+            .get_scene(scene_name)
+            .ok_or_else(|| format!("Scene '{}' not found", scene_name))?
+            .clone();
+
+        let prepared = SceneTransitionPlanner::new(&self.entity_definitions).prepare_scene_load(
+            &scene,
+            None,
+            save_data.player.clone(),
+        )?;
+
+        self.apply_prepared_scene_load(scene_name, prepared)?;
+        if let (Some(saved_player), Some(player_id)) = (save_data.player.as_ref(), self.player_id) {
+            if let Some(player) = self.entity_manager.get_entity_mut(player_id) {
+                let mut restored_player = saved_player.clone();
+                restored_player.id = player_id;
+                restored_player.control_role = ControlRole::PlayerCharacter;
+                restored_player.entity_kind = EntityKind::Player;
+                *player = restored_player;
+            }
+            if let Some(audio) = self.entity_manager.audio_component_mut(player_id) {
+                *audio = saved_player.audio.to_component();
+            }
+        }
+        self.game_flags = save_data.flags.clone();
+        self.play_time_ms = save_data.metadata.play_time_ms;
         Ok(())
     }
 }

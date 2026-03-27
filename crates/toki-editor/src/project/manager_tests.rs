@@ -399,6 +399,11 @@ fn action_kind_label(action: &RuleAction) -> &'static str {
         RuleAction::RemoveInventoryItem { .. } => "RemoveInventoryItem",
         RuleAction::SetEntityActive { .. } => "SetEntityActive",
         RuleAction::TeleportEntity { .. } => "TeleportEntity",
+        RuleAction::SetFlag { .. } => "SetFlag",
+        RuleAction::IncrementFlag { .. } => "IncrementFlag",
+        RuleAction::ClearFlag { .. } => "ClearFlag",
+        RuleAction::SaveGame { .. } => "SaveGame",
+        RuleAction::LoadGame { .. } => "LoadGame",
     }
 }
 

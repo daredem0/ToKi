@@ -6,6 +6,7 @@ use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
     tilemap::TileMap,
 };
+use toki_core::flags::FlagValue;
 use toki_core::game::{AudioChannel, AudioEvent};
 use toki_core::rules::{
     InteractionMode, Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel,
@@ -748,6 +749,99 @@ fn entity_active_condition_checks_target_active_flag() {
         event,
         AudioEvent::PlaySound { sound_id, .. } if sound_id == "cond_active"
     )));
+}
+
+#[test]
+fn flag_equals_condition_matches_current_flag_value() {
+    let mut state = GameState::new_empty();
+    state.set_rules(RuleSet {
+        rules: vec![base_rule(
+            "requires-quest-flag",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::PlaySound {
+                channel: RuleSoundChannel::Collision,
+                sound_id: "cond_flag_equals".to_string(),
+            }],
+        )],
+    });
+    state.rules_mut().rules[0].conditions = vec![RuleCondition::FlagEquals {
+        flag: "quest_stage".to_string(),
+        value: FlagValue::String("done".to_string()),
+    }];
+
+    let without_flag = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert!(without_flag.events.is_empty());
+
+    state.set_flag("quest_stage", FlagValue::String("done".to_string()));
+    let with_flag = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+    assert!(with_flag.events.iter().any(|event| matches!(
+        event,
+        AudioEvent::PlaySound { sound_id, .. } if sound_id == "cond_flag_equals"
+    )));
+}
+
+#[test]
+fn increment_flag_action_updates_integer_flags() {
+    let mut state = GameState::new_empty();
+    state.set_flag("coins", FlagValue::Int(2));
+    state.set_rules(RuleSet {
+        rules: vec![Rule {
+            id: "increment-coins".to_string(),
+            enabled: true,
+            priority: 0,
+            once: false,
+            trigger: RuleTrigger::OnUpdate,
+            conditions: vec![RuleCondition::Always],
+            actions: vec![RuleAction::IncrementFlag {
+                flag: "coins".to_string(),
+                amount: 3,
+            }],
+        }],
+    });
+
+    let _ = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert_eq!(state.flag("coins"), Some(&FlagValue::Int(5)));
+}
+
+#[test]
+fn clear_flag_action_removes_existing_flags() {
+    let mut state = GameState::new_empty();
+    state.set_flag("door_open", FlagValue::Bool(true));
+    state.set_rules(RuleSet {
+        rules: vec![Rule {
+            id: "clear-door".to_string(),
+            enabled: true,
+            priority: 0,
+            once: false,
+            trigger: RuleTrigger::OnUpdate,
+            conditions: vec![RuleCondition::Always],
+            actions: vec![RuleAction::ClearFlag {
+                flag: "door_open".to_string(),
+            }],
+        }],
+    });
+
+    let _ = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert!(state.flag("door_open").is_none());
 }
 
 #[test]
@@ -1655,6 +1749,60 @@ fn start_dialog_action_emits_dialog_start_request() {
         .dialog_start_request
         .expect("dialog start request should be emitted");
     assert_eq!(request.dialog_id, "intro");
+}
+
+#[test]
+fn save_game_action_emits_persistence_request() {
+    let mut state = GameState::new_empty();
+    let mut scene = scene_with_player("Save Scene", IVec2::new(0, 0));
+    scene.rules = RuleSet {
+        rules: vec![base_rule(
+            "save-slot",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::SaveGame { slot: 2 }],
+        )],
+    };
+    state.add_scene(scene);
+    state.load_scene("Save Scene").expect("scene should load");
+
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert_eq!(
+        result.persistence_request,
+        Some(toki_core::PersistenceRequest::SaveSlot { slot: 2 })
+    );
+}
+
+#[test]
+fn load_game_action_emits_persistence_request() {
+    let mut state = GameState::new_empty();
+    let mut scene = scene_with_player("Load Scene", IVec2::new(0, 0));
+    scene.rules = RuleSet {
+        rules: vec![base_rule(
+            "load-slot",
+            RuleTrigger::OnUpdate,
+            0,
+            vec![RuleAction::LoadGame { slot: 3 }],
+        )],
+    };
+    state.add_scene(scene);
+    state.load_scene("Load Scene").expect("scene should load");
+
+    let result = state.update(
+        UVec2::new(256, 256),
+        &create_test_tilemap(),
+        &create_test_atlas(),
+    );
+
+    assert_eq!(
+        result.persistence_request,
+        Some(toki_core::PersistenceRequest::LoadSlot { slot: 3 })
+    );
 }
 
 #[test]

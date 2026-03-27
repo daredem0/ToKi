@@ -21,6 +21,7 @@ use toki_core::rules::{
     InteractionMode, Rule, RuleAction, RuleCondition, RuleKey, RuleSet, RuleSoundChannel,
     RuleSpawnEntityType, RuleTarget, RuleTrigger,
 };
+use toki_core::FlagValue;
 
 mod animation_editor;
 mod assets;

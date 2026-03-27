@@ -161,6 +161,27 @@ impl InspectorSystem {
                 tile_x,
                 tile_y,
             } => Self::render_teleport_params(ui, scene_name, node_key, target, tile_x, tile_y),
+            RuleAction::SetFlag { flag, value } => {
+                let mut changed = Self::render_flag_name_editor(ui, flag);
+                changed |= Self::render_flag_value_editor(
+                    ui,
+                    format!("graph_node_set_flag_{}_{}", scene_name, node_key),
+                    value,
+                );
+                changed
+            }
+            RuleAction::IncrementFlag { flag, amount } => {
+                let mut changed = Self::render_flag_name_editor(ui, flag);
+                ui.horizontal(|ui| {
+                    ui.label("Amount:");
+                    changed |= ui.add(egui::DragValue::new(amount).speed(1.0)).changed();
+                });
+                changed
+            }
+            RuleAction::ClearFlag { flag } => Self::render_flag_name_editor(ui, flag),
+            RuleAction::SaveGame { slot } | RuleAction::LoadGame { slot } => {
+                Self::render_save_slot_editor(ui, slot)
+            }
         }
     }
 

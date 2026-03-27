@@ -7,6 +7,7 @@ use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::entity::{Entity, EntityDefinition, EntityId, EntityManager, MovementProfile};
 use crate::events::{GameEvent, GameUpdateResult};
+use crate::flags::{FlagValue, GameFlags};
 use crate::rules::{RuleSet, RuleTrigger};
 use crate::scene_manager::SceneManager;
 
@@ -141,6 +142,14 @@ pub struct GameState {
     /// Runtime-only accumulator for feeding fixed-step AI updates in delta mode.
     #[serde(skip, default)]
     ai_delta_accumulator_ms: f32,
+
+    /// Persistent game flags for authored progression and narrative state.
+    #[serde(default)]
+    game_flags: GameFlags,
+
+    /// Total accumulated play time for stable save-slot metadata.
+    #[serde(default)]
+    play_time_ms: u64,
 }
 
 use input_state::InputRuntimeState;
@@ -148,6 +157,30 @@ use rules::RuleRuntimeState;
 use stat_effects::StatChangeRequest;
 
 impl GameState {
+    pub fn game_flags(&self) -> &GameFlags {
+        &self.game_flags
+    }
+
+    pub fn flag(&self, flag: &str) -> Option<&FlagValue> {
+        self.game_flags.get(flag)
+    }
+
+    pub fn set_flag(&mut self, flag: impl Into<String>, value: FlagValue) {
+        self.game_flags.set(flag, value);
+    }
+
+    pub fn clear_flag(&mut self, flag: &str) -> bool {
+        self.game_flags.clear(flag)
+    }
+
+    pub fn increment_flag(&mut self, flag: impl Into<String>, amount: i32) -> bool {
+        self.game_flags.increment(flag, amount)
+    }
+
+    pub fn play_time_ms(&self) -> u64 {
+        self.play_time_ms
+    }
+
     fn effective_movement_profile(entity: &Entity) -> MovementProfile {
         entity.effective_movement_profile()
     }
@@ -159,6 +192,9 @@ impl GameState {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> GameUpdateResult<AudioEvent> {
+        self.play_time_ms = self
+            .play_time_ms
+            .saturating_add(DEFAULT_TIMESTEP_MS.round() as u64);
         let mut result = GameUpdateResult::new();
         let mut rule_commands = Vec::new();
         self.rule_runtime.frame_collisions.clear();
@@ -173,7 +209,7 @@ impl GameState {
         }
         self.collect_rule_commands_for_trigger(RuleTrigger::OnUpdate, &mut rule_commands);
         self.collect_rule_commands_for_key_triggers(&mut rule_commands);
-        let (mut pending_rule_animations, mut pending_scene_switch, _) =
+        let (mut pending_rule_animations, mut pending_scene_switch, _, mut pending_persistence) =
             self.apply_rule_commands(rule_commands, &mut result, tilemap);
 
         let initial_player_position = self
@@ -241,10 +277,13 @@ impl GameState {
 
         let reactive_rule_commands =
             self.collect_reactive_rule_commands(result.player_moved, tilemap, atlas);
-        let (mut reactive_animations, reactive_scene_switch, _) =
+        let (mut reactive_animations, reactive_scene_switch, _, reactive_persistence) =
             self.apply_rule_commands(reactive_rule_commands, &mut result, tilemap);
         if pending_scene_switch.is_none() {
             pending_scene_switch = reactive_scene_switch;
+        }
+        if pending_persistence.is_none() {
+            pending_persistence = reactive_persistence;
         }
         pending_rule_animations.append(&mut reactive_animations);
 
@@ -261,6 +300,13 @@ impl GameState {
 
         if let Some((scene_name, spawn_point_id)) = pending_scene_switch {
             result.request_scene_switch(scene_name, spawn_point_id);
+        }
+        if let Some(crate::events::PersistenceRequest::SaveSlot { slot }) = pending_persistence {
+            result.request_save_slot(slot);
+        } else if let Some(crate::events::PersistenceRequest::LoadSlot { slot }) =
+            pending_persistence
+        {
+            result.request_load_slot(slot);
         }
 
         result
@@ -297,6 +343,9 @@ impl GameState {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> GameUpdateResult<AudioEvent> {
+        self.play_time_ms = self
+            .play_time_ms
+            .saturating_add(animation_delta_ms.max(0.0).round() as u64);
         let mut result = GameUpdateResult::new();
         let mut rule_commands = Vec::new();
         self.rule_runtime.frame_collisions.clear();
@@ -311,7 +360,7 @@ impl GameState {
         }
         self.collect_rule_commands_for_trigger(RuleTrigger::OnUpdate, &mut rule_commands);
         self.collect_rule_commands_for_key_triggers(&mut rule_commands);
-        let (mut pending_rule_animations, mut pending_scene_switch, _) =
+        let (mut pending_rule_animations, mut pending_scene_switch, _, mut pending_persistence) =
             self.apply_rule_commands(rule_commands, &mut result, tilemap);
 
         let initial_player_position = self
@@ -356,10 +405,13 @@ impl GameState {
 
         let reactive_rule_commands =
             self.collect_reactive_rule_commands(result.player_moved, tilemap, atlas);
-        let (mut reactive_animations, reactive_scene_switch, _) =
+        let (mut reactive_animations, reactive_scene_switch, _, reactive_persistence) =
             self.apply_rule_commands(reactive_rule_commands, &mut result, tilemap);
         if pending_scene_switch.is_none() {
             pending_scene_switch = reactive_scene_switch;
+        }
+        if pending_persistence.is_none() {
+            pending_persistence = reactive_persistence;
         }
         pending_rule_animations.append(&mut reactive_animations);
 
@@ -376,6 +428,13 @@ impl GameState {
 
         if let Some((scene_name, spawn_point_id)) = pending_scene_switch {
             result.request_scene_switch(scene_name, spawn_point_id);
+        }
+        if let Some(crate::events::PersistenceRequest::SaveSlot { slot }) = pending_persistence {
+            result.request_save_slot(slot);
+        } else if let Some(crate::events::PersistenceRequest::LoadSlot { slot }) =
+            pending_persistence
+        {
+            result.request_load_slot(slot);
         }
 
         result

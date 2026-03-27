@@ -421,6 +421,12 @@ impl DialogController {
             } => resolve_dialog_target(game_state, context, *target)
                 .and_then(|entity_id| game_state.entity_manager().get_entity(entity_id))
                 .is_some_and(|entity| entity.entity_kind == *entity_kind),
+            DialogCondition::FlagEquals { flag, value } => game_state.flag(flag) == Some(value),
+            DialogCondition::FlagSet { flag } => game_state.game_flags().is_set(flag),
+            DialogCondition::FlagGreaterThan { flag, value } => game_state
+                .flag(flag)
+                .and_then(|flag_value| flag_value.as_int())
+                .is_some_and(|flag_value| flag_value > *value),
         }
     }
 }
@@ -476,7 +482,8 @@ fn cycle_binary_selection(active: &mut ActiveDialogState, allow_cancel: bool, di
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dialog::{DialogChoice, DialogNode, DialogNodeKind, DialogTree};
+    use crate::dialog::{DialogBranch, DialogChoice, DialogCondition, DialogNode, DialogNodeKind, DialogTree};
+    use crate::flags::FlagValue;
     use crate::menu::MenuInput;
     use crate::GameState;
 
@@ -642,5 +649,57 @@ mod tests {
             .expect("dialog should start");
 
         assert!(!controller.active_dialog_gates_gameplay());
+    }
+
+    #[test]
+    fn dialog_controller_resolves_branch_nodes_from_game_flags() {
+        let mut game_state = GameState::new_empty();
+        game_state.set_flag("met_npc", FlagValue::Bool(true));
+        let dialog = DialogTree {
+            id: "flag_branch".to_string(),
+            title: "Flags".to_string(),
+            entry_node_id: "branch".to_string(),
+            allow_cancel: true,
+            gate_gameplay: true,
+            nodes: vec![
+                DialogNode {
+                    id: "branch".to_string(),
+                    speaker_name: None,
+                    kind: DialogNodeKind::Branch {
+                        branches: vec![DialogBranch {
+                            conditions: vec![DialogCondition::FlagSet {
+                                flag: "met_npc".to_string(),
+                            }],
+                            next_node_id: "met".to_string(),
+                        }],
+                        default_next_node_id: Some("new".to_string()),
+                    },
+                },
+                DialogNode {
+                    id: "met".to_string(),
+                    speaker_name: None,
+                    kind: DialogNodeKind::End {
+                        body: "welcome back".to_string(),
+                        outcome_id: Some("met".to_string()),
+                    },
+                },
+                DialogNode {
+                    id: "new".to_string(),
+                    speaker_name: None,
+                    kind: DialogNodeKind::End {
+                        body: "nice to meet you".to_string(),
+                        outcome_id: Some("new".to_string()),
+                    },
+                },
+            ],
+        };
+
+        let mut controller = DialogController::new(vec![dialog]);
+        controller
+            .start_dialog(&game_state, "flag_branch", DialogRuntimeContext::default())
+            .expect("dialog should start");
+
+        let view = controller.current_view().expect("view");
+        assert_eq!(view.body, "welcome back");
     }
 }

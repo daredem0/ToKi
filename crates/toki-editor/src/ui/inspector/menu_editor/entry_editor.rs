@@ -296,7 +296,9 @@ impl InspectorSystem {
                 ui.selectable_value(&mut action_kind, 4, "Exit Runtime");
                 ui.selectable_value(&mut action_kind, 5, "Open Audio Settings");
                 ui.selectable_value(&mut action_kind, 6, "Open Graphics Settings");
-                ui.selectable_value(&mut action_kind, 7, "Emit Event");
+                ui.selectable_value(&mut action_kind, 7, "Save Game");
+                ui.selectable_value(&mut action_kind, 8, "Load Game");
+                ui.selectable_value(&mut action_kind, 9, "Emit Event");
             });
 
         changed |= Self::apply_action_kind_change(ui, action, action_kind, available_surface_ids);
@@ -312,7 +314,9 @@ impl InspectorSystem {
             UiAction::ExitRuntime => 4,
             UiAction::OpenAudioSettings => 5,
             UiAction::OpenGraphicsSettings => 6,
-            UiAction::EmitEvent { .. } => 7,
+            UiAction::SaveGame { .. } => 7,
+            UiAction::LoadGame { .. } => 8,
+            UiAction::EmitEvent { .. } => 9,
         }
     }
 
@@ -325,6 +329,8 @@ impl InspectorSystem {
             4 => "Exit Runtime",
             5 => "Open Audio Settings",
             6 => "Open Graphics Settings",
+            7 => "Save Game",
+            8 => "Load Game",
             _ => "Emit Event",
         }
     }
@@ -378,6 +384,30 @@ impl InspectorSystem {
             6 if *action != UiAction::OpenGraphicsSettings => {
                 *action = UiAction::OpenGraphicsSettings;
                 changed = true;
+            }
+            7 => {
+                let mut slot = match action {
+                    UiAction::SaveGame { slot } => *slot,
+                    _ => 1,
+                };
+                changed |= Self::render_save_slot_editor(ui, &mut slot);
+                let next_action = UiAction::SaveGame { slot };
+                if *action != next_action {
+                    *action = next_action;
+                    changed = true;
+                }
+            }
+            8 => {
+                let mut slot = match action {
+                    UiAction::LoadGame { slot } => *slot,
+                    _ => 1,
+                };
+                changed |= Self::render_save_slot_editor(ui, &mut slot);
+                let next_action = UiAction::LoadGame { slot };
+                if *action != next_action {
+                    *action = next_action;
+                    changed = true;
+                }
             }
             _ => {
                 let mut event_id = match action {

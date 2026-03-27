@@ -84,6 +84,12 @@ pub enum UiAction {
     ExitRuntime,
     OpenAudioSettings,
     OpenGraphicsSettings,
+    SaveGame {
+        slot: u8,
+    },
+    LoadGame {
+        slot: u8,
+    },
     EmitEvent {
         event_id: String,
     },
@@ -94,6 +100,8 @@ pub enum UiCommand {
     ExitRuntime,
     OpenAudioSettings,
     OpenGraphicsSettings,
+    SaveGame { slot: u8 },
+    LoadGame { slot: u8 },
     EmitEvent { event_id: String },
 }
 

@@ -8,6 +8,12 @@ use toki_core::DialogStartRequest;
 use super::App;
 
 impl App {
+    fn close_runtime_menu(&mut self) {
+        self.menu_system.close();
+        self.runtime_overlay = None;
+        self.game_system.clear_runtime_inputs();
+    }
+
     pub(super) fn is_dialog_open(&self) -> bool {
         self.dialog_system.is_open()
     }
@@ -279,12 +285,30 @@ impl App {
     }
 
     fn apply_menu_command(&mut self, command: UiCommand) {
-        apply_menu_command(
-            &mut self.exit_requested,
-            &mut self.pending_ui_events,
-            &mut self.runtime_overlay,
-            command,
-        );
+        match command {
+            UiCommand::SaveGame { slot } => {
+                tracing::info!("Runtime menu requested save to slot {}", slot);
+                if let Err(error) = self.save_to_slot(slot) {
+                    tracing::error!("Failed to save slot {} from runtime menu: {}", slot, error);
+                } else {
+                    self.close_runtime_menu();
+                }
+            }
+            UiCommand::LoadGame { slot } => {
+                tracing::info!("Runtime menu requested load from slot {}", slot);
+                if let Err(error) = self.load_from_slot(slot) {
+                    tracing::error!("Failed to load slot {} from runtime menu: {}", slot, error);
+                } else {
+                    self.close_runtime_menu();
+                }
+            }
+            other => apply_menu_command(
+                &mut self.exit_requested,
+                &mut self.pending_ui_events,
+                &mut self.runtime_overlay,
+                other,
+            ),
+        }
     }
 }
 
@@ -304,6 +328,7 @@ fn apply_menu_command(
         UiCommand::OpenGraphicsSettings => {
             *runtime_overlay = Some(super::RuntimeMenuOverlay::graphics());
         }
+        UiCommand::SaveGame { .. } | UiCommand::LoadGame { .. } => {}
         UiCommand::EmitEvent { event_id } => pending_ui_events.push(event_id),
     }
 }
@@ -416,6 +441,30 @@ mod tests {
             runtime_overlay,
             Some(super::super::RuntimeMenuOverlay::graphics())
         );
+    }
+
+    #[test]
+    fn save_and_load_menu_commands_are_ignored_by_the_pure_overlay_helper() {
+        let mut exit_requested = false;
+        let mut pending_ui_events = Vec::new();
+        let mut runtime_overlay = None;
+
+        apply_menu_command(
+            &mut exit_requested,
+            &mut pending_ui_events,
+            &mut runtime_overlay,
+            UiCommand::SaveGame { slot: 1 },
+        );
+        apply_menu_command(
+            &mut exit_requested,
+            &mut pending_ui_events,
+            &mut runtime_overlay,
+            UiCommand::LoadGame { slot: 2 },
+        );
+
+        assert!(!exit_requested);
+        assert!(pending_ui_events.is_empty());
+        assert_eq!(runtime_overlay, None);
     }
 
     #[test]
