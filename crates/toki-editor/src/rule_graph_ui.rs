@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::ui::editor_domain::{rule_key_label, rule_sound_channel_label, rule_target_label};
 use crate::ui::rule_graph::{RuleGraph, RuleGraphEdge, RuleGraphNodeKind};
+use toki_core::FlagValue;
 use toki_core::rules::{RuleAction, RuleCondition, RuleTrigger};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -210,6 +211,13 @@ pub fn rule_graph_condition_summary(
             item_id,
             min_count
         ),
+        RuleCondition::FlagEquals { flag, value } => {
+            format!("FlagEquals({}, {})", flag, flag_value_summary(value))
+        }
+        RuleCondition::FlagSet { flag } => format!("FlagSet({flag})"),
+        RuleCondition::FlagGreaterThan { flag, value } => {
+            format!("FlagGreaterThan({}, {})", flag, value)
+        }
     }
 }
 
@@ -369,6 +377,23 @@ pub fn rule_graph_action_summary(action: &RuleAction, style: RuleGraphSummarySty
             tile_x,
             tile_y
         ),
+        RuleAction::SetFlag { flag, value } => {
+            format!("SetFlag({}, {})", flag, flag_value_summary(value))
+        }
+        RuleAction::IncrementFlag { flag, amount } => {
+            format!("IncrementFlag({}, {})", flag, amount)
+        }
+        RuleAction::ClearFlag { flag } => format!("ClearFlag({flag})"),
+        RuleAction::SaveGame { slot } => format!("SaveGame(slot {})", slot),
+        RuleAction::LoadGame { slot } => format!("LoadGame(slot {})", slot),
+    }
+}
+
+fn flag_value_summary(value: &FlagValue) -> String {
+    match value {
+        FlagValue::Bool(value) => value.to_string(),
+        FlagValue::Int(value) => value.to_string(),
+        FlagValue::String(value) => format!("{value:?}"),
     }
 }
 

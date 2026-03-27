@@ -1,79 +1,155 @@
 use std::time::Instant;
 
 use toki_core::menu::MenuInput;
-use toki_core::serialization::{load_game, save_game};
+use toki_core::serialization::{load_save_data_from_slot, save_game_to_slot, save_slot_file_path};
 use winit::application::ApplicationHandler;
-use winit::event::{ElementState, MouseButton, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
-use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
+use winit::platform::modifier_supplement::KeyEventExtModifierSupplement;
 use winit::window::WindowId;
 
 use super::App;
 
 impl App {
+    fn event_matches_key(event: &KeyEvent, physical: KeyCode, logical: NamedKey) -> bool {
+        matches!(event.physical_key, PhysicalKey::Code(keycode) if keycode == physical)
+            || matches!(&event.logical_key, Key::Named(named) if *named == logical)
+            || matches!(event.key_without_modifiers(), Key::Named(named) if named == logical)
+    }
+
+    pub(super) fn resolve_save_root(&self) -> std::path::PathBuf {
+        let base = std::env::var_os("XDG_DATA_HOME")
+            .map(std::path::PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("HOME")
+                    .map(std::path::PathBuf::from)
+                    .map(|home| home.join(".local").join("share"))
+            })
+            .or_else(|| std::env::current_dir().ok())
+            .expect("runtime should always resolve a save directory");
+
+        let project_name = self
+            .launch_options
+            .project_path
+            .as_deref()
+            .and_then(std::path::Path::file_name)
+            .and_then(|name| name.to_str())
+            .unwrap_or("default");
+
+        base.join("toki").join(project_name).join("saves")
+    }
+
+    pub(super) fn save_to_slot(&mut self, slot: u8) -> anyhow::Result<std::path::PathBuf> {
+        let path = save_game_to_slot(&self.game_system.game_state, self.resolve_save_root(), slot)?;
+        tracing::info!(
+            "Saved slot {} to '{}' (scene='{}')",
+            slot,
+            path.display(),
+            self.game_system.active_scene_name().unwrap_or("<none>")
+        );
+        Ok(path)
+    }
+
+    pub(super) fn load_from_slot(&mut self, slot: u8) -> anyhow::Result<()> {
+        let save_root = self.resolve_save_root();
+        let save_path = save_slot_file_path(&save_root, slot)?;
+        let save_data = load_save_data_from_slot(save_root, slot)?;
+        let active_scene_name = save_data.active_scene_name.clone();
+        self.game_system
+            .game_state
+            .restore_from_save_data(&save_data)
+            .map_err(anyhow::Error::msg)?;
+        self.refresh_runtime_after_scene_restore();
+        tracing::info!(
+            "Loaded slot {} from '{}' (scene='{}')",
+            slot,
+            save_path.display(),
+            active_scene_name
+        );
+        Ok(())
+    }
+
     fn handle_keyboard_input_event(&mut self, event: winit::event::KeyEvent) {
-        if let PhysicalKey::Code(keycode) = event.physical_key {
-            match event.state {
-                ElementState::Pressed => match keycode {
-                    KeyCode::F3 => {
-                        self.performance.toggle_hud_display();
+        match event.state {
+            ElementState::Pressed => {
+                if !event.repeat {
+                    tracing::debug!(
+                        "Keyboard input pressed: physical={:?} logical={:?} without_modifiers={:?} text={:?}",
+                        event.physical_key,
+                        event.logical_key,
+                        event.key_without_modifiers(),
+                        event.text
+                    );
+                }
+                if Self::event_matches_key(&event, KeyCode::F3, NamedKey::F3) {
+                    self.performance.toggle_hud_display();
+                    return;
+                }
+                if Self::event_matches_key(&event, KeyCode::F7, NamedKey::F7) {
+                    self.performance.toggle_console_display();
+                    return;
+                }
+                if Self::event_matches_key(&event, KeyCode::F5, NamedKey::F5) {
+                    tracing::info!("Hotkey requested save to slot 1");
+                    if let Err(e) = self.save_to_slot(1) {
+                        tracing::error!("Failed to save game: {}", e);
                     }
-                    KeyCode::F7 => {
-                        self.performance.toggle_console_display();
-                    }
-                    KeyCode::F5 => {
-                        if let Err(e) = save_game(&self.game_system.game_state, "savegame.json") {
-                            tracing::error!("Failed to save game: {}", e);
-                        } else {
-                            tracing::info!("Game saved to savegame.json");
-                        }
-                    }
-                    KeyCode::F6 => match load_game("savegame.json") {
-                        Ok(loaded_state) => {
-                            self.game_system.game_state = loaded_state;
-                            tracing::info!("Game loaded from savegame.json");
-                        }
+                    return;
+                }
+                if Self::event_matches_key(&event, KeyCode::F6, NamedKey::F6) {
+                    tracing::info!("Hotkey requested load from slot 1");
+                    match self.load_from_slot(1) {
+                        Ok(()) => {}
                         Err(e) => tracing::error!("Failed to load game: {}", e),
-                    },
-                    KeyCode::Escape => {
-                        if self.is_dialog_open() || self.is_menu_open() {
-                            self.handle_menu_input(MenuInput::Back);
-                        } else {
-                            self.open_pause_menu();
+                    }
+                    return;
+                }
+
+                if let PhysicalKey::Code(keycode) = event.physical_key {
+                    match keycode {
+                        KeyCode::Escape => {
+                            if self.is_dialog_open() || self.is_menu_open() {
+                                self.handle_menu_input(MenuInput::Back);
+                            } else {
+                                self.open_pause_menu();
+                            }
+                        }
+                        KeyCode::ArrowUp | KeyCode::KeyW
+                            if self.is_dialog_open() || self.is_menu_open() =>
+                        {
+                            self.handle_menu_input(MenuInput::Up);
+                        }
+                        KeyCode::ArrowDown | KeyCode::KeyS
+                            if self.is_dialog_open() || self.is_menu_open() =>
+                        {
+                            self.handle_menu_input(MenuInput::Down);
+                        }
+                        KeyCode::ArrowLeft | KeyCode::KeyA
+                            if self.is_dialog_open() || self.is_menu_open() =>
+                        {
+                            self.handle_menu_input(MenuInput::Left);
+                        }
+                        KeyCode::ArrowRight | KeyCode::KeyD
+                            if self.is_dialog_open() || self.is_menu_open() =>
+                        {
+                            self.handle_menu_input(MenuInput::Right);
+                        }
+                        KeyCode::Enter | KeyCode::Space
+                            if self.is_dialog_open() || self.is_menu_open() =>
+                        {
+                            self.handle_menu_input(MenuInput::Confirm);
+                        }
+                        _ => {
+                            if !self.is_dialog_open() && !self.is_menu_open() {
+                                self.game_system.handle_keyboard_input(keycode, true);
+                            }
                         }
                     }
-                    KeyCode::ArrowUp | KeyCode::KeyW
-                        if self.is_dialog_open() || self.is_menu_open() =>
-                    {
-                        self.handle_menu_input(MenuInput::Up);
-                    }
-                    KeyCode::ArrowDown | KeyCode::KeyS
-                        if self.is_dialog_open() || self.is_menu_open() =>
-                    {
-                        self.handle_menu_input(MenuInput::Down);
-                    }
-                    KeyCode::ArrowLeft | KeyCode::KeyA
-                        if self.is_dialog_open() || self.is_menu_open() =>
-                    {
-                        self.handle_menu_input(MenuInput::Left);
-                    }
-                    KeyCode::ArrowRight | KeyCode::KeyD
-                        if self.is_dialog_open() || self.is_menu_open() =>
-                    {
-                        self.handle_menu_input(MenuInput::Right);
-                    }
-                    KeyCode::Enter | KeyCode::Space
-                        if self.is_dialog_open() || self.is_menu_open() =>
-                    {
-                        self.handle_menu_input(MenuInput::Confirm);
-                    }
-                    _ => {
-                        if !self.is_dialog_open() && !self.is_menu_open() {
-                            self.game_system.handle_keyboard_input(keycode, true);
-                        }
-                    }
-                },
-                ElementState::Released => {
+                }
+            }
+            ElementState::Released => {
+                if let PhysicalKey::Code(keycode) = event.physical_key {
                     if !self.is_dialog_open() && !self.is_menu_open() {
                         self.game_system.handle_keyboard_input(keycode, false);
                     }

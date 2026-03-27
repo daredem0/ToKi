@@ -4,7 +4,7 @@ use toki_core::animation::{AnimationClip, AnimationController, AnimationState, L
 use toki_core::collision::CollisionBox;
 use toki_core::entity::*;
 use toki_core::serialization::*;
-use toki_core::{GameState, InputKey};
+use toki_core::{FlagValue, GameState, InputKey, Scene};
 
 fn test_definition(name: &str, category: &str) -> EntityDefinition {
     EntityDefinition {
@@ -154,6 +154,22 @@ fn create_test_entity_manager() -> EntityManager {
     manager.set_entity_active(npc_id, false);
 
     manager
+}
+
+fn create_save_test_state() -> GameState {
+    let mut game_state = GameState::new_empty();
+    let mut scene = Scene::new("main".to_string());
+    let mut player = create_test_entity();
+    player.id = 1;
+    player.position = IVec2::new(24, 40);
+    scene.camera_position = Some(IVec2::new(6, 8));
+    scene.camera_scale = Some(3);
+    scene.entities.push(player);
+    game_state.add_scene(scene);
+    game_state.load_scene("main").unwrap();
+    game_state.set_flag("quest_complete", FlagValue::Bool(true));
+    game_state.set_flag("coins", FlagValue::Int(7));
+    game_state
 }
 
 #[test]
@@ -317,22 +333,90 @@ fn test_save_load_scene() {
 }
 
 #[test]
-fn test_save_load_game_state() {
-    let mut game_state = GameState::new_empty();
-    let player_id = game_state.spawn_player_at(IVec2::new(100, 200));
+fn save_data_round_trips_with_versioned_metadata() {
+    let game_state = create_save_test_state();
     let temp_file = NamedTempFile::new().unwrap();
-    let file_path = temp_file.path().to_str().unwrap();
 
-    // Test save
-    save_game(&game_state, file_path).unwrap();
+    let save_data = SaveData::capture(&game_state, 2).unwrap();
+    assert_eq!(save_data.version, SAVE_DATA_VERSION);
+    assert_eq!(save_data.metadata.slot, 2);
+    assert_eq!(save_data.metadata.scene_name, "main");
 
-    // Test load
-    let loaded_game_state = load_game(file_path).unwrap();
+    save_save_data(&save_data, temp_file.path()).unwrap();
+    let loaded = load_save_data(temp_file.path()).unwrap();
 
-    // Verify
-    assert_eq!(loaded_game_state.player_id(), Some(player_id));
-    let loaded_player = loaded_game_state.player_entity().unwrap();
-    assert_eq!(loaded_player.position, IVec2::new(100, 200));
+    assert_eq!(loaded.version, SAVE_DATA_VERSION);
+    assert_eq!(loaded.metadata.slot, 2);
+    assert_eq!(loaded.metadata.scene_name, "main");
+    assert_eq!(loaded.flags.get("coins"), Some(&FlagValue::Int(7)));
+    assert_eq!(
+        loaded.player.as_ref().map(|player| player.position),
+        Some(IVec2::new(24, 40))
+    );
+    assert_eq!(loaded.camera.position, Some(IVec2::new(6, 8)));
+    assert_eq!(loaded.camera.scale, Some(3));
+}
+
+#[test]
+fn restore_from_save_data_rehydrates_existing_project_state() {
+    let source_state = create_save_test_state();
+    let mut save_data = SaveData::capture(&source_state, 1).unwrap();
+    save_data.metadata.play_time_ms = 1_234;
+    save_data.camera.position = Some(IVec2::new(11, 12));
+    save_data.camera.scale = Some(4);
+    save_data
+        .flags
+        .set("chapter", FlagValue::String("intro".to_string()));
+    if let Some(player) = &mut save_data.player {
+        player.position = IVec2::new(80, 96);
+    }
+
+    let mut restored = create_save_test_state();
+    restored.restore_from_save_data(&save_data).unwrap();
+
+    assert_eq!(restored.scene_manager().active_scene_name(), Some("main"));
+    assert_eq!(restored.player_position(), IVec2::new(80, 96));
+    assert_eq!(
+        restored.flag("chapter"),
+        Some(&FlagValue::String("intro".to_string()))
+    );
+    assert_eq!(restored.play_time_ms(), 1_234);
+    assert_eq!(
+        restored
+            .active_scene()
+            .and_then(|scene| scene.camera_position),
+        Some(IVec2::new(11, 12))
+    );
+    assert_eq!(
+        restored.active_scene().and_then(|scene| scene.camera_scale),
+        Some(4)
+    );
+}
+
+#[test]
+fn save_slot_metadata_lists_existing_slots_and_empty_slots() {
+    let state = create_save_test_state();
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    let slot_one_path = save_game_to_slot(&state, temp_dir.path(), 1).unwrap();
+    let slot_three_path = save_game_to_slot(&state, temp_dir.path(), 3).unwrap();
+    assert!(slot_one_path.ends_with("slot_1.json"));
+    assert!(slot_three_path.ends_with("slot_3.json"));
+
+    let slots = list_save_slot_metadata(temp_dir.path()).unwrap();
+    assert_eq!(slots.len(), MAX_SAVE_SLOTS as usize);
+    assert_eq!(slots[0].as_ref().map(|metadata| metadata.slot), Some(1));
+    assert!(slots[1].is_none());
+    assert_eq!(slots[2].as_ref().map(|metadata| metadata.slot), Some(3));
+}
+
+#[test]
+fn save_slot_helpers_reject_invalid_slot_numbers() {
+    let state = create_save_test_state();
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    let error = save_game_to_slot(&state, temp_dir.path(), 0).unwrap_err();
+    assert!(matches!(error, SerializationError::InvalidSaveSlot(0)));
 }
 
 #[test]
@@ -401,7 +485,7 @@ fn test_file_error_handling() {
     let result = load_scene("/non/existent/path.json");
     assert!(result.is_err());
 
-    let result = load_game("/non/existent/path.json");
+    let result = load_save_data("/non/existent/path.json");
     assert!(result.is_err());
 }
 

@@ -8,6 +8,7 @@ use crate::animation::AnimationState;
 use crate::assets::tilemap::TileMap;
 use crate::entity::EntityId;
 use crate::events::GameUpdateResult;
+use crate::events::PersistenceRequest;
 
 use super::{AudioEvent, GameState, PendingDialogStart, PendingSceneSwitch, RuleCommand};
 
@@ -21,11 +22,13 @@ impl GameState {
         Vec<(EntityId, AnimationState)>,
         Option<PendingSceneSwitch>,
         Option<PendingDialogStart>,
+        Option<PersistenceRequest>,
     ) {
         let mut buffered_velocities = HashMap::new();
         let mut buffered_animations = HashMap::new();
         let mut pending_scene_switch = None;
         let mut pending_dialog_start = None;
+        let mut pending_persistence = None;
 
         for command in commands {
             match command {
@@ -110,6 +113,25 @@ impl GameState {
                     self.stat_effect_service()
                         .teleport_entity_to_tile(entity_id, tile_x, tile_y, tilemap);
                 }
+                RuleCommand::SetFlag { flag, value } => {
+                    self.set_flag(flag, value);
+                }
+                RuleCommand::IncrementFlag { flag, amount } => {
+                    self.increment_flag(flag, amount);
+                }
+                RuleCommand::ClearFlag { flag } => {
+                    self.clear_flag(&flag);
+                }
+                RuleCommand::SaveGame { slot } => {
+                    if pending_persistence.is_none() {
+                        pending_persistence = Some(PersistenceRequest::SaveSlot { slot });
+                    }
+                }
+                RuleCommand::LoadGame { slot } => {
+                    if pending_persistence.is_none() {
+                        pending_persistence = Some(PersistenceRequest::LoadSlot { slot });
+                    }
+                }
             }
         }
 
@@ -126,6 +148,7 @@ impl GameState {
             pending_animations,
             pending_scene_switch,
             pending_dialog_start,
+            pending_persistence,
         )
     }
 

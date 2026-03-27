@@ -8,7 +8,7 @@ use super::app_scene_runtime::{SceneRuntimeCoordinator, SceneRuntimeRefs, SceneR
 use super::App;
 
 impl App {
-    fn create_scene_runtime_coordinator(&mut self) -> SceneRuntimeCoordinator<'_> {
+    pub(super) fn create_scene_runtime_coordinator(&mut self) -> SceneRuntimeCoordinator<'_> {
         let content_root = self.content_root_path().map(std::path::Path::to_path_buf);
         SceneRuntimeCoordinator::new(
             SceneRuntimeRefs {
@@ -86,6 +86,21 @@ impl App {
         if let Some(request) = game_result.scene_switch_request.take() {
             let mut coordinator = self.create_scene_runtime_coordinator();
             coordinator.queue_scene_switch_request(request);
+        }
+
+        if let Some(request) = game_result.persistence_request.take() {
+            match request {
+                toki_core::PersistenceRequest::SaveSlot { slot } => {
+                    if let Err(error) = self.save_to_slot(slot) {
+                        tracing::error!("Failed to save slot {} from rule action: {}", slot, error);
+                    }
+                }
+                toki_core::PersistenceRequest::LoadSlot { slot } => {
+                    if let Err(error) = self.load_from_slot(slot) {
+                        tracing::error!("Failed to load slot {} from rule action: {}", slot, error);
+                    }
+                }
+            }
         }
 
         {

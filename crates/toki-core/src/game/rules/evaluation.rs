@@ -77,6 +77,12 @@ impl GameState {
             } => self.resolve_entity(*target, context).is_some_and(|entity| {
                 entity.attributes.inventory.item_count(item_id) >= *min_count
             }),
+            RuleCondition::FlagEquals { flag, value } => self.flag(flag) == Some(value),
+            RuleCondition::FlagSet { flag } => self.game_flags().is_set(flag),
+            RuleCondition::FlagGreaterThan { flag, value } => self
+                .flag(flag)
+                .and_then(|flag_value| flag_value.as_int())
+                .is_some_and(|flag_value| flag_value > *value),
         }
     }
 }

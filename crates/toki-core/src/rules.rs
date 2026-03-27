@@ -3,6 +3,7 @@ use strum::EnumIter;
 
 use crate::animation::AnimationState;
 use crate::entity::{EntityId, EntityKind};
+use crate::flags::FlagValue;
 
 /// Context provided by triggers that involve entity interactions.
 ///
@@ -245,6 +246,17 @@ pub enum RuleCondition {
         item_id: String,
         min_count: u32,
     },
+    FlagEquals {
+        flag: String,
+        value: FlagValue,
+    },
+    FlagSet {
+        flag: String,
+    },
+    FlagGreaterThan {
+        flag: String,
+        value: i32,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter)]
@@ -376,6 +388,23 @@ pub enum RuleAction {
         tile_x: u32,
         /// The tile y-coordinate (in tile units, not pixels).
         tile_y: u32,
+    },
+    SetFlag {
+        flag: String,
+        value: FlagValue,
+    },
+    IncrementFlag {
+        flag: String,
+        amount: i32,
+    },
+    ClearFlag {
+        flag: String,
+    },
+    SaveGame {
+        slot: u8,
+    },
+    LoadGame {
+        slot: u8,
     },
 }
 

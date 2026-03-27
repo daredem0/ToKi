@@ -16,6 +16,102 @@ use crate::ui::editor_domain::{
 };
 
 impl InspectorSystem {
+    pub(in super::super) fn render_flag_name_editor(ui: &mut egui::Ui, flag: &mut String) -> bool {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Flag:");
+            changed |= ui.text_edit_singleline(flag).changed();
+        });
+        changed
+    }
+
+    pub(in super::super) fn render_flag_value_editor(
+        ui: &mut egui::Ui,
+        id_salt: impl std::hash::Hash,
+        value: &mut FlagValue,
+    ) -> bool {
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum FlagValueKind {
+            Bool,
+            Int,
+            String,
+        }
+
+        let mut changed = false;
+        let current_kind = match value {
+            FlagValue::Bool(_) => FlagValueKind::Bool,
+            FlagValue::Int(_) => FlagValueKind::Int,
+            FlagValue::String(_) => FlagValueKind::String,
+        };
+        let mut selected_kind = current_kind;
+        ui.horizontal(|ui| {
+            ui.label("Value Type:");
+            egui::ComboBox::from_id_salt((&id_salt, "kind"))
+                .selected_text(match current_kind {
+                    FlagValueKind::Bool => "Bool",
+                    FlagValueKind::Int => "Int",
+                    FlagValueKind::String => "String",
+                })
+                .show_ui(ui, |ui| {
+                    changed |= ui
+                        .selectable_value(&mut selected_kind, FlagValueKind::Bool, "Bool")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(&mut selected_kind, FlagValueKind::Int, "Int")
+                        .changed();
+                    changed |= ui
+                        .selectable_value(&mut selected_kind, FlagValueKind::String, "String")
+                        .changed();
+                });
+        });
+        if selected_kind != current_kind {
+            *value = match selected_kind {
+                FlagValueKind::Bool => FlagValue::Bool(false),
+                FlagValueKind::Int => FlagValue::Int(0),
+                FlagValueKind::String => FlagValue::String(String::new()),
+            };
+        }
+
+        match value {
+            FlagValue::Bool(flag) => {
+                ui.horizontal(|ui| {
+                    ui.label("Value:");
+                    changed |= ui.checkbox(flag, "Enabled").changed();
+                });
+            }
+            FlagValue::Int(flag) => {
+                ui.horizontal(|ui| {
+                    ui.label("Value:");
+                    changed |= ui.add(egui::DragValue::new(flag).speed(1.0)).changed();
+                });
+            }
+            FlagValue::String(flag) => {
+                ui.horizontal(|ui| {
+                    ui.label("Value:");
+                    changed |= ui.text_edit_singleline(flag).changed();
+                });
+            }
+        }
+
+        changed
+    }
+
+    pub(in super::super) fn render_save_slot_editor(ui: &mut egui::Ui, slot: &mut u8) -> bool {
+        let mut changed = false;
+        ui.horizontal(|ui| {
+            ui.label("Slot:");
+            let mut slot_i32 = (*slot).clamp(1, 3) as i32;
+            if ui
+                .add(egui::DragValue::new(&mut slot_i32).speed(1.0).range(1..=3))
+                .changed()
+            {
+                *slot = slot_i32.clamp(1, 3) as u8;
+                changed = true;
+            }
+        });
+        changed
+    }
+
     pub(in super::super) fn next_rule_id(rule_set: &RuleSet) -> String {
         let mut index = 1usize;
         loop {
@@ -236,6 +332,20 @@ impl InspectorSystem {
                             }
                         }
                     }
+                    RuleCondition::FlagEquals { flag, .. }
+                    | RuleCondition::FlagSet { flag }
+                    | RuleCondition::FlagGreaterThan { flag, .. } => {
+                        if flag.trim().is_empty() {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: None,
+                                message: format!(
+                                    "Condition {} flag name must not be empty",
+                                    condition_index + 1
+                                ),
+                            });
+                        }
+                    }
                 }
             }
 
@@ -405,6 +515,27 @@ impl InspectorSystem {
                     }
                     RuleAction::SetEntityActive { .. } => {}
                     RuleAction::TeleportEntity { .. } => {}
+                    RuleAction::SetFlag { flag, .. }
+                    | RuleAction::IncrementFlag { flag, .. }
+                    | RuleAction::ClearFlag { flag } => {
+                        if flag.trim().is_empty() {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "Flag actions require a non-empty flag name"
+                                    .to_string(),
+                            });
+                        }
+                    }
+                    RuleAction::SaveGame { slot } | RuleAction::LoadGame { slot } => {
+                        if !(1..=3).contains(slot) {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "Save/load slot must be between 1 and 3".to_string(),
+                            });
+                        }
+                    }
                 }
             }
         }

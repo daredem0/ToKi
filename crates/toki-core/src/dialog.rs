@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::entity::{EntityId, EntityKind};
+use crate::flags::FlagValue;
 
 fn default_allow_cancel() -> bool {
     true
@@ -108,6 +109,17 @@ pub enum DialogCondition {
     EntityIsKind {
         target: DialogConditionTarget,
         entity_kind: EntityKind,
+    },
+    FlagEquals {
+        flag: String,
+        value: FlagValue,
+    },
+    FlagSet {
+        flag: String,
+    },
+    FlagGreaterThan {
+        flag: String,
+        value: i32,
     },
 }
 

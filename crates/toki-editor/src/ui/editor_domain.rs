@@ -1,6 +1,7 @@
 use strum::EnumIter;
 use toki_core::animation::AnimationState;
 use toki_core::entity::EntityKind;
+use toki_core::FlagValue;
 use toki_core::rules::{
     InteractionMode, RuleAction, RuleCondition, RuleKey, RuleSoundChannel, RuleSpawnEntityType,
     RuleTarget, RuleTrigger,
@@ -62,6 +63,11 @@ pub enum RuleActionEditorKind {
     RemoveInventoryItem,
     SetEntityActive,
     TeleportEntity,
+    SetFlag,
+    IncrementFlag,
+    ClearFlag,
+    SaveGame,
+    LoadGame,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
@@ -78,6 +84,9 @@ pub enum RuleConditionEditorKind {
     EntityHasTag,
     TriggerOtherHasTag,
     HasInventoryItem,
+    FlagEquals,
+    FlagSet,
+    FlagGreaterThan,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
@@ -112,6 +121,11 @@ pub fn rule_action_kind(action: &RuleAction) -> RuleActionEditorKind {
         RuleAction::RemoveInventoryItem { .. } => RuleActionEditorKind::RemoveInventoryItem,
         RuleAction::SetEntityActive { .. } => RuleActionEditorKind::SetEntityActive,
         RuleAction::TeleportEntity { .. } => RuleActionEditorKind::TeleportEntity,
+        RuleAction::SetFlag { .. } => RuleActionEditorKind::SetFlag,
+        RuleAction::IncrementFlag { .. } => RuleActionEditorKind::IncrementFlag,
+        RuleAction::ClearFlag { .. } => RuleActionEditorKind::ClearFlag,
+        RuleAction::SaveGame { .. } => RuleActionEditorKind::SaveGame,
+        RuleAction::LoadGame { .. } => RuleActionEditorKind::LoadGame,
     }
 }
 
@@ -131,6 +145,11 @@ pub fn rule_action_kind_label(kind: RuleActionEditorKind) -> &'static str {
         RuleActionEditorKind::RemoveInventoryItem => "RemoveInventoryItem",
         RuleActionEditorKind::SetEntityActive => "SetEntityActive",
         RuleActionEditorKind::TeleportEntity => "TeleportEntity",
+        RuleActionEditorKind::SetFlag => "SetFlag",
+        RuleActionEditorKind::IncrementFlag => "IncrementFlag",
+        RuleActionEditorKind::ClearFlag => "ClearFlag",
+        RuleActionEditorKind::SaveGame => "SaveGame",
+        RuleActionEditorKind::LoadGame => "LoadGame",
     }
 }
 
@@ -192,6 +211,19 @@ pub fn default_rule_action(kind: RuleActionEditorKind) -> RuleAction {
             tile_x: 0,
             tile_y: 0,
         },
+        RuleActionEditorKind::SetFlag => RuleAction::SetFlag {
+            flag: String::new(),
+            value: FlagValue::Bool(false),
+        },
+        RuleActionEditorKind::IncrementFlag => RuleAction::IncrementFlag {
+            flag: String::new(),
+            amount: 1,
+        },
+        RuleActionEditorKind::ClearFlag => RuleAction::ClearFlag {
+            flag: String::new(),
+        },
+        RuleActionEditorKind::SaveGame => RuleAction::SaveGame { slot: 1 },
+        RuleActionEditorKind::LoadGame => RuleAction::LoadGame { slot: 1 },
     }
 }
 
@@ -209,6 +241,9 @@ pub fn rule_condition_kind(condition: &RuleCondition) -> RuleConditionEditorKind
         RuleCondition::EntityHasTag { .. } => RuleConditionEditorKind::EntityHasTag,
         RuleCondition::TriggerOtherHasTag { .. } => RuleConditionEditorKind::TriggerOtherHasTag,
         RuleCondition::HasInventoryItem { .. } => RuleConditionEditorKind::HasInventoryItem,
+        RuleCondition::FlagEquals { .. } => RuleConditionEditorKind::FlagEquals,
+        RuleCondition::FlagSet { .. } => RuleConditionEditorKind::FlagSet,
+        RuleCondition::FlagGreaterThan { .. } => RuleConditionEditorKind::FlagGreaterThan,
     }
 }
 
@@ -226,6 +261,9 @@ pub fn rule_condition_kind_label(kind: RuleConditionEditorKind) -> &'static str 
         RuleConditionEditorKind::EntityHasTag => "EntityHasTag",
         RuleConditionEditorKind::TriggerOtherHasTag => "TriggerOtherHasTag",
         RuleConditionEditorKind::HasInventoryItem => "HasInventoryItem",
+        RuleConditionEditorKind::FlagEquals => "FlagEquals",
+        RuleConditionEditorKind::FlagSet => "FlagSet",
+        RuleConditionEditorKind::FlagGreaterThan => "FlagGreaterThan",
     }
 }
 
@@ -267,6 +305,17 @@ pub fn default_rule_condition(kind: RuleConditionEditorKind) -> RuleCondition {
             target: RuleTarget::Player,
             item_id: String::new(),
             min_count: 1,
+        },
+        RuleConditionEditorKind::FlagEquals => RuleCondition::FlagEquals {
+            flag: String::new(),
+            value: FlagValue::Bool(false),
+        },
+        RuleConditionEditorKind::FlagSet => RuleCondition::FlagSet {
+            flag: String::new(),
+        },
+        RuleConditionEditorKind::FlagGreaterThan => RuleCondition::FlagGreaterThan {
+            flag: String::new(),
+            value: 0,
         },
     }
 }

@@ -441,6 +441,27 @@ impl InspectorSystem {
             } => {
                 changed |= Self::render_teleport_action_editor(ui, &ctx, target, tile_x, tile_y);
             }
+            RuleAction::SetFlag { flag, value } => {
+                changed |= Self::render_flag_name_editor(ui, flag);
+                changed |= Self::render_flag_value_editor(
+                    ui,
+                    format!("{id_salt}_set_flag"),
+                    value,
+                );
+            }
+            RuleAction::IncrementFlag { flag, amount } => {
+                changed |= Self::render_flag_name_editor(ui, flag);
+                ui.horizontal(|ui| {
+                    ui.label("Amount:");
+                    changed |= ui.add(egui::DragValue::new(amount).speed(1.0)).changed();
+                });
+            }
+            RuleAction::ClearFlag { flag } => {
+                changed |= Self::render_flag_name_editor(ui, flag);
+            }
+            RuleAction::SaveGame { slot } | RuleAction::LoadGame { slot } => {
+                changed |= Self::render_save_slot_editor(ui, slot);
+            }
         }
 
         for issue in validation_issues.iter().filter(|issue| {
@@ -932,6 +953,24 @@ impl InspectorSystem {
                     changed |= ui
                         .add(egui::DragValue::new(min_count).range(1..=999))
                         .changed();
+                });
+            }
+            RuleCondition::FlagEquals { flag, value } => {
+                changed |= Self::render_flag_name_editor(ui, flag);
+                changed |= Self::render_flag_value_editor(
+                    ui,
+                    format!("flag_equals_{scene_name}_{rule_index}_{condition_index}"),
+                    value,
+                );
+            }
+            RuleCondition::FlagSet { flag } => {
+                changed |= Self::render_flag_name_editor(ui, flag);
+            }
+            RuleCondition::FlagGreaterThan { flag, value } => {
+                changed |= Self::render_flag_name_editor(ui, flag);
+                ui.horizontal(|ui| {
+                    ui.label("Threshold:");
+                    changed |= ui.add(egui::DragValue::new(value).speed(1.0)).changed();
                 });
             }
         }

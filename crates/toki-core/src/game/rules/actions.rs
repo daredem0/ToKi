@@ -143,6 +143,38 @@ impl GameState {
                     }
                 });
             }
+            RuleAction::SetFlag { flag, value } => {
+                let flag = flag.trim();
+                if !flag.is_empty() {
+                    command_buffer.push(RuleCommand::SetFlag {
+                        flag: flag.to_string(),
+                        value: value.clone(),
+                    });
+                }
+            }
+            RuleAction::IncrementFlag { flag, amount } => {
+                let flag = flag.trim();
+                if !flag.is_empty() {
+                    command_buffer.push(RuleCommand::IncrementFlag {
+                        flag: flag.to_string(),
+                        amount: *amount,
+                    });
+                }
+            }
+            RuleAction::ClearFlag { flag } => {
+                let flag = flag.trim();
+                if !flag.is_empty() {
+                    command_buffer.push(RuleCommand::ClearFlag {
+                        flag: flag.to_string(),
+                    });
+                }
+            }
+            RuleAction::SaveGame { slot } => {
+                command_buffer.push(RuleCommand::SaveGame { slot: *slot });
+            }
+            RuleAction::LoadGame { slot } => {
+                command_buffer.push(RuleCommand::LoadGame { slot: *slot });
+            }
         }
     }
 
