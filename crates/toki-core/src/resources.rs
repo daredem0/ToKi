@@ -1,4 +1,5 @@
 use crate::assets::{atlas::AtlasMeta, tilemap::TileMap};
+use crate::CoreError;
 use std::path::Path;
 
 /// Errors that can occur during resource loading
@@ -8,6 +9,18 @@ pub enum ResourceError {
     Io(#[from] std::io::Error),
     #[error("JSON parsing error: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("Failed to load atlas '{path}': {source}")]
+    AtlasLoad {
+        path: String,
+        #[source]
+        source: CoreError,
+    },
+    #[error("Failed to load tilemap '{path}': {source}")]
+    TilemapLoad {
+        path: String,
+        #[source]
+        source: CoreError,
+    },
     #[error("Asset validation error: {0}")]
     Validation(String),
 }
@@ -32,20 +45,28 @@ impl ResourceManager {
     /// Load all game resources from a project directory
     pub fn load_from_project_dir(project_dir: &Path) -> Result<Self, ResourceError> {
         let assets_dir = project_dir.join("assets");
+        let terrain_path = assets_dir.join("terrain.json");
+        let creature_path = assets_dir.join("creatures.json");
+        let tilemap_path = assets_dir.join("maps").join("new_town_map_64x64_crossings.json");
 
-        let terrain_atlas = AtlasMeta::load_from_file(assets_dir.join("terrain.json"))
-            .map_err(|_| ResourceError::Validation("Failed to load terrain.json".to_string()))?;
+        let terrain_atlas =
+            AtlasMeta::load_from_file(&terrain_path).map_err(|source| ResourceError::AtlasLoad {
+                path: terrain_path.display().to_string(),
+                source,
+            })?;
 
-        let creature_atlas = AtlasMeta::load_from_file(assets_dir.join("creatures.json"))
-            .map_err(|_| ResourceError::Validation("Failed to load creatures.json".to_string()))?;
+        let creature_atlas =
+            AtlasMeta::load_from_file(&creature_path).map_err(|source| ResourceError::AtlasLoad {
+                path: creature_path.display().to_string(),
+                source,
+            })?;
 
         // Default to the main map used by runtime
-        let tilemap = TileMap::load_from_file(
-            assets_dir
-                .join("maps")
-                .join("new_town_map_64x64_crossings.json"),
-        )
-        .map_err(|_| ResourceError::Validation("Failed to load default tilemap".to_string()))?;
+        let tilemap =
+            TileMap::load_from_file(&tilemap_path).map_err(|source| ResourceError::TilemapLoad {
+                path: tilemap_path.display().to_string(),
+                source,
+            })?;
 
         // Validate the tilemap
         tilemap
@@ -65,25 +86,27 @@ impl ResourceManager {
         creature_atlas_path: &Path,
         tilemap_path: &Path,
     ) -> Result<Self, ResourceError> {
-        let terrain_atlas = AtlasMeta::load_from_file(terrain_atlas_path).map_err(|_| {
-            ResourceError::Validation(format!(
-                "Failed to load terrain atlas: {}",
-                terrain_atlas_path.display()
-            ))
-        })?;
+        let terrain_atlas =
+            AtlasMeta::load_from_file(terrain_atlas_path).map_err(|source| {
+                ResourceError::AtlasLoad {
+                    path: terrain_atlas_path.display().to_string(),
+                    source,
+                }
+            })?;
 
-        let creature_atlas = AtlasMeta::load_from_file(creature_atlas_path).map_err(|_| {
-            ResourceError::Validation(format!(
-                "Failed to load creature atlas: {}",
-                creature_atlas_path.display()
-            ))
-        })?;
+        let creature_atlas =
+            AtlasMeta::load_from_file(creature_atlas_path).map_err(|source| {
+                ResourceError::AtlasLoad {
+                    path: creature_atlas_path.display().to_string(),
+                    source,
+                }
+            })?;
 
-        let tilemap = TileMap::load_from_file(tilemap_path).map_err(|_| {
-            ResourceError::Validation(format!(
-                "Failed to load tilemap: {}",
-                tilemap_path.display()
-            ))
+        let tilemap = TileMap::load_from_file(tilemap_path).map_err(|source| {
+            ResourceError::TilemapLoad {
+                path: tilemap_path.display().to_string(),
+                source,
+            }
         })?;
 
         // Validate the tilemap

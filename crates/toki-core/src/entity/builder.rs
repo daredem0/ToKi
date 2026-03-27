@@ -5,6 +5,7 @@
 use super::types::{
     ControlRole, Entity, EntityAttributes, EntityAudioSettings, EntityId, EntityKind,
 };
+use super::default_category_for_kind;
 use crate::collision::CollisionBox;
 use glam::{IVec2, UVec2};
 
@@ -109,7 +110,7 @@ impl EntityBuilder {
     pub fn build(self) -> Entity {
         let category = self
             .category
-            .unwrap_or_else(|| Self::default_category_for_kind(&self.entity_kind).to_string());
+            .unwrap_or_else(|| default_category_for_kind(&self.entity_kind).to_string());
 
         Entity {
             id: self.id,
@@ -125,17 +126,6 @@ impl EntityBuilder {
             collision_box: self.collision_box,
             tags: self.tags,
             movement_accumulator: glam::Vec2::ZERO,
-        }
-    }
-
-    fn default_category_for_kind(entity_kind: &EntityKind) -> &'static str {
-        match entity_kind {
-            EntityKind::Player => "human",
-            EntityKind::Npc => "creature",
-            EntityKind::Item => "item",
-            EntityKind::Decoration => "decoration",
-            EntityKind::Trigger => "trigger",
-            EntityKind::Projectile => "projectile",
         }
     }
 }

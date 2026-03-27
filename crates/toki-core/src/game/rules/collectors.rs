@@ -86,6 +86,39 @@ impl GameState {
         self.rule_runtime.fired_once_rules.extend(fired_once_ids);
     }
 
+    fn collect_rules_for_event<MatchRule, LogRule, LogAction>(
+        &mut self,
+        context: TriggerContext,
+        command_buffer: &mut Vec<RuleCommand>,
+        mut matches_rule: MatchRule,
+        log_rule: LogRule,
+        log_action: LogAction,
+    ) where
+        MatchRule: FnMut(&Self, &crate::rules::Rule, &TriggerContext) -> bool,
+        LogRule: FnMut(&crate::rules::Rule, bool),
+        LogAction: FnMut(&str, &RuleAction),
+    {
+        let mut sorted_indices = self
+            .rules
+            .rules
+            .iter()
+            .enumerate()
+            .filter(|(_, rule)| {
+                self.rule_is_collectible(rule) && matches_rule(self, rule, &context)
+            })
+            .map(|(idx, _)| idx)
+            .collect::<Vec<_>>();
+        self.sort_rule_indices(&mut sorted_indices);
+        self.execute_sorted_rule_indices(
+            &sorted_indices,
+            &context,
+            command_buffer,
+            |_| true,
+            log_rule,
+            log_action,
+        );
+    }
+
     /// Collects rule commands for a trigger without context.
     pub(in crate::game) fn collect_rule_commands_for_trigger(
         &mut self,
@@ -106,20 +139,10 @@ impl GameState {
         context: TriggerContext,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        let mut sorted_indices = self
-            .rules
-            .rules
-            .iter()
-            .enumerate()
-            .filter(|(_, rule)| self.rule_is_collectible(rule) && rule.trigger == trigger)
-            .map(|(idx, _)| idx)
-            .collect::<Vec<_>>();
-        self.sort_rule_indices(&mut sorted_indices);
-        self.execute_sorted_rule_indices(
-            &sorted_indices,
-            &context,
+        self.collect_rules_for_event(
+            context,
             command_buffer,
-            |_| true,
+            |_, rule, _| rule.trigger == trigger,
             |rule, conditions_result| {
                 debug!(
                     rule_id = %rule.id,
@@ -142,33 +165,21 @@ impl GameState {
     ) {
         let context = TriggerContext::with_pair(event.interactor, event.interactable);
 
-        // Collect matching rule indices to avoid borrow conflicts
-        let mut sorted_indices = self
-            .rules
-            .rules
-            .iter()
-            .enumerate()
-            .filter(|(_, rule)| {
-                self.rule_is_collectible(rule)
-                    && matches!(rule.trigger, RuleTrigger::OnInteract { .. })
-            })
-            .filter(|(_, rule)| {
+        self.collect_rules_for_event(
+            context,
+            command_buffer,
+            |state, rule, context| {
+                if !matches!(rule.trigger, RuleTrigger::OnInteract { .. }) {
+                    return false;
+                }
                 let mode = rule.trigger.interaction_mode().unwrap_or_default();
                 Self::interaction_mode_matches(mode, event.spatial)
-                    && self.entity_filter_matches(
+                    && state.entity_filter_matches(
                         rule.trigger.interact_entity_filter(),
                         event.interactable,
-                        &context,
+                        context,
                     )
-            })
-            .map(|(i, _)| i)
-            .collect::<Vec<_>>();
-        self.sort_rule_indices(&mut sorted_indices);
-        self.execute_sorted_rule_indices(
-            &sorted_indices,
-            &context,
-            command_buffer,
-            |_| true,
+            },
             |rule, conditions_result| {
                 debug!(
                     rule_id = %rule.id,
@@ -229,28 +240,17 @@ impl GameState {
             TriggerContext::with_self_only(event.entity_a)
         };
 
-        let mut sorted_indices = self
-            .rules
-            .rules
-            .iter()
-            .enumerate()
-            .filter(|(_, rule)| {
-                self.rule_is_collectible(rule)
-                    && matches!(rule.trigger, RuleTrigger::OnCollision { .. })
-                    && self.entity_filter_matches(
+        self.collect_rules_for_event(
+            context,
+            command_buffer,
+            |state, rule, context| {
+                matches!(rule.trigger, RuleTrigger::OnCollision { .. })
+                    && state.entity_filter_matches(
                         rule.trigger.collision_entity_filter(),
                         event.entity_a,
-                        &context,
+                        context,
                     )
-            })
-            .map(|(i, _)| i)
-            .collect::<Vec<_>>();
-        self.sort_rule_indices(&mut sorted_indices);
-        self.execute_sorted_rule_indices(
-            &sorted_indices,
-            &context,
-            command_buffer,
-            |_| true,
+            },
             |rule, conditions_result| {
                 if event.entity_b.is_some() {
                     debug!(
@@ -293,28 +293,17 @@ impl GameState {
             TriggerContext::with_self_only(event.victim)
         };
 
-        let mut sorted_indices = self
-            .rules
-            .rules
-            .iter()
-            .enumerate()
-            .filter(|(_, rule)| {
-                self.rule_is_collectible(rule)
-                    && matches!(rule.trigger, RuleTrigger::OnDamaged { .. })
-                    && self.entity_filter_matches(
+        self.collect_rules_for_event(
+            context,
+            command_buffer,
+            |state, rule, context| {
+                matches!(rule.trigger, RuleTrigger::OnDamaged { .. })
+                    && state.entity_filter_matches(
                         rule.trigger.damaged_entity_filter(),
                         event.victim,
-                        &context,
+                        context,
                     )
-            })
-            .map(|(i, _)| i)
-            .collect::<Vec<_>>();
-        self.sort_rule_indices(&mut sorted_indices);
-        self.execute_sorted_rule_indices(
-            &sorted_indices,
-            &context,
-            command_buffer,
-            |_| true,
+            },
             |rule, conditions_result| {
                 debug!(
                     rule_id = %rule.id,
@@ -358,28 +347,17 @@ impl GameState {
             TriggerContext::with_self_only(event.victim)
         };
 
-        let mut sorted_indices = self
-            .rules
-            .rules
-            .iter()
-            .enumerate()
-            .filter(|(_, rule)| {
-                self.rule_is_collectible(rule)
-                    && matches!(rule.trigger, RuleTrigger::OnDeath { .. })
-                    && self.entity_filter_matches(
+        self.collect_rules_for_event(
+            context,
+            command_buffer,
+            |state, rule, context| {
+                matches!(rule.trigger, RuleTrigger::OnDeath { .. })
+                    && state.entity_filter_matches(
                         rule.trigger.death_entity_filter(),
                         event.victim,
-                        &context,
+                        context,
                     )
-            })
-            .map(|(i, _)| i)
-            .collect::<Vec<_>>();
-        self.sort_rule_indices(&mut sorted_indices);
-        self.execute_sorted_rule_indices(
-            &sorted_indices,
-            &context,
-            command_buffer,
-            |_| true,
+            },
             |rule, conditions_result| {
                 tracing::info!(
                     rule_id = %rule.id,

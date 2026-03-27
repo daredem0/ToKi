@@ -214,129 +214,7 @@ impl GameState {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> GameUpdateResult<AudioEvent> {
-        self.play_time_ms = self
-            .play_time_ms
-            .saturating_add(DEFAULT_TIMESTEP_MS.round() as u64);
-        let mut result = GameUpdateResult::new();
-        let mut rule_commands = Vec::new();
-        self.rule_runtime.frame_collisions.clear();
-        self.rule_runtime.frame_damage_events.clear();
-        self.rule_runtime.frame_death_events.clear();
-        self.rule_runtime.frame_interactions.clear();
-        self.rule_runtime.frame_tile_transitions.clear();
-
-        if !self.rule_runtime.started {
-            self.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut rule_commands);
-            self.rule_runtime.started = true;
-        }
-        self.collect_rule_commands_for_trigger(RuleTrigger::OnUpdate, &mut rule_commands);
-        self.collect_rule_commands_for_key_triggers(&mut rule_commands);
-        let (mut pending_rule_animations, mut pending_scene_switch, _, mut pending_persistence) =
-            self.apply_rule_commands(rule_commands, &mut result, tilemap);
-
-        let initial_player_position = self
-            .player_id
-            .and_then(|player_id| self.entity_manager.get_entity(player_id))
-            .map(|entity| entity.position)
-            .unwrap_or(glam::IVec2::ZERO);
-
-        let input_result = self.process_input(world_bounds, tilemap, atlas);
-        result.player_moved = input_result.player_moved;
-        result.add_events(input_result.events);
-
-        if self.apply_rule_velocities(world_bounds, tilemap, atlas, &mut result) {
-            result.player_moved = true;
-        }
-
-        let intended_player_delta = self
-            .player_id
-            .and_then(|player_id| self.entity_manager.get_entity(player_id))
-            .map(|entity| self.held_keys_for_profile(Self::effective_movement_profile(entity)))
-            .map(|keys| Self::movement_delta_from_keys(&keys))
-            .unwrap_or(glam::IVec2::ZERO);
-
-        // Pick moving or idle animation
-        if let Some(player_entity) = self.entity_manager.get_player_mut() {
-            if let Some(animation_controller) = &mut player_entity.attributes.animation_controller {
-                if !Self::action_animation_locks_locomotion(animation_controller) {
-                    let actual_player_delta = player_entity.position - initial_player_position;
-                    let player_delta = if actual_player_delta == glam::IVec2::ZERO {
-                        intended_player_delta
-                    } else {
-                        actual_player_delta
-                    };
-                    // Use intent (direction keys held) for animation, not actual pixel movement.
-                    // This ensures walking animation plays during sub-pixel accumulation.
-                    let is_trying_to_move = intended_player_delta != glam::IVec2::ZERO;
-                    let desired_player_animation = Self::resolve_animation_state(
-                        animation_controller,
-                        is_trying_to_move,
-                        player_delta,
-                    );
-                    if animation_controller.current_clip_state != desired_player_animation {
-                        tracing::debug!(
-                            "Changing clip from  {:?} to {:?}",
-                            animation_controller.current_clip_state,
-                            desired_player_animation
-                        );
-                        animation_controller.play(desired_player_animation);
-                    }
-                }
-            }
-        }
-
-        self.process_profile_actions();
-        self.update_projectiles(tilemap, atlas);
-        self.collect_overlapping_pickups();
-        self.collect_interaction_events();
-        self.resolve_pending_stat_changes();
-
-        // Update NPC AI
-        self.update_npc_ai_fixed(world_bounds, tilemap, atlas, &mut result);
-
-        // Detect tile transitions after all movement is complete
-        self.detect_tile_transitions(tilemap);
-
-        let reactive_rule_commands =
-            self.collect_reactive_rule_commands(result.player_moved, tilemap, atlas);
-        let (mut reactive_animations, reactive_scene_switch, _, reactive_persistence) =
-            self.apply_rule_commands(reactive_rule_commands, &mut result, tilemap);
-        if pending_scene_switch.is_none() {
-            pending_scene_switch = reactive_scene_switch;
-        }
-        if pending_persistence.is_none() {
-            pending_persistence = reactive_persistence;
-        }
-        pending_rule_animations.append(&mut reactive_animations);
-
-        self.apply_rule_animations(pending_rule_animations);
-
-        // Despawn entities that died after death events have been processed
-        self.flush_pending_despawns();
-
-        // Update entity animation timing and emit animation-loop-based movement sounds.
-        let completed_animation_loops = self.entity_manager.update_animations(17.0);
-        for (entity_id, completed_loops) in completed_animation_loops {
-            self.emit_animation_loop_movement_audio(entity_id, completed_loops, &mut result);
-        }
-
-        if let Some(request) = pending_scene_switch {
-            result.request_scene_switch(
-                request.scene_name,
-                request.spawn_point_id,
-                request.transition,
-                request.duration_ms,
-            );
-        }
-        if let Some(crate::events::PersistenceRequest::SaveSlot { slot }) = pending_persistence {
-            result.request_save_slot(slot);
-        } else if let Some(crate::events::PersistenceRequest::LoadSlot { slot }) =
-            pending_persistence
-        {
-            result.request_load_slot(slot);
-        }
-
-        result
+        self.update_with_scale(1.0, world_bounds, tilemap, atlas)
     }
 
     /// Update game state with delta time scaling.
@@ -358,18 +236,18 @@ impl GameState {
         atlas: &AtlasMeta,
     ) -> GameUpdateResult<AudioEvent> {
         let time_scale = delta_ms / DEFAULT_TIMESTEP_MS;
-        self.update_internal(time_scale, delta_ms, world_bounds, tilemap, atlas)
+        self.update_with_scale(time_scale, world_bounds, tilemap, atlas)
     }
 
-    /// Internal update implementation that accepts time scaling parameters.
-    fn update_internal(
+    /// Shared update implementation that scales movement and animation timing.
+    pub fn update_with_scale(
         &mut self,
         time_scale: f32,
-        animation_delta_ms: f32,
         world_bounds: glam::UVec2,
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> GameUpdateResult<AudioEvent> {
+        let animation_delta_ms = (DEFAULT_TIMESTEP_MS * time_scale).max(0.0);
         self.play_time_ms = self
             .play_time_ms
             .saturating_add(animation_delta_ms.max(0.0).round() as u64);
@@ -396,7 +274,11 @@ impl GameState {
             .map(|entity| entity.position)
             .unwrap_or(glam::IVec2::ZERO);
 
-        let input_result = self.process_input_scaled(world_bounds, tilemap, atlas, time_scale);
+        let input_result = if time_scale == 1.0 {
+            self.process_input(world_bounds, tilemap, atlas)
+        } else {
+            self.process_input_scaled(world_bounds, tilemap, atlas, time_scale)
+        };
         result.player_moved = input_result.player_moved;
         result.add_events(input_result.events);
 

@@ -9,6 +9,7 @@ use thiserror::Error;
 
 pub const SAVE_DATA_VERSION: u32 = 1;
 pub const MAX_SAVE_SLOTS: u8 = 3;
+pub const MAX_SAVE_FILE_SIZE: u64 = 8 * 1024 * 1024;
 
 #[derive(Debug, Error)]
 pub enum SerializationError {
@@ -18,6 +19,14 @@ pub enum SerializationError {
     Io(#[from] std::io::Error),
     #[error("invalid save slot {0}; expected 1..={MAX_SAVE_SLOTS}")]
     InvalidSaveSlot(u8),
+    #[error("unsupported save data version {actual}; expected {expected}")]
+    InvalidSaveVersion { expected: u32, actual: u32 },
+    #[error("file is too large to load safely: {path} ({size_bytes} bytes, max {max_bytes})")]
+    FileTooLarge {
+        path: String,
+        size_bytes: u64,
+        max_bytes: u64,
+    },
     #[error("failed to restore save data: {0}")]
     Restore(String),
 }
@@ -110,6 +119,17 @@ impl SaveData {
     }
 }
 
+pub fn validate_version(version: u32) -> Result<(), SerializationError> {
+    if version == SAVE_DATA_VERSION {
+        Ok(())
+    } else {
+        Err(SerializationError::InvalidSaveVersion {
+            expected: SAVE_DATA_VERSION,
+            actual: version,
+        })
+    }
+}
+
 fn validate_save_slot(slot: u8) -> Result<(), SerializationError> {
     if (1..=MAX_SAVE_SLOTS).contains(&slot) {
         Ok(())
@@ -125,7 +145,7 @@ pub fn save_entity_to_file(entity: &Entity, path: &str) -> Result<(), Serializat
 }
 
 pub fn load_entity_from_file(path: &str) -> Result<Entity, SerializationError> {
-    let json = fs::read_to_string(path)?;
+    let json = read_text_file_with_limit(path, MAX_SAVE_FILE_SIZE)?;
     let entity: Entity = serde_json::from_str(&json)?;
     Ok(entity)
 }
@@ -137,7 +157,7 @@ pub fn save_scene(entity_manager: &EntityManager, path: &str) -> Result<(), Seri
 }
 
 pub fn load_scene(path: &str) -> Result<EntityManager, SerializationError> {
-    let json = fs::read_to_string(path)?;
+    let json = read_text_file_with_limit(path, MAX_SAVE_FILE_SIZE)?;
     let entity_manager: EntityManager = serde_json::from_str(&json)?;
     Ok(entity_manager)
 }
@@ -152,8 +172,9 @@ pub fn save_save_data(
 }
 
 pub fn load_save_data(path: impl AsRef<Path>) -> Result<SaveData, SerializationError> {
-    let json = fs::read_to_string(path)?;
+    let json = read_text_file_with_limit(path.as_ref(), MAX_SAVE_FILE_SIZE)?;
     let save_data: SaveData = serde_json::from_str(&json)?;
+    validate_version(save_data.version)?;
     Ok(save_data)
 }
 
@@ -204,4 +225,20 @@ pub fn list_save_slot_metadata(
     (1..=MAX_SAVE_SLOTS)
         .map(|slot| read_save_slot_metadata(save_root.as_ref(), slot))
         .collect()
+}
+
+fn read_text_file_with_limit(
+    path: impl AsRef<Path>,
+    max_bytes: u64,
+) -> Result<String, SerializationError> {
+    let path = path.as_ref();
+    let metadata = fs::metadata(path)?;
+    if metadata.len() > max_bytes {
+        return Err(SerializationError::FileTooLarge {
+            path: path.display().to_string(),
+            size_bytes: metadata.len(),
+            max_bytes,
+        });
+    }
+    Ok(fs::read_to_string(path)?)
 }
