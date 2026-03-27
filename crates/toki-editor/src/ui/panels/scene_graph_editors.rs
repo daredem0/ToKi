@@ -269,11 +269,23 @@ impl PanelSystem {
             RuleAction::SwitchScene {
                 scene_name,
                 spawn_point_id,
+                duration_ms,
+                ..
             } => {
                 let mut changed = ui.text_edit_singleline(scene_name).changed();
                 ui.end_row();
                 ui.label("Spawn Point");
                 changed |= ui.text_edit_singleline(spawn_point_id).changed();
+                ui.end_row();
+                ui.label("Fade Override (ms)");
+                let mut value = duration_ms.unwrap_or(0) as i64;
+                if ui
+                    .add(egui::DragValue::new(&mut value).speed(1.0).range(0..=60_000))
+                    .changed()
+                {
+                    *duration_ms = if value <= 0 { None } else { Some(value as u32) };
+                    changed = true;
+                }
                 changed
             }
             RuleAction::StartDialog { dialog_id } => {

@@ -68,6 +68,7 @@ fn solid_entity() -> Entity {
         entity_kind: EntityKind::Npc,
         category: "creature".to_string(),
         definition_name: Some("test".to_string()),
+        persistent_across_saves: false,
         control_role: crate::entity::ControlRole::None,
         audio: crate::entity::EntityAudioSettings::default(),
         attributes: EntityAttributes::default(),

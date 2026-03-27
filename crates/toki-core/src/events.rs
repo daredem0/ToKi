@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use crate::dialog::DialogRuntimeContext;
+use crate::project_runtime::SceneTransitionEffect;
 
 /// Trait that all game events must implement
 pub trait GameEvent: std::fmt::Debug + Clone + Send + Sync {}
@@ -67,6 +68,8 @@ pub trait EventHandler<T: GameEvent> {
 pub struct SceneSwitchRequest {
     pub scene_name: String,
     pub spawn_point_id: String,
+    pub transition: Option<SceneTransitionEffect>,
+    pub duration_ms: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -133,10 +136,14 @@ impl<T: GameEvent> GameUpdateResult<T> {
         &mut self,
         scene_name: impl Into<String>,
         spawn_point_id: impl Into<String>,
+        transition: Option<SceneTransitionEffect>,
+        duration_ms: Option<u32>,
     ) {
         self.scene_switch_request = Some(SceneSwitchRequest {
             scene_name: scene_name.into(),
             spawn_point_id: spawn_point_id.into(),
+            transition,
+            duration_ms,
         });
     }
 

@@ -391,6 +391,8 @@ impl InspectorSystem {
             RuleAction::SwitchScene {
                 scene_name,
                 spawn_point_id,
+                transition,
+                duration_ms,
             } => {
                 changed |= Self::render_switch_scene_editor(
                     ui,
@@ -400,6 +402,8 @@ impl InspectorSystem {
                     ),
                     scene_name,
                     spawn_point_id,
+                    transition,
+                    duration_ms,
                     scenes,
                 );
             }

@@ -340,6 +340,7 @@ fn resolve_post_splash_sprite_texture_path_prefers_project_creatures_texture() {
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
         transition: Default::default(),
+        flags: Default::default(),
         menu: MenuSettings::default(),
         dialog_appearance: Default::default(),
     };
@@ -377,6 +378,7 @@ fn resolve_post_splash_sprite_texture_path_prefers_content_root_over_project_pat
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
         transition: Default::default(),
+        flags: Default::default(),
         menu: MenuSettings::default(),
         dialog_appearance: Default::default(),
     };
@@ -444,6 +446,7 @@ fn build_startup_state_loads_resources_and_scene_from_pack_mount() {
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
         transition: Default::default(),
+        flags: Default::default(),
         menu: MenuSettings::default(),
         dialog_appearance: Default::default(),
     };
@@ -560,6 +563,7 @@ fn build_startup_state_uses_scene_player_entry_and_preloads_all_scenes() {
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
         transition: Default::default(),
+        flags: Default::default(),
         menu: MenuSettings::default(),
         dialog_appearance: Default::default(),
     };
@@ -669,6 +673,7 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
         transition: Default::default(),
+        flags: Default::default(),
         menu: MenuSettings::default(),
         dialog_appearance: Default::default(),
     };
@@ -732,6 +737,8 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
                 actions: vec![RuleAction::SwitchScene {
                     scene_name: "Second".to_string(),
                     spawn_point_id: "entry_b".to_string(),
+                    transition: None,
+                    duration_ms: None,
                 }],
             }],
         },
@@ -831,6 +838,7 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
         transition: super::RuntimeTransitionOptions {
             fade_duration_ms: 100,
         },
+        flags: Default::default(),
         menu: MenuSettings::default(),
         dialog_appearance: Default::default(),
     };
@@ -919,6 +927,7 @@ fn build_startup_state_from_pack_returns_error_when_required_assets_are_missing(
         audio_mix: RuntimeAudioMixOptions::default(),
         display: RuntimeDisplayOptions::default(),
         transition: Default::default(),
+        flags: Default::default(),
         menu: MenuSettings::default(),
         dialog_appearance: Default::default(),
     };

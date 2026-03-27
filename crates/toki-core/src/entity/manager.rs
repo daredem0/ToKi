@@ -95,6 +95,7 @@ impl EntityManager {
             entity_kind,
             category: Self::legacy_category_for_kind(&entity_kind).to_string(),
             definition_name: None,
+            persistent_across_saves: false,
             control_role: ControlRole::LegacyDefault,
             audio: EntityAudioSettings::default(),
             attributes,

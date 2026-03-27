@@ -10,6 +10,8 @@ pub(crate) struct DialogEditorState {
     pub loaded_dialog_id: Option<String>,
     pub draft: Option<DialogTree>,
     pub selected_node_id: Option<String>,
+    pub node_id_edit_target: Option<String>,
+    pub node_id_edit_value: String,
     pub dirty: bool,
     pub status_message: Option<String>,
 }
@@ -32,6 +34,7 @@ impl DialogEditorState {
                     DialogNode {
                         id: start_id,
                         speaker_name: Some("NPC".to_string()),
+                        conditions: Vec::new(),
                         kind: DialogNodeKind::Line {
                             body: "Hello.".to_string(),
                             next_node_id: Some(end_id.clone()),
@@ -40,6 +43,7 @@ impl DialogEditorState {
                     DialogNode {
                         id: end_id.clone(),
                         speaker_name: None,
+                        conditions: Vec::new(),
                         kind: DialogNodeKind::End {
                             body: String::new(),
                             outcome_id: Some("done".to_string()),
@@ -48,6 +52,8 @@ impl DialogEditorState {
                 ],
             }),
             selected_node_id: Some("start".to_string()),
+            node_id_edit_target: Some("start".to_string()),
+            node_id_edit_value: "start".to_string(),
             dirty: true,
             status_message: Some("Created new dialog draft".to_string()),
         }
@@ -62,9 +68,24 @@ impl DialogEditorState {
         self.selected_dialog_id = Some(dialog.id.clone());
         self.loaded_dialog_id = Some(dialog.id.clone());
         self.draft = Some(dialog);
-        self.selected_node_id = selected_node_id;
+        self.selected_node_id = selected_node_id.clone();
+        self.node_id_edit_target = selected_node_id.clone();
+        self.node_id_edit_value = selected_node_id.unwrap_or_default();
         self.dirty = false;
         self.status_message = None;
+    }
+
+    pub fn select_dialog_node(&mut self, node_id: String) {
+        self.selected_node_id = Some(node_id.clone());
+        self.node_id_edit_target = Some(node_id.clone());
+        self.node_id_edit_value = node_id;
+    }
+
+    pub fn sync_node_id_editor(&mut self, selected_node_id: Option<&str>) {
+        if self.node_id_edit_target.as_deref() != selected_node_id {
+            self.node_id_edit_target = selected_node_id.map(str::to_string);
+            self.node_id_edit_value = selected_node_id.unwrap_or_default().to_string();
+        }
     }
 
     pub fn collect_available_dialogs(dialogs: &[DialogTree]) -> BTreeMap<String, Vec<String>> {
@@ -131,6 +152,8 @@ mod tests {
         let dialog = state.draft.as_ref().expect("draft");
         assert!(dialog.validate().is_valid());
         assert_eq!(state.selected_node_id.as_deref(), Some("start"));
+        assert_eq!(state.node_id_edit_target.as_deref(), Some("start"));
+        assert_eq!(state.node_id_edit_value, "start");
     }
 
     #[test]
@@ -144,6 +167,7 @@ mod tests {
             nodes: vec![DialogNode {
                 id: "end".to_string(),
                 speaker_name: None,
+                conditions: Vec::new(),
                 kind: DialogNodeKind::End {
                     body: String::new(),
                     outcome_id: Some("accepted".to_string()),
@@ -152,5 +176,22 @@ mod tests {
         }];
         let available = DialogEditorState::collect_available_dialogs(&dialogs);
         assert_eq!(available.get("intro"), Some(&vec!["accepted".to_string()]));
+    }
+
+    #[test]
+    fn sync_node_id_editor_tracks_selected_node() {
+        let mut state = DialogEditorState::default();
+
+        state.sync_node_id_editor(Some("start"));
+        assert_eq!(state.node_id_edit_target.as_deref(), Some("start"));
+        assert_eq!(state.node_id_edit_value, "start");
+
+        state.node_id_edit_value = "draft_value".to_string();
+        state.sync_node_id_editor(Some("start"));
+        assert_eq!(state.node_id_edit_value, "draft_value");
+
+        state.sync_node_id_editor(Some("end"));
+        assert_eq!(state.node_id_edit_target.as_deref(), Some("end"));
+        assert_eq!(state.node_id_edit_value, "end");
     }
 }

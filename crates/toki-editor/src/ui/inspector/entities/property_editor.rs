@@ -67,6 +67,14 @@ impl InspectorSystem {
         changed |= ui
             .checkbox(&mut draft.has_inventory, "Has Inventory")
             .changed();
+        if show_position {
+            changed |= ui
+                .checkbox(
+                    &mut draft.persistent_across_saves,
+                    "Persistent Across Saves",
+                )
+                .changed();
+        }
 
         if !is_static_item {
             ui.separator();

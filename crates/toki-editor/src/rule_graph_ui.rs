@@ -288,6 +288,7 @@ pub fn rule_graph_action_summary(action: &RuleAction, style: RuleGraphSummarySty
         RuleAction::SwitchScene {
             scene_name,
             spawn_point_id,
+            ..
         } => {
             let scene = if matches!(style, RuleGraphSummaryStyle::Detailed) && scene_name.is_empty()
             {

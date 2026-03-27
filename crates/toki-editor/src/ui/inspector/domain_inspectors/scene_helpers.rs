@@ -183,11 +183,17 @@ pub fn render_rules_editor_section(
     let mut edited_rules = before_rules.clone();
 
     let map_size = extract_map_size(ctx, scene_index);
+    let declared_flags = ctx
+        .project
+        .as_ref()
+        .map(|project| project.metadata.runtime.flags.declarations.as_slice())
+        .unwrap_or(&[]);
     let rules_changed = InspectorSystem::render_scene_rules_editor(
         ui,
         scene_name,
         &mut edited_rules,
         &ctx.ui_state.scenes,
+        declared_flags,
         &ctx.ui_state.project.available_dialog_outcomes,
         ctx.config,
         map_size,

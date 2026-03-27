@@ -93,7 +93,19 @@ impl SaveData {
                 position: camera_position,
                 scale: camera_scale,
             },
-            persisted_entities: Vec::new(),
+            persisted_entities: game_state
+                .persistent_scene_entity_keys()
+                .into_iter()
+                .map(|(scene_name, entity_id)| PersistedSceneEntityState {
+                    entity: game_state
+                        .scene_manager()
+                        .get_scene(&scene_name)
+                        .and_then(|scene| scene.get_entity(entity_id))
+                        .cloned(),
+                    scene_name,
+                    entity_id,
+                })
+                .collect(),
         })
     }
 }

@@ -103,6 +103,7 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
     draft.has_inventory = true;
     draft.speed = -10.0;
     draft.render_layer = 8;
+    draft.persistent_across_saves = true;
     draft.health_enabled = true;
     draft.health_value = -4;
     draft.attack_power_enabled = true;
@@ -142,6 +143,7 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
     assert!(entity.attributes.has_inventory);
     assert_eq!(entity.attributes.speed, 0.0);
     assert_eq!(entity.attributes.render_layer, 8);
+    assert!(entity.persistent_across_saves);
     assert_eq!(entity.attributes.health, Some(0));
     assert_eq!(entity.attributes.current_stat(HEALTH_STAT_ID), Some(0));
     assert_eq!(
@@ -274,6 +276,11 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
         post_process_quantize_palette_id: "gray".to_string(),
         post_process_gb_contrast_percent: 0,
         post_process_vignette_strength_percent: 60,
+        flag_declarations: vec![toki_core::project_runtime::ProjectFlagDefinition {
+            id: "quest_done".to_string(),
+            default_value: toki_core::FlagValue::Bool(false),
+        }],
+        transition_default_duration_ms: 420,
     };
 
     let changed = InspectorSystem::apply_project_settings_draft(&mut project, &draft);
@@ -289,6 +296,11 @@ fn apply_project_settings_draft_updates_metadata_and_marks_project_dirty() {
     assert!(!project.metadata.runtime.display.show_ground_shadows);
     assert_eq!(project.metadata.runtime.audio.master_percent, 85);
     assert_eq!(project.metadata.runtime.audio.music_percent, 70);
+    assert_eq!(project.metadata.runtime.flags.declarations, draft.flag_declarations);
+    assert_eq!(
+        project.metadata.runtime.scene_transitions.default_duration_ms,
+        420
+    );
     assert_eq!(project.metadata.runtime.audio.movement_percent, 55);
     assert_eq!(project.metadata.runtime.audio.collision_percent, 35);
     assert!(project.is_dirty);
@@ -849,7 +861,8 @@ fn add_remove_and_switch_action_types() {
         rule.actions[6],
         RuleAction::SwitchScene {
             ref scene_name,
-            ref spawn_point_id
+            ref spawn_point_id,
+            ..
         } if scene_name.is_empty() && spawn_point_id.is_empty()
     ));
 
@@ -957,6 +970,8 @@ fn validate_rule_set_reports_duplicate_ids_and_invalid_action_payloads() {
         actions: vec![RuleAction::SwitchScene {
             scene_name: "   ".to_string(),
             spawn_point_id: "   ".to_string(),
+            transition: None,
+            duration_ms: None,
         }],
     };
 
@@ -1011,6 +1026,43 @@ fn validate_rule_set_reports_empty_play_music_track() {
 }
 
 #[test]
+fn validate_rule_set_for_scene_warns_for_undeclared_flags() {
+    let rules = RuleSet {
+        rules: vec![Rule {
+            id: "flag_rule".to_string(),
+            enabled: true,
+            priority: 0,
+            once: false,
+            trigger: RuleTrigger::OnUpdate,
+            conditions: vec![RuleCondition::FlagSet {
+                flag: "missing_flag".to_string(),
+            }],
+            actions: vec![RuleAction::SetFlag {
+                flag: "missing_flag".to_string(),
+                value: toki_core::FlagValue::Bool(true),
+            }],
+        }],
+    };
+
+    let issues = InspectorSystem::validate_rule_set_for_scene(
+        &rules,
+        "Main Scene",
+        &[],
+        &[toki_core::project_runtime::ProjectFlagDefinition {
+            id: "declared_flag".to_string(),
+            default_value: toki_core::FlagValue::Bool(false),
+        }],
+    );
+
+    assert!(issues
+        .iter()
+        .any(|issue| issue.message.contains("references undeclared flag 'missing_flag'")));
+    assert!(issues
+        .iter()
+        .any(|issue| issue.message.contains("Flag action references undeclared flag 'missing_flag'")));
+}
+
+#[test]
 fn validate_rule_set_for_scene_reports_invalid_switch_scene_targets() {
     let mut target_scene = Scene::new("Target Scene".to_string());
     target_scene.add_anchor(SceneAnchor {
@@ -1033,16 +1085,20 @@ fn validate_rule_set_for_scene_reports_invalid_switch_scene_targets() {
                 RuleAction::SwitchScene {
                     scene_name: "Missing Scene".to_string(),
                     spawn_point_id: "spawn_a".to_string(),
+                    transition: None,
+                    duration_ms: None,
                 },
                 RuleAction::SwitchScene {
                     scene_name: "Target Scene".to_string(),
                     spawn_point_id: "missing_spawn".to_string(),
+                    transition: None,
+                    duration_ms: None,
                 },
             ],
         }],
     };
 
-    let issues = InspectorSystem::validate_rule_set_for_scene(&rules, "Main Scene", &scenes);
+    let issues = InspectorSystem::validate_rule_set_for_scene(&rules, "Main Scene", &scenes, &[]);
     assert!(issues.iter().any(|issue| issue
         .message
         .contains("SwitchScene target scene 'Missing Scene' does not exist")));

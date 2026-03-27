@@ -118,6 +118,7 @@ impl EntityBuilder {
             entity_kind: self.entity_kind,
             category,
             definition_name: self.definition_name,
+            persistent_across_saves: false,
             control_role: self.control_role,
             audio: self.audio,
             attributes: self.attributes,

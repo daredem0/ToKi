@@ -78,6 +78,9 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             self.audio_mix.music_percent,
         ) {
             super::app_transition::TransitionAdvance::ReadyToSwap(request) => {
+                self.game_system
+                    .game_state
+                    .sync_persistent_entities_to_active_scene();
                 if self.scene_persistence {
                     self.game_system.sync_entities_to_active_scene();
                 }

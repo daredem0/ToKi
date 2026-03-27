@@ -22,7 +22,7 @@ pub mod palette;
 pub mod project_assets;
 pub mod project_content;
 pub mod project_runtime;
-pub use project_runtime::TimingMode;
+pub use project_runtime::{SceneTransitionEffect, TimingMode};
 
 pub mod fonts;
 pub mod menu;

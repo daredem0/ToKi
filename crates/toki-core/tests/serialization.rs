@@ -118,6 +118,7 @@ fn create_test_entity() -> Entity {
         entity_kind: EntityKind::Player,
         category: "human".to_string(),
         definition_name: Some("player".to_string()),
+        persistent_across_saves: false,
         control_role: ControlRole::PlayerCharacter,
         audio: EntityAudioSettings {
             footstep_trigger_distance: 32.0,
@@ -172,6 +173,16 @@ fn create_save_test_state() -> GameState {
     game_state
 }
 
+fn persistent_npc(id: u32, position: IVec2) -> Entity {
+    let mut entity = create_test_entity();
+    entity.id = id;
+    entity.entity_kind = EntityKind::Npc;
+    entity.control_role = ControlRole::None;
+    entity.position = position;
+    entity.persistent_across_saves = true;
+    entity
+}
+
 #[test]
 fn test_entity_roundtrip_serialization() {
     let entity = create_test_entity();
@@ -204,6 +215,7 @@ fn test_entity_minimal_fields() {
         entity_kind: EntityKind::Item,
         category: "item".to_string(),
         definition_name: None,
+        persistent_across_saves: false,
         control_role: ControlRole::None,
         audio: EntityAudioSettings::default(),
         attributes: EntityAttributes::default(),
@@ -222,6 +234,67 @@ fn test_entity_minimal_fields() {
     assert!(deserialized.collision_box.is_none());
     assert!(deserialized.attributes.animation_controller.is_none());
     assert_eq!(deserialized.attributes.health, None);
+}
+
+#[test]
+fn save_data_capture_persists_only_persistent_scene_entities() {
+    let mut game_state = GameState::new_empty();
+    let mut scene = Scene::new("main".to_string());
+    let persistent = persistent_npc(2, IVec2::new(10, 10));
+    let mut transient = persistent_npc(3, IVec2::new(20, 20));
+    transient.persistent_across_saves = false;
+    scene.entities.push(persistent);
+    scene.entities.push(transient);
+    game_state.add_scene(scene);
+    game_state.load_scene("main").expect("scene should load");
+
+    if let Some(entity) = game_state.entity_manager_mut().get_entity_mut(2) {
+        entity.position = IVec2::new(99, 88);
+    }
+    game_state
+        .entity_manager_mut()
+        .despawn_entity(3);
+    game_state.sync_persistent_entities_to_active_scene();
+
+    let save = SaveData::capture(&game_state, 1).expect("save should capture");
+
+    assert_eq!(save.persisted_entities.len(), 1);
+    assert_eq!(save.persisted_entities[0].scene_name, "main");
+    assert_eq!(save.persisted_entities[0].entity_id, 2);
+    assert_eq!(
+        save.persisted_entities[0]
+            .entity
+            .as_ref()
+            .expect("persistent entity should be saved")
+            .position,
+        IVec2::new(99, 88)
+    );
+}
+
+#[test]
+fn restore_from_save_data_reapplies_removed_persistent_entities_as_missing() {
+    let mut game_state = GameState::new_empty();
+    let mut scene = Scene::new("main".to_string());
+    scene.entities.push(persistent_npc(2, IVec2::new(10, 10)));
+    game_state.add_scene(scene);
+    game_state.load_scene("main").expect("scene should load");
+    game_state.entity_manager_mut().despawn_entity(2);
+    game_state.sync_persistent_entities_to_active_scene();
+
+    let save = SaveData::capture(&game_state, 1).expect("save should capture");
+    assert_eq!(save.persisted_entities.len(), 1);
+    assert!(save.persisted_entities[0].entity.is_none());
+
+    let mut restored = GameState::new_empty();
+    let mut restored_scene = Scene::new("main".to_string());
+    restored_scene.entities.push(persistent_npc(2, IVec2::new(10, 10)));
+    restored.add_scene(restored_scene);
+    restored.load_scene("main").expect("scene should load");
+    restored
+        .restore_from_save_data(&save)
+        .expect("save should restore");
+
+    assert!(restored.active_scene().and_then(|scene| scene.get_entity(2)).is_none());
 }
 
 #[test]

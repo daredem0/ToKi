@@ -81,6 +81,7 @@ pub(super) struct EntityPropertyDraft {
     pub(super) has_inventory: bool,
     pub(super) speed: f64,
     pub(super) render_layer: i32,
+    pub(super) persistent_across_saves: bool,
     pub(super) health_enabled: bool,
     pub(super) health_value: i64,
     pub(super) attack_power_enabled: bool,
@@ -212,6 +213,7 @@ impl EntityPropertyDraft {
             has_inventory: entity.attributes.has_inventory,
             speed: entity.attributes.speed as f64,
             render_layer: entity.attributes.render_layer,
+            persistent_across_saves: entity.persistent_across_saves,
             health_enabled,
             health_value,
             attack_power_enabled,
@@ -293,6 +295,7 @@ impl EntityPropertyDraft {
             has_inventory: definition.attributes.has_inventory,
             speed: definition.attributes.speed as f64,
             render_layer: definition.rendering.render_layer,
+            persistent_across_saves: false,
             health_enabled,
             health_value,
             attack_power_enabled,
@@ -386,7 +389,13 @@ impl InspectorSystem {
                             );
                         }
                         super::editor_ui::RightPanelTab::Project => {
-                            Self::render_project_settings_panel(ui_state, ui, project, config);
+                            Self::render_project_settings_panel(
+                                ui_state,
+                                ui,
+                                project,
+                                project_assets,
+                                config,
+                            );
                         }
                     }
                 });

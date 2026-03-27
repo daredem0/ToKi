@@ -1,5 +1,6 @@
 use crate::menu::{MenuAppearance, MenuSettings};
 use crate::palette::{resolve_palette, Palette4};
+use crate::FlagValue;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -65,6 +66,56 @@ pub struct RuntimeSettings {
     pub menu: MenuSettings,
     #[serde(default)]
     pub dialog_appearance: MenuAppearance,
+    #[serde(default)]
+    pub flags: RuntimeFlagSettings,
+    #[serde(default)]
+    pub scene_transitions: RuntimeSceneTransitionSettings,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct RuntimeFlagSettings {
+    #[serde(default)]
+    pub declarations: Vec<ProjectFlagDefinition>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProjectFlagDefinition {
+    pub id: String,
+    #[serde(default = "default_project_flag_value")]
+    pub default_value: FlagValue,
+}
+
+impl Default for ProjectFlagDefinition {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            default_value: default_project_flag_value(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SceneTransitionEffect {
+    #[default]
+    Fade,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeSceneTransitionSettings {
+    #[serde(default)]
+    pub default_effect: SceneTransitionEffect,
+    #[serde(default = "default_scene_transition_duration_ms")]
+    pub default_duration_ms: u32,
+}
+
+impl Default for RuntimeSceneTransitionSettings {
+    fn default() -> Self {
+        Self {
+            default_effect: SceneTransitionEffect::default(),
+            default_duration_ms: default_scene_transition_duration_ms(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
@@ -383,6 +434,14 @@ pub const fn default_show_ground_shadows() -> bool {
 
 pub const fn default_scene_persistence() -> bool {
     false
+}
+
+pub fn default_project_flag_value() -> FlagValue {
+    FlagValue::Bool(false)
+}
+
+pub const fn default_scene_transition_duration_ms() -> u32 {
+    250
 }
 
 /// Default zoom level (100 = 1.0x, no zoom)

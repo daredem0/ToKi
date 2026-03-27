@@ -1,8 +1,10 @@
 use crate::menu::{MenuAppearance, MenuTextAppearance};
 use crate::project_runtime::{
-    PostProcessMode, ProjectPreset, ProjectRuntimeMetadata, QuantizeStrategy, RuntimeConfigFile,
-    RuntimeDisplaySettings, RuntimePostProcessSettings, RuntimeSettings,
+    PostProcessMode, ProjectFlagDefinition, ProjectPreset, ProjectRuntimeMetadata,
+    QuantizeStrategy, RuntimeConfigFile, RuntimeDisplaySettings, RuntimePostProcessSettings,
+    RuntimeSettings, SceneTransitionEffect,
 };
+use crate::FlagValue;
 
 #[test]
 fn project_preset_topdown_returns_gameboy_resolution() {
@@ -61,6 +63,12 @@ fn runtime_settings_defaults_match_engine_baseline() {
     assert_eq!(settings.display.resolution_height, 144);
     assert_eq!(settings.menu.pause_root_screen_id, "pause_menu");
     assert_eq!(settings.dialog_appearance, MenuAppearance::default());
+    assert!(settings.flags.declarations.is_empty());
+    assert_eq!(
+        settings.scene_transitions.default_effect,
+        SceneTransitionEffect::Fade
+    );
+    assert_eq!(settings.scene_transitions.default_duration_ms, 250);
 }
 
 #[test]
@@ -182,6 +190,54 @@ fn runtime_metadata_supports_dedicated_dialog_appearance() {
             cursive: false,
         }
     );
+}
+
+#[test]
+fn runtime_metadata_supports_project_flag_declarations() {
+    let metadata: ProjectRuntimeMetadata = toml::from_str(
+        r#"
+        [[runtime.flags.declarations]]
+        id = "quest_done"
+        default_value = { type = "bool", value = true }
+
+        [[runtime.flags.declarations]]
+        id = "coins"
+        default_value = { type = "int", value = 3 }
+        "#,
+    )
+    .expect("runtime metadata should deserialize");
+
+    assert_eq!(
+        metadata.runtime.flags.declarations,
+        vec![
+            ProjectFlagDefinition {
+                id: "quest_done".to_string(),
+                default_value: FlagValue::Bool(true),
+            },
+            ProjectFlagDefinition {
+                id: "coins".to_string(),
+                default_value: FlagValue::Int(3),
+            }
+        ]
+    );
+}
+
+#[test]
+fn runtime_metadata_supports_transition_defaults() {
+    let metadata: ProjectRuntimeMetadata = toml::from_str(
+        r#"
+        [runtime.scene_transitions]
+        default_effect = "fade"
+        default_duration_ms = 420
+        "#,
+    )
+    .expect("runtime metadata should deserialize");
+
+    assert_eq!(
+        metadata.runtime.scene_transitions.default_effect,
+        SceneTransitionEffect::Fade
+    );
+    assert_eq!(metadata.runtime.scene_transitions.default_duration_ms, 420);
 }
 
 #[test]

@@ -1,4 +1,4 @@
-use crate::project::ProjectAssets;
+use crate::project::{Project, ProjectAssets};
 use crate::ui::editor_ui::{sync_dialog_registry, EditorUI};
 use egui::Ui;
 use toki_core::dialog::{
@@ -31,6 +31,7 @@ pub(super) fn render_dialog_editor(
     ui: &mut Ui,
     ui_state: &mut EditorUI,
     project_assets: Option<&mut ProjectAssets>,
+    project: Option<&mut Project>,
 ) {
     let Some(project_assets) = project_assets else {
         ui.label("Open a project to author dialog assets.");
@@ -38,10 +39,19 @@ pub(super) fn render_dialog_editor(
     };
 
     sync_dialog_registry(ui_state, project_assets);
-    render_dialog_main(ui, ui_state, project_assets);
+    let declared_flags = project
+        .as_ref()
+        .map(|project| project.metadata.runtime.flags.declarations.as_slice())
+        .unwrap_or(&[]);
+    render_dialog_main(ui, ui_state, project_assets, declared_flags);
 }
 
-fn render_dialog_main(ui: &mut Ui, ui_state: &mut EditorUI, project_assets: &mut ProjectAssets) {
+fn render_dialog_main(
+    ui: &mut Ui,
+    ui_state: &mut EditorUI,
+    project_assets: &mut ProjectAssets,
+    declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+) {
     let Some(mut dialog) = ui_state.dialog.draft.take() else {
         ui.label("No dialog selected.");
         return;
@@ -111,6 +121,9 @@ fn render_dialog_main(ui: &mut Ui, ui_state: &mut EditorUI, project_assets: &mut
             ui.colored_label(egui::Color32::from_rgb(255, 210, 80), warning);
         }
     }
+    for warning in undeclared_flag_warnings(&dialog, declared_flags) {
+        ui.colored_label(egui::Color32::from_rgb(255, 210, 80), warning);
+    }
 
     ui.separator();
     ui.columns(2, |columns| {
@@ -124,6 +137,74 @@ fn render_dialog_main(ui: &mut Ui, ui_state: &mut EditorUI, project_assets: &mut
         ui_state.dialog.dirty = true;
     }
     ui_state.dialog.draft = Some(dialog);
+}
+
+fn undeclared_flag_warnings(
+    dialog: &toki_core::dialog::DialogTree,
+    declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+) -> Vec<String> {
+    if declared_flags.is_empty() {
+        return Vec::new();
+    }
+    let declared = declared_flags
+        .iter()
+        .map(|flag| flag.id.trim())
+        .filter(|id| !id.is_empty())
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut warnings = Vec::new();
+    for node in &dialog.nodes {
+        collect_undeclared_dialog_condition_warnings(
+            &node.conditions,
+            &declared,
+            &mut warnings,
+            format!("node '{}'", node.id),
+        );
+        match &node.kind {
+            DialogNodeKind::Choice { choices, .. } => {
+                for choice in choices {
+                    collect_undeclared_dialog_condition_warnings(
+                        &choice.conditions,
+                        &declared,
+                        &mut warnings,
+                        format!("choice '{}' in node '{}'", choice.id, node.id),
+                    );
+                }
+            }
+            DialogNodeKind::Branch { branches, .. } => {
+                for (index, branch) in branches.iter().enumerate() {
+                    collect_undeclared_dialog_condition_warnings(
+                        &branch.conditions,
+                        &declared,
+                        &mut warnings,
+                        format!("branch {} in node '{}'", index + 1, node.id),
+                    );
+                }
+            }
+            DialogNodeKind::Line { .. } | DialogNodeKind::End { .. } => {}
+        }
+    }
+    warnings
+}
+
+fn collect_undeclared_dialog_condition_warnings(
+    conditions: &[DialogCondition],
+    declared: &std::collections::BTreeSet<&str>,
+    warnings: &mut Vec<String>,
+    scope: String,
+) {
+    for condition in conditions {
+        let Some(flag) = (match condition {
+            DialogCondition::FlagEquals { flag, .. }
+            | DialogCondition::FlagSet { flag }
+            | DialogCondition::FlagGreaterThan { flag, .. } => Some(flag.trim()),
+            _ => None,
+        }) else {
+            continue;
+        };
+        if !flag.is_empty() && !declared.contains(flag) {
+            warnings.push(format!("{scope} references undeclared flag '{flag}'"));
+        }
+    }
 }
 
 fn render_node_list(
@@ -144,9 +225,10 @@ fn render_node_list(
                 dialog.nodes.push(DialogNode {
                     id: new_id.clone(),
                     speaker_name: None,
+                    conditions: Vec::new(),
                     kind: default_node_kind(kind),
                 });
-                ui_state.dialog.selected_node_id = Some(new_id);
+                ui_state.dialog.select_dialog_node(new_id);
                 *dirty = true;
             }
         }
@@ -156,7 +238,7 @@ fn render_node_list(
         for node in &dialog.nodes {
             let selected = ui_state.dialog.selected_node_id.as_deref() == Some(node.id.as_str());
             if ui.selectable_label(selected, &node.id).clicked() {
-                ui_state.dialog.selected_node_id = Some(node.id.clone());
+                ui_state.dialog.select_dialog_node(node.id.clone());
             }
         }
     });
@@ -172,6 +254,9 @@ fn render_node_editor(
         ui.label("Select a node.");
         return;
     };
+    ui_state
+        .dialog
+        .sync_node_id_editor(Some(selected_node_id.as_str()));
     let Some(node_index) = dialog
         .nodes
         .iter()
@@ -180,12 +265,69 @@ fn render_node_editor(
         ui.label("Selected node no longer exists.");
         return;
     };
-    let node = &mut dialog.nodes[node_index];
+
+    let mut deleted = false;
+    ui.horizontal(|ui| {
+        let delete_button =
+            egui::Button::new("Delete Node").fill(egui::Color32::from_rgb(120, 40, 40));
+        if ui
+            .add_enabled(dialog.nodes.len() > 1, delete_button)
+            .clicked()
+        {
+            match delete_selected_node(dialog, &mut ui_state.dialog.selected_node_id) {
+                Ok(status) => {
+                    let selected_after_delete = ui_state.dialog.selected_node_id.clone();
+                    ui_state
+                        .dialog
+                        .sync_node_id_editor(selected_after_delete.as_deref());
+                    ui_state.dialog.status_message = Some(status);
+                    *dirty = true;
+                    deleted = true;
+                }
+                Err(error) => {
+                    ui_state.dialog.status_message = Some(error);
+                }
+            }
+        }
+        if dialog.nodes.len() <= 1 {
+            ui.label("Dialogs must keep at least one node.");
+        }
+    });
+    if deleted {
+        return;
+    }
 
     ui.horizontal(|ui| {
         ui.label("Node Id:");
-        *dirty |= ui.text_edit_singleline(&mut node.id).changed();
+        let response = ui.text_edit_singleline(&mut ui_state.dialog.node_id_edit_value);
+        let apply_clicked = ui.small_button("Apply").clicked();
+        let pressed_enter =
+            response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+        if apply_clicked || pressed_enter {
+            match rename_dialog_node_id(
+                dialog,
+                &mut ui_state.dialog.selected_node_id,
+                selected_node_id.as_str(),
+                &ui_state.dialog.node_id_edit_value,
+            ) {
+                Ok(Some(status)) => {
+                    let committed_id = ui_state.dialog.selected_node_id.clone().unwrap_or_default();
+                    ui_state.dialog.node_id_edit_target = Some(committed_id.clone());
+                    ui_state.dialog.node_id_edit_value = committed_id;
+                    ui_state.dialog.status_message = Some(status);
+                    *dirty = true;
+                    return;
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    ui_state.dialog.status_message = Some(error);
+                }
+            }
+        }
+        ui.label("Press Enter to apply");
     });
+
+    let node = &mut dialog.nodes[node_index];
     ui.horizontal(|ui| {
         ui.label("Speaker:");
         let speaker = node.speaker_name.get_or_insert_with(String::new);
@@ -225,6 +367,7 @@ fn render_node_editor(
             ui.label("Body:");
             *dirty |= ui.text_edit_multiline(body).changed();
             optional_node_ref_editor(ui, "Next Node:", next_node_id, dirty);
+            render_conditions(ui, &mut node.conditions, dirty, ("node_conditions", node_index));
         }
         DialogNodeKind::Choice { body, choices } => {
             ui.label("Body:");
@@ -238,9 +381,26 @@ fn render_node_editor(
                 });
                 *dirty = true;
             }
-            for (index, choice) in choices.iter_mut().enumerate() {
+            let mut index = 0usize;
+            while index < choices.len() {
+                let mut delete_choice = false;
                 ui.separator();
-                ui.label(format!("Choice {}", index + 1));
+                ui.horizontal(|ui| {
+                    ui.label(format!("Choice {}", index + 1));
+                    if ui
+                        .small_button("Delete Choice")
+                        .on_hover_text("Remove this choice from the dialog node")
+                        .clicked()
+                    {
+                        delete_choice = true;
+                    }
+                });
+                if delete_choice {
+                    choices.remove(index);
+                    *dirty = true;
+                    continue;
+                }
+                let choice = &mut choices[index];
                 ui.horizontal(|ui| {
                     ui.label("Id:");
                     *dirty |= ui.text_edit_singleline(&mut choice.id).changed();
@@ -259,6 +419,7 @@ fn render_node_editor(
                     dirty,
                     ("choice_conditions", index),
                 );
+                index += 1;
             }
         }
         DialogNodeKind::Branch {
@@ -273,9 +434,26 @@ fn render_node_editor(
                 });
                 *dirty = true;
             }
-            for (index, branch) in branches.iter_mut().enumerate() {
+            let mut index = 0usize;
+            while index < branches.len() {
+                let mut delete_branch = false;
                 ui.separator();
-                ui.label(format!("Branch {}", index + 1));
+                ui.horizontal(|ui| {
+                    ui.label(format!("Branch {}", index + 1));
+                    if ui
+                        .small_button("Delete Branch")
+                        .on_hover_text("Remove this branch target from the dialog node")
+                        .clicked()
+                    {
+                        delete_branch = true;
+                    }
+                });
+                if delete_branch {
+                    branches.remove(index);
+                    *dirty = true;
+                    continue;
+                }
+                let branch = &mut branches[index];
                 ui.horizontal(|ui| {
                     ui.label("Next Node:");
                     *dirty |= ui.text_edit_singleline(&mut branch.next_node_id).changed();
@@ -286,14 +464,165 @@ fn render_node_editor(
                     dirty,
                     ("branch_conditions", index),
                 );
+                index += 1;
             }
         }
         DialogNodeKind::End { body, outcome_id } => {
             ui.label("Body:");
             *dirty |= ui.text_edit_multiline(body).changed();
             optional_node_ref_editor(ui, "Outcome Id:", outcome_id, dirty);
+            render_conditions(ui, &mut node.conditions, dirty, ("node_conditions", node_index));
         }
     }
+}
+
+fn delete_selected_node(
+    dialog: &mut toki_core::dialog::DialogTree,
+    selected_node_id: &mut Option<String>,
+) -> Result<String, String> {
+    let Some(selected_node_id_value) = selected_node_id.clone() else {
+        return Err("Select a node to delete.".to_string());
+    };
+    if dialog.nodes.len() <= 1 {
+        return Err("Dialogs must keep at least one node.".to_string());
+    }
+    let Some(node_index) = dialog
+        .nodes
+        .iter()
+        .position(|node| node.id == selected_node_id_value)
+    else {
+        return Err("Selected node no longer exists.".to_string());
+    };
+
+    let deleted_node_id = dialog.nodes[node_index].id.clone();
+    let fallback_selection = dialog
+        .nodes
+        .get(node_index + 1)
+        .or_else(|| node_index.checked_sub(1).and_then(|index| dialog.nodes.get(index)))
+        .map(|node| node.id.clone());
+
+    dialog.nodes.remove(node_index);
+    *selected_node_id = fallback_selection.clone();
+
+    if dialog.entry_node_id == deleted_node_id {
+        if let Some(fallback_selection) = fallback_selection {
+            dialog.entry_node_id = fallback_selection;
+        }
+    }
+
+    let mut cleared_optional_refs = 0usize;
+    let mut removed_choices = 0usize;
+    let mut removed_branches = 0usize;
+    for node in &mut dialog.nodes {
+        match &mut node.kind {
+            DialogNodeKind::Line { next_node_id, .. } => {
+                if next_node_id.as_deref() == Some(deleted_node_id.as_str()) {
+                    *next_node_id = None;
+                    cleared_optional_refs += 1;
+                }
+            }
+            DialogNodeKind::Choice { choices, .. } => {
+                let before = choices.len();
+                choices.retain(|choice| choice.next_node_id != deleted_node_id);
+                removed_choices += before - choices.len();
+            }
+            DialogNodeKind::Branch {
+                branches,
+                default_next_node_id,
+            } => {
+                let before = branches.len();
+                branches.retain(|branch| branch.next_node_id != deleted_node_id);
+                removed_branches += before - branches.len();
+                if default_next_node_id.as_deref() == Some(deleted_node_id.as_str()) {
+                    *default_next_node_id = None;
+                    cleared_optional_refs += 1;
+                }
+            }
+            DialogNodeKind::End { .. } => {}
+        }
+    }
+
+    let mut details = Vec::new();
+    if cleared_optional_refs > 0 {
+        details.push(format!("cleared {cleared_optional_refs} optional reference(s)"));
+    }
+    if removed_choices > 0 {
+        details.push(format!("removed {removed_choices} choice(s)"));
+    }
+    if removed_branches > 0 {
+        details.push(format!("removed {removed_branches} branch target(s)"));
+    }
+    let suffix = if details.is_empty() {
+        String::new()
+    } else {
+        format!(" and {}", details.join(", "))
+    };
+
+    Ok(format!("Deleted node '{deleted_node_id}'{suffix}."))
+}
+
+fn rename_dialog_node_id(
+    dialog: &mut toki_core::dialog::DialogTree,
+    selected_node_id: &mut Option<String>,
+    old_node_id: &str,
+    new_node_id: &str,
+) -> Result<Option<String>, String> {
+    if old_node_id == new_node_id {
+        return Ok(None);
+    }
+    if new_node_id.trim().is_empty() {
+        return Err("Node id must not be empty.".to_string());
+    }
+    if dialog
+        .nodes
+        .iter()
+        .any(|node| node.id == new_node_id && node.id != old_node_id)
+    {
+        return Err(format!("Dialog already contains a node named '{new_node_id}'."));
+    }
+    let Some(node) = dialog.nodes.iter_mut().find(|node| node.id == old_node_id) else {
+        return Err(format!("Selected node '{old_node_id}' no longer exists."));
+    };
+    node.id = new_node_id.to_string();
+
+    if dialog.entry_node_id == old_node_id {
+        dialog.entry_node_id = new_node_id.to_string();
+    }
+    for node in &mut dialog.nodes {
+        match &mut node.kind {
+            DialogNodeKind::Line { next_node_id, .. } => {
+                if next_node_id.as_deref() == Some(old_node_id) {
+                    *next_node_id = Some(new_node_id.to_string());
+                }
+            }
+            DialogNodeKind::Choice { choices, .. } => {
+                for choice in choices {
+                    if choice.next_node_id == old_node_id {
+                        choice.next_node_id = new_node_id.to_string();
+                    }
+                }
+            }
+            DialogNodeKind::Branch {
+                branches,
+                default_next_node_id,
+            } => {
+                for branch in branches {
+                    if branch.next_node_id == old_node_id {
+                        branch.next_node_id = new_node_id.to_string();
+                    }
+                }
+                if default_next_node_id.as_deref() == Some(old_node_id) {
+                    *default_next_node_id = Some(new_node_id.to_string());
+                }
+            }
+            DialogNodeKind::End { .. } => {}
+        }
+    }
+    *selected_node_id = Some(new_node_id.to_string());
+
+    Ok(Some(format!(
+        "Renamed node '{old_node_id}' to '{new_node_id}'."
+    )))
 }
 
 fn render_conditions(
@@ -312,8 +641,24 @@ fn render_conditions(
         }
     });
 
-    for (index, condition) in conditions.iter_mut().enumerate() {
+    let mut index = 0usize;
+    while index < conditions.len() {
+        let mut delete_condition = false;
         ui.group(|ui| {
+            ui.horizontal(|ui| {
+                ui.label(format!("Condition {}", index + 1));
+                if ui
+                    .small_button("Delete Condition")
+                    .on_hover_text("Remove this condition")
+                    .clicked()
+                {
+                    delete_condition = true;
+                }
+            });
+            if delete_condition {
+                return;
+            }
+            let condition = &mut conditions[index];
             let current_kind = condition_kind(condition);
             let mut selected_kind = current_kind;
             egui::ComboBox::from_id_salt((&id_salt, "condition_kind", index))
@@ -422,6 +767,12 @@ fn render_conditions(
                 }
             }
         });
+        if delete_condition {
+            conditions.remove(index);
+            *dirty = true;
+            continue;
+        }
+        index += 1;
     }
 }
 
@@ -645,6 +996,315 @@ fn default_condition(kind: DialogConditionKind) -> DialogCondition {
             flag: String::new(),
             value: 0,
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn delete_selected_node_reselects_neighbor_and_repairs_entry_node() {
+        let mut dialog = toki_core::dialog::DialogTree {
+            id: "intro".to_string(),
+            title: String::new(),
+            entry_node_id: "start".to_string(),
+            allow_cancel: true,
+            gate_gameplay: true,
+            nodes: vec![
+                DialogNode {
+                    id: "start".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::Line {
+                        body: String::new(),
+                        next_node_id: Some("middle".to_string()),
+                    },
+                },
+                DialogNode {
+                    id: "middle".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::End {
+                        body: String::new(),
+                        outcome_id: None,
+                    },
+                },
+            ],
+        };
+        let mut selected = Some("start".to_string());
+
+        let status = delete_selected_node(&mut dialog, &mut selected).expect("delete succeeds");
+
+        assert_eq!(dialog.entry_node_id, "middle");
+        assert_eq!(selected.as_deref(), Some("middle"));
+        assert_eq!(dialog.nodes.len(), 1);
+        assert_eq!(dialog.nodes[0].id, "middle");
+        assert!(status.contains("Deleted node 'start'"));
+    }
+
+    #[test]
+    fn delete_selected_node_cleans_references_to_deleted_node() {
+        let mut dialog = toki_core::dialog::DialogTree {
+            id: "intro".to_string(),
+            title: String::new(),
+            entry_node_id: "line".to_string(),
+            allow_cancel: true,
+            gate_gameplay: true,
+            nodes: vec![
+                DialogNode {
+                    id: "line".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::Line {
+                        body: String::new(),
+                        next_node_id: Some("target".to_string()),
+                    },
+                },
+                DialogNode {
+                    id: "choice".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::Choice {
+                        body: String::new(),
+                        choices: vec![
+                            DialogChoice {
+                                id: "remove".to_string(),
+                                label: String::new(),
+                                next_node_id: "target".to_string(),
+                                conditions: Vec::new(),
+                            },
+                            DialogChoice {
+                                id: "keep".to_string(),
+                                label: String::new(),
+                                next_node_id: "line".to_string(),
+                                conditions: Vec::new(),
+                            },
+                        ],
+                    },
+                },
+                DialogNode {
+                    id: "branch".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::Branch {
+                        branches: vec![
+                            DialogBranch {
+                                conditions: Vec::new(),
+                                next_node_id: "target".to_string(),
+                            },
+                            DialogBranch {
+                                conditions: Vec::new(),
+                                next_node_id: "line".to_string(),
+                            },
+                        ],
+                        default_next_node_id: Some("target".to_string()),
+                    },
+                },
+                DialogNode {
+                    id: "target".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::End {
+                        body: String::new(),
+                        outcome_id: None,
+                    },
+                },
+            ],
+        };
+        let mut selected = Some("target".to_string());
+
+        let status = delete_selected_node(&mut dialog, &mut selected).expect("delete succeeds");
+
+        let line = dialog.node("line").expect("line survives");
+        assert_eq!(
+            line,
+            &DialogNode {
+                id: "line".to_string(),
+                speaker_name: None,
+                conditions: Vec::new(),
+                kind: DialogNodeKind::Line {
+                    body: String::new(),
+                    next_node_id: None,
+                },
+            }
+        );
+        let choice = dialog.node("choice").expect("choice survives");
+        let DialogNodeKind::Choice { choices, .. } = &choice.kind else {
+            panic!("expected choice node");
+        };
+        assert_eq!(choices.len(), 1);
+        assert_eq!(choices[0].id, "keep");
+        let branch = dialog.node("branch").expect("branch survives");
+        let DialogNodeKind::Branch {
+            branches,
+            default_next_node_id,
+        } = &branch.kind
+        else {
+            panic!("expected branch node");
+        };
+        assert_eq!(branches.len(), 1);
+        assert_eq!(branches[0].next_node_id, "line");
+        assert_eq!(default_next_node_id, &None);
+        assert!(status.contains("cleared 2 optional reference(s)"));
+        assert!(status.contains("removed 1 choice(s)"));
+        assert!(status.contains("removed 1 branch target(s)"));
+    }
+
+    #[test]
+    fn delete_selected_node_rejects_last_remaining_node() {
+        let mut dialog = toki_core::dialog::DialogTree {
+            id: "intro".to_string(),
+            title: String::new(),
+            entry_node_id: "only".to_string(),
+            allow_cancel: true,
+            gate_gameplay: true,
+            nodes: vec![DialogNode {
+                id: "only".to_string(),
+                speaker_name: None,
+                conditions: Vec::new(),
+                kind: DialogNodeKind::End {
+                    body: String::new(),
+                    outcome_id: None,
+                },
+            }],
+        };
+        let mut selected = Some("only".to_string());
+
+        let error = delete_selected_node(&mut dialog, &mut selected).expect_err("delete fails");
+
+        assert_eq!(error, "Dialogs must keep at least one node.");
+        assert_eq!(dialog.nodes.len(), 1);
+        assert_eq!(selected.as_deref(), Some("only"));
+    }
+
+    #[test]
+    fn rename_dialog_node_id_updates_selection_entry_and_references() {
+        let mut dialog = toki_core::dialog::DialogTree {
+            id: "intro".to_string(),
+            title: String::new(),
+            entry_node_id: "start".to_string(),
+            allow_cancel: true,
+            gate_gameplay: true,
+            nodes: vec![
+                DialogNode {
+                    id: "start".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::Line {
+                        body: String::new(),
+                        next_node_id: Some("target".to_string()),
+                    },
+                },
+                DialogNode {
+                    id: "choice".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::Choice {
+                        body: String::new(),
+                        choices: vec![DialogChoice {
+                            id: "next".to_string(),
+                            label: String::new(),
+                            next_node_id: "target".to_string(),
+                            conditions: Vec::new(),
+                        }],
+                    },
+                },
+                DialogNode {
+                    id: "branch".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::Branch {
+                        branches: vec![DialogBranch {
+                            conditions: Vec::new(),
+                            next_node_id: "target".to_string(),
+                        }],
+                        default_next_node_id: Some("target".to_string()),
+                    },
+                },
+                DialogNode {
+                    id: "target".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::End {
+                        body: String::new(),
+                        outcome_id: None,
+                    },
+                },
+            ],
+        };
+        let mut selected = Some("target".to_string());
+
+        let status = rename_dialog_node_id(&mut dialog, &mut selected, "target", "done")
+            .expect("rename succeeds");
+
+        assert_eq!(selected.as_deref(), Some("done"));
+        assert!(status
+            .expect("status")
+            .contains("Renamed node 'target' to 'done'."));
+        assert!(dialog.node("target").is_none());
+        assert!(dialog.node("done").is_some());
+        let line = dialog.node("start").expect("line");
+        let DialogNodeKind::Line { next_node_id, .. } = &line.kind else {
+            panic!("expected line");
+        };
+        assert_eq!(next_node_id.as_deref(), Some("done"));
+        let choice = dialog.node("choice").expect("choice");
+        let DialogNodeKind::Choice { choices, .. } = &choice.kind else {
+            panic!("expected choice");
+        };
+        assert_eq!(choices[0].next_node_id, "done");
+        let branch = dialog.node("branch").expect("branch");
+        let DialogNodeKind::Branch {
+            branches,
+            default_next_node_id,
+        } = &branch.kind
+        else {
+            panic!("expected branch");
+        };
+        assert_eq!(branches[0].next_node_id, "done");
+        assert_eq!(default_next_node_id.as_deref(), Some("done"));
+    }
+
+    #[test]
+    fn rename_dialog_node_id_rejects_empty_and_duplicate_ids() {
+        let mut dialog = toki_core::dialog::DialogTree {
+            id: "intro".to_string(),
+            title: String::new(),
+            entry_node_id: "start".to_string(),
+            allow_cancel: true,
+            gate_gameplay: true,
+            nodes: vec![
+                DialogNode {
+                    id: "start".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::Line {
+                        body: String::new(),
+                        next_node_id: Some("end".to_string()),
+                    },
+                },
+                DialogNode {
+                    id: "end".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::End {
+                        body: String::new(),
+                        outcome_id: None,
+                    },
+                },
+            ],
+        };
+        let mut selected = Some("start".to_string());
+
+        let empty_error =
+            rename_dialog_node_id(&mut dialog, &mut selected, "start", "").expect_err("empty");
+        assert_eq!(empty_error, "Node id must not be empty.");
+
+        let duplicate_error =
+            rename_dialog_node_id(&mut dialog, &mut selected, "start", "end").expect_err("dup");
+        assert_eq!(duplicate_error, "Dialog already contains a node named 'end'.");
+        assert_eq!(selected.as_deref(), Some("start"));
     }
 }
 

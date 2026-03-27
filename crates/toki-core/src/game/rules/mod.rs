@@ -22,6 +22,7 @@ use std::collections::{HashMap, HashSet};
 use crate::animation::AnimationState;
 use crate::entity::EntityId;
 use crate::flags::FlagValue;
+use crate::project_runtime::SceneTransitionEffect;
 use crate::rules::{Rule, RuleSet, RuleSpawnEntityType};
 
 // Re-export submodules
@@ -98,6 +99,8 @@ pub(super) enum RuleCommand {
     SwitchScene {
         scene_name: String,
         spawn_point_id: String,
+        transition: Option<SceneTransitionEffect>,
+        duration_ms: Option<u32>,
     },
     StartDialog {
         dialog_id: String,
@@ -149,8 +152,8 @@ pub(super) enum RuleCommand {
     },
 }
 
-/// A pending scene switch (scene_name, spawn_point_id).
-pub(super) type PendingSceneSwitch = (String, String);
+/// A pending scene switch.
+pub(super) type PendingSceneSwitch = crate::events::SceneSwitchRequest;
 /// A pending dialog start request.
 pub(super) type PendingDialogStart = crate::events::DialogStartRequest;
 

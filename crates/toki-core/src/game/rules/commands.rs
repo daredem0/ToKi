@@ -64,10 +64,14 @@ impl GameState {
                 RuleCommand::SwitchScene {
                     scene_name,
                     spawn_point_id,
+                    transition,
+                    duration_ms,
                 } => {
                     self.apply_switch_scene(
                         &scene_name,
                         &spawn_point_id,
+                        transition,
+                        duration_ms,
                         &mut pending_scene_switch,
                     );
                 }
@@ -166,12 +170,19 @@ impl GameState {
         &self,
         scene_name: &str,
         spawn_point_id: &str,
+        transition: Option<crate::project_runtime::SceneTransitionEffect>,
+        duration_ms: Option<u32>,
         pending_scene_switch: &mut Option<PendingSceneSwitch>,
     ) {
         let target = scene_name.trim();
         let spawn = spawn_point_id.trim();
         if !target.is_empty() && !spawn.is_empty() && pending_scene_switch.is_none() {
-            *pending_scene_switch = Some((target.to_string(), spawn.to_string()));
+            *pending_scene_switch = Some(crate::events::SceneSwitchRequest {
+                scene_name: target.to_string(),
+                spawn_point_id: spawn.to_string(),
+                transition,
+                duration_ms,
+            });
         }
     }
 }

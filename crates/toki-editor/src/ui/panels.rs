@@ -204,7 +204,12 @@ impl PanelSystem {
             }
 
             if ui_state.workspace.center_panel_tab == CenterPanelTab::DialogEditor {
-                dialog_editor::render_dialog_editor(ui, ui_state, panel_ctx.project_assets);
+                dialog_editor::render_dialog_editor(
+                    ui,
+                    ui_state,
+                    panel_ctx.project_assets,
+                    panel_ctx.project,
+                );
                 return;
             }
 

@@ -1,5 +1,6 @@
 use std::time::Instant;
 
+use directories::ProjectDirs;
 use toki_core::menu::MenuInput;
 use toki_core::serialization::{load_save_data_from_slot, save_game_to_slot, save_slot_file_path};
 use winit::application::ApplicationHandler;
@@ -18,29 +19,38 @@ impl App {
             || matches!(event.key_without_modifiers(), Key::Named(named) if named == logical)
     }
 
-    pub(super) fn resolve_save_root(&self) -> std::path::PathBuf {
-        let base = std::env::var_os("XDG_DATA_HOME")
-            .map(std::path::PathBuf::from)
-            .or_else(|| {
-                std::env::var_os("HOME")
-                    .map(std::path::PathBuf::from)
-                    .map(|home| home.join(".local").join("share"))
-            })
-            .or_else(|| std::env::current_dir().ok())
-            .expect("runtime should always resolve a save directory");
-
-        let project_name = self
-            .launch_options
-            .project_path
-            .as_deref()
+    fn resolve_save_root_from_base(
+        base: Option<&std::path::Path>,
+        cwd: Option<&std::path::Path>,
+        project_path: Option<&std::path::Path>,
+    ) -> std::path::PathBuf {
+        let project_name = project_path
             .and_then(std::path::Path::file_name)
             .and_then(|name| name.to_str())
             .unwrap_or("default");
 
-        base.join("toki").join(project_name).join("saves")
+        base.map(std::path::Path::to_path_buf)
+            .or_else(|| cwd.map(std::path::Path::to_path_buf))
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join("toki")
+            .join(project_name)
+            .join("saves")
+    }
+
+    pub(super) fn resolve_save_root(&self) -> std::path::PathBuf {
+        let data_dir = ProjectDirs::from("", "", "toki")
+            .map(|dirs| dirs.data_local_dir().to_path_buf());
+        Self::resolve_save_root_from_base(
+            data_dir.as_deref(),
+            std::env::current_dir().ok().as_deref(),
+            self.launch_options.project_path.as_deref(),
+        )
     }
 
     pub(super) fn save_to_slot(&mut self, slot: u8) -> anyhow::Result<std::path::PathBuf> {
+        self.game_system
+            .game_state
+            .sync_persistent_entities_to_active_scene();
         let path = save_game_to_slot(&self.game_system.game_state, self.resolve_save_root(), slot)?;
         tracing::info!(
             "Saved slot {} to '{}' (scene='{}')",
@@ -73,15 +83,6 @@ impl App {
     fn handle_keyboard_input_event(&mut self, event: winit::event::KeyEvent) {
         match event.state {
             ElementState::Pressed => {
-                if !event.repeat {
-                    tracing::debug!(
-                        "Keyboard input pressed: physical={:?} logical={:?} without_modifiers={:?} text={:?}",
-                        event.physical_key,
-                        event.logical_key,
-                        event.key_without_modifiers(),
-                        event.text
-                    );
-                }
                 if Self::event_matches_key(&event, KeyCode::F3, NamedKey::F3) {
                     self.performance.toggle_hud_display();
                     return;
@@ -228,6 +229,36 @@ impl App {
                 total_frame_time,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::App;
+    use std::path::Path;
+
+    #[test]
+    fn resolve_save_root_from_base_uses_project_name_when_available() {
+        let root = App::resolve_save_root_from_base(
+            Some(Path::new("/data")),
+            None,
+            Some(Path::new("/projects/Demo")),
+        );
+
+        assert_eq!(root, Path::new("/data").join("toki").join("Demo").join("saves"));
+    }
+
+    #[test]
+    fn resolve_save_root_from_base_falls_back_to_current_dir_and_default_project() {
+        let root = App::resolve_save_root_from_base(None, Some(Path::new("/cwd")), None);
+
+        assert_eq!(
+            root,
+            Path::new("/cwd")
+                .join("toki")
+                .join("default")
+                .join("saves")
+        );
     }
 }
 

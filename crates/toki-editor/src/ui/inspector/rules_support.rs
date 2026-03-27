@@ -245,15 +245,21 @@ impl InspectorSystem {
 
     #[cfg(test)]
     pub(in super::super) fn validate_rule_set(rule_set: &RuleSet) -> Vec<RuleValidationIssue> {
-        Self::validate_rule_set_for_scene(rule_set, "", &[])
+        Self::validate_rule_set_for_scene(rule_set, "", &[], &[])
     }
 
     pub(in super::super) fn validate_rule_set_for_scene(
         rule_set: &RuleSet,
         _current_scene_name: &str,
         scenes: &[toki_core::Scene],
+        declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
     ) -> Vec<RuleValidationIssue> {
         let mut issues = Vec::new();
+        let declared_flag_ids = declared_flags
+            .iter()
+            .map(|declaration| declaration.id.trim())
+            .filter(|id| !id.is_empty())
+            .collect::<std::collections::BTreeSet<_>>();
 
         let mut id_to_indices: HashMap<&str, Vec<usize>> = HashMap::new();
         for (rule_index, rule) in rule_set.rules.iter().enumerate() {
@@ -344,6 +350,18 @@ impl InspectorSystem {
                                     condition_index + 1
                                 ),
                             });
+                        } else if !declared_flag_ids.is_empty()
+                            && !declared_flag_ids.contains(flag.trim())
+                        {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: None,
+                                message: format!(
+                                    "Condition {} references undeclared flag '{}'",
+                                    condition_index + 1,
+                                    flag.trim()
+                                ),
+                            });
                         }
                     }
                 }
@@ -398,6 +416,8 @@ impl InspectorSystem {
                     RuleAction::SwitchScene {
                         scene_name,
                         spawn_point_id,
+                        duration_ms,
+                        ..
                     } => {
                         if scene_name.trim().is_empty() {
                             issues.push(RuleValidationIssue {
@@ -411,6 +431,14 @@ impl InspectorSystem {
                                 rule_index,
                                 action_index: Some(action_index),
                                 message: "SwitchScene requires a spawn point id".to_string(),
+                            });
+                        }
+                        if matches!(duration_ms, Some(0)) {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: "SwitchScene override duration must be positive"
+                                    .to_string(),
                             });
                         }
                         if !scenes.is_empty() && !scene_name.trim().is_empty() {
@@ -525,6 +553,17 @@ impl InspectorSystem {
                                 message: "Flag actions require a non-empty flag name"
                                     .to_string(),
                             });
+                        } else if !declared_flag_ids.is_empty()
+                            && !declared_flag_ids.contains(flag.trim())
+                        {
+                            issues.push(RuleValidationIssue {
+                                rule_index,
+                                action_index: Some(action_index),
+                                message: format!(
+                                    "Flag action references undeclared flag '{}'",
+                                    flag.trim()
+                                ),
+                            });
                         }
                     }
                     RuleAction::SaveGame { slot } | RuleAction::LoadGame { slot } => {
@@ -571,6 +610,8 @@ impl InspectorSystem {
         id_salt: impl std::hash::Hash,
         scene_name: &mut String,
         spawn_point_id: &mut String,
+        transition: &mut Option<toki_core::SceneTransitionEffect>,
+        duration_ms: &mut Option<u32>,
         scenes: &[toki_core::Scene],
     ) -> bool {
         let mut changed = false;
@@ -615,6 +656,42 @@ impl InspectorSystem {
                     }
                 });
         });
+
+        let mut use_override = duration_ms.is_some();
+        ui.horizontal(|ui| {
+            changed |= ui.checkbox(&mut use_override, "Override Fade").changed();
+        });
+        if use_override {
+            if duration_ms.is_none() {
+                *duration_ms = Some(250);
+                changed = true;
+            }
+            if transition.is_none() {
+                *transition = Some(toki_core::SceneTransitionEffect::Fade);
+                changed = true;
+            }
+        } else {
+            if duration_ms.take().is_some() {
+                changed = true;
+            }
+            if transition.take().is_some() {
+                changed = true;
+            }
+        }
+        if let Some(override_duration_ms) = duration_ms.as_mut() {
+            ui.horizontal(|ui| {
+                ui.label("Fade Duration:");
+                let mut value = *override_duration_ms as i64;
+                if ui
+                    .add(egui::DragValue::new(&mut value).speed(1.0).range(1..=60_000))
+                    .changed()
+                {
+                    *override_duration_ms = value.max(1) as u32;
+                    changed = true;
+                }
+                ui.label("ms");
+            });
+        }
 
         changed
     }
