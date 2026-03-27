@@ -2,7 +2,7 @@
 //!
 //! Contains functions for collecting rule commands based on different triggers.
 
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::entity::EntityId;
 use crate::rules::{RuleAction, RuleTarget, RuleTrigger, TriggerContext};
@@ -52,17 +52,21 @@ impl GameState {
         for &idx in sorted_indices {
             // Extract owned data in a block to release the borrow on self.rules
             // before calling self.buffer_rule_action below.
-            let Some((actions, rule_id, rule_once)) = ({
+            let Some((actions, rule_id, rule_once, log_enabled)) = ({
                 let rule = &self.rules.rules[idx];
                 if !should_execute_rule(rule) {
                     None
                 } else {
-                    let conditions_result = self.rule_conditions_match(&rule.conditions, context);
+                    if rule.log_enabled {
+                        info!(rule_id = %rule.id, trigger = ?rule.trigger, "Rule trigger passed");
+                    }
+                    let conditions_result =
+                        self.rule_conditions_match(&rule.id, rule.log_enabled, &rule.conditions, context);
                     log_rule(rule, conditions_result);
                     if !conditions_result {
                         None
                     } else {
-                        Some((rule.actions.clone(), rule.id.clone(), rule.once))
+                        Some((rule.actions.clone(), rule.id.clone(), rule.once, rule.log_enabled))
                     }
                 }
             }) else {
@@ -71,7 +75,7 @@ impl GameState {
 
             for action in &actions {
                 log_action(&rule_id, action);
-                self.buffer_rule_action(action, context, command_buffer);
+                self.buffer_rule_action(&rule_id, log_enabled, action, context, command_buffer);
             }
 
             if rule_once {

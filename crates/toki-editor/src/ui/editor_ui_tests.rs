@@ -65,6 +65,7 @@ fn sync_rule_graph_with_rule_set_preserves_unserializable_existing_draft() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlaySound {

@@ -215,6 +215,7 @@ fn load_project_scene_reads_valid_scene_file() {
             enabled: true,
             priority: 1,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnStart,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlaySound {
@@ -292,6 +293,7 @@ fn game_state_from_scene_uses_scene_data_without_fallback_entities() {
             enabled: true,
             priority: 3,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlayMusic {
@@ -732,6 +734,7 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
                 enabled: true,
                 priority: 0,
                 once: false,
+        log_enabled: false,
                 trigger: RuleTrigger::OnUpdate,
                 conditions: vec![RuleCondition::Always],
                 actions: vec![RuleAction::SwitchScene {

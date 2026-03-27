@@ -99,6 +99,7 @@ fn base_rule(id: &str, trigger: RuleTrigger, priority: i32, actions: Vec<RuleAct
         enabled: true,
         priority,
         once: false,
+        log_enabled: false,
         trigger,
         conditions: vec![RuleCondition::Always],
         actions,
@@ -799,6 +800,7 @@ fn increment_flag_action_updates_integer_flags() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::IncrementFlag {
@@ -827,6 +829,7 @@ fn clear_flag_action_removes_existing_flags() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::ClearFlag {
@@ -1528,6 +1531,7 @@ fn rules_serialize_roundtrip() {
             enabled: true,
             priority: 3,
             once: true,
+        log_enabled: false,
             trigger: RuleTrigger::OnStart,
             conditions: vec![
                 RuleCondition::Always,
@@ -2016,6 +2020,7 @@ fn on_collision_with_trigger_self_condition_resolves_correctly() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnCollision { entity: None },
             conditions: vec![RuleCondition::TargetExists {
                 target: RuleTarget::TriggerSelf,
@@ -2059,6 +2064,7 @@ fn on_collision_with_trigger_other_condition_none_for_tile_collision() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnCollision { entity: None },
             conditions: vec![RuleCondition::TargetExists {
                 target: RuleTarget::TriggerOther,
@@ -2128,6 +2134,7 @@ fn on_damaged_with_trigger_self_refers_to_victim() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnDamaged { entity: None },
             conditions: vec![RuleCondition::TargetExists {
                 target: RuleTarget::TriggerSelf,
@@ -2200,6 +2207,7 @@ fn on_damaged_with_trigger_other_refers_to_attacker() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnDamaged { entity: None },
             conditions: vec![RuleCondition::TargetExists {
                 target: RuleTarget::TriggerOther,
@@ -2463,6 +2471,7 @@ fn on_interact_provides_trigger_context() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnInteract {
                 mode: InteractionMode::default(),
                 entity: None,
@@ -2619,6 +2628,7 @@ fn on_damaged_provides_trigger_context() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnDamaged { entity: None },
             conditions: vec![
                 RuleCondition::TargetExists {
@@ -2713,6 +2723,7 @@ fn on_death_provides_trigger_context() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnDeath { entity: None },
             conditions: vec![
                 RuleCondition::TargetExists {
@@ -2765,6 +2776,7 @@ fn on_death_fires_without_attacker() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnDeath { entity: None },
             conditions: vec![RuleCondition::TargetExists {
                 target: RuleTarget::TriggerSelf,
@@ -2823,6 +2835,7 @@ fn on_damaged_with_entity_filter_only_fires_for_matching_entity() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnDamaged {
                 entity: Some(RuleTarget::Player),
             },
@@ -2896,6 +2909,7 @@ fn on_damaged_without_entity_filter_fires_for_all_entities() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnDamaged { entity: None },
             conditions: vec![],
             actions: vec![RuleAction::PlaySound {
@@ -2951,6 +2965,7 @@ fn on_damaged_with_specific_entity_id_filter() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnDamaged {
                 entity: Some(RuleTarget::Entity(npc1_id)),
             },
@@ -3024,6 +3039,7 @@ fn on_death_with_entity_filter_only_fires_for_matching_entity() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnDeath {
                 entity: Some(RuleTarget::Player),
             },
@@ -3091,6 +3107,7 @@ fn on_death_without_entity_filter_fires_for_all_entities() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnDeath { entity: None },
             conditions: vec![],
             actions: vec![RuleAction::PlaySound {
@@ -3144,6 +3161,7 @@ fn health_below_condition_matches_when_entity_health_is_below_threshold() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::HealthBelow {
                 target: RuleTarget::Player,
@@ -3192,6 +3210,7 @@ fn health_below_condition_does_not_match_when_health_equals_threshold() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::HealthBelow {
                 target: RuleTarget::Player,
@@ -3228,6 +3247,7 @@ fn health_below_condition_does_not_match_when_health_is_above_threshold() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::HealthBelow {
                 target: RuleTarget::Player,
@@ -3273,6 +3293,7 @@ fn health_above_condition_matches_when_entity_health_is_above_threshold() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::HealthAbove {
                 target: RuleTarget::Player,
@@ -3321,6 +3342,7 @@ fn health_above_condition_does_not_match_when_health_equals_threshold() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::HealthAbove {
                 target: RuleTarget::Player,
@@ -3366,6 +3388,7 @@ fn health_above_condition_does_not_match_when_health_is_below_threshold() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::HealthAbove {
                 target: RuleTarget::Player,
@@ -3409,6 +3432,7 @@ fn health_condition_fails_safely_when_entity_has_no_health_stat() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::HealthBelow {
                 target: RuleTarget::Player,
@@ -3450,6 +3474,7 @@ fn trigger_other_is_player_matches_when_other_entity_is_player_in_collision() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnCollision { entity: None },
             conditions: vec![RuleCondition::TriggerOtherIsPlayer],
             actions: vec![RuleAction::PlaySound {
@@ -3490,6 +3515,7 @@ fn trigger_other_is_player_does_not_match_when_other_is_not_player() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnDamaged { entity: None },
             conditions: vec![RuleCondition::TriggerOtherIsPlayer],
             actions: vec![RuleAction::PlaySound {
@@ -3529,6 +3555,7 @@ fn trigger_other_is_player_fails_safely_without_context() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::TriggerOtherIsPlayer],
             actions: vec![RuleAction::PlaySound {
@@ -3565,6 +3592,7 @@ fn entity_is_kind_matches_player_kind() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::EntityIsKind {
                 target: RuleTarget::Player,
@@ -3603,6 +3631,7 @@ fn entity_is_kind_does_not_match_wrong_kind() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::EntityIsKind {
                 target: RuleTarget::Player,
@@ -3671,6 +3700,7 @@ fn trigger_other_is_kind_matches_npc_on_damage() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnDamaged { entity: None },
             // Check if attacker (TriggerOther) is an NPC kind
             // In this case, attacker is player, so this should NOT match
@@ -3715,6 +3745,7 @@ fn trigger_other_is_kind_fails_safely_without_context() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::TriggerOtherIsKind {
                 kind: EntityKind::Npc,
@@ -3760,6 +3791,7 @@ fn entity_has_tag_matches_when_entity_has_specified_tag() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::EntityHasTag {
                 target: RuleTarget::Player,
@@ -3805,6 +3837,7 @@ fn entity_has_tag_does_not_match_when_entity_lacks_tag() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::EntityHasTag {
                 target: RuleTarget::Player,
@@ -3840,6 +3873,7 @@ fn trigger_other_has_tag_fails_safely_without_context() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::TriggerOtherHasTag {
                 tag: "enemy".to_string(),
@@ -3887,6 +3921,7 @@ fn has_inventory_item_matches_when_player_has_enough_items() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::HasInventoryItem {
                 target: RuleTarget::Player,
@@ -3935,6 +3970,7 @@ fn has_inventory_item_does_not_match_when_player_has_insufficient_items() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::HasInventoryItem {
                 target: RuleTarget::Player,
@@ -3972,6 +4008,7 @@ fn has_inventory_item_does_not_match_when_item_missing() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::HasInventoryItem {
                 target: RuleTarget::Player,
@@ -4271,6 +4308,7 @@ fn on_tile_enter_provides_trigger_self_context() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnTileEnter { x: 1, y: 0 },
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::SetVelocity {
@@ -4319,6 +4357,7 @@ fn on_tile_exit_provides_trigger_self_context() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnTileExit { x: 0, y: 0 },
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::SetVelocity {

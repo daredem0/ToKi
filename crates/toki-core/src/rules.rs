@@ -422,6 +422,8 @@ pub struct Rule {
     pub priority: i32,
     #[serde(default)]
     pub once: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub log_enabled: bool,
     pub trigger: RuleTrigger,
     #[serde(default)]
     pub conditions: Vec<RuleCondition>,
@@ -437,4 +439,8 @@ pub struct RuleSet {
 
 fn default_true() -> bool {
     true
+}
+
+const fn is_false(value: &bool) -> bool {
+    !*value
 }

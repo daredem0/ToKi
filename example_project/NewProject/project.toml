@@ -7,8 +7,8 @@ toki_editor_version = "0.1.0"
 description = ""
 
 [scenes]
-"Main Scene" = "scenes/Main Scene.json"
 main = "scenes/main.json"
+"Main Scene" = "scenes/Main Scene.json"
 "Scene 2" = "scenes/Scene 2.json"
 
 [assets]
@@ -253,103 +253,6 @@ recent_files = []
 
 [editor.camera_settings]
 
-[editor.graph_layouts."Main Scene"]
-zoom = 0.8540573716163635
-pan = [
-    -88.54324340820313,
-    -50.48046875,
-]
-
-[editor.graph_layouts."Main Scene".node_positions]
-"node:13" = [
-    430.0,
-    218.0,
-]
-"node:17" = [
-    60.0,
-    330.0,
-]
-"node:10" = [
-    430.0,
-    162.0,
-]
-"node:3" = [
-    430.0,
-    50.0,
-]
-"node:20" = [
-    60.0,
-    386.0,
-]
-"node:4" = [
-    60.0,
-    106.0,
-]
-"node:2" = [
-    800.0,
-    50.0,
-]
-"node:16" = [
-    430.0,
-    274.0,
-]
-"node:6" = [
-    800.0,
-    106.0,
-]
-"node:22" = [
-    539.7159423828125,
-    379.241455078125,
-]
-"node:7" = [
-    430.0,
-    106.0,
-]
-"node:19" = [
-    430.0,
-    330.0,
-]
-"node:21" = [
-    268.7559509277344,
-    388.2645263671875,
-]
-"node:12" = [
-    800.0,
-    218.0,
-]
-"node:9" = [
-    800.0,
-    162.0,
-]
-"node:5" = [
-    1170.0,
-    106.0,
-]
-"node:8" = [
-    60.0,
-    162.0,
-]
-"node:15" = [
-    800.0,
-    274.0,
-]
-"node:18" = [
-    800.0,
-    330.0,
-]
-"node:1" = [
-    60.0,
-    50.0,
-]
-"node:11" = [
-    60.0,
-    218.0,
-]
-"node:14" = [
-    60.0,
-    274.0,
-]
-
 [editor.graph_layouts."Scene 2"]
 zoom = 0.8264462351799011
 pan = [
@@ -358,21 +261,118 @@ pan = [
 ]
 
 [editor.graph_layouts."Scene 2".node_positions]
-"node:3" = [
-    430.0,
+"node:1" = [
+    60.0,
+    50.0,
+]
+"node:2" = [
+    800.0,
     50.0,
 ]
 "node:4" = [
     656.8824462890625,
     177.01071166992188,
 ]
-"node:2" = [
-    800.0,
+"node:3" = [
+    430.0,
     50.0,
+]
+
+[editor.graph_layouts."Main Scene"]
+zoom = 0.4000000059604645
+pan = [
+    65.34347534179688,
+    16.21484375,
+]
+
+[editor.graph_layouts."Main Scene".node_positions]
+"node:19" = [
+    430.0,
+    330.0,
+]
+"node:17" = [
+    60.0,
+    330.0,
+]
+"node:3" = [
+    430.0,
+    50.0,
+]
+"node:12" = [
+    800.0,
+    218.0,
+]
+"node:8" = [
+    60.0,
+    162.0,
+]
+"node:14" = [
+    60.0,
+    274.0,
+]
+"node:15" = [
+    800.0,
+    274.0,
+]
+"node:22" = [
+    430.0,
+    386.0,
 ]
 "node:1" = [
     60.0,
     50.0,
+]
+"node:16" = [
+    430.0,
+    274.0,
+]
+"node:18" = [
+    800.0,
+    330.0,
+]
+"node:9" = [
+    800.0,
+    162.0,
+]
+"node:13" = [
+    430.0,
+    218.0,
+]
+"node:11" = [
+    60.0,
+    218.0,
+]
+"node:21" = [
+    800.0,
+    386.0,
+]
+"node:2" = [
+    800.0,
+    50.0,
+]
+"node:6" = [
+    800.0,
+    106.0,
+]
+"node:7" = [
+    430.0,
+    106.0,
+]
+"node:5" = [
+    1170.0,
+    106.0,
+]
+"node:10" = [
+    430.0,
+    162.0,
+]
+"node:4" = [
+    60.0,
+    106.0,
+]
+"node:20" = [
+    60.0,
+    386.0,
 ]
 
 [[editor.rule_graph_drafts."Main Scene".nodes]]
@@ -576,6 +576,36 @@ position = [
 [editor.rule_graph_drafts."Main Scene".nodes.kind]
 Condition = "Always"
 
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 20
+position = [
+    60.0,
+    386.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Trigger.OnDeath]
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 21
+position = [
+    800.0,
+    386.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind.Action.IncrementFlag]
+flag = "coins"
+amount = 1
+
+[[editor.rule_graph_drafts."Main Scene".nodes]]
+id = 22
+position = [
+    430.0,
+    386.0,
+]
+
+[editor.rule_graph_drafts."Main Scene".nodes.kind]
+Condition = "Always"
+
 [[editor.rule_graph_drafts."Main Scene".edges]]
 from = 3
 to = 2
@@ -628,11 +658,20 @@ to = 18
 from = 17
 to = 19
 
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 22
+to = 21
+
+[[editor.rule_graph_drafts."Main Scene".edges]]
+from = 20
+to = 22
+
 [[editor.rule_graph_drafts."Main Scene".chains]]
 rule_id = "rule_2"
 enabled = true
 priority = 0
 once = false
+log_enabled = false
 trigger_node_id = 1
 
 [[editor.rule_graph_drafts."Main Scene".chains]]
@@ -640,6 +679,7 @@ rule_id = "rule_1"
 enabled = true
 priority = 0
 once = false
+log_enabled = false
 trigger_node_id = 4
 
 [[editor.rule_graph_drafts."Main Scene".chains]]
@@ -647,6 +687,7 @@ rule_id = "rule_3"
 enabled = true
 priority = 0
 once = false
+log_enabled = false
 trigger_node_id = 8
 
 [[editor.rule_graph_drafts."Main Scene".chains]]
@@ -654,6 +695,7 @@ rule_id = "rule_4"
 enabled = true
 priority = 0
 once = false
+log_enabled = false
 trigger_node_id = 11
 
 [[editor.rule_graph_drafts."Main Scene".chains]]
@@ -661,6 +703,7 @@ rule_id = "rule_5"
 enabled = true
 priority = 0
 once = false
+log_enabled = false
 trigger_node_id = 14
 
 [[editor.rule_graph_drafts."Main Scene".chains]]
@@ -668,4 +711,13 @@ rule_id = "rule_6"
 enabled = true
 priority = 0
 once = false
+log_enabled = false
 trigger_node_id = 17
+
+[[editor.rule_graph_drafts."Main Scene".chains]]
+rule_id = "rule_7"
+enabled = true
+priority = 0
+once = false
+log_enabled = true
+trigger_node_id = 20

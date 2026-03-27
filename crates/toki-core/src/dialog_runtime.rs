@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use tracing::info;
 
 use crate::dialog::{
     DialogCondition, DialogConditionTarget, DialogNodeKind, DialogRuntimeContext, DialogTree,
@@ -350,10 +351,28 @@ impl DialogController {
                 self.active = None;
                 return;
             };
-            if !Self::conditions_match(game_state, &active.context, &node.conditions) {
+            if !Self::conditions_match(
+                game_state,
+                &active.context,
+                &active.dialog_id,
+                &node.id,
+                "node",
+                &node.conditions,
+            ) {
                 match &node.kind {
                     DialogNodeKind::Line { next_node_id, .. } => {
+                        info!(
+                            dialog_id = %active.dialog_id,
+                            node_id = %node.id,
+                            next_node_id = ?next_node_id,
+                            "Dialog node conditions failed; skipping line node"
+                        );
                         let Some(next) = next_node_id.clone() else {
+                            info!(
+                                dialog_id = %active.dialog_id,
+                                node_id = %node.id,
+                                "Dialog node conditions failed and no fallback exists; closing dialog"
+                            );
                             self.active = None;
                             return;
                         };
@@ -362,6 +381,11 @@ impl DialogController {
                         continue;
                     }
                     DialogNodeKind::End { .. } => {
+                        info!(
+                            dialog_id = %active.dialog_id,
+                            node_id = %node.id,
+                            "Dialog end node conditions failed; closing dialog"
+                        );
                         self.active = None;
                         return;
                     }
@@ -376,15 +400,49 @@ impl DialogController {
                 return;
             };
             let context = active.context;
-            let next = branches
-                .iter()
-                .find(|branch| Self::conditions_match(game_state, &context, &branch.conditions))
-                .map(|branch| branch.next_node_id.clone())
+            let mut matched_branch = None;
+            for (branch_index, branch) in branches.iter().enumerate() {
+                if Self::conditions_match(
+                    game_state,
+                    &context,
+                    &active.dialog_id,
+                    &node.id,
+                    &format!("branch_{}", branch_index + 1),
+                    &branch.conditions,
+                ) {
+                    matched_branch = Some((branch_index, branch.next_node_id.clone()));
+                    break;
+                }
+            }
+            let next = matched_branch
+                .as_ref()
+                .map(|(_, next_node_id)| next_node_id.clone())
                 .or_else(|| default_next_node_id.clone());
             let Some(next) = next else {
+                info!(
+                    dialog_id = %active.dialog_id,
+                    node_id = %node.id,
+                    "No dialog branch conditions matched and no default branch exists; closing dialog"
+                );
                 self.active = None;
                 return;
             };
+            if let Some((branch_index, _)) = matched_branch {
+                info!(
+                    dialog_id = %active.dialog_id,
+                    node_id = %node.id,
+                    branch_index = branch_index + 1,
+                    next_node_id = %next,
+                    "Dialog branch conditions matched; selecting branch"
+                );
+            } else {
+                info!(
+                    dialog_id = %active.dialog_id,
+                    node_id = %node.id,
+                    next_node_id = %next,
+                    "No dialog branch conditions matched; using default branch"
+                );
+            }
             active.current_node_id = next;
             active.selected_index = 0;
         }
@@ -394,11 +452,23 @@ impl DialogController {
     fn conditions_match(
         game_state: &GameState,
         context: &DialogRuntimeContext,
+        dialog_id: &str,
+        node_id: &str,
+        scope: &str,
         conditions: &[DialogCondition],
     ) -> bool {
-        conditions
-            .iter()
-            .all(|condition| Self::condition_matches(game_state, context, condition))
+        conditions.iter().all(|condition| {
+            let result = Self::condition_matches(game_state, context, condition);
+            info!(
+                dialog_id = %dialog_id,
+                node_id = %node_id,
+                scope = %scope,
+                condition = ?condition,
+                result,
+                "Dialog condition evaluated"
+            );
+            result
+        })
     }
 
     fn condition_matches(

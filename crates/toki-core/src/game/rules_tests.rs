@@ -23,6 +23,7 @@ fn create_test_rule(id: &str, trigger: RuleTrigger) -> Rule {
         enabled: true,
         priority: 0,
         once: false,
+        log_enabled: false,
         trigger,
         conditions: vec![],
         actions: vec![RuleAction::PlaySound {
@@ -38,6 +39,7 @@ fn create_rule_with_priority(id: &str, trigger: RuleTrigger, priority: i32) -> R
         enabled: true,
         priority,
         once: false,
+        log_enabled: false,
         trigger,
         conditions: vec![],
         actions: vec![RuleAction::PlaySound {
@@ -53,6 +55,7 @@ fn create_once_rule(id: &str, trigger: RuleTrigger) -> Rule {
         enabled: true,
         priority: 0,
         once: true,
+        log_enabled: false,
         trigger,
         conditions: vec![],
         actions: vec![RuleAction::PlaySound {
@@ -68,6 +71,7 @@ fn create_disabled_rule(id: &str, trigger: RuleTrigger) -> Rule {
         enabled: false,
         priority: 0,
         once: false,
+        log_enabled: false,
         trigger,
         conditions: vec![],
         actions: vec![RuleAction::PlaySound {
@@ -475,6 +479,7 @@ fn collision_provides_trigger_context() {
         enabled: true,
         priority: 0,
         once: false,
+        log_enabled: false,
         trigger: RuleTrigger::OnCollision { entity: None },
         conditions: vec![RuleCondition::TriggerOtherIsPlayer],
         actions: vec![RuleAction::PlaySound {
@@ -516,6 +521,7 @@ fn damage_provides_trigger_context() {
         enabled: true,
         priority: 0,
         once: false,
+        log_enabled: false,
         trigger: RuleTrigger::OnDamaged { entity: None },
         conditions: vec![RuleCondition::TriggerOtherIsPlayer],
         actions: vec![RuleAction::PlaySound {
@@ -587,6 +593,7 @@ fn trigger_self_resolves_in_collision_context() {
         enabled: true,
         priority: 0,
         once: false,
+        log_enabled: false,
         trigger: RuleTrigger::OnCollision { entity: None },
         conditions: vec![],
         actions: vec![RuleAction::DestroySelf {
@@ -621,6 +628,7 @@ fn trigger_other_resolves_in_collision_context() {
         enabled: true,
         priority: 0,
         once: false,
+        log_enabled: false,
         trigger: RuleTrigger::OnCollision { entity: None },
         conditions: vec![],
         actions: vec![RuleAction::DestroySelf {

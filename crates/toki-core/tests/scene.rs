@@ -421,6 +421,7 @@ fn test_scene_rules_serialization_roundtrip() {
             enabled: true,
             priority: 7,
             once: true,
+        log_enabled: false,
             trigger: RuleTrigger::OnStart,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlaySound {

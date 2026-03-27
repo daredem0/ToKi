@@ -8,16 +8,31 @@
     {
       "id": "start",
       "speaker_name": "NPC",
+      "conditions": [],
       "kind": "line",
       "body": "Hello.",
-      "next_node_id": "end"
+      "next_node_id": "line"
     },
     {
       "id": "end",
       "speaker_name": "NPC",
+      "conditions": [],
       "kind": "end",
       "body": "Bye",
       "outcome_id": "done"
+    },
+    {
+      "id": "line",
+      "conditions": [
+        {
+          "kind": "flag_greater_than",
+          "flag": "coins",
+          "value": 3
+        }
+      ],
+      "kind": "line",
+      "body": "Oh you got coins",
+      "next_node_id": "end"
     }
   ]
 }
