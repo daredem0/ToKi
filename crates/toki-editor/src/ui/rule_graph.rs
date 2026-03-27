@@ -31,6 +31,7 @@ pub struct RuleGraphChain {
     pub enabled: bool,
     pub priority: i32,
     pub once: bool,
+    pub log_enabled: bool,
     pub trigger_node_id: RuleGraphNodeId,
 }
 
@@ -141,6 +142,7 @@ impl RuleGraph {
                 enabled: rule.enabled,
                 priority: rule.priority,
                 once: rule.once,
+                log_enabled: rule.log_enabled,
                 trigger_node_id: trigger_id,
             });
         }
@@ -330,6 +332,7 @@ impl RuleGraph {
                 enabled: chain.enabled,
                 priority: chain.priority,
                 once: chain.once,
+                log_enabled: chain.log_enabled,
                 trigger: trigger.clone(),
                 conditions,
                 actions,
@@ -379,12 +382,57 @@ impl RuleGraph {
             enabled: true,
             priority: 0,
             once: false,
+            log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: Vec::new(),
             actions: Vec::new(),
         });
         *self = Self::from_rule_set(&rules);
         Ok(rule_id)
+    }
+
+    pub fn logging_for_node(&self, node_id: RuleGraphNodeId) -> Option<bool> {
+        self.chains
+            .iter()
+            .find(|chain| {
+                self.chain_node_sequence(chain.trigger_node_id)
+                    .map(|sequence| sequence.contains(&node_id))
+                    .unwrap_or(false)
+            })
+            .map(|chain| chain.log_enabled)
+    }
+
+    pub fn set_logging_for_node(
+        &mut self,
+        node_id: RuleGraphNodeId,
+        log_enabled: bool,
+    ) -> Result<(), RuleGraphEditError> {
+        let mut rules = self
+            .to_rule_set()
+            .map_err(RuleGraphEditError::GraphInvalid)?;
+
+        let mut chain_hit = None::<usize>;
+        for (chain_index, chain) in self.chains.iter().enumerate() {
+            let sequence = self
+                .chain_node_sequence(chain.trigger_node_id)
+                .map_err(RuleGraphEditError::GraphInvalid)?;
+            if sequence.contains(&node_id) {
+                chain_hit = Some(chain_index);
+                break;
+            }
+        }
+        let Some(chain_index) = chain_hit else {
+            return Err(RuleGraphEditError::MissingNode { node_id });
+        };
+        let chain = &self.chains[chain_index];
+        let Some(rule) = rules.rules.iter_mut().find(|rule| rule.id == chain.rule_id) else {
+            return Err(RuleGraphEditError::MissingChain {
+                trigger_node_id: chain.trigger_node_id,
+            });
+        };
+        rule.log_enabled = log_enabled;
+        *self = Self::from_rule_set(&rules);
+        Ok(())
     }
 
     pub fn add_condition_node(

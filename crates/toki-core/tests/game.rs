@@ -2886,6 +2886,7 @@ fn game_state_emits_movement_audio_for_rule_velocity_movement() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![],
             actions: vec![RuleAction::SetVelocity {

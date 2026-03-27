@@ -34,6 +34,7 @@ fn sample_rule_set() -> RuleSet {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnStart,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlaySound {
@@ -463,6 +464,7 @@ fn update_scene_rules_graph_command_round_trips_rules_graph_and_layout() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnStart,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlaySound {
@@ -620,6 +622,7 @@ fn graph_node_rule_deletion_is_undoable() {
         enabled: true,
         priority: 0,
         once: false,
+        log_enabled: false,
         trigger: RuleTrigger::OnUpdate,
         conditions: vec![RuleCondition::Always],
         actions: vec![RuleAction::PlaySound {

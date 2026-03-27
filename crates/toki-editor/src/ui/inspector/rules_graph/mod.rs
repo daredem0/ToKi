@@ -65,7 +65,27 @@ impl InspectorSystem {
             node_key,
             node_id,
         };
-        let mut graph_mutated =
+        let mut graph_mutated = false;
+        if let Some(mut log_enabled) = graph.logging_for_node(node_id) {
+            if ui
+                .checkbox(&mut log_enabled, "Log Rule Events")
+                .on_hover_text(
+                    "Emit info logs when this rule's trigger, passing conditions, and actions fire at runtime",
+                )
+                .changed()
+            {
+                if let Err(error) = graph.set_logging_for_node(node_id, log_enabled) {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(255, 120, 120),
+                        format!("Failed to update rule logging: {:?}", error),
+                    );
+                } else {
+                    graph_mutated = true;
+                }
+            }
+            ui.separator();
+        }
+        graph_mutated |=
             Self::render_node_kind_editor(ui, ui_state, &params, &node_kind, &mut graph, &ctx);
 
         ui.separator();

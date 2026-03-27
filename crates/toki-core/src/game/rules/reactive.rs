@@ -89,6 +89,7 @@ mod tests {
                     priority: 0,
                     enabled: true,
                     once: false,
+                    log_enabled: false,
                 },
                 Rule {
                     id: "on_damage".to_string(),
@@ -101,6 +102,7 @@ mod tests {
                     priority: 0,
                     enabled: true,
                     once: false,
+                    log_enabled: false,
                 },
             ],
         });

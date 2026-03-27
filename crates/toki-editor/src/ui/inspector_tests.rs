@@ -72,6 +72,7 @@ fn sample_rule(id: &str) -> Rule {
         enabled: true,
         priority: 0,
         once: false,
+        log_enabled: false,
         trigger: RuleTrigger::OnUpdate,
         conditions: vec![RuleCondition::Always],
         actions: vec![RuleAction::PlaySound {
@@ -637,6 +638,7 @@ fn next_rule_id_fills_first_available_gap() {
                 enabled: true,
                 priority: 0,
                 once: false,
+        log_enabled: false,
                 trigger: RuleTrigger::OnUpdate,
                 conditions: vec![RuleCondition::Always],
                 actions: vec![],
@@ -646,6 +648,7 @@ fn next_rule_id_fills_first_available_gap() {
                 enabled: true,
                 priority: 0,
                 once: false,
+        log_enabled: false,
                 trigger: RuleTrigger::OnUpdate,
                 conditions: vec![RuleCondition::Always],
                 actions: vec![],
@@ -965,6 +968,7 @@ fn validate_rule_set_reports_duplicate_ids_and_invalid_action_payloads() {
         enabled: true,
         priority: 1,
         once: false,
+        log_enabled: false,
         trigger: RuleTrigger::OnStart,
         conditions: vec![RuleCondition::Always],
         actions: vec![RuleAction::SwitchScene {
@@ -1011,6 +1015,7 @@ fn validate_rule_set_reports_empty_play_music_track() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlayMusic {
@@ -1033,6 +1038,7 @@ fn validate_rule_set_for_scene_warns_for_undeclared_flags() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::FlagSet {
                 flag: "missing_flag".to_string(),
@@ -1079,6 +1085,7 @@ fn validate_rule_set_for_scene_reports_invalid_switch_scene_targets() {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnTrigger,
             conditions: vec![RuleCondition::Always],
             actions: vec![

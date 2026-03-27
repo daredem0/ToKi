@@ -640,6 +640,7 @@ mod tests {
                 enabled: true,
                 priority: 0,
                 once: false,
+        log_enabled: false,
                 trigger: RuleTrigger::OnStart,
                 conditions: vec![RuleCondition::Always],
                 actions: vec![RuleAction::PlayMusic {

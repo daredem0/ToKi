@@ -4,6 +4,7 @@
 
 use crate::animation::AnimationState;
 use crate::rules::{RuleAction, RuleSoundChannel, TriggerContext};
+use tracing::info;
 
 use super::{AudioChannel, GameState, RuleCommand};
 
@@ -22,10 +23,15 @@ impl GameState {
 
     pub(super) fn buffer_rule_action(
         &self,
+        rule_id: &str,
+        log_enabled: bool,
         action: &RuleAction,
         context: &TriggerContext,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
+        if log_enabled {
+            info!(rule_id = %rule_id, action = ?action, "Rule action passed");
+        }
         tracing::debug!("Buffering rule action: {:?}", action);
         match action {
             RuleAction::PlaySound { channel, sound_id } => {

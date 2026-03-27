@@ -148,6 +148,7 @@ fn scene_json_roundtrip_through_editor_persists_rules_and_executes_in_runtime() 
                 enabled: true,
                 priority: 5,
                 once: false,
+        log_enabled: false,
                 trigger: RuleTrigger::OnStart,
                 conditions: vec![RuleCondition::Always],
                 actions: vec![

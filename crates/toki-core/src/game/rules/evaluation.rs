@@ -4,6 +4,7 @@
 
 use crate::entity::HEALTH_STAT_ID;
 use crate::rules::{RuleCondition, TriggerContext};
+use tracing::info;
 
 use super::GameState;
 
@@ -19,12 +20,17 @@ impl GameState {
 
     pub(super) fn rule_conditions_match(
         &self,
+        rule_id: &str,
+        log_enabled: bool,
         conditions: &[RuleCondition],
         context: &TriggerContext,
     ) -> bool {
         conditions.iter().all(|condition| {
             let result = self.evaluate_condition(condition, context);
             tracing::trace!(condition = ?condition, result, "Condition evaluated");
+            if result && log_enabled {
+                info!(rule_id = %rule_id, condition = ?condition, "Rule condition passed");
+            }
             result
         })
     }

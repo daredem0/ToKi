@@ -130,6 +130,7 @@ impl InspectorSystem {
             enabled: true,
             priority: 0,
             once: false,
+        log_enabled: false,
             trigger: RuleTrigger::OnUpdate,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlaySound {
