@@ -1,8 +1,10 @@
 use super::*;
 use crate::project::apply_project_settings_draft;
+use crate::project::ProjectAssets;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
+use toki_core::dialog::{DialogCondition, DialogNodeKind};
 use toki_core::palette::{save_palette_asset_to_path, Palette4};
 use toki_core::project_assets::load_project_palettes;
 
@@ -11,6 +13,7 @@ impl InspectorSystem {
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
         project: Option<&mut Project>,
+        _project_assets: Option<&mut ProjectAssets>,
         _config: Option<&EditorConfig>,
     ) {
         let Some(project) = project else {
@@ -27,6 +30,7 @@ impl InspectorSystem {
         let mut draft = ProjectSettingsDraft::from_project(project);
         let mut changed = false;
         let mut palette_files_changed = false;
+        let previous_flags = project.metadata.runtime.flags.declarations.clone();
 
         ui.collapsing("General", |ui| {
             ui.horizontal(|ui| {
@@ -45,6 +49,61 @@ impl InspectorSystem {
                         .desired_width(f32::INFINITY),
                 )
                 .changed();
+        });
+
+        ui.separator();
+        ui.collapsing("Flags", |ui| {
+            for issue in validate_flag_registry(&draft.flag_declarations) {
+                ui.colored_label(issue.color, issue.message);
+            }
+
+            let mut remove_index = None;
+            for (index, declaration) in draft.flag_declarations.iter_mut().enumerate() {
+                ui.group(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(format!("Flag {}", index + 1));
+                        if ui.small_button("Delete").clicked() {
+                            remove_index = Some(index);
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Id:");
+                        changed |= ui.text_edit_singleline(&mut declaration.id).changed();
+                    });
+                    changed |= Self::render_flag_value_editor(
+                        ui,
+                        format!("project_flag_default_{index}"),
+                        &mut declaration.default_value,
+                    );
+                });
+            }
+            if let Some(index) = remove_index {
+                draft.flag_declarations.remove(index);
+                changed = true;
+            }
+            if ui.button("+ Add Flag").clicked() {
+                draft.flag_declarations.push(toki_core::project_runtime::ProjectFlagDefinition {
+                    id: String::new(),
+                    default_value: toki_core::FlagValue::Bool(false),
+                });
+                changed = true;
+            }
+        });
+
+        ui.separator();
+        ui.collapsing("Scene Transitions", |ui| {
+            ui.label("Effect: Fade");
+            ui.horizontal(|ui| {
+                ui.label("Default Fade Duration:");
+                changed |= ui
+                    .add(
+                        egui::DragValue::new(&mut draft.transition_default_duration_ms)
+                            .speed(1.0)
+                            .range(1..=60_000),
+                    )
+                    .changed();
+                ui.label("ms");
+            });
         });
 
         ui.separator();
@@ -650,6 +709,10 @@ impl InspectorSystem {
             });
         });
 
+        if changed {
+            propagate_flag_renames(ui_state, &previous_flags, &draft.flag_declarations);
+        }
+
         if changed && apply_project_settings_draft(project, &draft) {
             ui_state.set_title(&project.name);
             ui_state
@@ -704,4 +767,127 @@ fn remove_project_palette_file(project: &Project, palette_id: &str) -> anyhow::R
         fs::remove_file(&path)?;
     }
     Ok(())
+}
+
+struct FlagRegistryIssue {
+    color: egui::Color32,
+    message: String,
+}
+
+fn validate_flag_registry(
+    declarations: &[toki_core::project_runtime::ProjectFlagDefinition],
+) -> Vec<FlagRegistryIssue> {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut issues = Vec::new();
+    for declaration in declarations {
+        let id = declaration.id.trim();
+        if id.is_empty() {
+            issues.push(FlagRegistryIssue {
+                color: egui::Color32::from_rgb(255, 120, 120),
+                message: "Flag ids must not be empty".to_string(),
+            });
+        } else if !seen.insert(id.to_string()) {
+            issues.push(FlagRegistryIssue {
+                color: egui::Color32::from_rgb(255, 120, 120),
+                message: format!("Duplicate flag id '{id}'"),
+            });
+        }
+    }
+    issues
+}
+
+fn propagate_flag_renames(
+    ui_state: &mut EditorUI,
+    previous: &[toki_core::project_runtime::ProjectFlagDefinition],
+    next: &[toki_core::project_runtime::ProjectFlagDefinition],
+) {
+    for (before, after) in previous.iter().zip(next.iter()) {
+        let old_id = before.id.trim();
+        let new_id = after.id.trim();
+        if old_id.is_empty() || new_id.is_empty() || old_id == new_id {
+            continue;
+        }
+        rename_flag_references(ui_state, old_id, new_id);
+    }
+}
+
+fn rename_flag_references(ui_state: &mut EditorUI, old_id: &str, new_id: &str) {
+    for scene in &mut ui_state.scenes {
+        for rule in &mut scene.rules.rules {
+            for condition in &mut rule.conditions {
+                rename_rule_condition_flag(condition, old_id, new_id);
+            }
+            for action in &mut rule.actions {
+                rename_rule_action_flag(action, old_id, new_id);
+            }
+        }
+    }
+
+    if let Some(dialog) = ui_state.dialog.draft.as_mut() {
+        for node in &mut dialog.nodes {
+            rename_dialog_conditions(&mut node.conditions, old_id, new_id);
+            match &mut node.kind {
+                DialogNodeKind::Choice { choices, .. } => {
+                    for choice in choices {
+                        rename_dialog_conditions(&mut choice.conditions, old_id, new_id);
+                    }
+                }
+                DialogNodeKind::Branch { branches, .. } => {
+                    for branch in branches {
+                        rename_dialog_conditions(&mut branch.conditions, old_id, new_id);
+                    }
+                }
+                DialogNodeKind::Line { .. } | DialogNodeKind::End { .. } => {}
+            }
+        }
+    }
+}
+
+fn rename_rule_condition_flag(
+    condition: &mut toki_core::rules::RuleCondition,
+    old_id: &str,
+    new_id: &str,
+) {
+    match condition {
+        toki_core::rules::RuleCondition::FlagEquals { flag, .. }
+        | toki_core::rules::RuleCondition::FlagSet { flag }
+        | toki_core::rules::RuleCondition::FlagGreaterThan { flag, .. }
+            if flag.trim() == old_id =>
+        {
+            *flag = new_id.to_string();
+        }
+        _ => {}
+    }
+}
+
+fn rename_rule_action_flag(
+    action: &mut toki_core::rules::RuleAction,
+    old_id: &str,
+    new_id: &str,
+) {
+    match action {
+        toki_core::rules::RuleAction::SetFlag { flag, .. }
+        | toki_core::rules::RuleAction::IncrementFlag { flag, .. }
+        | toki_core::rules::RuleAction::ClearFlag { flag }
+            if flag.trim() == old_id =>
+        {
+            *flag = new_id.to_string();
+        }
+        _ => {}
+    }
+}
+
+fn rename_dialog_conditions(conditions: &mut [DialogCondition], old_id: &str, new_id: &str) {
+    for condition in conditions {
+        match condition {
+            DialogCondition::FlagEquals { flag, .. }
+            | DialogCondition::FlagSet { flag }
+            | DialogCondition::FlagGreaterThan { flag, .. }
+                if flag.trim() == old_id =>
+            {
+                *flag = new_id.to_string();
+            }
+            _ => {}
+        }
+    }
 }

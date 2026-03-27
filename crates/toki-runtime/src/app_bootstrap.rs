@@ -217,6 +217,7 @@ impl<'a> StartupCoordinator<'a> {
                 preloaded.scenes,
                 preloaded.entity_definitions,
                 scene_name,
+                &self.launch_options.flags.declarations,
             )
         } else {
             App::fallback_game_state()
@@ -417,13 +418,17 @@ impl App {
         scenes: Vec<Scene>,
         entity_definitions: Vec<EntityDefinition>,
         startup_scene_name: &str,
+        flag_declarations: &[toki_core::project_runtime::ProjectFlagDefinition],
     ) -> GameState {
         match shared_build_game_state_from_project_content(
             scenes,
             entity_definitions,
             startup_scene_name,
         ) {
-            Ok(game_state) => game_state,
+            Ok(mut game_state) => {
+                game_state.apply_flag_defaults(flag_declarations);
+                game_state
+            }
             Err(error) => {
                 tracing::error!(
                     "Failed to load startup scene '{}' into game state: {}",
@@ -469,6 +474,7 @@ mod tests {
         AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition, MovementProfile,
         MovementSoundTrigger, RenderingDef,
     };
+    use toki_core::FlagValue;
 
     fn write_minimal_entity_definition(project_path: &Path, name: &str) {
         let entities_dir = project_path.join("entities");
@@ -527,6 +533,22 @@ mod tests {
             serde_json::to_string_pretty(&definition).expect("serialize"),
         )
         .expect("write entity definition");
+    }
+
+    #[test]
+    fn game_state_from_project_content_applies_flag_defaults() {
+        let scene = Scene::new("Main".to_string());
+        let game_state = App::game_state_from_project_content(
+            vec![scene],
+            Vec::new(),
+            "Main",
+            &[toki_core::project_runtime::ProjectFlagDefinition {
+                id: "quest_done".to_string(),
+                default_value: FlagValue::Bool(true),
+            }],
+        );
+
+        assert_eq!(game_state.flag("quest_done"), Some(&FlagValue::Bool(true)));
     }
 
     #[test]

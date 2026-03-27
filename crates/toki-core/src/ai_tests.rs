@@ -324,6 +324,7 @@ fn create_test_entity(id: EntityId, position: IVec2, behavior: AiBehavior) -> En
         entity_kind: EntityKind::Npc,
         category: "creature".to_string(),
         definition_name: Some("test_npc".to_string()),
+        persistent_across_saves: false,
         control_role: ControlRole::None,
         audio: Default::default(),
         attributes: EntityAttributes {

@@ -148,6 +148,8 @@ pub struct Entity {
     /// This lets editor workflows (e.g. drag-to-move) re-enter placement mode without guessing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub definition_name: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub persistent_across_saves: bool,
     #[serde(default, skip_serializing_if = "ControlRole::is_legacy_default")]
     pub control_role: ControlRole,
     #[serde(default, skip_serializing_if = "EntityAudioSettings::is_default")]
@@ -179,6 +181,10 @@ pub struct EntityAudioComponent {
     pub movement_sound: Option<String>,
     #[serde(default)]
     pub collision_sound: Option<String>,
+}
+
+const fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 impl Default for EntityAudioComponent {

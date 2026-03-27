@@ -39,6 +39,7 @@ impl GameState {
             ai_delta_accumulator_ms: 0.0,
             game_flags: GameFlags::default(),
             play_time_ms: 0,
+            persistent_scene_entities: Default::default(),
         }
     }
 
@@ -59,6 +60,7 @@ impl GameState {
             ai_delta_accumulator_ms: 0.0,
             game_flags: GameFlags::default(),
             play_time_ms: 0,
+            persistent_scene_entities: Default::default(),
         }
     }
 
@@ -312,6 +314,7 @@ impl GameState {
 
     /// Add a scene to the scene manager
     pub fn add_scene(&mut self, scene: Scene) {
+        self.track_persistent_entities_for_scene(&scene);
         self.scene_manager.add_scene(scene);
     }
 
@@ -334,6 +337,50 @@ impl GameState {
             }
 
             active_scene.rules = rules;
+        }
+    }
+
+    pub fn sync_persistent_entities_to_active_scene(&mut self) {
+        let Some(active_scene_name) = self.scene_manager.active_scene_name().map(str::to_string) else {
+            return;
+        };
+
+        let tracked_ids = self
+            .persistent_scene_entities
+            .iter()
+            .filter(|(scene_name, _)| *scene_name == active_scene_name)
+            .map(|(_, entity_id)| *entity_id)
+            .collect::<Vec<_>>();
+
+        if tracked_ids.is_empty() {
+            return;
+        }
+
+        let current_entities = tracked_ids
+            .iter()
+            .filter_map(|entity_id| {
+                self.entity_manager
+                    .get_entity(*entity_id)
+                    .cloned()
+                    .map(|entity| (*entity_id, entity))
+            })
+            .collect::<HashMap<_, _>>();
+
+        if let Some(active_scene) = self.scene_manager.active_scene_mut() {
+            for entity_id in tracked_ids {
+                match current_entities.get(&entity_id) {
+                    Some(entity) => {
+                        if let Some(existing) = active_scene.get_entity_mut(entity_id) {
+                            *existing = entity.clone();
+                        } else {
+                            active_scene.add_entity(entity.clone());
+                        }
+                    }
+                    None => {
+                        active_scene.remove_entity(entity_id);
+                    }
+                }
+            }
         }
     }
 
@@ -384,6 +431,8 @@ impl GameState {
         }
 
         for persisted in &save_data.persisted_entities {
+            self.persistent_scene_entities
+                .insert((persisted.scene_name.clone(), persisted.entity_id));
             let Some(scene) = self.scene_manager.get_scene_mut(&persisted.scene_name) else {
                 continue;
             };
@@ -435,5 +484,14 @@ impl GameState {
         self.game_flags = save_data.flags.clone();
         self.play_time_ms = save_data.metadata.play_time_ms;
         Ok(())
+    }
+
+    fn track_persistent_entities_for_scene(&mut self, scene: &Scene) {
+        for entity in &scene.entities {
+            if entity.persistent_across_saves {
+                self.persistent_scene_entities
+                    .insert((scene.name.clone(), entity.id));
+            }
+        }
     }
 }

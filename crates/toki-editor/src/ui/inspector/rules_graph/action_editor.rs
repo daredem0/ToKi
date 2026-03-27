@@ -95,11 +95,15 @@ impl InspectorSystem {
             RuleAction::SwitchScene {
                 scene_name: scene,
                 spawn_point_id,
+                transition,
+                duration_ms,
             } => Self::render_switch_scene_editor(
                 ui,
                 format!("graph_switch_scene_{}_{}", scene_name, node_key),
                 scene,
                 spawn_point_id,
+                transition,
+                duration_ms,
                 scenes,
             ),
             RuleAction::StartDialog { dialog_id } => {

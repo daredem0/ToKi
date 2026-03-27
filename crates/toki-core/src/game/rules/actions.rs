@@ -57,6 +57,8 @@ impl GameState {
             RuleAction::SwitchScene {
                 scene_name,
                 spawn_point_id,
+                transition,
+                duration_ms,
             } => {
                 tracing::info!(
                     scene_name = %scene_name,
@@ -66,6 +68,8 @@ impl GameState {
                 command_buffer.push(RuleCommand::SwitchScene {
                     scene_name: scene_name.clone(),
                     spawn_point_id: spawn_point_id.clone(),
+                    transition: *transition,
+                    duration_ms: *duration_ms,
                 });
             }
             RuleAction::StartDialog { dialog_id } => {

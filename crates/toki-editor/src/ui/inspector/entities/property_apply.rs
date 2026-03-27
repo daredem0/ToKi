@@ -185,6 +185,10 @@ impl InspectorSystem {
         changed |= set_if_changed(&mut entity.attributes.has_inventory, draft.has_inventory);
         changed |= set_if_changed(&mut entity.attributes.speed, draft.speed.max(0.0) as f32);
         changed |= set_if_changed(&mut entity.attributes.render_layer, draft.render_layer);
+        changed |= set_if_changed(
+            &mut entity.persistent_across_saves,
+            draft.persistent_across_saves,
+        );
 
         let new_health = if draft.health_enabled {
             Some(clamp_to_non_negative_u32(draft.health_value))

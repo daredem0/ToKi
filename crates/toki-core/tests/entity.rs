@@ -271,6 +271,7 @@ fn test_add_existing_entity_tracks_explicit_player_character_role() {
         entity_kind: EntityKind::Npc,
         category: "creature".to_string(),
         definition_name: Some("slime".to_string()),
+        persistent_across_saves: false,
         control_role: ControlRole::PlayerCharacter,
         audio: EntityAudioSettings::default(),
         attributes: EntityAttributes {
@@ -306,6 +307,7 @@ fn test_add_existing_entity_seeds_generic_health_stat_from_legacy_health() {
         entity_kind: EntityKind::Npc,
         category: "creature".to_string(),
         definition_name: Some("slime".to_string()),
+        persistent_across_saves: false,
         control_role: ControlRole::None,
         audio: EntityAudioSettings::default(),
         attributes: EntityAttributes {

@@ -1,5 +1,5 @@
 use chrono::Utc;
-use toki_core::project_runtime::{PostProcessMode, QuantizeStrategy};
+use toki_core::project_runtime::{PostProcessMode, ProjectFlagDefinition, QuantizeStrategy};
 
 use super::Project;
 
@@ -32,6 +32,8 @@ pub struct ProjectSettingsDraft {
     pub post_process_quantize_palette_id: String,
     pub post_process_gb_contrast_percent: i16,
     pub post_process_vignette_strength_percent: u8,
+    pub flag_declarations: Vec<ProjectFlagDefinition>,
+    pub transition_default_duration_ms: u32,
 }
 
 impl ProjectSettingsDraft {
@@ -105,6 +107,12 @@ impl ProjectSettingsDraft {
                 .display
                 .post_process
                 .vignette_strength_percent,
+            flag_declarations: project.metadata.runtime.flags.declarations.clone(),
+            transition_default_duration_ms: project
+                .metadata
+                .runtime
+                .scene_transitions
+                .default_duration_ms,
         }
     }
 }
@@ -268,6 +276,17 @@ pub fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettin
             .vignette_strength_percent = draft.post_process_vignette_strength_percent;
         changed = true;
     }
+    if project.metadata.runtime.flags.declarations != draft.flag_declarations {
+        project.metadata.runtime.flags.declarations = draft.flag_declarations.clone();
+        changed = true;
+    }
+    if project.metadata.runtime.scene_transitions.default_duration_ms
+        != draft.transition_default_duration_ms
+    {
+        project.metadata.runtime.scene_transitions.default_duration_ms =
+            draft.transition_default_duration_ms.max(1);
+        changed = true;
+    }
     if project.metadata.runtime.display.resolution_width != draft.resolution_width {
         project.metadata.runtime.display.resolution_width = draft.resolution_width;
         changed = true;
@@ -354,6 +373,11 @@ mod tests {
             post_process_quantize_palette_id: "poison".to_string(),
             post_process_gb_contrast_percent: 12,
             post_process_vignette_strength_percent: 72,
+            flag_declarations: vec![ProjectFlagDefinition {
+                id: "quest_done".to_string(),
+                default_value: toki_core::FlagValue::Bool(false),
+            }],
+            transition_default_duration_ms: 420,
         };
 
         let changed = apply_project_settings_draft(&mut project, &draft);
@@ -449,6 +473,11 @@ mod tests {
                 .post_process
                 .vignette_strength_percent,
             72
+        );
+        assert_eq!(project.metadata.runtime.flags.declarations, draft.flag_declarations);
+        assert_eq!(
+            project.metadata.runtime.scene_transitions.default_duration_ms,
+            420
         );
         assert!(project.is_dirty);
         assert!(project.metadata.project.modified >= original_modified);

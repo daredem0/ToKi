@@ -180,6 +180,8 @@ pub fn default_rule_action(kind: RuleActionEditorKind) -> RuleAction {
         RuleActionEditorKind::SwitchScene => RuleAction::SwitchScene {
             scene_name: String::new(),
             spawn_point_id: String::new(),
+            transition: None,
+            duration_ms: None,
         },
         RuleActionEditorKind::StartDialog => RuleAction::StartDialog {
             dialog_id: String::new(),

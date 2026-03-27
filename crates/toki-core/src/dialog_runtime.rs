@@ -93,7 +93,7 @@ impl DialogController {
             selected_index: 0,
             context,
         });
-        self.resolve_branches(game_state);
+        self.resolve_current_node(game_state);
         Ok(())
     }
 
@@ -199,7 +199,7 @@ impl DialogController {
                         let next = choices[active.selected_index].next_node_id.clone();
                         active.current_node_id = next;
                         active.selected_index = 0;
-                        self.resolve_branches(game_state);
+                        self.resolve_current_node(game_state);
                         DialogAdvanceResult::None
                     } else {
                         let completion = DialogCompletion {
@@ -243,7 +243,7 @@ impl DialogController {
                     } else if let Some(next) = next_node_id.clone() {
                         active.current_node_id = next;
                         active.selected_index = 0;
-                        self.resolve_branches(game_state);
+                        self.resolve_current_node(game_state);
                         DialogAdvanceResult::None
                     } else {
                         let completion = DialogCompletion {
@@ -294,7 +294,7 @@ impl DialogController {
                 _ => DialogAdvanceResult::None,
             },
             DialogNodeKind::Branch { .. } => {
-                self.resolve_branches(game_state);
+                self.resolve_current_node(game_state);
                 DialogAdvanceResult::None
             }
         }
@@ -337,8 +337,8 @@ impl DialogController {
         active.selected_index = entry_index.min(max_index - 1);
     }
 
-    fn resolve_branches(&mut self, game_state: &GameState) {
-        for _ in 0..32 {
+    fn resolve_current_node(&mut self, game_state: &GameState) {
+        for _ in 0..64 {
             let Some(active) = self.active.as_mut() else {
                 return;
             };
@@ -350,6 +350,24 @@ impl DialogController {
                 self.active = None;
                 return;
             };
+            if !Self::conditions_match(game_state, &active.context, &node.conditions) {
+                match &node.kind {
+                    DialogNodeKind::Line { next_node_id, .. } => {
+                        let Some(next) = next_node_id.clone() else {
+                            self.active = None;
+                            return;
+                        };
+                        active.current_node_id = next;
+                        active.selected_index = 0;
+                        continue;
+                    }
+                    DialogNodeKind::End { .. } => {
+                        self.active = None;
+                        return;
+                    }
+                    DialogNodeKind::Choice { .. } | DialogNodeKind::Branch { .. } => {}
+                }
+            }
             let DialogNodeKind::Branch {
                 branches,
                 default_next_node_id,
@@ -498,6 +516,7 @@ mod tests {
                 DialogNode {
                     id: "start".to_string(),
                     speaker_name: Some("Guide".to_string()),
+                    conditions: Vec::new(),
                     kind: DialogNodeKind::Line {
                         body: "Hello".to_string(),
                         next_node_id: Some("end".to_string()),
@@ -506,6 +525,7 @@ mod tests {
                 DialogNode {
                     id: "end".to_string(),
                     speaker_name: None,
+                    conditions: Vec::new(),
                     kind: DialogNodeKind::End {
                         body: "Bye".to_string(),
                         outcome_id: Some("done".to_string()),
@@ -558,6 +578,7 @@ mod tests {
                 DialogNode {
                     id: "start".to_string(),
                     speaker_name: None,
+                    conditions: Vec::new(),
                     kind: DialogNodeKind::Choice {
                         body: "Choose".to_string(),
                         choices: vec![
@@ -579,6 +600,7 @@ mod tests {
                 DialogNode {
                     id: "end_a".to_string(),
                     speaker_name: None,
+                    conditions: Vec::new(),
                     kind: DialogNodeKind::End {
                         body: "A".to_string(),
                         outcome_id: Some("alpha".to_string()),
@@ -587,6 +609,7 @@ mod tests {
                 DialogNode {
                     id: "end_b".to_string(),
                     speaker_name: None,
+                    conditions: Vec::new(),
                     kind: DialogNodeKind::End {
                         body: "B".to_string(),
                         outcome_id: Some("beta".to_string()),
@@ -665,6 +688,7 @@ mod tests {
                 DialogNode {
                     id: "branch".to_string(),
                     speaker_name: None,
+                    conditions: Vec::new(),
                     kind: DialogNodeKind::Branch {
                         branches: vec![DialogBranch {
                             conditions: vec![DialogCondition::FlagSet {
@@ -678,6 +702,7 @@ mod tests {
                 DialogNode {
                     id: "met".to_string(),
                     speaker_name: None,
+                    conditions: Vec::new(),
                     kind: DialogNodeKind::End {
                         body: "welcome back".to_string(),
                         outcome_id: Some("met".to_string()),
@@ -686,6 +711,7 @@ mod tests {
                 DialogNode {
                     id: "new".to_string(),
                     speaker_name: None,
+                    conditions: Vec::new(),
                     kind: DialogNodeKind::End {
                         body: "nice to meet you".to_string(),
                         outcome_id: Some("new".to_string()),
@@ -701,5 +727,79 @@ mod tests {
 
         let view = controller.current_view().expect("view");
         assert_eq!(view.body, "welcome back");
+    }
+
+    #[test]
+    fn dialog_controller_skips_conditioned_line_nodes_until_it_finds_a_match() {
+        let mut game_state = GameState::new_empty();
+        game_state.set_flag("seen", FlagValue::Bool(true));
+        let dialog = DialogTree {
+            id: "line_skip".to_string(),
+            title: "Skip".to_string(),
+            entry_node_id: "start".to_string(),
+            allow_cancel: true,
+            gate_gameplay: true,
+            nodes: vec![
+                DialogNode {
+                    id: "start".to_string(),
+                    speaker_name: None,
+                    conditions: vec![DialogCondition::FlagSet {
+                        flag: "missing".to_string(),
+                    }],
+                    kind: DialogNodeKind::Line {
+                        body: "skip me".to_string(),
+                        next_node_id: Some("next".to_string()),
+                    },
+                },
+                DialogNode {
+                    id: "next".to_string(),
+                    speaker_name: None,
+                    conditions: vec![DialogCondition::FlagSet {
+                        flag: "seen".to_string(),
+                    }],
+                    kind: DialogNodeKind::End {
+                        body: "visible".to_string(),
+                        outcome_id: Some("ok".to_string()),
+                    },
+                },
+            ],
+        };
+
+        let mut controller = DialogController::new(vec![dialog]);
+        controller
+            .start_dialog(&game_state, "line_skip", DialogRuntimeContext::default())
+            .expect("dialog should start");
+
+        assert_eq!(controller.current_view().expect("view").body, "visible");
+    }
+
+    #[test]
+    fn dialog_controller_closes_when_conditioned_end_node_does_not_match() {
+        let game_state = GameState::new_empty();
+        let dialog = DialogTree {
+            id: "end_skip".to_string(),
+            title: "End".to_string(),
+            entry_node_id: "end".to_string(),
+            allow_cancel: true,
+            gate_gameplay: true,
+            nodes: vec![DialogNode {
+                id: "end".to_string(),
+                speaker_name: None,
+                conditions: vec![DialogCondition::FlagSet {
+                    flag: "missing".to_string(),
+                }],
+                kind: DialogNodeKind::End {
+                    body: "hidden".to_string(),
+                    outcome_id: Some("hidden".to_string()),
+                },
+            }],
+        };
+
+        let mut controller = DialogController::new(vec![dialog]);
+        controller
+            .start_dialog(&game_state, "end_skip", DialogRuntimeContext::default())
+            .expect("dialog should start");
+
+        assert!(!controller.is_open());
     }
 }

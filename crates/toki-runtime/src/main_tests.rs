@@ -11,6 +11,7 @@ use toki_core::project_runtime::{
     PostProcessMode, QuantizeStrategy, RuntimeConfigAudio, RuntimeConfigDisplay, RuntimeConfigFile,
     RuntimeConfigPack, RuntimeConfigSplash, RuntimeConfigStartup, RuntimePostProcessSettings,
 };
+use toki_core::FlagValue;
 use toki_runtime::{RuntimeAudioMixOptions, RuntimeDisplayOptions, RuntimeLaunchOptions};
 
 #[test]
@@ -524,4 +525,36 @@ fn apply_project_runtime_settings_loads_dedicated_dialog_appearance() {
             ..MenuAppearance::default()
         }
     );
+}
+
+#[test]
+fn apply_project_runtime_settings_loads_flag_registry_and_transition_defaults() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    std::fs::write(
+        dir.path().join("project.toml"),
+        r#"
+        [[runtime.flags.declarations]]
+        id = "quest_done"
+        default_value = { type = "bool", value = true }
+
+        [runtime.scene_transitions]
+        default_effect = "fade"
+        default_duration_ms = 420
+        "#,
+    )
+    .expect("project");
+
+    let updated =
+        apply_project_runtime_settings_from_project_file_if_present(RuntimeLaunchOptions {
+            project_path: Some(dir.path().to_path_buf()),
+            ..RuntimeLaunchOptions::default()
+        });
+
+    assert_eq!(updated.flags.declarations.len(), 1);
+    assert_eq!(updated.flags.declarations[0].id, "quest_done");
+    assert_eq!(
+        updated.flags.declarations[0].default_value,
+        FlagValue::Bool(true)
+    );
+    assert_eq!(updated.transition.fade_duration_ms, 420);
 }

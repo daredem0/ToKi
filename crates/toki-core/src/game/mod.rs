@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -8,6 +8,7 @@ use crate::assets::tilemap::TileMap;
 use crate::entity::{Entity, EntityDefinition, EntityId, EntityManager, MovementProfile};
 use crate::events::{GameEvent, GameUpdateResult};
 use crate::flags::{FlagValue, GameFlags};
+use crate::project_runtime::ProjectFlagDefinition;
 use crate::rules::{RuleSet, RuleTrigger};
 use crate::scene_manager::SceneManager;
 
@@ -150,6 +151,10 @@ pub struct GameState {
     /// Total accumulated play time for stable save-slot metadata.
     #[serde(default)]
     play_time_ms: u64,
+
+    /// Authored scene entities that should persist through save/load, tracked even when removed.
+    #[serde(skip, default)]
+    persistent_scene_entities: HashSet<(String, crate::entity::EntityId)>,
 }
 
 use input_state::InputRuntimeState;
@@ -179,6 +184,23 @@ impl GameState {
 
     pub fn play_time_ms(&self) -> u64 {
         self.play_time_ms
+    }
+
+    pub fn apply_flag_defaults(&mut self, declarations: &[ProjectFlagDefinition]) {
+        for declaration in declarations {
+            let flag = declaration.id.trim();
+            if flag.is_empty() || self.game_flags.is_set(flag) {
+                continue;
+            }
+            self.game_flags
+                .set(flag.to_string(), declaration.default_value.clone());
+        }
+    }
+
+    pub fn persistent_scene_entity_keys(&self) -> Vec<(String, crate::entity::EntityId)> {
+        let mut keys = self.persistent_scene_entities.iter().cloned().collect::<Vec<_>>();
+        keys.sort();
+        keys
     }
 
     fn effective_movement_profile(entity: &Entity) -> MovementProfile {
@@ -298,8 +320,13 @@ impl GameState {
             self.emit_animation_loop_movement_audio(entity_id, completed_loops, &mut result);
         }
 
-        if let Some((scene_name, spawn_point_id)) = pending_scene_switch {
-            result.request_scene_switch(scene_name, spawn_point_id);
+        if let Some(request) = pending_scene_switch {
+            result.request_scene_switch(
+                request.scene_name,
+                request.spawn_point_id,
+                request.transition,
+                request.duration_ms,
+            );
         }
         if let Some(crate::events::PersistenceRequest::SaveSlot { slot }) = pending_persistence {
             result.request_save_slot(slot);
@@ -426,8 +453,13 @@ impl GameState {
             self.emit_animation_loop_movement_audio(entity_id, completed_loops, &mut result);
         }
 
-        if let Some((scene_name, spawn_point_id)) = pending_scene_switch {
-            result.request_scene_switch(scene_name, spawn_point_id);
+        if let Some(request) = pending_scene_switch {
+            result.request_scene_switch(
+                request.scene_name,
+                request.spawn_point_id,
+                request.transition,
+                request.duration_ms,
+            );
         }
         if let Some(crate::events::PersistenceRequest::SaveSlot { slot }) = pending_persistence {
             result.request_save_slot(slot);

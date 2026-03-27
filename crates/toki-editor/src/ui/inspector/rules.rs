@@ -17,12 +17,14 @@ impl InspectorSystem {
         scene_name: &str,
         rule_set: &mut RuleSet,
         scenes: &[toki_core::Scene],
+        declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
         available_dialog_outcomes: &std::collections::BTreeMap<String, Vec<String>>,
         config: Option<&EditorConfig>,
         map_size: Option<(u32, u32)>,
     ) -> bool {
         let mut changed = false;
-        let validation_issues = Self::validate_rule_set_for_scene(rule_set, scene_name, scenes);
+        let validation_issues =
+            Self::validate_rule_set_for_scene(rule_set, scene_name, scenes, declared_flags);
         let audio_choices = Self::load_rule_audio_choices(config);
 
         ui.label("Visual Rules");

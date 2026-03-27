@@ -12,6 +12,7 @@ fn create_test_entity(id: EntityId, position: IVec2) -> Entity {
         entity_kind: EntityKind::Player,
         category: "human".to_string(),
         definition_name: None,
+        persistent_across_saves: false,
         control_role: toki_core::entity::ControlRole::PlayerCharacter,
         audio: EntityAudioSettings::default(),
         attributes: EntityAttributes::default(),

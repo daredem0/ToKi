@@ -31,6 +31,8 @@ pub struct DialogNode {
     pub id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub speaker_name: Option<String>,
+    #[serde(default)]
+    pub conditions: Vec<DialogCondition>,
     #[serde(flatten)]
     pub kind: DialogNodeKind,
 }
@@ -190,6 +192,12 @@ impl DialogTree {
         for node in &self.nodes {
             match &node.kind {
                 DialogNodeKind::Line { next_node_id, .. } => {
+                    if !node.conditions.is_empty() && next_node_id.is_none() {
+                        report.warnings.push(format!(
+                            "Dialog '{}' conditioned line node '{}' has no next node fallback",
+                            self.id, node.id
+                        ));
+                    }
                     if let Some(next_node_id) = next_node_id {
                         validate_node_ref(self, &node_map, next_node_id, &node.id, &mut report);
                     }
@@ -355,6 +363,7 @@ mod tests {
                 DialogNode {
                     id: "start".to_string(),
                     speaker_name: Some("Guide".to_string()),
+                    conditions: Vec::new(),
                     kind: DialogNodeKind::Line {
                         body: "Hello".to_string(),
                         next_node_id: Some("done".to_string()),
@@ -363,6 +372,7 @@ mod tests {
                 DialogNode {
                     id: "done".to_string(),
                     speaker_name: None,
+                    conditions: Vec::new(),
                     kind: DialogNodeKind::End {
                         body: "Bye".to_string(),
                         outcome_id: Some("completed".to_string()),
@@ -388,6 +398,7 @@ mod tests {
                 DialogNode {
                     id: "start".to_string(),
                     speaker_name: None,
+                    conditions: Vec::new(),
                     kind: DialogNodeKind::Line {
                         body: "Hello".to_string(),
                         next_node_id: Some("missing".to_string()),
@@ -396,6 +407,7 @@ mod tests {
                 DialogNode {
                     id: "unused".to_string(),
                     speaker_name: None,
+                    conditions: Vec::new(),
                     kind: DialogNodeKind::End {
                         body: String::new(),
                         outcome_id: None,
@@ -424,6 +436,7 @@ mod tests {
                 DialogNode {
                     id: "start".to_string(),
                     speaker_name: None,
+                    conditions: Vec::new(),
                     kind: DialogNodeKind::End {
                         body: "Hello".to_string(),
                         outcome_id: None,
@@ -432,6 +445,7 @@ mod tests {
                 DialogNode {
                     id: "unused".to_string(),
                     speaker_name: None,
+                    conditions: Vec::new(),
                     kind: DialogNodeKind::End {
                         body: String::new(),
                         outcome_id: None,

@@ -4,6 +4,7 @@ use strum::EnumIter;
 use crate::animation::AnimationState;
 use crate::entity::{EntityId, EntityKind};
 use crate::flags::FlagValue;
+use crate::project_runtime::SceneTransitionEffect;
 
 /// Context provided by triggers that involve entity interactions.
 ///
@@ -344,6 +345,10 @@ pub enum RuleAction {
     SwitchScene {
         scene_name: String,
         spawn_point_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        transition: Option<SceneTransitionEffect>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        duration_ms: Option<u32>,
     },
     StartDialog {
         dialog_id: String,

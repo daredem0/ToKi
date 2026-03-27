@@ -45,6 +45,7 @@ fn update_with_follow_mode_moves_camera_and_view_matrix_matches() {
         size: glam::UVec2::new(16, 16),
         entity_kind: EntityKind::Player,
         category: "human".to_string(),
+        persistent_across_saves: false,
         control_role: toki_core::entity::ControlRole::PlayerCharacter,
         audio: toki_core::entity::EntityAudioSettings::default(),
         attributes: EntityAttributes::default(),

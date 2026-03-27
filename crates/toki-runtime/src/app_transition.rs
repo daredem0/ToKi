@@ -72,10 +72,12 @@ enum TransitionPhase {
         request: SceneSwitchRequest,
         target_track_id: Option<String>,
         same_track: bool,
+        duration_ms: u32,
         elapsed_ms: u32,
         outgoing_music: Option<MusicPlayback>,
     },
     FadingIn {
+        duration_ms: u32,
         elapsed_ms: u32,
         fade_in_music: Option<MusicPlayback>,
         preserve_same_track: bool,
@@ -112,11 +114,17 @@ impl SceneTransitionController {
     pub(crate) fn fade_alpha(&self) -> f32 {
         match &self.phase {
             TransitionPhase::Idle => 0.0,
-            TransitionPhase::FadingOut { elapsed_ms, .. } => {
-                (*elapsed_ms as f32 / self.fade_duration_ms as f32).clamp(0.0, 1.0)
-            }
-            TransitionPhase::FadingIn { elapsed_ms, .. } => {
-                1.0 - (*elapsed_ms as f32 / self.fade_duration_ms as f32).clamp(0.0, 1.0)
+            TransitionPhase::FadingOut {
+                elapsed_ms,
+                duration_ms,
+                ..
+            } => (*elapsed_ms as f32 / *duration_ms as f32).clamp(0.0, 1.0),
+            TransitionPhase::FadingIn {
+                elapsed_ms,
+                duration_ms,
+                ..
+            } => {
+                1.0 - (*elapsed_ms as f32 / *duration_ms as f32).clamp(0.0, 1.0)
             }
         }
     }
@@ -135,11 +143,13 @@ impl SceneTransitionController {
             .as_ref()
             .map(|music| Some(music.track_id.as_str()) == target_track_id.as_deref())
             .unwrap_or(false);
+        let duration_ms = request.duration_ms.unwrap_or(self.fade_duration_ms).max(1);
 
         self.phase = TransitionPhase::FadingOut {
             request,
             target_track_id,
             same_track,
+            duration_ms,
             elapsed_ms: 0,
             outgoing_music,
         };
@@ -212,12 +222,13 @@ impl SceneTransitionController {
             TransitionPhase::FadingOut {
                 request,
                 same_track,
+                duration_ms,
                 elapsed_ms,
                 outgoing_music,
                 ..
             } => {
                 *elapsed_ms = elapsed_ms.saturating_add(delta_ms);
-                let progress = (*elapsed_ms as f32 / self.fade_duration_ms as f32).clamp(0.0, 1.0);
+                let progress = (*elapsed_ms as f32 / *duration_ms as f32).clamp(0.0, 1.0);
                 if !*same_track {
                     if let Some(outgoing_music) = outgoing_music.as_ref() {
                         audio.set_channel_volume_percent(
@@ -226,19 +237,20 @@ impl SceneTransitionController {
                         );
                     }
                 }
-                if *elapsed_ms >= self.fade_duration_ms {
+                if *elapsed_ms >= *duration_ms {
                     TransitionAdvance::ReadyToSwap(request.clone())
                 } else {
                     TransitionAdvance::None
                 }
             }
             TransitionPhase::FadingIn {
+                duration_ms,
                 elapsed_ms,
                 fade_in_music,
                 preserve_same_track,
             } => {
                 *elapsed_ms = elapsed_ms.saturating_add(delta_ms);
-                let progress = (*elapsed_ms as f32 / self.fade_duration_ms as f32).clamp(0.0, 1.0);
+                let progress = (*elapsed_ms as f32 / *duration_ms as f32).clamp(0.0, 1.0);
                 if !*preserve_same_track {
                     if let Some(fade_in_music) = fade_in_music.as_ref() {
                         audio.set_channel_volume_percent(
@@ -247,7 +259,7 @@ impl SceneTransitionController {
                         );
                     }
                 }
-                if *elapsed_ms >= self.fade_duration_ms {
+                if *elapsed_ms >= *duration_ms {
                     self.phase = TransitionPhase::Idle;
                     TransitionAdvance::Completed
                 } else {
@@ -316,12 +328,22 @@ impl SceneTransitionController {
         } else {
             outgoing_music.clone()
         };
+        let duration_ms = self.active_duration_ms();
         self.phase = TransitionPhase::FadingIn {
+            duration_ms,
             elapsed_ms: 0,
             fade_in_music,
             preserve_same_track,
         };
         Ok(())
+    }
+
+    fn active_duration_ms(&self) -> u32 {
+        match &self.phase {
+            TransitionPhase::Idle => self.fade_duration_ms,
+            TransitionPhase::FadingOut { duration_ms, .. }
+            | TransitionPhase::FadingIn { duration_ms, .. } => *duration_ms,
+        }
     }
 }
 
@@ -371,6 +393,8 @@ mod tests {
             SceneSwitchRequest {
                 scene_name: "Scene B".to_string(),
                 spawn_point_id: "entry_b".to_string(),
+                transition: None,
+                duration_ms: None,
             },
             None,
         );
@@ -405,6 +429,8 @@ mod tests {
             SceneSwitchRequest {
                 scene_name: "Scene B".to_string(),
                 spawn_point_id: "entry_b".to_string(),
+                transition: None,
+                duration_ms: None,
             },
             Some("track_a".to_string()),
         );
@@ -435,6 +461,8 @@ mod tests {
             SceneSwitchRequest {
                 scene_name: "Scene B".to_string(),
                 spawn_point_id: "entry_b".to_string(),
+                transition: None,
+                duration_ms: None,
             },
             Some("track_b".to_string()),
         );
@@ -474,6 +502,33 @@ mod tests {
         assert!(audio
             .volume_changes
             .contains(&(MUSIC_CHANNEL_A.to_string(), 75)));
+    }
+
+    #[test]
+    fn transition_request_duration_overrides_controller_default() {
+        let mut controller = SceneTransitionController::new(RuntimeTransitionOptions {
+            fade_duration_ms: 100,
+        });
+        let mut audio = FakeAudioSink::default();
+
+        controller.request_scene_switch(
+            SceneSwitchRequest {
+                scene_name: "Scene B".to_string(),
+                spawn_point_id: "entry_b".to_string(),
+                transition: None,
+                duration_ms: Some(40),
+            },
+            None,
+        );
+
+        assert!(matches!(
+            controller.advance(39, &mut audio, 100),
+            TransitionAdvance::None
+        ));
+        assert!(matches!(
+            controller.advance(1, &mut audio, 100),
+            TransitionAdvance::ReadyToSwap(SceneSwitchRequest { .. })
+        ));
     }
 
     #[test]

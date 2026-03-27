@@ -1559,6 +1559,8 @@ fn rules_serialize_roundtrip() {
                 RuleAction::SwitchScene {
                     scene_name: "Town".to_string(),
                     spawn_point_id: "from_gate".to_string(),
+                    transition: None,
+                    duration_ms: None,
                 },
                 RuleAction::Spawn {
                     entity_type: RuleSpawnEntityType::Npc,
@@ -1588,6 +1590,8 @@ fn switch_scene_requests_deferred_runtime_transition_after_movement_processing()
             vec![RuleAction::SwitchScene {
                 scene_name: "Scene B".to_string(),
                 spawn_point_id: "spawn_b".to_string(),
+                transition: None,
+                duration_ms: None,
             }],
         )],
     };
@@ -1626,6 +1630,8 @@ fn switch_scene_requests_deferred_runtime_transition_after_movement_processing()
         Some(toki_core::SceneSwitchRequest {
             scene_name: "Scene B".to_string(),
             spawn_point_id: "spawn_b".to_string(),
+            transition: None,
+            duration_ms: None,
         })
     );
 }
@@ -1643,6 +1649,8 @@ fn switch_scene_uses_highest_priority_rule_target() {
                 vec![RuleAction::SwitchScene {
                     scene_name: "Scene C".to_string(),
                     spawn_point_id: "spawn_c".to_string(),
+                    transition: None,
+                    duration_ms: None,
                 }],
             ),
             base_rule(
@@ -1652,6 +1660,8 @@ fn switch_scene_uses_highest_priority_rule_target() {
                 vec![RuleAction::SwitchScene {
                     scene_name: "Scene B".to_string(),
                     spawn_point_id: "spawn_b".to_string(),
+                    transition: None,
+                    duration_ms: None,
                 }],
             ),
         ],
@@ -1680,6 +1690,8 @@ fn switch_scene_uses_highest_priority_rule_target() {
         Some(toki_core::SceneSwitchRequest {
             scene_name: "Scene B".to_string(),
             spawn_point_id: "spawn_b".to_string(),
+            transition: None,
+            duration_ms: None,
         })
     );
 }
@@ -1696,6 +1708,8 @@ fn switch_scene_keeps_active_scene_when_target_scene_is_missing() {
             vec![RuleAction::SwitchScene {
                 scene_name: "Missing Scene".to_string(),
                 spawn_point_id: "missing_spawn".to_string(),
+                transition: None,
+                duration_ms: None,
             }],
         )],
     };
@@ -1718,6 +1732,8 @@ fn switch_scene_keeps_active_scene_when_target_scene_is_missing() {
         Some(toki_core::SceneSwitchRequest {
             scene_name: "Missing Scene".to_string(),
             spawn_point_id: "missing_spawn".to_string(),
+            transition: None,
+            duration_ms: None,
         })
     );
 }
@@ -1850,6 +1866,8 @@ fn switch_scene_keeps_active_scene_when_target_spawn_is_missing() {
             vec![RuleAction::SwitchScene {
                 scene_name: "Scene B".to_string(),
                 spawn_point_id: "spawn_b".to_string(),
+                transition: None,
+                duration_ms: None,
             }],
         )],
     };
@@ -1873,6 +1891,8 @@ fn switch_scene_keeps_active_scene_when_target_spawn_is_missing() {
         Some(toki_core::SceneSwitchRequest {
             scene_name: "Scene B".to_string(),
             spawn_point_id: "spawn_b".to_string(),
+            transition: None,
+            duration_ms: None,
         })
     );
 }
