@@ -5,6 +5,7 @@ use super::types::{
     ControlRole, Entity, EntityAttributes, EntityAudioComponent, EntityAudioSettings, EntityId,
     EntityKind,
 };
+use super::default_category_for_kind;
 use crate::collision::CollisionBox;
 use glam::{IVec2, UVec2};
 use serde::{Deserialize, Serialize};
@@ -33,17 +34,6 @@ impl EntityManager {
             entity.effective_control_role(),
             ControlRole::PlayerCharacter
         )
-    }
-
-    fn legacy_category_for_kind(entity_kind: &EntityKind) -> &'static str {
-        match entity_kind {
-            EntityKind::Player => "human",
-            EntityKind::Npc => "creature",
-            EntityKind::Item => "item",
-            EntityKind::Decoration => "decoration",
-            EntityKind::Trigger => "trigger",
-            EntityKind::Projectile => "projectile",
-        }
     }
 
     pub fn new() -> Self {
@@ -93,7 +83,7 @@ impl EntityManager {
             position,
             size,
             entity_kind,
-            category: Self::legacy_category_for_kind(&entity_kind).to_string(),
+            category: default_category_for_kind(&entity_kind).to_string(),
             definition_name: None,
             persistent_across_saves: false,
             control_role: ControlRole::LegacyDefault,
@@ -104,29 +94,22 @@ impl EntityManager {
             movement_accumulator: glam::Vec2::ZERO,
         };
 
-        // Capture values before moving entity into storage
-        let is_player = Self::tracks_player_role(&entity);
-        let is_active = entity.attributes.active;
-
         self.audio_components
             .insert(id, EntityAudioComponent::default());
 
         // Insert into main storage
         self.entities.insert(id, entity);
 
-        // Update lookup tables
-        if is_player {
-            self.player_id = Some(id);
-        }
-
-        self.entities_by_kind
-            .entry(entity_kind)
-            .or_default()
-            .insert(id);
-
-        if is_active {
-            self.active_entities.insert(id);
-        }
+        self.register_entity_indices_from_state(
+            entity_kind,
+            id,
+            self.entities
+                .get(&id)
+                .is_some_and(Self::tracks_player_role),
+            self.entities
+                .get(&id)
+                .is_some_and(|entity| entity.attributes.active),
+        );
 
         id
     }
@@ -144,21 +127,18 @@ impl EntityManager {
         let entity_kind = entity.entity_kind;
         let audio_component = definition.create_audio_component();
 
-        if Self::tracks_player_role(&entity) {
-            self.player_id = Some(id);
-        }
-
-        self.entities_by_kind
-            .entry(entity_kind)
-            .or_default()
-            .insert(id);
-
-        if entity.attributes.active {
-            self.active_entities.insert(id);
-        }
-
         self.entities.insert(id, entity);
         self.audio_components.insert(id, audio_component);
+        self.register_entity_indices_from_state(
+            entity_kind,
+            id,
+            self.entities
+                .get(&id)
+                .is_some_and(Self::tracks_player_role),
+            self.entities
+                .get(&id)
+                .is_some_and(|entity| entity.attributes.active),
+        );
         Ok(id)
     }
 
@@ -176,17 +156,16 @@ impl EntityManager {
         let entity_kind = cloned.entity_kind;
         let audio_component = cloned.audio.to_component();
 
-        self.entities_by_kind
-            .entry(entity_kind)
-            .or_default()
-            .insert(id);
-
-        if cloned.attributes.active {
-            self.active_entities.insert(id);
-        }
-
         self.entities.insert(id, cloned);
         self.audio_components.insert(id, audio_component);
+        self.register_entity_indices_from_state(
+            entity_kind,
+            id,
+            false,
+            self.entities
+                .get(&id)
+                .is_some_and(|entity| entity.attributes.active),
+        );
         Some(id)
     }
 
@@ -202,23 +181,20 @@ impl EntityManager {
             self.next_id = id + 1;
         }
 
-        // Track player entity
-        if Self::tracks_player_role(&entity) && self.player_id.is_none() {
-            self.player_id = Some(id);
-        }
-
-        // Update lookups
-        self.entities_by_kind
-            .entry(entity_kind)
-            .or_default()
-            .insert(id);
-
-        self.active_entities.insert(id);
         self.audio_components
             .insert(id, entity.audio.to_component());
 
         // Store the entity
         self.entities.insert(id, entity);
+        self.register_entity_indices_from_state(
+            entity_kind,
+            id,
+            self.entities
+                .get(&id)
+                .is_some_and(Self::tracks_player_role)
+                && self.player_id.is_none(),
+            true,
+        );
 
         tracing::trace!("Added existing entity {} to EntityManager", id);
         id
@@ -229,20 +205,36 @@ impl EntityManager {
             return false;
         };
 
-        // Clean up lookup tables
-        if self.player_id.is_some_and(|pid| pid == id) {
-            self.player_id = None;
-        }
-
-        if let Some(kind_set) = self.entities_by_kind.get_mut(&entity.entity_kind) {
-            kind_set.remove(&id);
-        }
-
-        // We don't care whether it was present; just ensure it's gone.
-        self.active_entities.remove(&id);
+        self.deregister_entity_indices(&entity, id);
         self.audio_components.remove(&id);
 
         true
+    }
+
+    fn register_entity_indices_from_state(
+        &mut self,
+        entity_kind: EntityKind,
+        id: EntityId,
+        is_player: bool,
+        is_active: bool,
+    ) {
+        if is_player {
+            self.player_id = Some(id);
+        }
+        self.entities_by_kind.entry(entity_kind).or_default().insert(id);
+        if is_active {
+            self.active_entities.insert(id);
+        }
+    }
+
+    fn deregister_entity_indices(&mut self, entity: &Entity, id: EntityId) {
+        if self.player_id.is_some_and(|player_id| player_id == id) {
+            self.player_id = None;
+        }
+        if let Some(kind_set) = self.entities_by_kind.get_mut(&entity.entity_kind) {
+            kind_set.remove(&id);
+        }
+        self.active_entities.remove(&id);
     }
 
     // Basic getters

@@ -431,6 +431,44 @@ fn save_data_round_trips_with_versioned_metadata() {
 }
 
 #[test]
+fn load_save_data_rejects_unsupported_version() {
+    let game_state = create_save_test_state();
+    let temp_file = NamedTempFile::new().unwrap();
+
+    let mut save_data = SaveData::capture(&game_state, 1).unwrap();
+    save_data.version = SAVE_DATA_VERSION + 1;
+    save_save_data(&save_data, temp_file.path()).unwrap();
+
+    let error = load_save_data(temp_file.path()).unwrap_err();
+    assert!(matches!(
+        error,
+        SerializationError::InvalidSaveVersion {
+            expected: SAVE_DATA_VERSION,
+            actual
+        } if actual == SAVE_DATA_VERSION + 1
+    ));
+}
+
+#[test]
+fn load_save_data_rejects_oversized_files() {
+    let temp_file = NamedTempFile::new().unwrap();
+    std::fs::write(
+        temp_file.path(),
+        vec![b'x'; (MAX_SAVE_FILE_SIZE as usize).saturating_add(1)],
+    )
+    .unwrap();
+
+    let error = load_save_data(temp_file.path()).unwrap_err();
+    assert!(matches!(
+        error,
+        SerializationError::FileTooLarge {
+            max_bytes: MAX_SAVE_FILE_SIZE,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn restore_from_save_data_rehydrates_existing_project_state() {
     let source_state = create_save_test_state();
     let mut save_data = SaveData::capture(&source_state, 1).unwrap();

@@ -3,6 +3,7 @@
 //! These types define the structure for loading entity definitions from files.
 
 use super::builder::EntityBuilder;
+use super::runtime_entity_kind_for_category;
 use super::types::{
     AiBehavior, AiConfig, ControlRole, Entity, EntityAttributes, EntityAudioComponent,
     EntityAudioSettings, EntityGrounding, EntityId, EntityKind, EntityStats, Inventory,
@@ -184,18 +185,6 @@ pub struct AnimationClipDef {
 
 // Conversion implementations
 impl EntityDefinition {
-    fn runtime_entity_kind_for_category(category: &str) -> EntityKind {
-        match category.trim().to_ascii_lowercase().as_str() {
-            "item" | "items" => EntityKind::Item,
-            "trigger" | "triggers" => EntityKind::Trigger,
-            "projectile" | "projectiles" => EntityKind::Projectile,
-            "decoration" | "decorations" | "building" | "buildings" | "plant" | "plants" => {
-                EntityKind::Decoration
-            }
-            _ => EntityKind::Npc,
-        }
-    }
-
     fn parse_animation_state(state: &str) -> Result<AnimationState, String> {
         match state.to_lowercase().as_str() {
             "idle" => Ok(AnimationState::Idle),
@@ -219,7 +208,7 @@ impl EntityDefinition {
 
     /// Create an Entity instance from this definition at the given position.
     pub fn create_entity(&self, position: IVec2, entity_id: EntityId) -> Result<Entity, String> {
-        let entity_kind = Self::runtime_entity_kind_for_category(&self.category);
+        let entity_kind = runtime_entity_kind_for_category(&self.category);
         let animation_controller = self.build_animation_controller()?;
         let grounding = self.build_grounding();
         let attributes = self.build_attributes(animation_controller, grounding.clone());

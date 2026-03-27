@@ -130,10 +130,10 @@ fn test_resource_manager_missing_terrain_atlas() {
     assert!(result.is_err());
 
     match result.unwrap_err() {
-        ResourceError::Validation(msg) => {
-            assert!(msg.contains("Failed to load terrain atlas"));
+        ResourceError::AtlasLoad { path, .. } => {
+            assert!(path.contains("terrain.json"));
         }
-        _ => panic!("Expected validation error"),
+        _ => panic!("Expected atlas load error"),
     }
 }
 
@@ -154,10 +154,10 @@ fn test_resource_manager_missing_creature_atlas() {
     assert!(result.is_err());
 
     match result.unwrap_err() {
-        ResourceError::Validation(msg) => {
-            assert!(msg.contains("Failed to load creature atlas"));
+        ResourceError::AtlasLoad { path, .. } => {
+            assert!(path.contains("creatures.json"));
         }
-        _ => panic!("Expected validation error"),
+        _ => panic!("Expected atlas load error"),
     }
 }
 
@@ -178,10 +178,10 @@ fn test_resource_manager_missing_tilemap() {
     assert!(result.is_err());
 
     match result.unwrap_err() {
-        ResourceError::Validation(msg) => {
-            assert!(msg.contains("Failed to load tilemap"));
+        ResourceError::TilemapLoad { path, .. } => {
+            assert!(path.contains("test_map.json"));
         }
-        _ => panic!("Expected validation error"),
+        _ => panic!("Expected tilemap load error"),
     }
 }
 
@@ -203,10 +203,10 @@ fn test_resource_manager_invalid_atlas_json() {
     assert!(result.is_err());
 
     match result.unwrap_err() {
-        ResourceError::Validation(msg) => {
-            assert!(msg.contains("Failed to load terrain atlas"));
+        ResourceError::AtlasLoad { path, .. } => {
+            assert!(path.contains("terrain.json"));
         }
-        _ => panic!("Expected validation error"),
+        _ => panic!("Expected atlas load error"),
     }
 }
 
@@ -263,4 +263,10 @@ fn test_resource_error_display() {
         format!("{}", validation_error),
         "Asset validation error: Test validation error"
     );
+
+    let atlas_error = ResourceError::AtlasLoad {
+        path: "terrain.json".to_string(),
+        source: toki_core::CoreError::NotFound("terrain.json".into()),
+    };
+    assert!(format!("{}", atlas_error).contains("Failed to load atlas"));
 }
