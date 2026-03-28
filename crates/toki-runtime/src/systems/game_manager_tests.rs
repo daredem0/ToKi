@@ -124,7 +124,7 @@ fn wrapper_methods_expose_core_entity_state() {
 fn sprite_render_request_wrapper_exposes_object_sheet_backed_entities() {
     let mut game_state = GameState::new_empty();
     let pickup_definition = toki_core::entity::EntityDefinition {
-        name: "coin_pickup_render".to_string(),
+        name: "coin_pickup_render".into(),
         display_name: "Coin Pickup Render".to_string(),
         description: "Static object-sheet-backed pickup".to_string(),
         rendering: toki_core::entity::RenderingDef {

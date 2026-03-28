@@ -1,6 +1,7 @@
 use super::EditorUI;
 #[cfg(test)]
 use crate::ui::undo_redo::EditorCommand;
+use crate::ui::undo_redo::History;
 use std::path::PathBuf;
 use toki_core::assets::tilemap::{MapObjectInstance, TileMap};
 use toki_core::entity::EntityGrounding;
@@ -66,18 +67,16 @@ pub struct MapEditorEditCommand {
 
 #[derive(Debug, Clone, Default)]
 pub struct MapEditorHistory {
-    undo_stack: Vec<MapEditorEditCommand>,
-    redo_stack: Vec<MapEditorEditCommand>,
+    history: History<MapEditorEditCommand>,
 }
 
 impl MapEditorHistory {
     pub(crate) fn push(&mut self, command: MapEditorEditCommand) {
-        self.undo_stack.push(command);
-        self.redo_stack.clear();
+        self.history.push(command);
     }
 
     pub(crate) fn undo(&mut self, ui_state: &mut EditorUI) -> bool {
-        let Some(command) = self.undo_stack.pop() else {
+        let Some(command) = self.history.take_undo() else {
             return false;
         };
         if ui_state.apply_map_editor_tilemap_snapshot(
@@ -85,16 +84,16 @@ impl MapEditorHistory {
             command.is_draft,
             &command.before,
         ) {
-            self.redo_stack.push(command);
+            self.history.restore_redo(command);
             true
         } else {
-            self.undo_stack.push(command);
+            self.history.restore_undo(command);
             false
         }
     }
 
     pub(crate) fn redo(&mut self, ui_state: &mut EditorUI) -> bool {
-        let Some(command) = self.redo_stack.pop() else {
+        let Some(command) = self.history.take_redo() else {
             return false;
         };
         if ui_state.apply_map_editor_tilemap_snapshot(
@@ -102,25 +101,24 @@ impl MapEditorHistory {
             command.is_draft,
             &command.after,
         ) {
-            self.undo_stack.push(command);
+            self.history.restore_undo(command);
             true
         } else {
-            self.redo_stack.push(command);
+            self.history.restore_redo(command);
             false
         }
     }
 
     pub(crate) fn can_undo(&self) -> bool {
-        !self.undo_stack.is_empty()
+        self.history.can_undo()
     }
 
     pub(crate) fn can_redo(&self) -> bool {
-        !self.redo_stack.is_empty()
+        self.history.can_redo()
     }
 
     pub(crate) fn clear(&mut self) {
-        self.undo_stack.clear();
-        self.redo_stack.clear();
+        self.history.clear();
     }
 }
 

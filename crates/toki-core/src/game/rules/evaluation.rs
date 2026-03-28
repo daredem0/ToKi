@@ -6,18 +6,9 @@ use crate::entity::HEALTH_STAT_ID;
 use crate::rules::{RuleCondition, TriggerContext};
 use tracing::info;
 
-use super::GameState;
+use super::RuleEngine;
 
-impl GameState {
-    fn resolve_entity(
-        &self,
-        target: crate::rules::RuleTarget,
-        context: &TriggerContext,
-    ) -> Option<&crate::entity::Entity> {
-        self.resolve_rule_target(target, context)
-            .and_then(|entity_id| self.entity_manager.get_entity(entity_id))
-    }
-
+impl RuleEngine<'_> {
     pub(super) fn rule_conditions_match(
         &self,
         rule_id: &str,
@@ -46,7 +37,8 @@ impl GameState {
                 self.resolve_entity(*target, context).is_some()
             }
             RuleCondition::KeyHeld { key } => {
-                self.all_held_keys().contains(&Self::to_input_key(*key))
+                self.held_keys
+                    .contains(&crate::game::GameState::to_input_key(*key))
             }
             RuleCondition::EntityActive { target, is_active } => self
                 .resolve_entity(*target, context)
@@ -83,10 +75,11 @@ impl GameState {
             } => self.resolve_entity(*target, context).is_some_and(|entity| {
                 entity.attributes.inventory.item_count(item_id) >= *min_count
             }),
-            RuleCondition::FlagEquals { flag, value } => self.flag(flag) == Some(value),
-            RuleCondition::FlagSet { flag } => self.game_flags().is_set(flag),
+            RuleCondition::FlagEquals { flag, value } => self.game_flags.get(flag) == Some(value),
+            RuleCondition::FlagSet { flag } => self.game_flags.is_set(flag),
             RuleCondition::FlagGreaterThan { flag, value } => self
-                .flag(flag)
+                .game_flags
+                .get(flag)
                 .and_then(|flag_value| flag_value.as_int())
                 .is_some_and(|flag_value| flag_value > *value),
         }

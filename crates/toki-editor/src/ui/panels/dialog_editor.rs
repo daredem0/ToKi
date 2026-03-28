@@ -72,8 +72,8 @@ fn render_dialog_main(
                 ui_state.dialog.status_message =
                     Some(format!("Failed to save dialog '{}': {error}", dialog.id));
             } else {
-                ui_state.dialog.selected_dialog_id = Some(dialog.id.clone());
-                ui_state.dialog.loaded_dialog_id = Some(dialog.id.clone());
+                ui_state.dialog.selected_dialog_id = Some(dialog.id.to_string());
+                ui_state.dialog.loaded_dialog_id = Some(dialog.id.to_string());
                 ui_state.dialog.dirty = false;
                 ui_state.dialog.status_message = Some("Dialog saved".to_string());
                 sync_dialog_registry(ui_state, project_assets);
@@ -90,7 +90,11 @@ fn render_dialog_main(
     ui.heading("Dialog");
     ui.horizontal(|ui| {
         ui.label("Id:");
-        dirty |= ui.text_edit_singleline(&mut dialog.id).changed();
+        let mut dialog_id = dialog.id.to_string();
+        if ui.text_edit_singleline(&mut dialog_id).changed() {
+            dialog.id = dialog_id.into();
+            dirty = true;
+        }
     });
     ui.horizontal(|ui| {
         ui.label("Title:");
@@ -1006,7 +1010,7 @@ mod tests {
     #[test]
     fn delete_selected_node_reselects_neighbor_and_repairs_entry_node() {
         let mut dialog = toki_core::dialog::DialogTree {
-            id: "intro".to_string(),
+            id: "intro".to_string().into(),
             title: String::new(),
             entry_node_id: "start".to_string(),
             allow_cancel: true,
@@ -1046,7 +1050,7 @@ mod tests {
     #[test]
     fn delete_selected_node_cleans_references_to_deleted_node() {
         let mut dialog = toki_core::dialog::DialogTree {
-            id: "intro".to_string(),
+            id: "intro".to_string().into(),
             title: String::new(),
             entry_node_id: "line".to_string(),
             allow_cancel: true,
@@ -1154,7 +1158,7 @@ mod tests {
     #[test]
     fn delete_selected_node_rejects_last_remaining_node() {
         let mut dialog = toki_core::dialog::DialogTree {
-            id: "intro".to_string(),
+            id: "intro".to_string().into(),
             title: String::new(),
             entry_node_id: "only".to_string(),
             allow_cancel: true,
@@ -1181,7 +1185,7 @@ mod tests {
     #[test]
     fn rename_dialog_node_id_updates_selection_entry_and_references() {
         let mut dialog = toki_core::dialog::DialogTree {
-            id: "intro".to_string(),
+            id: "intro".to_string().into(),
             title: String::new(),
             entry_node_id: "start".to_string(),
             allow_cancel: true,
@@ -1269,7 +1273,7 @@ mod tests {
     #[test]
     fn rename_dialog_node_id_rejects_empty_and_duplicate_ids() {
         let mut dialog = toki_core::dialog::DialogTree {
-            id: "intro".to_string(),
+            id: "intro".to_string().into(),
             title: String::new(),
             entry_node_id: "start".to_string(),
             allow_cancel: true,

@@ -162,6 +162,7 @@ impl GameState {
         let tile_events = std::mem::take(&mut self.rule_runtime.frame_tile_transitions);
         let map_width = tilemap.size.x;
         let map_height = tilemap.size.y;
+        let mut engine = self.rule_engine();
 
         for event in tile_events {
             let trigger = if event.is_enter {
@@ -178,16 +179,16 @@ impl GameState {
 
             let context = TriggerContext::with_self_only(event.entity_id);
 
-            let mut sorted_indices = self
+            let mut sorted_indices = engine
                 .rules
                 .rules
                 .iter()
                 .enumerate()
-                .filter(|(_, rule)| self.rule_is_collectible(rule) && rule.trigger == trigger)
+                .filter(|(_, rule)| engine.rule_is_collectible(rule) && rule.trigger == trigger)
                 .map(|(i, _)| i)
                 .collect::<Vec<_>>();
-            self.sort_rule_indices(&mut sorted_indices);
-            self.execute_sorted_rule_indices(
+            engine.sort_rule_indices(&mut sorted_indices);
+            engine.execute_sorted_rule_indices(
                 &sorted_indices,
                 &context,
                 command_buffer,

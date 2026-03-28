@@ -6,9 +6,9 @@ use crate::animation::AnimationState;
 use crate::rules::{RuleAction, RuleSoundChannel, TriggerContext};
 use tracing::info;
 
-use super::{AudioChannel, GameState, RuleCommand};
+use super::{AudioChannel, RuleCommand, RuleEngine};
 
-impl GameState {
+impl RuleEngine<'_> {
     fn resolve_and_push(
         &self,
         target: crate::rules::RuleTarget,
@@ -33,19 +33,49 @@ impl GameState {
             info!(rule_id = %rule_id, action = ?action, "Rule action passed");
         }
         tracing::debug!("Buffering rule action: {:?}", action);
+        if self.buffer_audio_or_motion_action(action, context, command_buffer)
+            || self.buffer_scene_dialog_or_persistence_action(action, context, command_buffer)
+            || self.buffer_entity_mutation_action(action, context, command_buffer)
+            || self.buffer_inventory_or_flag_action(action, context, command_buffer)
+        {
+            return;
+        }
+    }
+
+    fn buffer_audio_or_motion_action(
+        &self,
+        action: &RuleAction,
+        context: &TriggerContext,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) -> bool {
         match action {
             RuleAction::PlaySound { channel, sound_id } => {
                 self.buffer_play_sound(channel, sound_id, command_buffer);
+                true
             }
             RuleAction::PlayMusic { track_id } => {
                 self.buffer_play_music(track_id, command_buffer);
+                true
             }
             RuleAction::PlayAnimation { target, state } => {
                 self.buffer_play_animation(*target, *state, context, command_buffer);
+                true
             }
             RuleAction::SetVelocity { target, velocity } => {
                 self.buffer_set_velocity(*target, velocity, context, command_buffer);
+                true
             }
+            _ => false,
+        }
+    }
+
+    fn buffer_scene_dialog_or_persistence_action(
+        &self,
+        action: &RuleAction,
+        context: &TriggerContext,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) -> bool {
+        match action {
             RuleAction::Spawn {
                 entity_type,
                 position,
@@ -54,11 +84,13 @@ impl GameState {
                     entity_type: *entity_type,
                     position: glam::IVec2::new(position[0], position[1]),
                 });
+                true
             }
             RuleAction::DestroySelf { target } => {
                 self.resolve_and_push(*target, context, command_buffer, |entity_id| {
                     RuleCommand::DestroySelf { entity_id }
                 });
+                true
             }
             RuleAction::SwitchScene {
                 scene_name,
@@ -77,19 +109,40 @@ impl GameState {
                     transition: *transition,
                     duration_ms: *duration_ms,
                 });
+                true
             }
             RuleAction::StartDialog { dialog_id } => {
                 let dialog_id = dialog_id.trim();
                 if !dialog_id.is_empty() {
                     command_buffer.push(RuleCommand::StartDialog {
-                        dialog_id: dialog_id.to_string(),
+                        dialog_id: dialog_id.into(),
                         context: crate::dialog::DialogRuntimeContext {
                             interactor: context.trigger_self,
                             speaker: context.trigger_other,
                         },
                     });
                 }
+                true
             }
+            RuleAction::SaveGame { slot } => {
+                command_buffer.push(RuleCommand::SaveGame { slot: *slot });
+                true
+            }
+            RuleAction::LoadGame { slot } => {
+                command_buffer.push(RuleCommand::LoadGame { slot: *slot });
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn buffer_entity_mutation_action(
+        &self,
+        action: &RuleAction,
+        context: &TriggerContext,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) -> bool {
+        match action {
             RuleAction::DamageEntity { target, amount } => {
                 self.resolve_and_push(*target, context, command_buffer, |entity_id| {
                     RuleCommand::DamageEntity {
@@ -97,6 +150,7 @@ impl GameState {
                         amount: *amount,
                     }
                 });
+                true
             }
             RuleAction::HealEntity { target, amount } => {
                 self.resolve_and_push(*target, context, command_buffer, |entity_id| {
@@ -105,32 +159,7 @@ impl GameState {
                         amount: *amount,
                     }
                 });
-            }
-            RuleAction::AddInventoryItem {
-                target,
-                item_id,
-                count,
-            } => {
-                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                    RuleCommand::AddInventoryItem {
-                        entity_id,
-                        item_id: item_id.clone(),
-                        count: *count,
-                    }
-                });
-            }
-            RuleAction::RemoveInventoryItem {
-                target,
-                item_id,
-                count,
-            } => {
-                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
-                    RuleCommand::RemoveInventoryItem {
-                        entity_id,
-                        item_id: item_id.clone(),
-                        count: *count,
-                    }
-                });
+                true
             }
             RuleAction::SetEntityActive { target, active } => {
                 self.resolve_and_push(*target, context, command_buffer, |entity_id| {
@@ -139,6 +168,7 @@ impl GameState {
                         active: *active,
                     }
                 });
+                true
             }
             RuleAction::TeleportEntity {
                 target,
@@ -152,6 +182,46 @@ impl GameState {
                         tile_y: *tile_y,
                     }
                 });
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn buffer_inventory_or_flag_action(
+        &self,
+        action: &RuleAction,
+        context: &TriggerContext,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) -> bool {
+        match action {
+            RuleAction::AddInventoryItem {
+                target,
+                item_id,
+                count,
+            } => {
+                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                    RuleCommand::AddInventoryItem {
+                        entity_id,
+                        item_id: item_id.clone(),
+                        count: *count,
+                    }
+                });
+                true
+            }
+            RuleAction::RemoveInventoryItem {
+                target,
+                item_id,
+                count,
+            } => {
+                self.resolve_and_push(*target, context, command_buffer, |entity_id| {
+                    RuleCommand::RemoveInventoryItem {
+                        entity_id,
+                        item_id: item_id.clone(),
+                        count: *count,
+                    }
+                });
+                true
             }
             RuleAction::SetFlag { flag, value } => {
                 let flag = flag.trim();
@@ -161,6 +231,7 @@ impl GameState {
                         value: value.clone(),
                     });
                 }
+                true
             }
             RuleAction::IncrementFlag { flag, amount } => {
                 let flag = flag.trim();
@@ -170,6 +241,7 @@ impl GameState {
                         amount: *amount,
                     });
                 }
+                true
             }
             RuleAction::ClearFlag { flag } => {
                 let flag = flag.trim();
@@ -178,13 +250,9 @@ impl GameState {
                         flag: flag.to_string(),
                     });
                 }
+                true
             }
-            RuleAction::SaveGame { slot } => {
-                command_buffer.push(RuleCommand::SaveGame { slot: *slot });
-            }
-            RuleAction::LoadGame { slot } => {
-                command_buffer.push(RuleCommand::LoadGame { slot: *slot });
-            }
+            _ => false,
         }
     }
 

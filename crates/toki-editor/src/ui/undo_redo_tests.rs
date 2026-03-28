@@ -1,4 +1,4 @@
-use super::{EditorCommand, EntityPosition, IndexedEntity, UndoRedoHistory};
+use super::{EditorCommand, EntityPosition, History, IndexedEntity, UndoRedoHistory};
 use crate::project::{Project, SceneGraphLayout};
 use crate::ui::inspector::build_delete_scene_command;
 use crate::ui::rule_graph::RuleGraph;
@@ -16,7 +16,7 @@ fn sample_entity(id: u32, position: IVec2) -> Entity {
         size: UVec2::new(16, 16),
         entity_kind: EntityKind::Npc,
         category: "creature".to_string(),
-        definition_name: Some("npc".to_string()),
+        definition_name: Some("npc".to_string().into()),
         persistent_across_saves: false,
         control_role: toki_core::entity::ControlRole::None,
         audio: toki_core::entity::EntityAudioSettings::default(),
@@ -269,8 +269,25 @@ fn execute_clears_redo_stack_when_new_command_is_applied() {
     ));
     assert!(history.can_undo());
     assert!(!history.can_redo());
-    assert_eq!(history.undo_stack.len(), 1);
-    assert_eq!(history.redo_stack.len(), 0);
+    assert_eq!(history.undo_len(), 1);
+    assert_eq!(history.redo_len(), 0);
+}
+
+#[test]
+fn generic_history_pushes_trims_and_clears_redo() {
+    let mut history = History::with_max_size(2);
+
+    history.push(1);
+    history.push(2);
+    history.push(3);
+
+    assert_eq!(history.undo_len(), 2);
+    assert_eq!(history.take_undo(), Some(3));
+    history.restore_redo(3);
+    assert_eq!(history.redo_len(), 1);
+
+    history.push(4);
+    assert_eq!(history.redo_len(), 0);
 }
 
 #[test]
@@ -446,8 +463,8 @@ fn execute_noop_command_does_not_affect_history() {
 
     let command = EditorCommand::add_entity("Missing Scene", sample_entity(1, IVec2::new(0, 0)));
     assert!(!history.execute(command, &mut ui_state, None));
-    assert_eq!(history.undo_stack.len(), 0);
-    assert_eq!(history.redo_stack.len(), 0);
+    assert_eq!(history.undo_len(), 0);
+    assert_eq!(history.redo_len(), 0);
     assert!(!history.can_undo());
     assert!(!history.can_redo());
 }

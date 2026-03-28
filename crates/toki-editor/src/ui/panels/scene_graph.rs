@@ -481,7 +481,11 @@ impl PanelSystem {
                                         } = &mut trigger_value
                                         {
                                             ui.label("Dialog:");
-                                            let _ = ui.text_edit_singleline(dialog_id);
+                                            let mut dialog_id_value = dialog_id.to_string();
+                                            if ui.text_edit_singleline(&mut dialog_id_value).changed()
+                                            {
+                                                *dialog_id = dialog_id_value.into();
+                                            }
                                             ui.label("Outcome:");
                                             let _ = ui.text_edit_singleline(outcome_id);
                                         }

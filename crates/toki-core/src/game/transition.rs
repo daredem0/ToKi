@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::animation::AnimationState;
 use crate::collision::CollisionBox;
 use crate::entity::{ControlRole, Entity, EntityDefinition, EntityId, EntityKind, EntityManager};
+use crate::ids::EntityDefName;
 use crate::rules::RuleSet;
 use crate::scene::{Scene, SceneAnchorFacing};
 
@@ -15,11 +16,11 @@ pub(super) struct PreparedSceneLoad {
 }
 
 pub(super) struct SceneTransitionPlanner<'a> {
-    entity_definitions: &'a HashMap<String, EntityDefinition>,
+    entity_definitions: &'a HashMap<EntityDefName, EntityDefinition>,
 }
 
 impl<'a> SceneTransitionPlanner<'a> {
-    pub(super) fn new(entity_definitions: &'a HashMap<String, EntityDefinition>) -> Self {
+    pub(super) fn new(entity_definitions: &'a HashMap<EntityDefName, EntityDefinition>) -> Self {
         Self { entity_definitions }
     }
 
@@ -74,7 +75,9 @@ impl<'a> SceneTransitionPlanner<'a> {
                             scene.name, player_entry.entity_definition_name
                         )
                     })?;
-                let player_id = entity_manager.spawn_from_definition(definition, position)?;
+                let player_id = entity_manager
+                    .spawn_from_definition(definition, position)
+                    .map_err(|error| error.to_string())?;
                 entity_manager.set_control_role(player_id, ControlRole::PlayerCharacter);
                 if let Some(player) = entity_manager.get_entity_mut(player_id) {
                     player.entity_kind = EntityKind::Player;
@@ -121,7 +124,9 @@ impl<'a> SceneTransitionPlanner<'a> {
                 )
             })?;
         let (position, _) = self.resolve_spawn_anchor(scene, spawn_point_id)?;
-        let mut player = definition.create_entity(position, preserved_player.id)?;
+        let mut player = definition
+            .create_entity(position, preserved_player.id)
+            .map_err(|error| error.to_string())?;
         player.control_role = ControlRole::PlayerCharacter;
         player.entity_kind = EntityKind::Player;
         Self::apply_durable_player_state(&mut player, preserved_player);
@@ -255,7 +260,7 @@ mod tests {
     #[test]
     fn scene_transition_planner_preserves_durable_player_state_for_scene_player_entry() {
         let definition = EntityDefinition {
-            name: "player_knight".to_string(),
+            name: "player_knight".into(),
             display_name: "Knight".to_string(),
             description: String::new(),
             rendering: RenderingDef {
@@ -351,7 +356,7 @@ mod tests {
     #[test]
     fn scene_transition_planner_migrates_legacy_default_scene_entity_collision_from_definition() {
         let definition = EntityDefinition {
-            name: "player".to_string(),
+            name: "player".into(),
             display_name: "Player".to_string(),
             description: String::new(),
             rendering: RenderingDef {

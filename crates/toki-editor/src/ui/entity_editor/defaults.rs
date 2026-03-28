@@ -36,7 +36,7 @@ pub fn create_default_definition(
     category: &str,
 ) -> EntityDefinition {
     EntityDefinition {
-        name: name.to_string(),
+        name: name.to_string().into(),
         display_name: display_name.to_string(),
         description: String::new(),
         rendering: RenderingDef {

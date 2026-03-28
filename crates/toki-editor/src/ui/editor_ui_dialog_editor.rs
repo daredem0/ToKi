@@ -25,7 +25,7 @@ impl DialogEditorState {
             selected_dialog_id: Some(dialog_id.clone()),
             loaded_dialog_id: None,
             draft: Some(DialogTree {
-                id: dialog_id,
+                id: dialog_id.into(),
                 title: "New Dialog".to_string(),
                 entry_node_id: start_id.clone(),
                 allow_cancel: true,
@@ -65,8 +65,8 @@ impl DialogEditorState {
             .clone()
             .filter(|node_id| dialog.nodes.iter().any(|node| node.id == *node_id))
             .or_else(|| dialog.nodes.first().map(|node| node.id.clone()));
-        self.selected_dialog_id = Some(dialog.id.clone());
-        self.loaded_dialog_id = Some(dialog.id.clone());
+        self.selected_dialog_id = Some(dialog.id.to_string());
+        self.loaded_dialog_id = Some(dialog.id.to_string());
         self.draft = Some(dialog);
         self.selected_node_id = selected_node_id.clone();
         self.node_id_edit_target = selected_node_id.clone();
@@ -102,7 +102,7 @@ impl DialogEditorState {
                     .collect::<Vec<_>>();
                 outcomes.sort();
                 outcomes.dedup();
-                (dialog.id.clone(), outcomes)
+                (dialog.id.to_string(), outcomes)
             })
             .collect()
     }
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn collect_available_dialogs_extracts_unique_outcomes() {
         let dialogs = vec![DialogTree {
-            id: "intro".to_string(),
+            id: "intro".to_string().into(),
             title: String::new(),
             entry_node_id: "end".to_string(),
             allow_cancel: true,

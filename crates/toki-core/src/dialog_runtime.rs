@@ -1,16 +1,19 @@
 use std::collections::HashMap;
+use thiserror::Error;
 use tracing::info;
 
 use crate::dialog::{
     DialogCondition, DialogConditionTarget, DialogNodeKind, DialogRuntimeContext, DialogTree,
+    DialogValidationReport,
 };
 use crate::entity::HEALTH_STAT_ID;
+use crate::ids::DialogId;
 use crate::menu::{MenuDialogView, MenuInput, MenuViewEntry};
 use crate::GameState;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DialogCompletion {
-    pub dialog_id: String,
+    pub dialog_id: DialogId,
     pub outcome_id: Option<String>,
 }
 
@@ -20,15 +23,17 @@ pub enum DialogAdvanceResult {
     Closed(DialogCompletion),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum DialogStartError {
-    MissingDialog(String),
-    InvalidDialog(String),
+    #[error("missing dialog '{0}'")]
+    MissingDialog(DialogId),
+    #[error("invalid dialog: {0}")]
+    InvalidDialog(DialogValidationReport),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ActiveDialogState {
-    dialog_id: String,
+    dialog_id: DialogId,
     current_node_id: String,
     selected_index: usize,
     context: DialogRuntimeContext,
@@ -36,7 +41,7 @@ struct ActiveDialogState {
 
 #[derive(Debug, Default)]
 pub struct DialogController {
-    dialogs: HashMap<String, DialogTree>,
+    dialogs: HashMap<DialogId, DialogTree>,
     active: Option<ActiveDialogState>,
 }
 
@@ -63,8 +68,8 @@ impl DialogController {
         self.active.is_some()
     }
 
-    pub fn active_dialog_id(&self) -> Option<&str> {
-        self.active.as_ref().map(|active| active.dialog_id.as_str())
+    pub fn active_dialog_id(&self) -> Option<&DialogId> {
+        self.active.as_ref().map(|active| &active.dialog_id)
     }
 
     pub fn active_dialog_gates_gameplay(&self) -> bool {
@@ -77,19 +82,19 @@ impl DialogController {
     pub fn start_dialog(
         &mut self,
         game_state: &GameState,
-        dialog_id: &str,
+        dialog_id: &DialogId,
         context: DialogRuntimeContext,
     ) -> Result<(), DialogStartError> {
         let Some(dialog) = self.dialogs.get(dialog_id) else {
-            return Err(DialogStartError::MissingDialog(dialog_id.to_string()));
+            return Err(DialogStartError::MissingDialog(dialog_id.clone()));
         };
         let report = dialog.validate();
         if !report.is_valid() {
-            return Err(DialogStartError::InvalidDialog(report.errors.join("; ")));
+            return Err(DialogStartError::InvalidDialog(report));
         }
 
         self.active = Some(ActiveDialogState {
-            dialog_id: dialog_id.to_string(),
+            dialog_id: dialog_id.clone(),
             current_node_id: dialog.entry_node_id.clone(),
             selected_index: 0,
             context,
@@ -154,7 +159,7 @@ impl DialogController {
         };
 
         Some(MenuDialogView {
-            dialog_id: dialog.id.clone(),
+            dialog_id: dialog.id.to_string(),
             title,
             body,
             entries,
@@ -577,14 +582,14 @@ mod tests {
 
     fn simple_dialog() -> DialogTree {
         DialogTree {
-            id: "intro".to_string(),
+            id: "intro".to_string().into(),
             title: "Intro".to_string(),
-            entry_node_id: "start".to_string(),
+            entry_node_id: "start".to_string().into(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![
                 DialogNode {
-                    id: "start".to_string(),
+                    id: "start".to_string().into(),
                     speaker_name: Some("Guide".to_string()),
                     conditions: Vec::new(),
                     kind: DialogNodeKind::Line {
@@ -593,7 +598,7 @@ mod tests {
                     },
                 },
                 DialogNode {
-                    id: "end".to_string(),
+                    id: "end".to_string().into(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -610,7 +615,7 @@ mod tests {
         let game_state = GameState::new_empty();
         let mut controller = DialogController::new(vec![simple_dialog()]);
         controller
-            .start_dialog(&game_state, "intro", DialogRuntimeContext::default())
+            .start_dialog(&game_state, &"intro".into(), DialogRuntimeContext::default())
             .expect("dialog should start");
 
         let first = controller.current_view().expect("view");
@@ -628,7 +633,7 @@ mod tests {
         assert_eq!(
             controller.handle_input(MenuInput::Confirm, &game_state),
             DialogAdvanceResult::Closed(DialogCompletion {
-                dialog_id: "intro".to_string(),
+                dialog_id: "intro".to_string().into(),
                 outcome_id: Some("done".to_string()),
             })
         );
@@ -639,36 +644,36 @@ mod tests {
     fn dialog_controller_choice_navigation_selects_branch() {
         let game_state = GameState::new_empty();
         let dialog = DialogTree {
-            id: "choices".to_string(),
+            id: "choices".to_string().into(),
             title: "Choices".to_string(),
-            entry_node_id: "start".to_string(),
+            entry_node_id: "start".to_string().into(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![
                 DialogNode {
-                    id: "start".to_string(),
+                    id: "start".to_string().into(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::Choice {
                         body: "Choose".to_string(),
                         choices: vec![
                             DialogChoice {
-                                id: "a".to_string(),
+                                id: "a".to_string().into(),
                                 label: "Alpha".to_string(),
-                                next_node_id: "end_a".to_string(),
+                                next_node_id: "end_a".to_string().into(),
                                 conditions: Vec::new(),
                             },
                             DialogChoice {
-                                id: "b".to_string(),
+                                id: "b".to_string().into(),
                                 label: "Beta".to_string(),
-                                next_node_id: "end_b".to_string(),
+                                next_node_id: "end_b".to_string().into(),
                                 conditions: Vec::new(),
                             },
                         ],
                     },
                 },
                 DialogNode {
-                    id: "end_a".to_string(),
+                    id: "end_a".to_string().into(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -677,7 +682,7 @@ mod tests {
                     },
                 },
                 DialogNode {
-                    id: "end_b".to_string(),
+                    id: "end_b".to_string().into(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -689,7 +694,7 @@ mod tests {
         };
         let mut controller = DialogController::new(vec![dialog]);
         controller
-            .start_dialog(&game_state, "choices", DialogRuntimeContext::default())
+            .start_dialog(&game_state, &"choices".into(), DialogRuntimeContext::default())
             .expect("dialog should start");
         controller.handle_input(MenuInput::Down, &game_state);
         assert_eq!(
@@ -704,7 +709,7 @@ mod tests {
         assert_eq!(
             controller.handle_input(MenuInput::Confirm, &game_state),
             DialogAdvanceResult::Closed(DialogCompletion {
-                dialog_id: "choices".to_string(),
+                dialog_id: "choices".to_string().into(),
                 outcome_id: Some("beta".to_string()),
             })
         );
@@ -715,7 +720,7 @@ mod tests {
         let game_state = GameState::new_empty();
         let mut controller = DialogController::new(vec![simple_dialog()]);
         controller
-            .start_dialog(&game_state, "intro", DialogRuntimeContext::default())
+            .start_dialog(&game_state, &"intro".into(), DialogRuntimeContext::default())
             .expect("dialog should start");
 
         controller.handle_input(MenuInput::Right, &game_state);
@@ -725,7 +730,7 @@ mod tests {
         assert_eq!(
             controller.handle_input(MenuInput::Confirm, &game_state),
             DialogAdvanceResult::Closed(DialogCompletion {
-                dialog_id: "intro".to_string(),
+                dialog_id: "intro".to_string().into(),
                 outcome_id: None,
             })
         );
@@ -738,7 +743,7 @@ mod tests {
         dialog.gate_gameplay = false;
         let mut controller = DialogController::new(vec![dialog]);
         controller
-            .start_dialog(&game_state, "intro", DialogRuntimeContext::default())
+            .start_dialog(&game_state, &"intro".into(), DialogRuntimeContext::default())
             .expect("dialog should start");
 
         assert!(!controller.active_dialog_gates_gameplay());
@@ -749,14 +754,14 @@ mod tests {
         let mut game_state = GameState::new_empty();
         game_state.set_flag("met_npc", FlagValue::Bool(true));
         let dialog = DialogTree {
-            id: "flag_branch".to_string(),
+            id: "flag_branch".to_string().into(),
             title: "Flags".to_string(),
-            entry_node_id: "branch".to_string(),
+            entry_node_id: "branch".to_string().into(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![
                 DialogNode {
-                    id: "branch".to_string(),
+                    id: "branch".to_string().into(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::Branch {
@@ -764,13 +769,13 @@ mod tests {
                             conditions: vec![DialogCondition::FlagSet {
                                 flag: "met_npc".to_string(),
                             }],
-                            next_node_id: "met".to_string(),
+                            next_node_id: "met".to_string().into(),
                         }],
                         default_next_node_id: Some("new".to_string()),
                     },
                 },
                 DialogNode {
-                    id: "met".to_string(),
+                    id: "met".to_string().into(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -779,7 +784,7 @@ mod tests {
                     },
                 },
                 DialogNode {
-                    id: "new".to_string(),
+                    id: "new".to_string().into(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -792,7 +797,7 @@ mod tests {
 
         let mut controller = DialogController::new(vec![dialog]);
         controller
-            .start_dialog(&game_state, "flag_branch", DialogRuntimeContext::default())
+            .start_dialog(&game_state, &"flag_branch".into(), DialogRuntimeContext::default())
             .expect("dialog should start");
 
         let view = controller.current_view().expect("view");
@@ -804,14 +809,14 @@ mod tests {
         let mut game_state = GameState::new_empty();
         game_state.set_flag("seen", FlagValue::Bool(true));
         let dialog = DialogTree {
-            id: "line_skip".to_string(),
+            id: "line_skip".to_string().into(),
             title: "Skip".to_string(),
-            entry_node_id: "start".to_string(),
+            entry_node_id: "start".to_string().into(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![
                 DialogNode {
-                    id: "start".to_string(),
+                    id: "start".to_string().into(),
                     speaker_name: None,
                     conditions: vec![DialogCondition::FlagSet {
                         flag: "missing".to_string(),
@@ -822,7 +827,7 @@ mod tests {
                     },
                 },
                 DialogNode {
-                    id: "next".to_string(),
+                    id: "next".to_string().into(),
                     speaker_name: None,
                     conditions: vec![DialogCondition::FlagSet {
                         flag: "seen".to_string(),
@@ -837,7 +842,7 @@ mod tests {
 
         let mut controller = DialogController::new(vec![dialog]);
         controller
-            .start_dialog(&game_state, "line_skip", DialogRuntimeContext::default())
+            .start_dialog(&game_state, &"line_skip".into(), DialogRuntimeContext::default())
             .expect("dialog should start");
 
         assert_eq!(controller.current_view().expect("view").body, "visible");
@@ -847,13 +852,13 @@ mod tests {
     fn dialog_controller_closes_when_conditioned_end_node_does_not_match() {
         let game_state = GameState::new_empty();
         let dialog = DialogTree {
-            id: "end_skip".to_string(),
+            id: "end_skip".to_string().into(),
             title: "End".to_string(),
-            entry_node_id: "end".to_string(),
+            entry_node_id: "end".to_string().into(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![DialogNode {
-                id: "end".to_string(),
+                id: "end".to_string().into(),
                 speaker_name: None,
                 conditions: vec![DialogCondition::FlagSet {
                     flag: "missing".to_string(),
@@ -867,9 +872,45 @@ mod tests {
 
         let mut controller = DialogController::new(vec![dialog]);
         controller
-            .start_dialog(&game_state, "end_skip", DialogRuntimeContext::default())
+            .start_dialog(&game_state, &"end_skip".into(), DialogRuntimeContext::default())
             .expect("dialog should start");
 
         assert!(!controller.is_open());
+    }
+
+    #[test]
+    fn dialog_controller_returns_structured_validation_report_for_invalid_dialog() {
+        let game_state = GameState::new_empty();
+        let invalid = DialogTree {
+            id: "broken".to_string().into(),
+            title: String::new(),
+            entry_node_id: "missing".to_string().into(),
+            allow_cancel: true,
+            gate_gameplay: true,
+            nodes: vec![DialogNode {
+                id: "start".to_string().into(),
+                speaker_name: None,
+                conditions: Vec::new(),
+                kind: DialogNodeKind::End {
+                    body: String::new(),
+                    outcome_id: None,
+                },
+            }],
+        };
+
+        let mut controller = DialogController::new(vec![invalid]);
+        let result =
+            controller.start_dialog(&game_state, &"broken".into(), DialogRuntimeContext::default());
+
+        match result {
+            Err(DialogStartError::InvalidDialog(report)) => {
+                assert!(!report.is_valid());
+                assert!(report
+                    .errors
+                    .iter()
+                    .any(|error| error.contains("entry node 'missing' does not exist")));
+            }
+            other => panic!("expected structured invalid dialog error, got {other:?}"),
+        }
     }
 }

@@ -391,7 +391,7 @@ mod tests {
         let mut audio = FakeAudioSink::default();
         controller.request_scene_switch(
             SceneSwitchRequest {
-                scene_name: "Scene B".to_string(),
+                scene_name: "Scene B".into(),
                 spawn_point_id: "entry_b".to_string(),
                 transition: None,
                 duration_ms: None,
@@ -427,7 +427,7 @@ mod tests {
 
         controller.request_scene_switch(
             SceneSwitchRequest {
-                scene_name: "Scene B".to_string(),
+                scene_name: "Scene B".into(),
                 spawn_point_id: "entry_b".to_string(),
                 transition: None,
                 duration_ms: None,
@@ -459,7 +459,7 @@ mod tests {
 
         controller.request_scene_switch(
             SceneSwitchRequest {
-                scene_name: "Scene B".to_string(),
+                scene_name: "Scene B".into(),
                 spawn_point_id: "entry_b".to_string(),
                 transition: None,
                 duration_ms: None,
@@ -513,7 +513,7 @@ mod tests {
 
         controller.request_scene_switch(
             SceneSwitchRequest {
-                scene_name: "Scene B".to_string(),
+                scene_name: "Scene B".into(),
                 spawn_point_id: "entry_b".to_string(),
                 transition: None,
                 duration_ms: Some(40),

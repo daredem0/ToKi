@@ -1,0 +1,13 @@
+[package]
+name = "toki-test-fixtures"
+version = "0.2.2"
+edition = "2021"
+license = "MPL-2.0"
+description = "Shared test fixtures for ToKi crates."
+repository = "https://github.com/daredem0/ToKi"
+homepage = "https://github.com/daredem0/ToKi"
+readme = "../../README.md"
+
+[dependencies]
+toki-core = { path = "../toki-core", version = "0.2.2" }
+glam = "0.30.5"

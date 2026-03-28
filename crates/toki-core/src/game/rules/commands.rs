@@ -31,111 +31,20 @@ impl GameState {
         let mut pending_persistence = None;
 
         for command in commands {
-            match command {
-                RuleCommand::PlaySound { channel, sound_id } => {
-                    result.add_event(AudioEvent::PlaySound {
-                        channel,
-                        sound_id,
-                        source_position: None,
-                        hearing_radius: None,
-                    });
-                }
-                RuleCommand::PlayMusic { track_id } => {
-                    result.add_event(AudioEvent::BackgroundMusic(track_id));
-                }
-                RuleCommand::SetVelocity {
-                    entity_id,
-                    velocity,
-                } => {
-                    buffered_velocities.entry(entity_id).or_insert(velocity);
-                }
-                RuleCommand::PlayAnimation { entity_id, state } => {
-                    buffered_animations.entry(entity_id).or_insert(state);
-                }
-                RuleCommand::Spawn {
-                    entity_type,
-                    position,
-                } => {
-                    self.spawn_entity_from_rule(entity_type, position);
-                }
-                RuleCommand::DestroySelf { entity_id } => {
-                    self.apply_destroy_self(entity_id);
-                }
-                RuleCommand::SwitchScene {
-                    scene_name,
-                    spawn_point_id,
-                    transition,
-                    duration_ms,
-                } => {
-                    self.apply_switch_scene(
-                        &scene_name,
-                        &spawn_point_id,
-                        transition,
-                        duration_ms,
-                        &mut pending_scene_switch,
-                    );
-                }
-                RuleCommand::StartDialog { dialog_id, context } => {
-                    if pending_dialog_start.is_none() {
-                        pending_dialog_start =
-                            Some(crate::events::DialogStartRequest { dialog_id, context });
-                    }
-                }
-                RuleCommand::DamageEntity { entity_id, amount } => {
-                    self.stat_effect_service()
-                        .queue_damage(entity_id, amount, None);
-                }
-                RuleCommand::HealEntity { entity_id, amount } => {
-                    self.stat_effect_service()
-                        .queue_capped_heal(entity_id, amount);
-                }
-                RuleCommand::AddInventoryItem {
-                    entity_id,
-                    item_id,
-                    count,
-                } => {
-                    self.stat_effect_service()
-                        .add_inventory_item(entity_id, &item_id, count);
-                }
-                RuleCommand::RemoveInventoryItem {
-                    entity_id,
-                    item_id,
-                    count,
-                } => {
-                    self.stat_effect_service()
-                        .remove_inventory_item(entity_id, &item_id, count);
-                }
-                RuleCommand::SetEntityActive { entity_id, active } => {
-                    self.stat_effect_service()
-                        .set_entity_active(entity_id, active);
-                }
-                RuleCommand::TeleportEntity {
-                    entity_id,
-                    tile_x,
-                    tile_y,
-                } => {
-                    self.stat_effect_service()
-                        .teleport_entity_to_tile(entity_id, tile_x, tile_y, tilemap);
-                }
-                RuleCommand::SetFlag { flag, value } => {
-                    self.set_flag(flag, value);
-                }
-                RuleCommand::IncrementFlag { flag, amount } => {
-                    self.increment_flag(flag, amount);
-                }
-                RuleCommand::ClearFlag { flag } => {
-                    self.clear_flag(&flag);
-                }
-                RuleCommand::SaveGame { slot } => {
-                    if pending_persistence.is_none() {
-                        pending_persistence = Some(PersistenceRequest::SaveSlot { slot });
-                    }
-                }
-                RuleCommand::LoadGame { slot } => {
-                    if pending_persistence.is_none() {
-                        pending_persistence = Some(PersistenceRequest::LoadSlot { slot });
-                    }
-                }
+            if self.apply_audio_or_motion_command(
+                command.clone(),
+                result,
+                &mut buffered_velocities,
+                &mut buffered_animations,
+            ) || self.apply_scene_dialog_or_persistence_command(
+                command.clone(),
+                &mut pending_scene_switch,
+                &mut pending_dialog_start,
+                &mut pending_persistence,
+            ) || self.apply_entity_mutation_command(command.clone(), tilemap)
+                || self.apply_inventory_or_flag_command(command, &mut pending_persistence)
+            {
+                continue;
             }
         }
 
@@ -166,6 +75,173 @@ impl GameState {
         }
     }
 
+    fn apply_audio_or_motion_command(
+        &mut self,
+        command: RuleCommand,
+        result: &mut GameUpdateResult<AudioEvent>,
+        buffered_velocities: &mut HashMap<EntityId, glam::IVec2>,
+        buffered_animations: &mut HashMap<EntityId, AnimationState>,
+    ) -> bool {
+        match command {
+            RuleCommand::PlaySound { channel, sound_id } => {
+                result.add_event(AudioEvent::PlaySound {
+                    channel,
+                    sound_id,
+                    source_position: None,
+                    hearing_radius: None,
+                });
+                true
+            }
+            RuleCommand::PlayMusic { track_id } => {
+                result.add_event(AudioEvent::BackgroundMusic(track_id));
+                true
+            }
+            RuleCommand::SetVelocity {
+                entity_id,
+                velocity,
+            } => {
+                buffered_velocities.entry(entity_id).or_insert(velocity);
+                true
+            }
+            RuleCommand::PlayAnimation { entity_id, state } => {
+                buffered_animations.entry(entity_id).or_insert(state);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn apply_scene_dialog_or_persistence_command(
+        &mut self,
+        command: RuleCommand,
+        pending_scene_switch: &mut Option<PendingSceneSwitch>,
+        pending_dialog_start: &mut Option<PendingDialogStart>,
+        pending_persistence: &mut Option<PersistenceRequest>,
+    ) -> bool {
+        match command {
+            RuleCommand::Spawn {
+                entity_type,
+                position,
+            } => {
+                self.spawn_entity_from_rule(entity_type, position);
+                true
+            }
+            RuleCommand::DestroySelf { entity_id } => {
+                self.apply_destroy_self(entity_id);
+                true
+            }
+            RuleCommand::SwitchScene {
+                scene_name,
+                spawn_point_id,
+                transition,
+                duration_ms,
+            } => {
+                self.apply_switch_scene(
+                    &scene_name,
+                    &spawn_point_id,
+                    transition,
+                    duration_ms,
+                    pending_scene_switch,
+                );
+                true
+            }
+            RuleCommand::StartDialog { dialog_id, context } => {
+                if pending_dialog_start.is_none() {
+                    *pending_dialog_start =
+                        Some(crate::events::DialogStartRequest { dialog_id, context });
+                }
+                true
+            }
+            RuleCommand::SaveGame { slot } => {
+                if pending_persistence.is_none() {
+                    *pending_persistence = Some(PersistenceRequest::SaveSlot { slot });
+                }
+                true
+            }
+            RuleCommand::LoadGame { slot } => {
+                if pending_persistence.is_none() {
+                    *pending_persistence = Some(PersistenceRequest::LoadSlot { slot });
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn apply_entity_mutation_command(
+        &mut self,
+        command: RuleCommand,
+        tilemap: &TileMap,
+    ) -> bool {
+        match command {
+            RuleCommand::DamageEntity { entity_id, amount } => {
+                self.stat_effect_service()
+                    .queue_damage(entity_id, amount, None);
+                true
+            }
+            RuleCommand::HealEntity { entity_id, amount } => {
+                self.stat_effect_service()
+                    .queue_capped_heal(entity_id, amount);
+                true
+            }
+            RuleCommand::SetEntityActive { entity_id, active } => {
+                self.stat_effect_service()
+                    .set_entity_active(entity_id, active);
+                true
+            }
+            RuleCommand::TeleportEntity {
+                entity_id,
+                tile_x,
+                tile_y,
+            } => {
+                self.stat_effect_service()
+                    .teleport_entity_to_tile(entity_id, tile_x, tile_y, tilemap);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn apply_inventory_or_flag_command(
+        &mut self,
+        command: RuleCommand,
+        _pending_persistence: &mut Option<PersistenceRequest>,
+    ) -> bool {
+        match command {
+            RuleCommand::AddInventoryItem {
+                entity_id,
+                item_id,
+                count,
+            } => {
+                self.stat_effect_service()
+                    .add_inventory_item(entity_id, &item_id, count);
+                true
+            }
+            RuleCommand::RemoveInventoryItem {
+                entity_id,
+                item_id,
+                count,
+            } => {
+                self.stat_effect_service()
+                    .remove_inventory_item(entity_id, &item_id, count);
+                true
+            }
+            RuleCommand::SetFlag { flag, value } => {
+                self.set_flag(flag, value);
+                true
+            }
+            RuleCommand::IncrementFlag { flag, amount } => {
+                self.increment_flag(flag, amount);
+                true
+            }
+            RuleCommand::ClearFlag { flag } => {
+                self.clear_flag(&flag);
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn apply_switch_scene(
         &self,
         scene_name: &str,
@@ -178,7 +254,7 @@ impl GameState {
         let spawn = spawn_point_id.trim();
         if !target.is_empty() && !spawn.is_empty() && pending_scene_switch.is_none() {
             *pending_scene_switch = Some(crate::events::SceneSwitchRequest {
-                scene_name: target.to_string(),
+                scene_name: target.into(),
                 spawn_point_id: spawn.to_string(),
                 transition,
                 duration_ms,

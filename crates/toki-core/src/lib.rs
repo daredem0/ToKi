@@ -13,6 +13,8 @@ pub mod math {
 }
 pub mod errors;
 pub use errors::CoreError;
+pub mod ids;
+pub use ids::{DialogId, EntityDefName, SceneId};
 pub mod cache_utils;
 pub mod dialog;
 pub mod dialog_runtime;
@@ -51,7 +53,7 @@ pub mod ai;
 pub use ai::AiSystem;
 
 pub mod game;
-pub use game::{GameState, InputAction, InputKey, DEFAULT_TIMESTEP_MS};
+pub use game::{GameState, InputAction, InputKey, RestoreError, DEFAULT_TIMESTEP_MS};
 
 pub mod timing;
 pub use timing::{TimestepIterator, TimingSystem};

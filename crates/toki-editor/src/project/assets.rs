@@ -515,7 +515,7 @@ impl ProjectAssets {
         toki_core::project_assets::save_dialog_to_path(&path, dialog)
             .map_err(|error| anyhow::anyhow!("Failed to save dialog '{}': {}", dialog.id, error))?;
         self.dialogs.insert(
-            dialog.id.clone(),
+            dialog.id.to_string(),
             DialogAsset {
                 path,
                 dialog: Some(dialog.clone()),

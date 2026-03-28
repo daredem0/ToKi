@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::entity::{EntityId, EntityKind};
 use crate::flags::FlagValue;
+use crate::ids::DialogId;
 
 fn default_allow_cancel() -> bool {
     true
@@ -14,7 +16,7 @@ fn default_gate_gameplay() -> bool {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DialogTree {
-    pub id: String,
+    pub id: DialogId,
     #[serde(default)]
     pub title: String,
     pub entry_node_id: String,
@@ -140,6 +142,27 @@ pub struct DialogValidationReport {
 impl DialogValidationReport {
     pub fn is_valid(&self) -> bool {
         self.errors.is_empty()
+    }
+}
+
+impl fmt::Display for DialogValidationReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.errors.is_empty() && self.warnings.is_empty() {
+            return write!(f, "dialog is valid");
+        }
+
+        if !self.errors.is_empty() {
+            write!(f, "errors: {}", self.errors.join("; "))?;
+        }
+
+        if !self.warnings.is_empty() {
+            if !self.errors.is_empty() {
+                write!(f, " | ")?;
+            }
+            write!(f, "warnings: {}", self.warnings.join("; "))?;
+        }
+
+        Ok(())
     }
 }
 
@@ -354,14 +377,14 @@ mod tests {
     #[test]
     fn dialog_validation_accepts_reachable_linear_dialog() {
         let dialog = DialogTree {
-            id: "intro".to_string(),
+            id: "intro".to_string().into(),
             title: "Intro".to_string(),
-            entry_node_id: "start".to_string(),
+            entry_node_id: "start".to_string().into(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![
                 DialogNode {
-                    id: "start".to_string(),
+                    id: "start".to_string().into(),
                     speaker_name: Some("Guide".to_string()),
                     conditions: Vec::new(),
                     kind: DialogNodeKind::Line {
@@ -370,7 +393,7 @@ mod tests {
                     },
                 },
                 DialogNode {
-                    id: "done".to_string(),
+                    id: "done".to_string().into(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -389,14 +412,14 @@ mod tests {
     #[test]
     fn dialog_validation_reports_missing_node_and_unreachable_node() {
         let dialog = DialogTree {
-            id: "intro".to_string(),
+            id: "intro".to_string().into(),
             title: String::new(),
-            entry_node_id: "start".to_string(),
+            entry_node_id: "start".to_string().into(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![
                 DialogNode {
-                    id: "start".to_string(),
+                    id: "start".to_string().into(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::Line {
@@ -405,7 +428,7 @@ mod tests {
                     },
                 },
                 DialogNode {
-                    id: "unused".to_string(),
+                    id: "unused".to_string().into(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -427,14 +450,14 @@ mod tests {
     #[test]
     fn dialog_validation_warns_for_unreachable_nodes_when_graph_is_otherwise_valid() {
         let dialog = DialogTree {
-            id: "intro".to_string(),
+            id: "intro".to_string().into(),
             title: String::new(),
-            entry_node_id: "start".to_string(),
+            entry_node_id: "start".to_string().into(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![
                 DialogNode {
-                    id: "start".to_string(),
+                    id: "start".to_string().into(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -443,7 +466,7 @@ mod tests {
                     },
                 },
                 DialogNode {
-                    id: "unused".to_string(),
+                    id: "unused".to_string().into(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {

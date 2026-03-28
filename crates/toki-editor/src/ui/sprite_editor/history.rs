@@ -1,6 +1,7 @@
 //! Undo/redo history for sprite editing operations.
 
 use super::canvas::SpriteCanvas;
+use crate::ui::undo_redo::History;
 
 /// Undo/redo command for sprite editing
 #[derive(Debug, Clone)]
@@ -12,58 +13,47 @@ pub struct SpriteEditCommand {
 }
 
 /// Local undo/redo history for sprite editor (separate from scene history)
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct SpriteEditorHistory {
-    undo_stack: Vec<SpriteEditCommand>,
-    redo_stack: Vec<SpriteEditCommand>,
-    /// Maximum number of undo steps to keep
-    max_size: usize,
+    history: History<SpriteEditCommand>,
 }
 
 impl SpriteEditorHistory {
     pub fn new(max_size: usize) -> Self {
         Self {
-            undo_stack: Vec::new(),
-            redo_stack: Vec::new(),
-            max_size,
+            history: History::with_max_size(max_size),
         }
     }
 
     pub fn push(&mut self, command: SpriteEditCommand) {
-        self.undo_stack.push(command);
-        self.redo_stack.clear();
-        // Trim history if too large
-        while self.undo_stack.len() > self.max_size {
-            self.undo_stack.remove(0);
-        }
+        self.history.push(command);
     }
 
     pub fn take_undo(&mut self) -> Option<SpriteCanvas> {
-        let command = self.undo_stack.pop()?;
+        let command = self.history.take_undo()?;
         let before = command.before.clone();
-        self.redo_stack.push(command);
+        self.history.restore_redo(command);
         Some(before)
     }
 
     pub fn take_redo(&mut self) -> Option<SpriteCanvas> {
-        let command = self.redo_stack.pop()?;
+        let command = self.history.take_redo()?;
         let after = command.after.clone();
-        self.undo_stack.push(command);
+        self.history.restore_undo(command);
         Some(after)
     }
 
     #[cfg_attr(not(test), allow(dead_code))]
     pub fn can_undo(&self) -> bool {
-        !self.undo_stack.is_empty()
+        self.history.can_undo()
     }
 
     #[cfg_attr(not(test), allow(dead_code))]
     pub fn can_redo(&self) -> bool {
-        !self.redo_stack.is_empty()
+        self.history.can_redo()
     }
 
     pub fn clear(&mut self) {
-        self.undo_stack.clear();
-        self.redo_stack.clear();
+        self.history.clear();
     }
 }

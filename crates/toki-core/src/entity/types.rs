@@ -1,5 +1,6 @@
 use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use crate::collision::CollisionBox;
+use crate::ids::EntityDefName;
 use glam::{IVec2, UVec2};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -147,7 +148,7 @@ pub struct Entity {
     /// Source entity definition name used to instantiate this entity.
     /// This lets editor workflows (e.g. drag-to-move) re-enter placement mode without guessing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub definition_name: Option<String>,
+    pub definition_name: Option<EntityDefName>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub persistent_across_saves: bool,
     #[serde(default, skip_serializing_if = "ControlRole::is_legacy_default")]

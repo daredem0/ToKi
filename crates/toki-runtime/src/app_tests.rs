@@ -38,7 +38,7 @@ fn load_project_scene(project_path: &std::path::Path, scene_name: &str) -> anyho
 
 fn write_player_definition(project_path: &std::path::Path, name: &str) {
     let definition = EntityDefinition {
-        name: name.to_string(),
+        name: name.into(),
         display_name: "Player".to_string(),
         description: "Player definition".to_string(),
         rendering: RenderingDef {
@@ -497,7 +497,7 @@ fn build_startup_state_uses_scene_player_entry_and_preloads_all_scenes() {
             facing: Some(SceneAnchorFacing::Right),
         }],
         player_entry: Some(ScenePlayerEntry {
-            entity_definition_name: "player".to_string(),
+            entity_definition_name: "player".into(),
             spawn_point_id: "entry".to_string(),
         }),
     };
@@ -617,7 +617,7 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
             facing: Some(SceneAnchorFacing::Down),
         }],
         player_entry: Some(ScenePlayerEntry {
-            entity_definition_name: "player".to_string(),
+            entity_definition_name: "player".into(),
             spawn_point_id: "entry".to_string(),
         }),
     };
@@ -738,7 +738,7 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
                 trigger: RuleTrigger::OnUpdate,
                 conditions: vec![RuleCondition::Always],
                 actions: vec![RuleAction::SwitchScene {
-                    scene_name: "Second".to_string(),
+                    scene_name: "Second".into(),
                     spawn_point_id: "entry_b".to_string(),
                     transition: None,
                     duration_ms: None,
@@ -755,7 +755,7 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
             facing: Some(SceneAnchorFacing::Down),
         }],
         player_entry: Some(ScenePlayerEntry {
-            entity_definition_name: "player".to_string(),
+            entity_definition_name: "player".into(),
             spawn_point_id: "entry_a".to_string(),
         }),
     };
@@ -781,7 +781,7 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
             facing: Some(SceneAnchorFacing::Right),
         }],
         player_entry: Some(ScenePlayerEntry {
-            entity_definition_name: "player".to_string(),
+            entity_definition_name: "player".into(),
             spawn_point_id: "entry_b".to_string(),
         }),
     };

@@ -178,13 +178,13 @@ pub fn default_rule_action(kind: RuleActionEditorKind) -> RuleAction {
             target: RuleTarget::Player,
         },
         RuleActionEditorKind::SwitchScene => RuleAction::SwitchScene {
-            scene_name: String::new(),
+            scene_name: String::new().into(),
             spawn_point_id: String::new(),
             transition: None,
             duration_ms: None,
         },
         RuleActionEditorKind::StartDialog => RuleAction::StartDialog {
-            dialog_id: String::new(),
+            dialog_id: String::new().into(),
         },
         RuleActionEditorKind::DamageEntity => RuleAction::DamageEntity {
             target: RuleTarget::Player,
@@ -371,7 +371,7 @@ pub fn default_rule_trigger(kind: RuleTriggerEditorKind) -> RuleTrigger {
             entity: None,
         },
         RuleTriggerEditorKind::DialogComplete => RuleTrigger::OnDialogComplete {
-            dialog_id: String::new(),
+            dialog_id: String::new().into(),
             outcome_id: String::new(),
         },
         RuleTriggerEditorKind::TileEnter => RuleTrigger::OnTileEnter { x: 0, y: 0 },

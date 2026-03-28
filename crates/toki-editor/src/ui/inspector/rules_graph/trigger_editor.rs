@@ -67,7 +67,7 @@ impl InspectorSystem {
                 entity: None,
             },
             RuleTriggerKind::DialogComplete => RuleTrigger::OnDialogComplete {
-                dialog_id: String::new(),
+                dialog_id: String::new().into(),
                 outcome_id: String::new(),
             },
             RuleTriggerKind::TileEnter => RuleTrigger::OnTileEnter { x: 0, y: 0 },
@@ -111,7 +111,11 @@ impl InspectorSystem {
             ui.horizontal(|ui| {
                 ui.label("Dialog Id:");
                 if available_dialog_outcomes.is_empty() {
-                    changed |= ui.text_edit_singleline(dialog_id).changed();
+                    let mut dialog_id_value = dialog_id.to_string();
+                    if ui.text_edit_singleline(&mut dialog_id_value).changed() {
+                        *dialog_id = dialog_id_value.into();
+                        changed = true;
+                    }
                 } else {
                     egui::ComboBox::from_id_salt(format!(
                         "graph_node_trigger_dialog_id_{}_{}",
@@ -125,7 +129,11 @@ impl InspectorSystem {
                     .show_ui(ui, |ui| {
                         for candidate in available_dialog_outcomes.keys() {
                             changed |= ui
-                                .selectable_value(dialog_id, candidate.clone(), candidate.as_str())
+                                .selectable_value(
+                                    dialog_id,
+                                    candidate.clone().into(),
+                                    candidate.as_str(),
+                                )
                                 .changed();
                         }
                     });
@@ -133,7 +141,7 @@ impl InspectorSystem {
             });
             ui.horizontal(|ui| {
                 ui.label("Outcome Id:");
-                if let Some(outcomes) = available_dialog_outcomes.get(dialog_id) {
+                if let Some(outcomes) = available_dialog_outcomes.get(dialog_id.as_str()) {
                     egui::ComboBox::from_id_salt(format!(
                         "graph_node_trigger_outcome_id_{}_{}",
                         scene_name, node_key

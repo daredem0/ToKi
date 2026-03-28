@@ -8,6 +8,7 @@ use crate::rules::{RuleTarget, TriggerContext};
 use super::GameState;
 
 impl GameState {
+    #[allow(dead_code)]
     /// Resolves a rule target to an entity ID using the current trigger context.
     ///
     /// # Architecture Note (for Phase 1.5B+ implementers)

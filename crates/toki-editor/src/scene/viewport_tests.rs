@@ -220,7 +220,7 @@ fn viewport_resolves_shared_sprite_render_requests_for_static_entities() {
 
     let mut game_state = toki_core::GameState::new_empty();
     let pickup_definition = toki_core::entity::EntityDefinition {
-        name: "coin_pickup_render".to_string(),
+        name: "coin_pickup_render".to_string().into(),
         display_name: "Coin Pickup Render".to_string(),
         description: "Static object-sheet-backed pickup".to_string(),
         rendering: toki_core::entity::RenderingDef {

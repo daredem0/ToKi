@@ -67,7 +67,7 @@ fn solid_entity() -> Entity {
         size: UVec2::new(16, 16),
         entity_kind: EntityKind::Npc,
         category: "creature".to_string(),
-        definition_name: Some("test".to_string()),
+        definition_name: Some("test".into()),
         persistent_across_saves: false,
         control_role: crate::entity::ControlRole::None,
         audio: crate::entity::EntityAudioSettings::default(),

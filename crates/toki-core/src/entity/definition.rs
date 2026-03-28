@@ -12,9 +12,11 @@ use super::types::{
 };
 use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use crate::collision::CollisionBox;
+use crate::ids::EntityDefName;
 use glam::{IVec2, UVec2};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use thiserror::Error;
 
 fn default_hearing_radius() -> u32 {
     192
@@ -26,7 +28,7 @@ fn default_has_shadow() -> bool {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityDefinition {
-    pub name: String,
+    pub name: EntityDefName,
     pub display_name: String,
     pub description: String,
     pub rendering: RenderingDef,
@@ -183,9 +185,17 @@ pub struct AnimationClipDef {
     pub loop_mode: String, // "loop", "once", "ping_pong"
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum EntityDefinitionError {
+    #[error("unknown animation state: {state}")]
+    UnknownAnimationState { state: String },
+    #[error("unknown loop mode: {mode}")]
+    UnknownLoopMode { mode: String },
+}
+
 // Conversion implementations
 impl EntityDefinition {
-    fn parse_animation_state(state: &str) -> Result<AnimationState, String> {
+    fn parse_animation_state(state: &str) -> Result<AnimationState, EntityDefinitionError> {
         match state.to_lowercase().as_str() {
             "idle" => Ok(AnimationState::Idle),
             "walk" => Ok(AnimationState::Walk),
@@ -202,12 +212,18 @@ impl EntityDefinition {
             "attack_up" => Ok(AnimationState::AttackUp),
             "attack_left" => Ok(AnimationState::AttackLeft),
             "attack_right" => Ok(AnimationState::AttackRight),
-            _ => Err(format!("Unknown animation state: {state}")),
+            _ => Err(EntityDefinitionError::UnknownAnimationState {
+                state: state.to_string(),
+            }),
         }
     }
 
     /// Create an Entity instance from this definition at the given position.
-    pub fn create_entity(&self, position: IVec2, entity_id: EntityId) -> Result<Entity, String> {
+    pub fn create_entity(
+        &self,
+        position: IVec2,
+        entity_id: EntityId,
+    ) -> Result<Entity, EntityDefinitionError> {
         let entity_kind = runtime_entity_kind_for_category(&self.category);
         let animation_controller = self.build_animation_controller()?;
         let grounding = self.build_grounding();
@@ -233,7 +249,7 @@ impl EntityDefinition {
         Ok(entity)
     }
 
-    fn build_animation_controller(&self) -> Result<Option<AnimationController>, String> {
+    fn build_animation_controller(&self) -> Result<Option<AnimationController>, EntityDefinitionError> {
         if self.animations.clips.is_empty() {
             return Ok(None);
         }
@@ -260,12 +276,14 @@ impl EntityDefinition {
         Ok(Some(controller))
     }
 
-    fn parse_loop_mode(mode: &str) -> Result<LoopMode, String> {
+    fn parse_loop_mode(mode: &str) -> Result<LoopMode, EntityDefinitionError> {
         match mode.to_lowercase().as_str() {
             "loop" => Ok(LoopMode::Loop),
             "once" => Ok(LoopMode::Once),
             "ping_pong" => Ok(LoopMode::PingPong),
-            _ => Err(format!("Unknown loop mode: {mode}")),
+            _ => Err(EntityDefinitionError::UnknownLoopMode {
+                mode: mode.to_string(),
+            }),
         }
     }
 

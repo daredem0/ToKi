@@ -164,7 +164,7 @@ fn apply_entity_property_draft_clamps_and_sets_values() {
 #[test]
 fn apply_entity_property_draft_to_definition_updates_has_shadow() {
     let mut definition = toki_core::entity::EntityDefinition {
-        name: "shadow_test".to_string(),
+        name: "shadow_test".to_string().into(),
         display_name: "Shadow Test".to_string(),
         description: String::new(),
         rendering: toki_core::entity::RenderingDef {
@@ -972,7 +972,7 @@ fn validate_rule_set_reports_duplicate_ids_and_invalid_action_payloads() {
         trigger: RuleTrigger::OnStart,
         conditions: vec![RuleCondition::Always],
         actions: vec![RuleAction::SwitchScene {
-            scene_name: "   ".to_string(),
+            scene_name: "   ".to_string().into(),
             spawn_point_id: "   ".to_string(),
             transition: None,
             duration_ms: None,
@@ -1090,13 +1090,13 @@ fn validate_rule_set_for_scene_reports_invalid_switch_scene_targets() {
             conditions: vec![RuleCondition::Always],
             actions: vec![
                 RuleAction::SwitchScene {
-                    scene_name: "Missing Scene".to_string(),
+                    scene_name: "Missing Scene".to_string().into(),
                     spawn_point_id: "spawn_a".to_string(),
                     transition: None,
                     duration_ms: None,
                 },
                 RuleAction::SwitchScene {
-                    scene_name: "Target Scene".to_string(),
+                    scene_name: "Target Scene".to_string().into(),
                     spawn_point_id: "missing_spawn".to_string(),
                     transition: None,
                     duration_ms: None,
@@ -1187,7 +1187,7 @@ fn save_entity_definition_persists_audio_updates() {
     let entity_file = temp_dir.path().join("player.json");
 
     let definition = toki_core::entity::EntityDefinition {
-        name: "player".to_string(),
+        name: "player".to_string().into(),
         display_name: "Player".to_string(),
         description: "desc".to_string(),
         rendering: toki_core::entity::RenderingDef {

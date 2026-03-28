@@ -4,6 +4,7 @@ use strum::EnumIter;
 use crate::animation::AnimationState;
 use crate::entity::{EntityId, EntityKind};
 use crate::flags::FlagValue;
+use crate::ids::{DialogId, SceneId};
 use crate::project_runtime::SceneTransitionEffect;
 
 /// Context provided by triggers that involve entity interactions.
@@ -87,7 +88,7 @@ pub enum RuleTrigger {
         entity: Option<RuleTarget>,
     },
     OnDialogComplete {
-        dialog_id: String,
+        dialog_id: DialogId,
         outcome_id: String,
     },
     OnTileEnter {
@@ -343,7 +344,7 @@ pub enum RuleAction {
     },
     /// Runtime placeholder until scene-switch plumbing is integrated end-to-end.
     SwitchScene {
-        scene_name: String,
+        scene_name: SceneId,
         spawn_point_id: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         transition: Option<SceneTransitionEffect>,
@@ -351,7 +352,7 @@ pub enum RuleAction {
         duration_ms: Option<u32>,
     },
     StartDialog {
-        dialog_id: String,
+        dialog_id: DialogId,
     },
     /// Damages the target entity by the specified amount.
     /// Does not reduce health below zero. Death is handled by the game state.

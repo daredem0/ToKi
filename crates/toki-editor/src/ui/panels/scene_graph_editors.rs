@@ -272,7 +272,11 @@ impl PanelSystem {
                 duration_ms,
                 ..
             } => {
-                let mut changed = ui.text_edit_singleline(scene_name).changed();
+                let mut scene_name_value = scene_name.to_string();
+                let mut changed = ui.text_edit_singleline(&mut scene_name_value).changed();
+                if changed {
+                    *scene_name = scene_name_value.into();
+                }
                 ui.end_row();
                 ui.label("Spawn Point");
                 changed |= ui.text_edit_singleline(spawn_point_id).changed();
@@ -292,7 +296,11 @@ impl PanelSystem {
                 let mut changed = false;
                 ui.horizontal(|ui| {
                     ui.label("Dialog Id");
-                    changed |= ui.text_edit_singleline(dialog_id).changed();
+                    let mut dialog_id_value = dialog_id.to_string();
+                    if ui.text_edit_singleline(&mut dialog_id_value).changed() {
+                        *dialog_id = dialog_id_value.into();
+                        changed = true;
+                    }
                 });
                 changed
             }
@@ -689,7 +697,10 @@ impl PanelSystem {
                 {
                     ui.horizontal(|ui| {
                         ui.label("Dialog Id:");
-                        let _ = ui.text_edit_singleline(dialog_id);
+                        let mut dialog_id_value = dialog_id.to_string();
+                        if ui.text_edit_singleline(&mut dialog_id_value).changed() {
+                            *dialog_id = dialog_id_value.into();
+                        }
                     });
                     ui.horizontal(|ui| {
                         ui.label("Outcome Id:");

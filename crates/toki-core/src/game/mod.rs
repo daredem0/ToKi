@@ -8,6 +8,7 @@ use crate::assets::tilemap::TileMap;
 use crate::entity::{Entity, EntityDefinition, EntityId, EntityManager, MovementProfile};
 use crate::events::{GameEvent, GameUpdateResult};
 use crate::flags::{FlagValue, GameFlags};
+use crate::ids::EntityDefName;
 use crate::project_runtime::ProjectFlagDefinition;
 use crate::rules::{RuleSet, RuleTrigger};
 use crate::scene_manager::SceneManager;
@@ -35,6 +36,7 @@ pub use rules::{
     CollisionEvent, DamageEvent, DeathEvent, InteractionEvent, InteractionSpatial,
     TileTransitionEvent,
 };
+pub use scene::RestoreError;
 
 /// Default timestep in milliseconds for fixed 60 FPS game logic.
 /// Used as the baseline for delta time scaling.
@@ -107,7 +109,7 @@ pub struct GameState {
 
     /// Authored entity definitions available to scene player-entry instantiation.
     #[serde(default)]
-    entity_definitions: HashMap<String, EntityDefinition>,
+    entity_definitions: HashMap<EntityDefName, EntityDefinition>,
 
     /// Player entity ID for quick access
     player_id: Option<EntityId>,

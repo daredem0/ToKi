@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use crate::dialog::DialogRuntimeContext;
+use crate::ids::{DialogId, SceneId};
 use crate::project_runtime::SceneTransitionEffect;
 
 /// Trait that all game events must implement
@@ -66,7 +67,7 @@ pub trait EventHandler<T: GameEvent> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SceneSwitchRequest {
-    pub scene_name: String,
+    pub scene_name: SceneId,
     pub spawn_point_id: String,
     pub transition: Option<SceneTransitionEffect>,
     pub duration_ms: Option<u32>,
@@ -74,7 +75,7 @@ pub struct SceneSwitchRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DialogStartRequest {
-    pub dialog_id: String,
+    pub dialog_id: DialogId,
     pub context: DialogRuntimeContext,
 }
 
@@ -134,7 +135,7 @@ impl<T: GameEvent> GameUpdateResult<T> {
 
     pub fn request_scene_switch(
         &mut self,
-        scene_name: impl Into<String>,
+        scene_name: impl Into<SceneId>,
         spawn_point_id: impl Into<String>,
         transition: Option<SceneTransitionEffect>,
         duration_ms: Option<u32>,
@@ -149,7 +150,7 @@ impl<T: GameEvent> GameUpdateResult<T> {
 
     pub fn request_dialog_start(
         &mut self,
-        dialog_id: impl Into<String>,
+        dialog_id: impl Into<DialogId>,
         context: DialogRuntimeContext,
     ) {
         self.dialog_start_request = Some(DialogStartRequest {

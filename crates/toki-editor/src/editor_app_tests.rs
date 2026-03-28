@@ -514,7 +514,7 @@ fn solid_entity(id: u32, position: IVec2) -> Entity {
         size: UVec2::new(16, 16),
         entity_kind: EntityKind::Npc,
         category: "creature".to_string(),
-        definition_name: Some("test".to_string()),
+        definition_name: Some("test".to_string().into()),
         persistent_across_saves: false,
         control_role: toki_core::entity::ControlRole::None,
         audio: toki_core::entity::EntityAudioSettings::default(),
@@ -581,7 +581,7 @@ fn load_preview_sprite_frame_static_supports_object_sheet_backed_entities() {
     )
     .expect("object sheet should be written");
     let entity_def = EntityDefinition {
-        name: "coin_pickup".to_string(),
+        name: "coin_pickup".to_string().into(),
         display_name: "Coin Pickup".to_string(),
         description: "Collectible coin".to_string(),
         rendering: RenderingDef {
@@ -677,7 +677,7 @@ fn build_scene_player_overlay_sprites_uses_scene_player_entry_spawn_point() {
     .expect("object sheet should be written");
 
     let entity_def = EntityDefinition {
-        name: "player".to_string(),
+        name: "player".to_string().into(),
         display_name: "Player".to_string(),
         description: "Scene player preview".to_string(),
         rendering: RenderingDef {
@@ -748,7 +748,7 @@ fn build_scene_player_overlay_sprites_uses_scene_player_entry_spawn_point() {
         facing: None,
     });
     scene.player_entry = Some(ScenePlayerEntry {
-        entity_definition_name: "player".to_string(),
+        entity_definition_name: "player".to_string().into(),
         spawn_point_id: "spawn_a".to_string(),
     });
     ui_state.scenes = vec![scene];
@@ -775,7 +775,7 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
     fs::write(
         project_path.join("entities/player.json"),
         serde_json::to_string_pretty(&EntityDefinition {
-            name: "player".to_string(),
+            name: "player".to_string().into(),
             display_name: "Player".to_string(),
             description: "Scene player preview".to_string(),
             rendering: RenderingDef {
@@ -829,7 +829,7 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
     fs::write(
         project_path.join("entities/test.json"),
         serde_json::to_string_pretty(&EntityDefinition {
-            name: "test".to_string(),
+            name: "test".to_string().into(),
             display_name: "Test Entity".to_string(),
             description: "Scene entity".to_string(),
             rendering: RenderingDef {
@@ -894,7 +894,7 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
         facing: None,
     });
     scene.player_entry = Some(ScenePlayerEntry {
-        entity_definition_name: "player".to_string(),
+        entity_definition_name: "player".to_string().into(),
         spawn_point_id: "spawn_a".to_string(),
     });
     scene.entities.push(solid_entity(77, IVec2::new(16, 32)));
@@ -924,7 +924,7 @@ fn build_scene_preview_game_state_loads_scene_entity_definitions_for_legacy_grou
     fs::create_dir_all(project_path.join("entities")).expect("entities dir should exist");
 
     let soldier_definition = EntityDefinition {
-        name: "soldier".to_string(),
+        name: "soldier".to_string().into(),
         display_name: "Soldier".to_string(),
         description: "Soldier".to_string(),
         rendering: RenderingDef {
@@ -1025,7 +1025,7 @@ fn build_scene_preview_game_state_errors_when_player_entry_definition_is_unavail
         facing: None,
     });
     scene.player_entry = Some(ScenePlayerEntry {
-        entity_definition_name: "player".to_string(),
+        entity_definition_name: "player".to_string().into(),
         spawn_point_id: "spawn_a".to_string(),
     });
 
@@ -1059,7 +1059,7 @@ fn build_scene_player_overlay_sprites_skips_when_scene_already_contains_authored
     fs::write(
         project_path.join("entities/player.json"),
         serde_json::to_string_pretty(&EntityDefinition {
-            name: "player".to_string(),
+            name: "player".to_string().into(),
             display_name: "Player".to_string(),
             description: String::new(),
             rendering: RenderingDef {
@@ -1128,7 +1128,7 @@ fn build_scene_player_overlay_sprites_skips_when_scene_already_contains_authored
         facing: None,
     });
     scene.player_entry = Some(ScenePlayerEntry {
-        entity_definition_name: "player".to_string(),
+        entity_definition_name: "player".to_string().into(),
         spawn_point_id: "spawn_a".to_string(),
     });
     let mut placed_player = solid_entity(1, IVec2::new(64, 80));
@@ -1171,7 +1171,7 @@ fn cached_preview_sprite_frame_reuses_loaded_visual_without_reloading_from_disk(
     fs::write(
         project_path.join("entities/player.json"),
         serde_json::to_string_pretty(&EntityDefinition {
-            name: "player".to_string(),
+            name: "player".to_string().into(),
             display_name: "Player".to_string(),
             description: String::new(),
             rendering: RenderingDef {

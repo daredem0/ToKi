@@ -111,7 +111,11 @@ impl InspectorSystem {
                 ui.horizontal(|ui| {
                     ui.label("Dialog Id:");
                     if available_dialog_outcomes.is_empty() {
-                        changed |= ui.text_edit_singleline(dialog_id).changed();
+                        let mut dialog_id_value = dialog_id.to_string();
+                        if ui.text_edit_singleline(&mut dialog_id_value).changed() {
+                            *dialog_id = dialog_id_value.into();
+                            changed = true;
+                        }
                     } else {
                         egui::ComboBox::from_id_salt(format!(
                             "graph_start_dialog_{}_{}",
@@ -127,7 +131,7 @@ impl InspectorSystem {
                                 changed |= ui
                                     .selectable_value(
                                         dialog_id,
-                                        candidate.clone(),
+                                        candidate.clone().into(),
                                         candidate.as_str(),
                                     )
                                     .changed();

@@ -609,7 +609,7 @@ impl InspectorSystem {
     pub(in super::super) fn render_switch_scene_editor(
         ui: &mut egui::Ui,
         id_salt: impl std::hash::Hash,
-        scene_name: &mut String,
+        scene_name: &mut toki_core::SceneId,
         spawn_point_id: &mut String,
         transition: &mut Option<toki_core::SceneTransitionEffect>,
         duration_ms: &mut Option<u32>,
@@ -617,27 +617,31 @@ impl InspectorSystem {
     ) -> bool {
         let mut changed = false;
         let scene_names = Self::scene_switch_target_scene_names(scenes);
+        let mut scene_name_value = scene_name.to_string();
         ui.horizontal(|ui| {
             ui.label("Scene:");
             egui::ComboBox::from_id_salt((&id_salt, "scene"))
-                .selected_text(if scene_name.is_empty() {
+                .selected_text(if scene_name_value.is_empty() {
                     "<select scene>"
                 } else {
-                    scene_name.as_str()
+                    scene_name_value.as_str()
                 })
                 .show_ui(ui, |ui| {
                     changed |= ui
-                        .selectable_value(scene_name, String::new(), "<select scene>")
+                        .selectable_value(&mut scene_name_value, String::new(), "<select scene>")
                         .changed();
                     for candidate in &scene_names {
                         changed |= ui
-                            .selectable_value(scene_name, candidate.clone(), candidate)
+                            .selectable_value(&mut scene_name_value, candidate.clone(), candidate)
                             .changed();
                     }
                 });
         });
+        if changed {
+            *scene_name = scene_name_value.into();
+        }
 
-        let spawn_ids = Self::scene_switch_spawn_point_ids(scenes, scene_name);
+        let spawn_ids = Self::scene_switch_spawn_point_ids(scenes, scene_name.as_str());
         ui.horizontal(|ui| {
             ui.label("Spawn Point:");
             egui::ComboBox::from_id_salt((&id_salt, "spawn"))

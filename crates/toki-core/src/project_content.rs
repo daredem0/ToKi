@@ -40,8 +40,8 @@ mod tests {
 
     fn sample_player_definition(name: &str) -> EntityDefinition {
         EntityDefinition {
-            name: name.to_string(),
-            display_name: "Player".to_string(),
+            name: name.into(),
+            display_name: "Player".to_string().into(),
             description: "Player definition".to_string(),
             rendering: RenderingDef {
                 size: [16, 16],
@@ -84,7 +84,7 @@ mod tests {
                 collision_sound: None,
             },
             animations: AnimationsDef {
-                atlas_name: "creatures".to_string(),
+                atlas_name: "creatures".to_string().into(),
                 clips: vec![AnimationClipDef {
                     state: "idle_down".to_string(),
                     frame_tiles: vec!["idle".to_string()],
@@ -110,7 +110,7 @@ mod tests {
             facing: None,
         });
         scene.player_entry = Some(ScenePlayerEntry {
-            entity_definition_name: "player".to_string(),
+            entity_definition_name: "player".to_string().into(),
             spawn_point_id: "spawn_a".to_string(),
         });
 
@@ -134,7 +134,7 @@ mod tests {
             facing: None,
         });
         scene.player_entry = Some(ScenePlayerEntry {
-            entity_definition_name: "player".to_string(),
+            entity_definition_name: "player".to_string().into(),
             spawn_point_id: "spawn_a".to_string(),
         });
 

@@ -110,9 +110,9 @@ fn load_entity_summary(file_path: &Path) -> Option<EntitySummary> {
     let def = load_entity_definition(file_path)?;
 
     Some(EntitySummary {
-        name: def.name.clone(),
+        name: def.name.to_string(),
         display_name: if def.display_name.is_empty() {
-            def.name.clone()
+            def.name.to_string()
         } else {
             def.display_name
         },
@@ -181,9 +181,9 @@ fn update_browser_summary(ui_state: &mut EditorUI) {
         .iter_mut()
         .find(|e| e.file_path == edit.file_path)
     {
-        summary.name = edit.definition.name.clone();
+        summary.name = edit.definition.name.to_string();
         summary.display_name = if edit.definition.display_name.is_empty() {
-            edit.definition.name.clone()
+            edit.definition.name.to_string()
         } else {
             edit.definition.display_name.clone()
         };

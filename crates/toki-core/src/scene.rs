@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::entity::{Entity, EntityId};
+use crate::ids::EntityDefName;
 use crate::rules::RuleSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -26,7 +27,7 @@ pub struct SceneAnchor {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScenePlayerEntry {
-    pub entity_definition_name: String,
+    pub entity_definition_name: EntityDefName,
     pub spawn_point_id: String,
 }
 

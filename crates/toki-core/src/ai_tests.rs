@@ -323,7 +323,7 @@ fn create_test_entity(id: EntityId, position: IVec2, behavior: AiBehavior) -> En
         size: UVec2::new(16, 16),
         entity_kind: EntityKind::Npc,
         category: "creature".to_string(),
-        definition_name: Some("test_npc".to_string()),
+        definition_name: Some("test_npc".into()),
         persistent_across_saves: false,
         control_role: ControlRole::None,
         audio: Default::default(),
@@ -1483,7 +1483,7 @@ fn ai_system_run_and_multiply_ignores_different_definition() {
         AiBehavior::RunAndMultiply,
         100,
     );
-    entity2.definition_name = Some("different_npc".to_string());
+    entity2.definition_name = Some("different_npc".into());
     entity_manager.add_existing_entity(entity2);
 
     let results = ai_system.update(
