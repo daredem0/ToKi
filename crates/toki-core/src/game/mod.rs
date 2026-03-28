@@ -10,7 +10,7 @@ use crate::events::{GameEvent, GameUpdateResult};
 use crate::flags::{FlagValue, GameFlags};
 use crate::ids::EntityDefName;
 use crate::project_runtime::ProjectFlagDefinition;
-use crate::rules::{RuleSet, RuleTrigger};
+use crate::rules::RuleSet;
 use crate::scene_manager::SceneManager;
 
 mod ai_runtime;
@@ -32,11 +32,18 @@ mod rules_tests;
 
 // Re-export event types for external use
 pub use render_queries::GroundShadow;
+pub use render_queries::RenderQueryService;
+pub use movement::MovementSystem;
+pub use combat::CombatSystem;
+pub use interaction::InteractionSystem;
 pub use rules::{
     CollisionEvent, DamageEvent, DeathEvent, InteractionEvent, InteractionSpatial,
     TileTransitionEvent,
 };
+pub use rules::RuleSystem;
 pub use scene::RestoreError;
+pub use scene::SceneSystem;
+pub use input::InputSystem;
 
 /// Default timestep in milliseconds for fixed 60 FPS game logic.
 /// Used as the baseline for delta time scaling.
@@ -95,229 +102,245 @@ pub enum AudioChannel {
 
 impl GameEvent for AudioEvent {}
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WorldState {
+    #[serde(default)]
+    entity_manager: EntityManager,
+    #[serde(default)]
+    entity_definitions: HashMap<EntityDefName, EntityDefinition>,
+    #[serde(default)]
+    player_id: Option<EntityId>,
+}
+
+impl Default for WorldState {
+    fn default() -> Self {
+        Self {
+            entity_manager: EntityManager::new(),
+            entity_definitions: HashMap::new(),
+            player_id: None,
+        }
+    }
+}
+
+impl WorldState {
+    pub fn entity_manager(&self) -> &EntityManager {
+        &self.entity_manager
+    }
+
+    pub fn entity_definitions(&self) -> &HashMap<EntityDefName, EntityDefinition> {
+        &self.entity_definitions
+    }
+
+    pub fn player_id(&self) -> Option<EntityId> {
+        self.player_id
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SceneState {
+    #[serde(default)]
+    scene_manager: SceneManager,
+    #[serde(default)]
+    active_rules: RuleSet,
+    #[serde(skip, default)]
+    persistent_scene_entities: HashSet<(String, crate::entity::EntityId)>,
+}
+
+impl Default for SceneState {
+    fn default() -> Self {
+        Self {
+            scene_manager: SceneManager::new(),
+            active_rules: RuleSet::default(),
+            persistent_scene_entities: HashSet::new(),
+        }
+    }
+}
+
+impl SceneState {
+    pub fn scene_manager(&self) -> &SceneManager {
+        &self.scene_manager
+    }
+
+    pub fn active_rules(&self) -> &RuleSet {
+        &self.active_rules
+    }
+
+    pub fn persistent_scene_entities(&self) -> &HashSet<(String, crate::entity::EntityId)> {
+        &self.persistent_scene_entities
+    }
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct ProgressState {
+    #[serde(default)]
+    game_flags: GameFlags,
+    #[serde(default)]
+    play_time_ms: u64,
+}
+
+impl ProgressState {
+    pub fn game_flags(&self) -> &GameFlags {
+        &self.game_flags
+    }
+
+    pub fn play_time_ms(&self) -> u64 {
+        self.play_time_ms
+    }
+}
+
+#[derive(Debug)]
+pub struct AiRuntimeState {
+    system: AiSystem,
+    delta_accumulator_ms: f32,
+}
+
+impl Default for AiRuntimeState {
+    fn default() -> Self {
+        Self {
+            system: AiSystem::new(),
+            delta_accumulator_ms: 0.0,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct EffectRuntimeState {
+    pending_stat_changes: Vec<StatChangeRequest>,
+    pending_despawns: Vec<EntityId>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RuntimeState {
+    #[serde(default)]
+    input: InputRuntimeState,
+    #[serde(default)]
+    debug_collision_rendering: bool,
+    #[serde(skip, default)]
+    ai: AiRuntimeState,
+    #[serde(skip, default)]
+    rules: RuleRuntimeState,
+    #[serde(skip, default)]
+    effects: EffectRuntimeState,
+}
+
+impl Default for RuntimeState {
+    fn default() -> Self {
+        Self {
+            input: InputRuntimeState::default(),
+            debug_collision_rendering: false,
+            ai: AiRuntimeState::default(),
+            rules: RuleRuntimeState::default(),
+            effects: EffectRuntimeState::default(),
+        }
+    }
+}
+
+impl RuntimeState {
+    pub fn debug_collision_rendering(&self) -> bool {
+        self.debug_collision_rendering
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct UpdateContext<'a> {
+    pub time_scale: f32,
+    pub world_bounds: glam::UVec2,
+    pub tilemap: &'a TileMap,
+    pub atlas: &'a AtlasMeta,
+}
+
+pub struct GameSimulation;
+
 /// Core game state that manages entities, scenes, input, and game logic.
 ///
 /// This is platform-independent and contains pure game logic without
 /// any runtime or windowing dependencies.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GameState {
-    /// Scene manager holding all scenes
-    scene_manager: SceneManager,
-
-    /// Entity manager for all game objects in the current scene
-    entity_manager: EntityManager,
-
-    /// Authored entity definitions available to scene player-entry instantiation.
-    #[serde(default)]
-    entity_definitions: HashMap<EntityDefName, EntityDefinition>,
-
-    /// Player entity ID for quick access
-    player_id: Option<EntityId>,
-
-    /// Runtime input bookkeeping for keys, per-profile movement, and debounced actions.
-    #[serde(default)]
-    input_state: InputRuntimeState,
-
-    /// Debug rendering flags
-    #[serde(default)]
-    debug_collision_rendering: bool,
-
-    /// AI system for NPC behavior
-    #[serde(skip, default)]
-    ai_system: AiSystem,
-
-    /// Data-driven gameplay rules evaluated each frame.
-    #[serde(default)]
-    rules: RuleSet,
-
-    /// Runtime-only rule execution state.
-    #[serde(skip, default)]
-    rule_runtime: RuleRuntimeState,
-
-    /// Pending generic stat changes gathered during update and resolved centrally.
-    #[serde(skip, default)]
-    pending_stat_changes: Vec<StatChangeRequest>,
-
-    /// Entities that died and need to be despawned after death events are processed.
-    #[serde(skip, default)]
-    pending_despawns: Vec<EntityId>,
-
-    /// Runtime-only accumulator for feeding fixed-step AI updates in delta mode.
-    #[serde(skip, default)]
-    ai_delta_accumulator_ms: f32,
-
-    /// Persistent game flags for authored progression and narrative state.
-    #[serde(default)]
-    game_flags: GameFlags,
-
-    /// Total accumulated play time for stable save-slot metadata.
-    #[serde(default)]
-    play_time_ms: u64,
-
-    /// Authored scene entities that should persist through save/load, tracked even when removed.
-    #[serde(skip, default)]
-    persistent_scene_entities: HashSet<(String, crate::entity::EntityId)>,
+    #[serde(flatten)]
+    world: WorldState,
+    #[serde(flatten)]
+    scene: SceneState,
+    #[serde(flatten)]
+    progress: ProgressState,
+    #[serde(flatten)]
+    runtime: RuntimeState,
 }
 
 use input_state::InputRuntimeState;
 use rules::RuleRuntimeState;
 use stat_effects::StatChangeRequest;
 
-impl GameState {
-    pub fn game_flags(&self) -> &GameFlags {
-        &self.game_flags
-    }
-
-    pub fn flag(&self, flag: &str) -> Option<&FlagValue> {
-        self.game_flags.get(flag)
-    }
-
-    pub fn set_flag(&mut self, flag: impl Into<String>, value: FlagValue) {
-        self.game_flags.set(flag, value);
-    }
-
-    pub fn clear_flag(&mut self, flag: &str) -> bool {
-        self.game_flags.clear(flag)
-    }
-
-    pub fn increment_flag(&mut self, flag: impl Into<String>, amount: i32) -> bool {
-        self.game_flags.increment(flag, amount)
-    }
-
-    pub fn play_time_ms(&self) -> u64 {
-        self.play_time_ms
-    }
-
-    pub fn apply_flag_defaults(&mut self, declarations: &[ProjectFlagDefinition]) {
-        for declaration in declarations {
-            let flag = declaration.id.trim();
-            if flag.is_empty() || self.game_flags.is_set(flag) {
-                continue;
-            }
-            self.game_flags
-                .set(flag.to_string(), declaration.default_value.clone());
-        }
-    }
-
-    pub fn persistent_scene_entity_keys(&self) -> Vec<(String, crate::entity::EntityId)> {
-        let mut keys = self.persistent_scene_entities.iter().cloned().collect::<Vec<_>>();
-        keys.sort();
-        keys
-    }
-
-    fn effective_movement_profile(entity: &Entity) -> MovementProfile {
-        entity.effective_movement_profile()
-    }
-
-    /// Update game state by one tick
-    pub fn update(
-        &mut self,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
-    ) -> GameUpdateResult<AudioEvent> {
-        self.update_with_scale(1.0, world_bounds, tilemap, atlas)
-    }
-
-    /// Update game state with delta time scaling.
-    ///
-    /// This method scales movement speed proportionally to the elapsed time,
-    /// allowing for variable frame rate game logic while maintaining consistent
-    /// perceived movement speed.
-    ///
-    /// # Arguments
-    /// * `delta_ms` - Elapsed time since last update in milliseconds
-    /// * `world_bounds` - World boundary constraints
-    /// * `tilemap` - Current tilemap for collision detection
-    /// * `atlas` - Atlas metadata for tile properties
-    pub fn update_with_delta(
-        &mut self,
-        delta_ms: f32,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
-    ) -> GameUpdateResult<AudioEvent> {
-        let time_scale = delta_ms / DEFAULT_TIMESTEP_MS;
-        self.update_with_scale(time_scale, world_bounds, tilemap, atlas)
-    }
-
-    /// Shared update implementation that scales movement and animation timing.
-    pub fn update_with_scale(
-        &mut self,
-        time_scale: f32,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
-    ) -> GameUpdateResult<AudioEvent> {
-        let animation_delta_ms = (DEFAULT_TIMESTEP_MS * time_scale).max(0.0);
-        self.play_time_ms = self
+impl GameSimulation {
+    pub fn tick(state: &mut GameState, ctx: UpdateContext<'_>) -> GameUpdateResult<AudioEvent> {
+        let animation_delta_ms = (DEFAULT_TIMESTEP_MS * ctx.time_scale).max(0.0);
+        state.progress.play_time_ms = state
+            .progress
             .play_time_ms
             .saturating_add(animation_delta_ms.max(0.0).round() as u64);
         let mut result = GameUpdateResult::new();
         let mut rule_commands = Vec::new();
-        self.rule_runtime.frame_collisions.clear();
-        self.rule_runtime.frame_damage_events.clear();
-        self.rule_runtime.frame_death_events.clear();
-        self.rule_runtime.frame_interactions.clear();
-        self.rule_runtime.frame_tile_transitions.clear();
-
-        if !self.rule_runtime.started {
-            self.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut rule_commands);
-            self.rule_runtime.started = true;
-        }
-        self.collect_rule_commands_for_trigger(RuleTrigger::OnUpdate, &mut rule_commands);
-        self.collect_rule_commands_for_key_triggers(&mut rule_commands);
+        RuleSystem::begin_frame(state);
+        RuleSystem::collect_frame_commands(state, &mut rule_commands);
         let (mut pending_rule_animations, mut pending_scene_switch, _, mut pending_persistence) =
-            self.apply_rule_commands(rule_commands, &mut result, tilemap);
+            RuleSystem::apply_commands(state, rule_commands, &mut result, ctx.tilemap);
 
-        let initial_player_position = self
+        let initial_player_position = state
+            .world
             .player_id
-            .and_then(|player_id| self.entity_manager.get_entity(player_id))
+            .and_then(|player_id| state.world.entity_manager.get_entity(player_id))
             .map(|entity| entity.position)
             .unwrap_or(glam::IVec2::ZERO);
 
-        let input_result = if time_scale == 1.0 {
-            self.process_input(world_bounds, tilemap, atlas)
-        } else {
-            self.process_input_scaled(world_bounds, tilemap, atlas, time_scale)
-        };
+        let input_result = MovementSystem::process_input_scaled(
+            state,
+            ctx.world_bounds,
+            ctx.tilemap,
+            ctx.atlas,
+            ctx.time_scale,
+        );
         result.player_moved = input_result.player_moved;
         result.add_events(input_result.events);
 
-        if self.apply_rule_velocities(world_bounds, tilemap, atlas, &mut result) {
+        if MovementSystem::apply_rule_velocities(
+            state,
+            ctx.world_bounds,
+            ctx.tilemap,
+            ctx.atlas,
+            &mut result,
+        ) {
             result.player_moved = true;
         }
 
-        let intended_player_delta = self
+        let intended_player_delta = state
+            .world
             .player_id
-            .and_then(|player_id| self.entity_manager.get_entity(player_id))
-            .map(|entity| self.held_keys_for_profile(Self::effective_movement_profile(entity)))
-            .map(|keys| Self::movement_delta_from_keys(&keys))
+            .and_then(|player_id| state.world.entity_manager.get_entity(player_id))
+            .map(|entity| state.held_keys_for_profile(GameState::effective_movement_profile(entity)))
+            .map(|keys| GameState::movement_delta_from_keys(&keys))
             .unwrap_or(glam::IVec2::ZERO);
 
-        self.update_player_animation(initial_player_position, intended_player_delta);
-        self.process_profile_actions();
-        self.update_projectiles(tilemap, atlas);
-        self.collect_overlapping_pickups();
-        self.collect_interaction_events();
-        self.resolve_pending_stat_changes();
+        MovementSystem::update_player_animation(state, initial_player_position, intended_player_delta);
+        CombatSystem::process_profile_actions(state);
+        CombatSystem::update_projectiles(state, ctx.tilemap, ctx.atlas);
+        InteractionSystem::collect_overlapping_pickups(state);
+        InteractionSystem::collect_interaction_events(state);
+        state.resolve_pending_stat_changes();
 
-        // Update NPC AI on a fixed cadence so behavior stays consistent across frame rates.
-        self.update_npc_ai_with_delta(
+        state.update_npc_ai_with_delta(
             animation_delta_ms,
-            world_bounds,
-            tilemap,
-            atlas,
+            ctx.world_bounds,
+            ctx.tilemap,
+            ctx.atlas,
             &mut result,
         );
 
-        // Detect tile transitions after all movement is complete
-        self.detect_tile_transitions(tilemap);
+        state.detect_tile_transitions(ctx.tilemap);
 
         let reactive_rule_commands =
-            self.collect_reactive_rule_commands(result.player_moved, tilemap, atlas);
+            RuleSystem::collect_reactive_commands(state, result.player_moved, ctx.tilemap, ctx.atlas);
         let (mut reactive_animations, reactive_scene_switch, _, reactive_persistence) =
-            self.apply_rule_commands(reactive_rule_commands, &mut result, tilemap);
+            RuleSystem::apply_commands(state, reactive_rule_commands, &mut result, ctx.tilemap);
         if pending_scene_switch.is_none() {
             pending_scene_switch = reactive_scene_switch;
         }
@@ -326,15 +349,15 @@ impl GameState {
         }
         pending_rule_animations.append(&mut reactive_animations);
 
-        self.apply_rule_animations(pending_rule_animations);
+        state.apply_rule_animations(pending_rule_animations);
+        state.flush_pending_despawns();
 
-        // Despawn entities that died after death events have been processed
-        self.flush_pending_despawns();
-
-        // Update entity animation timing with actual delta
-        let completed_animation_loops = self.entity_manager.update_animations(animation_delta_ms);
+        let completed_animation_loops = state
+            .world
+            .entity_manager
+            .update_animations(animation_delta_ms);
         for (entity_id, completed_loops) in completed_animation_loops {
-            self.emit_animation_loop_movement_audio(entity_id, completed_loops, &mut result);
+            MovementSystem::emit_animation_loop_audio(state, entity_id, completed_loops, &mut result);
         }
 
         if let Some(request) = pending_scene_switch {
@@ -356,13 +379,183 @@ impl GameState {
         result
     }
 
+    pub fn tick_fixed(
+        state: &mut GameState,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> GameUpdateResult<AudioEvent> {
+        Self::tick(
+            state,
+            UpdateContext {
+                time_scale: 1.0,
+                world_bounds,
+                tilemap,
+                atlas,
+            },
+        )
+    }
+
+    pub fn tick_with_delta(
+        state: &mut GameState,
+        delta_ms: f32,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> GameUpdateResult<AudioEvent> {
+        Self::tick(
+            state,
+            UpdateContext {
+                time_scale: delta_ms / DEFAULT_TIMESTEP_MS,
+                world_bounds,
+                tilemap,
+                atlas,
+            },
+        )
+    }
+}
+
+impl GameState {
+    pub fn world(&self) -> &WorldState {
+        &self.world
+    }
+
+    pub fn world_mut(&mut self) -> &mut WorldState {
+        &mut self.world
+    }
+
+    pub fn scene(&self) -> &SceneState {
+        &self.scene
+    }
+
+    pub fn scene_mut(&mut self) -> &mut SceneState {
+        &mut self.scene
+    }
+
+    pub fn progress(&self) -> &ProgressState {
+        &self.progress
+    }
+
+    pub fn progress_mut(&mut self) -> &mut ProgressState {
+        &mut self.progress
+    }
+
+    pub fn runtime(&self) -> &RuntimeState {
+        &self.runtime
+    }
+
+    pub fn runtime_mut(&mut self) -> &mut RuntimeState {
+        &mut self.runtime
+    }
+
+    pub fn game_flags(&self) -> &GameFlags {
+        &self.progress.game_flags
+    }
+
+    pub fn flag(&self, flag: &str) -> Option<&FlagValue> {
+        self.progress.game_flags.get(flag)
+    }
+
+    pub fn set_flag(&mut self, flag: impl Into<String>, value: FlagValue) {
+        self.progress.game_flags.set(flag, value);
+    }
+
+    pub fn clear_flag(&mut self, flag: &str) -> bool {
+        self.progress.game_flags.clear(flag)
+    }
+
+    pub fn increment_flag(&mut self, flag: impl Into<String>, amount: i32) -> bool {
+        self.progress.game_flags.increment(flag, amount)
+    }
+
+    pub fn play_time_ms(&self) -> u64 {
+        self.progress.play_time_ms
+    }
+
+    pub fn apply_flag_defaults(&mut self, declarations: &[ProjectFlagDefinition]) {
+        for declaration in declarations {
+            let flag = declaration.id.trim();
+            if flag.is_empty() || self.progress.game_flags.is_set(flag) {
+                continue;
+            }
+            self.progress
+                .game_flags
+                .set(flag.to_string(), declaration.default_value.clone());
+        }
+    }
+
+    pub fn persistent_scene_entity_keys(&self) -> Vec<(String, crate::entity::EntityId)> {
+        let mut keys = self
+            .scene
+            .persistent_scene_entities
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        keys.sort();
+        keys
+    }
+
+    fn effective_movement_profile(entity: &Entity) -> MovementProfile {
+        entity.effective_movement_profile()
+    }
+
+    /// Update game state by one tick
+    pub fn update(
+        &mut self,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> GameUpdateResult<AudioEvent> {
+        GameSimulation::tick_fixed(self, world_bounds, tilemap, atlas)
+    }
+
+    /// Update game state with delta time scaling.
+    ///
+    /// This method scales movement speed proportionally to the elapsed time,
+    /// allowing for variable frame rate game logic while maintaining consistent
+    /// perceived movement speed.
+    ///
+    /// # Arguments
+    /// * `delta_ms` - Elapsed time since last update in milliseconds
+    /// * `world_bounds` - World boundary constraints
+    /// * `tilemap` - Current tilemap for collision detection
+    /// * `atlas` - Atlas metadata for tile properties
+    pub fn update_with_delta(
+        &mut self,
+        delta_ms: f32,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> GameUpdateResult<AudioEvent> {
+        GameSimulation::tick_with_delta(self, delta_ms, world_bounds, tilemap, atlas)
+    }
+
+    /// Shared update implementation that scales movement and animation timing.
+    pub fn update_with_scale(
+        &mut self,
+        time_scale: f32,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+    ) -> GameUpdateResult<AudioEvent> {
+        GameSimulation::tick(
+            self,
+            UpdateContext {
+                time_scale,
+                world_bounds,
+                tilemap,
+                atlas,
+            },
+        )
+    }
+
     /// Helper to update player animation based on movement intent.
     fn update_player_animation(
         &mut self,
         initial_player_position: glam::IVec2,
         intended_player_delta: glam::IVec2,
     ) {
-        let Some(player_entity) = self.entity_manager.get_player_mut() else {
+        let Some(player_entity) = self.world.entity_manager.get_player_mut() else {
             return;
         };
         let Some(animation_controller) = &mut player_entity.attributes.animation_controller else {
@@ -399,9 +592,9 @@ impl GameState {
         atlas: &AtlasMeta,
         result: &mut GameUpdateResult<AudioEvent>,
     ) {
-        let ai_updates = self.ai_system.update(
-            &self.entity_manager,
-            self.player_id,
+        let ai_updates = self.runtime.ai.system.update(
+            &self.world.entity_manager,
+            self.world.player_id,
             world_bounds,
             tilemap,
             atlas,
@@ -411,6 +604,7 @@ impl GameState {
                 continue;
             };
             let Some(initial_position) = self
+                .world
                 .entity_manager
                 .get_entity(ai_result.entity_id)
                 .map(|entity| entity.position)
@@ -431,6 +625,7 @@ impl GameState {
             );
 
             let Some(final_position) = self
+                .world
                 .entity_manager
                 .get_entity(ai_result.entity_id)
                 .map(|entity| entity.position)
@@ -454,12 +649,12 @@ impl GameState {
         atlas: &AtlasMeta,
         result: &mut GameUpdateResult<AudioEvent>,
     ) {
-        self.ai_delta_accumulator_ms += delta_ms.max(0.0);
+        self.runtime.ai.delta_accumulator_ms += delta_ms.max(0.0);
 
         let mut steps = 0;
-        while self.ai_delta_accumulator_ms >= DEFAULT_TIMESTEP_MS {
+        while self.runtime.ai.delta_accumulator_ms >= DEFAULT_TIMESTEP_MS {
             self.update_npc_ai_fixed(world_bounds, tilemap, atlas, result);
-            self.ai_delta_accumulator_ms -= DEFAULT_TIMESTEP_MS;
+            self.runtime.ai.delta_accumulator_ms -= DEFAULT_TIMESTEP_MS;
             steps += 1;
 
             if steps >= MAX_AI_FIXED_STEPS_PER_UPDATE {

@@ -7,6 +7,22 @@ use super::animation::FacingDirection;
 use super::stat_effects::StatChangeRequest;
 use super::{GameState, InputAction};
 
+pub struct CombatSystem;
+
+impl CombatSystem {
+    pub fn process_profile_actions(state: &mut GameState) {
+        state.process_profile_actions();
+    }
+
+    pub fn update_projectiles(
+        state: &mut GameState,
+        tilemap: &crate::assets::tilemap::TileMap,
+        atlas: &crate::assets::atlas::AtlasMeta,
+    ) {
+        state.update_projectiles(tilemap, atlas);
+    }
+}
+
 impl GameState {
     fn facing_vector(facing: FacingDirection) -> glam::IVec2 {
         facing.to_ivec2()
@@ -33,7 +49,7 @@ impl GameState {
         attacker_id: EntityId,
         facing: FacingDirection,
     ) -> Vec<StatChangeRequest> {
-        let Some(attacker) = self.entity_manager.get_entity(attacker_id) else {
+        let Some(attacker) = self.world.entity_manager.get_entity(attacker_id) else {
             return Vec::new();
         };
 
@@ -43,14 +59,14 @@ impl GameState {
         }
 
         let (hitbox_pos, hitbox_size) = Self::primary_action_hitbox(attacker, facing);
-        let mut target_ids = self.entity_manager.active_entities();
+        let mut target_ids = self.world.entity_manager.active_entities();
         target_ids.sort_unstable();
 
         let changes = target_ids
             .into_iter()
             .filter(|&target_id| target_id != attacker_id)
             .filter_map(|target_id| {
-                let target = self.entity_manager.get_entity(target_id)?;
+                let target = self.world.entity_manager.get_entity(target_id)?;
                 if !target.attributes.active
                     || target.attributes.current_stat(HEALTH_STAT_ID).is_none()
                 {
@@ -91,7 +107,7 @@ impl GameState {
     }
 
     fn spawn_primary_projectile(&mut self, attacker_id: EntityId, facing: FacingDirection) {
-        let Some(attacker) = self.entity_manager.get_entity(attacker_id) else {
+        let Some(attacker) = self.world.entity_manager.get_entity(attacker_id) else {
             return;
         };
         let Some(spec) = attacker.attributes.primary_projectile.clone() else {
@@ -137,13 +153,13 @@ impl GameState {
             }),
             ..crate::entity::EntityAttributes::default()
         };
-        let projectile_id = self.entity_manager.spawn_entity(
+        let projectile_id = self.world.entity_manager.spawn_entity(
             crate::entity::EntityKind::Projectile,
             spawn_position,
             size,
             attributes.clone(),
         );
-        if let Some(projectile) = self.entity_manager.get_entity_mut(projectile_id) {
+        if let Some(projectile) = self.world.entity_manager.get_entity_mut(projectile_id) {
             projectile.category = "projectile".to_string();
             projectile.collision_box = Some(CollisionBox::solid_box(size));
             projectile.attributes = attributes;
@@ -163,18 +179,18 @@ impl GameState {
     }
 
     fn projectile_hit_target(&self, projectile_id: EntityId) -> Option<EntityId> {
-        let projectile = self.entity_manager.get_entity(projectile_id)?;
+        let projectile = self.world.entity_manager.get_entity(projectile_id)?;
         let projectile_state = projectile.attributes.projectile.as_ref()?;
         let (projectile_pos, projectile_size) = projectile.interaction_bounds();
 
-        let mut target_ids = self.entity_manager.active_entities();
+        let mut target_ids = self.world.entity_manager.active_entities();
         target_ids.sort_unstable();
         for target_id in target_ids {
             if target_id == projectile_id || projectile_state.owner_id == Some(target_id) {
                 continue;
             }
 
-            let Some(target) = self.entity_manager.get_entity(target_id) else {
+            let Some(target) = self.world.entity_manager.get_entity(target_id) else {
                 continue;
             };
             if !target.attributes.active
@@ -199,11 +215,12 @@ impl GameState {
         atlas: &crate::assets::atlas::AtlasMeta,
     ) {
         let projectile_ids = self
+            .world
             .entity_manager
             .active_entities()
             .into_iter()
             .filter(|&entity_id| {
-                self.entity_manager
+                self.world.entity_manager
                     .get_entity(entity_id)
                     .and_then(|entity| entity.attributes.projectile.as_ref())
                     .is_some()
@@ -214,6 +231,7 @@ impl GameState {
 
         for projectile_id in projectile_ids {
             let Some((current_position, velocity, remaining_ticks, damage, owner_id)) = self
+                .world
                 .entity_manager
                 .get_entity(projectile_id)
                 .and_then(|entity| {
@@ -253,7 +271,7 @@ impl GameState {
                 continue;
             }
 
-            if let Some(projectile_entity) = self.entity_manager.get_entity_mut(projectile_id) {
+            if let Some(projectile_entity) = self.world.entity_manager.get_entity_mut(projectile_id) {
                 projectile_entity.position = new_position;
                 if let Some(projectile) = projectile_entity.attributes.projectile.as_mut() {
                     projectile.remaining_ticks = projectile.remaining_ticks.saturating_sub(1);
@@ -282,6 +300,7 @@ impl GameState {
             }
 
             let expired = self
+                .world
                 .entity_manager
                 .get_entity(projectile_id)
                 .and_then(|entity| entity.attributes.projectile.as_ref())
@@ -299,13 +318,14 @@ impl GameState {
         despawn_ids.sort_unstable();
         despawn_ids.dedup();
         for entity_id in despawn_ids {
-            self.entity_manager.despawn_entity(entity_id);
+            self.world.entity_manager.despawn_entity(entity_id);
         }
     }
 
     fn trigger_entity_primary_action(&mut self, entity_id: EntityId) -> bool {
         let triggered_facing = {
             let Some(animation_controller) = self
+                .world
                 .entity_manager
                 .get_entity_mut(entity_id)
                 .and_then(|entity| entity.attributes.animation_controller.as_mut())
@@ -341,7 +361,7 @@ impl GameState {
         );
 
         self.spawn_primary_projectile(entity_id, facing);
-        self.pending_stat_changes
+        self.runtime.effects.pending_stat_changes
             .extend(self.collect_primary_action_stat_changes(entity_id, facing));
         true
     }
@@ -362,7 +382,7 @@ impl GameState {
                 continue;
             }
             for &entity_id in &controlled_entity_ids {
-                let Some(entity) = self.entity_manager.get_entity(entity_id) else {
+                let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
                     continue;
                 };
                 if Self::effective_movement_profile(entity) != profile {

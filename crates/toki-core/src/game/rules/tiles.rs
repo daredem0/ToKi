@@ -14,8 +14,8 @@ impl GameState {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> bool {
-        for entity_id in self.entity_manager.active_entities_iter() {
-            let Some(entity) = self.entity_manager.get_entity(entity_id) else {
+        for entity_id in self.world.entity_manager.active_entities_iter() {
+            let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
                 continue;
             };
             if Self::entity_overlaps_trigger_tile(entity, tilemap, atlas) {

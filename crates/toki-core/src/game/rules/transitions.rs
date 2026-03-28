@@ -36,10 +36,11 @@ impl GameState {
 
         // Collect entity tile data first to avoid borrow conflicts
         let entity_data: Vec<EntityTileData> = self
+            .world
             .entity_manager
             .active_entities_iter()
             .filter_map(|entity_id| {
-                let entity = self.entity_manager.get_entity(entity_id)?;
+                let entity = self.world.entity_manager.get_entity(entity_id)?;
 
                 let center_x = entity.position.x + (entity.size.x as i32 / 2);
                 let center_y = entity.position.y + (entity.size.y as i32 / 2);
@@ -79,7 +80,7 @@ impl GameState {
     ) {
         // Check if we have a previous tile position for this entity
         if let Some(&(prev_tile_x, prev_tile_y)) =
-            self.rule_runtime.entity_tile_positions.get(&entity_id)
+            self.runtime.rules.entity_tile_positions.get(&entity_id)
         {
             // If tile position changed, generate exit and enter events
             if (prev_tile_x, prev_tile_y) != (current_tile_x, current_tile_y) {
@@ -93,7 +94,7 @@ impl GameState {
                 );
 
                 // Exit previous tile
-                self.rule_runtime
+                self.runtime.rules
                     .frame_tile_transitions
                     .push(TileTransitionEvent {
                         entity_id,
@@ -103,7 +104,7 @@ impl GameState {
                     });
 
                 // Enter new tile
-                self.rule_runtime
+                self.runtime.rules
                     .frame_tile_transitions
                     .push(TileTransitionEvent {
                         entity_id,
@@ -115,7 +116,7 @@ impl GameState {
         }
 
         // Update stored tile position
-        self.rule_runtime
+        self.runtime.rules
             .entity_tile_positions
             .insert(entity_id, (current_tile_x, current_tile_y));
     }
@@ -129,7 +130,7 @@ impl GameState {
         current_tile_y: u32,
         pixel_pos: glam::IVec2,
     ) {
-        if Some(entity_id) == self.player_id {
+        if Some(entity_id) == self.world.player_id {
             tracing::trace!(
                 "Player moved from_tile=({},{}) to_tile=({},{}) pixel_pos=({},{})",
                 prev_tile_x,
@@ -159,7 +160,7 @@ impl GameState {
         tilemap: &TileMap,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        let tile_events = std::mem::take(&mut self.rule_runtime.frame_tile_transitions);
+        let tile_events = std::mem::take(&mut self.runtime.rules.frame_tile_transitions);
         let map_width = tilemap.size.x;
         let map_height = tilemap.size.y;
         let mut engine = self.rule_engine();

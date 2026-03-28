@@ -15,14 +15,14 @@ pub struct GroundShadow {
     pub color: [f32; 4],
 }
 
-struct RenderQueryFacade<'a> {
+pub struct RenderQueryService<'a> {
     entity_manager: &'a EntityManager,
     player_id: Option<EntityId>,
     debug_collision_rendering: bool,
 }
 
-impl<'a> RenderQueryFacade<'a> {
-    fn new(
+impl<'a> RenderQueryService<'a> {
+    pub fn new(
         entity_manager: &'a EntityManager,
         player_id: Option<EntityId>,
         debug_collision_rendering: bool,
@@ -34,7 +34,7 @@ impl<'a> RenderQueryFacade<'a> {
         }
     }
 
-    fn entity_sprite_frame(
+    pub fn entity_sprite_frame(
         &self,
         entity_id: EntityId,
         atlas: &AtlasMeta,
@@ -97,14 +97,14 @@ impl<'a> RenderQueryFacade<'a> {
         None
     }
 
-    fn entity_current_atlas_name(&self, entity_id: EntityId) -> Option<String> {
+    pub fn entity_current_atlas_name(&self, entity_id: EntityId) -> Option<String> {
         self.entity_manager
             .get_entity(entity_id)
             .and_then(|entity| entity.attributes.animation_controller.as_ref())
             .and_then(|controller| controller.current_atlas_name().ok())
     }
 
-    fn entity_sprite_flip_x(&self, entity_id: EntityId) -> bool {
+    pub fn entity_sprite_flip_x(&self, entity_id: EntityId) -> bool {
         self.entity_manager
             .get_entity(entity_id)
             .and_then(|entity| entity.attributes.animation_controller.as_ref())
@@ -112,7 +112,7 @@ impl<'a> RenderQueryFacade<'a> {
             .unwrap_or(false)
     }
 
-    fn renderable_entities(&self) -> Vec<(EntityId, glam::IVec2, glam::UVec2)> {
+    pub fn renderable_entities(&self) -> Vec<(EntityId, glam::IVec2, glam::UVec2)> {
         let active_entities = self.entity_manager.active_entities();
         tracing::trace!(
             "Checking {} active entities for renderability",
@@ -160,7 +160,7 @@ impl<'a> RenderQueryFacade<'a> {
         renderable
     }
 
-    fn entity_health_bars(&self) -> Vec<EntityHealthBar> {
+    pub fn entity_health_bars(&self) -> Vec<EntityHealthBar> {
         self.entity_manager
             .active_entities()
             .iter()
@@ -190,7 +190,7 @@ impl<'a> RenderQueryFacade<'a> {
             .collect()
     }
 
-    fn entity_ground_shadows(&self) -> Vec<GroundShadow> {
+    pub fn entity_ground_shadows(&self) -> Vec<GroundShadow> {
         self.entity_manager
             .active_entities_iter()
             .filter_map(|entity_id| {
@@ -237,7 +237,7 @@ impl<'a> RenderQueryFacade<'a> {
             .collect()
     }
 
-    fn sprite_render_requests(&self) -> Vec<SpriteRenderRequest> {
+    pub fn sprite_render_requests(&self) -> Vec<SpriteRenderRequest> {
         let mut requests = Vec::new();
         let mut animated_sequence = 0_u32;
         let mut static_sequence = 0_u32;
@@ -326,7 +326,7 @@ impl<'a> RenderQueryFacade<'a> {
         requests
     }
 
-    fn current_sprite_frame(&self, atlas: &AtlasMeta, texture_size: glam::UVec2) -> SpriteFrame {
+    pub fn current_sprite_frame(&self, atlas: &AtlasMeta, texture_size: glam::UVec2) -> SpriteFrame {
         if let Some(player_id) = self.player_id {
             if let Some(frame) = self.entity_sprite_frame(player_id, atlas, texture_size) {
                 return frame;
@@ -341,14 +341,14 @@ impl<'a> RenderQueryFacade<'a> {
         }
     }
 
-    fn player_position(&self) -> glam::IVec2 {
+    pub fn player_position(&self) -> glam::IVec2 {
         self.player_id
             .and_then(|player_id| self.entity_manager.get_entity(player_id))
             .map(|player| player.position)
             .unwrap_or(glam::IVec2::ZERO)
     }
 
-    fn entity_collision_boxes(&self) -> Vec<(glam::IVec2, glam::UVec2, bool)> {
+    pub fn entity_collision_boxes(&self) -> Vec<(glam::IVec2, glam::UVec2, bool)> {
         if !self.debug_collision_rendering {
             return Vec::new();
         }
@@ -365,7 +365,7 @@ impl<'a> RenderQueryFacade<'a> {
         boxes
     }
 
-    fn solid_tile_positions(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> Vec<(u32, u32)> {
+    pub fn solid_tile_positions(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> Vec<(u32, u32)> {
         if !self.debug_collision_rendering {
             return Vec::new();
         }
@@ -383,7 +383,7 @@ impl<'a> RenderQueryFacade<'a> {
         solid_tiles
     }
 
-    fn trigger_tile_positions(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> Vec<(u32, u32)> {
+    pub fn trigger_tile_positions(&self, tilemap: &TileMap, atlas: &AtlasMeta) -> Vec<(u32, u32)> {
         if !self.debug_collision_rendering {
             return Vec::new();
         }
@@ -403,11 +403,11 @@ impl<'a> RenderQueryFacade<'a> {
 }
 
 impl GameState {
-    fn render_query_facade(&self) -> RenderQueryFacade<'_> {
-        RenderQueryFacade::new(
-            &self.entity_manager,
-            self.player_id,
-            self.debug_collision_rendering,
+    fn render_query_service(&self) -> RenderQueryService<'_> {
+        RenderQueryService::new(
+            &self.world.entity_manager,
+            self.world.player_id,
+            self.runtime.debug_collision_rendering,
         )
     }
 
@@ -418,36 +418,36 @@ impl GameState {
         atlas: &AtlasMeta,
         texture_size: glam::UVec2,
     ) -> Option<SpriteFrame> {
-        self.render_query_facade()
+        self.render_query_service()
             .entity_sprite_frame(entity_id, atlas, texture_size)
     }
 
     pub fn get_entity_current_atlas_name(&self, entity_id: EntityId) -> Option<String> {
-        self.render_query_facade()
+        self.render_query_service()
             .entity_current_atlas_name(entity_id)
     }
 
     pub fn get_entity_sprite_flip_x(&self, entity_id: EntityId) -> bool {
-        self.render_query_facade().entity_sprite_flip_x(entity_id)
+        self.render_query_service().entity_sprite_flip_x(entity_id)
     }
 
     /// Get all renderable entities (entities that are visible and have animation controllers)
     pub fn get_renderable_entities(&self) -> Vec<(EntityId, glam::IVec2, glam::UVec2)> {
-        self.render_query_facade().renderable_entities()
+        self.render_query_service().renderable_entities()
     }
 
     /// Get world-space health bar data for visible, active entities with health stats.
     pub fn get_entity_health_bars(&self) -> Vec<EntityHealthBar> {
-        self.render_query_facade().entity_health_bars()
+        self.render_query_service().entity_health_bars()
     }
 
     /// Get world-space ground-shadow quads for visible, active renderable entities.
     pub fn get_entity_ground_shadows(&self) -> Vec<GroundShadow> {
-        self.render_query_facade().entity_ground_shadows()
+        self.render_query_service().entity_ground_shadows()
     }
 
     pub fn get_sprite_render_requests(&self) -> Vec<SpriteRenderRequest> {
-        self.render_query_facade().sprite_render_requests()
+        self.render_query_service().sprite_render_requests()
     }
 
     /// Get the current player sprite frame for rendering with proper atlas lookup.
@@ -456,24 +456,24 @@ impl GameState {
         atlas: &AtlasMeta,
         texture_size: glam::UVec2,
     ) -> SpriteFrame {
-        self.render_query_facade()
+        self.render_query_service()
             .current_sprite_frame(atlas, texture_size)
     }
 
     /// Get player position for rendering
     pub fn player_position(&self) -> glam::IVec2 {
-        self.render_query_facade().player_position()
+        self.render_query_service().player_position()
     }
 
     /// Check if debug collision rendering is enabled
     pub fn is_debug_collision_rendering_enabled(&self) -> bool {
-        self.debug_collision_rendering
+        self.runtime.debug_collision_rendering
     }
 
     /// Get entity collision boxes for debug rendering
     /// Returns Vec of (position, size, is_trigger) tuples
     pub fn get_entity_collision_boxes(&self) -> Vec<(glam::IVec2, glam::UVec2, bool)> {
-        self.render_query_facade().entity_collision_boxes()
+        self.render_query_service().entity_collision_boxes()
     }
 
     /// Get solid tile positions for debug rendering
@@ -483,7 +483,7 @@ impl GameState {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> Vec<(u32, u32)> {
-        self.render_query_facade()
+        self.render_query_service()
             .solid_tile_positions(tilemap, atlas)
     }
 
@@ -494,14 +494,14 @@ impl GameState {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> Vec<(u32, u32)> {
-        self.render_query_facade()
+        self.render_query_service()
             .trigger_tile_positions(tilemap, atlas)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{GroundShadow, RenderQueryFacade};
+    use super::{GroundShadow, RenderQueryService};
     use crate::entity::{
         EntityFootprint, EntityGrounding, EntityManager, EntityStats, StaticObjectRenderDef,
     };
@@ -542,7 +542,7 @@ mod tests {
             },
         );
 
-        let facade = RenderQueryFacade::new(&entity_manager, None, false);
+        let facade = RenderQueryService::new(&entity_manager, None, false);
         let bars = facade.entity_health_bars();
 
         assert_eq!(bars.len(), 1);
@@ -615,7 +615,7 @@ mod tests {
             },
         );
 
-        let facade = RenderQueryFacade::new(&entity_manager, None, false);
+        let facade = RenderQueryService::new(&entity_manager, None, false);
         let shadows = facade.entity_ground_shadows();
 
         assert_eq!(shadows.len(), 1);
@@ -637,7 +637,7 @@ mod tests {
             },
         );
 
-        let facade = RenderQueryFacade::new(&entity_manager, None, false);
+        let facade = RenderQueryService::new(&entity_manager, None, false);
         let shadows = facade.entity_ground_shadows();
 
         assert_eq!(
@@ -670,7 +670,7 @@ mod tests {
             },
         );
 
-        let facade = RenderQueryFacade::new(&entity_manager, None, false);
+        let facade = RenderQueryService::new(&entity_manager, None, false);
         let shadows = facade.entity_ground_shadows();
 
         assert_eq!(
@@ -703,7 +703,7 @@ mod tests {
             },
         );
 
-        let facade = RenderQueryFacade::new(&entity_manager, None, false);
+        let facade = RenderQueryService::new(&entity_manager, None, false);
         let shadows = facade.entity_ground_shadows();
 
         assert_eq!(
@@ -752,7 +752,7 @@ mod tests {
             },
         );
 
-        let facade = RenderQueryFacade::new(&entity_manager, None, false);
+        let facade = RenderQueryService::new(&entity_manager, None, false);
         let mut requests = facade.sprite_render_requests();
         crate::sprite_render::sort_sprite_render_requests(&mut requests);
 

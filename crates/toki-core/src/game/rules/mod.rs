@@ -51,6 +51,69 @@ pub use events::{
 
 use super::{AudioChannel, AudioEvent, GameState};
 
+pub struct RuleSystem;
+
+impl RuleSystem {
+    pub(in crate::game) fn begin_frame(state: &mut GameState) {
+        state.runtime.rules.frame_collisions.clear();
+        state.runtime.rules.frame_damage_events.clear();
+        state.runtime.rules.frame_death_events.clear();
+        state.runtime.rules.frame_interactions.clear();
+        state.runtime.rules.frame_tile_transitions.clear();
+    }
+
+    pub(in crate::game) fn collect_frame_commands(
+        state: &mut GameState,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        if !state.runtime.rules.started {
+            state.collect_rule_commands_for_trigger(crate::rules::RuleTrigger::OnStart, command_buffer);
+            state.runtime.rules.started = true;
+        }
+        state.collect_rule_commands_for_trigger(crate::rules::RuleTrigger::OnUpdate, command_buffer);
+        state.collect_rule_commands_for_key_triggers(command_buffer);
+    }
+
+    pub(in crate::game) fn apply_commands(
+        state: &mut GameState,
+        commands: Vec<RuleCommand>,
+        result: &mut crate::events::GameUpdateResult<AudioEvent>,
+        tilemap: &crate::assets::tilemap::TileMap,
+    ) -> (
+        Vec<(EntityId, AnimationState)>,
+        Option<PendingSceneSwitch>,
+        Option<PendingDialogStart>,
+        Option<crate::events::PersistenceRequest>,
+    ) {
+        state.apply_rule_commands(commands, result, tilemap)
+    }
+
+    pub(in crate::game) fn collect_reactive_commands(
+        state: &mut GameState,
+        player_moved: bool,
+        tilemap: &crate::assets::tilemap::TileMap,
+        atlas: &crate::assets::atlas::AtlasMeta,
+    ) -> Vec<RuleCommand> {
+        state.collect_reactive_rule_commands(player_moved, tilemap, atlas)
+    }
+
+    pub fn set_rules(state: &mut GameState, rules: RuleSet) {
+        state.scene.active_rules = rules;
+        state.runtime.rules = RuleRuntimeState::default();
+    }
+
+    pub fn record_dialog_completion(
+        state: &mut GameState,
+        dialog_id: impl Into<crate::DialogId>,
+        outcome_id: impl Into<String>,
+    ) {
+        state.runtime.rules.frame_dialog_completions.push(DialogCompletionEvent {
+            dialog_id: dialog_id.into(),
+            outcome_id: outcome_id.into(),
+        });
+    }
+}
+
 /// Runtime state for the rule system.
 #[derive(Debug, Default)]
 pub(super) struct RuleRuntimeState {
@@ -163,32 +226,31 @@ pub(super) type PendingDialogStart = crate::events::DialogStartRequest;
 // Public API on GameState for rule management
 impl GameState {
     pub fn rules(&self) -> &RuleSet {
-        &self.rules
+        &self.scene.active_rules
     }
 
     pub fn rules_mut(&mut self) -> &mut RuleSet {
-        &mut self.rules
+        &mut self.scene.active_rules
     }
 
     pub fn set_rules(&mut self, rules: RuleSet) {
-        self.rules = rules;
-        self.rule_runtime = RuleRuntimeState::default();
+        RuleSystem::set_rules(self, rules);
     }
 
     pub fn add_rule(&mut self, rule: Rule) {
-        self.rules.rules.push(rule);
+        self.scene.active_rules.rules.push(rule);
     }
 
     /// Gets the rule-assigned velocity for an entity, if any.
     /// Used by tests to verify rule actions.
     pub fn get_rule_velocity(&self, entity_id: EntityId) -> Option<glam::IVec2> {
-        self.rule_runtime.velocities.get(&entity_id).copied()
+        self.runtime.rules.velocities.get(&entity_id).copied()
     }
 
     /// Sets the rule-assigned velocity for an entity directly.
     /// Used by tests to set up specific scenarios.
     pub fn set_rule_velocity(&mut self, entity_id: EntityId, velocity: glam::IVec2) {
-        self.rule_runtime.velocities.insert(entity_id, velocity);
+        self.runtime.rules.velocities.insert(entity_id, velocity);
     }
 
     pub fn record_dialog_completion(
@@ -196,23 +258,18 @@ impl GameState {
         dialog_id: impl Into<crate::DialogId>,
         outcome_id: impl Into<String>,
     ) {
-        self.rule_runtime
-            .frame_dialog_completions
-            .push(DialogCompletionEvent {
-                dialog_id: dialog_id.into(),
-                outcome_id: outcome_id.into(),
-            });
+        RuleSystem::record_dialog_completion(self, dialog_id, outcome_id);
     }
 
     pub(super) fn rule_engine(&mut self) -> RuleEngine<'_> {
         let held_keys = self.all_held_keys();
         RuleEngine::new(
-            &self.entity_manager,
-            self.player_id,
+            &self.world.entity_manager,
+            self.world.player_id,
             held_keys,
-            &self.game_flags,
-            &self.rules,
-            &mut self.rule_runtime,
+            &self.progress.game_flags,
+            &self.scene.active_rules,
+            &mut self.runtime.rules,
         )
     }
 }

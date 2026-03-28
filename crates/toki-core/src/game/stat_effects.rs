@@ -176,10 +176,10 @@ impl<'a> StatEffectService<'a> {
 impl GameState {
     pub(super) fn stat_effect_service(&mut self) -> StatEffectService<'_> {
         StatEffectService::new(
-            &mut self.entity_manager,
-            &mut self.rule_runtime,
-            &mut self.pending_stat_changes,
-            &mut self.pending_despawns,
+            &mut self.world.entity_manager,
+            &mut self.runtime.rules,
+            &mut self.runtime.effects.pending_stat_changes,
+            &mut self.runtime.effects.pending_despawns,
         )
     }
 

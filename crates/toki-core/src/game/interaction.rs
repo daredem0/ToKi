@@ -2,6 +2,18 @@ use super::GameState;
 use crate::collision;
 use crate::game::rules::{InteractionEvent, InteractionSpatial};
 
+pub struct InteractionSystem;
+
+impl InteractionSystem {
+    pub fn collect_overlapping_pickups(state: &mut GameState) {
+        state.collect_overlapping_pickups();
+    }
+
+    pub fn collect_interaction_events(state: &mut GameState) {
+        state.collect_interaction_events();
+    }
+}
+
 impl GameState {
     /// Collects interaction events when the player presses interact while overlapping
     /// or adjacent to interactable entities.
@@ -13,10 +25,10 @@ impl GameState {
         }
 
         // Get the player
-        let Some(player_id) = self.player_id else {
+        let Some(player_id) = self.world.player_id else {
             return;
         };
-        let Some(player) = self.entity_manager.get_entity(player_id) else {
+        let Some(player) = self.world.entity_manager.get_entity(player_id) else {
             return;
         };
 
@@ -31,6 +43,7 @@ impl GameState {
 
         // Find all interactable entities
         let mut interactable_ids = self
+            .world
             .entity_manager
             .active_entities()
             .into_iter()
@@ -38,7 +51,7 @@ impl GameState {
                 if entity_id == player_id {
                     return false;
                 }
-                self.entity_manager
+                self.world.entity_manager
                     .get_entity(entity_id)
                     .is_some_and(|entity| {
                         entity.attributes.interactable && entity.attributes.active
@@ -49,7 +62,7 @@ impl GameState {
 
         // Check for overlaps and record interaction events with spatial relationship
         for interactable_id in interactable_ids {
-            let Some(interactable) = self.entity_manager.get_entity(interactable_id) else {
+            let Some(interactable) = self.world.entity_manager.get_entity(interactable_id) else {
                 continue;
             };
 
@@ -68,7 +81,7 @@ impl GameState {
             );
 
             if let Some(spatial) = spatial {
-                self.rule_runtime.frame_interactions.push(InteractionEvent {
+                self.runtime.rules.frame_interactions.push(InteractionEvent {
                     interactor: player_id,
                     interactable: interactable_id,
                     spatial,

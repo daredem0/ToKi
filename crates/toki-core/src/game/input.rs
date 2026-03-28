@@ -1,20 +1,78 @@
 use super::input_state::InputStateEffect;
-use super::{GameState, InputAction, InputKey};
+use super::{GameState, InputAction, InputKey, RuntimeState};
 use crate::entity::{EntityId, MovementProfile};
 use crate::rules::RuleKey;
 
+pub struct InputSystem;
+
+impl InputSystem {
+    pub fn clear(runtime: &mut RuntimeState) {
+        runtime.input.clear();
+    }
+
+    pub fn handle_key_press(runtime: &mut RuntimeState, key: InputKey) {
+        match runtime.input.handle_key_press(key) {
+            InputStateEffect::ToggleDebugCollisionRendering => {
+                runtime.debug_collision_rendering = !runtime.debug_collision_rendering;
+                tracing::info!(
+                    "Debug collision rendering: {}",
+                    runtime.debug_collision_rendering
+                );
+            }
+            InputStateEffect::None => {}
+        }
+    }
+
+    pub fn handle_key_release(runtime: &mut RuntimeState, key: InputKey) {
+        runtime.input.handle_key_release(key);
+    }
+
+    pub fn handle_profile_key_press(
+        runtime: &mut RuntimeState,
+        profile: MovementProfile,
+        key: InputKey,
+    ) {
+        runtime.input.handle_profile_key_press(profile, key);
+    }
+
+    pub fn handle_profile_key_release(
+        runtime: &mut RuntimeState,
+        profile: MovementProfile,
+        key: InputKey,
+    ) {
+        runtime.input.handle_profile_key_release(profile, key);
+    }
+
+    pub fn handle_profile_action_press(
+        runtime: &mut RuntimeState,
+        profile: MovementProfile,
+        action: InputAction,
+    ) {
+        runtime.input.handle_profile_action_press(profile, action);
+    }
+
+    pub fn handle_profile_action_release(
+        runtime: &mut RuntimeState,
+        profile: MovementProfile,
+        action: InputAction,
+    ) {
+        runtime.input.handle_profile_action_release(profile, action);
+    }
+}
+
 impl GameState {
     pub fn clear_runtime_inputs(&mut self) {
-        self.input_state.clear();
+        InputSystem::clear(&mut self.runtime);
     }
 
     pub(super) fn controlled_input_entity_ids(&self) -> Vec<EntityId> {
         let mut entity_ids = self
+            .world
             .entity_manager
             .active_entities()
             .iter()
             .filter_map(|&entity_id| {
-                let entity = self.entity_manager.get_entity(entity_id)?;
+                let entity = self.world.entity_manager.get_entity(entity_id)?;
                 if matches!(
                     Self::effective_movement_profile(entity),
                     MovementProfile::PlayerWasd
@@ -30,30 +88,21 @@ impl GameState {
     }
 
     pub(super) fn held_keys_for_profile(&self, movement_profile: MovementProfile) -> Vec<InputKey> {
-        self.input_state.held_keys_for_profile(movement_profile)
+        self.runtime.input.held_keys_for_profile(movement_profile)
     }
 
     pub(super) fn all_held_keys(&self) -> Vec<InputKey> {
-        self.input_state.all_held_keys()
+        self.runtime.input.all_held_keys()
     }
 
     /// Handle key press events
     pub fn handle_key_press(&mut self, key: InputKey) {
-        match self.input_state.handle_key_press(key) {
-            InputStateEffect::ToggleDebugCollisionRendering => {
-                self.debug_collision_rendering = !self.debug_collision_rendering;
-                tracing::info!(
-                    "Debug collision rendering: {}",
-                    self.debug_collision_rendering
-                );
-            }
-            InputStateEffect::None => {}
-        }
+        InputSystem::handle_key_press(&mut self.runtime, key);
     }
 
     /// Handle key release events
     pub fn handle_key_release(&mut self, key: InputKey) {
-        self.input_state.handle_key_release(key);
+        InputSystem::handle_key_release(&mut self.runtime, key);
     }
 
     /// Handle profile-scoped movement key press events.
@@ -62,30 +111,28 @@ impl GameState {
             self.handle_key_press(key);
             return;
         }
-        self.input_state.handle_profile_key_press(profile, key);
+        InputSystem::handle_profile_key_press(&mut self.runtime, profile, key);
     }
 
     /// Handle profile-scoped movement key release events.
     pub fn handle_profile_key_release(&mut self, profile: MovementProfile, key: InputKey) {
-        self.input_state.handle_profile_key_release(profile, key);
+        InputSystem::handle_profile_key_release(&mut self.runtime, profile, key);
     }
 
     /// Handle profile-scoped action press events.
     pub fn handle_profile_action_press(&mut self, profile: MovementProfile, action: InputAction) {
-        self.input_state
-            .handle_profile_action_press(profile, action);
+        InputSystem::handle_profile_action_press(&mut self.runtime, profile, action);
     }
 
     /// Handle profile-scoped action release events.
     pub fn handle_profile_action_release(&mut self, profile: MovementProfile, action: InputAction) {
-        self.input_state
-            .handle_profile_action_release(profile, action);
+        InputSystem::handle_profile_action_release(&mut self.runtime, profile, action);
     }
 
     pub(super) fn take_pending_profile_actions(
         &mut self,
     ) -> std::collections::HashMap<MovementProfile, std::collections::HashSet<InputAction>> {
-        self.input_state.take_pending_profile_actions()
+        self.runtime.input.take_pending_profile_actions()
     }
     pub(super) fn to_rule_key(key: InputKey) -> RuleKey {
         match key {
