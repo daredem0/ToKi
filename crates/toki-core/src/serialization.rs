@@ -1,5 +1,7 @@
 use crate::entity::{Entity, EntityManager};
 use crate::game::GameState;
+use crate::game::RestoreError;
+use crate::ids::SceneId;
 use crate::GameFlags;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -28,13 +30,13 @@ pub enum SerializationError {
         max_bytes: u64,
     },
     #[error("failed to restore save data: {0}")]
-    Restore(String),
+    Restore(#[from] RestoreError),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SaveSlotMetadata {
     pub slot: u8,
-    pub scene_name: String,
+    pub scene_name: SceneId,
     pub play_time_ms: u64,
     pub saved_at_unix_secs: u64,
 }
@@ -49,7 +51,7 @@ pub struct SavedCameraState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersistedSceneEntityState {
-    pub scene_name: String,
+    pub scene_name: SceneId,
     pub entity_id: crate::entity::EntityId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entity: Option<Entity>,
@@ -59,7 +61,7 @@ pub struct PersistedSceneEntityState {
 pub struct SaveData {
     pub version: u32,
     pub metadata: SaveSlotMetadata,
-    pub active_scene_name: String,
+    pub active_scene_name: SceneId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub player: Option<Entity>,
     #[serde(default)]
@@ -91,11 +93,11 @@ impl SaveData {
             version: SAVE_DATA_VERSION,
             metadata: SaveSlotMetadata {
                 slot,
-                scene_name: active_scene_name.clone(),
+                scene_name: active_scene_name.clone().into(),
                 play_time_ms: game_state.play_time_ms(),
                 saved_at_unix_secs,
             },
-            active_scene_name,
+            active_scene_name: active_scene_name.into(),
             player: game_state.player_entity().cloned(),
             flags: game_state.game_flags().clone(),
             camera: SavedCameraState {
@@ -111,7 +113,7 @@ impl SaveData {
                         .get_scene(&scene_name)
                         .and_then(|scene| scene.get_entity(entity_id))
                         .cloned(),
-                    scene_name,
+                    scene_name: scene_name.into(),
                     entity_id,
                 })
                 .collect(),

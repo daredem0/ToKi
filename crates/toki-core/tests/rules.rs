@@ -1,6 +1,4 @@
 use glam::{IVec2, UVec2};
-use std::collections::HashMap;
-use std::path::PathBuf;
 use toki_core::animation::AnimationState;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
@@ -17,37 +15,14 @@ use toki_core::{
     scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind},
     GameState, InputKey, Scene,
 };
+use toki_test_fixtures::{scene_with_test_player, test_atlas, test_tilemap};
 
 fn create_test_tilemap() -> TileMap {
-    TileMap {
-        size: UVec2::new(10, 10),
-        tile_size: UVec2::new(16, 16),
-        atlas: PathBuf::from("test_atlas.json"),
-        tiles: vec!["floor".to_string(); 100],
-        objects: vec![],
-    }
+    test_tilemap()
 }
 
 fn create_test_atlas() -> AtlasMeta {
-    let mut tiles = HashMap::new();
-    tiles.insert(
-        "floor".to_string(),
-        TileInfo {
-            position: UVec2::new(0, 0),
-            properties: TileProperties {
-                solid: false,
-                trigger: false,
-            },
-        },
-    );
-
-    AtlasMeta {
-        image: PathBuf::from("test_atlas.png"),
-        tile_size: UVec2::new(16, 16),
-        color_mode: toki_core::assets::atlas::ColorMode::TrueColor,
-        palette: None,
-        tiles,
-    }
+    test_atlas()
 }
 
 fn create_collision_test_tilemap() -> TileMap {
@@ -107,16 +82,7 @@ fn base_rule(id: &str, trigger: RuleTrigger, priority: i32, actions: Vec<RuleAct
 }
 
 fn scene_with_player(name: &str, position: IVec2) -> Scene {
-    let mut scene = Scene::new(name.to_string());
-    let mut template_state = GameState::new_empty();
-    let player_id = template_state.spawn_player_at(position);
-    let player = template_state
-        .entity_manager()
-        .get_entity(player_id)
-        .expect("template player should exist")
-        .clone();
-    scene.add_entity(player);
-    scene
+    scene_with_test_player(name, position)
 }
 
 fn spawn_anchor(id: &str, position: IVec2, facing: Option<SceneAnchorFacing>) -> SceneAnchor {
@@ -1561,7 +1527,7 @@ fn rules_serialize_roundtrip() {
                     track_id: "lavandia".to_string(),
                 },
                 RuleAction::SwitchScene {
-                    scene_name: "Town".to_string(),
+                    scene_name: "Town".to_string().into(),
                     spawn_point_id: "from_gate".to_string(),
                     transition: None,
                     duration_ms: None,
@@ -1592,7 +1558,7 @@ fn switch_scene_requests_deferred_runtime_transition_after_movement_processing()
             RuleTrigger::OnUpdate,
             0,
             vec![RuleAction::SwitchScene {
-                scene_name: "Scene B".to_string(),
+                scene_name: "Scene B".to_string().into(),
                 spawn_point_id: "spawn_b".to_string(),
                 transition: None,
                 duration_ms: None,
@@ -1632,7 +1598,7 @@ fn switch_scene_requests_deferred_runtime_transition_after_movement_processing()
     assert_eq!(
         result.scene_switch_request,
         Some(toki_core::SceneSwitchRequest {
-            scene_name: "Scene B".to_string(),
+            scene_name: "Scene B".to_string().into(),
             spawn_point_id: "spawn_b".to_string(),
             transition: None,
             duration_ms: None,
@@ -1651,7 +1617,7 @@ fn switch_scene_uses_highest_priority_rule_target() {
                 RuleTrigger::OnUpdate,
                 1,
                 vec![RuleAction::SwitchScene {
-                    scene_name: "Scene C".to_string(),
+                    scene_name: "Scene C".to_string().into(),
                     spawn_point_id: "spawn_c".to_string(),
                     transition: None,
                     duration_ms: None,
@@ -1662,7 +1628,7 @@ fn switch_scene_uses_highest_priority_rule_target() {
                 RuleTrigger::OnUpdate,
                 10,
                 vec![RuleAction::SwitchScene {
-                    scene_name: "Scene B".to_string(),
+                    scene_name: "Scene B".to_string().into(),
                     spawn_point_id: "spawn_b".to_string(),
                     transition: None,
                     duration_ms: None,
@@ -1692,7 +1658,7 @@ fn switch_scene_uses_highest_priority_rule_target() {
     assert_eq!(
         result.scene_switch_request,
         Some(toki_core::SceneSwitchRequest {
-            scene_name: "Scene B".to_string(),
+            scene_name: "Scene B".to_string().into(),
             spawn_point_id: "spawn_b".to_string(),
             transition: None,
             duration_ms: None,
@@ -1710,7 +1676,7 @@ fn switch_scene_keeps_active_scene_when_target_scene_is_missing() {
             RuleTrigger::OnUpdate,
             0,
             vec![RuleAction::SwitchScene {
-                scene_name: "Missing Scene".to_string(),
+                scene_name: "Missing Scene".to_string().into(),
                 spawn_point_id: "missing_spawn".to_string(),
                 transition: None,
                 duration_ms: None,
@@ -1734,7 +1700,7 @@ fn switch_scene_keeps_active_scene_when_target_scene_is_missing() {
     assert_eq!(
         result.scene_switch_request,
         Some(toki_core::SceneSwitchRequest {
-            scene_name: "Missing Scene".to_string(),
+            scene_name: "Missing Scene".to_string().into(),
             spawn_point_id: "missing_spawn".to_string(),
             transition: None,
             duration_ms: None,
@@ -1752,7 +1718,7 @@ fn start_dialog_action_emits_dialog_start_request() {
             RuleTrigger::OnUpdate,
             0,
             vec![RuleAction::StartDialog {
-                dialog_id: "intro".to_string(),
+                dialog_id: "intro".to_string().into(),
             }],
         )],
     };
@@ -1833,7 +1799,7 @@ fn dialog_completion_trigger_can_drive_follow_up_rules() {
         rules: vec![base_rule(
             "dialog-reward",
             RuleTrigger::OnDialogComplete {
-                dialog_id: "intro".to_string(),
+                dialog_id: "intro".to_string().into(),
                 outcome_id: "accepted".to_string(),
             },
             0,
@@ -1868,7 +1834,7 @@ fn switch_scene_keeps_active_scene_when_target_spawn_is_missing() {
             RuleTrigger::OnUpdate,
             0,
             vec![RuleAction::SwitchScene {
-                scene_name: "Scene B".to_string(),
+                scene_name: "Scene B".to_string().into(),
                 spawn_point_id: "spawn_b".to_string(),
                 transition: None,
                 duration_ms: None,
@@ -1893,7 +1859,7 @@ fn switch_scene_keeps_active_scene_when_target_spawn_is_missing() {
     assert_eq!(
         result.scene_switch_request,
         Some(toki_core::SceneSwitchRequest {
-            scene_name: "Scene B".to_string(),
+            scene_name: "Scene B".to_string().into(),
             spawn_point_id: "spawn_b".to_string(),
             transition: None,
             duration_ms: None,

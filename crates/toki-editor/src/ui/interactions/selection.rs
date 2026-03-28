@@ -576,7 +576,7 @@ impl SelectionInteraction {
         project_path: Option<&Path>,
     ) -> Option<String> {
         if let Some(name) = &entity.definition_name {
-            return Some(name.clone());
+            return Some(name.to_string());
         }
 
         if let Some(project_path) = project_path {

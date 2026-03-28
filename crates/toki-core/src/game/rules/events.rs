@@ -4,6 +4,7 @@
 //! that trigger rule evaluation.
 
 use crate::entity::EntityId;
+use crate::ids::DialogId;
 
 /// A collision event between an entity and another entity or the world.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,7 +59,7 @@ pub struct InteractionEvent {
 /// A dialog completion event emitted when a dialog closes with an outcome id.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DialogCompletionEvent {
-    pub dialog_id: String,
+    pub dialog_id: DialogId,
     pub outcome_id: String,
 }
 

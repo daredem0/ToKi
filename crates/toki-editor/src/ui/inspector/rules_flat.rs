@@ -140,7 +140,11 @@ impl InspectorSystem {
                     ui.horizontal(|ui| {
                         ui.label("Dialog Id:");
                         if available_dialog_outcomes.is_empty() {
-                            outcome.changed |= ui.text_edit_singleline(dialog_id).changed();
+                            let mut dialog_id_value = dialog_id.to_string();
+                            if ui.text_edit_singleline(&mut dialog_id_value).changed() {
+                                *dialog_id = dialog_id_value.into();
+                                outcome.changed = true;
+                            }
                         } else {
                             egui::ComboBox::from_id_salt(format!(
                                 "rule_trigger_dialog_id_{}_{}",
@@ -156,7 +160,7 @@ impl InspectorSystem {
                                     outcome.changed |= ui
                                         .selectable_value(
                                             dialog_id,
-                                            candidate.clone(),
+                                            candidate.clone().into(),
                                             candidate.as_str(),
                                         )
                                         .changed();
@@ -166,7 +170,7 @@ impl InspectorSystem {
                     });
                     ui.horizontal(|ui| {
                         ui.label("Outcome Id:");
-                        if let Some(outcomes) = available_dialog_outcomes.get(dialog_id) {
+                        if let Some(outcomes) = available_dialog_outcomes.get(dialog_id.as_str()) {
                             egui::ComboBox::from_id_salt(format!(
                                 "rule_trigger_dialog_outcome_{}_{}",
                                 scene_name, rule_index
@@ -669,14 +673,18 @@ impl InspectorSystem {
     fn render_start_dialog_action_editor(
         ui: &mut egui::Ui,
         id_salt: &str,
-        dialog_id: &mut String,
+        dialog_id: &mut toki_core::DialogId,
         available_dialog_outcomes: &std::collections::BTreeMap<String, Vec<String>>,
     ) -> bool {
         let mut changed = false;
         ui.horizontal(|ui| {
             ui.label("Dialog Id:");
             if available_dialog_outcomes.is_empty() {
-                changed |= ui.text_edit_singleline(dialog_id).changed();
+                let mut dialog_id_value = dialog_id.to_string();
+                if ui.text_edit_singleline(&mut dialog_id_value).changed() {
+                    *dialog_id = dialog_id_value.into();
+                    changed = true;
+                }
             } else {
                 egui::ComboBox::from_id_salt(format!("rule_start_dialog_{id_salt}"))
                     .selected_text(if dialog_id.is_empty() {
@@ -687,7 +695,11 @@ impl InspectorSystem {
                     .show_ui(ui, |ui| {
                         for candidate in available_dialog_outcomes.keys() {
                             changed |= ui
-                                .selectable_value(dialog_id, candidate.clone(), candidate.as_str())
+                                .selectable_value(
+                                    dialog_id,
+                                    candidate.clone().into(),
+                                    candidate.as_str(),
+                                )
                                 .changed();
                         }
                     });

@@ -18,7 +18,7 @@ pub use builder::EntityBuilder;
 pub use category::{default_category_for_kind, runtime_entity_kind_for_category};
 pub use definition::{
     AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef, EntityDefinition,
-    RenderingDef,
+    EntityDefinitionError, RenderingDef,
 };
 pub use manager::EntityManager;
 pub use types::{

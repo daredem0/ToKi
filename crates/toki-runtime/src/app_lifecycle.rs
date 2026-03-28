@@ -69,7 +69,7 @@ impl App {
         self.game_system
             .game_state
             .restore_from_save_data(&save_data)
-            .map_err(anyhow::Error::msg)?;
+            .map_err(anyhow::Error::from)?;
         self.refresh_runtime_after_scene_restore();
         tracing::info!(
             "Loaded slot {} from '{}' (scene='{}')",

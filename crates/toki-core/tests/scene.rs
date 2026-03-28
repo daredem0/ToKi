@@ -10,7 +10,7 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
     let mut controller = AnimationController::new();
     let idle_clip = AnimationClip {
         state: AnimationState::Idle,
-        atlas_name: "test_atlas".to_string(),
+        atlas_name: "test_atlas".to_string().into(),
         frame_tile_names: vec!["idle_0".to_string()],
         frame_positions: None,
         frame_duration_ms: 300.0,
@@ -270,7 +270,7 @@ fn test_scene_serialization() {
         facing: Some(SceneAnchorFacing::Right),
     });
     scene.player_entry = Some(ScenePlayerEntry {
-        entity_definition_name: "player".to_string(),
+        entity_definition_name: "player".to_string().into(),
         spawn_point_id: "from_forest".to_string(),
     });
 
@@ -396,7 +396,7 @@ fn test_scene_player_entry_is_optional() {
 fn test_scene_player_entry_roundtrip() {
     let mut scene = Scene::new("player_entry_scene".to_string());
     scene.player_entry = Some(ScenePlayerEntry {
-        entity_definition_name: "player_knight".to_string(),
+        entity_definition_name: "player_knight".to_string().into(),
         spawn_point_id: "main_spawn".to_string(),
     });
 
@@ -406,7 +406,7 @@ fn test_scene_player_entry_roundtrip() {
     assert_eq!(
         deserialized.player_entry,
         Some(ScenePlayerEntry {
-            entity_definition_name: "player_knight".to_string(),
+            entity_definition_name: "player_knight".to_string().into(),
             spawn_point_id: "main_spawn".to_string(),
         })
     );

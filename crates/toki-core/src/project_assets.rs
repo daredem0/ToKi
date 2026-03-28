@@ -323,7 +323,7 @@ pub fn discover_palette_assets(
         };
         let palette = load_palette_asset_from_path(&path)?;
         assets.push(DiscoveredPaletteAsset {
-            name: name.to_string(),
+            name: name.into(),
             path,
             palette,
         });

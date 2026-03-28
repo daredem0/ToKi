@@ -22,8 +22,10 @@ use std::collections::{HashMap, HashSet};
 use crate::animation::AnimationState;
 use crate::entity::EntityId;
 use crate::flags::FlagValue;
+use crate::ids::{DialogId, SceneId};
 use crate::project_runtime::SceneTransitionEffect;
 use crate::rules::{Rule, RuleSet, RuleSpawnEntityType};
+use self::engine::RuleEngine;
 
 // Re-export submodules
 pub mod events;
@@ -33,6 +35,7 @@ mod actions;
 mod animations;
 mod collectors;
 mod commands;
+mod engine;
 mod evaluation;
 mod reactive;
 mod spawning;
@@ -97,13 +100,13 @@ pub(super) enum RuleCommand {
         entity_id: EntityId,
     },
     SwitchScene {
-        scene_name: String,
+        scene_name: SceneId,
         spawn_point_id: String,
         transition: Option<SceneTransitionEffect>,
         duration_ms: Option<u32>,
     },
     StartDialog {
-        dialog_id: String,
+        dialog_id: DialogId,
         context: crate::dialog::DialogRuntimeContext,
     },
     DamageEntity {
@@ -190,7 +193,7 @@ impl GameState {
 
     pub fn record_dialog_completion(
         &mut self,
-        dialog_id: impl Into<String>,
+        dialog_id: impl Into<crate::DialogId>,
         outcome_id: impl Into<String>,
     ) {
         self.rule_runtime
@@ -199,5 +202,17 @@ impl GameState {
                 dialog_id: dialog_id.into(),
                 outcome_id: outcome_id.into(),
             });
+    }
+
+    pub(super) fn rule_engine(&mut self) -> RuleEngine<'_> {
+        let held_keys = self.all_held_keys();
+        RuleEngine::new(
+            &self.entity_manager,
+            self.player_id,
+            held_keys,
+            &self.game_flags,
+            &self.rules,
+            &mut self.rule_runtime,
+        )
     }
 }

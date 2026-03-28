@@ -71,7 +71,7 @@ impl EntityEditorState {
     /// Load an entity definition for editing
     pub fn load_for_editing(&mut self, def: EntityDefinition, file_path: PathBuf) {
         let name = def.name.clone();
-        self.selected_entity = Some(name);
+        self.selected_entity = Some(name.to_string());
         self.edit_state = Some(EntityEditState::from_definition(def, file_path));
     }
 

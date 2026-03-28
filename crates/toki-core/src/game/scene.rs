@@ -4,11 +4,25 @@ use super::{GameState, RuleRuntimeState};
 use crate::ai::AiSystem;
 use crate::entity::{ControlRole, Entity, EntityDefinition, EntityId, EntityKind, EntityManager};
 use crate::flags::GameFlags;
+use crate::ids::EntityDefName;
 use crate::rules::RuleSet;
 use crate::scene::Scene;
 use crate::scene_manager::SceneManager;
 use crate::sprite::SpriteInstance;
 use std::collections::HashMap;
+use thiserror::Error;
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum RestoreError {
+    #[error("save data is missing an active scene name")]
+    MissingActiveSceneName,
+    #[error("scene '{0}' not found")]
+    MissingScene(String),
+    #[error("failed to prepare scene load: {0}")]
+    PrepareSceneLoad(String),
+    #[error("failed to apply scene load: {0}")]
+    ApplySceneLoad(String),
+}
 
 impl GameState {
     /// Create a new GameState with the given player sprite
@@ -95,7 +109,7 @@ impl GameState {
 
     fn default_player_definition() -> crate::entity::EntityDefinition {
         crate::entity::EntityDefinition {
-            name: "player".to_string(),
+            name: EntityDefName::from("player"),
             display_name: "Player".to_string(),
             description: "Default player entity".to_string(),
             rendering: crate::entity::RenderingDef {
@@ -169,7 +183,7 @@ impl GameState {
 
     fn player_like_npc_definition() -> crate::entity::EntityDefinition {
         crate::entity::EntityDefinition {
-            name: "player_like_npc".to_string(),
+            name: EntityDefName::from("player_like_npc"),
             display_name: "Player-like NPC".to_string(),
             description: "NPC using the player visual style".to_string(),
             rendering: crate::entity::RenderingDef {
@@ -424,15 +438,15 @@ impl GameState {
     pub fn restore_from_save_data(
         &mut self,
         save_data: &crate::serialization::SaveData,
-    ) -> Result<(), String> {
+    ) -> Result<(), RestoreError> {
         let scene_name = save_data.active_scene_name.trim();
         if scene_name.is_empty() {
-            return Err("save data is missing an active scene name".to_string());
+            return Err(RestoreError::MissingActiveSceneName);
         }
 
         for persisted in &save_data.persisted_entities {
             self.persistent_scene_entities
-                .insert((persisted.scene_name.clone(), persisted.entity_id));
+                .insert((persisted.scene_name.to_string(), persisted.entity_id));
             let Some(scene) = self.scene_manager.get_scene_mut(&persisted.scene_name) else {
                 continue;
             };
@@ -459,16 +473,18 @@ impl GameState {
         let scene = self
             .scene_manager
             .get_scene(scene_name)
-            .ok_or_else(|| format!("Scene '{}' not found", scene_name))?
+            .ok_or_else(|| RestoreError::MissingScene(scene_name.to_string()))?
             .clone();
 
         let prepared = SceneTransitionPlanner::new(&self.entity_definitions).prepare_scene_load(
             &scene,
             None,
             save_data.player.clone(),
-        )?;
+        )
+        .map_err(RestoreError::PrepareSceneLoad)?;
 
-        self.apply_prepared_scene_load(scene_name, prepared)?;
+        self.apply_prepared_scene_load(scene_name, prepared)
+            .map_err(RestoreError::ApplySceneLoad)?;
         if let (Some(saved_player), Some(player_id)) = (save_data.player.as_ref(), self.player_id) {
             if let Some(player) = self.entity_manager.get_entity_mut(player_id) {
                 let mut restored_player = saved_player.clone();

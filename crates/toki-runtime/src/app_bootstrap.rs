@@ -480,7 +480,7 @@ mod tests {
         let entities_dir = project_path.join("entities");
         fs::create_dir_all(&entities_dir).expect("entities dir");
         let definition = EntityDefinition {
-            name: name.to_string(),
+            name: name.into(),
             display_name: name.to_string(),
             description: String::new(),
             rendering: RenderingDef {

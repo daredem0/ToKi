@@ -26,7 +26,7 @@ fn unique_temp_project_dir() -> PathBuf {
 
 fn sample_entity_definition(name: &str, category: &str, size: [u32; 2]) -> EntityDefinition {
     EntityDefinition {
-        name: name.to_string(),
+        name: name.to_string().into(),
         display_name: format!("Display {name}"),
         description: format!("Definition for {name}"),
         rendering: RenderingDef {
@@ -159,7 +159,7 @@ fn resolve_entity_definition_name_prefers_entity_metadata() {
         .get_entity(entity_id)
         .expect("missing spawned entity")
         .clone();
-    entity.definition_name = Some("custom_npc".to_string());
+    entity.definition_name = Some("custom_npc".to_string().into());
 
     let resolved = SelectionInteraction::resolve_entity_definition_name(&entity, None);
     assert_eq!(resolved, Some("custom_npc".to_string()));

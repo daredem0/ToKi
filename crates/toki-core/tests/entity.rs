@@ -4,7 +4,7 @@ use toki_core::entity::*;
 
 fn test_definition(name: &str, category: &str) -> EntityDefinition {
     EntityDefinition {
-        name: name.to_string(),
+        name: name.into(),
         display_name: format!("Display {name}"),
         description: format!("Definition for {name}"),
         rendering: RenderingDef {
@@ -270,7 +270,7 @@ fn test_add_existing_entity_tracks_explicit_player_character_role() {
         size: UVec2::new(16, 16),
         entity_kind: EntityKind::Npc,
         category: "creature".to_string(),
-        definition_name: Some("slime".to_string()),
+        definition_name: Some("slime".into()),
         persistent_across_saves: false,
         control_role: ControlRole::PlayerCharacter,
         audio: EntityAudioSettings::default(),
@@ -306,7 +306,7 @@ fn test_add_existing_entity_seeds_generic_health_stat_from_legacy_health() {
         size: UVec2::new(16, 16),
         entity_kind: EntityKind::Npc,
         category: "creature".to_string(),
-        definition_name: Some("slime".to_string()),
+        definition_name: Some("slime".into()),
         persistent_across_saves: false,
         control_role: ControlRole::None,
         audio: EntityAudioSettings::default(),

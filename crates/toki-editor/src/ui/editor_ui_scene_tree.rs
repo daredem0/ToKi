@@ -38,6 +38,7 @@ impl EditorUI {
                         let kind_label = entity
                             .definition_name
                             .clone()
+                            .map(|name| name.to_string())
                             .or_else(|| {
                                 if entity.category.is_empty() {
                                     None

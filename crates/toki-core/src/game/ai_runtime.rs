@@ -2,20 +2,21 @@ use std::collections::HashMap;
 
 use crate::ai::{AiSystem, AiUpdateResult, SpawnMode};
 use crate::entity::{EntityDefinition, EntityId, EntityManager};
+use crate::ids::EntityDefName;
 
 use super::GameState;
 
 pub(super) struct AiRuntimeApplier<'a> {
     entity_manager: &'a mut EntityManager,
     ai_system: &'a mut AiSystem,
-    entity_definitions: &'a HashMap<String, EntityDefinition>,
+    entity_definitions: &'a HashMap<EntityDefName, EntityDefinition>,
 }
 
 impl<'a> AiRuntimeApplier<'a> {
     pub(super) fn new(
         entity_manager: &'a mut EntityManager,
         ai_system: &'a mut AiSystem,
-        entity_definitions: &'a HashMap<String, EntityDefinition>,
+        entity_definitions: &'a HashMap<EntityDefName, EntityDefinition>,
     ) -> Self {
         Self {
             entity_manager,
@@ -95,6 +96,7 @@ impl<'a> AiRuntimeApplier<'a> {
 
         self.entity_manager
             .spawn_from_definition(&definition, position)
+            .map_err(|error| error.to_string())
     }
 }
 
@@ -123,7 +125,7 @@ mod tests {
     #[test]
     fn ai_runtime_applier_spawns_from_definition_and_enters_separation_state() {
         let definition = EntityDefinition {
-            name: "slime".to_string(),
+            name: "slime".into(),
             display_name: "Slime".to_string(),
             description: String::new(),
             rendering: RenderingDef {

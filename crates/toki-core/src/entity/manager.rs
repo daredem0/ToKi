@@ -1,6 +1,6 @@
 //! Entity management - creating, spawning, despawning, and querying entities.
 
-use super::definition::EntityDefinition;
+use super::definition::{EntityDefinition, EntityDefinitionError};
 use super::types::{
     ControlRole, Entity, EntityAttributes, EntityAudioComponent, EntityAudioSettings, EntityId,
     EntityKind,
@@ -119,7 +119,7 @@ impl EntityManager {
         &mut self,
         definition: &EntityDefinition,
         position: IVec2,
-    ) -> Result<EntityId, String> {
+    ) -> Result<EntityId, EntityDefinitionError> {
         let id = self.next_id;
         self.next_id += 1;
 

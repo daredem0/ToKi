@@ -101,7 +101,7 @@ fn create_solid_test_atlas() -> AtlasMeta {
 
 fn test_definition(name: &str, category: &str) -> EntityDefinition {
     EntityDefinition {
-        name: name.to_string(),
+        name: name.into(),
         display_name: format!("Display {name}"),
         description: format!("Definition for {name}"),
         rendering: RenderingDef {
@@ -170,7 +170,7 @@ fn test_definition(name: &str, category: &str) -> EntityDefinition {
 
 fn player_definition(name: &str) -> EntityDefinition {
     EntityDefinition {
-        name: name.to_string(),
+        name: name.into(),
         display_name: format!("Display {name}"),
         description: format!("Definition for {name}"),
         rendering: RenderingDef {
@@ -520,7 +520,7 @@ fn game_state_world_bounds_clamp_uses_footprint_not_full_sprite_size() {
         facing: None,
     });
     scene.player_entry = Some(ScenePlayerEntry {
-        entity_definition_name: "foot_player".to_string(),
+        entity_definition_name: "foot_player".into(),
         spawn_point_id: "spawn".to_string(),
     });
 
@@ -1769,7 +1769,7 @@ fn game_state_pickup_collection_stacks_and_does_not_double_collect() {
 fn game_state_static_entity_renderables_include_object_sheet_backed_entities() {
     let mut game_state = GameState::new_empty();
     let static_pickup = EntityDefinition {
-        name: "coin_pickup_render".to_string(),
+        name: "coin_pickup_render".into(),
         display_name: "Coin Pickup Render".to_string(),
         description: "Static object-sheet-backed pickup".to_string(),
         rendering: RenderingDef {
@@ -2331,7 +2331,7 @@ fn game_state_load_scene_spawns_player_from_scene_player_entry() {
         Some(SceneAnchorFacing::Left),
     ));
     scene.player_entry = Some(ScenePlayerEntry {
-        entity_definition_name: "player".to_string(),
+        entity_definition_name: "player".into(),
         spawn_point_id: "main_spawn".to_string(),
     });
 
@@ -2376,7 +2376,7 @@ fn game_state_transition_to_scene_preserves_durable_player_state_and_resets_tran
         Some(SceneAnchorFacing::Left),
     ));
     scene_b.player_entry = Some(ScenePlayerEntry {
-        entity_definition_name: "player_knight".to_string(),
+        entity_definition_name: "player_knight".into(),
         spawn_point_id: "default_spawn".to_string(),
     });
 

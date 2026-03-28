@@ -7,6 +7,7 @@ use super::types::{
 };
 use super::default_category_for_kind;
 use crate::collision::CollisionBox;
+use crate::ids::EntityDefName;
 use glam::{IVec2, UVec2};
 
 /// Builder for constructing Entity instances fluently.
@@ -26,7 +27,7 @@ pub struct EntityBuilder {
     size: UVec2,
     entity_kind: EntityKind,
     category: Option<String>,
-    definition_name: Option<String>,
+    definition_name: Option<EntityDefName>,
     control_role: ControlRole,
     audio: EntityAudioSettings,
     attributes: EntityAttributes,
@@ -59,7 +60,7 @@ impl EntityBuilder {
     }
 
     /// Set the source definition name.
-    pub fn definition_name(mut self, name: impl Into<String>) -> Self {
+    pub fn definition_name(mut self, name: impl Into<EntityDefName>) -> Self {
         self.definition_name = Some(name.into());
         self
     }
@@ -157,7 +158,7 @@ mod tests {
             .build();
 
         assert_eq!(entity.category, "treasure");
-        assert_eq!(entity.definition_name, Some("gold_coin".to_string()));
+        assert_eq!(entity.definition_name, Some("gold_coin".into()));
         assert_eq!(entity.tags, vec!["valuable", "collectible"]);
     }
 

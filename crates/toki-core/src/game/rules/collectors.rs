@@ -11,9 +11,9 @@ use super::events::{
     CollisionEvent, DamageEvent, DeathEvent, DialogCompletionEvent, InteractionEvent,
     InteractionSpatial,
 };
-use super::{GameState, RuleCommand};
+use super::{GameState, RuleCommand, RuleEngine};
 
-impl GameState {
+impl RuleEngine<'_> {
     pub(in crate::game::rules) fn rule_is_collectible(&self, rule: &crate::rules::Rule) -> bool {
         rule.enabled
             && !(rule.once
@@ -378,13 +378,76 @@ impl GameState {
         &mut self,
         command_buffer: &mut Vec<RuleCommand>,
     ) {
-        let held_keys = self.all_held_keys();
-
+        let held_keys = self.held_keys.clone();
         for input_key in held_keys {
             let trigger = RuleTrigger::OnKey {
-                key: Self::to_rule_key(input_key),
+                key: crate::game::GameState::to_rule_key(input_key),
             };
             self.collect_rule_commands_for_trigger(trigger, command_buffer);
         }
+    }
+}
+
+impl GameState {
+    pub(in crate::game) fn collect_rule_commands_for_trigger(
+        &mut self,
+        trigger: RuleTrigger,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        self.rule_engine()
+            .collect_rule_commands_for_trigger(trigger, command_buffer);
+    }
+
+    pub(in crate::game) fn collect_rule_commands_for_interaction(
+        &mut self,
+        event: &InteractionEvent,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        self.rule_engine()
+            .collect_rule_commands_for_interaction(event, command_buffer);
+    }
+
+    pub(in crate::game) fn collect_rule_commands_for_dialog_completion(
+        &mut self,
+        event: &DialogCompletionEvent,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        self.rule_engine()
+            .collect_rule_commands_for_dialog_completion(event, command_buffer);
+    }
+
+    pub(in crate::game) fn collect_rule_commands_for_collision(
+        &mut self,
+        event: &CollisionEvent,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        self.rule_engine()
+            .collect_rule_commands_for_collision(event, command_buffer);
+    }
+
+    pub(in crate::game) fn collect_rule_commands_for_damage(
+        &mut self,
+        event: &DamageEvent,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        self.rule_engine()
+            .collect_rule_commands_for_damage(event, command_buffer);
+    }
+
+    pub(in crate::game) fn collect_rule_commands_for_death(
+        &mut self,
+        event: &DeathEvent,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        self.rule_engine()
+            .collect_rule_commands_for_death(event, command_buffer);
+    }
+
+    pub(in crate::game) fn collect_rule_commands_for_key_triggers(
+        &mut self,
+        command_buffer: &mut Vec<RuleCommand>,
+    ) {
+        self.rule_engine()
+            .collect_rule_commands_for_key_triggers(command_buffer);
     }
 }

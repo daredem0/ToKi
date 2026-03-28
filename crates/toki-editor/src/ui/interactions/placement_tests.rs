@@ -15,7 +15,7 @@ use toki_core::scene::SceneAnchorKind;
 
 fn sample_entity_definition(name: &str) -> EntityDefinition {
     EntityDefinition {
-        name: name.to_string(),
+        name: name.to_string().into(),
         display_name: "Sample Entity".to_string(),
         description: "Entity used for placement tests".to_string(),
         rendering: RenderingDef {

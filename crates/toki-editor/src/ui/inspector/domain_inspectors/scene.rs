@@ -129,7 +129,7 @@ impl SceneInspector {
         ui: &mut egui::Ui,
         scene_name: &str,
         choices: &[String],
-        value: &mut String,
+        value: &mut toki_core::EntityDefName,
     ) -> bool {
         let mut changed = false;
         ui.horizontal(|ui| {
@@ -138,7 +138,9 @@ impl SceneInspector {
                 .selected_text(value.as_str())
                 .show_ui(ui, |ui| {
                     for name in choices {
-                        changed |= ui.selectable_value(value, name.clone(), name).changed();
+                        changed |= ui
+                            .selectable_value(value, name.clone().into(), name)
+                            .changed();
                     }
                 });
         });
@@ -233,7 +235,7 @@ impl SceneInspector {
             .clicked()
         {
             let new_entry = ScenePlayerEntry {
-                entity_definition_name: entry_ctx.entity_defs[0].clone(),
+                entity_definition_name: entry_ctx.entity_defs[0].clone().into(),
                 spawn_point_id: entry_ctx.spawn_points[0].clone(),
             };
             return Self::commit_player_entry_change(scene_name, scene, Some(new_entry), ctx);

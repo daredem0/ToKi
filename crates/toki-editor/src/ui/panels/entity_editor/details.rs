@@ -40,7 +40,9 @@ fn render_core_properties(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     // Name (identifier)
     ui.horizontal(|ui| {
         ui.label("Name:");
-        if ui.text_edit_singleline(&mut edit.definition.name).changed() {
+        let mut name = edit.definition.name.to_string();
+        if ui.text_edit_singleline(&mut name).changed() {
+            edit.definition.name = name.into();
             edit.mark_dirty();
         }
     });

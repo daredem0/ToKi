@@ -9,66 +9,56 @@ use toki_core::menu::MenuSettings;
 use toki_core::rules::RuleSet;
 use toki_core::Scene;
 
-#[derive(Debug, Clone, Default)]
-pub struct UndoRedoHistory {
-    undo_stack: Vec<EditorCommand>,
-    redo_stack: Vec<EditorCommand>,
+#[derive(Debug, Clone)]
+pub struct History<T> {
+    undo_stack: Vec<T>,
+    redo_stack: Vec<T>,
+    max_size: Option<usize>,
 }
 
-impl UndoRedoHistory {
-    pub fn execute(
-        &mut self,
-        command: EditorCommand,
-        ui_state: &mut EditorUI,
-        project: Option<&mut Project>,
-    ) -> bool {
-        if command.apply(ui_state, project) {
-            self.undo_stack.push(command);
-            self.redo_stack.clear();
-            self.undo_stack
-                .last()
-                .expect("command just pushed")
-                .mark_post_apply(ui_state);
-            true
-        } else {
-            false
+impl<T> Default for History<T> {
+    fn default() -> Self {
+        Self {
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            max_size: None,
+        }
+    }
+}
+
+impl<T> History<T> {
+    pub fn with_max_size(max_size: usize) -> Self {
+        Self {
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            max_size: Some(max_size),
         }
     }
 
-    pub fn undo(&mut self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
-        let Some(command) = self.undo_stack.pop() else {
-            return false;
-        };
-
-        if command.undo(ui_state, project) {
-            self.redo_stack.push(command);
-            self.redo_stack
-                .last()
-                .expect("command just pushed")
-                .mark_post_apply(ui_state);
-            true
-        } else {
-            self.undo_stack.push(command);
-            false
+    pub fn push(&mut self, entry: T) {
+        self.undo_stack.push(entry);
+        self.redo_stack.clear();
+        if let Some(max_size) = self.max_size {
+            while self.undo_stack.len() > max_size {
+                self.undo_stack.remove(0);
+            }
         }
     }
 
-    pub fn redo(&mut self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
-        let Some(command) = self.redo_stack.pop() else {
-            return false;
-        };
+    pub fn take_undo(&mut self) -> Option<T> {
+        self.undo_stack.pop()
+    }
 
-        if command.apply(ui_state, project) {
-            self.undo_stack.push(command);
-            self.undo_stack
-                .last()
-                .expect("command just pushed")
-                .mark_post_apply(ui_state);
-            true
-        } else {
-            self.redo_stack.push(command);
-            false
-        }
+    pub fn restore_redo(&mut self, entry: T) {
+        self.redo_stack.push(entry);
+    }
+
+    pub fn take_redo(&mut self) -> Option<T> {
+        self.redo_stack.pop()
+    }
+
+    pub fn restore_undo(&mut self, entry: T) {
+        self.undo_stack.push(entry);
     }
 
     pub fn can_undo(&self) -> bool {
@@ -82,6 +72,90 @@ impl UndoRedoHistory {
     pub fn clear(&mut self) {
         self.undo_stack.clear();
         self.redo_stack.clear();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn undo_len(&self) -> usize {
+        self.undo_stack.len()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn redo_len(&self) -> usize {
+        self.redo_stack.len()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct UndoRedoHistory {
+    history: History<EditorCommand>,
+}
+
+impl UndoRedoHistory {
+    pub fn execute(
+        &mut self,
+        command: EditorCommand,
+        ui_state: &mut EditorUI,
+        project: Option<&mut Project>,
+    ) -> bool {
+        if command.apply(ui_state, project) {
+            command.mark_post_apply(ui_state);
+            self.history.push(command);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn undo(&mut self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
+        let Some(command) = self.history.take_undo() else {
+            return false;
+        };
+
+        if command.undo(ui_state, project) {
+            command.mark_post_apply(ui_state);
+            self.history.restore_redo(command);
+            true
+        } else {
+            self.history.restore_undo(command);
+            false
+        }
+    }
+
+    pub fn redo(&mut self, ui_state: &mut EditorUI, project: Option<&mut Project>) -> bool {
+        let Some(command) = self.history.take_redo() else {
+            return false;
+        };
+
+        if command.apply(ui_state, project) {
+            command.mark_post_apply(ui_state);
+            self.history.restore_undo(command);
+            true
+        } else {
+            self.history.restore_redo(command);
+            false
+        }
+    }
+
+    pub fn can_undo(&self) -> bool {
+        self.history.can_undo()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        self.history.can_redo()
+    }
+
+    pub fn clear(&mut self) {
+        self.history.clear();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn undo_len(&self) -> usize {
+        self.history.undo_len()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn redo_len(&self) -> usize {
+        self.history.redo_len()
     }
 }
 

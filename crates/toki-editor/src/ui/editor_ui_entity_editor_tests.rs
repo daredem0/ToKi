@@ -648,7 +648,7 @@ fn validation_passes_for_valid_entity() {
 #[test]
 fn validation_fails_for_empty_name() {
     let mut state = make_edit_state();
-    state.definition.name = "  ".to_string();
+    state.definition.name = "  ".to_string().into();
 
     assert!(!state.validate());
     assert!(state.has_error("name"));
@@ -657,7 +657,7 @@ fn validation_fails_for_empty_name() {
 #[test]
 fn validation_fails_for_invalid_name_chars() {
     let mut state = make_edit_state();
-    state.definition.name = "my-entity".to_string();
+    state.definition.name = "my-entity".to_string().into();
 
     assert!(!state.validate());
     assert!(state.has_error("name"));
@@ -666,7 +666,7 @@ fn validation_fails_for_invalid_name_chars() {
 #[test]
 fn validation_fails_for_name_starting_with_digit() {
     let mut state = make_edit_state();
-    state.definition.name = "123entity".to_string();
+    state.definition.name = "123entity".to_string().into();
 
     assert!(!state.validate());
     assert!(state.has_error("name"));
@@ -722,7 +722,7 @@ fn validation_fails_for_zero_collision_size_when_enabled() {
 #[test]
 fn get_error_returns_message() {
     let mut state = make_edit_state();
-    state.definition.name = "".to_string();
+    state.definition.name = "".to_string().into();
     state.validate();
 
     let error = state.get_error("name");
