@@ -7,6 +7,8 @@ use crate::entity::{EntityId, MovementSoundTrigger};
 use crate::events::GameUpdateResult;
 use std::collections::HashMap;
 
+pub struct MovementSystem;
+
 /// Result of checking movement collision.
 struct MovementCollisionResult {
     /// Whether movement is blocked.
@@ -21,6 +23,49 @@ pub(super) struct MovementStepContext<'a> {
     pub atlas: &'a AtlasMeta,
     pub result: &'a mut GameUpdateResult<AudioEvent>,
     pub time_scale: f32,
+}
+
+impl MovementSystem {
+    pub fn process_input_scaled(
+        state: &mut GameState,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+        time_scale: f32,
+    ) -> GameUpdateResult<AudioEvent> {
+        if time_scale == 1.0 {
+            state.process_input(world_bounds, tilemap, atlas)
+        } else {
+            state.process_input_scaled(world_bounds, tilemap, atlas, time_scale)
+        }
+    }
+
+    pub fn apply_rule_velocities(
+        state: &mut GameState,
+        world_bounds: glam::UVec2,
+        tilemap: &TileMap,
+        atlas: &AtlasMeta,
+        result: &mut GameUpdateResult<AudioEvent>,
+    ) -> bool {
+        state.apply_rule_velocities(world_bounds, tilemap, atlas, result)
+    }
+
+    pub fn update_player_animation(
+        state: &mut GameState,
+        initial_player_position: glam::IVec2,
+        intended_player_delta: glam::IVec2,
+    ) {
+        state.update_player_animation(initial_player_position, intended_player_delta);
+    }
+
+    pub fn emit_animation_loop_audio(
+        state: &mut GameState,
+        entity_id: EntityId,
+        completed_loops: u32,
+        result: &mut GameUpdateResult<AudioEvent>,
+    ) {
+        state.emit_animation_loop_movement_audio(entity_id, completed_loops, result);
+    }
 }
 
 impl GameState {
@@ -93,7 +138,7 @@ impl GameState {
         ctx: MovementStepContext<'_>,
     ) -> bool {
         let (current_position, accumulator, new_position) = {
-            let Some(entity) = self.entity_manager.get_entity(entity_id) else {
+            let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
                 return false;
             };
 
@@ -120,7 +165,7 @@ impl GameState {
         };
 
         // Store updated accumulator after all immutable reads of `entity`.
-        if let Some(entity) = self.entity_manager.get_entity_mut(entity_id) {
+        if let Some(entity) = self.world.entity_manager.get_entity_mut(entity_id) {
             entity.movement_accumulator = accumulator;
         }
 
@@ -145,7 +190,7 @@ impl GameState {
             false
         } else {
             if let Some((entity, entity_audio)) =
-                self.entity_manager.get_entity_with_audio_mut(entity_id)
+                self.world.entity_manager.get_entity_with_audio_mut(entity_id)
             {
                 entity.position = new_position;
                 entity_audio.last_collision_state = false;
@@ -162,7 +207,7 @@ impl GameState {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> MovementCollisionResult {
-        let Some(entity) = self.entity_manager.get_entity(entity_id) else {
+        let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
             return MovementCollisionResult {
                 blocked: true,
                 collided_with: None,
@@ -179,6 +224,7 @@ impl GameState {
 
         // Check entity-entity collision
         if let Some(colliding_entity) = self
+            .world
             .entity_manager
             .find_colliding_entity(entity_id, new_position)
         {
@@ -207,12 +253,13 @@ impl GameState {
         result: &mut GameUpdateResult<AudioEvent>,
     ) {
         let source_position = self
+            .world
             .entity_manager
             .get_entity(entity_id)
             .map(|entity| entity.position);
-        let Some(entity_audio) = self.entity_manager.audio_component_mut(entity_id) else {
+        let Some(entity_audio) = self.world.entity_manager.audio_component_mut(entity_id) else {
             // Record collision event even without audio component
-            self.rule_runtime.frame_collisions.push(CollisionEvent {
+            self.runtime.rules.frame_collisions.push(CollisionEvent {
                 entity_a: entity_id,
                 entity_b: collided_with,
             });
@@ -234,7 +281,7 @@ impl GameState {
                 });
             }
             // Record collision event (with or without entity context)
-            self.rule_runtime.frame_collisions.push(CollisionEvent {
+            self.runtime.rules.frame_collisions.push(CollisionEvent {
                 entity_a: entity_id,
                 entity_b: collided_with,
             });
@@ -249,12 +296,13 @@ impl GameState {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> bool {
-        let Some(entity) = self.entity_manager.get_entity(entity_id) else {
+        let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
             return false;
         };
 
         collision::can_entity_move_to_position(entity, new_position, tilemap, atlas)
             && !self
+                .world
                 .entity_manager
                 .would_collide_with_solid_entity(entity_id, new_position)
     }
@@ -275,10 +323,11 @@ impl GameState {
         }
 
         let source_position = self
+            .world
             .entity_manager
             .get_entity(entity_id)
             .map(|entity| entity.position);
-        let Some(entity_audio) = self.entity_manager.audio_component_mut(entity_id) else {
+        let Some(entity_audio) = self.world.entity_manager.audio_component_mut(entity_id) else {
             return;
         };
 
@@ -336,10 +385,11 @@ impl GameState {
         }
 
         let source_position = self
+            .world
             .entity_manager
             .get_entity(entity_id)
             .map(|entity| entity.position);
-        let Some(entity_audio) = self.entity_manager.audio_component_mut(entity_id) else {
+        let Some(entity_audio) = self.world.entity_manager.audio_component_mut(entity_id) else {
             return;
         };
 
@@ -399,7 +449,7 @@ impl GameState {
         let initial_positions = controlled_entity_ids
             .iter()
             .filter_map(|&entity_id| {
-                self.entity_manager
+                self.world.entity_manager
                     .get_entity(entity_id)
                     .map(|entity| (entity_id, entity.position))
             })
@@ -407,7 +457,7 @@ impl GameState {
         let mut result = GameUpdateResult::new();
 
         for &entity_id in &controlled_entity_ids {
-            let Some(entity) = self.entity_manager.get_entity(entity_id) else {
+            let Some(entity) = self.world.entity_manager.get_entity(entity_id) else {
                 continue;
             };
             let held_keys = self.held_keys_for_profile(Self::effective_movement_profile(entity));
@@ -430,17 +480,18 @@ impl GameState {
             let Some(initial_position) = initial_positions.get(&entity_id).copied() else {
                 continue;
             };
-            let Some(final_entity) = self.entity_manager.get_entity(entity_id) else {
+            let Some(final_entity) = self.world.entity_manager.get_entity(entity_id) else {
                 continue;
             };
             let final_position = final_entity.position;
             let entity_moved = final_position != initial_position;
 
-            if Some(entity_id) == self.player_id {
+            if Some(entity_id) == self.world.player_id {
                 result.player_moved = entity_moved;
             }
 
             if let Some(animation_controller) = self
+                .world
                 .entity_manager
                 .get_entity_mut(entity_id)
                 .and_then(|entity| entity.attributes.animation_controller.as_mut())
@@ -489,7 +540,8 @@ impl GameState {
         result: &mut GameUpdateResult<AudioEvent>,
     ) -> bool {
         let mut velocities = self
-            .rule_runtime
+            .runtime
+            .rules
             .velocities
             .iter()
             .map(|(entity_id, velocity)| (*entity_id, *velocity))
@@ -503,7 +555,7 @@ impl GameState {
                 continue;
             }
 
-            let Some(current_entity) = self.entity_manager.get_entity(entity_id).cloned() else {
+            let Some(current_entity) = self.world.entity_manager.get_entity(entity_id).cloned() else {
                 continue;
             };
 
@@ -533,11 +585,11 @@ impl GameState {
             }
 
             if let Some((entity, entity_audio)) =
-                self.entity_manager.get_entity_with_audio_mut(entity_id)
+                self.world.entity_manager.get_entity_with_audio_mut(entity_id)
             {
                 entity.position = candidate_position;
                 entity_audio.last_collision_state = false;
-                if Some(entity_id) == self.player_id {
+                if Some(entity_id) == self.world.player_id {
                     moved_player = true;
                 }
             }

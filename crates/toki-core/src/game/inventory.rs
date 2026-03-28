@@ -24,11 +24,12 @@ impl GameState {
 
     pub(super) fn collect_overlapping_pickups(&mut self) {
         let mut collector_ids = self
+            .world
             .entity_manager
             .active_entities()
             .into_iter()
             .filter(|&entity_id| {
-                self.entity_manager
+                self.world.entity_manager
                     .get_entity(entity_id)
                     .is_some_and(|entity| entity.attributes.has_inventory)
             })
@@ -36,11 +37,12 @@ impl GameState {
         collector_ids.sort_unstable();
 
         let mut pickup_ids = self
+            .world
             .entity_manager
             .active_entities()
             .into_iter()
             .filter(|&entity_id| {
-                self.entity_manager
+                self.world.entity_manager
                     .get_entity(entity_id)
                     .and_then(|entity| entity.attributes.pickup.as_ref())
                     .is_some()
@@ -50,13 +52,13 @@ impl GameState {
 
         let mut collected = Vec::new();
         for collector_id in collector_ids {
-            let Some(collector) = self.entity_manager.get_entity(collector_id) else {
+            let Some(collector) = self.world.entity_manager.get_entity(collector_id) else {
                 continue;
             };
             let (collector_pos, collector_size) = collector.interaction_bounds();
 
             for &pickup_id in &pickup_ids {
-                let Some(pickup_entity) = self.entity_manager.get_entity(pickup_id) else {
+                let Some(pickup_entity) = self.world.entity_manager.get_entity(pickup_id) else {
                     continue;
                 };
                 let Some(pickup) = pickup_entity.attributes.pickup.as_ref() else {
@@ -85,7 +87,7 @@ impl GameState {
         collected.dedup_by_key(|(_, pickup_id, _, _)| *pickup_id);
 
         for (collector_id, pickup_id, item_id, count) in collected {
-            let Some(collector) = self.entity_manager.get_entity_mut(collector_id) else {
+            let Some(collector) = self.world.entity_manager.get_entity_mut(collector_id) else {
                 continue;
             };
             if !collector.attributes.has_inventory {
@@ -102,7 +104,7 @@ impl GameState {
                 collector.attributes.inventory.item_count(&item_id)
             );
 
-            self.entity_manager.despawn_entity(pickup_id);
+            self.world.entity_manager.despawn_entity(pickup_id);
         }
     }
 }

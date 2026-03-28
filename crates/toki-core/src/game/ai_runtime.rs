@@ -103,9 +103,9 @@ impl<'a> AiRuntimeApplier<'a> {
 impl GameState {
     pub(super) fn ai_runtime_applier(&mut self) -> AiRuntimeApplier<'_> {
         AiRuntimeApplier::new(
-            &mut self.entity_manager,
-            &mut self.ai_system,
-            &self.entity_definitions,
+            &mut self.world.entity_manager,
+            &mut self.runtime.ai.system,
+            &self.world.entity_definitions,
         )
     }
 }

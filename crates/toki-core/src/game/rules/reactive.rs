@@ -22,28 +22,28 @@ impl GameState {
             );
         }
 
-        let collision_events = std::mem::take(&mut self.rule_runtime.frame_collisions);
+        let collision_events = std::mem::take(&mut self.runtime.rules.frame_collisions);
         for event in collision_events {
             self.collect_rule_commands_for_collision(&event, &mut reactive_rule_commands);
         }
 
-        let damage_events = std::mem::take(&mut self.rule_runtime.frame_damage_events);
+        let damage_events = std::mem::take(&mut self.runtime.rules.frame_damage_events);
         for event in damage_events {
             self.collect_rule_commands_for_damage(&event, &mut reactive_rule_commands);
         }
 
-        let death_events = std::mem::take(&mut self.rule_runtime.frame_death_events);
+        let death_events = std::mem::take(&mut self.runtime.rules.frame_death_events);
         for event in death_events {
             self.collect_rule_commands_for_death(&event, &mut reactive_rule_commands);
         }
 
-        let interaction_events = std::mem::take(&mut self.rule_runtime.frame_interactions);
+        let interaction_events = std::mem::take(&mut self.runtime.rules.frame_interactions);
         for event in &interaction_events {
             self.collect_rule_commands_for_interaction(event, &mut reactive_rule_commands);
         }
 
         let dialog_completion_events =
-            std::mem::take(&mut self.rule_runtime.frame_dialog_completions);
+            std::mem::take(&mut self.runtime.rules.frame_dialog_completions);
         for event in &dialog_completion_events {
             self.collect_rule_commands_for_dialog_completion(event, &mut reactive_rule_commands);
         }
@@ -107,7 +107,7 @@ mod tests {
             ],
         });
 
-        state.rule_runtime.frame_damage_events.push(DamageEvent {
+        state.runtime.rules.frame_damage_events.push(DamageEvent {
             victim: self_id,
             attacker: Some(other_id),
         });

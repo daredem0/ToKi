@@ -110,7 +110,7 @@ impl SaveData {
                 .map(|(scene_name, entity_id)| PersistedSceneEntityState {
                     entity: game_state
                         .scene_manager()
-                        .get_scene(&scene_name)
+                        .get_scene(scene_name.as_str())
                         .and_then(|scene| scene.get_entity(entity_id))
                         .cloned(),
                     scene_name: scene_name.into(),

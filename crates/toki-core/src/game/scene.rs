@@ -1,11 +1,7 @@
-use super::input_state::InputRuntimeState;
 use super::transition::SceneTransitionPlanner;
-use super::{GameState, RuleRuntimeState};
-use crate::ai::AiSystem;
+use super::{GameState, ProgressState, RuntimeState, SceneState, WorldState};
 use crate::entity::{ControlRole, Entity, EntityDefinition, EntityId, EntityKind, EntityManager};
-use crate::flags::GameFlags;
 use crate::ids::EntityDefName;
-use crate::rules::RuleSet;
 use crate::scene::Scene;
 use crate::scene_manager::SceneManager;
 use crate::sprite::SpriteInstance;
@@ -24,6 +20,187 @@ pub enum RestoreError {
     ApplySceneLoad(String),
 }
 
+pub struct SceneSystem;
+
+impl SceneSystem {
+    pub fn add_scene(state: &mut GameState, scene: Scene) {
+        state.track_persistent_entities_for_scene(&scene);
+        state.scene.scene_manager.add_scene(scene);
+    }
+
+    pub fn active_scene<'a>(state: &'a GameState) -> Option<&'a Scene> {
+        state.scene.scene_manager.active_scene()
+    }
+
+    pub fn load(state: &mut GameState, scene_name: &str) -> Result<(), String> {
+        let scene = state
+            .scene
+            .scene_manager
+            .get_scene(scene_name)
+            .ok_or_else(|| format!("Scene '{}' not found", scene_name))?
+            .clone();
+
+        let prepared = SceneTransitionPlanner::new(&state.world.entity_definitions)
+            .prepare_scene_load(&scene, None, None)?;
+        state.apply_prepared_scene_load(scene_name, prepared)
+    }
+
+    pub fn transition(
+        state: &mut GameState,
+        scene_name: &str,
+        spawn_point_id: &str,
+    ) -> Result<(), String> {
+        let scene = state
+            .scene
+            .scene_manager
+            .get_scene(scene_name)
+            .ok_or_else(|| format!("Scene '{}' not found", scene_name))?
+            .clone();
+        let preserved_player = state.player_entity().cloned();
+        let prepared = SceneTransitionPlanner::new(&state.world.entity_definitions)
+            .prepare_scene_load(&scene, Some(spawn_point_id), preserved_player)?;
+
+        state.apply_prepared_scene_load(scene_name, prepared)
+    }
+
+    pub fn sync_entities_to_active_scene(state: &mut GameState) {
+        let rules = state.scene.active_rules.clone();
+        if let Some(active_scene) = state.scene.scene_manager.active_scene_mut() {
+            active_scene.entities.clear();
+
+            for entity_id in state.world.entity_manager.active_entities_iter() {
+                if let Some(entity) = state.world.entity_manager.get_entity(entity_id) {
+                    active_scene.entities.push(entity.clone());
+                }
+            }
+
+            active_scene.rules = rules;
+        }
+    }
+
+    pub fn sync_persistent_entities_to_active_scene(state: &mut GameState) {
+        let Some(active_scene_name) = state
+            .scene
+            .scene_manager
+            .active_scene_name()
+            .map(str::to_string)
+        else {
+            return;
+        };
+
+        let tracked_ids = state
+            .scene
+            .persistent_scene_entities
+            .iter()
+            .filter(|(scene_name, _)| *scene_name == active_scene_name)
+            .map(|(_, entity_id)| *entity_id)
+            .collect::<Vec<_>>();
+
+        if tracked_ids.is_empty() {
+            return;
+        }
+
+        let current_entities = tracked_ids
+            .iter()
+            .filter_map(|entity_id| {
+                state
+                    .world
+                    .entity_manager
+                    .get_entity(*entity_id)
+                    .cloned()
+                    .map(|entity| (*entity_id, entity))
+            })
+            .collect::<HashMap<_, _>>();
+
+        if let Some(active_scene) = state.scene.scene_manager.active_scene_mut() {
+            for entity_id in tracked_ids {
+                match current_entities.get(&entity_id) {
+                    Some(entity) => {
+                        if let Some(existing) = active_scene.get_entity_mut(entity_id) {
+                            *existing = entity.clone();
+                        } else {
+                            active_scene.add_entity(entity.clone());
+                        }
+                    }
+                    None => {
+                        active_scene.remove_entity(entity_id);
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn restore_from_save_data(
+        state: &mut GameState,
+        save_data: &crate::serialization::SaveData,
+    ) -> Result<(), RestoreError> {
+        let scene_name = save_data.active_scene_name.trim();
+        if scene_name.is_empty() {
+            return Err(RestoreError::MissingActiveSceneName);
+        }
+
+        for persisted in &save_data.persisted_entities {
+            state
+                .scene
+                .persistent_scene_entities
+                .insert((persisted.scene_name.to_string(), persisted.entity_id));
+            let Some(scene) = state.scene.scene_manager.get_scene_mut(&persisted.scene_name) else {
+                continue;
+            };
+
+            match &persisted.entity {
+                Some(entity) => {
+                    if let Some(existing) = scene.get_entity_mut(persisted.entity_id) {
+                        *existing = entity.clone();
+                    } else {
+                        scene.add_entity(entity.clone());
+                    }
+                }
+                None => {
+                    scene.remove_entity(persisted.entity_id);
+                }
+            }
+        }
+
+        if let Some(scene) = state.scene.scene_manager.get_scene_mut(scene_name) {
+            scene.camera_position = save_data.camera.position;
+            scene.camera_scale = save_data.camera.scale;
+        }
+
+        let scene = state
+            .scene
+            .scene_manager
+            .get_scene(scene_name)
+            .ok_or_else(|| RestoreError::MissingScene(scene_name.to_string()))?
+            .clone();
+
+        let prepared = SceneTransitionPlanner::new(&state.world.entity_definitions)
+            .prepare_scene_load(&scene, None, save_data.player.clone())
+            .map_err(RestoreError::PrepareSceneLoad)?;
+
+        state
+            .apply_prepared_scene_load(scene_name, prepared)
+            .map_err(RestoreError::ApplySceneLoad)?;
+        if let (Some(saved_player), Some(player_id)) =
+            (save_data.player.as_ref(), state.world.player_id)
+        {
+            if let Some(player) = state.world.entity_manager.get_entity_mut(player_id) {
+                let mut restored_player = saved_player.clone();
+                restored_player.id = player_id;
+                restored_player.control_role = ControlRole::PlayerCharacter;
+                restored_player.entity_kind = EntityKind::Player;
+                *player = restored_player;
+            }
+            if let Some(audio) = state.world.entity_manager.audio_component_mut(player_id) {
+                *audio = saved_player.audio.to_component();
+            }
+        }
+        state.progress.game_flags = save_data.flags.clone();
+        state.progress.play_time_ms = save_data.metadata.play_time_ms;
+        Ok(())
+    }
+}
+
 impl GameState {
     /// Create a new GameState with the given player sprite
     pub fn new(player_sprite: SpriteInstance) -> Self {
@@ -39,42 +216,24 @@ impl GameState {
         }
 
         Self {
-            scene_manager: SceneManager::new(),
-            entity_manager,
-            entity_definitions: HashMap::new(),
-            player_id: Some(player_id),
-            input_state: InputRuntimeState::default(),
-            debug_collision_rendering: false,
-            ai_system: AiSystem::new(),
-            rules: RuleSet::default(),
-            rule_runtime: RuleRuntimeState::default(),
-            pending_stat_changes: Vec::new(),
-            pending_despawns: Vec::new(),
-            ai_delta_accumulator_ms: 0.0,
-            game_flags: GameFlags::default(),
-            play_time_ms: 0,
-            persistent_scene_entities: Default::default(),
+            world: WorldState {
+                entity_manager,
+                entity_definitions: HashMap::new(),
+                player_id: Some(player_id),
+            },
+            scene: SceneState::default(),
+            progress: ProgressState::default(),
+            runtime: RuntimeState::default(),
         }
     }
 
     /// Create a new empty GameState with no entities
     pub fn new_empty() -> Self {
         Self {
-            scene_manager: SceneManager::new(),
-            entity_manager: EntityManager::new(),
-            entity_definitions: HashMap::new(),
-            player_id: None,
-            input_state: InputRuntimeState::default(),
-            debug_collision_rendering: false,
-            ai_system: AiSystem::new(),
-            rules: RuleSet::default(),
-            rule_runtime: RuleRuntimeState::default(),
-            pending_stat_changes: Vec::new(),
-            pending_despawns: Vec::new(),
-            ai_delta_accumulator_ms: 0.0,
-            game_flags: GameFlags::default(),
-            play_time_ms: 0,
-            persistent_scene_entities: Default::default(),
+            world: WorldState::default(),
+            scene: SceneState::default(),
+            progress: ProgressState::default(),
+            runtime: RuntimeState::default(),
         }
     }
 
@@ -82,28 +241,32 @@ impl GameState {
     pub fn spawn_player_at(&mut self, position: glam::IVec2) -> EntityId {
         let player_def = Self::default_player_definition();
         let player_id = self
+            .world
             .entity_manager
             .spawn_from_definition(&player_def, position)
             .expect("default player definition should always be valid");
-        self.entity_manager
+        self.world
+            .entity_manager
             .set_control_role(player_id, crate::entity::ControlRole::PlayerCharacter);
-        if let Some(player) = self.entity_manager.get_entity_mut(player_id) {
+        if let Some(player) = self.world.entity_manager.get_entity_mut(player_id) {
             player.entity_kind = crate::entity::EntityKind::Player;
         }
-        self.player_id = Some(player_id);
+        self.world.player_id = Some(player_id);
         player_id
     }
 
     /// Spawn an NPC that looks identical to the player
     pub fn spawn_player_like_npc(&mut self, position: glam::IVec2) -> EntityId {
         let npc_def = Self::player_like_npc_definition();
-        self.entity_manager
+        self.world
+            .entity_manager
             .spawn_from_definition(&npc_def, position)
             .expect("default player-like npc definition should always be valid")
     }
 
     pub fn add_entity_definition(&mut self, definition: EntityDefinition) {
-        self.entity_definitions
+        self.world
+            .entity_definitions
             .insert(definition.name.clone(), definition);
     }
 
@@ -259,51 +422,44 @@ impl GameState {
 
     /// Get reference to all entities (legacy method - preserved for compatibility)
     pub fn entities(&self) -> Vec<&Entity> {
-        self.entity_manager
+        self.world
+            .entity_manager
             .active_entities()
             .iter()
-            .filter_map(|&id| self.entity_manager.get_entity(id))
+            .filter_map(|&id| self.world.entity_manager.get_entity(id))
             .collect()
     }
 
     /// Get access to the entity manager
     pub fn entity_manager(&self) -> &EntityManager {
-        &self.entity_manager
+        &self.world.entity_manager
     }
 
     /// Get mutable access to the entity manager
     pub fn entity_manager_mut(&mut self) -> &mut EntityManager {
-        &mut self.entity_manager
+        &mut self.world.entity_manager
     }
 
     /// Set the player entity ID directly (for testing purposes).
     #[cfg(test)]
     pub fn set_player_id(&mut self, id: EntityId) {
-        self.player_id = Some(id);
+        self.world.player_id = Some(id);
     }
 
     /// Get access to the scene manager
     pub fn scene_manager(&self) -> &SceneManager {
-        &self.scene_manager
+        &self.scene.scene_manager
     }
 
     /// Get mutable access to the scene manager
     pub fn scene_manager_mut(&mut self) -> &mut SceneManager {
-        &mut self.scene_manager
+        &mut self.scene.scene_manager
     }
 
     /// Load a scene and make it the active scene
     /// This will clear current entities and load entities from the scene
     pub fn load_scene(&mut self, scene_name: &str) -> Result<(), String> {
-        let scene = self
-            .scene_manager
-            .get_scene(scene_name)
-            .ok_or_else(|| format!("Scene '{}' not found", scene_name))?
-            .clone();
-
-        let prepared = SceneTransitionPlanner::new(&self.entity_definitions)
-            .prepare_scene_load(&scene, None, None)?;
-        self.apply_prepared_scene_load(scene_name, prepared)
+        SceneSystem::load(self, scene_name)
     }
 
     pub fn transition_to_scene(
@@ -311,110 +467,48 @@ impl GameState {
         scene_name: &str,
         spawn_point_id: &str,
     ) -> Result<(), String> {
-        let scene = self
-            .scene_manager
-            .get_scene(scene_name)
-            .ok_or_else(|| format!("Scene '{}' not found", scene_name))?
-            .clone();
-        let preserved_player = self.player_entity().cloned();
-        let prepared = SceneTransitionPlanner::new(&self.entity_definitions).prepare_scene_load(
-            &scene,
-            Some(spawn_point_id),
-            preserved_player,
-        )?;
-
-        self.apply_prepared_scene_load(scene_name, prepared)
+        SceneSystem::transition(self, scene_name, spawn_point_id)
     }
 
     /// Add a scene to the scene manager
     pub fn add_scene(&mut self, scene: Scene) {
-        self.track_persistent_entities_for_scene(&scene);
-        self.scene_manager.add_scene(scene);
+        SceneSystem::add_scene(self, scene);
     }
 
     /// Get reference to the current active scene
     pub fn active_scene(&self) -> Option<&Scene> {
-        self.scene_manager.active_scene()
+        SceneSystem::active_scene(self)
     }
 
     /// Sync current entities back to the active scene
     /// Useful for saving changes made during runtime back to scene data
     pub fn sync_entities_to_active_scene(&mut self) {
-        let rules = self.rules.clone();
-        if let Some(active_scene) = self.scene_manager.active_scene_mut() {
-            active_scene.entities.clear();
-
-            for entity_id in self.entity_manager.active_entities_iter() {
-                if let Some(entity) = self.entity_manager.get_entity(entity_id) {
-                    active_scene.entities.push(entity.clone());
-                }
-            }
-
-            active_scene.rules = rules;
-        }
+        SceneSystem::sync_entities_to_active_scene(self);
     }
 
     pub fn sync_persistent_entities_to_active_scene(&mut self) {
-        let Some(active_scene_name) = self.scene_manager.active_scene_name().map(str::to_string) else {
-            return;
-        };
-
-        let tracked_ids = self
-            .persistent_scene_entities
-            .iter()
-            .filter(|(scene_name, _)| *scene_name == active_scene_name)
-            .map(|(_, entity_id)| *entity_id)
-            .collect::<Vec<_>>();
-
-        if tracked_ids.is_empty() {
-            return;
-        }
-
-        let current_entities = tracked_ids
-            .iter()
-            .filter_map(|entity_id| {
-                self.entity_manager
-                    .get_entity(*entity_id)
-                    .cloned()
-                    .map(|entity| (*entity_id, entity))
-            })
-            .collect::<HashMap<_, _>>();
-
-        if let Some(active_scene) = self.scene_manager.active_scene_mut() {
-            for entity_id in tracked_ids {
-                match current_entities.get(&entity_id) {
-                    Some(entity) => {
-                        if let Some(existing) = active_scene.get_entity_mut(entity_id) {
-                            *existing = entity.clone();
-                        } else {
-                            active_scene.add_entity(entity.clone());
-                        }
-                    }
-                    None => {
-                        active_scene.remove_entity(entity_id);
-                    }
-                }
-            }
-        }
+        SceneSystem::sync_persistent_entities_to_active_scene(self);
     }
 
     /// Get the player entity ID
     pub fn player_id(&self) -> Option<EntityId> {
-        self.player_id
+        self.world.player_id
     }
 
     /// Get reference to player entity
     pub fn player_entity(&self) -> Option<&Entity> {
-        self.player_id
-            .and_then(|id| self.entity_manager.get_entity(id))
+        self.world
+            .player_id
+            .and_then(|id| self.world.entity_manager.get_entity(id))
     }
 
     /// Get entities as owned Vec for camera system compatibility
     pub fn entities_owned(&self) -> Vec<Entity> {
-        self.entity_manager
+        self.world
+            .entity_manager
             .active_entities()
             .iter()
-            .filter_map(|&id| self.entity_manager.get_entity(id))
+            .filter_map(|&id| self.world.entity_manager.get_entity(id))
             .cloned()
             .collect()
     }
@@ -424,13 +518,13 @@ impl GameState {
         scene_name: &str,
         prepared: super::transition::PreparedSceneLoad,
     ) -> Result<(), String> {
-        self.scene_manager.set_active_scene(scene_name)?;
+        self.scene.scene_manager.set_active_scene(scene_name)?;
         self.clear_runtime_inputs();
-        self.pending_stat_changes.clear();
-        self.pending_despawns.clear();
-        self.ai_delta_accumulator_ms = 0.0;
-        self.entity_manager = prepared.entity_manager;
-        self.player_id = prepared.player_id;
+        self.runtime.effects.pending_stat_changes.clear();
+        self.runtime.effects.pending_despawns.clear();
+        self.runtime.ai.delta_accumulator_ms = 0.0;
+        self.world.entity_manager = prepared.entity_manager;
+        self.world.player_id = prepared.player_id;
         self.set_rules(prepared.rules);
         Ok(())
     }
@@ -439,73 +533,14 @@ impl GameState {
         &mut self,
         save_data: &crate::serialization::SaveData,
     ) -> Result<(), RestoreError> {
-        let scene_name = save_data.active_scene_name.trim();
-        if scene_name.is_empty() {
-            return Err(RestoreError::MissingActiveSceneName);
-        }
-
-        for persisted in &save_data.persisted_entities {
-            self.persistent_scene_entities
-                .insert((persisted.scene_name.to_string(), persisted.entity_id));
-            let Some(scene) = self.scene_manager.get_scene_mut(&persisted.scene_name) else {
-                continue;
-            };
-
-            match &persisted.entity {
-                Some(entity) => {
-                    if let Some(existing) = scene.get_entity_mut(persisted.entity_id) {
-                        *existing = entity.clone();
-                    } else {
-                        scene.add_entity(entity.clone());
-                    }
-                }
-                None => {
-                    scene.remove_entity(persisted.entity_id);
-                }
-            }
-        }
-
-        if let Some(scene) = self.scene_manager.get_scene_mut(scene_name) {
-            scene.camera_position = save_data.camera.position;
-            scene.camera_scale = save_data.camera.scale;
-        }
-
-        let scene = self
-            .scene_manager
-            .get_scene(scene_name)
-            .ok_or_else(|| RestoreError::MissingScene(scene_name.to_string()))?
-            .clone();
-
-        let prepared = SceneTransitionPlanner::new(&self.entity_definitions).prepare_scene_load(
-            &scene,
-            None,
-            save_data.player.clone(),
-        )
-        .map_err(RestoreError::PrepareSceneLoad)?;
-
-        self.apply_prepared_scene_load(scene_name, prepared)
-            .map_err(RestoreError::ApplySceneLoad)?;
-        if let (Some(saved_player), Some(player_id)) = (save_data.player.as_ref(), self.player_id) {
-            if let Some(player) = self.entity_manager.get_entity_mut(player_id) {
-                let mut restored_player = saved_player.clone();
-                restored_player.id = player_id;
-                restored_player.control_role = ControlRole::PlayerCharacter;
-                restored_player.entity_kind = EntityKind::Player;
-                *player = restored_player;
-            }
-            if let Some(audio) = self.entity_manager.audio_component_mut(player_id) {
-                *audio = saved_player.audio.to_component();
-            }
-        }
-        self.game_flags = save_data.flags.clone();
-        self.play_time_ms = save_data.metadata.play_time_ms;
-        Ok(())
+        SceneSystem::restore_from_save_data(self, save_data)
     }
 
     fn track_persistent_entities_for_scene(&mut self, scene: &Scene) {
         for entity in &scene.entities {
             if entity.persistent_across_saves {
-                self.persistent_scene_entities
+                self.scene
+                    .persistent_scene_entities
                     .insert((scene.name.clone(), entity.id));
             }
         }

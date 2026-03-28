@@ -30,7 +30,7 @@ impl GameState {
         position: glam::IVec2,
         can_move: bool,
     ) -> EntityId {
-        self.entity_manager.spawn_entity(
+        self.world.entity_manager.spawn_entity(
             kind,
             position,
             glam::UVec2::new(16, 16),
@@ -43,7 +43,7 @@ impl GameState {
     }
 
     fn spawn_trigger_entity(&mut self, position: glam::IVec2) -> EntityId {
-        self.entity_manager.spawn_entity(
+        self.world.entity_manager.spawn_entity(
             EntityKind::Trigger,
             position,
             glam::UVec2::new(16, 16),

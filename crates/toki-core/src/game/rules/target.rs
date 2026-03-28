@@ -28,7 +28,7 @@ impl GameState {
         context: &TriggerContext,
     ) -> Option<EntityId> {
         match target {
-            RuleTarget::Player => self.player_id,
+            RuleTarget::Player => self.world.player_id,
             RuleTarget::Entity(entity_id) => Some(entity_id),
             RuleTarget::TriggerSelf => context.trigger_self,
             RuleTarget::TriggerOther => context.trigger_other,

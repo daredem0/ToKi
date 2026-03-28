@@ -49,7 +49,7 @@ impl GameState {
         }
 
         for (entity_id, velocity) in buffered_velocities {
-            self.rule_runtime.velocities.insert(entity_id, velocity);
+            self.runtime.rules.velocities.insert(entity_id, velocity);
         }
 
         let mut pending_animations = buffered_animations.into_iter().collect::<Vec<_>>();
@@ -66,12 +66,12 @@ impl GameState {
     }
 
     fn apply_destroy_self(&mut self, entity_id: EntityId) {
-        let removed = self.entity_manager.despawn_entity(entity_id);
+        let removed = self.world.entity_manager.despawn_entity(entity_id);
         if removed {
-            if self.player_id == Some(entity_id) {
-                self.player_id = None;
+            if self.world.player_id == Some(entity_id) {
+                self.world.player_id = None;
             }
-            self.rule_runtime.velocities.remove(&entity_id);
+            self.runtime.rules.velocities.remove(&entity_id);
         }
     }
 
