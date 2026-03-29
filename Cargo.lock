@@ -4505,7 +4505,6 @@ dependencies = [
  "strum",
  "tempfile",
  "thiserror 2.0.14",
- "toki-test-fixtures",
  "toml",
  "tracing",
  "zstd",
@@ -4531,7 +4530,6 @@ dependencies = [
  "toki-core",
  "toki-render",
  "toki-schemas",
- "toki-test-fixtures",
  "toml",
  "tracing",
  "tracing-subscriber",
@@ -4582,14 +4580,6 @@ version = "0.2.2"
 dependencies = [
  "jsonschema",
  "serde_json",
-]
-
-[[package]]
-name = "toki-test-fixtures"
-version = "0.2.2"
-dependencies = [
- "glam",
- "toki-core",
 ]
 
 [[package]]

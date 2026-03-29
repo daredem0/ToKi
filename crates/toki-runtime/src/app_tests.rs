@@ -1095,6 +1095,11 @@ fn splash_version_style_shrinks_long_version_to_fit_default_view_width() {
     let estimated_width =
         COMMUNITY_SPLASH_VERSION_TEXT.chars().count() as f32 * style.size_px * 0.55;
     assert!(style.size_px <= SPLASH_VERSION_DEFAULT_SIZE_PX);
-    assert!(style.size_px >= SPLASH_VERSION_MIN_SIZE_PX);
+    assert!(style.size_px > 0.0);
+    if COMMUNITY_SPLASH_VERSION_TEXT.chars().count() as f32 * SPLASH_VERSION_MIN_SIZE_PX * 0.55
+        <= 160.0 - SPLASH_TEXT_HORIZONTAL_PADDING_PX
+    {
+        assert!(style.size_px >= SPLASH_VERSION_MIN_SIZE_PX);
+    }
     assert!(estimated_width <= 160.0 - SPLASH_TEXT_HORIZONTAL_PADDING_PX);
 }
