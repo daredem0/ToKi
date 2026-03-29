@@ -27,7 +27,7 @@ impl SceneSystem {
         state.scene.scene_manager.add_scene(scene);
     }
 
-    pub fn active_scene<'a>(state: &'a GameState) -> Option<&'a Scene> {
+    pub fn active_scene(state: &GameState) -> Option<&Scene> {
         state.scene.scene_manager.active_scene()
     }
 

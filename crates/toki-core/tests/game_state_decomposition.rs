@@ -141,8 +141,10 @@ fn scene_system_transition_preserves_player_inventory_and_stats() {
         .get_entity(player_id)
         .expect("player should exist")
         .clone();
-    let mut components = OptionalEntityComponents::default();
-    components.inventory = Some(Default::default());
+    let mut components = OptionalEntityComponents {
+        inventory: Some(Default::default()),
+        ..OptionalEntityComponents::default()
+    };
     components
         .inventory
         .as_mut()

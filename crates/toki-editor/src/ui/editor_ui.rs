@@ -725,6 +725,8 @@ impl EditorUI {
             .expect("scene viewport context should always exist")
     }
 
+    #[cfg(test)]
+    #[cfg(test)]
     pub(crate) fn rule_graph_context(&self) -> &RuleGraphContext {
         if self.active_tab == CenterPanelTab::SceneGraph || self.active_tab == CenterPanelTab::SceneRules {
             self.context::<RuleGraphContext>(self.active_tab)

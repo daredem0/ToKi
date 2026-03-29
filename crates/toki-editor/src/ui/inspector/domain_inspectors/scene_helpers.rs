@@ -6,7 +6,7 @@ use super::scene_commands::build_delete_scene_command;
 use crate::editor_services::commands as editor_commands;
 use crate::scene::view_models::SceneSummaryView;
 use crate::ui::editor_ui::EditorConfirmation;
-use crate::ui::inspector::InspectorSystem;
+use crate::ui::inspector::{rules::SceneRulesEditorParams, InspectorSystem};
 use toki_core::scene::SceneAnchorKind;
 
 pub fn render_scene_stats(ui: &mut egui::Ui, scene: &toki_core::Scene) {
@@ -190,13 +190,15 @@ pub fn render_rules_editor_section(
         .unwrap_or(&[]);
     let rules_changed = InspectorSystem::render_scene_rules_editor(
         ui,
-        scene_name,
-        &mut edited_rules,
-        &ctx.ui_state.scenes,
-        declared_flags,
-        &ctx.ui_state.project.available_dialog_outcomes,
-        ctx.config,
-        map_size,
+        SceneRulesEditorParams {
+            scene_name,
+            rule_set: &mut edited_rules,
+            scenes: &ctx.ui_state.scenes,
+            declared_flags,
+            available_dialog_outcomes: &ctx.ui_state.project.available_dialog_outcomes,
+            config: ctx.config,
+            map_size,
+        },
     );
 
     if rules_changed && edited_rules != before_rules {

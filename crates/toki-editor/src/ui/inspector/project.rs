@@ -1,7 +1,8 @@
 use super::*;
 use crate::project::apply_project_settings_draft;
-use crate::project::{validate_project_settings_draft, ProjectViewportModeDraft};
-use crate::project::ProjectAssets;
+use crate::project::{validate_project_settings_draft, ProjectAssets, ProjectViewportModeDraft};
+#[cfg(test)]
+use crate::project::ProjectSettingsDraft;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;

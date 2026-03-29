@@ -51,6 +51,13 @@ pub use events::{
 
 use super::{AudioChannel, AudioEvent, GameState};
 
+pub(super) type AppliedRuleCommandResult = (
+    Vec<(EntityId, AnimationState)>,
+    Option<PendingSceneSwitch>,
+    Option<PendingDialogStart>,
+    Option<crate::events::PersistenceRequest>,
+);
+
 pub struct RuleSystem;
 
 impl RuleSystem {
@@ -79,12 +86,7 @@ impl RuleSystem {
         commands: Vec<RuleCommand>,
         result: &mut crate::events::GameUpdateResult<AudioEvent>,
         tilemap: &crate::assets::tilemap::TileMap,
-    ) -> (
-        Vec<(EntityId, AnimationState)>,
-        Option<PendingSceneSwitch>,
-        Option<PendingDialogStart>,
-        Option<crate::events::PersistenceRequest>,
-    ) {
+    ) -> AppliedRuleCommandResult {
         state.apply_rule_commands(commands, result, tilemap)
     }
 

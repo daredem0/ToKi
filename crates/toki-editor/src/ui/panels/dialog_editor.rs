@@ -1008,6 +1008,17 @@ fn default_condition(kind: DialogConditionKind) -> DialogCondition {
     }
 }
 
+fn unique_node_id(dialog: &toki_core::dialog::DialogTree, prefix: &str) -> String {
+    let mut index = 1usize;
+    loop {
+        let candidate = format!("{prefix}_{index}");
+        if !dialog.nodes.iter().any(|node| node.id == candidate) {
+            return candidate;
+        }
+        index += 1;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1314,16 +1325,5 @@ mod tests {
             rename_dialog_node_id(&mut dialog, &mut selected, "start", "end").expect_err("dup");
         assert_eq!(duplicate_error, "Dialog already contains a node named 'end'.");
         assert_eq!(selected.as_deref(), Some("start"));
-    }
-}
-
-fn unique_node_id(dialog: &toki_core::dialog::DialogTree, prefix: &str) -> String {
-    let mut index = 1usize;
-    loop {
-        let candidate = format!("{prefix}_{index}");
-        if !dialog.nodes.iter().any(|node| node.id == candidate) {
-            return candidate;
-        }
-        index += 1;
     }
 }

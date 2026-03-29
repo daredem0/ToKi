@@ -331,7 +331,7 @@ fn load_entity_definition_from_path_reads_definition_json() {
     let entity_path = tmp.path().join("slime.json");
     let definition = crate::entity::EntityDefinition {
         name: "slime".to_string().into(),
-        display_name: "Slime".to_string().into(),
+        display_name: "Slime".to_string(),
         description: String::new(),
         rendering: crate::entity::RenderingDef {
             size: [16, 16],
@@ -371,7 +371,7 @@ fn load_entity_definition_from_path_reads_definition_json() {
             collision_sound: None,
         },
         animations: crate::entity::AnimationsDef {
-            atlas_name: "slimes".to_string().into(),
+            atlas_name: "slimes".to_string(),
             clips: vec![crate::entity::AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["slime/idle_0".to_string()],

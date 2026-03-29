@@ -42,7 +42,7 @@ mod tests {
     fn sample_player_definition(name: &str) -> EntityDefinition {
         EntityDefinition {
             name: name.into(),
-            display_name: "Player".to_string().into(),
+            display_name: "Player".to_string(),
             description: "Player definition".to_string(),
             rendering: RenderingDef {
                 size: [16, 16],
@@ -85,7 +85,7 @@ mod tests {
                 collision_sound: None,
             },
             animations: AnimationsDef {
-                atlas_name: "creatures".to_string().into(),
+                atlas_name: "creatures".to_string(),
                 clips: vec![AnimationClipDef {
                     state: "idle_down".to_string(),
                     frame_tiles: vec!["idle".to_string()],

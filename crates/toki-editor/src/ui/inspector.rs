@@ -8,7 +8,6 @@ use super::editor_ui::{EditorUI, MapEditorTool, SceneRulesGraphCommandData, Sele
 use super::rule_graph::{RuleGraph, RuleGraphNodeKind};
 use crate::config::EditorConfig;
 use crate::project::Project;
-pub(crate) use crate::project::ProjectSettingsDraft;
 use crate::ui::panel_layout::SIDE_PANEL_DEFAULT_WIDTH;
 use std::collections::HashMap;
 use toki_core::assets::object_sheet::ObjectSheetMeta;
@@ -417,8 +416,14 @@ impl InspectorSystem {
         let mut host = super::editor_context::EditorContextHost {
             scene_viewport: None,
             map_editor_viewport: None,
-            project: project.as_deref_mut(),
-            project_assets: project_assets.as_deref_mut(),
+            project: match project.as_mut() {
+                Some(project) => Some(&mut **project),
+                None => None,
+            },
+            project_assets: match project_assets.as_mut() {
+                Some(project_assets) => Some(&mut **project_assets),
+                None => None,
+            },
             available_map_names: None,
             config: None,
             log_capture: None,

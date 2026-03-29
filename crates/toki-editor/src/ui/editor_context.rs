@@ -136,14 +136,12 @@ impl RuleGraphContext {
         if ui.active_tab() == CenterPanelTab::SceneGraph || ui.active_tab() == CenterPanelTab::SceneRules {
             ui.context_mut::<Self>(ui.active_tab())
                 .expect("rule graph context should always exist")
+        } else if ui.context::<Self>(CenterPanelTab::SceneGraph).is_some() {
+            ui.context_mut::<Self>(CenterPanelTab::SceneGraph)
+                .expect("rule graph context should always exist")
         } else {
-            if ui.context::<Self>(CenterPanelTab::SceneGraph).is_some() {
-                ui.context_mut::<Self>(CenterPanelTab::SceneGraph)
-                    .expect("rule graph context should always exist")
-            } else {
-                ui.context_mut::<Self>(CenterPanelTab::SceneRules)
-                    .expect("rule graph context should always exist")
-            }
+            ui.context_mut::<Self>(CenterPanelTab::SceneRules)
+                .expect("rule graph context should always exist")
         }
     }
 }

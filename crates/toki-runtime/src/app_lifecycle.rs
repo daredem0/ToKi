@@ -234,36 +234,6 @@ impl App {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::App;
-    use std::path::Path;
-
-    #[test]
-    fn resolve_save_root_from_base_uses_project_name_when_available() {
-        let root = App::resolve_save_root_from_base(
-            Some(Path::new("/data")),
-            None,
-            Some(Path::new("/projects/Demo")),
-        );
-
-        assert_eq!(root, Path::new("/data").join("toki").join("Demo").join("saves"));
-    }
-
-    #[test]
-    fn resolve_save_root_from_base_falls_back_to_current_dir_and_default_project() {
-        let root = App::resolve_save_root_from_base(None, Some(Path::new("/cwd")), None);
-
-        assert_eq!(
-            root,
-            Path::new("/cwd")
-                .join("toki")
-                .join("default")
-                .join("saves")
-        );
-    }
-}
-
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let content_root = self.content_root_path().map(std::path::Path::to_path_buf);
@@ -473,5 +443,35 @@ impl ApplicationHandler for App {
             }
             _ => (),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::App;
+    use std::path::Path;
+
+    #[test]
+    fn resolve_save_root_from_base_uses_project_name_when_available() {
+        let root = App::resolve_save_root_from_base(
+            Some(Path::new("/data")),
+            None,
+            Some(Path::new("/projects/Demo")),
+        );
+
+        assert_eq!(root, Path::new("/data").join("toki").join("Demo").join("saves"));
+    }
+
+    #[test]
+    fn resolve_save_root_from_base_falls_back_to_current_dir_and_default_project() {
+        let root = App::resolve_save_root_from_base(None, Some(Path::new("/cwd")), None);
+
+        assert_eq!(
+            root,
+            Path::new("/cwd")
+                .join("toki")
+                .join("default")
+                .join("saves")
+        );
     }
 }

@@ -590,12 +590,12 @@ mod tests {
         DialogTree {
             id: "intro".to_string().into(),
             title: "Intro".to_string(),
-            entry_node_id: "start".to_string().into(),
+            entry_node_id: "start".to_string(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![
                 DialogNode {
-                    id: "start".to_string().into(),
+                    id: "start".to_string(),
                     speaker_name: Some("Guide".to_string()),
                     conditions: Vec::new(),
                     kind: DialogNodeKind::Line {
@@ -604,7 +604,7 @@ mod tests {
                     },
                 },
                 DialogNode {
-                    id: "end".to_string().into(),
+                    id: "end".to_string(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -652,34 +652,34 @@ mod tests {
         let dialog = DialogTree {
             id: "choices".to_string().into(),
             title: "Choices".to_string(),
-            entry_node_id: "start".to_string().into(),
+            entry_node_id: "start".to_string(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![
                 DialogNode {
-                    id: "start".to_string().into(),
+                    id: "start".to_string(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::Choice {
                         body: "Choose".to_string(),
                         choices: vec![
                             DialogChoice {
-                                id: "a".to_string().into(),
+                                id: "a".to_string(),
                                 label: "Alpha".to_string(),
-                                next_node_id: "end_a".to_string().into(),
+                                next_node_id: "end_a".to_string(),
                                 conditions: Vec::new(),
                             },
                             DialogChoice {
-                                id: "b".to_string().into(),
+                                id: "b".to_string(),
                                 label: "Beta".to_string(),
-                                next_node_id: "end_b".to_string().into(),
+                                next_node_id: "end_b".to_string(),
                                 conditions: Vec::new(),
                             },
                         ],
                     },
                 },
                 DialogNode {
-                    id: "end_a".to_string().into(),
+                    id: "end_a".to_string(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -688,7 +688,7 @@ mod tests {
                     },
                 },
                 DialogNode {
-                    id: "end_b".to_string().into(),
+                    id: "end_b".to_string(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -762,12 +762,12 @@ mod tests {
         let dialog = DialogTree {
             id: "flag_branch".to_string().into(),
             title: "Flags".to_string(),
-            entry_node_id: "branch".to_string().into(),
+            entry_node_id: "branch".to_string(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![
                 DialogNode {
-                    id: "branch".to_string().into(),
+                    id: "branch".to_string(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::Branch {
@@ -775,13 +775,13 @@ mod tests {
                             conditions: vec![DialogCondition::FlagSet {
                                 flag: "met_npc".to_string(),
                             }],
-                            next_node_id: "met".to_string().into(),
+                            next_node_id: "met".to_string(),
                         }],
                         default_next_node_id: Some("new".to_string()),
                     },
                 },
                 DialogNode {
-                    id: "met".to_string().into(),
+                    id: "met".to_string(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -790,7 +790,7 @@ mod tests {
                     },
                 },
                 DialogNode {
-                    id: "new".to_string().into(),
+                    id: "new".to_string(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -817,12 +817,12 @@ mod tests {
         let dialog = DialogTree {
             id: "line_skip".to_string().into(),
             title: "Skip".to_string(),
-            entry_node_id: "start".to_string().into(),
+            entry_node_id: "start".to_string(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![
                 DialogNode {
-                    id: "start".to_string().into(),
+                    id: "start".to_string(),
                     speaker_name: None,
                     conditions: vec![DialogCondition::FlagSet {
                         flag: "missing".to_string(),
@@ -833,7 +833,7 @@ mod tests {
                     },
                 },
                 DialogNode {
-                    id: "next".to_string().into(),
+                    id: "next".to_string(),
                     speaker_name: None,
                     conditions: vec![DialogCondition::FlagSet {
                         flag: "seen".to_string(),
@@ -860,11 +860,11 @@ mod tests {
         let dialog = DialogTree {
             id: "end_skip".to_string().into(),
             title: "End".to_string(),
-            entry_node_id: "end".to_string().into(),
+            entry_node_id: "end".to_string(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![DialogNode {
-                id: "end".to_string().into(),
+                id: "end".to_string(),
                 speaker_name: None,
                 conditions: vec![DialogCondition::FlagSet {
                     flag: "missing".to_string(),
@@ -890,11 +890,11 @@ mod tests {
         let invalid = DialogTree {
             id: "broken".to_string().into(),
             title: String::new(),
-            entry_node_id: "missing".to_string().into(),
+            entry_node_id: "missing".to_string(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![DialogNode {
-                id: "start".to_string().into(),
+                id: "start".to_string(),
                 speaker_name: None,
                 conditions: Vec::new(),
                 kind: DialogNodeKind::End {

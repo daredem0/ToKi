@@ -923,7 +923,6 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
             .active_entities()
             .iter()
             .filter_map(|&id| game_state.world().entity_manager().get_entity(id))
-            .cloned()
             .any(|entity| entity.id == 77),
         "authored scene entity should still be present in preview GameState"
     );

@@ -102,7 +102,7 @@ pub enum AudioChannel {
 
 impl GameEvent for AudioEvent {}
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct WorldState {
     #[serde(default)]
     entity_manager: EntityManager,
@@ -110,16 +110,6 @@ pub struct WorldState {
     entity_definitions: HashMap<EntityDefName, EntityDefinition>,
     #[serde(default)]
     player_id: Option<EntityId>,
-}
-
-impl Default for WorldState {
-    fn default() -> Self {
-        Self {
-            entity_manager: EntityManager::new(),
-            entity_definitions: HashMap::new(),
-            player_id: None,
-        }
-    }
 }
 
 impl WorldState {
@@ -148,7 +138,7 @@ impl WorldState {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SceneState {
     #[serde(default)]
     scene_manager: SceneManager,
@@ -156,16 +146,6 @@ pub struct SceneState {
     active_rules: RuleSet,
     #[serde(skip, default)]
     persistent_scene_entities: HashSet<(String, crate::entity::EntityId)>,
-}
-
-impl Default for SceneState {
-    fn default() -> Self {
-        Self {
-            scene_manager: SceneManager::new(),
-            active_rules: RuleSet::default(),
-            persistent_scene_entities: HashSet::new(),
-        }
-    }
 }
 
 impl SceneState {
@@ -233,7 +213,7 @@ pub struct EffectRuntimeState {
     pending_despawns: Vec<EntityId>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct RuntimeState {
     #[serde(default)]
     input: InputRuntimeState,
@@ -245,18 +225,6 @@ pub struct RuntimeState {
     rules: RuleRuntimeState,
     #[serde(skip, default)]
     effects: EffectRuntimeState,
-}
-
-impl Default for RuntimeState {
-    fn default() -> Self {
-        Self {
-            input: InputRuntimeState::default(),
-            debug_collision_rendering: false,
-            ai: AiRuntimeState::default(),
-            rules: RuleRuntimeState::default(),
-            effects: EffectRuntimeState::default(),
-        }
-    }
 }
 
 impl RuntimeState {
