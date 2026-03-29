@@ -25,12 +25,12 @@ fn create_test_entity_manager() -> EntityManager {
     if let Some(player) = manager.get_entity_mut(player_id) {
         player.position = IVec2::new(100, 200);
     }
-    if let Some(audio) = manager.audio_component_mut(player_id) {
+    if let Some(audio) = manager.storage_mut().audio_component_mut(player_id) {
         audio.footstep_trigger_distance = 32.0;
         audio.movement_sound = Some("sfx_step".to_string());
         audio.collision_sound = Some("sfx_hit2".to_string());
     }
-    manager.set_primary_projectile(
+    manager.storage_mut().components_mut().set_primary_projectile(
         player_id,
         Some(PrimaryProjectileDef {
             sheet: "effects".to_string(),
@@ -42,8 +42,12 @@ fn create_test_entity_manager() -> EntityManager {
             spawn_offset: [1, -2],
         }),
     );
-    manager.ensure_inventory(player_id).add_item("coin", 3);
-    manager.set_projectile(
+    manager
+        .storage_mut()
+        .components_mut()
+        .ensure_inventory(player_id)
+        .add_item("coin", 3);
+    manager.storage_mut().components_mut().set_projectile(
         npc_id,
         Some(ProjectileState {
             sheet: "effects".to_string(),
@@ -55,7 +59,7 @@ fn create_test_entity_manager() -> EntityManager {
             owner_id: Some(player_id),
         }),
     );
-    manager.set_pickup(
+    manager.storage_mut().components_mut().set_pickup(
         npc_id,
         Some(PickupDef {
             item_id: "gem".to_string(),
@@ -180,8 +184,8 @@ fn save_data_capture_persists_only_persistent_scene_entities() {
     let persistent = persistent_npc(2, IVec2::new(10, 10));
     let mut transient = persistent_npc(3, IVec2::new(20, 20));
     transient.persistent_across_saves = false;
-    scene.entities.push(persistent);
-    scene.entities.push(transient);
+    scene.add_entity(persistent);
+    scene.add_entity(transient);
     SceneSystem::add_scene(&mut game_state, scene);
     SceneSystem::load(&mut game_state, "main").expect("scene should load");
 
@@ -211,7 +215,7 @@ fn save_data_capture_persists_only_persistent_scene_entities() {
 fn restore_from_save_data_reapplies_removed_persistent_entities_as_missing() {
     let mut game_state = GameState::new_empty();
     let mut scene = Scene::new("main".to_string());
-    scene.entities.push(persistent_npc(2, IVec2::new(10, 10)));
+    scene.add_entity(persistent_npc(2, IVec2::new(10, 10)));
     SceneSystem::add_scene(&mut game_state, scene);
     SceneSystem::load(&mut game_state, "main").expect("scene should load");
     game_state.world_mut().entity_manager_mut().despawn_entity(2);
@@ -223,7 +227,7 @@ fn restore_from_save_data_reapplies_removed_persistent_entities_as_missing() {
 
     let mut restored = GameState::new_empty();
     let mut restored_scene = Scene::new("main".to_string());
-    restored_scene.entities.push(persistent_npc(2, IVec2::new(10, 10)));
+    restored_scene.add_entity(persistent_npc(2, IVec2::new(10, 10)));
     SceneSystem::add_scene(&mut restored, restored_scene);
     SceneSystem::load(&mut restored, "main").expect("scene should load");
     toki_core::game::SceneSystem::restore_from_save_data(&mut restored, &save)
@@ -332,8 +336,8 @@ fn save_slot_round_trip_restores_removed_items_and_entity_health_in_non_main_sce
     dropped_item.entity_kind = EntityKind::Item;
     dropped_item.control_role = ControlRole::None;
     dropped_item.position = IVec2::new(132, 120);
-    side_scene.entities.push(wounded_npc);
-    side_scene.entities.push(dropped_item);
+    side_scene.add_entity(wounded_npc);
+    side_scene.add_entity(dropped_item);
 
     SceneSystem::add_scene(&mut state, main_scene.clone());
     SceneSystem::add_scene(&mut state, side_scene.clone());
@@ -410,30 +414,36 @@ fn test_entity_manager_roundtrip() {
 
     // Verify audio components were preserved
     let audio_component = deserialized
-        .audio_component(original_player_id)
+        .storage().audio_component(original_player_id)
         .expect("player audio component should exist");
     assert_eq!(audio_component.footstep_trigger_distance, 32.0);
     assert_eq!(audio_component.movement_sound.as_deref(), Some("sfx_step"));
     assert_eq!(audio_component.collision_sound.as_deref(), Some("sfx_hit2"));
 
     let primary_projectile = deserialized
+        .storage()
+        .components()
         .primary_projectile(original_player_id)
         .expect("player primary projectile should exist");
     assert_eq!(primary_projectile.object_name, "fireball");
     assert_eq!(primary_projectile.spawn_offset, [1, -2]);
 
     let inventory = deserialized
-        .inventory(original_player_id)
+        .storage().components().inventory(original_player_id)
         .expect("player inventory should exist");
     assert_eq!(inventory.item_count("coin"), 3);
 
     let projectile = deserialized
+        .storage()
+        .components()
         .projectile(npc_id)
         .expect("npc projectile state should exist");
     assert_eq!(projectile.object_name, "spark");
     assert_eq!(projectile.owner_id, Some(original_player_id));
 
     let pickup = deserialized
+        .storage()
+        .components()
         .pickup(npc_id)
         .expect("npc pickup should exist");
     assert_eq!(pickup.item_id, "gem");

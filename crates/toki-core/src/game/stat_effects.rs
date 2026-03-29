@@ -67,7 +67,11 @@ impl<'a> StatEffectService<'a> {
 
     pub(super) fn add_inventory_item(&mut self, entity_id: EntityId, item_id: &str, count: u32) {
         if self.entity_manager.get_entity_mut(entity_id).is_some() {
-            self.entity_manager.ensure_inventory(entity_id).add_item(item_id, count);
+            self.entity_manager
+                .storage_mut()
+                .components_mut()
+                .ensure_inventory(entity_id)
+                .add_item(item_id, count);
         }
     }
 
@@ -77,6 +81,8 @@ impl<'a> StatEffectService<'a> {
         };
         let available = self
             .entity_manager
+            .storage()
+            .components()
             .inventory(entity_id)
             .map(|inventory| inventory.item_count(item_id))
             .unwrap_or(0);
@@ -87,11 +93,18 @@ impl<'a> StatEffectService<'a> {
 
         let new_count = available.saturating_sub(to_remove);
         if new_count == 0 {
-            if let Some(inventory) = self.entity_manager.inventory_mut(entity_id) {
+            if let Some(inventory) = self
+                .entity_manager
+                .storage_mut()
+                .components_mut()
+                .inventory_mut(entity_id)
+            {
                 inventory.items.remove(item_id);
             }
         } else if let Some(entry) = self
             .entity_manager
+            .storage_mut()
+            .components_mut()
             .inventory_mut(entity_id)
             .and_then(|inventory| inventory.items.get_mut(item_id))
         {

@@ -584,7 +584,7 @@ fn test_spawn_from_definition_registers_audio_component() {
         .expect("definition spawn should succeed");
 
     let audio = manager
-        .audio_component(entity_id)
+        .storage().audio_component(entity_id)
         .expect("audio component should be registered");
     assert_eq!(audio.footstep_distance_accumulator, 0.0);
     assert_eq!(audio.footstep_trigger_distance, 32.0);
@@ -605,7 +605,7 @@ fn test_add_existing_entity_uses_scene_audio_settings_for_component() {
     let entity_id = manager.add_existing_entity(entity);
 
     let audio = manager
-        .audio_component(entity_id)
+        .storage().audio_component(entity_id)
         .expect("audio component should be initialized from scene entity");
     assert_eq!(audio.footstep_trigger_distance, 7.5);
     assert_eq!(audio.movement_sound.as_deref(), Some("sfx_custom_step"));

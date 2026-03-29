@@ -1,6 +1,8 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::entity::{Entity, EntityComponentStore, EntityId, EntityOptionalComponents, StoredEntity};
+use crate::entity::{
+    Entity, EntityId, OptionalComponentRegistry, OptionalEntityComponents, StoredEntity,
+};
 use crate::ids::EntityDefName;
 use crate::rules::RuleSet;
 
@@ -46,9 +48,9 @@ pub struct Scene {
     pub maps: Vec<String>,
 
     /// Entities in this scene
-    pub entities: Vec<Entity>,
+    entities: Vec<Entity>,
 
-    pub components: EntityComponentStore,
+    components: OptionalComponentRegistry,
 
     /// Data-driven rules authored for this scene.
     pub rules: RuleSet,
@@ -149,7 +151,7 @@ impl Scene {
             description: None,
             maps: Vec::new(),
             entities: Vec::new(),
-            components: EntityComponentStore::default(),
+            components: OptionalComponentRegistry::default(),
             rules: RuleSet::default(),
             camera_position: None,
             camera_scale: None,
@@ -166,7 +168,7 @@ impl Scene {
             description: None,
             maps,
             entities: Vec::new(),
-            components: EntityComponentStore::default(),
+            components: OptionalComponentRegistry::default(),
             rules: RuleSet::default(),
             camera_position: None,
             camera_scale: None,
@@ -178,13 +180,21 @@ impl Scene {
 
     /// Add an entity to the scene
     pub fn add_entity(&mut self, entity: Entity) -> EntityId {
-        self.add_stored_entity(StoredEntity::new(entity, EntityOptionalComponents::default()))
+        self.add_stored_entity(StoredEntity::new(entity, OptionalEntityComponents::default()))
     }
 
     pub fn add_stored_entity(&mut self, stored: StoredEntity) -> EntityId {
         let id = stored.entity.id;
-        self.components.set_optional_components(id, stored.components);
+        self.components.apply_optional_components(id, stored.components);
         self.entities.push(stored.entity);
+        id
+    }
+
+    pub fn insert_stored_entity(&mut self, index: usize, stored: StoredEntity) -> EntityId {
+        let id = stored.entity.id;
+        self.components.apply_optional_components(id, stored.components);
+        let insert_index = index.min(self.entities.len());
+        self.entities.insert(insert_index, stored.entity);
         id
     }
 
@@ -200,23 +210,70 @@ impl Scene {
     }
 
     /// Get an entity by ID
-    pub fn get_entity(&self, entity_id: EntityId) -> Option<&Entity> {
+    pub fn entity(&self, entity_id: EntityId) -> Option<&Entity> {
         self.entities.iter().find(|e| e.id == entity_id)
     }
 
+    pub fn get_entity(&self, entity_id: EntityId) -> Option<&Entity> {
+        self.entity(entity_id)
+    }
+
     /// Get a mutable reference to an entity by ID
-    pub fn get_entity_mut(&mut self, entity_id: EntityId) -> Option<&mut Entity> {
+    pub fn entity_mut(&mut self, entity_id: EntityId) -> Option<&mut Entity> {
         self.entities.iter_mut().find(|e| e.id == entity_id)
     }
 
+    pub fn get_entity_mut(&mut self, entity_id: EntityId) -> Option<&mut Entity> {
+        self.entity_mut(entity_id)
+    }
+
+    pub fn entities(&self) -> &[Entity] {
+        &self.entities
+    }
+
+    pub fn entity_count(&self) -> usize {
+        self.entities.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entities.is_empty()
+    }
+
+    pub fn clear_entities(&mut self) {
+        self.entities.clear();
+        self.components = OptionalComponentRegistry::default();
+    }
+
+    pub fn entity_index(&self, entity_id: EntityId) -> Option<usize> {
+        self.entities.iter().position(|e| e.id == entity_id)
+    }
+
+    pub fn remove_entity_at(&mut self, index: usize) -> Option<StoredEntity> {
+        if index >= self.entities.len() {
+            return None;
+        }
+        let entity = self.entities.remove(index);
+        let components = self.components.optional_components(entity.id);
+        self.components.remove_all(entity.id);
+        Some(StoredEntity::new(entity, components))
+    }
+
     pub fn stored_entity(&self, entity_id: EntityId) -> Option<StoredEntity> {
-        self.get_entity(entity_id)
+        self.entity(entity_id)
             .cloned()
             .map(|entity| StoredEntity::new(entity, self.components.optional_components(entity_id)))
     }
 
-    pub fn optional_components(&self, entity_id: EntityId) -> EntityOptionalComponents {
+    pub fn optional_components(&self, entity_id: EntityId) -> OptionalEntityComponents {
         self.components.optional_components(entity_id)
+    }
+
+    pub fn components(&self) -> &OptionalComponentRegistry {
+        &self.components
+    }
+
+    pub fn components_mut(&mut self) -> &mut OptionalComponentRegistry {
+        &mut self.components
     }
 
     /// Add a map to this scene

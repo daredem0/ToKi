@@ -10,7 +10,7 @@ impl SceneSummaryView {
     pub fn from_scene(scene: &toki_core::Scene) -> Self {
         Self {
             map_count: scene.maps.len(),
-            entity_count: scene.entities.len(),
+            entity_count: scene.entities().len(),
             anchor_count: scene.anchors.len(),
             rule_count: scene.rules.rules.len(),
         }

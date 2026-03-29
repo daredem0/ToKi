@@ -1,10 +1,10 @@
-use super::components::{
-    EntityOptionalComponents, Inventory, PickupDef, PrimaryProjectileDef, ProjectileState,
-};
 use super::model::{
     AiConfig, ControlRole, Entity, EntityAttributes, EntityAudioSettings, EntityBehavior,
     EntityGameplay, EntityGrounding, EntityId, EntityKind, EntityRendering, EntityStats,
     MovementProfile, StaticObjectRenderDef,
+};
+use super::storage::{
+    Inventory, OptionalEntityComponents, PickupDef, PrimaryProjectileDef, ProjectileState,
 };
 use crate::animation::AnimationController;
 use crate::collision::CollisionBox;
@@ -59,7 +59,7 @@ const fn default_has_shadow() -> bool {
 impl EntityAttributesWire {
     pub fn from_parts(
         attributes: &EntityAttributes,
-        components: &EntityOptionalComponents,
+        components: &OptionalEntityComponents,
     ) -> Self {
         Self {
             health: attributes.gameplay.health,
@@ -87,7 +87,7 @@ impl EntityAttributesWire {
         }
     }
 
-    pub fn into_parts(self) -> (EntityAttributes, EntityOptionalComponents) {
+    pub fn into_parts(self) -> (EntityAttributes, OptionalEntityComponents) {
         let mut attributes = EntityAttributes {
             gameplay: EntityGameplay {
                 health: self.health,
@@ -115,7 +115,7 @@ impl EntityAttributesWire {
             },
         };
         attributes.ensure_legacy_health_stat();
-        let components = EntityOptionalComponents {
+        let components = OptionalEntityComponents {
             primary_projectile: self.primary_projectile,
             projectile: self.projectile,
             pickup: self.pickup,
@@ -132,11 +132,11 @@ impl EntityAttributesWire {
 #[derive(Debug, Clone)]
 pub struct StoredEntity {
     pub entity: Entity,
-    pub components: EntityOptionalComponents,
+    pub components: OptionalEntityComponents,
 }
 
 impl StoredEntity {
-    pub fn new(entity: Entity, components: EntityOptionalComponents) -> Self {
+    pub fn new(entity: Entity, components: OptionalEntityComponents) -> Self {
         Self { entity, components }
     }
 }

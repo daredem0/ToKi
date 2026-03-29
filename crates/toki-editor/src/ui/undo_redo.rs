@@ -4,7 +4,7 @@ use crate::project::{Project, ProjectMetadata, SceneGraphLayout};
 use glam::IVec2;
 use std::fs;
 use std::path::PathBuf;
-use toki_core::entity::{Entity, EntityId};
+use toki_core::entity::{Entity, EntityId, StoredEntity};
 use toki_core::menu::MenuSettings;
 use toki_core::rules::RuleSet;
 use toki_core::Scene;
@@ -319,7 +319,7 @@ pub struct DeleteSceneCommandData {
 #[derive(Debug, Clone)]
 pub struct IndexedEntity {
     pub index: usize,
-    pub entity: Entity,
+    pub entity: StoredEntity,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -377,13 +377,13 @@ impl AddEntityCommand {
             return false;
         };
         if scene
-            .entities
+            .entities()
             .iter()
             .any(|existing| existing.id == self.entity.id)
         {
             return false;
         }
-        scene.entities.push(self.entity.clone());
+        scene.add_entity(self.entity.clone());
         true
     }
 
@@ -392,14 +392,13 @@ impl AddEntityCommand {
             return false;
         };
         let Some(index) = scene
-            .entities
+            .entities()
             .iter()
             .position(|existing| existing.id == self.entity.id)
         else {
             return false;
         };
-        scene.entities.remove(index);
-        true
+        scene.remove_entity_at(index).is_some()
     }
 }
 
@@ -418,12 +417,11 @@ impl RemoveEntityCommand {
         let mut changed = false;
         for removed in &self.removed_entities {
             if let Some(index) = scene
-                .entities
+                .entities()
                 .iter()
-                .position(|entity| entity.id == removed.entity.id)
+                .position(|entity| entity.id == removed.entity.entity.id)
             {
-                scene.entities.remove(index);
-                changed = true;
+                changed |= scene.remove_entity_at(index).is_some();
             }
         }
         changed
@@ -440,14 +438,14 @@ impl RemoveEntityCommand {
         let mut changed = false;
         for removed in to_restore {
             if scene
-                .entities
+                .entities()
                 .iter()
-                .any(|entity| entity.id == removed.entity.id)
+                .any(|entity| entity.id == removed.entity.entity.id)
             {
                 continue;
             }
-            let insert_index = removed.index.min(scene.entities.len());
-            scene.entities.insert(insert_index, removed.entity);
+            let insert_index = removed.index.min(scene.entities().len());
+            scene.insert_stored_entity(insert_index, removed.entity);
             changed = true;
         }
         changed
@@ -603,11 +601,7 @@ fn apply_entity_positions(
 
     let mut changed = false;
     for target in positions {
-        if let Some(entity) = scene
-            .entities
-            .iter_mut()
-            .find(|entity| entity.id == target.id)
-        {
+        if let Some(entity) = scene.entity_mut(target.id) {
             if entity.position != target.position {
                 entity.position = target.position;
                 changed = true;
@@ -624,11 +618,7 @@ fn apply_entity_snapshots(ui_state: &mut EditorUI, scene_name: &str, snapshots: 
 
     let mut changed = false;
     for snapshot in snapshots {
-        if let Some(entity) = scene
-            .entities
-            .iter_mut()
-            .find(|entity| entity.id == snapshot.id)
-        {
+        if let Some(entity) = scene.entity_mut(snapshot.id) {
             *entity = snapshot.clone();
             changed = true;
         }

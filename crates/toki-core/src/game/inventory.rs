@@ -15,6 +15,8 @@ impl GameState {
         let mut entries = self
             .world
             .entity_manager
+            .storage()
+            .components()
             .inventory(player.id)
             .into_iter()
             .flat_map(|inventory| inventory.items.iter())
@@ -44,13 +46,13 @@ impl GameState {
         let mut pickup_ids = self
             .world
             .entity_manager
-            .active_entities()
-            .into_iter()
+            .storage()
+            .components()
+            .pickup_ids()
             .filter(|&entity_id| {
                 self.world.entity_manager
                     .get_entity(entity_id)
-                    .and_then(|entity| self.world.entity_manager.pickup(entity.id))
-                    .is_some()
+                    .is_some_and(|entity| entity.attributes.behavior.active)
             })
             .collect::<Vec<_>>();
         pickup_ids.sort_unstable();
@@ -66,7 +68,13 @@ impl GameState {
                 let Some(pickup_entity) = self.world.entity_manager.get_entity(pickup_id) else {
                     continue;
                 };
-                let Some(pickup) = self.world.entity_manager.pickup(pickup_id) else {
+                let Some(pickup) = self
+                    .world
+                    .entity_manager
+                    .storage()
+                    .components()
+                    .pickup(pickup_id)
+                else {
                     continue;
                 };
                 if pickup.count == 0 || pickup.item_id.is_empty() {
@@ -101,6 +109,8 @@ impl GameState {
 
             self.world
                 .entity_manager
+                .storage_mut()
+                .components_mut()
                 .ensure_inventory(collector_id)
                 .add_item(&item_id, count);
             tracing::debug!(
@@ -111,6 +121,8 @@ impl GameState {
                 count,
                 self.world
                     .entity_manager
+                    .storage()
+                    .components()
                     .inventory(collector_id)
                     .map(|inventory| inventory.item_count(&item_id))
                     .unwrap_or(0)

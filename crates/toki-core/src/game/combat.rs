@@ -110,7 +110,14 @@ impl GameState {
         let Some(attacker) = self.world.entity_manager.get_entity(attacker_id) else {
             return;
         };
-        let Some(spec) = self.world.entity_manager.primary_projectile(attacker_id).cloned() else {
+        let Some(spec) = self
+            .world
+            .entity_manager
+            .storage()
+            .components()
+            .primary_projectile(attacker_id)
+            .cloned()
+        else {
             return;
         };
         if spec.size[0] == 0 || spec.size[1] == 0 || spec.lifetime_ticks == 0 {
@@ -147,7 +154,11 @@ impl GameState {
             size,
             attributes,
         );
-        self.world.entity_manager.set_projectile(
+        self.world
+            .entity_manager
+            .storage_mut()
+            .components_mut()
+            .set_projectile(
             projectile_id,
             Some(crate::entity::ProjectileState {
                 sheet: spec.sheet,
@@ -179,7 +190,12 @@ impl GameState {
 
     fn projectile_hit_target(&self, projectile_id: EntityId) -> Option<EntityId> {
         let projectile = self.world.entity_manager.get_entity(projectile_id)?;
-        let projectile_state = self.world.entity_manager.projectile(projectile_id)?;
+        let projectile_state = self
+            .world
+            .entity_manager
+            .storage()
+            .components()
+            .projectile(projectile_id)?;
         let (projectile_pos, projectile_size) = projectile.interaction_bounds();
 
         let mut target_ids = self.world.entity_manager.active_entities();
@@ -194,7 +210,13 @@ impl GameState {
             };
             if !target.attributes.behavior.active
                 || target.attributes.current_stat(HEALTH_STAT_ID).is_none()
-                || self.world.entity_manager.projectile(target_id).is_some()
+                || self
+                    .world
+                    .entity_manager
+                    .storage()
+                    .components()
+                    .projectile(target_id)
+                    .is_some()
             {
                 continue;
             }
@@ -216,13 +238,14 @@ impl GameState {
         let projectile_ids = self
             .world
             .entity_manager
-            .active_entities()
-            .into_iter()
+            .storage()
+            .components()
+            .projectile_ids()
             .filter(|&entity_id| {
-                self.world.entity_manager
+                self.world
+                    .entity_manager
                     .get_entity(entity_id)
-                    .and_then(|entity| self.world.entity_manager.projectile(entity.id))
-                    .is_some()
+                    .is_some_and(|entity| entity.attributes.behavior.active)
             })
             .collect::<Vec<_>>();
 
@@ -234,15 +257,20 @@ impl GameState {
                 .entity_manager
                 .get_entity(projectile_id)
                 .and_then(|entity| {
-                    self.world.entity_manager.projectile(entity.id).map(|projectile| {
-                        (
-                            entity.position,
-                            glam::IVec2::new(projectile.velocity[0], projectile.velocity[1]),
-                            projectile.remaining_ticks,
-                            projectile.damage.max(0),
-                            projectile.owner_id,
-                        )
-                    })
+                    self.world
+                        .entity_manager
+                        .storage()
+                        .components()
+                        .projectile(entity.id)
+                        .map(|projectile| {
+                            (
+                                entity.position,
+                                glam::IVec2::new(projectile.velocity[0], projectile.velocity[1]),
+                                projectile.remaining_ticks,
+                                projectile.damage.max(0),
+                                projectile.owner_id,
+                            )
+                        })
                 })
             else {
                 continue;
@@ -272,7 +300,13 @@ impl GameState {
 
             if let Some(projectile_entity) = self.world.entity_manager.get_entity_mut(projectile_id) {
                 projectile_entity.position = new_position;
-                if let Some(projectile) = self.world.entity_manager.projectile_mut(projectile_id) {
+                if let Some(projectile) = self
+                    .world
+                    .entity_manager
+                    .storage_mut()
+                    .components_mut()
+                    .projectile_mut(projectile_id)
+                {
                     projectile.remaining_ticks = projectile.remaining_ticks.saturating_sub(1);
                     tracing::trace!(
                         "Projectile {} moved from {:?} to {:?} remaining_ticks={}",
@@ -302,7 +336,13 @@ impl GameState {
                 .world
                 .entity_manager
                 .get_entity(projectile_id)
-                .and_then(|entity| self.world.entity_manager.projectile(entity.id))
+                .and_then(|entity| {
+                    self.world
+                        .entity_manager
+                        .storage()
+                        .components()
+                        .projectile(entity.id)
+                })
                 .is_some_and(|projectile| projectile.remaining_ticks == 0);
             if expired {
                 tracing::debug!(

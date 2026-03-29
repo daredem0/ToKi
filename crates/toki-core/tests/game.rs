@@ -1454,19 +1454,9 @@ fn game_state_primary_action_damages_scene_loaded_legacy_health_target() {
         .expect("target entity should instantiate");
     target.attributes.gameplay.stats = toki_core::entity::EntityStats::default();
 
-    let scene = Scene {
-        name: "Legacy Arena".to_string(),
-        description: None,
-        maps: Vec::new(),
-        entities: vec![hero, target],
-        components: Default::default(),
-        rules: Default::default(),
-        camera_position: None,
-        camera_scale: None,
-        background_music_track_id: None,
-        anchors: Vec::new(),
-        player_entry: None,
-    };
+    let mut scene = Scene::new("Legacy Arena".to_string());
+    scene.add_entity(hero);
+    scene.add_entity(target);
 
     SceneSystem::add_scene(&mut game_state, scene);
     SceneSystem::load(&mut game_state, "Legacy Arena")
@@ -1494,7 +1484,7 @@ fn game_state_primary_action_spawns_projectile_when_authored() {
     game_state
         .world_mut()
         .entity_manager_mut()
-        .set_primary_projectile(player_id, Some(PrimaryProjectileDef {
+        .storage_mut().components_mut().set_primary_projectile(player_id, Some(PrimaryProjectileDef {
         sheet: "fauna".to_string(),
         object_name: "rock".to_string(),
         size: [16, 16],
@@ -1577,7 +1567,7 @@ fn game_state_projectile_moves_and_expires_after_lifetime() {
     game_state
         .world_mut()
         .entity_manager_mut()
-        .set_primary_projectile(player_id, Some(PrimaryProjectileDef {
+        .storage_mut().components_mut().set_primary_projectile(player_id, Some(PrimaryProjectileDef {
         sheet: "fauna".to_string(),
         object_name: "rock".to_string(),
         size: [16, 16],
@@ -1662,7 +1652,7 @@ fn game_state_projectile_applies_damage_and_despawns_on_hit() {
     game_state
         .world_mut()
         .entity_manager_mut()
-        .set_primary_projectile(player_id, Some(PrimaryProjectileDef {
+        .storage_mut().components_mut().set_primary_projectile(player_id, Some(PrimaryProjectileDef {
         sheet: "fauna".to_string(),
         object_name: "rock".to_string(),
         size: [16, 16],
@@ -1762,7 +1752,7 @@ fn game_state_collects_overlapping_pickup_into_inventory_and_despawns_item() {
         game_state
             .world()
             .entity_manager()
-            .inventory(player_id)
+            .storage().components().inventory(player_id)
             .expect("player inventory should exist")
             .item_count("coin"),
         2
@@ -1812,7 +1802,7 @@ fn game_state_pickup_collection_stacks_and_does_not_double_collect() {
         game_state
             .world()
             .entity_manager()
-            .inventory(player_id)
+            .storage().components().inventory(player_id)
             .expect("player inventory should exist")
             .item_count("coin"),
         2
@@ -2339,19 +2329,8 @@ fn game_state_load_scene_uses_control_role_for_player_identity() {
     hero.control_role = ControlRole::PlayerCharacter;
     hero.category = "creature".to_string();
 
-    let scene = Scene {
-        name: "Arena".to_string(),
-        description: None,
-        maps: Vec::new(),
-        entities: vec![hero],
-        components: Default::default(),
-        rules: Default::default(),
-        camera_position: None,
-        camera_scale: None,
-        background_music_track_id: None,
-        anchors: Vec::new(),
-        player_entry: None,
-    };
+    let mut scene = Scene::new("Arena".to_string());
+    scene.add_entity(hero);
 
     SceneSystem::add_scene(&mut game_state, scene);
     SceneSystem::load(&mut game_state, "Arena")
@@ -2444,7 +2423,7 @@ fn game_state_transition_to_scene_preserves_durable_player_state_and_resets_tran
             .expect("player should exist")
             .attributes
             .apply_stat_delta("health", -35);
-        entity_manager.ensure_inventory(player_id).add_item("coin", 3);
+        entity_manager.storage_mut().components_mut().ensure_inventory(player_id).add_item("coin", 3);
         let player = entity_manager
             .get_entity_mut(player_id)
             .expect("player should exist");
@@ -2462,7 +2441,7 @@ fn game_state_transition_to_scene_preserves_durable_player_state_and_resets_tran
     }
     let audio = game_state
         .world_mut().entity_manager_mut()
-        .audio_component_mut(player_id)
+        .storage_mut().audio_component_mut(player_id)
         .expect("player audio should exist");
     audio.footstep_distance_accumulator = 42.0;
     audio.last_collision_state = true;
@@ -2485,7 +2464,7 @@ fn game_state_transition_to_scene_preserves_durable_player_state_and_resets_tran
         game_state
             .world()
             .entity_manager()
-            .inventory(player_id)
+            .storage().components().inventory(player_id)
             .expect("player inventory should exist")
             .item_count("coin"),
         3
@@ -2503,7 +2482,7 @@ fn game_state_transition_to_scene_preserves_durable_player_state_and_resets_tran
     assert!(!controller.is_finished);
 
     let audio = game_state.world().entity_manager()
-        .audio_component(player_id)
+        .storage().audio_component(player_id)
         .expect("player audio should exist after transition");
     assert_eq!(audio.footstep_distance_accumulator, 0.0);
     assert!(!audio.last_collision_state);
@@ -2786,7 +2765,7 @@ fn game_state_emits_movement_audio_event_with_component_sound_id() {
     let player_id = game_state.world().player_id().expect("player should exist");
     let player_audio = game_state
         .world_mut().entity_manager_mut()
-        .audio_component_mut(player_id)
+        .storage_mut().audio_component_mut(player_id)
         .expect("player audio component should exist");
     player_audio.footstep_trigger_distance = 1.0;
     player_audio.movement_sound = Some("sfx_custom_step".to_string());
@@ -2820,7 +2799,7 @@ fn game_state_emits_movement_audio_on_animation_loop_when_configured() {
     {
         let player_audio = game_state
             .world_mut().entity_manager_mut()
-            .audio_component_mut(player_id)
+            .storage_mut().audio_component_mut(player_id)
             .expect("player audio component should exist");
         player_audio.footstep_trigger_distance = 9999.0;
         player_audio.movement_sound = Some("sfx_anim_step".to_string());
@@ -2983,7 +2962,7 @@ fn game_state_emits_collision_audio_event_with_component_sound_id() {
     let player_id = game_state.world().player_id().expect("player should exist");
     let player_audio = game_state
         .world_mut().entity_manager_mut()
-        .audio_component_mut(player_id)
+        .storage_mut().audio_component_mut(player_id)
         .expect("player audio component should exist");
     player_audio.collision_sound = Some("sfx_custom_collision".to_string());
 

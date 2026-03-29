@@ -199,7 +199,7 @@ pub fn save_test_state() -> GameState {
     player.position = IVec2::new(24, 40);
     scene.camera_position = Some(IVec2::new(6, 8));
     scene.camera_scale = Some(3);
-    scene.entities.push(player);
+    scene.add_entity(player);
     SceneSystem::add_scene(&mut game_state, scene);
     SceneSystem::load(&mut game_state, "main").unwrap();
     game_state.set_flag("quest_complete", FlagValue::Bool(true));

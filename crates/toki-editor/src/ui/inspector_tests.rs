@@ -536,7 +536,7 @@ fn find_selected_scene_entity_returns_entity_from_active_scene() {
         .iter_mut()
         .find(|scene| scene.name == "Main Scene")
         .expect("missing default scene");
-    scene.entities.push(entity);
+    scene.add_entity(entity);
 
     let selected_entity =
         InspectorSystem::find_selected_scene_entity(&ui_state, 7).expect("entity should be found");
@@ -555,7 +555,7 @@ fn find_selected_scene_entity_returns_none_for_inactive_scene() {
         .iter_mut()
         .find(|scene| scene.name == "Main Scene")
         .expect("missing default scene");
-    scene.entities.push(sample_entity_with_id(42));
+    scene.add_entity(sample_entity_with_id(42));
 
     assert!(InspectorSystem::find_selected_scene_entity(&ui_state, 42).is_none());
 }
@@ -569,7 +569,7 @@ fn apply_entity_property_draft_with_undo_round_trips() {
         .iter_mut()
         .find(|scene| scene.name == "Main Scene")
         .expect("missing default scene");
-    scene.entities.push(entity.clone());
+    scene.add_entity(entity.clone());
 
     let mut draft = EntityPropertyDraft::from_entity(&entity);
     draft.position_x = 99;
@@ -604,8 +604,8 @@ fn apply_entity_property_draft_with_undo_enforces_single_player_character() {
         .iter_mut()
         .find(|scene| scene.name == "Main Scene")
         .expect("missing default scene");
-    scene.entities.push(first);
-    scene.entities.push(second.clone());
+    scene.add_entity(first);
+    scene.add_entity(second.clone());
 
     let mut draft = EntityPropertyDraft::from_entity(&second);
     draft.control_role = ControlRole::PlayerCharacter;
@@ -622,12 +622,12 @@ fn apply_entity_property_draft_with_undo_enforces_single_player_character() {
         .find(|scene| scene.name == "Main Scene")
         .expect("missing default scene");
     let first = scene
-        .entities
+        .entities()
         .iter()
         .find(|entity| entity.id == 1)
         .expect("first entity should exist");
     let second = scene
-        .entities
+        .entities()
         .iter()
         .find(|entity| entity.id == 2)
         .expect("second entity should exist");

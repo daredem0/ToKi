@@ -105,7 +105,14 @@ fn player_entity(state: &GameState) -> Option<&toki_core::entity::Entity> {
 fn player_inventory(state: &GameState) -> Option<&toki_core::entity::Inventory> {
     state.world()
         .player_id()
-        .and_then(|player_id| state.world().entity_manager().inventory(player_id))
+        .and_then(|player_id| {
+            state
+                .world()
+                .entity_manager()
+                .storage()
+                .components()
+                .inventory(player_id)
+        })
 }
 
 fn scene_with_player(name: &str, position: IVec2) -> Scene {
@@ -161,7 +168,7 @@ fn on_collision_rule_runs_when_movement_is_blocked() {
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     state
         .world_mut().entity_manager_mut()
-        .audio_component_mut(player_id)
+        .storage_mut().audio_component_mut(player_id)
         .expect("player audio should exist")
         .collision_sound = None;
 
@@ -203,7 +210,7 @@ fn on_collision_rule_only_fires_once_for_sustained_blocked_input() {
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     state
         .world_mut().entity_manager_mut()
-        .audio_component_mut(player_id)
+        .storage_mut().audio_component_mut(player_id)
         .expect("player audio should exist")
         .collision_sound = None;
 
@@ -2006,7 +2013,7 @@ fn on_collision_with_trigger_self_condition_resolves_correctly() {
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     state
         .world_mut().entity_manager_mut()
-        .audio_component_mut(player_id)
+        .storage_mut().audio_component_mut(player_id)
         .expect("player audio should exist")
         .collision_sound = None;
 
@@ -2050,7 +2057,7 @@ fn on_collision_with_trigger_other_condition_none_for_tile_collision() {
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     state
         .world_mut().entity_manager_mut()
-        .audio_component_mut(player_id)
+        .storage_mut().audio_component_mut(player_id)
         .expect("player audio should exist")
         .collision_sound = None;
 
@@ -3906,7 +3913,7 @@ fn has_inventory_item_matches_when_player_has_enough_items() {
     // Give player inventory items
     state
         .world_mut().entity_manager_mut()
-        .ensure_inventory(player_id)
+        .storage_mut().components_mut().ensure_inventory(player_id)
         .add_item("key", 3);
 
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -3952,7 +3959,7 @@ fn has_inventory_item_does_not_match_when_player_has_insufficient_items() {
     // Give player fewer items than required
     state
         .world_mut().entity_manager_mut()
-        .ensure_inventory(player_id)
+        .storage_mut().components_mut().ensure_inventory(player_id)
         .add_item("key", 1);
 
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -4670,7 +4677,7 @@ fn add_inventory_item_adds_to_empty_inventory() {
     let inventory = state
         .world()
         .entity_manager()
-        .inventory(player_id)
+        .storage().components().inventory(player_id)
         .expect("player inventory should exist");
     assert_eq!(inventory.item_count("key_red"), 1);
 }
@@ -4710,7 +4717,7 @@ fn add_inventory_item_stacks_with_existing() {
     let inventory = state
         .world()
         .entity_manager()
-        .inventory(player_id)
+        .storage().components().inventory(player_id)
         .expect("player inventory should exist");
     assert_eq!(inventory.item_count("coin"), 20);
 }
@@ -4723,7 +4730,7 @@ fn remove_inventory_item_reduces_count() {
     // Add items first
     state
         .world_mut().entity_manager_mut()
-        .ensure_inventory(player_id)
+        .storage_mut().components_mut().ensure_inventory(player_id)
         .add_item("potion", 5);
 
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -4748,7 +4755,7 @@ fn remove_inventory_item_reduces_count() {
     let inventory = state
         .world()
         .entity_manager()
-        .inventory(player_id)
+        .storage().components().inventory(player_id)
         .expect("player inventory should exist");
     assert_eq!(inventory.item_count("potion"), 3);
 }
@@ -4761,7 +4768,7 @@ fn remove_inventory_item_never_goes_negative() {
     // Add only 2 items
     state
         .world_mut().entity_manager_mut()
-        .ensure_inventory(player_id)
+        .storage_mut().components_mut().ensure_inventory(player_id)
         .add_item("arrow", 2);
 
     RuleSystem::set_rules(&mut state, RuleSet {
@@ -4786,7 +4793,7 @@ fn remove_inventory_item_never_goes_negative() {
     let inventory = state
         .world()
         .entity_manager()
-        .inventory(player_id)
+        .storage().components().inventory(player_id)
         .expect("player inventory should exist");
     assert_eq!(
         inventory.item_count("arrow"),

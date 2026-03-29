@@ -956,7 +956,7 @@ indexed_palette_override = "gb_default"
         .expect("scene should parse");
     assert_eq!(scene.name, "Main Scene");
     assert_eq!(scene.maps, vec!["palette_demo_map".to_string()]);
-    assert_eq!(scene.entities.len(), 2);
+    assert_eq!(scene.entities().len(), 2);
     assert_eq!(
         scene
             .player_entry

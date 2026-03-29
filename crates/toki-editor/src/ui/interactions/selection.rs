@@ -528,7 +528,7 @@ impl SelectionInteraction {
         let max_y = world_start.y.max(world_end.y);
 
         scene
-            .entities
+            .entities()
             .iter()
             .filter(|entity| {
                 let entity_min_x = entity.position.x as f32;
@@ -572,7 +572,7 @@ impl SelectionInteraction {
         entity_id: toki_core::entity::EntityId,
     ) -> Option<Entity> {
         let scene = ui_state.scenes.iter().find(|s| s.name == scene_name)?;
-        scene.entities.iter().find(|e| e.id == entity_id).cloned()
+        scene.entities().iter().find(|e| e.id == entity_id).cloned()
     }
 
     fn find_scene_anchor(
@@ -613,7 +613,7 @@ impl SelectionInteraction {
             .copied()
             .collect::<std::collections::HashSet<_>>();
         let mut dragged = scene
-            .entities
+            .entities()
             .iter()
             .filter(|entity| selected_set.contains(&entity.id))
             .cloned()

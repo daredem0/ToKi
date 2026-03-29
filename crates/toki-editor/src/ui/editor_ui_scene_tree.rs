@@ -190,7 +190,7 @@ impl EditorUI {
                 .default_open(false)
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui.label(format!("{} entities", scene.entities.len()));
+                        ui.label(format!("{} entities", scene.entities().len()));
                         ui.label(format!("{} maps", scene.maps.len()));
                     });
 
@@ -237,9 +237,9 @@ impl EditorUI {
                         });
                     }
 
-                    if !scene.entities.is_empty() {
+                    if !scene.entities().is_empty() {
                         let (scene_items, scene_entities): (Vec<_>, Vec<_>) = scene
-                            .entities
+                            .entities()
                             .iter()
                             .partition(|entity| Self::is_scene_item_entity(entity));
 
@@ -389,11 +389,15 @@ impl EditorUI {
                 continue;
             };
             let Some((index, entity)) = self.scenes[scene_index]
-                .entities
+                .entities()
                 .iter()
                 .enumerate()
                 .find(|(_, entity)| entity.id == entity_id)
-                .map(|(index, entity)| (index, entity.clone()))
+                .and_then(|(index, entity)| {
+                    self.scenes[scene_index]
+                        .stored_entity(entity.id)
+                        .map(|stored| (index, stored))
+                })
             else {
                 continue;
             };

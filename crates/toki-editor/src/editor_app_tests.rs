@@ -902,7 +902,7 @@ fn build_scene_preview_game_state_keeps_scene_entities_when_scene_has_player_ent
         entity_definition_name: "player".to_string().into(),
         spawn_point_id: "spawn_a".to_string(),
     });
-    scene.entities.push(solid_entity(77, IVec2::new(16, 32)));
+    scene.add_entity(solid_entity(77, IVec2::new(16, 32)));
 
     let game_state = EditorApp::build_scene_preview_game_state(&scene, Some(&mut project_assets))
         .expect("scene preview game state should build");
@@ -1006,7 +1006,7 @@ fn build_scene_preview_game_state_loads_scene_entity_definitions_for_legacy_grou
         .expect("scene entity should instantiate");
     stale_scene_entity.attributes.rendering.grounding = EntityGrounding::default();
     stale_scene_entity.collision_box = Some(CollisionBox::solid_box(stale_scene_entity.size));
-    scene.entities.push(stale_scene_entity);
+    scene.add_entity(stale_scene_entity);
 
     let game_state = EditorApp::build_scene_preview_game_state(&scene, Some(&mut project_assets))
         .expect("scene preview game state should build");
@@ -1151,7 +1151,7 @@ fn build_scene_player_overlay_sprites_skips_when_scene_already_contains_authored
     });
     let mut placed_player = solid_entity(1, IVec2::new(64, 80));
     placed_player.control_role = toki_core::entity::ControlRole::PlayerCharacter;
-    scene.entities.push(placed_player);
+    scene.add_entity(placed_player);
     ui_state.scenes = vec![scene];
     ui_state.active_scene = Some("Main Scene".to_string());
 

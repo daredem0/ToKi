@@ -155,7 +155,7 @@ fn execute_command_undo_and_redo_round_trip_entity_creation() {
             .iter()
             .find(|scene| scene.name == "Main Scene")
             .expect("main scene should exist")
-            .entities
+            .entities()
             .len(),
         1
     );
@@ -167,7 +167,7 @@ fn execute_command_undo_and_redo_round_trip_entity_creation() {
         .iter()
         .find(|scene| scene.name == "Main Scene")
         .expect("main scene should exist")
-        .entities
+        .entities()
         .is_empty());
 
     assert!(ui.redo());
@@ -176,7 +176,7 @@ fn execute_command_undo_and_redo_round_trip_entity_creation() {
             .iter()
             .find(|scene| scene.name == "Main Scene")
             .expect("main scene should exist")
-            .entities
+            .entities()
             .len(),
         1
     );

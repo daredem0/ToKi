@@ -107,11 +107,7 @@ fn update_scene_entity_position(
     else {
         return false;
     };
-    let Some(entity) = scene
-        .entities
-        .iter_mut()
-        .find(|entity| entity.id == entity_id)
-    else {
+    let Some(entity) = scene.entity_mut(entity_id) else {
         return false;
     };
     entity.position = position;
@@ -133,11 +129,7 @@ fn update_scene_entities_position(
     };
     let mut moved = 0;
     for dragged in dragged_entities {
-        let Some(entity) = scene
-            .entities
-            .iter_mut()
-            .find(|entity| entity.id == dragged.id)
-        else {
+        let Some(entity) = scene.entity_mut(dragged.id) else {
             continue;
         };
         entity.position = dragged.position + drag_delta;
@@ -224,7 +216,7 @@ fn update_scene_entity_position_moves_target_entity() {
         .iter_mut()
         .find(|s| s.name == "Main Scene")
         .expect("missing default scene");
-    scene.entities.push(entity);
+    scene.add_entity(entity);
 
     let moved =
         update_scene_entity_position(&mut ui_state, "Main Scene", entity_id, IVec2::new(42, 84));
@@ -236,7 +228,7 @@ fn update_scene_entity_position_moves_target_entity() {
         .find(|s| s.name == "Main Scene")
         .expect("missing default scene");
     let moved_entity = scene
-        .entities
+        .entities()
         .iter()
         .find(|e| e.id == entity_id)
         .expect("missing moved entity");
@@ -287,8 +279,8 @@ fn drag_entities_for_start_uses_multi_selection_when_clicking_selected_entity() 
         .iter_mut()
         .find(|s| s.name == "Main Scene")
         .expect("default scene should exist");
-    scene.entities.push(first.clone());
-    scene.entities.push(second.clone());
+    scene.add_entity(first.clone());
+    scene.add_entity(second.clone());
 
     ui_state.set_single_entity_selection(first_id);
     ui_state.toggle_entity_selection(second_id);
@@ -330,8 +322,8 @@ fn update_scene_entities_position_moves_all_dragged_entities_by_delta() {
         .iter_mut()
         .find(|s| s.name == "Main Scene")
         .expect("default scene should exist");
-    scene.entities.push(first.clone());
-    scene.entities.push(second.clone());
+    scene.add_entity(first.clone());
+    scene.add_entity(second.clone());
 
     let moved = update_scene_entities_position(
         &mut ui_state,
@@ -347,12 +339,12 @@ fn update_scene_entities_position_moves_all_dragged_entities_by_delta() {
         .find(|s| s.name == "Main Scene")
         .expect("default scene should exist");
     let moved_first = scene
-        .entities
+        .entities()
         .iter()
         .find(|entity| entity.id == first_id)
         .expect("first moved entity should exist");
     let moved_second = scene
-        .entities
+        .entities()
         .iter()
         .find(|entity| entity.id == second_id)
         .expect("second moved entity should exist");
@@ -519,13 +511,13 @@ fn collect_scene_entities_in_world_rect_returns_intersecting_scene_entities() {
         .iter_mut()
         .find(|s| s.name == "Main Scene")
         .expect("missing default scene");
-    scene.entities.push(
+    scene.add_entity(
         manager
             .get_entity(first_id)
             .expect("first entity should exist")
             .clone(),
     );
-    scene.entities.push(
+    scene.add_entity(
         manager
             .get_entity(second_id)
             .expect("second entity should exist")

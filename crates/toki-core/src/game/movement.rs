@@ -257,7 +257,12 @@ impl GameState {
             .entity_manager
             .get_entity(entity_id)
             .map(|entity| entity.position);
-        let Some(entity_audio) = self.world.entity_manager.audio_component_mut(entity_id) else {
+        let Some(entity_audio) = self
+            .world
+            .entity_manager
+            .storage_mut()
+            .audio_component_mut(entity_id)
+        else {
             // Record collision event even without audio component
             self.runtime.rules.frame_collisions.push(CollisionEvent {
                 entity_a: entity_id,
@@ -327,7 +332,12 @@ impl GameState {
             .entity_manager
             .get_entity(entity_id)
             .map(|entity| entity.position);
-        let Some(entity_audio) = self.world.entity_manager.audio_component_mut(entity_id) else {
+        let Some(entity_audio) = self
+            .world
+            .entity_manager
+            .storage_mut()
+            .audio_component_mut(entity_id)
+        else {
             return;
         };
 
@@ -389,7 +399,12 @@ impl GameState {
             .entity_manager
             .get_entity(entity_id)
             .map(|entity| entity.position);
-        let Some(entity_audio) = self.world.entity_manager.audio_component_mut(entity_id) else {
+        let Some(entity_audio) = self
+            .world
+            .entity_manager
+            .storage_mut()
+            .audio_component_mut(entity_id)
+        else {
             return;
         };
 

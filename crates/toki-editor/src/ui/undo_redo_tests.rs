@@ -122,8 +122,8 @@ fn main_scene_entities(ui_state: &EditorUI) -> Vec<Entity> {
         .iter()
         .find(|scene| scene.name == "Main Scene")
         .expect("main scene should exist")
-        .entities
-        .clone()
+        .entities()
+        .to_vec()
 }
 
 fn main_scene(ui_state: &EditorUI) -> toki_core::Scene {
@@ -317,8 +317,13 @@ fn move_entities_command_round_trips_positions() {
         .iter_mut()
         .find(|scene| scene.name == "Main Scene")
         .expect("main scene should exist")
-        .entities
-        .extend([first, second]);
+        .add_entity(first);
+    ui_state
+        .scenes
+        .iter_mut()
+        .find(|scene| scene.name == "Main Scene")
+        .expect("main scene should exist")
+        .add_entity(second);
 
     let command = EditorCommand::move_entities(
         "Main Scene",
@@ -382,8 +387,7 @@ fn update_entities_command_restores_previous_state_on_undo() {
         .iter_mut()
         .find(|scene| scene.name == "Main Scene")
         .expect("main scene should exist")
-        .entities
-        .push(before.clone());
+        .add_entity(before.clone());
 
     let mut after = before.clone();
     after.attributes.rendering.visible = false;
@@ -424,19 +428,36 @@ fn remove_entities_command_restores_original_order_on_undo() {
         .iter_mut()
         .find(|scene| scene.name == "Main Scene")
         .expect("main scene should exist")
-        .entities
-        .extend(entities.clone());
+        .add_entity(entities[0].clone());
+    ui_state
+        .scenes
+        .iter_mut()
+        .find(|scene| scene.name == "Main Scene")
+        .expect("main scene should exist")
+        .add_entity(entities[1].clone());
+    ui_state
+        .scenes
+        .iter_mut()
+        .find(|scene| scene.name == "Main Scene")
+        .expect("main scene should exist")
+        .add_entity(entities[2].clone());
 
     let command = EditorCommand::remove_entities(
         "Main Scene",
         vec![
             IndexedEntity {
                 index: 0,
-                entity: entities[0].clone(),
+                entity: toki_core::entity::StoredEntity::new(
+                    entities[0].clone(),
+                    Default::default(),
+                ),
             },
             IndexedEntity {
                 index: 2,
-                entity: entities[2].clone(),
+                entity: toki_core::entity::StoredEntity::new(
+                    entities[2].clone(),
+                    Default::default(),
+                ),
             },
         ],
     );
