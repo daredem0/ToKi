@@ -112,7 +112,7 @@ impl App {
             &presentation.layout,
             appearance,
         );
-        self.rendering.render_ui_composition(&composition);
+        self.rendering.render_viewport_ui_composition(&composition);
         true
     }
 

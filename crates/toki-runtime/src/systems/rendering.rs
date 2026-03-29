@@ -12,8 +12,8 @@ use toki_core::sprite_render::{ResolvedSpriteRenderInstance, SpriteRenderMateria
 use toki_core::text::TextItem;
 use toki_core::ui::UiComposition;
 use toki_render::{
-    FrameLifecycle, GpuState, RenderBackend, ShapeRenderer, SpriteRenderer, TextRenderer,
-    TextureLoader,
+    FrameLifecycle, GpuState, RenderBackend, SceneClipRect, ShapeRenderer, SpriteRenderer,
+    TextRenderer, TextureLoader,
 };
 use winit::window::Window;
 
@@ -106,6 +106,7 @@ impl RenderingSystem {
 
     pub fn set_viewport_mode(&mut self, mode: RuntimeViewportMode) {
         self.viewport_mode = mode;
+        self.update_scene_clip_rect();
     }
 
     /// Update desired resolution (useful for editor viewport scaling)
@@ -234,6 +235,7 @@ impl RenderingSystem {
     pub fn update_window_size(&mut self, size: winit::dpi::PhysicalSize<u32>) {
         self.projection_params.width = size.width;
         self.projection_params.height = size.height;
+        self.update_scene_clip_rect();
     }
 
     /// Calculate current projection matrix
@@ -255,11 +257,47 @@ impl RenderingSystem {
         )
     }
 
+    pub fn viewport_logical_size(&self) -> glam::Vec2 {
+        self.viewport_presentation().logical_viewport_size()
+    }
+
+    pub fn viewport_surface_size(&self) -> glam::Vec2 {
+        self.viewport_presentation().surface_viewport_size()
+    }
+
+    pub fn logical_to_surface_position(&self, position: glam::Vec2) -> glam::Vec2 {
+        self.viewport_presentation().logical_to_surface_position(position)
+    }
+
+    pub fn surface_to_viewport_position(&self, position: glam::Vec2) -> Option<glam::Vec2> {
+        self.viewport_presentation()
+            .surface_to_viewport_local_position(position)
+    }
+
     /// Update GPU projection matrix with view transform
     pub fn update_projection(&mut self, view_matrix: glam::Mat4) {
         let projection = self.calculate_projection();
+        let clip_rect = self.scene_clip_rect();
         if let Some(backend) = &mut self.backend {
+            FrameLifecycle::set_scene_clip_rect(backend.as_mut(), clip_rect);
             FrameLifecycle::update_projection(backend.as_mut(), projection * view_matrix);
+        }
+    }
+
+    fn scene_clip_rect(&self) -> Option<SceneClipRect> {
+        let rect = self.viewport_presentation().layout.viewport_rect;
+        Some(SceneClipRect {
+            x: rect.x.round().max(0.0) as u32,
+            y: rect.y.round().max(0.0) as u32,
+            width: rect.width.round().max(1.0) as u32,
+            height: rect.height.round().max(1.0) as u32,
+        })
+    }
+
+    fn update_scene_clip_rect(&mut self) {
+        let clip_rect = self.scene_clip_rect();
+        if let Some(backend) = &mut self.backend {
+            FrameLifecycle::set_scene_clip_rect(backend.as_mut(), clip_rect);
         }
     }
 
@@ -454,6 +492,11 @@ impl RenderingSystem {
         }
     }
 
+    pub fn add_viewport_text_item(&mut self, text: TextItem) {
+        let transformed = self.viewport_presentation().offset_surface_text_item(&text);
+        self.add_text_item(transformed);
+    }
+
     pub fn clear_world_underlay_shapes(&mut self) {
         if let Some(backend) = &mut self.backend {
             ShapeRenderer::clear_world_underlay_shapes(backend.as_mut());
@@ -524,6 +567,13 @@ impl RenderingSystem {
                 self.add_text_item(text.to_text_item());
             }
         }
+    }
+
+    pub fn render_viewport_ui_composition(&mut self, composition: &UiComposition) {
+        let transformed = self
+            .viewport_presentation()
+            .offset_surface_ui_composition(composition);
+        self.render_ui_composition(&transformed);
     }
 
     pub fn clear_debug_shapes(&mut self) {

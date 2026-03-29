@@ -24,6 +24,7 @@ pub(super) struct SceneRuntimeCoordinator<'a> {
     audio_mix: &'a RuntimeAudioMixOptions,
     scene_persistence: bool,
     indexed_palette_override: Option<String>,
+    window_size: Option<winit::dpi::PhysicalSize<u32>>,
     content_root: Option<PathBuf>,
 }
 
@@ -42,6 +43,7 @@ pub(super) struct SceneRuntimeSettings<'a> {
     pub audio_mix: &'a RuntimeAudioMixOptions,
     pub scene_persistence: bool,
     pub indexed_palette_override: Option<String>,
+    pub window_size: Option<winit::dpi::PhysicalSize<u32>>,
     pub content_root: Option<PathBuf>,
 }
 
@@ -59,6 +61,7 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             audio_mix: settings.audio_mix,
             scene_persistence: settings.scene_persistence,
             indexed_palette_override: settings.indexed_palette_override,
+            window_size: settings.window_size,
             content_root: settings.content_root,
         }
     }
@@ -207,6 +210,9 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             .clamp_to_world_bounds(world_bounds);
 
         if self.rendering.has_gpu() {
+            if let Some(window_size) = self.window_size {
+                self.rendering.update_window_size(window_size);
+            }
             let view = self.camera_system.view_matrix();
             self.rendering.update_projection(view);
             self.camera_system
@@ -297,6 +303,7 @@ impl App {
                     .display
                     .indexed_palette_override
                     .clone(),
+                window_size: self.platform.inner_size(),
                 content_root,
             },
         )

@@ -16,7 +16,7 @@ use toki_core::sprite_render::{
 };
 use toki_core::text::{TextItem, TextStyle};
 use toki_core::ui::{UiBlock, UiComposition, UiRect, UiTextBlock};
-use toki_render::RenderBackend;
+use toki_render::{RenderBackend, SceneClipRect};
 
 #[derive(Default, Debug)]
 struct FakeBackend {
@@ -38,9 +38,14 @@ struct FakeBackend {
     finalized_world_underlay: Rc<Cell<usize>>,
     finalized_debug: Rc<Cell<usize>>,
     finalized_ui: Rc<Cell<usize>>,
+    scene_clip_rect: Rc<RefCell<Option<SceneClipRect>>>,
 }
 
 impl RenderBackend for FakeBackend {
+    fn set_scene_clip_rect(&mut self, rect: Option<SceneClipRect>) {
+        *self.scene_clip_rect.borrow_mut() = rect;
+    }
+
     fn load_tilemap_texture(
         &mut self,
         texture_path: std::path::PathBuf,
@@ -366,6 +371,30 @@ fn integer_scale_fixed_projection_uses_requested_factor_when_available() {
     assert!((top_left.y - 84.0).abs() < 0.01);
     assert!((bottom_right.x - 640.0).abs() < 0.01);
     assert!((bottom_right.y - 516.0).abs() < 0.01);
+}
+
+#[test]
+fn update_projection_applies_scene_clip_rect_for_letterboxed_viewport() {
+    let fake = FakeBackend::default();
+    let scene_clip_rect = fake.scene_clip_rect.clone();
+    let mut rendering = RenderingSystem::new_with_desired_resolution(160, 144);
+    rendering.set_backend_for_tests(Box::new(fake));
+    rendering.set_viewport_mode(RuntimeViewportMode::IntegerScale {
+        factor: IntegerScaleFactor::Auto,
+    });
+    rendering.update_window_size(winit::dpi::PhysicalSize::new(800, 600));
+
+    rendering.update_projection(glam::Mat4::IDENTITY);
+
+    assert_eq!(
+        *scene_clip_rect.borrow(),
+        Some(SceneClipRect {
+            x: 80,
+            y: 12,
+            width: 640,
+            height: 576,
+        })
+    );
 }
 
 #[test]

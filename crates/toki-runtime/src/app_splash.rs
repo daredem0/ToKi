@@ -110,11 +110,8 @@ impl App {
     pub(super) fn render_startup_splash(&mut self) {
         let logo_size = glam::UVec2::new(SPLASH_LOGO_WIDTH, SPLASH_LOGO_HEIGHT);
         let presentation = self.rendering.viewport_presentation();
-        let view_size = glam::Vec2::new(
-            presentation.layout.logical_viewport_size.x as f32,
-            presentation.layout.logical_viewport_size.y as f32,
-        );
-        let logo_origin = Self::centered_logo_origin_for_view(view_size, logo_size);
+        let logical_view_size = presentation.logical_viewport_size();
+        let logo_origin = Self::centered_logo_origin_for_view(logical_view_size, logo_size);
         self.rendering.update_projection(glam::Mat4::IDENTITY);
         self.rendering.set_tilemap_render_enabled(false);
         self.rendering.clear_sprites();
@@ -141,13 +138,26 @@ impl App {
                 weight: TextWeight::Bold,
                 ..TextStyle::default()
             };
-            let version_style =
-                Self::fitted_splash_version_style(view_size.x, COMMUNITY_SPLASH_VERSION_TEXT);
+            let surface_view_size = presentation.surface_viewport_size();
+            let surface_logo_origin =
+                presentation.logical_to_surface_position(logo_origin.as_vec2()).floor().as_ivec2();
+            let surface_logo_size = glam::UVec2::new(
+                (logo_size.x as f32 * presentation.layout.resolved_scale)
+                    .round()
+                    .max(1.0) as u32,
+                (logo_size.y as f32 * presentation.layout.resolved_scale)
+                    .round()
+                    .max(1.0) as u32,
+            );
+            let version_style = Self::fitted_splash_version_style(
+                surface_view_size.x,
+                COMMUNITY_SPLASH_VERSION_TEXT,
+            );
             let (branding_position, version_position) = Self::splash_branding_positions(
-                view_size,
+                surface_view_size,
                 self.splash_logo_loaded,
-                logo_origin,
-                logo_size,
+                surface_logo_origin,
+                surface_logo_size,
                 &branding_style,
                 &version_style,
             );
@@ -166,7 +176,7 @@ impl App {
                     version_position,
                     version_style,
                 )
-                .with_max_width((view_size.x - SPLASH_TEXT_HORIZONTAL_PADDING_PX).max(1.0))
+                .with_max_width((surface_view_size.x - SPLASH_TEXT_HORIZONTAL_PADDING_PX).max(1.0))
                 .with_anchor(TextAnchor::TopCenter)
                 .with_layer(10),
             );
