@@ -1,8 +1,8 @@
 use super::{
     AiBehavior, AiConfig, EntityPropertyDraft, InspectorSystem, MovementProfile,
-    MultiEntityBatchEdit, ProjectSettingsDraft, RuleActionKind, RuleConditionKind, RuleTriggerKind,
+    MultiEntityBatchEdit, RuleActionKind, RuleConditionKind, RuleTriggerKind,
 };
-use crate::project::Project;
+use crate::project::{Project, ProjectSettingsDraft};
 use crate::ui::EditorUI;
 use glam::{IVec2, UVec2};
 use std::fs;

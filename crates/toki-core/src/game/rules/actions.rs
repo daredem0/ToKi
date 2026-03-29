@@ -33,13 +33,10 @@ impl RuleEngine<'_> {
             info!(rule_id = %rule_id, action = ?action, "Rule action passed");
         }
         tracing::debug!("Buffering rule action: {:?}", action);
-        if self.buffer_audio_or_motion_action(action, context, command_buffer)
+        let _handled = self.buffer_audio_or_motion_action(action, context, command_buffer)
             || self.buffer_scene_dialog_or_persistence_action(action, context, command_buffer)
             || self.buffer_entity_mutation_action(action, context, command_buffer)
-            || self.buffer_inventory_or_flag_action(action, context, command_buffer)
-        {
-            return;
-        }
+            || self.buffer_inventory_or_flag_action(action, context, command_buffer);
     }
 
     fn buffer_audio_or_motion_action(

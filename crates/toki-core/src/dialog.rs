@@ -379,12 +379,12 @@ mod tests {
         let dialog = DialogTree {
             id: "intro".to_string().into(),
             title: "Intro".to_string(),
-            entry_node_id: "start".to_string().into(),
+            entry_node_id: "start".to_string(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![
                 DialogNode {
-                    id: "start".to_string().into(),
+                    id: "start".to_string(),
                     speaker_name: Some("Guide".to_string()),
                     conditions: Vec::new(),
                     kind: DialogNodeKind::Line {
@@ -393,7 +393,7 @@ mod tests {
                     },
                 },
                 DialogNode {
-                    id: "done".to_string().into(),
+                    id: "done".to_string(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -414,12 +414,12 @@ mod tests {
         let dialog = DialogTree {
             id: "intro".to_string().into(),
             title: String::new(),
-            entry_node_id: "start".to_string().into(),
+            entry_node_id: "start".to_string(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![
                 DialogNode {
-                    id: "start".to_string().into(),
+                    id: "start".to_string(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::Line {
@@ -428,7 +428,7 @@ mod tests {
                     },
                 },
                 DialogNode {
-                    id: "unused".to_string().into(),
+                    id: "unused".to_string(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -452,12 +452,12 @@ mod tests {
         let dialog = DialogTree {
             id: "intro".to_string().into(),
             title: String::new(),
-            entry_node_id: "start".to_string().into(),
+            entry_node_id: "start".to_string(),
             allow_cancel: true,
             gate_gameplay: true,
             nodes: vec![
                 DialogNode {
-                    id: "start".to_string().into(),
+                    id: "start".to_string(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {
@@ -466,7 +466,7 @@ mod tests {
                     },
                 },
                 DialogNode {
-                    id: "unused".to_string().into(),
+                    id: "unused".to_string(),
                     speaker_name: None,
                     conditions: Vec::new(),
                     kind: DialogNodeKind::End {

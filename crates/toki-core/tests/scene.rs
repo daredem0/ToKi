@@ -11,7 +11,7 @@ fn create_test_entity(id: u32, position: IVec2) -> Entity {
     let mut controller = AnimationController::new();
     let idle_clip = AnimationClip {
         state: AnimationState::Idle,
-        atlas_name: "test_atlas".to_string().into(),
+        atlas_name: "test_atlas".to_string(),
         frame_tile_names: vec!["idle_0".to_string()],
         frame_positions: None,
         frame_duration_ms: 300.0,
@@ -446,14 +446,16 @@ fn test_scene_rules_serialization_roundtrip() {
 fn test_scene_serialization_preserves_sparse_optional_components() {
     let mut scene = Scene::new("stored_entities".to_string());
     let entity = create_test_entity(9, IVec2::new(32, 48));
-    let mut components = OptionalEntityComponents::default();
-    components.pickup = Some(PickupDef {
-        item_id: "coin".to_string(),
-        count: 5,
-    });
     let mut inventory = toki_core::entity::Inventory::default();
     inventory.add_item("key_red", 1);
-    components.inventory = Some(inventory);
+    let components = OptionalEntityComponents {
+        pickup: Some(PickupDef {
+            item_id: "coin".to_string(),
+            count: 5,
+        }),
+        inventory: Some(inventory),
+        ..OptionalEntityComponents::default()
+    };
 
     scene.add_stored_entity(StoredEntity::new(entity, components));
 

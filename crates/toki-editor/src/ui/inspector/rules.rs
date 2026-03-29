@@ -11,17 +11,30 @@ mod rules_support;
 use super::RuleAudioChoices;
 use super::RuleValidationIssue;
 
+pub(super) struct SceneRulesEditorParams<'a> {
+    pub(super) scene_name: &'a str,
+    pub(super) rule_set: &'a mut RuleSet,
+    pub(super) scenes: &'a [toki_core::Scene],
+    pub(super) declared_flags: &'a [toki_core::project_runtime::ProjectFlagDefinition],
+    pub(super) available_dialog_outcomes: &'a std::collections::BTreeMap<String, Vec<String>>,
+    pub(super) config: Option<&'a EditorConfig>,
+    pub(super) map_size: Option<(u32, u32)>,
+}
+
 impl InspectorSystem {
     pub(super) fn render_scene_rules_editor(
         ui: &mut egui::Ui,
-        scene_name: &str,
-        rule_set: &mut RuleSet,
-        scenes: &[toki_core::Scene],
-        declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
-        available_dialog_outcomes: &std::collections::BTreeMap<String, Vec<String>>,
-        config: Option<&EditorConfig>,
-        map_size: Option<(u32, u32)>,
+        params: SceneRulesEditorParams<'_>,
     ) -> bool {
+        let SceneRulesEditorParams {
+            scene_name,
+            rule_set,
+            scenes,
+            declared_flags,
+            available_dialog_outcomes,
+            config,
+            map_size,
+        } = params;
         let mut changed = false;
         let validation_issues =
             Self::validate_rule_set_for_scene(rule_set, scene_name, scenes, declared_flags);

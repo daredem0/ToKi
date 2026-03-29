@@ -6,7 +6,7 @@ use toki_core::entity::*;
 fn test_entity_definition_create_entity_basic() {
     let entity_def = EntityDefinition {
         name: "test_player".to_string().into(),
-        display_name: "Test Player".to_string().into(),
+        display_name: "Test Player".to_string(),
         description: "A test player entity".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -46,7 +46,7 @@ fn test_entity_definition_create_entity_basic() {
             collision_sound: Some("player_collision".to_string()),
         },
         animations: AnimationsDef {
-            atlas_name: "player_atlas".to_string().into(),
+            atlas_name: "player_atlas".to_string(),
             clips: vec![
                 AnimationClipDef {
                     state: "idle".to_string(),
@@ -144,7 +144,7 @@ fn test_entity_definition_create_entity_basic() {
 fn test_entity_definition_create_npc_entity() {
     let entity_def = EntityDefinition {
         name: "test_npc".to_string().into(),
-        display_name: "Test NPC".to_string().into(),
+        display_name: "Test NPC".to_string(),
         description: "A test NPC entity".to_string(),
         rendering: RenderingDef {
             size: [32, 32],
@@ -184,7 +184,7 @@ fn test_entity_definition_create_npc_entity() {
             collision_sound: Some("npc_collision".to_string()),
         },
         animations: AnimationsDef {
-            atlas_name: "npc_atlas".to_string().into(),
+            atlas_name: "npc_atlas".to_string(),
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["npc/idle_0".to_string()],
@@ -296,7 +296,7 @@ fn test_entity_definition_missing_ai_fields_defaults_to_none() {
 fn test_entity_definition_non_player_type_can_still_become_player_via_control_role_later() {
     let entity_def = EntityDefinition {
         name: "hero_creature".to_string().into(),
-        display_name: "Hero Creature".to_string().into(),
+        display_name: "Hero Creature".to_string(),
         description: "Generic creature whose player role comes from the scene".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -306,7 +306,7 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
             palette_override: None,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
-                object_name: "coin".to_string().into(),
+                object_name: "coin".to_string(),
             }),
             grounding: Default::default(),
         },
@@ -339,7 +339,7 @@ fn test_entity_definition_non_player_type_can_still_become_player_via_control_ro
             collision_sound: None,
         },
         animations: AnimationsDef {
-            atlas_name: "creatures".to_string().into(),
+            atlas_name: "creatures".to_string(),
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["creature/idle_0".to_string()],
@@ -430,7 +430,7 @@ fn test_entity_definition_supports_explicit_player_wasd_movement_profile() {
 fn test_entity_definition_accepts_directional_animation_states() {
     let entity_def = EntityDefinition {
         name: "directional_player".to_string().into(),
-        display_name: "Directional Player".to_string().into(),
+        display_name: "Directional Player".to_string(),
         description: "Player with directional walk clips".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -470,7 +470,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
             collision_sound: None,
         },
         animations: AnimationsDef {
-            atlas_name: "players.json".to_string().into(),
+            atlas_name: "players.json".to_string(),
             clips: vec![
                 AnimationClipDef {
                     state: "idle_down".to_string(),
@@ -528,7 +528,7 @@ fn test_entity_definition_accepts_directional_animation_states() {
 fn test_entity_definition_accepts_optional_attack_animation_states() {
     let entity_def = EntityDefinition {
         name: "player".to_string().into(),
-        display_name: "Player".to_string().into(),
+        display_name: "Player".to_string(),
         description: "Player with optional attack clips".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -568,7 +568,7 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
             collision_sound: None,
         },
         animations: AnimationsDef {
-            atlas_name: "players.json".to_string().into(),
+            atlas_name: "players.json".to_string(),
             clips: vec![
                 AnimationClipDef {
                     state: "idle_down".to_string(),
@@ -634,7 +634,7 @@ fn test_entity_definition_accepts_optional_attack_animation_states() {
 fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
     let entity_def = EntityDefinition {
         name: "slime".to_string().into(),
-        display_name: "Slime".to_string().into(),
+        display_name: "Slime".to_string(),
         description: "Stat-seeded slime".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -644,7 +644,7 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
             palette_override: None,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
-                object_name: "coin".to_string().into(),
+                object_name: "coin".to_string(),
             }),
             grounding: Default::default(),
         },
@@ -677,7 +677,7 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
             collision_sound: None,
         },
         animations: AnimationsDef {
-            atlas_name: "creatures.json".to_string().into(),
+            atlas_name: "creatures.json".to_string(),
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["slime/idle_0".to_string()],
@@ -705,7 +705,7 @@ fn test_entity_definition_seeds_generic_health_stat_from_legacy_health() {
 fn test_entity_definition_seeds_authored_attack_power_stat() {
     let entity_def = EntityDefinition {
         name: "fighter".to_string().into(),
-        display_name: "Fighter".to_string().into(),
+        display_name: "Fighter".to_string(),
         description: "Attack-powered fighter".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -715,7 +715,7 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
             palette_override: None,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
-                object_name: "coin".to_string().into(),
+                object_name: "coin".to_string(),
             }),
             grounding: Default::default(),
         },
@@ -748,7 +748,7 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
             collision_sound: None,
         },
         animations: AnimationsDef {
-            atlas_name: "fighters".to_string().into(),
+            atlas_name: "fighters".to_string(),
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["fighter/idle_0".to_string()],
@@ -780,7 +780,7 @@ fn test_entity_definition_seeds_authored_attack_power_stat() {
 fn test_entity_definition_copies_authored_primary_projectile() {
     let entity_def = EntityDefinition {
         name: "ranger".to_string().into(),
-        display_name: "Ranger".to_string().into(),
+        display_name: "Ranger".to_string(),
         description: "Projectile-capable ranger".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -802,7 +802,7 @@ fn test_entity_definition_copies_authored_primary_projectile() {
             movement_profile: MovementProfile::PlayerWasd,
             primary_projectile: Some(PrimaryProjectileDef {
                 sheet: "fauna".to_string(),
-                object_name: "rock".to_string().into(),
+                object_name: "rock".to_string(),
                 size: [16, 16],
                 speed: 4,
                 damage: 8,
@@ -828,7 +828,7 @@ fn test_entity_definition_copies_authored_primary_projectile() {
             collision_sound: None,
         },
         animations: AnimationsDef {
-            atlas_name: "ranger".to_string().into(),
+            atlas_name: "ranger".to_string(),
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["ranger/idle_0".to_string()],
@@ -864,7 +864,7 @@ fn test_entity_definition_copies_authored_primary_projectile() {
 fn test_entity_definition_copies_authored_pickup() {
     let entity_def = EntityDefinition {
         name: "coin_pickup".to_string().into(),
-        display_name: "Coin Pickup".to_string().into(),
+        display_name: "Coin Pickup".to_string(),
         description: "Collectible coin".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -874,7 +874,7 @@ fn test_entity_definition_copies_authored_pickup() {
             palette_override: None,
             static_object: Some(StaticObjectRenderDef {
                 sheet: "items".to_string(),
-                object_name: "coin".to_string().into(),
+                object_name: "coin".to_string(),
             }),
             grounding: Default::default(),
         },
@@ -951,7 +951,7 @@ fn test_entity_definition_copies_authored_pickup() {
 fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type() {
     let entity_def = EntityDefinition {
         name: "invalid".to_string().into(),
-        display_name: "Invalid".to_string().into(),
+        display_name: "Invalid".to_string(),
         description: "Invalid entity type".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -991,7 +991,7 @@ fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type()
             collision_sound: None,
         },
         animations: AnimationsDef {
-            atlas_name: "test".to_string().into(),
+            atlas_name: "test".to_string(),
             clips: vec![],
             default_state: "idle".to_string(),
         },
@@ -1010,7 +1010,7 @@ fn test_entity_definition_unknown_category_defaults_to_actor_like_runtime_type()
 fn test_entity_definition_invalid_animation_state() {
     let entity_def = EntityDefinition {
         name: "invalid_anim".to_string().into(),
-        display_name: "Invalid Animation".to_string().into(),
+        display_name: "Invalid Animation".to_string(),
         description: "Invalid animation state".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -1050,7 +1050,7 @@ fn test_entity_definition_invalid_animation_state() {
             collision_sound: None,
         },
         animations: AnimationsDef {
-            atlas_name: "test".to_string().into(),
+            atlas_name: "test".to_string(),
             clips: vec![AnimationClipDef {
                 state: "invalid_state".to_string(), // Invalid state
                 frame_tiles: vec!["test/frame_0".to_string()],
@@ -1078,7 +1078,7 @@ fn test_entity_definition_invalid_animation_state() {
 fn test_entity_definition_invalid_loop_mode() {
     let entity_def = EntityDefinition {
         name: "invalid_loop".to_string().into(),
-        display_name: "Invalid Loop Mode".to_string().into(),
+        display_name: "Invalid Loop Mode".to_string(),
         description: "Invalid loop mode".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -1118,7 +1118,7 @@ fn test_entity_definition_invalid_loop_mode() {
             collision_sound: None,
         },
         animations: AnimationsDef {
-            atlas_name: "test".to_string().into(),
+            atlas_name: "test".to_string(),
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["test/frame_0".to_string()],
@@ -1146,7 +1146,7 @@ fn test_entity_definition_invalid_loop_mode() {
 fn test_entity_definition_serialization() {
     let entity_def = EntityDefinition {
         name: "serialize_test".to_string().into(),
-        display_name: "Serialize Test".to_string().into(),
+        display_name: "Serialize Test".to_string(),
         description: "Test serialization".to_string(),
         rendering: RenderingDef {
             size: [8, 8],
@@ -1186,7 +1186,7 @@ fn test_entity_definition_serialization() {
             collision_sound: None,
         },
         animations: AnimationsDef {
-            atlas_name: "items".to_string().into(),
+            atlas_name: "items".to_string(),
             clips: vec![],
             default_state: "idle".to_string(),
         },
@@ -1278,7 +1278,7 @@ fn entity_definition_rendering_defaults_has_shadow_to_true_when_missing() {
 fn create_entity_copies_has_shadow_from_definition_rendering() {
     let entity_def = EntityDefinition {
         name: "no_shadow".to_string().into(),
-        display_name: "No Shadow".to_string().into(),
+        display_name: "No Shadow".to_string(),
         description: "".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -1337,7 +1337,7 @@ fn create_entity_copies_has_shadow_from_definition_rendering() {
 fn test_entity_definition_create_audio_component() {
     let entity_def = EntityDefinition {
         name: "audio_test".to_string().into(),
-        display_name: "Audio Test".to_string().into(),
+        display_name: "Audio Test".to_string(),
         description: "Audio component extraction".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -1377,7 +1377,7 @@ fn test_entity_definition_create_audio_component() {
             collision_sound: Some("sfx_custom_hit".to_string()),
         },
         animations: AnimationsDef {
-            atlas_name: "test".to_string().into(),
+            atlas_name: "test".to_string(),
             clips: vec![AnimationClipDef {
                 state: "idle".to_string(),
                 frame_tiles: vec!["test_0".to_string()],
@@ -1414,7 +1414,7 @@ fn test_entity_definition_create_audio_component() {
 fn test_entity_definition_create_audio_component_trims_blank_audio_fields() {
     let entity_def = EntityDefinition {
         name: "audio_trim_test".to_string().into(),
-        display_name: "Audio Trim Test".to_string().into(),
+        display_name: "Audio Trim Test".to_string(),
         description: "Audio normalization".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -1454,7 +1454,7 @@ fn test_entity_definition_create_audio_component_trims_blank_audio_fields() {
             collision_sound: Some("   ".to_string()),
         },
         animations: AnimationsDef {
-            atlas_name: "test".to_string().into(),
+            atlas_name: "test".to_string(),
             clips: vec![],
             default_state: "idle".to_string(),
         },
@@ -1666,7 +1666,7 @@ fn test_legacy_ai_behavior_backward_compatibility() {
 fn entity_definition_defaults_grounding_to_bottom_center_and_collision_footprint() {
     let entity_def = EntityDefinition {
         name: "grounding_default".to_string().into(),
-        display_name: "Grounding Default".to_string().into(),
+        display_name: "Grounding Default".to_string(),
         description: String::new(),
         rendering: RenderingDef {
             size: [32, 48],
@@ -1734,7 +1734,7 @@ fn entity_definition_defaults_grounding_to_bottom_center_and_collision_footprint
 fn entity_definition_uses_explicit_grounding_for_collision_and_sorting() {
     let entity_def = EntityDefinition {
         name: "grounding_override".to_string().into(),
-        display_name: "Grounding Override".to_string().into(),
+        display_name: "Grounding Override".to_string(),
         description: String::new(),
         rendering: RenderingDef {
             size: [32, 48],
@@ -2019,7 +2019,7 @@ fn test_entity_definition_with_position_based_animations() {
     // Test full entity definition with position-based animation clips
     let entity_def = EntityDefinition {
         name: "position_animated".to_string().into(),
-        display_name: "Position Animated Entity".to_string().into(),
+        display_name: "Position Animated Entity".to_string(),
         description: "Entity using position-based animation frames".to_string(),
         rendering: RenderingDef {
             size: [16, 16],
@@ -2059,7 +2059,7 @@ fn test_entity_definition_with_position_based_animations() {
             collision_sound: None,
         },
         animations: AnimationsDef {
-            atlas_name: "sprites.json".to_string().into(),
+            atlas_name: "sprites.json".to_string(),
             clips: vec![
                 AnimationClipDef {
                     state: "idle".to_string(),
@@ -2116,7 +2116,7 @@ fn test_animation_controller_per_frame_duration_timing() {
 
     let clip = AnimationClip {
         state: AnimationState::Attack,
-        atlas_name: "test".to_string().into(),
+        atlas_name: "test".to_string(),
         frame_tile_names: vec![
             "frame_0".to_string(),
             "frame_1".to_string(),

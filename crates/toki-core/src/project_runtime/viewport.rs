@@ -41,16 +41,11 @@ impl RuntimeViewportMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IntegerScaleFactor {
+    #[default]
     Auto,
     Fixed(u8),
-}
-
-impl Default for IntegerScaleFactor {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 impl Serialize for IntegerScaleFactor {

@@ -10,7 +10,10 @@ use crate::entity::EntityId;
 use crate::events::GameUpdateResult;
 use crate::events::PersistenceRequest;
 
-use super::{AudioEvent, GameState, PendingDialogStart, PendingSceneSwitch, RuleCommand};
+use super::{
+    AppliedRuleCommandResult, AudioEvent, GameState, PendingDialogStart, PendingSceneSwitch,
+    RuleCommand,
+};
 
 impl GameState {
     pub(in crate::game) fn apply_rule_commands(
@@ -18,12 +21,7 @@ impl GameState {
         commands: Vec<RuleCommand>,
         result: &mut GameUpdateResult<AudioEvent>,
         tilemap: &TileMap,
-    ) -> (
-        Vec<(EntityId, AnimationState)>,
-        Option<PendingSceneSwitch>,
-        Option<PendingDialogStart>,
-        Option<PersistenceRequest>,
-    ) {
+    ) -> AppliedRuleCommandResult {
         let mut buffered_velocities = HashMap::new();
         let mut buffered_animations = HashMap::new();
         let mut pending_scene_switch = None;

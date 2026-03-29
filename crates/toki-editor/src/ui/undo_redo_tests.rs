@@ -418,7 +418,7 @@ fn remove_entities_command_restores_original_order_on_undo() {
     let mut ui_state = EditorUI::new();
     let mut history = UndoRedoHistory::default();
 
-    let entities = vec![
+    let entities = [
         sample_entity(1, IVec2::new(0, 0)),
         sample_entity(2, IVec2::new(16, 0)),
         sample_entity(3, IVec2::new(32, 0)),
