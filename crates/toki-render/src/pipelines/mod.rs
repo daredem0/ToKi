@@ -1,3 +1,5 @@
+mod common;
+mod dynamic_buffer;
 pub mod debug;
 pub mod post_process;
 pub mod sprite;
@@ -7,10 +9,12 @@ use bytemuck::Pod;
 use std::path::PathBuf;
 use toki_core::graphics::image::DecodedImage;
 use wgpu::util::DeviceExt;
-use wgpu::{BindGroupLayout, Device, Queue, RenderPass, RenderPipeline as WgpuRenderPipeline};
+use wgpu::{BindGroupLayout, Device, Queue, RenderPass};
 
 use crate::wgpu_utils::{create_texture_bindgroup, create_texture_bindgroup_from_rgba8};
 use crate::RenderError;
+
+pub(crate) use common::build_standard_render_pipeline;
 
 /// Common trait for all rendering pipelines
 pub trait RenderPipeline {
@@ -21,7 +25,7 @@ pub trait RenderPipeline {
     fn update(&mut self);
 
     /// Update pipeline state with queue access (optional)
-    fn update_with_queue(&mut self, _queue: &Queue) {
+    fn update_with_queue(&mut self, _device: &Device, _queue: &Queue) {
         self.update();
     }
 }
@@ -98,48 +102,6 @@ pub(crate) fn create_texture_bindgroup_for_source(
             texture_label,
         ),
     }
-}
-
-pub(crate) fn build_standard_render_pipeline(
-    device: &Device,
-    surface_format: wgpu::TextureFormat,
-    shader: &wgpu::ShaderModule,
-    pipeline_layout_label: &str,
-    pipeline_label: &str,
-    bind_group_layouts: &[&BindGroupLayout],
-    vertex_buffers: &[wgpu::VertexBufferLayout<'_>],
-) -> WgpuRenderPipeline {
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some(pipeline_layout_label),
-        bind_group_layouts,
-        push_constant_ranges: &[],
-    });
-
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some(pipeline_label),
-        cache: None,
-        layout: Some(&pipeline_layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: Some("vs_main"),
-            buffers: vertex_buffers,
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: Some("fs_main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            targets: &[Some(wgpu::ColorTargetState {
-                format: surface_format,
-                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
-        multiview: None,
-    })
 }
 
 #[cfg(test)]

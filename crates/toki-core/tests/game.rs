@@ -2759,6 +2759,35 @@ fn game_state_spawn_player_like_npc_uses_definition_metadata() {
 }
 
 #[test]
+fn game_state_spawn_player_like_npc_uses_player_visuals_with_npc_behavior() {
+    let mut game_state = GameState::new_empty();
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut game_state, IVec2::new(120, 72));
+    let npc = game_state
+        .world()
+        .entity_manager()
+        .get_entity(npc_id)
+        .expect("spawned npc should exist");
+
+    assert_eq!(npc.attributes.gameplay.health, Some(50));
+    assert_eq!(npc.attributes.gameplay.speed, 1.0);
+    assert!(!npc.attributes.behavior.can_move);
+    assert_eq!(
+        npc.attributes.behavior.movement_profile,
+        toki_core::entity::MovementProfile::None
+    );
+    assert!(npc.attributes.rendering.animation_controller.is_some());
+    assert!(
+        game_state
+            .world()
+            .entity_manager()
+            .storage()
+            .components()
+            .inventory(npc_id)
+            .is_none()
+    );
+}
+
+#[test]
 fn game_state_emits_movement_audio_event_with_component_sound_id() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);

@@ -21,11 +21,15 @@ mod input_state;
 mod interaction;
 mod inventory;
 mod movement;
+mod player_defs;
 mod render_queries;
 pub(crate) mod rules;
 mod scene;
+mod scene_restore;
+mod simulation;
 mod stat_effects;
 mod transition;
+mod world_context;
 
 #[cfg(test)]
 mod rules_tests;
@@ -44,6 +48,7 @@ pub use rules::RuleSystem;
 pub use scene::RestoreError;
 pub use scene::SceneSystem;
 pub use input::InputSystem;
+pub(crate) use world_context::WorldContext;
 
 /// Default timestep in milliseconds for fixed 60 FPS game logic.
 /// Used as the baseline for delta time scaling.
@@ -259,150 +264,6 @@ use input_state::InputRuntimeState;
 use rules::RuleRuntimeState;
 use stat_effects::StatChangeRequest;
 
-impl GameSimulation {
-    pub fn tick(state: &mut GameState, ctx: UpdateContext<'_>) -> GameUpdateResult<AudioEvent> {
-        let animation_delta_ms = (DEFAULT_TIMESTEP_MS * ctx.time_scale).max(0.0);
-        state.progress.play_time_ms = state
-            .progress
-            .play_time_ms
-            .saturating_add(animation_delta_ms.max(0.0).round() as u64);
-        let mut result = GameUpdateResult::new();
-        let mut rule_commands = Vec::new();
-        RuleSystem::begin_frame(state);
-        RuleSystem::collect_frame_commands(state, &mut rule_commands);
-        let (mut pending_rule_animations, mut pending_scene_switch, _, mut pending_persistence) =
-            RuleSystem::apply_commands(state, rule_commands, &mut result, ctx.tilemap);
-
-        let initial_player_position = state
-            .world
-            .player_id
-            .and_then(|player_id| state.world.entity_manager.get_entity(player_id))
-            .map(|entity| entity.position)
-            .unwrap_or(glam::IVec2::ZERO);
-
-        let input_result = MovementSystem::process_input_scaled(
-            state,
-            ctx.world_bounds,
-            ctx.tilemap,
-            ctx.atlas,
-            ctx.time_scale,
-        );
-        result.player_moved = input_result.player_moved;
-        result.add_events(input_result.events);
-
-        if MovementSystem::apply_rule_velocities(
-            state,
-            ctx.world_bounds,
-            ctx.tilemap,
-            ctx.atlas,
-            &mut result,
-        ) {
-            result.player_moved = true;
-        }
-
-        let intended_player_delta = state
-            .world
-            .player_id
-            .and_then(|player_id| state.world.entity_manager.get_entity(player_id))
-            .map(|entity| state.held_keys_for_profile(GameState::effective_movement_profile(entity)))
-            .map(|keys| GameState::movement_delta_from_keys(&keys))
-            .unwrap_or(glam::IVec2::ZERO);
-
-        MovementSystem::update_player_animation(state, initial_player_position, intended_player_delta);
-        CombatSystem::process_profile_actions(state);
-        CombatSystem::update_projectiles(state, ctx.tilemap, ctx.atlas);
-        InteractionSystem::collect_overlapping_pickups(state);
-        InteractionSystem::collect_interaction_events(state);
-        state.resolve_pending_stat_changes();
-
-        state.update_npc_ai_with_delta(
-            animation_delta_ms,
-            ctx.world_bounds,
-            ctx.tilemap,
-            ctx.atlas,
-            &mut result,
-        );
-
-        state.detect_tile_transitions(ctx.tilemap);
-
-        let reactive_rule_commands =
-            RuleSystem::collect_reactive_commands(state, result.player_moved, ctx.tilemap, ctx.atlas);
-        let (mut reactive_animations, reactive_scene_switch, _, reactive_persistence) =
-            RuleSystem::apply_commands(state, reactive_rule_commands, &mut result, ctx.tilemap);
-        if pending_scene_switch.is_none() {
-            pending_scene_switch = reactive_scene_switch;
-        }
-        if pending_persistence.is_none() {
-            pending_persistence = reactive_persistence;
-        }
-        pending_rule_animations.append(&mut reactive_animations);
-
-        state.apply_rule_animations(pending_rule_animations);
-        state.flush_pending_despawns();
-
-        let completed_animation_loops = state
-            .world
-            .entity_manager
-            .update_animations(animation_delta_ms);
-        for (entity_id, completed_loops) in completed_animation_loops {
-            MovementSystem::emit_animation_loop_audio(state, entity_id, completed_loops, &mut result);
-        }
-
-        if let Some(request) = pending_scene_switch {
-            result.request_scene_switch(
-                request.scene_name,
-                request.spawn_point_id,
-                request.transition,
-                request.duration_ms,
-            );
-        }
-        if let Some(crate::events::PersistenceRequest::SaveSlot { slot }) = pending_persistence {
-            result.request_save_slot(slot);
-        } else if let Some(crate::events::PersistenceRequest::LoadSlot { slot }) =
-            pending_persistence
-        {
-            result.request_load_slot(slot);
-        }
-
-        result
-    }
-
-    pub fn tick_fixed(
-        state: &mut GameState,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
-    ) -> GameUpdateResult<AudioEvent> {
-        Self::tick(
-            state,
-            UpdateContext {
-                time_scale: 1.0,
-                world_bounds,
-                tilemap,
-                atlas,
-            },
-        )
-    }
-
-    pub fn tick_with_delta(
-        state: &mut GameState,
-        delta_ms: f32,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
-    ) -> GameUpdateResult<AudioEvent> {
-        Self::tick(
-            state,
-            UpdateContext {
-                time_scale: delta_ms / DEFAULT_TIMESTEP_MS,
-                world_bounds,
-                tilemap,
-                atlas,
-            },
-        )
-    }
-}
-
 impl GameState {
     pub fn world(&self) -> &WorldState {
         &self.world
@@ -527,17 +388,15 @@ impl GameState {
     /// Update NPC AI using the AI system
     fn update_npc_ai_fixed(
         &mut self,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
+        world: WorldContext<'_>,
         result: &mut GameUpdateResult<AudioEvent>,
     ) {
         let ai_updates = self.runtime.ai.system.update(
             &self.world.entity_manager,
             self.world.player_id,
-            world_bounds,
-            tilemap,
-            atlas,
+            world.bounds,
+            world.tilemap,
+            world.atlas,
         );
         for ai_result in &ai_updates {
             let Some(direction) = ai_result.movement_intent else {
@@ -556,9 +415,9 @@ impl GameState {
                 ai_result.entity_id,
                 direction,
                 movement::MovementStepContext {
-                    world_bounds,
-                    tilemap,
-                    atlas,
+                    world_bounds: world.bounds,
+                    tilemap: world.tilemap,
+                    atlas: world.atlas,
                     result,
                     time_scale: 1.0,
                 },
@@ -584,16 +443,14 @@ impl GameState {
     fn update_npc_ai_with_delta(
         &mut self,
         delta_ms: f32,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
+        world: WorldContext<'_>,
         result: &mut GameUpdateResult<AudioEvent>,
     ) {
         self.runtime.ai.delta_accumulator_ms += delta_ms.max(0.0);
 
         let mut steps = 0;
         while self.runtime.ai.delta_accumulator_ms >= DEFAULT_TIMESTEP_MS {
-            self.update_npc_ai_fixed(world_bounds, tilemap, atlas, result);
+            self.update_npc_ai_fixed(world, result);
             self.runtime.ai.delta_accumulator_ms -= DEFAULT_TIMESTEP_MS;
             steps += 1;
 

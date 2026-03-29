@@ -1,4 +1,5 @@
 use super::{
+    dynamic_buffer::DynamicVertexBuffer,
     build_standard_render_pipeline, create_mvp_uniform_buffer, create_texture_bindgroup_for_source,
     write_uniform_buffer, RenderPipeline, TextureSource,
 };
@@ -31,7 +32,7 @@ pub struct SpritePipeline {
     render_pipeline: WgpuRenderPipeline,
     bind_group: wgpu::BindGroup,
     uniform_buffer: wgpu::Buffer,
-    vertex_buffer: wgpu::Buffer,
+    vertex_buffer: DynamicVertexBuffer,
     instances: Vec<SpriteInstance>,
     needs_buffer_update: bool,
 }
@@ -81,19 +82,11 @@ impl SpritePipeline {
         let render_pipeline =
             Self::build_render_pipeline(device, surface_format, &bind_group_layout);
 
-        // Create initial empty vertex buffer
-        let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Sprite Vertex Buffer"),
-            size: std::mem::size_of::<QuadVertex>() as u64 * 6 * 1000, // Space for 1000 sprites
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
         Ok(Self {
             render_pipeline,
             bind_group,
             uniform_buffer,
-            vertex_buffer,
+            vertex_buffer: DynamicVertexBuffer::new("Sprite Vertex Buffer"),
             instances: Vec::new(),
             needs_buffer_update: false,
         })
@@ -123,7 +116,7 @@ impl SpritePipeline {
         );
     }
 
-    fn update_vertex_buffer(&mut self, queue: &Queue) {
+    fn update_vertex_buffer(&mut self, device: &Device, queue: &Queue) {
         let mut vertices = Vec::new();
 
         for instance in &self.instances {
@@ -137,9 +130,8 @@ impl SpritePipeline {
             vertices.extend_from_slice(&quad_verts);
         }
 
-        if !vertices.is_empty() {
-            queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
-        }
+        self.vertex_buffer
+            .write(device, queue, bytemuck::cast_slice(&vertices));
 
         self.needs_buffer_update = false;
     }
@@ -155,9 +147,9 @@ impl RenderPipeline for SpritePipeline {
         // For now, just handle buffer updates when needed
     }
 
-    fn update_with_queue(&mut self, queue: &Queue) {
+    fn update_with_queue(&mut self, device: &Device, queue: &Queue) {
         if self.needs_buffer_update {
-            self.update_vertex_buffer(queue);
+            self.update_vertex_buffer(device, queue);
         }
     }
 }
@@ -178,9 +170,13 @@ impl SpritePipeline {
             return;
         }
 
+        let Some(vertex_buffer) = self.vertex_buffer.buffer() else {
+            return;
+        };
+
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
         render_pass.draw((start * 6) as u32..(end * 6) as u32, 0..1);
     }
 }

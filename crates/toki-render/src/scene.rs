@@ -337,9 +337,9 @@ impl SceneRenderer {
     }
 
     fn update_sprite_batches(&mut self) {
-        self.sprite_pipeline.update_with_queue(&self.queue);
+        self.sprite_pipeline.update_with_queue(&self.device, &self.queue);
         for pipeline in self.sprite_pipelines_by_texture.values_mut() {
-            pipeline.update_with_queue(&self.queue);
+            pipeline.update_with_queue(&self.device, &self.queue);
         }
     }
 

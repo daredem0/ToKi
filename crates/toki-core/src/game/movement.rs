@@ -1,5 +1,5 @@
 use super::rules::CollisionEvent;
-use super::{AudioChannel, AudioEvent, GameState, InputKey};
+use super::{AudioChannel, AudioEvent, GameState, InputKey, WorldContext};
 use crate::assets::atlas::AtlasMeta;
 use crate::assets::tilemap::TileMap;
 use crate::collision;
@@ -26,28 +26,24 @@ pub(super) struct MovementStepContext<'a> {
 }
 
 impl MovementSystem {
-    pub fn process_input_scaled(
+    pub(crate) fn process_input_scaled(
         state: &mut GameState,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
+        world: WorldContext<'_>,
         time_scale: f32,
     ) -> GameUpdateResult<AudioEvent> {
         if time_scale == 1.0 {
-            state.process_input(world_bounds, tilemap, atlas)
+            state.process_input(world.bounds, world.tilemap, world.atlas)
         } else {
-            state.process_input_scaled(world_bounds, tilemap, atlas, time_scale)
+            state.process_input_scaled(world.bounds, world.tilemap, world.atlas, time_scale)
         }
     }
 
-    pub fn apply_rule_velocities(
+    pub(crate) fn apply_rule_velocities(
         state: &mut GameState,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
+        world: WorldContext<'_>,
         result: &mut GameUpdateResult<AudioEvent>,
     ) -> bool {
-        state.apply_rule_velocities(world_bounds, tilemap, atlas, result)
+        state.apply_rule_velocities(world.bounds, world.tilemap, world.atlas, result)
     }
 
     pub fn update_player_animation(

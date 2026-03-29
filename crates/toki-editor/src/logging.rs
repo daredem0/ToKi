@@ -52,6 +52,27 @@ pub struct LogCapture {
 }
 
 impl LogCapture {
+    fn with_logs<R>(&self, f: impl FnOnce(&Vec<LogEntry>) -> R) -> R {
+        match self.logs.lock() {
+            Ok(logs) => f(&logs),
+            Err(poisoned) => {
+                tracing::warn!("Log capture mutex was poisoned; continuing with inner state");
+                f(&poisoned.into_inner())
+            }
+        }
+    }
+
+    fn with_logs_mut<R>(&self, f: impl FnOnce(&mut Vec<LogEntry>) -> R) -> R {
+        match self.logs.lock() {
+            Ok(mut logs) => f(&mut logs),
+            Err(poisoned) => {
+                tracing::warn!("Log capture mutex was poisoned; continuing with inner state");
+                let mut logs = poisoned.into_inner();
+                f(&mut logs)
+            }
+        }
+    }
+
     pub fn new() -> Self {
         Self {
             logs: Arc::new(Mutex::new(Vec::new())),
@@ -59,7 +80,7 @@ impl LogCapture {
     }
 
     pub fn get_logs(&self) -> Vec<LogEntry> {
-        self.logs.lock().unwrap().clone()
+        self.with_logs(Clone::clone)
     }
 
     pub fn add_log(&self, level: String, message: String) {
@@ -70,12 +91,13 @@ impl LogCapture {
             timestamp,
         };
 
-        let mut logs = self.logs.lock().unwrap();
-        logs.push(entry);
+        self.with_logs_mut(|logs| {
+            logs.push(entry);
 
-        // Keep only last 1000 logs to prevent memory issues
-        if logs.len() > 1000 {
-            logs.remove(0);
-        }
+            // Keep only last 1000 logs to prevent memory issues
+            if logs.len() > 1000 {
+                logs.remove(0);
+            }
+        });
     }
 }

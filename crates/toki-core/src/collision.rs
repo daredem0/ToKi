@@ -121,20 +121,17 @@ fn is_collision_box_blocked(
 
     for tile_y in min_tile_y..=max_tile_y {
         for tile_x in min_tile_x..=max_tile_x {
-            match tilemap.is_tile_solid_at(atlas, tile_x, tile_y) {
-                Ok(is_solid) => {
-                    if is_solid {
-                        return true;
-                    }
-                }
-                Err(_) => {
-                    return true;
-                }
+            if tile_blocks_collision(tilemap, atlas, tile_x, tile_y) {
+                return true;
             }
         }
     }
 
     collides_with_solid_map_object(tilemap, box_pos, box_size)
+}
+
+fn tile_blocks_collision(tilemap: &TileMap, atlas: &AtlasMeta, tile_x: u32, tile_y: u32) -> bool {
+    tilemap.is_tile_solid_at(atlas, tile_x, tile_y).unwrap_or(true)
 }
 
 fn collides_with_solid_map_object(tilemap: &TileMap, box_pos: IVec2, box_size: UVec2) -> bool {

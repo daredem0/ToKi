@@ -26,6 +26,18 @@ impl Default for ProjectManager {
 }
 
 impl ProjectManager {
+    fn current_project(&self) -> Result<&Project> {
+        self.current_project
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No project currently loaded"))
+    }
+
+    fn current_project_mut(&mut self) -> Result<&mut Project> {
+        self.current_project
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("No project currently loaded"))
+    }
+
     /// Create a new project manager
     pub fn new() -> Self {
         Self {
@@ -80,10 +92,10 @@ impl ProjectManager {
         self.current_project = Some(project);
 
         // Initialize asset manager
-        let project_path = self.current_project.as_ref().unwrap().path.clone();
+        let project_path = self.current_project()?.path.clone();
         let mut project_assets = ProjectAssets::new(project_path);
 
-        populate_project_template(&self.current_project.as_ref().unwrap().path, template)?;
+        populate_project_template(&self.current_project()?.path, template)?;
 
         match template {
             ProjectTemplateKind::Empty => {
@@ -105,7 +117,7 @@ impl ProjectManager {
         let game_state = GameState::new_empty();
 
         // Add to recent projects
-        let project_path = self.current_project.as_ref().unwrap().path.clone();
+        let project_path = self.current_project()?.path.clone();
         self.add_to_recent(project_path);
 
         tracing::info!("Successfully created new project");
@@ -143,7 +155,7 @@ impl ProjectManager {
         self.current_project = Some(project);
 
         // Initialize asset manager and scan for assets
-        let project_path = self.current_project.as_ref().unwrap().path.clone();
+        let project_path = self.current_project()?.path.clone();
         let mut project_assets = ProjectAssets::new(project_path.clone());
         project_assets.scan_assets()?;
         self.project_assets = Some(project_assets);
@@ -157,7 +169,7 @@ impl ProjectManager {
 
         tracing::info!(
             "Successfully opened project: {}",
-            self.current_project.as_ref().unwrap().name
+            self.current_project()?.name
         );
         Ok(game_state)
     }
@@ -183,7 +195,7 @@ impl ProjectManager {
         }
 
         // Save project metadata and mark as clean
-        let project = self.current_project.as_mut().unwrap();
+        let project = self.current_project_mut()?;
         project.save_metadata()?;
         project.mark_clean();
 
