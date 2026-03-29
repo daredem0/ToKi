@@ -9,6 +9,23 @@ use toki_core::DialogStartRequest;
 use super::App;
 
 impl App {
+    fn runtime_menu_viewport(&self) -> glam::Vec2 {
+        if self.rendering.has_gpu() {
+            self.rendering.viewport_surface_size()
+        } else {
+            let size = self.camera_system.viewport_size();
+            glam::Vec2::new(size.x as f32, size.y as f32)
+        }
+    }
+
+    fn runtime_menu_position(&self, position: glam::Vec2) -> Option<glam::Vec2> {
+        if self.rendering.has_gpu() {
+            self.rendering.surface_to_viewport_position(position)
+        } else {
+            Some(position)
+        }
+    }
+
     fn close_runtime_menu(&mut self) {
         self.menu_system.close();
         self.runtime_overlay = None;
@@ -51,14 +68,10 @@ impl App {
     }
 
     pub(super) fn handle_menu_pointer_click(&mut self, position: glam::Vec2) -> bool {
-        let viewport = self
-            .platform
-            .inner_size()
-            .map(|size| glam::Vec2::new(size.width as f32, size.height as f32))
-            .unwrap_or_else(|| {
-                let size = self.camera_system.viewport_size();
-                glam::Vec2::new(size.x as f32, size.y as f32)
-            });
+        let viewport = self.runtime_menu_viewport();
+        let Some(position) = self.runtime_menu_position(position) else {
+            return false;
+        };
 
         if self.runtime_overlay.is_some() {
             return self.handle_runtime_overlay_pointer_click(position, viewport);
@@ -117,14 +130,10 @@ impl App {
     }
 
     pub(super) fn handle_menu_pointer_hover(&mut self, position: glam::Vec2) -> bool {
-        let viewport = self
-            .platform
-            .inner_size()
-            .map(|size| glam::Vec2::new(size.width as f32, size.height as f32))
-            .unwrap_or_else(|| {
-                let size = self.camera_system.viewport_size();
-                glam::Vec2::new(size.x as f32, size.y as f32)
-            });
+        let viewport = self.runtime_menu_viewport();
+        let Some(position) = self.runtime_menu_position(position) else {
+            return false;
+        };
 
         if self.runtime_overlay.is_some() {
             return self.handle_runtime_overlay_pointer_hover(position, viewport);
@@ -170,14 +179,10 @@ impl App {
     }
 
     pub(super) fn handle_menu_pointer_drag(&mut self, position: glam::Vec2) -> bool {
-        let viewport = self
-            .platform
-            .inner_size()
-            .map(|size| glam::Vec2::new(size.width as f32, size.height as f32))
-            .unwrap_or_else(|| {
-                let size = self.camera_system.viewport_size();
-                glam::Vec2::new(size.x as f32, size.y as f32)
-            });
+        let viewport = self.runtime_menu_viewport();
+        let Some(position) = self.runtime_menu_position(position) else {
+            return false;
+        };
         self.handle_runtime_overlay_pointer_drag(position, viewport)
     }
 
@@ -234,18 +239,11 @@ impl App {
             let Some(dialog_view) = self.dialog_system.current_view() else {
                 return;
             };
-            let viewport = self
-                .platform
-                .inner_size()
-                .map(|size| glam::Vec2::new(size.width as f32, size.height as f32))
-                .unwrap_or_else(|| {
-                    let size = self.camera_system.viewport_size();
-                    glam::Vec2::new(size.x as f32, size.y as f32)
-                });
+            let viewport = self.runtime_menu_viewport();
             let appearance = narrative_dialog_appearance(&self.launch_options).clone();
             let dialog_layout = build_dialog_layout(&dialog_view, &appearance, viewport);
             let dialog_composition = compose_dialog_ui(&dialog_layout, &appearance);
-            self.rendering.render_ui_composition(&dialog_composition);
+            self.rendering.render_viewport_ui_composition(&dialog_composition);
             return;
         }
 
@@ -258,14 +256,7 @@ impl App {
             return;
         };
 
-        let viewport = self
-            .platform
-            .inner_size()
-            .map(|size| glam::Vec2::new(size.width as f32, size.height as f32))
-            .unwrap_or_else(|| {
-                let size = self.camera_system.viewport_size();
-                glam::Vec2::new(size.x as f32, size.y as f32)
-            });
+        let viewport = self.runtime_menu_viewport();
         let appearance = self.menu_system.settings().appearance.clone();
 
         if self.render_runtime_settings_overlay(&appearance, viewport) {
@@ -278,13 +269,13 @@ impl App {
         if !should_hide_main_menu {
             let layout = build_menu_layout(&view, &appearance, viewport);
             let composition = compose_menu_ui(&layout, &appearance);
-            self.rendering.render_ui_composition(&composition);
+            self.rendering.render_viewport_ui_composition(&composition);
         }
 
         if let Some(dialog_view) = dialog_view {
             let dialog_layout = build_dialog_layout(&dialog_view, &appearance, viewport);
             let dialog_composition = compose_dialog_ui(&dialog_layout, &appearance);
-            self.rendering.render_ui_composition(&dialog_composition);
+            self.rendering.render_viewport_ui_composition(&dialog_composition);
         }
     }
 

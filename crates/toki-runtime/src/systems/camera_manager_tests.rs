@@ -25,6 +25,16 @@ fn sample_tilemap() -> TileMap {
     }
 }
 
+fn multi_chunk_tilemap() -> TileMap {
+    TileMap {
+        size: glam::UVec2::new(48, 16),
+        tile_size: glam::UVec2::new(16, 16),
+        atlas: std::path::PathBuf::from("atlas.json"),
+        tiles: vec!["floor".to_string(); 48 * 16],
+        objects: vec![],
+    }
+}
+
 #[test]
 fn update_chunk_cache_reports_changes_then_stabilizes() {
     let mut manager = sample_camera_manager();
@@ -99,4 +109,21 @@ fn view_matrix_includes_zoom_scale() {
     let point2 = glam::vec4(108.0, 50.0, 0.0, 1.0);
     let transformed2 = view * point2;
     assert_eq!(transformed2, glam::vec4(16.0, 0.0, 0.0, 1.0));
+}
+
+#[test]
+fn update_chunk_cache_uses_visible_world_size_when_zoomed_out() {
+    let camera = Camera {
+        position: glam::IVec2::ZERO,
+        viewport_size: glam::UVec2::new(160, 144),
+        zoom: 0.5,
+    };
+    let controller = CameraController {
+        mode: CameraMode::FreeScroll,
+    };
+    let mut manager = CameraManager::new(camera, controller);
+    let tilemap = multi_chunk_tilemap();
+
+    assert!(manager.update_chunk_cache(&tilemap));
+    assert_eq!(manager.cached_visible_chunks().len(), 2);
 }

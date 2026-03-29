@@ -7,12 +7,24 @@ use toki_core::text::TextItem;
 
 use crate::RenderError;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SceneClipRect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
 /// Trait defining the rendering backend interface.
 ///
 /// This trait abstracts GPU rendering operations, allowing for different implementations
 /// (real GPU via wgpu, or mock for testing). It consolidates all rendering operations
 /// into a single interface.
 pub trait RenderBackend: std::fmt::Debug {
+    /// Set the clip rect used for the scene pass. When present, all scene-pass rendering is
+    /// scissored to this rectangle and the cleared background remains visible outside it.
+    fn set_scene_clip_rect(&mut self, rect: Option<SceneClipRect>);
+
     /// Load a tilemap texture from file
     fn load_tilemap_texture(&mut self, texture_path: PathBuf) -> Result<(), RenderError>;
 
@@ -289,6 +301,10 @@ impl<T: RenderBackend + ?Sized> TextRenderer for T {}
 
 #[allow(dead_code)]
 pub trait FrameLifecycle: RenderBackend {
+    fn set_scene_clip_rect(&mut self, rect: Option<SceneClipRect>) {
+        RenderBackend::set_scene_clip_rect(self, rect);
+    }
+
     fn update_projection(&mut self, mvp: glam::Mat4) {
         RenderBackend::update_projection(self, mvp);
     }

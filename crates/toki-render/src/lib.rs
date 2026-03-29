@@ -12,7 +12,8 @@ mod vertex;
 pub mod wgpu_utils;
 
 pub use backend::{
-    FrameLifecycle, RenderBackend, ShapeRenderer, SpriteRenderer, TextRenderer, TextureLoader,
+    FrameLifecycle, RenderBackend, SceneClipRect, ShapeRenderer, SpriteRenderer, TextRenderer,
+    TextureLoader,
 };
 pub use errors::RenderError;
 pub use gpu::GpuState;

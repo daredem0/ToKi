@@ -71,7 +71,7 @@ impl<'a> WorldFramePresenter<'a> {
             let hud_text = TextItem::new_screen(stats_line, glam::Vec2::new(8.0, 8.0), hud_style)
                 .with_anchor(TextAnchor::TopLeft)
                 .with_layer(1);
-            self.rendering.add_text_item(hud_text);
+            self.rendering.add_viewport_text_item(hud_text);
         }
     }
 

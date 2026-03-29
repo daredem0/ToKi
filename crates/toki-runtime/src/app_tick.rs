@@ -32,6 +32,7 @@ impl App {
                     .display
                     .indexed_palette_override
                     .clone(),
+                window_size: self.platform.inner_size(),
                 content_root,
             },
         )

@@ -17,8 +17,8 @@ use crate::sprite_batch_order::{append_ordered_draw_batch, OrderedDrawBatch};
 use crate::targets::{OffscreenTarget, RenderTarget};
 use crate::wgpu_utils::{choose_present_mode, create_device_and_surface};
 use crate::{
-    DebugPipeline, GlyphonTextRenderer, PostProcessPipeline, RenderError, SpritePipeline,
-    TextBackgroundRect, TilemapPipeline,
+    DebugPipeline, GlyphonTextRenderer, PostProcessPipeline, RenderError, SceneClipRect,
+    SpritePipeline, TextBackgroundRect, TilemapPipeline,
 };
 
 #[allow(dead_code)]
@@ -43,6 +43,7 @@ pub struct GpuState {
     text_items: Vec<TextItem>,
     tilemap_render_enabled: bool,
     current_mvp: glam::Mat4,
+    scene_clip_rect: Option<SceneClipRect>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -107,6 +108,7 @@ impl GpuState {
             text_items: Vec::new(),
             tilemap_render_enabled: true,
             current_mvp: glam::Mat4::IDENTITY,
+            scene_clip_rect: None,
         })
     }
 
@@ -251,6 +253,9 @@ impl GpuState {
             0.0,
             1.0,
         );
+        if let Some(rect) = self.scene_clip_rect {
+            render_pass.set_scissor_rect(rect.x, rect.y, rect.width, rect.height);
+        }
 
         if self.tilemap_render_enabled {
             self.tilemap_pipeline.render(&mut render_pass);
@@ -564,6 +569,10 @@ impl GpuState {
         self.post_process_settings = settings;
     }
 
+    pub fn set_scene_clip_rect(&mut self, rect: Option<SceneClipRect>) {
+        self.scene_clip_rect = rect;
+    }
+
     pub fn set_vsync(&mut self, enabled: bool) {
         let next_mode = choose_present_mode(&self.supported_present_modes, enabled);
         if self.config.present_mode != next_mode {
@@ -706,6 +715,10 @@ impl GpuState {
 }
 
 impl crate::RenderBackend for GpuState {
+    fn set_scene_clip_rect(&mut self, rect: Option<SceneClipRect>) {
+        GpuState::set_scene_clip_rect(self, rect);
+    }
+
     fn load_tilemap_texture(
         &mut self,
         texture_path: std::path::PathBuf,

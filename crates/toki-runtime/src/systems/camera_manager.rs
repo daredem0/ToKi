@@ -65,9 +65,14 @@ impl CameraManager {
     /// Update the visible chunks cache based on current camera position.
     /// Returns true if the visible chunks changed (indicating rendering updates are needed).
     pub fn update_chunk_cache(&mut self, tilemap: &TileMap) -> bool {
+        let visible_world_size = self.camera.visible_world_size();
+        let viewport_size = glam::UVec2::new(
+            visible_world_size.x.ceil().max(1.0) as u32,
+            visible_world_size.y.ceil().max(1.0) as u32,
+        );
         let current_chunks = tilemap.visible_chunks(
             glam::UVec2::new(self.camera.position.x as u32, self.camera.position.y as u32),
-            self.camera.viewport_size,
+            viewport_size,
         );
 
         if current_chunks != self.cached_visible_chunks {
