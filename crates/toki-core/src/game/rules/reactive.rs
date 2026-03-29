@@ -65,7 +65,7 @@ impl GameState {
 mod tests {
     use crate::assets::atlas::AtlasMeta;
     use crate::assets::tilemap::TileMap;
-    use crate::game::{AudioChannel, DamageEvent, GameState};
+    use crate::game::{AudioChannel, DamageEvent, GameState, SceneSystem};
     use crate::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 
     use crate::game::RuleSystem;
@@ -84,8 +84,8 @@ mod tests {
     #[test]
     fn reactive_rule_pipeline_collects_commands_from_frame_events_and_player_motion() {
         let mut state = GameState::new_empty();
-        let self_id = state.spawn_player_like_npc(glam::IVec2::new(0, 0));
-        let other_id = state.spawn_player_like_npc(glam::IVec2::new(16, 0));
+        let self_id = SceneSystem::spawn_player_like_npc(&mut state, glam::IVec2::new(0, 0));
+        let other_id = SceneSystem::spawn_player_like_npc(&mut state, glam::IVec2::new(16, 0));
 
         state.set_rules(RuleSet {
             rules: vec![

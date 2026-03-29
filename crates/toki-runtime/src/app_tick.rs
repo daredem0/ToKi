@@ -1,7 +1,10 @@
 use std::time::Instant;
 
 use toki_core::camera::RuntimeState;
-use toki_core::{EventHandler, GameUpdateResult, DEFAULT_TIMESTEP_MS};
+use toki_core::{
+    game::{GameSimulation, RenderQueryService},
+    EventHandler, GameUpdateResult, DEFAULT_TIMESTEP_MS,
+};
 
 use super::app_presenter::{render_scene_transition_overlay, WorldFramePresenter};
 use super::app_scene_runtime::{SceneRuntimeCoordinator, SceneRuntimeRefs, SceneRuntimeSettings};
@@ -55,24 +58,33 @@ impl App {
             if self.should_gate_gameplay_for_menu() || self.scene_transition.is_active() {
                 GameUpdateResult::new()
             } else if let Some(delta) = delta_ms {
-                self.game_system.update_with_delta(
+                GameSimulation::tick_with_delta(
+                    &mut self.game_system.game_state,
                     delta,
                     world_bounds,
                     self.resources.get_tilemap(),
                     self.resources.get_terrain_atlas(),
                 )
             } else {
-                self.game_system.update(
+                GameSimulation::tick_fixed(
+                    &mut self.game_system.game_state,
                     world_bounds,
                     self.resources.get_tilemap(),
                     self.resources.get_terrain_atlas(),
                 )
             };
 
-        let listener_position = self
-            .game_system
-            .player_id()
-            .map(|_| self.game_system.player_position());
+        let listener_position = self.game_system.player_id().map(|_| {
+            RenderQueryService::new(
+                self.game_system.game_state.world().entity_manager(),
+                self.game_system.game_state.world().player_id(),
+                self.game_system
+                    .game_state
+                    .runtime()
+                    .debug_collision_rendering(),
+            )
+            .player_position()
+        });
         self.audio_system.set_listener_position(listener_position);
 
         for event in &game_result.events {

@@ -178,7 +178,7 @@ pub fn test_entity() -> Entity {
 pub fn scene_with_test_player(name: &str, position: IVec2) -> Scene {
     let mut scene = Scene::new(name.to_string());
     let mut template_state = GameState::new_empty();
-    let player_id = template_state.spawn_player_at(position);
+    let player_id = SceneSystem::spawn_player_at(&mut template_state, position);
     let player = template_state
         .world()
         .entity_manager()

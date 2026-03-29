@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::TileMap;
+use toki_core::game::{GameSimulation, RenderQueryService, SceneSystem};
 use toki_core::sprite_render::{SpriteRenderOrigin, SpriteVisualRef};
 use toki_core::GameState;
 use winit::keyboard::KeyCode;
@@ -73,10 +74,22 @@ fn walkable_tilemap() -> TileMap {
     }
 }
 
+fn render_queries(manager: &GameManager) -> RenderQueryService<'_> {
+    RenderQueryService::new(
+        manager.game_state.world().entity_manager(),
+        manager.game_state.world().player_id(),
+        manager.game_state.runtime().debug_collision_rendering(),
+    )
+}
+
+fn player_position(manager: &GameManager) -> glam::IVec2 {
+    render_queries(manager).player_position()
+}
+
 #[test]
 fn debug_toggle_key_is_forwarded_to_core_input() {
     let mut game_state = GameState::new_empty();
-    game_state.spawn_player_at(glam::IVec2::new(0, 0));
+    SceneSystem::spawn_player_at(&mut game_state, glam::IVec2::new(0, 0));
     let mut manager = GameManager::new(game_state);
 
     assert!(!manager.is_debug_collision_rendering_enabled());
@@ -87,7 +100,7 @@ fn debug_toggle_key_is_forwarded_to_core_input() {
 #[test]
 fn unsupported_key_does_not_change_debug_state() {
     let mut game_state = GameState::new_empty();
-    game_state.spawn_player_at(glam::IVec2::new(0, 0));
+    SceneSystem::spawn_player_at(&mut game_state, glam::IVec2::new(0, 0));
     let mut manager = GameManager::new(game_state);
 
     manager.handle_keyboard_input(KeyCode::Space, true);
@@ -97,15 +110,15 @@ fn unsupported_key_does_not_change_debug_state() {
 #[test]
 fn wrapper_methods_expose_core_entity_state() {
     let mut game_state = GameState::new_empty();
-    let player_id = game_state.spawn_player_at(glam::IVec2::new(10, 12));
+    let player_id = SceneSystem::spawn_player_at(&mut game_state, glam::IVec2::new(10, 12));
     let mut manager = GameManager::new(game_state);
 
-    let npc_id = manager.spawn_player_like_npc(glam::IVec2::new(20, 12));
-    let renderable = manager.get_sprite_render_requests();
+    let npc_id = SceneSystem::spawn_player_like_npc(&mut manager.game_state, glam::IVec2::new(20, 12));
+    let renderable = render_queries(&manager).sprite_render_requests();
     let entities_for_camera = manager.entities_for_camera();
 
     assert_eq!(manager.player_id(), Some(player_id));
-    assert_eq!(manager.player_position(), glam::IVec2::new(10, 12));
+    assert_eq!(player_position(&manager), glam::IVec2::new(10, 12));
     assert_eq!(renderable.len(), 2);
     assert_eq!(entities_for_camera.len(), 2);
     assert!(entities_for_camera
@@ -185,7 +198,7 @@ fn sprite_render_request_wrapper_exposes_object_sheet_backed_entities() {
         .expect("pickup should spawn");
     let manager = GameManager::new(game_state);
 
-    let renderable = manager.get_sprite_render_requests();
+    let renderable = render_queries(&manager).sprite_render_requests();
     assert_eq!(renderable.len(), 1);
     assert_eq!(
         renderable[0].origin,
@@ -203,42 +216,35 @@ fn sprite_render_request_wrapper_exposes_object_sheet_backed_entities() {
 #[test]
 fn debug_collision_wrappers_return_tiles_and_boxes_when_enabled() {
     let mut game_state = GameState::new_empty();
-    game_state.spawn_player_at(glam::IVec2::new(0, 0));
+    SceneSystem::spawn_player_at(&mut game_state, glam::IVec2::new(0, 0));
     let mut manager = GameManager::new(game_state);
     let atlas = sample_atlas();
     let tilemap = sample_tilemap();
 
-    assert!(manager.get_entity_collision_boxes().is_empty());
-    assert!(manager
-        .get_solid_tile_positions(&tilemap, &atlas)
-        .is_empty());
-    assert!(manager
-        .get_trigger_tile_positions(&tilemap, &atlas)
-        .is_empty());
+    let queries = render_queries(&manager);
+    assert!(queries.entity_collision_boxes().is_empty());
+    assert!(queries.solid_tile_positions(&tilemap, &atlas).is_empty());
+    assert!(queries.trigger_tile_positions(&tilemap, &atlas).is_empty());
 
     manager.handle_keyboard_input(KeyCode::F4, true);
 
-    assert!(!manager.get_entity_collision_boxes().is_empty());
-    assert_eq!(
-        manager.get_solid_tile_positions(&tilemap, &atlas),
-        vec![(0, 0)]
-    );
-    assert_eq!(
-        manager.get_trigger_tile_positions(&tilemap, &atlas),
-        vec![(1, 0)]
-    );
+    let queries = render_queries(&manager);
+    assert!(!queries.entity_collision_boxes().is_empty());
+    assert_eq!(queries.solid_tile_positions(&tilemap, &atlas), vec![(0, 0)]);
+    assert_eq!(queries.trigger_tile_positions(&tilemap, &atlas), vec![(1, 0)]);
 }
 
 #[test]
 fn player_wasd_profile_ignores_arrow_keys_for_movement() {
     let mut game_state = GameState::new_empty();
-    let player_id = game_state.spawn_player_at(glam::IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut game_state, glam::IVec2::new(0, 0));
     let mut manager = GameManager::new(game_state);
     let atlas = sample_atlas();
     let tilemap = walkable_tilemap();
 
     manager.handle_keyboard_input(KeyCode::ArrowRight, true);
-    let result = manager.update(glam::UVec2::new(128, 128), &tilemap, &atlas);
+    let result =
+        GameSimulation::tick_fixed(&mut manager.game_state, glam::UVec2::new(128, 128), &tilemap, &atlas);
     manager.handle_keyboard_input(KeyCode::ArrowRight, false);
 
     assert!(!result.player_moved);
@@ -257,13 +263,14 @@ fn player_wasd_profile_ignores_arrow_keys_for_movement() {
 #[test]
 fn player_wasd_profile_moves_from_wasd_keys() {
     let mut game_state = GameState::new_empty();
-    let player_id = game_state.spawn_player_at(glam::IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut game_state, glam::IVec2::new(0, 0));
     let mut manager = GameManager::new(game_state);
     let atlas = sample_atlas();
     let tilemap = walkable_tilemap();
 
     manager.handle_keyboard_input(KeyCode::KeyD, true);
-    let result = manager.update(glam::UVec2::new(128, 128), &tilemap, &atlas);
+    let result =
+        GameSimulation::tick_fixed(&mut manager.game_state, glam::UVec2::new(128, 128), &tilemap, &atlas);
     manager.handle_keyboard_input(KeyCode::KeyD, false);
 
     assert!(result.player_moved);
@@ -282,7 +289,7 @@ fn player_wasd_profile_moves_from_wasd_keys() {
 #[test]
 fn player_wasd_space_triggers_primary_action_attack_when_clip_exists() {
     let mut game_state = GameState::new_empty();
-    let player_id = game_state.spawn_player_at(glam::IVec2::new(0, 0));
+    let player_id = SceneSystem::spawn_player_at(&mut game_state, glam::IVec2::new(0, 0));
     let player = game_state
         .world_mut()
         .entity_manager_mut()
@@ -318,7 +325,7 @@ fn player_wasd_space_triggers_primary_action_attack_when_clip_exists() {
     let tilemap = walkable_tilemap();
 
     manager.handle_keyboard_input(KeyCode::Space, true);
-    manager.update(glam::UVec2::new(128, 128), &tilemap, &atlas);
+    GameSimulation::tick_fixed(&mut manager.game_state, glam::UVec2::new(128, 128), &tilemap, &atlas);
     manager.handle_keyboard_input(KeyCode::Space, false);
 
     let current_state = manager

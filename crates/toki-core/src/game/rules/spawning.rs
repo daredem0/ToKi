@@ -6,6 +6,7 @@ use crate::entity::{EntityAttributes, EntityId, EntityKind};
 use crate::rules::RuleSpawnEntityType;
 
 use super::GameState;
+use crate::game::SceneSystem;
 
 impl GameState {
     pub(super) fn spawn_entity_from_rule(
@@ -14,7 +15,7 @@ impl GameState {
         position: glam::IVec2,
     ) -> EntityId {
         match entity_type {
-            RuleSpawnEntityType::PlayerLikeNpc => self.spawn_player_like_npc(position),
+            RuleSpawnEntityType::PlayerLikeNpc => SceneSystem::spawn_player_like_npc(self, position),
             RuleSpawnEntityType::Npc => self.spawn_basic_entity(EntityKind::Npc, position, true),
             RuleSpawnEntityType::Item => self.spawn_basic_entity(EntityKind::Item, position, false),
             RuleSpawnEntityType::Decoration => {

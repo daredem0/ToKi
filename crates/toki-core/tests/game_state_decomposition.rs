@@ -1,6 +1,3 @@
-#[path = "support/game_state_compat.rs"]
-mod game_state_compat;
-
 use glam::IVec2;
 use std::collections::HashMap;
 use toki_core::assets::atlas::{AtlasMeta, ColorMode, TileInfo, TileProperties};
@@ -15,7 +12,6 @@ use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleTrigger};
 use toki_core::scene::{SceneAnchor, SceneAnchorFacing, SceneAnchorKind};
 use toki_core::{scene::Scene, DEFAULT_TIMESTEP_MS, GameState, InputKey};
 use toki_test_fixtures::{test_atlas, test_tilemap};
-use game_state_compat::GameStateCompatExt;
 
 fn player_definition(name: &str) -> EntityDefinition {
     EntityDefinition {
@@ -96,8 +92,8 @@ fn atlas_with_player_tile() -> AtlasMeta {
 fn game_simulation_fixed_and_delta_ticks_match_for_default_timestep() {
     let mut fixed = GameState::new_empty();
     let mut delta = GameState::new_empty();
-    fixed.spawn_player_at(IVec2::new(10, 10));
-    delta.spawn_player_at(IVec2::new(10, 10));
+    SceneSystem::spawn_player_at(&mut fixed, IVec2::new(10, 10));
+    SceneSystem::spawn_player_at(&mut delta, IVec2::new(10, 10));
 
     let tilemap = test_tilemap();
     let atlas = test_atlas();
@@ -133,11 +129,14 @@ fn game_simulation_fixed_and_delta_ticks_match_for_default_timestep() {
 #[test]
 fn scene_system_transition_preserves_player_inventory_and_stats() {
     let mut state = GameState::new_empty();
-    state.add_entity_definition(player_definition("player"));
+    state
+        .world_mut()
+        .insert_entity_definition(player_definition("player"));
 
     let mut scene_a = Scene::new("A".to_string());
-    let player_id = state.spawn_player_at(IVec2::new(8, 8));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(8, 8));
     let mut player = state
+        .world()
         .entity_manager()
         .get_entity(player_id)
         .expect("player should exist")
@@ -159,7 +158,11 @@ fn scene_system_transition_preserves_player_inventory_and_stats() {
     SceneSystem::load(&mut state, "A").expect("scene A should load");
     SceneSystem::transition(&mut state, "B", "door").expect("scene B should load");
 
-    let player = state.player_entity().expect("player should be preserved");
+    let player = state
+        .world()
+        .player_id()
+        .and_then(|player_id| state.world().entity_manager().get_entity(player_id))
+        .expect("player should be preserved");
     assert_eq!(player.position, IVec2::new(96, 48));
     assert_eq!(player.attributes.inventory.item_count("potion"), 2);
     assert_eq!(player.attributes.current_stat("health"), Some(75));
@@ -168,7 +171,7 @@ fn scene_system_transition_preserves_player_inventory_and_stats() {
 #[test]
 fn render_query_service_matches_legacy_render_query_outputs() {
     let mut state = GameState::new_empty();
-    state.spawn_player_at(IVec2::new(12, 14));
+    let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(12, 14));
     let atlas = atlas_with_player_tile();
     let texture_size = glam::UVec2::new(32, 16);
 
@@ -178,23 +181,29 @@ fn render_query_service_matches_legacy_render_query_outputs() {
         state.runtime().debug_collision_rendering(),
     );
 
+    let legacy_like_service = RenderQueryService::new(
+        state.world().entity_manager(),
+        state.world().player_id(),
+        state.runtime().debug_collision_rendering(),
+    );
     assert_eq!(
         service.sprite_render_requests(),
-        state.get_sprite_render_requests()
+        legacy_like_service.sprite_render_requests()
     );
-    assert_eq!(service.player_position(), state.player_position());
+    assert_eq!(service.player_position(), legacy_like_service.player_position());
     let service_frame = service.current_sprite_frame(&atlas, texture_size);
-    let legacy_frame = state.current_sprite_frame(&atlas, texture_size);
+    let legacy_frame = legacy_like_service.current_sprite_frame(&atlas, texture_size);
     assert_eq!(service_frame.u0, legacy_frame.u0);
     assert_eq!(service_frame.v0, legacy_frame.v0);
     assert_eq!(service_frame.u1, legacy_frame.u1);
     assert_eq!(service_frame.v1, legacy_frame.v1);
+    assert_eq!(service.entity_sprite_flip_x(player_id), legacy_like_service.entity_sprite_flip_x(player_id));
 }
 
 #[test]
 fn input_system_held_key_behavior_matches_runtime_movement_expectations() {
     let mut state = GameState::new_empty();
-    state.spawn_player_at(IVec2::new(10, 10));
+    SceneSystem::spawn_player_at(&mut state, IVec2::new(10, 10));
 
     let tilemap = test_tilemap();
     let atlas = test_atlas();

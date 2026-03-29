@@ -1,16 +1,14 @@
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
 use std::path::PathBuf;
-#[path = "support/game_state_compat.rs"]
-mod game_state_compat;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
     tilemap::TileMap,
 };
 use toki_core::collision::{can_place_collision_box_at_position, CollisionBox};
 use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
+use toki_core::game::{GameSimulation, InputSystem, RenderQueryService};
 use toki_core::{GameState, InputKey};
-use game_state_compat::GameStateCompatExt;
 
 /// Create a test tilemap with a mix of solid and non-solid tiles
 /// Layout:
@@ -112,6 +110,15 @@ fn create_test_sprite() -> SpriteInstance {
     SpriteInstance::new(IVec2::new(0, 0), animation, sprite_sheet)
 }
 
+fn player_position(state: &GameState) -> IVec2 {
+    RenderQueryService::new(
+        state.world().entity_manager(),
+        state.world().player_id(),
+        state.runtime().debug_collision_rendering(),
+    )
+    .player_position()
+}
+
 #[test]
 fn collision_entity_without_collision_box_can_move_anywhere() {
     let sprite = create_test_sprite();
@@ -120,18 +127,18 @@ fn collision_entity_without_collision_box_can_move_anywhere() {
     let atlas = create_collision_test_atlas();
 
     // Get the player entity and remove its collision box
-    let player_id = game_state.player_id().unwrap();
-    if let Some(player) = game_state.entity_manager_mut().get_entity_mut(player_id) {
+    let player_id = game_state.world().player_id().unwrap();
+    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
         player.position = IVec2::new(0, 0);
         player.collision_box = None; // Remove collision box
     }
 
     // Should be able to move to solid tile position since no collision box
-    game_state.handle_key_press(InputKey::Right);
-    let initial_pos = game_state.player_position();
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let initial_pos = player_position(&game_state);
 
-    game_state.update(UVec2::new(1000, 1000), &tilemap, &atlas);
-    let final_pos = game_state.player_position();
+    GameSimulation::tick_fixed(&mut game_state, UVec2::new(1000, 1000), &tilemap, &atlas);
+    let final_pos = player_position(&game_state);
 
     // Should move even though destination has solid stone
     assert_ne!(initial_pos, final_pos);
@@ -145,18 +152,18 @@ fn collision_small_entity_blocked_by_solid_tile() {
     let atlas = create_collision_test_atlas();
 
     // Get the player entity and modify its collision box
-    let player_id = game_state.player_id().unwrap();
-    if let Some(player) = game_state.entity_manager_mut().get_entity_mut(player_id) {
+    let player_id = game_state.world().player_id().unwrap();
+    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
         player.position = IVec2::new(0, 0); // Start at (0,0) - on floor tile
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(16, 16)));
     }
 
     // Try to move right into solid tile at (16, 0)
-    game_state.handle_key_press(InputKey::Right);
-    let initial_pos = game_state.player_position();
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let initial_pos = player_position(&game_state);
 
-    game_state.update(UVec2::new(1000, 1000), &tilemap, &atlas);
-    let final_pos = game_state.player_position();
+    GameSimulation::tick_fixed(&mut game_state, UVec2::new(1000, 1000), &tilemap, &atlas);
+    let final_pos = player_position(&game_state);
 
     // Should not have moved because tile at (16, 0) is solid stone
     assert_eq!(initial_pos, final_pos);
@@ -170,18 +177,18 @@ fn collision_small_entity_can_move_on_non_solid_tiles() {
     let atlas = create_collision_test_atlas();
 
     // Get the player entity and modify its collision box
-    let player_id = game_state.player_id().unwrap();
-    if let Some(player) = game_state.entity_manager_mut().get_entity_mut(player_id) {
+    let player_id = game_state.world().player_id().unwrap();
+    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
         player.position = IVec2::new(0, 0); // Start at (0,0) - on floor tile
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(16, 16)));
     }
 
     // Try to move down to another floor tile at (0, 16)
-    game_state.handle_key_press(InputKey::Down);
-    let initial_pos = game_state.player_position();
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Down);
+    let initial_pos = player_position(&game_state);
 
-    game_state.update(UVec2::new(1000, 1000), &tilemap, &atlas);
-    let final_pos = game_state.player_position();
+    GameSimulation::tick_fixed(&mut game_state, UVec2::new(1000, 1000), &tilemap, &atlas);
+    let final_pos = player_position(&game_state);
 
     // Should have moved because tile at (0, 16) is floor
     // Player has default speed of 2.0, so moves 2 pixels
@@ -197,8 +204,8 @@ fn collision_entity_with_offset_collision_box() {
     let atlas = create_collision_test_atlas();
 
     // Get the player entity and give it an offset collision box
-    let player_id = game_state.player_id().unwrap();
-    if let Some(player) = game_state.entity_manager_mut().get_entity_mut(player_id) {
+    let player_id = game_state.world().player_id().unwrap();
+    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
         player.position = IVec2::new(8, 0); // Start at (8,0)
                                             // Collision box offset by (8,0) with size (16,16)
                                             // This means collision box spans from (16,0) to (32,16) - overlapping solid stone
@@ -210,11 +217,11 @@ fn collision_entity_with_offset_collision_box() {
     }
 
     // Entity at (8,0) with collision box at (16,0) should be blocked
-    game_state.handle_key_press(InputKey::Right);
-    let initial_pos = game_state.player_position();
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let initial_pos = player_position(&game_state);
 
-    game_state.update(UVec2::new(1000, 1000), &tilemap, &atlas);
-    let final_pos = game_state.player_position();
+    GameSimulation::tick_fixed(&mut game_state, UVec2::new(1000, 1000), &tilemap, &atlas);
+    let final_pos = player_position(&game_state);
 
     // Should not move because collision box would overlap solid stone
     assert_eq!(initial_pos, final_pos);
@@ -228,19 +235,19 @@ fn collision_large_entity_spanning_multiple_tiles() {
     let atlas = create_collision_test_atlas();
 
     // Get the player entity and give it a large collision box
-    let player_id = game_state.player_id().unwrap();
-    if let Some(player) = game_state.entity_manager_mut().get_entity_mut(player_id) {
+    let player_id = game_state.world().player_id().unwrap();
+    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
         player.position = IVec2::new(0, 0); // Start at (0,0)
                                             // Large collision box spanning multiple tiles
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(32, 32)));
     }
 
     // Large entity should be blocked from moving because it would overlap solid stones
-    game_state.handle_key_press(InputKey::Right);
-    let initial_pos = game_state.player_position();
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let initial_pos = player_position(&game_state);
 
-    game_state.update(UVec2::new(1000, 1000), &tilemap, &atlas);
-    let final_pos = game_state.player_position();
+    GameSimulation::tick_fixed(&mut game_state, UVec2::new(1000, 1000), &tilemap, &atlas);
+    let final_pos = player_position(&game_state);
 
     // Should not move because large collision box would overlap stone tiles
     assert_eq!(initial_pos, final_pos);
@@ -254,19 +261,19 @@ fn collision_trigger_entity_does_not_block_movement() {
     let atlas = create_collision_test_atlas();
 
     // Get the player entity and give it a trigger collision box
-    let player_id = game_state.player_id().unwrap();
-    if let Some(player) = game_state.entity_manager_mut().get_entity_mut(player_id) {
+    let player_id = game_state.world().player_id().unwrap();
+    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
         player.position = IVec2::new(0, 0);
         // Trigger collision box should not block movement
         player.collision_box = Some(CollisionBox::trigger_box(UVec2::new(16, 16)));
     }
 
     // Even with trigger collision box, should be able to move onto solid tile
-    game_state.handle_key_press(InputKey::Right);
-    let initial_pos = game_state.player_position();
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let initial_pos = player_position(&game_state);
 
-    game_state.update(UVec2::new(1000, 1000), &tilemap, &atlas);
-    let final_pos = game_state.player_position();
+    GameSimulation::tick_fixed(&mut game_state, UVec2::new(1000, 1000), &tilemap, &atlas);
+    let final_pos = player_position(&game_state);
 
     // Should move because trigger boxes don't block movement
     assert_ne!(initial_pos, final_pos);
@@ -280,18 +287,18 @@ fn collision_negative_coordinates_blocked() {
     let atlas = create_collision_test_atlas();
 
     // Get the player entity and position it at the edge
-    let player_id = game_state.player_id().unwrap();
-    if let Some(player) = game_state.entity_manager_mut().get_entity_mut(player_id) {
+    let player_id = game_state.world().player_id().unwrap();
+    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
         player.position = IVec2::new(0, 0); // At the very edge
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(16, 16)));
     }
 
     // Try to move left (would result in negative coordinates)
-    game_state.handle_key_press(InputKey::Left);
-    let initial_pos = game_state.player_position();
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Left);
+    let initial_pos = player_position(&game_state);
 
-    game_state.update(UVec2::new(1000, 1000), &tilemap, &atlas);
-    let final_pos = game_state.player_position();
+    GameSimulation::tick_fixed(&mut game_state, UVec2::new(1000, 1000), &tilemap, &atlas);
+    let final_pos = player_position(&game_state);
 
     // Should not move into negative coordinates
     assert_eq!(initial_pos, final_pos);
@@ -305,18 +312,18 @@ fn collision_out_of_bounds_tiles_block_movement() {
     let atlas = create_collision_test_atlas();
 
     // Get the player entity and position it near the edge
-    let player_id = game_state.player_id().unwrap();
-    if let Some(player) = game_state.entity_manager_mut().get_entity_mut(player_id) {
+    let player_id = game_state.world().player_id().unwrap();
+    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
         player.position = IVec2::new(48, 48); // Near the bottom-right corner
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(16, 16)));
     }
 
     // Try to move right (would go out of bounds)
-    game_state.handle_key_press(InputKey::Right);
-    let initial_pos = game_state.player_position();
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let initial_pos = player_position(&game_state);
 
-    game_state.update(UVec2::new(1000, 1000), &tilemap, &atlas);
-    let final_pos = game_state.player_position();
+    GameSimulation::tick_fixed(&mut game_state, UVec2::new(1000, 1000), &tilemap, &atlas);
+    let final_pos = player_position(&game_state);
 
     // Should not move out of bounds
     assert_eq!(initial_pos, final_pos);
@@ -330,18 +337,18 @@ fn collision_movement_step_collision_boundaries() {
     let atlas = create_collision_test_atlas();
 
     // Position entity right next to a solid tile
-    let player_id = game_state.player_id().unwrap();
-    if let Some(player) = game_state.entity_manager_mut().get_entity_mut(player_id) {
+    let player_id = game_state.world().player_id().unwrap();
+    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
         player.position = IVec2::new(15, 0); // 1 pixel before solid stone at (16, 0)
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(16, 16)));
     }
 
     // Try to move right - should be blocked because collision box would overlap stone
-    game_state.handle_key_press(InputKey::Right);
-    let initial_pos = game_state.player_position();
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let initial_pos = player_position(&game_state);
 
-    game_state.update(UVec2::new(1000, 1000), &tilemap, &atlas);
-    let final_pos = game_state.player_position();
+    GameSimulation::tick_fixed(&mut game_state, UVec2::new(1000, 1000), &tilemap, &atlas);
+    let final_pos = player_position(&game_state);
 
     // Should not move because collision box would overlap solid stone
     assert_eq!(initial_pos, final_pos);
@@ -355,18 +362,18 @@ fn collision_exact_tile_boundary_movement() {
     let atlas = create_collision_test_atlas();
 
     // Position entity in a safe area with room to move
-    let player_id = game_state.player_id().unwrap();
-    if let Some(player) = game_state.entity_manager_mut().get_entity_mut(player_id) {
+    let player_id = game_state.world().player_id().unwrap();
+    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
         player.position = IVec2::new(32, 32); // Bottom area, all floor tiles
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(16, 16)));
     }
 
     // Try to move down - should be allowed (floor tiles)
-    game_state.handle_key_press(InputKey::Down);
-    let initial_pos = game_state.player_position();
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Down);
+    let initial_pos = player_position(&game_state);
 
-    game_state.update(UVec2::new(1000, 1000), &tilemap, &atlas);
-    let final_pos = game_state.player_position();
+    GameSimulation::tick_fixed(&mut game_state, UVec2::new(1000, 1000), &tilemap, &atlas);
+    let final_pos = player_position(&game_state);
 
     // Should move because moving within floor tile area
     assert_ne!(initial_pos, final_pos);
@@ -380,19 +387,19 @@ fn collision_multi_direction_movement() {
     let atlas = create_collision_test_atlas();
 
     // Position entity in free area
-    let player_id = game_state.player_id().unwrap();
-    if let Some(player) = game_state.entity_manager_mut().get_entity_mut(player_id) {
+    let player_id = game_state.world().player_id().unwrap();
+    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
         player.position = IVec2::new(48, 48); // Bottom-right area (all floor tiles)
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(16, 16)));
     }
 
     // Try diagonal movement (up+left) - both directions should be allowed
-    game_state.handle_key_press(InputKey::Up);
-    game_state.handle_key_press(InputKey::Left);
-    let initial_pos = game_state.player_position();
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Up);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Left);
+    let initial_pos = player_position(&game_state);
 
-    game_state.update(UVec2::new(1000, 1000), &tilemap, &atlas);
-    let final_pos = game_state.player_position();
+    GameSimulation::tick_fixed(&mut game_state, UVec2::new(1000, 1000), &tilemap, &atlas);
+    let final_pos = player_position(&game_state);
 
     // Should move in both directions
     assert!(final_pos.x < initial_pos.x); // Moved left
@@ -410,19 +417,19 @@ fn collision_entity_larger_than_tiles() {
     let mut game_state = GameState::new(sprite);
 
     // Entity with collision box larger than tile size
-    let player_id = game_state.player_id().unwrap();
-    if let Some(player) = game_state.entity_manager_mut().get_entity_mut(player_id) {
+    let player_id = game_state.world().player_id().unwrap();
+    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
         player.position = IVec2::new(0, 0);
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(24, 24)));
         // Spans 3x3 tiles
     }
 
     // Large entity should be blocked by the solid stones in the tilemap
-    game_state.handle_key_press(InputKey::Right);
-    let initial_pos = game_state.player_position();
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
+    let initial_pos = player_position(&game_state);
 
-    game_state.update(UVec2::new(1000, 1000), &tilemap, &atlas);
-    let final_pos = game_state.player_position();
+    GameSimulation::tick_fixed(&mut game_state, UVec2::new(1000, 1000), &tilemap, &atlas);
+    let final_pos = player_position(&game_state);
 
     // Should not move because large collision box overlaps solid tiles
     assert_eq!(initial_pos, final_pos);

@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use toki_core::assets::{atlas::AtlasMeta, tilemap::TileMap};
+use toki_core::game::SceneSystem;
 use toki_core::GameState;
 use winit::application::ApplicationHandler;
 use winit::event::Modifiers;
@@ -992,8 +993,10 @@ impl EditorApp {
         if self.core.ui.visibility.create_test_entities {
             if let Some(viewport) = &mut self.viewports.scene {
                 let game_state = viewport.game_state_mut();
-                let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
-                let _npc_id = game_state.spawn_player_like_npc(glam::IVec2::new(120, 72));
+                let _player_id =
+                    SceneSystem::spawn_player_at(game_state, glam::IVec2::new(80, 72));
+                let _npc_id =
+                    SceneSystem::spawn_player_like_npc(game_state, glam::IVec2::new(120, 72));
                 tracing::info!("Created test entities");
             }
             self.core.ui.visibility.create_test_entities = false;

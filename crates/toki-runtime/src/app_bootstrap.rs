@@ -11,6 +11,7 @@ use toki_core::project_content::{
     build_game_state_from_project_content as shared_build_game_state_from_project_content,
     build_game_state_from_scene as shared_build_game_state_from_scene,
 };
+use toki_core::game::SceneSystem;
 use toki_core::{GameState, Scene};
 use toki_render::RenderError;
 
@@ -442,8 +443,9 @@ impl App {
 
     pub(super) fn fallback_game_state() -> GameState {
         let mut game_state = GameState::new_empty();
-        let _player_id = game_state.spawn_player_at(glam::IVec2::new(80, 72));
-        let _npc_id = game_state.spawn_player_like_npc(glam::IVec2::new(120, 72));
+        let _player_id = SceneSystem::spawn_player_at(&mut game_state, glam::IVec2::new(80, 72));
+        let _npc_id =
+            SceneSystem::spawn_player_like_npc(&mut game_state, glam::IVec2::new(120, 72));
         game_state
     }
 

@@ -65,9 +65,7 @@ impl App {
         let save_path = save_slot_file_path(&save_root, slot)?;
         let save_data = load_save_data_from_slot(save_root, slot)?;
         let active_scene_name = save_data.active_scene_name.clone();
-        self.game_system
-            .game_state
-            .restore_from_save_data(&save_data)
+        SceneSystem::restore_from_save_data(&mut self.game_system.game_state, &save_data)
             .map_err(anyhow::Error::from)?;
         self.refresh_runtime_after_scene_restore();
         tracing::info!(
@@ -338,9 +336,7 @@ impl ApplicationHandler for App {
         self.refresh_tilemap_vertices_for_current_camera();
 
         self.audio_system.list_available_sounds();
-        if let Some(track_id) = self
-            .game_system
-            .active_scene()
+        if let Some(track_id) = SceneSystem::active_scene(&self.game_system.game_state)
             .and_then(|scene| scene.background_music_track_id.as_deref())
         {
             if let Err(error) = self.scene_transition.ensure_scene_music(
@@ -356,9 +352,7 @@ impl ApplicationHandler for App {
             }
         }
         if self.launch_options.scene_name.is_none()
-            && self
-                .game_system
-                .active_scene()
+            && SceneSystem::active_scene(&self.game_system.game_state)
                 .and_then(|scene| scene.background_music_track_id.as_deref())
                 .is_none()
         {

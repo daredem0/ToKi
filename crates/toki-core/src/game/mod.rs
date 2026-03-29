@@ -142,6 +142,10 @@ impl WorldState {
     pub fn player_id(&self) -> Option<EntityId> {
         self.player_id
     }
+
+    pub fn insert_entity_definition(&mut self, definition: EntityDefinition) {
+        self.entity_definitions.insert(definition.name.clone(), definition);
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

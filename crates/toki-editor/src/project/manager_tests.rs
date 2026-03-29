@@ -19,61 +19,6 @@ const FULL_SURFACE_FIXTURE: &str =
 const ON_PLAYER_MOVE_RUNTIME_FIXTURE: &str =
     include_str!("../../tests/fixtures/scene_rules_on_player_move_runtime.json");
 
-trait GameStateEditorCompatExt {
-    fn add_scene(&mut self, scene: Scene);
-    fn load_scene(&mut self, scene_name: &str) -> Result<(), String>;
-    fn player_id(&self) -> Option<toki_core::entity::EntityId>;
-    fn entity_manager(&self) -> &toki_core::entity::EntityManager;
-    fn handle_key_press(&mut self, key: InputKey);
-    fn handle_key_release(&mut self, key: InputKey);
-    fn update(
-        &mut self,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
-    ) -> toki_core::GameUpdateResult<AudioEvent>;
-    fn set_rules(&mut self, rules: RuleSet);
-}
-
-impl GameStateEditorCompatExt for GameState {
-    fn add_scene(&mut self, scene: Scene) {
-        SceneSystem::add_scene(self, scene);
-    }
-
-    fn load_scene(&mut self, scene_name: &str) -> Result<(), String> {
-        SceneSystem::load(self, scene_name)
-    }
-
-    fn player_id(&self) -> Option<toki_core::entity::EntityId> {
-        self.world().player_id()
-    }
-
-    fn entity_manager(&self) -> &toki_core::entity::EntityManager {
-        self.world().entity_manager()
-    }
-
-    fn handle_key_press(&mut self, key: InputKey) {
-        InputSystem::handle_key_press(self.runtime_mut(), key);
-    }
-
-    fn handle_key_release(&mut self, key: InputKey) {
-        InputSystem::handle_key_release(self.runtime_mut(), key);
-    }
-
-    fn update(
-        &mut self,
-        world_bounds: glam::UVec2,
-        tilemap: &TileMap,
-        atlas: &AtlasMeta,
-    ) -> toki_core::GameUpdateResult<AudioEvent> {
-        GameSimulation::tick_fixed(self, world_bounds, tilemap, atlas)
-    }
-
-    fn set_rules(&mut self, rules: RuleSet) {
-        RuleSystem::set_rules(self, rules);
-    }
-}
-
 #[test]
 fn create_top_down_starter_project_populates_template_content() {
     let temp_dir = tempfile::tempdir().expect("temp dir should be created");
@@ -152,26 +97,22 @@ fn top_down_starter_player_is_loaded_as_runtime_player_and_can_move() {
 
     let mut game_state = GameState::new_empty();
     let scene_name = scene.name.clone();
-    game_state.add_scene(scene);
-    game_state
-        .load_scene(&scene_name)
+    SceneSystem::add_scene(&mut game_state, scene);
+    SceneSystem::load(&mut game_state, &scene_name)
         .expect("starter scene should load into runtime game state");
 
-    let player_id = game_state
-        .player_id()
+    let player_id = game_state.world().player_id()
         .expect("starter scene should provide a player entity");
-    let initial_position = game_state
-        .entity_manager()
+    let initial_position = game_state.world().entity_manager()
         .get_entity(player_id)
         .expect("player should exist")
         .position;
 
-    game_state.handle_key_press(InputKey::Left);
-    let _ = game_state.update(glam::UVec2::new(160, 144), &tilemap, &atlas);
-    game_state.handle_key_release(InputKey::Left);
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Left);
+    let _ = GameSimulation::tick_fixed(&mut game_state, glam::UVec2::new(160, 144), &tilemap, &atlas);
+    InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Left);
 
-    let moved_position = game_state
-        .entity_manager()
+    let moved_position = game_state.world().entity_manager()
         .get_entity(player_id)
         .expect("player should still exist")
         .position;
@@ -257,15 +198,14 @@ fn scene_json_roundtrip_through_editor_persists_rules_and_executes_in_runtime() 
     assert_eq!(saved_scene.rules, authored_scene.rules);
 
     let mut game_state = GameState::new_empty();
-    game_state.add_scene(saved_scene.clone());
-    game_state
-        .load_scene(&saved_scene.name)
+    SceneSystem::add_scene(&mut game_state, saved_scene.clone());
+    SceneSystem::load(&mut game_state, &saved_scene.name)
         .expect("saved scene should load in runtime");
 
     let atlas = test_atlas();
     let tilemap = test_tilemap();
 
-    let first_update = game_state.update(glam::UVec2::new(16, 16), &tilemap, &atlas);
+    let first_update = GameSimulation::tick_fixed(&mut game_state, glam::UVec2::new(16, 16), &tilemap, &atlas);
     assert!(first_update.events.iter().any(|event| {
         matches!(
             event,
@@ -283,7 +223,7 @@ fn scene_json_roundtrip_through_editor_persists_rules_and_executes_in_runtime() 
         )
     }));
 
-    let second_update = game_state.update(glam::UVec2::new(16, 16), &tilemap, &atlas);
+    let second_update = GameSimulation::tick_fixed(&mut game_state, glam::UVec2::new(16, 16), &tilemap, &atlas);
     assert!(!second_update.events.iter().any(|event| {
         matches!(event, AudioEvent::BackgroundMusic(track_id) if track_id == "lavandia")
     }));
@@ -380,11 +320,11 @@ fn on_player_move_fixture_executes_in_runtime_and_emits_expected_audio_event() {
         .expect("on-player-move fixture should deserialize into Scene");
 
     let mut game_state = GameState::new_empty();
-    game_state.spawn_player_at(glam::IVec2::new(0, 0));
-    game_state.set_rules(scene.rules.clone());
-    game_state.handle_key_press(InputKey::Right);
+    SceneSystem::spawn_player_at(&mut game_state, glam::IVec2::new(0, 0));
+    RuleSystem::set_rules(&mut game_state, scene.rules.clone());
+    InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
 
-    let update = game_state.update(
+    let update = GameSimulation::tick_fixed(&mut game_state, 
         glam::UVec2::new(128, 128),
         &movement_test_tilemap(),
         &test_atlas(),
