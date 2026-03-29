@@ -221,7 +221,7 @@ pub fn render_empty_canvas_slot(
             ui.label("Empty");
             if ui.button("New").clicked() {
                 crate::ui::editor_context::sprite_state_mut(ui_state).set_active_canvas(side);
-                ui_state.begin_new_sprite_canvas_dialog();
+                crate::ui::editor_ui::begin_new_sprite_canvas_dialog(ui_state);
             }
             let load_enabled = sprites_dir.is_some();
             if ui

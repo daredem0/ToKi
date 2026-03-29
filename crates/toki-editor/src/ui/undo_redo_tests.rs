@@ -56,8 +56,7 @@ fn scene_rules(ui_state: &EditorUI) -> RuleSet {
 }
 
 fn scene_graph(ui_state: &EditorUI) -> RuleGraph {
-    ui_state
-        .rule_graph_for_scene("Main Scene")
+    crate::ui::editor_ui::rule_graph_for_scene(ui_state, "Main Scene")
         .cloned()
         .expect("scene graph should exist")
 }
@@ -70,7 +69,7 @@ fn seed_scene_graph(ui_state: &mut EditorUI, rules: RuleSet) {
         .find(|scene| scene.name == "Main Scene")
         .expect("main scene should exist");
     scene.rules = rules;
-    ui_state.set_rule_graph_for_scene("Main Scene".to_string(), graph);
+    crate::ui::editor_ui::set_rule_graph_for_scene(ui_state, "Main Scene".to_string(), graph);
 }
 
 fn apply_graph_transition(
@@ -81,7 +80,7 @@ fn apply_graph_transition(
     mutate: impl FnOnce(&mut RuleGraph),
 ) {
     let before_rule_set = scene_rules(ui_state);
-    let before_graph = ui_state.rule_graph_for_scene("Main Scene").cloned();
+    let before_graph = crate::ui::editor_ui::rule_graph_for_scene(ui_state, "Main Scene").cloned();
     let before_layout = crate::ui::editor_context::graph_state(ui_state).layouts_by_scene.get("Main Scene").cloned();
     let mut after_graph = before_graph
         .clone()
@@ -519,7 +518,7 @@ fn update_scene_rules_graph_command_round_trips_rules_graph_and_layout() {
         .expect("main scene should exist");
     assert_eq!(scene.rules, after_rule_set);
     assert_eq!(
-        ui_state.rule_graph_for_scene("Main Scene"),
+        crate::ui::editor_ui::rule_graph_for_scene(&ui_state, "Main Scene"),
         after_graph.as_ref()
     );
     let layout = ui_state
@@ -539,7 +538,7 @@ fn update_scene_rules_graph_command_round_trips_rules_graph_and_layout() {
         .find(|scene| scene.name == "Main Scene")
         .expect("main scene should exist");
     assert_eq!(scene.rules, before_rule_set);
-    assert!(ui_state.rule_graph_for_scene("Main Scene").is_none());
+    assert!(crate::ui::editor_ui::rule_graph_for_scene(&ui_state, "Main Scene").is_none());
     assert!(!crate::ui::editor_context::graph_state_mut(&mut ui_state).layouts_by_scene.contains_key("Main Scene"));
 }
 

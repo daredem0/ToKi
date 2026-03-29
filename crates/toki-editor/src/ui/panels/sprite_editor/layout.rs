@@ -15,7 +15,7 @@ pub fn render_no_canvas_message(
             ui.label("No canvas open");
             ui.add_space(10.0);
             if ui.button("Create New Canvas").clicked() {
-                ui_state.begin_new_sprite_canvas_dialog();
+                crate::ui::editor_ui::begin_new_sprite_canvas_dialog(ui_state);
             }
             ui.add_space(5.0);
             if ui.button("Create New Canvas from Image").clicked() {

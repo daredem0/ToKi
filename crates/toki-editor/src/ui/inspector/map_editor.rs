@@ -104,7 +104,8 @@ impl InspectorSystem {
                     let visible_changed = ui.checkbox(&mut visible, "Visible").changed();
                     let solid_changed = ui.checkbox(&mut solid, "Solid").changed();
                     if grounding_changed || visible_changed || solid_changed {
-                        ui_state.queue_map_editor_object_property_edit(
+                        crate::ui::editor_ui::queue_map_editor_object_property_edit(
+                            ui_state,
                             selected_object.index,
                             grounding,
                             visible,
@@ -162,14 +163,12 @@ impl InspectorSystem {
                             "Indexed atlas palette selection is controlled by atlas metadata or the project-wide indexed override.",
                         );
                     }
-                    ui_state.sync_map_editor_brush_selection(&tile_names);
+                    crate::ui::editor_ui::sync_map_editor_brush_selection(ui_state, &tile_names);
                     ui.horizontal(|ui| {
                         ui.label("Tile:");
                         egui::ComboBox::from_id_salt("inspector_map_editor_brush_tile_selector")
                             .selected_text(
-                                ui_state
-                                    .map_editor_context()
-                                    .map
+                                crate::ui::editor_context::map_state(ui_state)
                                     .selected_tile
                                     .as_deref()
                                     .unwrap_or("No tile selected"),
@@ -248,14 +247,15 @@ impl InspectorSystem {
                 if let Some((sheet_names, object_names, object_sheet, texture_path)) =
                     Self::load_map_editor_object_sheet_source(ui_state, config)
                 {
-                    ui_state.sync_map_editor_object_sheet_selection(&sheet_names);
+                    crate::ui::editor_ui::sync_map_editor_object_sheet_selection(
+                        ui_state,
+                        &sheet_names,
+                    );
                     ui.horizontal(|ui| {
                         ui.label("Object Sheet:");
                         egui::ComboBox::from_id_salt("inspector_map_editor_object_sheet_selector")
                             .selected_text(
-                                ui_state
-                                    .map_editor_context()
-                                    .map
+                                crate::ui::editor_context::map_state(ui_state)
                                     .selected_object_sheet
                                     .as_deref()
                                     .unwrap_or("No object sheet selected"),
@@ -272,7 +272,7 @@ impl InspectorSystem {
                                 }
                             });
                     });
-                    ui_state.sync_map_editor_object_selection(&object_names);
+                    crate::ui::editor_ui::sync_map_editor_object_selection(ui_state, &object_names);
                     ui.separator();
                     ui.label("Objects");
                     Self::render_map_editor_object_sheet_gallery(
@@ -313,7 +313,7 @@ impl InspectorSystem {
             }
         }
 
-        if ui_state.has_unsaved_map_editor_changes() {
+        if crate::ui::editor_ui::has_unsaved_map_editor_changes(ui_state) {
             ui.separator();
             ui.label("Map editor has unsaved changes.");
         }
@@ -402,9 +402,7 @@ impl InspectorSystem {
             .iter()
             .map(|(name, _, _)| name.clone())
             .collect::<Vec<_>>();
-        let selected_sheet_name = ui_state
-            .map_editor_context()
-            .map
+        let selected_sheet_name = crate::ui::editor_context::map_state(ui_state)
             .selected_object_sheet
             .clone()
             .unwrap_or_else(|| sheet_names[0].clone());

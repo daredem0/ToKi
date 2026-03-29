@@ -125,7 +125,7 @@ impl InspectorSystem {
                 dialog_id,
                 &normalized,
             );
-            ui_state.select_menu_dialog(normalized);
+            crate::ui::editor_ui::select_menu_dialog(ui_state, normalized);
         }
         if changed {
             Self::commit_menu_settings_change(ui_state, project, before_settings);

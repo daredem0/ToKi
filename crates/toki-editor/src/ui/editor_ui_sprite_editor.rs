@@ -15,22 +15,20 @@ pub(crate) use crate::ui::sprite_editor::{
     SpriteEditCommand, SpriteEditorHistory, SpriteEditorState, SpriteEditorTool, SpriteSelection,
 };
 
-impl EditorUI {
-    /// Begin showing the new canvas dialog
-    pub fn begin_new_sprite_canvas_dialog(&mut self) {
-        crate::ui::editor_context::sprite_state_mut(self).new_canvas_source_image = None;
-        crate::ui::editor_context::sprite_state_mut(self).new_canvas_source_image_size = None;
-        crate::ui::editor_context::sprite_state_mut(self).new_canvas_error = None;
-        crate::ui::editor_context::sprite_state_mut(self).show_new_canvas_dialog = true;
-    }
+/// Begin showing the new canvas dialog
+pub(crate) fn begin_new_sprite_canvas_dialog(ui_state: &mut EditorUI) {
+    crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_source_image = None;
+    crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_source_image_size = None;
+    crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_error = None;
+    crate::ui::editor_context::sprite_state_mut(ui_state).show_new_canvas_dialog = true;
+}
 
-    /// Cancel new canvas dialog
-    pub fn cancel_new_sprite_canvas_dialog(&mut self) {
-        crate::ui::editor_context::sprite_state_mut(self).new_canvas_source_image = None;
-        crate::ui::editor_context::sprite_state_mut(self).new_canvas_source_image_size = None;
-        crate::ui::editor_context::sprite_state_mut(self).new_canvas_error = None;
-        crate::ui::editor_context::sprite_state_mut(self).show_new_canvas_dialog = false;
-    }
+/// Cancel new canvas dialog
+pub(crate) fn cancel_new_sprite_canvas_dialog(ui_state: &mut EditorUI) {
+    crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_source_image = None;
+    crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_source_image_size = None;
+    crate::ui::editor_context::sprite_state_mut(ui_state).new_canvas_error = None;
+    crate::ui::editor_context::sprite_state_mut(ui_state).show_new_canvas_dialog = false;
 }
 
 #[cfg(test)]

@@ -25,7 +25,7 @@ impl InspectorSystem {
             project.metadata.runtime.menu.pause_root_screen_id = next_id.clone();
         }
         Self::commit_menu_settings_change(ui_state, project, before_settings);
-        ui_state.select_menu_screen(next_id);
+        crate::ui::editor_ui::select_menu_screen(ui_state, next_id);
     }
 
     pub(crate) fn add_menu_dialog(ui_state: &mut EditorUI, project: &mut Project) {
@@ -47,7 +47,7 @@ impl InspectorSystem {
                 hide_main_menu: false,
             });
         Self::commit_menu_settings_change(ui_state, project, before_settings);
-        ui_state.select_menu_dialog(next_id);
+        crate::ui::editor_ui::select_menu_dialog(ui_state, next_id);
     }
 
     pub(super) fn duplicate_menu_screen(
@@ -69,7 +69,7 @@ impl InspectorSystem {
             .screens
             .insert(insert_index, duplicate.clone());
         Self::commit_menu_settings_change(ui_state, project, before_settings);
-        ui_state.select_menu_screen(duplicate.id);
+        crate::ui::editor_ui::select_menu_screen(ui_state, duplicate.id);
     }
 
     pub(super) fn duplicate_menu_dialog(
@@ -91,7 +91,7 @@ impl InspectorSystem {
             .dialogs
             .insert(insert_index, duplicate.clone());
         Self::commit_menu_settings_change(ui_state, project, before_settings);
-        ui_state.select_menu_dialog(duplicate.id);
+        crate::ui::editor_ui::select_menu_dialog(ui_state, duplicate.id);
     }
 
     pub(super) fn delete_menu_screen(
@@ -113,7 +113,7 @@ impl InspectorSystem {
                 .unwrap_or_default();
         }
         Self::commit_menu_settings_change(ui_state, project, before_settings);
-        ui_state.sync_menu_editor_selection(Some(project));
+        crate::ui::editor_ui::sync_menu_editor_selection(ui_state, Some(project));
         true
     }
 
@@ -126,7 +126,7 @@ impl InspectorSystem {
         let removed = project.metadata.runtime.menu.dialogs.remove(dialog_index);
         Self::remove_ui_action_surface_targets(&mut project.metadata.runtime.menu, &removed.id);
         Self::commit_menu_settings_change(ui_state, project, before_settings);
-        ui_state.sync_menu_editor_selection(Some(project));
+        crate::ui::editor_ui::sync_menu_editor_selection(ui_state, Some(project));
     }
 
     pub(super) fn add_menu_item_to_selected_screen(
@@ -135,7 +135,9 @@ impl InspectorSystem {
         item: MenuItemDefinition,
     ) {
         let before_settings = project.metadata.runtime.menu.clone();
-        let Some(screen_id) = ui_state.selected_menu_screen_id().map(str::to_string) else {
+        let Some(screen_id) =
+            crate::ui::editor_ui::selected_menu_screen_id(ui_state).map(str::to_string)
+        else {
             return;
         };
         let Some(screen_index) = Self::selected_menu_screen_index(project, &screen_id) else {
@@ -145,7 +147,7 @@ impl InspectorSystem {
         let item_index = screen.items.len();
         screen.items.push(item);
         Self::commit_menu_settings_change(ui_state, project, before_settings);
-        ui_state.select_menu_entry(screen_id, item_index);
+        crate::ui::editor_ui::select_menu_entry(ui_state, screen_id, item_index);
     }
 
     pub(super) fn duplicate_menu_item(
@@ -163,7 +165,7 @@ impl InspectorSystem {
         let screen_id = project.metadata.runtime.menu.screens[screen_index]
             .id
             .clone();
-        ui_state.select_menu_entry(screen_id, item_index + 1);
+        crate::ui::editor_ui::select_menu_entry(ui_state, screen_id, item_index + 1);
     }
 
     pub(crate) fn delete_menu_item(
@@ -180,9 +182,9 @@ impl InspectorSystem {
         };
         Self::commit_menu_settings_change(ui_state, project, before_settings);
         if item_index < remaining_len {
-            ui_state.select_menu_entry(screen_id, item_index);
+            crate::ui::editor_ui::select_menu_entry(ui_state, screen_id, item_index);
         } else {
-            ui_state.select_menu_screen(screen_id);
+            crate::ui::editor_ui::select_menu_screen(ui_state, screen_id);
         }
     }
 
@@ -207,7 +209,7 @@ impl InspectorSystem {
             screen.id.clone()
         };
         Self::commit_menu_settings_change(ui_state, project, before_settings);
-        ui_state.select_menu_entry(screen_id, next_index as usize);
+        crate::ui::editor_ui::select_menu_entry(ui_state, screen_id, next_index as usize);
     }
 
     pub(super) fn coerce_menu_item_kind(

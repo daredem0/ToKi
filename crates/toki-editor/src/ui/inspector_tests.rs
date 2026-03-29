@@ -371,7 +371,7 @@ fn delete_menu_item_falls_back_to_screen_selection_when_last_item_removed() {
         }],
     }];
     let mut ui = EditorUI::new();
-    ui.select_menu_entry("pause_menu", 0);
+    crate::ui::editor_ui::select_menu_entry(&mut ui, "pause_menu", 0);
 
     InspectorSystem::delete_menu_item(&mut ui, &mut project, 0, 0);
 

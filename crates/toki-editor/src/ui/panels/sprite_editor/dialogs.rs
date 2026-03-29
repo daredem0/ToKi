@@ -160,7 +160,7 @@ fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                     submit_new_canvas(ui_state);
                 }
                 if ui.button("Cancel").clicked() {
-                    ui_state.cancel_new_sprite_canvas_dialog();
+                    crate::ui::editor_ui::cancel_new_sprite_canvas_dialog(ui_state);
                 }
             });
         });

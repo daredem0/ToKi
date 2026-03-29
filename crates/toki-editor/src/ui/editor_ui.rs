@@ -6,7 +6,7 @@ use super::undo_redo::UndoRedoHistory;
 use crate::ui::editor_context::{
     default_active_context, default_parked_contexts, null_context, AnimationEditorContext,
     DialogEditorContext, EditorContext, EditorContextHost, EntityEditorContext,
-    MapEditorContext, RuleGraphContext, SceneViewportContext, SpriteEditorContext,
+    RuleGraphContext, SceneViewportContext, SpriteEditorContext,
 };
 use crate::editor_tab_strip::EditorTabStripState;
 use crate::editor_types::PlacementPreviewVisual;
@@ -44,12 +44,35 @@ pub(crate) use editor_ui_dialog_editor::{sync_dialog_registry, DialogEditorState
 pub(crate) use editor_ui_entity_editor::{
     create_default_definition, EntityCategory, EntityEditState, EntitySummary,
 };
-pub(crate) use editor_ui_graph::SceneRulesGraphCommandData;
+pub(crate) use editor_ui_graph::{
+    clear_graph_layout_dirty, execute_scene_rules_graph_command,
+    export_graph_layouts_for_project, export_rule_graph_drafts_for_project,
+    graph_layout_position, graph_view_for_scene, is_graph_layout_dirty,
+    load_graph_layouts_from_project, load_rule_graph_drafts_from_project, rule_graph_for_scene,
+    set_graph_view_for_scene, set_rule_graph_for_scene, sync_rule_graph_with_rule_set,
+    SceneRulesGraphCommandData,
+};
 pub(crate) use editor_ui_map_editor::{
-    MapEditorDraft, MapEditorHistory, MapEditorObjectInfo, MapEditorObjectPropertyEditRequest,
+    begin_map_editor_edit, begin_map_object_move_drag, begin_new_map_dialog,
+    cancel_map_editor_edit, clear_map_editor_dirty, clear_map_editor_history,
+    clear_map_editor_object_selection, finalize_saved_existing_map,
+    finalize_saved_map_editor_draft, finish_map_editor_edit, finish_map_object_move_drag,
+    has_unsaved_map_editor_changes, has_unsaved_map_editor_draft, is_map_object_move_drag_active,
+    map_editor_selected_label, mark_map_editor_dirty, pick_map_editor_tile,
+    queue_map_editor_object_property_edit, select_map_editor_object, set_map_editor_draft,
+    sync_map_editor_brush_selection, sync_map_editor_object_selection,
+    sync_map_editor_object_sheet_selection, sync_map_editor_selection,
+    sync_selected_map_editor_object_from_tilemap, take_map_editor_object_property_edit_request,
+    take_pending_map_editor_tilemap_sync, submit_new_map_request, MapEditorDraft,
+    MapEditorHistory, MapEditorObjectInfo, MapEditorObjectPropertyEditRequest,
     MapEditorTileInfo, MapEditorTool, MapObjectMoveDragState, NewMapRequest,
 };
+pub(crate) use editor_ui_menu_editor::{
+    select_menu_dialog, select_menu_entry, select_menu_screen, selected_menu_dialog_id,
+    selected_menu_screen_id, sync_menu_editor_selection,
+};
 pub(crate) use editor_ui_sprite_editor::{
+    begin_new_sprite_canvas_dialog, cancel_new_sprite_canvas_dialog,
     CanvasSide, DualCanvasLayout, PixelColor, ResizeAnchor, SelectionMask, SpriteAssetKind,
     SpriteCanvas, SpriteCanvasViewport, SpriteEditorState, SpriteEditorTool, SpriteSelection,
 };
@@ -726,11 +749,6 @@ impl EditorUI {
         }
     }
 
-    pub(crate) fn map_editor_context(&self) -> &MapEditorContext {
-        self.context::<MapEditorContext>(CenterPanelTab::MapEditor)
-            .expect("map editor context should always exist")
-    }
-
     pub(crate) fn dialog_editor_context(&self) -> &DialogEditorContext {
         self.context::<DialogEditorContext>(CenterPanelTab::DialogEditor)
             .expect("dialog editor context should always exist")
@@ -816,7 +834,9 @@ impl EditorUI {
     pub fn load_scenes_from_project(&mut self, loaded_scenes: Vec<Scene>) {
         tracing::info!("Loading {} scenes into UI hierarchy", loaded_scenes.len());
         self.scenes = loaded_scenes;
-        self.rule_graph_context_mut().graph.rule_graphs_by_scene.clear();
+        crate::ui::editor_context::graph_state_mut(self)
+            .rule_graphs_by_scene
+            .clear();
         self.command_history.clear();
 
         let current_active_missing = self
@@ -982,7 +1002,7 @@ impl EditorUI {
         }
 
         if self.active_tab() == CenterPanelTab::MenuEditor {
-            self.sync_menu_editor_selection(context_host.project.as_deref());
+            sync_menu_editor_selection(self, context_host.project.as_deref());
         }
 
         // Render viewport last (mutable access)

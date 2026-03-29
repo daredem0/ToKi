@@ -92,11 +92,10 @@ fn sync_rule_graph_with_rule_set_preserves_unserializable_existing_draft() {
         "graph should be intentionally non-serializable due to branching"
     );
 
-    ui.set_rule_graph_for_scene("Main Scene".to_string(), graph.clone());
-    ui.sync_rule_graph_with_rule_set("Main Scene", &rule_set);
+    crate::ui::editor_ui::set_rule_graph_for_scene(&mut ui, "Main Scene".to_string(), graph.clone());
+    crate::ui::editor_ui::sync_rule_graph_with_rule_set(&mut ui, "Main Scene", &rule_set);
 
-    let persisted_graph = ui
-        .rule_graph_for_scene("Main Scene")
+    let persisted_graph = crate::ui::editor_ui::rule_graph_for_scene(&ui, "Main Scene")
         .expect("graph draft should still exist");
     assert!(
         persisted_graph
@@ -217,7 +216,7 @@ fn sync_map_editor_selection_picks_sorted_first_map_and_requests_load() {
         "middle".to_string(),
     ];
 
-    ui.sync_map_editor_selection(&maps);
+    crate::ui::editor_ui::sync_map_editor_selection(&mut ui, &maps);
 
     assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).active_map.as_deref(), Some("alpha"));
     assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).map_load_requested.as_deref(), Some("alpha"));
@@ -233,7 +232,7 @@ fn sync_map_editor_selection_preserves_existing_valid_choice() {
         "middle".to_string(),
     ];
 
-    ui.sync_map_editor_selection(&maps);
+    crate::ui::editor_ui::sync_map_editor_selection(&mut ui, &maps);
 
     assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).active_map.as_deref(), Some("middle"));
     assert!(crate::ui::editor_context::map_state_mut(&mut ui).map_load_requested.is_none());
@@ -242,7 +241,7 @@ fn sync_map_editor_selection_preserves_existing_valid_choice() {
 #[test]
 fn sync_map_editor_selection_preserves_unsaved_draft() {
     let mut ui = EditorUI::new();
-    ui.set_map_editor_draft(MapEditorDraft {
+    crate::ui::editor_ui::set_map_editor_draft(&mut ui, MapEditorDraft {
         name: "draft_map".to_string(),
         tilemap: toki_core::assets::tilemap::TileMap {
             size: glam::UVec2::new(2, 2),
@@ -253,17 +252,20 @@ fn sync_map_editor_selection_preserves_unsaved_draft() {
         },
     });
 
-    ui.sync_map_editor_selection(&["alpha".to_string(), "zeta".to_string()]);
+    crate::ui::editor_ui::sync_map_editor_selection(
+        &mut ui,
+        &["alpha".to_string(), "zeta".to_string()],
+    );
 
     assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).active_map.as_deref(), Some("draft_map"));
     assert!(crate::ui::editor_context::map_state_mut(&mut ui).map_load_requested.is_none());
-    assert!(ui.has_unsaved_map_editor_draft());
+    assert!(crate::ui::editor_ui::has_unsaved_map_editor_draft(&ui));
 }
 
 #[test]
 fn finalize_saved_map_editor_draft_requests_reload_from_disk() {
     let mut ui = EditorUI::new();
-    ui.set_map_editor_draft(MapEditorDraft {
+    crate::ui::editor_ui::set_map_editor_draft(&mut ui, MapEditorDraft {
         name: "draft_map".to_string(),
         tilemap: toki_core::assets::tilemap::TileMap {
             size: glam::UVec2::new(2, 2),
@@ -274,10 +276,10 @@ fn finalize_saved_map_editor_draft_requests_reload_from_disk() {
         },
     });
 
-    ui.finalize_saved_map_editor_draft("draft_map".to_string());
+    crate::ui::editor_ui::finalize_saved_map_editor_draft(&mut ui, "draft_map".to_string());
 
-    assert!(!ui.has_unsaved_map_editor_draft());
-    assert!(!ui.has_unsaved_map_editor_changes());
+    assert!(!crate::ui::editor_ui::has_unsaved_map_editor_draft(&ui));
+    assert!(!crate::ui::editor_ui::has_unsaved_map_editor_changes(&ui));
     assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).active_map.as_deref(), Some("draft_map"));
     assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).map_load_requested.as_deref(), Some("draft_map"));
 }
@@ -300,7 +302,7 @@ fn switching_tabs_preserves_sprite_map_and_graph_state() {
     let mut ui = EditorUI::new();
     crate::ui::editor_context::sprite_state_mut(&mut ui).new_canvas(8, 8);
     crate::ui::editor_context::sprite_state_mut(&mut ui).foreground_color = PixelColor::new(10, 20, 30, 255);
-    ui.set_map_editor_draft(MapEditorDraft {
+    crate::ui::editor_ui::set_map_editor_draft(&mut ui, MapEditorDraft {
         name: "draft_map".to_string(),
         tilemap: toki_core::assets::tilemap::TileMap {
             size: glam::UVec2::new(2, 2),
@@ -328,7 +330,7 @@ fn switching_tabs_preserves_sprite_map_and_graph_state() {
 #[test]
 fn active_context_undo_prefers_map_history_when_map_tab_is_active() {
     let mut ui = EditorUI::new();
-    ui.set_map_editor_draft(MapEditorDraft {
+    crate::ui::editor_ui::set_map_editor_draft(&mut ui, MapEditorDraft {
         name: "draft_map".to_string(),
         tilemap: toki_core::assets::tilemap::TileMap {
             size: glam::UVec2::new(2, 2),
@@ -365,9 +367,12 @@ fn active_context_undo_prefers_map_history_when_map_tab_is_active() {
 fn sync_map_editor_selection_preserves_dirty_loaded_map() {
     let mut ui = EditorUI::new();
     crate::ui::editor_context::map_state_mut(&mut ui).active_map = Some("middle".to_string());
-    ui.mark_map_editor_dirty();
+    crate::ui::editor_ui::mark_map_editor_dirty(&mut ui);
 
-    ui.sync_map_editor_selection(&["alpha".to_string(), "middle".to_string()]);
+    crate::ui::editor_ui::sync_map_editor_selection(
+        &mut ui,
+        &["alpha".to_string(), "middle".to_string()],
+    );
 
     assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).active_map.as_deref(), Some("middle"));
     assert!(crate::ui::editor_context::map_state_mut(&mut ui).map_load_requested.is_none());
@@ -417,7 +422,7 @@ fn sync_menu_editor_selection_picks_first_screen_when_none_selected() {
     let mut ui = EditorUI::new();
     let project = sample_project_with_menu_screens(&["pause_menu", "inventory_menu"]);
 
-    ui.sync_menu_editor_selection(Some(&project));
+    crate::ui::editor_ui::sync_menu_editor_selection(&mut ui, Some(&project));
 
     assert_eq!(
         ui.selection,
@@ -430,7 +435,7 @@ fn sync_menu_editor_selection_picks_first_dialog_when_only_dialogs_exist() {
     let mut ui = EditorUI::new();
     let project = sample_project_with_menu_dialogs(&["exit_confirm", "discard_confirm"]);
 
-    ui.sync_menu_editor_selection(Some(&project));
+    crate::ui::editor_ui::sync_menu_editor_selection(&mut ui, Some(&project));
 
     assert_eq!(
         ui.selection,
@@ -442,9 +447,9 @@ fn sync_menu_editor_selection_picks_first_dialog_when_only_dialogs_exist() {
 fn sync_menu_editor_selection_preserves_valid_entry_selection() {
     let mut ui = EditorUI::new();
     let project = sample_project_with_menu_screens(&["pause_menu"]);
-    ui.select_menu_entry("pause_menu", 0);
+    crate::ui::editor_ui::select_menu_entry(&mut ui, "pause_menu", 0);
 
-    ui.sync_menu_editor_selection(Some(&project));
+    crate::ui::editor_ui::sync_menu_editor_selection(&mut ui, Some(&project));
 
     assert_eq!(
         ui.selection,
@@ -459,9 +464,9 @@ fn sync_menu_editor_selection_preserves_valid_entry_selection() {
 fn sync_menu_editor_selection_downgrades_missing_entry_to_screen_selection() {
     let mut ui = EditorUI::new();
     let project = sample_project_with_menu_screens(&["pause_menu"]);
-    ui.select_menu_entry("pause_menu", 3);
+    crate::ui::editor_ui::select_menu_entry(&mut ui, "pause_menu", 3);
 
-    ui.sync_menu_editor_selection(Some(&project));
+    crate::ui::editor_ui::sync_menu_editor_selection(&mut ui, Some(&project));
 
     assert_eq!(
         ui.selection,
@@ -473,9 +478,9 @@ fn sync_menu_editor_selection_downgrades_missing_entry_to_screen_selection() {
 fn sync_menu_editor_selection_replaces_missing_screen_selection() {
     let mut ui = EditorUI::new();
     let project = sample_project_with_menu_screens(&["pause_menu", "inventory_menu"]);
-    ui.select_menu_screen("missing_menu");
+    crate::ui::editor_ui::select_menu_screen(&mut ui, "missing_menu");
 
-    ui.sync_menu_editor_selection(Some(&project));
+    crate::ui::editor_ui::sync_menu_editor_selection(&mut ui, Some(&project));
 
     assert_eq!(
         ui.selection,
@@ -487,7 +492,7 @@ fn sync_menu_editor_selection_replaces_missing_screen_selection() {
 fn sync_map_editor_brush_selection_picks_first_sorted_tile() {
     let mut ui = EditorUI::new();
 
-    ui.sync_map_editor_brush_selection(&[
+    crate::ui::editor_ui::sync_map_editor_brush_selection(&mut ui, &[
         "water".to_string(),
         "grass".to_string(),
         "bush".to_string(),
@@ -508,7 +513,7 @@ fn map_editor_defaults_to_drag_tool() {
 fn sync_map_editor_object_sheet_selection_picks_first_sorted_sheet() {
     let mut ui = EditorUI::new();
 
-    ui.sync_map_editor_object_sheet_selection(&[
+    crate::ui::editor_ui::sync_map_editor_object_sheet_selection(&mut ui, &[
         "trees".to_string(),
         "fauna".to_string(),
         "props".to_string(),
@@ -521,7 +526,7 @@ fn sync_map_editor_object_sheet_selection_picks_first_sorted_sheet() {
 fn sync_map_editor_object_selection_picks_first_sorted_object() {
     let mut ui = EditorUI::new();
 
-    ui.sync_map_editor_object_selection(&[
+    crate::ui::editor_ui::sync_map_editor_object_selection(&mut ui, &[
         "tree_large".to_string(),
         "bush".to_string(),
         "flower".to_string(),
@@ -535,7 +540,7 @@ fn pick_map_editor_tile_sets_selected_tile_and_switches_back_to_brush() {
     let mut ui = EditorUI::new();
     crate::ui::editor_context::map_state_mut(&mut ui).tool = super::MapEditorTool::PickTile;
 
-    ui.pick_map_editor_tile("water".to_string());
+    crate::ui::editor_ui::pick_map_editor_tile(&mut ui, "water".to_string());
 
     assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).selected_tile.as_deref(), Some("water"));
     assert_eq!(crate::ui::editor_context::map_state_mut(&mut ui).tool, super::MapEditorTool::Brush);
@@ -565,7 +570,7 @@ fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
         solid: false,
     };
 
-    ui.select_map_editor_object(0, &object);
+    crate::ui::editor_ui::select_map_editor_object(&mut ui, 0, &object);
     assert!(crate::ui::editor_context::map_state_mut(&mut ui).selected_tile_info.is_none());
     assert_eq!(
         crate::ui::editor_context::map_state_mut(&mut ui)
@@ -587,10 +592,8 @@ fn select_map_editor_object_clears_tile_selection_and_syncs_changes() {
         }],
     };
 
-    ui.sync_selected_map_editor_object_from_tilemap(&tilemap);
-    let selected = ui
-        .map_editor_context()
-        .map
+    crate::ui::editor_ui::sync_selected_map_editor_object_from_tilemap(&mut ui, &tilemap);
+    let selected = crate::ui::editor_context::map_state(&ui)
         .selected_object_info
         .as_ref()
         .expect("selected object should remain");
@@ -615,21 +618,24 @@ fn queue_map_editor_object_property_edit_updates_selected_object_info() {
         visible: true,
         solid: false,
     };
-    ui.select_map_editor_object(2, &object);
+    crate::ui::editor_ui::select_map_editor_object(&mut ui, 2, &object);
 
-    ui.queue_map_editor_object_property_edit(2, grounding.clone(), false, true);
+    crate::ui::editor_ui::queue_map_editor_object_property_edit(
+        &mut ui,
+        2,
+        grounding.clone(),
+        false,
+        true,
+    );
 
-    let selected = ui
-        .map_editor_context()
-        .map
+    let selected = crate::ui::editor_context::map_state(&ui)
         .selected_object_info
         .as_ref()
         .expect("selected object should exist");
     assert_eq!(selected.grounding, grounding);
     assert!(!selected.visible);
     assert!(selected.solid);
-    let request = ui
-        .take_map_editor_object_property_edit_request()
+    let request = crate::ui::editor_ui::take_map_editor_object_property_edit_request(&mut ui)
         .expect("edit request should exist");
     assert_eq!(request.object_index, 2);
     assert_eq!(request.grounding, grounding);
@@ -641,7 +647,7 @@ fn queue_map_editor_object_property_edit_updates_selected_object_info() {
 fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
     let mut ui = EditorUI::new();
     ui.set_active_tab(super::CenterPanelTab::MapEditor);
-    ui.set_map_editor_draft(MapEditorDraft {
+    crate::ui::editor_ui::set_map_editor_draft(&mut ui, MapEditorDraft {
         name: "draft_map".to_string(),
         tilemap: toki_core::assets::tilemap::TileMap {
             size: glam::UVec2::new(2, 2),
@@ -652,9 +658,7 @@ fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
         },
     });
 
-    let before = ui
-        .map_editor_context()
-        .map
+    let before = crate::ui::editor_context::map_state(&ui)
         .draft
         .as_ref()
         .expect("draft should exist")
@@ -663,19 +667,17 @@ fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
     let mut after = before.clone();
     after.tiles[0] = "water".to_string();
 
-    ui.begin_map_editor_edit(&before);
-    assert!(ui.finish_map_editor_edit(&after));
+    crate::ui::editor_ui::begin_map_editor_edit(&mut ui, &before);
+    assert!(crate::ui::editor_ui::finish_map_editor_edit(&mut ui, &after));
     assert!(ui.can_undo());
 
     assert!(ui.undo());
-    let undone = ui
-        .take_pending_map_editor_tilemap_sync()
+    let undone = crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut ui)
         .expect("undo should queue a tilemap sync");
     assert_eq!(undone.tiles[0], "grass");
 
     assert!(ui.redo());
-    let redone = ui
-        .take_pending_map_editor_tilemap_sync()
+    let redone = crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut ui)
         .expect("redo should queue a tilemap sync");
     assert_eq!(redone.tiles[0], "water");
 }
@@ -690,7 +692,7 @@ fn map_editor_can_undo_prefers_map_history_when_map_editor_tab_is_active() {
     ui.set_active_tab(super::CenterPanelTab::MapEditor);
     assert!(!ui.can_undo());
 
-    ui.set_map_editor_draft(MapEditorDraft {
+    crate::ui::editor_ui::set_map_editor_draft(&mut ui, MapEditorDraft {
         name: "draft_map".to_string(),
         tilemap: toki_core::assets::tilemap::TileMap {
             size: glam::UVec2::new(1, 1),
@@ -703,12 +705,12 @@ fn map_editor_can_undo_prefers_map_history_when_map_editor_tab_is_active() {
     let before = crate::ui::editor_context::map_state_mut(&mut ui).draft.as_ref().unwrap().tilemap.clone();
     let mut after = before.clone();
     after.tiles[0] = "water".to_string();
-    ui.begin_map_editor_edit(&before);
-    assert!(ui.finish_map_editor_edit(&after));
+    crate::ui::editor_ui::begin_map_editor_edit(&mut ui, &before);
+    assert!(crate::ui::editor_ui::finish_map_editor_edit(&mut ui, &after));
 
     assert!(ui.can_undo());
     assert!(ui.undo());
-    assert!(ui.take_pending_map_editor_tilemap_sync().is_some());
+    assert!(crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut ui).is_some());
 }
 
 // =============================================================================

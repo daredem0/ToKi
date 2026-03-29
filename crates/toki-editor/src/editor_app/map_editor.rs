@@ -163,7 +163,7 @@ impl EditorApp {
                     return;
                 }
 
-                self.core.ui.set_map_editor_draft(draft);
+                crate::ui::editor_ui::set_map_editor_draft(&mut self.core.ui, draft);
                 viewport.mark_dirty();
             }
             Err(error) => {
@@ -195,7 +195,10 @@ impl EditorApp {
             {
                 Ok(_) => {
                     tracing::info!("Saved map editor draft '{}'", draft.name);
-                    self.core.ui.finalize_saved_map_editor_draft(draft.name);
+                    crate::ui::editor_ui::finalize_saved_map_editor_draft(
+                        &mut self.core.ui,
+                        draft.name,
+                    );
                 }
                 Err(error) => {
                     tracing::error!(
@@ -230,7 +233,7 @@ impl EditorApp {
         {
             Ok(_) => {
                 tracing::info!("Saved map editor asset '{}'", active_map_name);
-                self.core.ui.finalize_saved_existing_map();
+                crate::ui::editor_ui::finalize_saved_existing_map(&mut self.core.ui);
             }
             Err(error) => {
                 tracing::error!(
@@ -244,7 +247,7 @@ impl EditorApp {
     }
 
     pub(super) fn handle_map_editor_map_requests(&mut self) {
-        if self.core.ui.has_unsaved_map_editor_draft() {
+        if crate::ui::editor_ui::has_unsaved_map_editor_draft(&self.core.ui) {
             crate::ui::editor_context::map_state_mut(&mut self.core.ui).map_load_requested = None;
             return;
         }
@@ -279,8 +282,8 @@ impl EditorApp {
             Ok(()) => {
                 tracing::info!("Loaded map '{}' into map editor viewport", map_name);
                 crate::ui::editor_context::map_state_mut(&mut self.core.ui).active_map = Some(map_name);
-                self.core.ui.clear_map_editor_dirty();
-                self.core.ui.clear_map_editor_history();
+                crate::ui::editor_ui::clear_map_editor_dirty(&mut self.core.ui);
+                crate::ui::editor_ui::clear_map_editor_history(&mut self.core.ui);
                 viewport.mark_dirty();
             }
             Err(e) => {
@@ -294,7 +297,9 @@ impl EditorApp {
     }
 
     pub(super) fn handle_pending_map_editor_tilemap_sync(&mut self) {
-        let Some(tilemap) = self.core.ui.take_pending_map_editor_tilemap_sync() else {
+        let Some(tilemap) =
+            crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut self.core.ui)
+        else {
             return;
         };
 

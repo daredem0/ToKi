@@ -13,7 +13,7 @@ pub fn render_toolbar(
         ui.separator();
 
         if ui.button("New Canvas").clicked() {
-            ui_state.begin_new_sprite_canvas_dialog();
+            crate::ui::editor_ui::begin_new_sprite_canvas_dialog(ui_state);
         }
 
         // Load button - only enabled if we have a project
