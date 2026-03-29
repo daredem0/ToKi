@@ -94,7 +94,7 @@ impl ViewportPresentation {
     }
 }
 
-pub fn resolve_fixed_viewport_presentation(
+pub fn resolve_viewport_presentation(
     window_size: glam::UVec2,
     base_viewport: glam::UVec2,
     mode: RuntimeViewportMode,
@@ -126,14 +126,14 @@ pub fn build_fixed_viewport_projection(layout: ViewportLayout) -> glam::Mat4 {
 
 #[cfg(test)]
 mod tests {
-    use super::resolve_fixed_viewport_presentation;
+    use super::resolve_viewport_presentation;
     use toki_core::project_runtime::{IntegerScaleFactor, RuntimeViewportMode};
     use toki_core::text::{TextAnchor, TextItem, TextStyle};
     use toki_core::ui::{UiBlock, UiComposition, UiRect, UiTextBlock};
 
     #[test]
     fn viewport_positions_are_scaled_and_centered_into_surface_space() {
-        let presentation = resolve_fixed_viewport_presentation(
+        let presentation = resolve_viewport_presentation(
             glam::UVec2::new(800, 600),
             glam::UVec2::new(160, 144),
             RuntimeViewportMode::IntegerScale {
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn surface_positions_outside_viewport_are_rejected() {
-        let presentation = resolve_fixed_viewport_presentation(
+        let presentation = resolve_viewport_presentation(
             glam::UVec2::new(800, 600),
             glam::UVec2::new(160, 144),
             RuntimeViewportMode::IntegerScale {
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn surface_text_and_ui_are_offset_into_the_letterboxed_viewport() {
-        let presentation = resolve_fixed_viewport_presentation(
+        let presentation = resolve_viewport_presentation(
             glam::UVec2::new(800, 600),
             glam::UVec2::new(160, 144),
             RuntimeViewportMode::IntegerScale {
@@ -222,28 +222,28 @@ mod tests {
 
     #[test]
     fn runtime_ui_scale_factor_targets_scale_seven_as_full_size() {
-        let scale_one = resolve_fixed_viewport_presentation(
+        let scale_one = resolve_viewport_presentation(
             glam::UVec2::new(160, 144),
             glam::UVec2::new(160, 144),
             RuntimeViewportMode::IntegerScale {
                 factor: IntegerScaleFactor::Fixed(1),
             },
         );
-        let scale_three = resolve_fixed_viewport_presentation(
+        let scale_three = resolve_viewport_presentation(
             glam::UVec2::new(480, 432),
             glam::UVec2::new(160, 144),
             RuntimeViewportMode::IntegerScale {
                 factor: IntegerScaleFactor::Fixed(3),
             },
         );
-        let scale_four = resolve_fixed_viewport_presentation(
+        let scale_four = resolve_viewport_presentation(
             glam::UVec2::new(640, 576),
             glam::UVec2::new(160, 144),
             RuntimeViewportMode::IntegerScale {
                 factor: IntegerScaleFactor::Fixed(4),
             },
         );
-        let scale_seven = resolve_fixed_viewport_presentation(
+        let scale_seven = resolve_viewport_presentation(
             glam::UVec2::new(1120, 1008),
             glam::UVec2::new(160, 144),
             RuntimeViewportMode::IntegerScale {

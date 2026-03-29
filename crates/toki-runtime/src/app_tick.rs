@@ -11,6 +11,28 @@ use super::app_scene_runtime::{SceneRuntimeCoordinator, SceneRuntimeRefs, SceneR
 use super::App;
 
 impl App {
+    pub(super) fn current_world_bounds(&self) -> glam::UVec2 {
+        glam::UVec2::new(
+            self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
+            self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
+        )
+    }
+
+    pub(super) fn sync_runtime_viewport_to_window(&mut self, world_bounds: glam::UVec2) -> bool {
+        if let Some(size) = self.platform.inner_size() {
+            self.rendering.update_window_size(size);
+        }
+        let effective_viewport = self.rendering.effective_runtime_viewport();
+        let viewport_changed = self
+            .camera_system
+            .apply_runtime_viewport(effective_viewport.world_viewport_size(), world_bounds);
+        if self.rendering.has_gpu() {
+            self.rendering
+                .update_projection(self.camera_system.view_matrix());
+        }
+        viewport_changed
+    }
+
     pub(super) fn create_scene_runtime_coordinator(&mut self) -> SceneRuntimeCoordinator<'_> {
         let content_root = self.content_root_path().map(std::path::Path::to_path_buf);
         SceneRuntimeCoordinator::new(
@@ -51,10 +73,8 @@ impl App {
         tracing::trace!("TICK @ {:?}", tick_start);
 
         let transition_delta_ms = delta_ms.unwrap_or(DEFAULT_TIMESTEP_MS).max(0.0) as u32;
-        let mut world_bounds = glam::UVec2::new(
-            self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
-            self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
-        );
+        let mut world_bounds = self.current_world_bounds();
+        let viewport_changed = self.sync_runtime_viewport_to_window(world_bounds);
         let mut game_result =
             if self.should_gate_gameplay_for_menu() || self.scene_transition.is_active() {
                 GameUpdateResult::new()
@@ -120,17 +140,15 @@ impl App {
             let mut coordinator = self.create_scene_runtime_coordinator();
             coordinator.advance_scene_transition(transition_delta_ms);
         }
-        world_bounds = glam::UVec2::new(
-            self.resources.tilemap_size().x * self.resources.tilemap_tile_size().x,
-            self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
-        );
+        world_bounds = self.current_world_bounds();
 
         let player_moved = game_result.player_moved;
         let entities = self.game_system.entities_for_camera();
         let runtime = RuntimeState {
             entities: &entities,
         };
-        let cam_changed = self.camera_system.update(&runtime, world_bounds) || player_moved;
+        let cam_changed =
+            self.camera_system.update(&runtime, world_bounds) || player_moved || viewport_changed;
 
         if self.rendering.has_gpu() {
             self.rendering

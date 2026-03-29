@@ -13,6 +13,10 @@ pub enum RuntimeViewportMode {
         #[serde(default)]
         factor: IntegerScaleFactor,
     },
+    WindowFill {
+        #[serde(default = "default_window_fill_zoom_percent")]
+        zoom_percent: u16,
+    },
 }
 
 impl Default for RuntimeViewportMode {
@@ -25,7 +29,14 @@ impl RuntimeViewportMode {
     pub fn fit_percent(self) -> u16 {
         match self {
             Self::AspectFit { fit_percent } => fit_percent.max(1),
-            Self::IntegerScale { .. } => default_aspect_fit_percent(),
+            Self::IntegerScale { .. } | Self::WindowFill { .. } => default_aspect_fit_percent(),
+        }
+    }
+
+    pub fn zoom_percent(self) -> u16 {
+        match self {
+            Self::WindowFill { zoom_percent } => zoom_percent.max(1),
+            Self::AspectFit { .. } | Self::IntegerScale { .. } => default_window_fill_zoom_percent(),
         }
     }
 }
@@ -106,6 +117,10 @@ impl<'de> Deserialize<'de> for IntegerScaleFactor {
 }
 
 pub const fn default_aspect_fit_percent() -> u16 {
+    100
+}
+
+pub const fn default_window_fill_zoom_percent() -> u16 {
     100
 }
 

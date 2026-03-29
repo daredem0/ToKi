@@ -72,6 +72,21 @@ viewport = { mode = "aspect_fit", fit_percent = 100 }
 }
 
 #[test]
+fn runtime_display_settings_support_window_fill_viewport_mode() {
+    let display: RuntimeDisplaySettings = toml::from_str(
+        r#"
+viewport = { mode = "window_fill", zoom_percent = 125 }
+"#,
+    )
+    .expect("window fill viewport should deserialize");
+
+    assert_eq!(
+        display.viewport,
+        RuntimeViewportMode::WindowFill { zoom_percent: 125 }
+    );
+}
+
+#[test]
 fn integer_scale_factor_serializes_as_expected_scalars() {
     #[derive(serde::Serialize)]
     struct Wrapper {
@@ -181,6 +196,23 @@ fn runtime_metadata_supports_viewport_mode_settings() {
         RuntimeViewportMode::IntegerScale {
             factor: IntegerScaleFactor::Fixed(3),
         }
+    );
+}
+
+#[test]
+fn runtime_metadata_supports_window_fill_viewport_mode_settings() {
+    let metadata: ProjectRuntimeMetadata = toml::from_str(
+        r#"
+        [runtime.display.viewport]
+        mode = "window_fill"
+        zoom_percent = 150
+        "#,
+    )
+    .expect("runtime metadata should deserialize");
+
+    assert_eq!(
+        metadata.runtime.display.viewport,
+        RuntimeViewportMode::WindowFill { zoom_percent: 150 }
     );
 }
 
