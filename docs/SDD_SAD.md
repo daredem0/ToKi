@@ -29,6 +29,7 @@ Supporting crates provide the shared substrate:
 - `toki-schemas`: canonical JSON schema payloads
 - `toki-core`: domain models, asset models, simulation, collision, scene/rule logic, serialization
 - `toki-render`: reusable WGPU rendering infrastructure and text rendering
+- `toki-test-fixtures`: shared test utilities and fixtures for unit/integration testing across crates
 
 High-level context:
 
@@ -57,7 +58,7 @@ flowchart LR
 
 Main persisted surfaces:
 
-- `project.toml`: project metadata, runtime settings (display, audio, splash, menu, timing mode)
+- `project.toml`: project metadata, runtime settings (display, audio, splash, menu, timing mode, scene transitions)
 - `scenes/*.json`: scene documents referencing maps and containing scene entities, rules, and dialog trees
 - `entities/*.json`: entity definitions used for placement and spawning
 - `assets/tilemaps/*.json`: tilemap assets with tile grid plus map-owned object instances
@@ -65,6 +66,7 @@ Main persisted surfaces:
 - `assets/palettes/*.json`: 4-color palette definitions for sprite recoloring
 - `assets/audio/**/*`: music and sound effects (sfx/, music/ subdirectories)
 - `toki_editor_config.json`: editor-local configuration outside project scope
+- `runtime_config.json`: runtime-local persisted settings (audio mix, display) saved per project
 
 ## 3. Architectural Overview
 
@@ -131,6 +133,8 @@ Runtime examples:
 - `DialogController`
 - `AiRuntimeState`
 - `RuleRuntimeState`
+- `EffectRuntimeState`
+- `GameFlags`
 - runtime audio components
 - camera follow state
 - render snapshots (`SceneData`, `SpriteInstance`, debug shapes)
@@ -148,18 +152,21 @@ flowchart TD
     RENDER[crates/toki-render]
     RUNTIME[crates/toki-runtime]
     EDITOR[crates/toki-editor]
+    FIXTURES[crates/toki-test-fixtures]
 
     EDITOR --> SCHEMAS
     EDITOR --> CORE
     EDITOR --> RENDER
     RUNTIME --> CORE
     RUNTIME --> RENDER
+    FIXTURES --> CORE
 ```
 
 Practical note:
 
 - the editor depends conceptually on `toki-core`, `toki-render`, and `toki-schemas`
 - the runtime depends on `toki-core` and `toki-render`
+- `toki-test-fixtures` depends on `toki-core` and provides shared test builders and helpers
 - project files and schema payloads are the shared contract between both applications
 
 ### 4.2 Crate-level decomposition
@@ -192,60 +199,68 @@ Key areas:
 
 | File/module | Responsibility |
 |---|---|
-| `src/entity/` | runtime `Entity`, `EntityManager`, `EntityBuilder`, `EntityDefinition`, control roles, AI behavior, movement profiles, entity audio settings, stats, inventory, projectiles |
+| `src/entity/` | runtime `Entity`, `EntityManager`, `EntityBuilder`, `EntityDefinition`, `EntityStorage`, sparse component storage, control roles, AI behavior, movement profiles, entity audio settings, stats, inventory, projectiles, tags |
 | `src/game/` | modularized `GameState` with focused submodules (see below) |
 | `src/game/rules/` | rule execution engine: trigger collection, condition evaluation, action buffering, command application, entity spawning, target resolution (see below) |
+| `src/rules.rs` | rule data model: `Rule`, `RuleTrigger`, `RuleAction`, `RuleCondition`, `RuleTarget`, `RuleSet`, `TriggerContext` |
+| `src/flags.rs` | `GameFlags` key-value store with `FlagValue` (Bool, Int, String) for persistent game state |
 | `src/ai/` | autonomous entity behavior: `AiSystem`, behavior handlers (wander, chase, run-and-multiply), AI runtime state, separation logic |
 | `src/dialog.rs` | `DialogTree`, `DialogNode`, `DialogNodeKind`, `DialogChoice`, `DialogBranch`, `DialogCondition`, validation |
 | `src/dialog_runtime.rs` | `DialogController` runtime: start, advance, close dialogs, input handling |
-| `src/project_runtime.rs` | shared runtime/project configuration contract used by editor and runtime |
+| `src/project_runtime.rs` | shared runtime/project configuration contract: `TimingMode`, `SceneTransitionEffect`, `PostProcessMode`, `ResolvedPostProcessSettings`, `RuntimePostProcessSettings`, `RuntimeSceneTransitionSettings` |
+| `src/project_runtime/viewport.rs` | `RuntimeViewportMode` enum: `AspectFit`, `IntegerScale`, `WindowFill` |
 | `src/project_assets.rs` | shared project asset discovery, path resolution, and classification helpers |
 | `src/project_content.rs` | project content loading helpers |
 | `src/menu/` | `MenuSettings`, `MenuAppearance`, `MenuController`, screen/dialog definitions, layout building, visual metrics |
 | `src/ui.rs` | generic UI composition blocks plus shared UI action/command model |
 | `src/sprite_render.rs` | shared sprite render request, resolution, and failure-reporting pipeline |
-| `src/fonts.rs` | shared project-font discovery and built-in family resolution |
+| `src/fonts.rs` | `BuiltinFontFamily`, `ProjectFontAsset`, `ProjectFontRegistry`, project-font discovery and built-in family resolution |
 | `src/palette.rs` | 4-color palette model, built-in palettes, palette asset I/O, indexed image recoloring |
 | `src/scene.rs` | persisted scene document |
 | `src/scene_manager.rs` | loaded scene registry and active-scene selection |
 | `src/camera.rs` | `Camera`, `CameraController`, `CameraMode` (follow entity or free scroll), projection math, viewport/world coordinate conversion |
 | `src/collision.rs` | tile, entity, and map-object collision helpers |
-| `src/animation.rs`, `src/sprite.rs` | animation selection, sprite frame selection, flip state |
-| `src/events.rs` | `GameEvent` trait, `EventQueue`, `GameUpdateResult`, `SceneSwitchRequest`, `DialogStartRequest` |
-| `src/timing.rs` | `TimingSystem`, `TimestepIterator`, fixed-timestep accumulator |
+| `src/animation.rs` | `AnimationController`, `ClipPlayback`, `PlayDirection`, `PlaybackEvent`, `LoopMode`, animation clip model |
+| `src/sprite.rs` | `SpriteFrame` UV coordinates, sprite definitions |
+| `src/events.rs` | `GameEvent` trait, `EventQueue`, `GameUpdateResult`, `SceneSwitchRequest`, `DialogStartRequest`, `PersistenceRequest` |
+| `src/timing.rs` | `TimingSystem`, `TimestepIterator`, fixed-timestep accumulator (60 FPS default) |
+| `src/serialization.rs` | save/load helpers for runtime and authored data |
 | `src/errors.rs` | `CoreError` error type |
-| `src/assets/atlas.rs` | sprite atlas format and tile metadata |
+| `src/ids.rs` | type-safe ID wrappers: `EntityDefName`, `DialogId`, `SceneId` |
+| `src/assets/atlas.rs` | sprite atlas format, tile metadata, `ColorMode` (PaletteIndexed, TrueColor) |
 | `src/assets/tilemap.rs` | tilemap format, tile grid, map-owned object instances |
 | `src/assets/object_sheet.rs` | named placeable static object definitions |
-| `src/asset_cache.rs` | runtime asset caching |
+| `src/asset_cache.rs` | generic `AssetCache<K, V>` for runtime asset caching |
 | `src/math/` | coordinate system conversions, camera projection math |
 | `src/graphics/` | image data structures, vertex layout definitions |
-| `src/serialization.rs` | save/load helpers for runtime and authored data |
+| `src/resources.rs` | `ResourceManager` for loading atlases and tilemaps from project directories |
 | `src/pack.rs` | bundle-manifest and pack-format helpers shared with runtime |
 
 The `src/game/` module is decomposed into focused submodules:
 
 | Submodule | Responsibility |
 |---|---|
-| `mod.rs` | `GameState` struct, core update loop, input routing, audio dispatch |
+| `mod.rs` | `GameState` struct, `WorldState`, `SceneState`, `ProgressState`, `RuntimeState`, `EffectRuntimeState`, `AudioEvent`, `AudioChannel`, core update loop, input routing, audio dispatch |
 | `movement.rs` | accumulated movement, axis alignment, collision gating, movement audio |
-| `combat.rs` | stat changes, damage, primary action, hitbox collision detection |
+| `combat.rs` | stat changes, damage, primary action, hitbox collision detection, projectile updates |
 | `interaction.rs` | entity interaction collection, spatial detection (overlap, adjacent, in-front) |
 | `scene.rs` | scene loading, entity instantiation, rule initialization |
 | `transition.rs` | scene transition planning, player state preservation across scene switches |
-| `animation.rs` | animation state selection, facing direction, locomotion state |
-| `input.rs` | input mapping, movement input conversion |
-| `input_state.rs` | input state tracking |
+| `animation.rs` | animation state selection, facing direction, locomotion state, directional helpers |
+| `input.rs` | input mapping, movement input conversion, `InputSystem` |
+| `input_state.rs` | `InputRuntimeState`: key tracking, profile-based input routing, pending action management |
 | `ai_runtime.rs` | AI behavior update dispatch into `GameState` |
-| `stat_effects.rs` | stat change requests, capped healing, inventory mutations, entity activation, teleportation |
+| `stat_effects.rs` | `StatEffectService`: stat change requests, capped healing, inventory mutations, entity activation, teleportation, pending despawns |
 | `inventory.rs` | pickup collection, item management |
-| `render_queries.rs` | health bar queries, visible entity collection, debug data |
+| `render_queries.rs` | `RenderQueryService`: health bar queries, ground shadows, visible entity collection, sprite render requests, debug data |
+| `player_defs.rs` | `PlayerDefinitionConfig` and default player entity definition builder |
 
 The `src/game/rules/` submodule is decomposed further:
 
 | Submodule | Responsibility |
 |---|---|
-| `mod.rs` | `RuleRuntimeState`, rule update orchestration, fired-once tracking |
+| `mod.rs` | `RuleRuntimeState`, `RuleSystem`, `RuleCommand`, rule update orchestration, fired-once tracking |
+| `engine.rs` | rule engine execution pipeline |
 | `events.rs` | event types: `CollisionEvent`, `DamageEvent`, `DeathEvent`, `InteractionEvent`, `DialogCompletionEvent`, `TileTransitionEvent` |
 | `evaluation.rs` | condition evaluation against runtime state |
 | `collectors.rs` | rule command collection by trigger type |
@@ -273,20 +288,32 @@ Key areas:
 
 | File/module | Responsibility |
 |---|---|
-| `src/backend.rs` | renderer backend trait used by runtime abstractions and tests |
-| `src/scene.rs` | `SceneRenderer`, `SceneData`, `SpriteInstance`, `DebugShape`, `OverlayShape`, scene submission |
-| `src/gpu.rs` | runtime-oriented `GpuState` orchestration |
+| `src/backend.rs` | `RenderBackend` trait plus sub-traits (`TextureLoader`, `SpriteRenderer`, `ShapeRenderer`, `TextRenderer`, `FrameLifecycle`) |
+| `src/scene.rs` | `SceneData`, `SpriteInstance`, `DebugShape`, `OverlayShape`, scene submission |
+| `src/gpu.rs` | `GpuState` orchestration: WGPU device/queue/surface, multi-pipeline management, sprite batching, post-processing |
+| `src/sprite_batch_order.rs` | `OrderedDrawBatch` for texture-keyed sprite batch ordering |
 | `src/targets.rs` | `RenderTarget`, `OffscreenTarget`, `SurfaceProvider` |
-| `src/pipelines/sprite.rs` | `SpritePipeline` for 2D sprite rendering |
+| `src/pipelines/sprite.rs` | `SpritePipeline` for 2D sprite rendering with per-texture batching |
 | `src/pipelines/tilemap.rs` | `TilemapPipeline` for tile-based map rendering |
 | `src/pipelines/post_process.rs` | `PostProcessPipeline` with effects: tint, brightness/saturation, quantize, ordered dither, Game Boy palette, vignette |
-| `src/pipelines/debug.rs` | `DebugPipeline` for debug geometry |
+| `src/pipelines/debug.rs` | `DebugPipeline` for debug geometry (used by world underlay, debug overlay, UI shapes) |
 | `src/text.rs` | `GlyphonTextRenderer` for glyph-based text layout and anchoring, `TextBackgroundRect` |
-| `src/texture.rs` | texture loading and management |
+| `src/texture.rs` | `GpuTexture` loading and management |
 | `src/draw.rs` | low-level sprite draw helpers including flip handling |
 | `src/vertex.rs` | vertex layout types |
 | `src/errors.rs` | `RenderError` error type |
-| `src/wgpu_utils.rs` | WGPU helper functions |
+| `src/wgpu_utils.rs` | WGPU helper functions: device/surface creation, texture bindgroups, present mode selection |
+
+`RenderBackend` trait surface:
+
+- texture loading: `load_tilemap_texture`, `load_sprite_texture`, `load_font_file`, plus RGBA8 raw-data variants
+- sprite management: `clear_sprites`, `add_sprite`, `add_sprite_with_texture`
+- text management: `clear_text_items`, `add_text_item`
+- shape layers: world underlay shapes, debug shapes, and UI shapes (each with clear/add/finalize lifecycle)
+- state: `update_projection`, `set_post_process_settings`, `set_scene_clip_rect`, `set_vsync`, `set_tilemap_render_enabled`
+- lifecycle: `resize`, `draw`
+
+`GpuState` manages multiple `SpritePipeline` instances keyed by texture path (`sprite_pipelines_by_texture`) to support multi-atlas entity rendering. It also maintains separate `DebugPipeline` instances for world underlay, debug overlay, UI rectangles, and UI debug layers.
 
 Render orchestration:
 
@@ -302,27 +329,47 @@ Key areas:
 
 | File/module | Responsibility |
 |---|---|
-| `src/main.rs` | CLI parsing, runtime config loading, derived-version startup log |
-| `src/app.rs` | runtime shell wiring, launch options, top-level app state |
-| `src/app/app_bootstrap.rs` | startup-state construction from project or pack |
-| `src/app/app_lifecycle.rs` | winit lifecycle, resize/input/redraw handling |
-| `src/app/app_splash.rs` | splash policy, layout, and splash rendering helpers |
-| `src/app/app_tick.rs` | per-frame simulation and render orchestration |
-| `src/app/app_transition.rs` | `SceneTransitionController`, scene-switch orchestration |
-| `src/app/app_presenter.rs` | frame presentation and surface management |
-| `src/app/app_scene_runtime.rs` | scene execution bridge between app and `GameState` |
-| `src/app/app_runtime_settings.rs` | `RuntimeMenuOverlay`, runtime settings integration |
+| `src/main.rs` | CLI parsing (`--project`, `--scene`, `--map`, `--pack`, `--splash-duration-ms`, `--splash-hide-branding`), runtime config loading, derived-version startup log |
+| `src/app.rs` | runtime shell wiring, `RuntimeLaunchOptions`, `RuntimeDisplayOptions`, `RuntimeAudioMixOptions`, `RuntimeTransitionOptions`, `RuntimeFlagSettings`, top-level `App` state |
+| `src/app_bootstrap.rs` | startup-state construction from project or pack |
+| `src/app_lifecycle.rs` | winit lifecycle, resize/input/redraw handling |
+| `src/app_splash.rs` | splash policy, layout, and splash rendering helpers |
+| `src/app_tick.rs` | per-frame simulation and render orchestration |
+| `src/app_transition.rs` | `SceneTransitionController`, scene-switch orchestration |
+| `src/app_presenter.rs` | frame presentation and surface management |
+| `src/app_scene_runtime.rs` | scene execution bridge between app and `GameState` |
+| `src/app_runtime_settings.rs` | `RuntimeMenuOverlay`, runtime settings integration |
+| `src/app_runtime_display_settings.rs` | live display settings: viewport mode switching, zoom, resolution, camera sync |
+| `src/app_runtime_persistence.rs` | `runtime_config.json` save/load for persisting audio mix and display settings across sessions |
 | `src/pack.rs` | `.toki.pak` extraction and validation |
 | `src/runtime_menu.rs` | runtime menu/dialog rendering and UI command application |
 | `src/systems/resources.rs` | runtime resource loading for atlases, object sheets, tilemaps, and textures |
 | `src/systems/game_manager.rs` | key translation and bridge into `GameState` |
 | `src/systems/camera_manager.rs` | follow camera and visible-chunk updates |
 | `src/systems/rendering.rs` | render submission and projection updates |
-| `src/systems/audio_manager.rs` | mixer, preload policy, channel routing, spatial attenuation |
+| `src/systems/audio_manager.rs` | Kira mixer, preload policy, channel routing, spatial attenuation |
 | `src/systems/asset_loading.rs` | preload planning and decoded-project caching |
 | `src/systems/frame_limiter.rs` | frame limiting when vsync is disabled |
 | `src/systems/platform.rs` | platform/window hooks |
 | `src/systems/performance.rs` | HUD/console/frame stats |
+| `src/viewport/layout.rs` | viewport layout computation |
+| `src/viewport/presentation.rs` | logical-to-physical viewport mapping |
+| `src/viewport/runtime_state.rs` | active viewport configuration state |
+
+`RuntimeLaunchOptions` aggregates all runtime configuration:
+
+| Field | Purpose |
+|---|---|
+| `project_path` / `pack_path` | source of project or pack data |
+| `scene_name` / `map_name` | starting scene and map |
+| `scene_persistence` | whether to persist scene state |
+| `splash` | splash screen duration, branding, custom logo |
+| `audio_mix` | master, music, movement, collision volume percentages |
+| `display` | resolution, zoom, viewport mode, vsync, target FPS, timing mode, health bars, shadows, palette override, post-process |
+| `transition` | default scene transition effect and duration |
+| `flags` | initial game flag settings |
+| `menu` | menu screen and dialog definitions |
+| `dialog_appearance` | dialog visual styling |
 
 Current runtime boundary:
 
@@ -330,6 +377,7 @@ Current runtime boundary:
 - runtime loads a chosen scene/map instead of only a demo bootstrap
 - runtime renders multi-atlas entities and map-owned object-sheet instances
 - runtime applies project-level audio mix and community splash/version policy
+- runtime persists audio and display settings to `runtime_config.json` and restores them on restart
 
 #### `toki-editor`
 
@@ -350,6 +398,11 @@ Key areas:
 | `src/config.rs` | `EditorConfig`: window size, panel settings, grid settings, camera settings, recent projects |
 | `src/logging.rs` | `LogCapture` for in-editor log display |
 | `src/rendering/window.rs` | `WindowRenderer` (WGPU + egui integration) |
+| `src/editor_grid.rs` | snapping and grid visualization |
+| `src/editor_types.rs` | common editor types |
+| `src/editor_viewport.rs` | editor viewport abstractions |
+| `src/editor_sprite_preview.rs` | sprite preview rendering |
+| `src/editor_tab_strip.rs` | tab strip UI component |
 | `src/project/project_data.rs` | `project.toml` model, runtime settings, project-level audio mixer settings, `SceneGraphLayout` |
 | `src/project/manager.rs` | create/open/save project, save tilemaps, load assets |
 | `src/project/assets.rs` | discovery of scenes, tilemaps, sprite atlases, object sheets, audio, entities, palettes |
@@ -365,18 +418,28 @@ Key areas:
 | `src/scene/viewport_assets.rs` | asset loading for viewport |
 | `src/scene/viewport_ui.rs` | viewport UI overlays |
 | `src/scene/overlays.rs` | debug and editing overlays |
+| `src/scene/view_models.rs` | scene view model data |
 | `src/ui/editor_ui.rs` | editor UI state, tab management, selection model |
+| `src/ui/editor_ui_*.rs` | UI sub-modules: `animation_authoring`, `animation_editor`, `asset_palette`, `dialog_editor`, `entity_editor`, `graph`, `hierarchy_panel`, `map_editor`, `menu_editor`, `scene_tree`, `sprite_editor` |
 | `src/ui/editor_domain.rs` | shared editor-domain helpers and vocabulary |
+| `src/ui/editor_context.rs` | editor context for UI rendering |
 | `src/ui/inspector_trait.rs` | `Inspector` trait, `InspectorContext` for domain-specific panels |
 | `src/ui/undo_redo.rs` | editor command history for scene, map, and menu mutations |
-| `src/ui/inspector.rs` | inspector routing across domain-specific inspectors |
-| `src/ui/inspector/domain_inspectors/` | type-specific inspectors: entity, entity definition, map, menu, scene, scene anchor, scene commands, scene player entry, rule graph node |
-| `src/ui/inspector/entities/` | detailed entity property editing: multi-edit, property editor, runtime view |
-| `src/ui/inspector/menu_editor/` | menu/dialog authoring inspector with appearance, entry, screen, and dialog sub-editors |
+| `src/ui/inspector/` | inspector routing across domain-specific inspectors |
+| `src/ui/inspector/domain_inspectors/` | type-specific inspectors: entity, entity definition, map, menu, scene, scene anchor, scene commands, scene helpers, scene player entry, rule graph node |
+| `src/ui/inspector/entities/` | detailed entity property editing: multi-edit, property editor, property apply, runtime view, helpers, types |
+| `src/ui/inspector/menu_editor/` | menu/dialog authoring inspector with appearance, entry, screen, dialog sub-editors, helpers, operations |
 | `src/ui/inspector/animation_editor.rs` | animation clip editing in inspector |
 | `src/ui/inspector/sprite_editor.rs` | sprite/animation frame editing in inspector |
-| `src/ui/inspector/rules_graph/` | visual rule graph node editing: trigger, condition, action editors |
+| `src/ui/inspector/rules_graph/` | visual rule graph node editing: trigger, condition, action, shared editors, context |
 | `src/ui/inspector/rules_flat.rs` | flat rule list view |
+| `src/ui/inspector/rules.rs` | rule inspector routing |
+| `src/ui/inspector/rules_support.rs` | rule editing support helpers |
+| `src/ui/inspector/assets.rs` | asset inspector |
+| `src/ui/inspector/project.rs` | project settings inspector |
+| `src/ui/inspector/dialog_editor.rs` | dialog inspector |
+| `src/ui/inspector/map_editor.rs` | map inspector |
+| `src/ui/inspector/entity_editor.rs` | entity inspector |
 | `src/ui/panels.rs` | central panel routing across scene, map, graph, sprite, animation, dialog, entity, and menu surfaces |
 | `src/ui/panels/scene_viewport.rs` | scene viewport rendering panel |
 | `src/ui/panels/scene_graph.rs` | scene graph tree visualization |
@@ -389,10 +452,12 @@ Key areas:
 | `src/ui/panels/map_editor_interactions.rs` | map painting and object placement |
 | `src/ui/panels/menu_editor.rs` | visual menu/dialog preview surface |
 | `src/ui/panels/dialog_editor.rs` | dialog tree visual editor panel |
-| `src/ui/panels/animation_editor/` | animation clip authoring: toolbar, clip list, frame sequence, atlas grid, preview |
-| `src/ui/panels/entity_editor/` | entity browser and editor: toolbar, browser, components, details, dialogs |
-| `src/ui/panels/sprite_editor/` | pixel art sprite editor: toolbar, canvas, layout, tools, shortcuts |
-| `src/ui/rule_graph.rs` | `RuleGraph` data structure, `RuleGraphNode`, `RuleGraphEdge`, `RuleGraphChain`, validation |
+| `src/ui/panels/animation_editor/` | animation clip authoring: toolbar, clip list, frame sequence, atlas grid, preview, dialogs, I/O |
+| `src/ui/panels/entity_editor/` | entity browser and editor: toolbar, browser, components, components core, details, dialogs, I/O, widgets |
+| `src/ui/panels/sprite_editor/` | pixel art sprite editor: toolbar, canvas, layout, tools, shortcuts, dialogs |
+| `src/ui/entity_editor/` | entity editor state management: state, edit state, defaults, dialogs, toggles, types |
+| `src/rule_graph_ui.rs` | `RuleGraph` rendering, `RuleGraphNode`, `RuleGraphEdge`, `RuleGraphChain`, validation |
+| `src/ui/rule_graph.rs` | rule graph data structure (re-exported from crate root) |
 | `src/ui/hierarchy.rs` | left navigation for scenes, maps, and entity palette |
 | `src/ui/menus.rs` | file/edit menu bar |
 | `src/ui/panel_layout.rs` | panel layout management |
@@ -403,7 +468,8 @@ Key areas:
 | `src/ui/interactions/sprite_paint.rs` | sprite pixel painting interactions |
 | `src/ui/interactions/grid.rs` | grid snapping |
 | `src/ui/interactions/camera.rs` | viewport camera pan/zoom |
-| `src/ui/sprite_editor/` | pixel art sprite state machine: canvas state, cell editing, file I/O, undo/redo history, selection, viewport |
+| `src/ui/sprite_editor/` | pixel art sprite state machine: canvas state, dual canvas, cell editing, file I/O, undo/redo history, floating selection, selection, viewport, types |
+| `src/ui/widgets/` | custom egui widgets, separator styles |
 | `src/background_tasks.rs` | `BackgroundTaskManager`, `BackgroundTaskUpdate` |
 | `src/fonts.rs` | font management for editor and previews |
 | `src/validation.rs` | schema validation against project assets |
@@ -419,6 +485,10 @@ Current editor boundary:
 - sprite art is authored through a dedicated pixel art sprite editor with canvas tools and undo/redo
 - scene rules can be viewed as a flat list or as a visual node graph with trigger/condition/action nodes
 - the map editor operates as an independent asset editor, not a scene-dependent mode
+
+#### `toki-test-fixtures`
+
+Shared test utilities and fixtures for unit/integration testing across crates. Depends on `toki-core` and provides builders and helpers for constructing test entities, scenes, and game state without duplicating setup logic across test suites.
 
 ## 5. Domain Model Decomposition
 
@@ -451,7 +521,7 @@ Key authored asset meanings:
 | `Scene` | scene composition: map references, scene entities, scene rules, optional camera overrides |
 | `EntityDefinition` | reusable entity archetype: category, visuals, defaults, audio defaults |
 | `TileMap` | tile grid plus persisted map-owned object instances |
-| `AtlasMeta` | named tile metadata including solid/trigger flags and UV layout |
+| `AtlasMeta` | named tile metadata including solid/trigger flags, UV layout, `ColorMode` (PaletteIndexed or TrueColor) |
 | `ObjectSheetMeta` | named placeable static object definitions extracted from a sprite sheet |
 
 ### 5.2 Entity model
@@ -463,10 +533,10 @@ Identity and behavior concepts:
 | Concept | Owned by | Meaning |
 |---|---|---|
 | `category` | `EntityDefinition` / `Entity` | generic authored taxonomy such as human or creature |
-| `EntityKind` | runtime `Entity` | internal runtime mechanics classification |
-| `control_role` | scene entity / runtime `Entity` | whether a placed entity is the current player character |
-| `movement_profile` | entity attributes | how an entity responds to input |
-| `ai_behavior` | entity attributes | autonomous behavior such as wander, chase, run-and-multiply |
+| `EntityKind` | runtime `Entity` | internal runtime mechanics classification: `Player`, `Npc`, `Item`, `Decoration`, `Trigger`, `Projectile` |
+| `control_role` | scene entity / runtime `Entity` | whether a placed entity is the current player character: `LegacyDefault` (resolves to `None`), `None`, `PlayerCharacter` |
+| `movement_profile` | entity behavior | how an entity responds to input: `LegacyDefault` (resolves based on control role), `None`, `PlayerWasd` |
+| `ai_behavior` | entity behavior via `AiConfig` | autonomous behavior such as `None`, `Wander`, `Chase`, `Run`, `RunAndMultiply` |
 | `tags` | `EntityDefinition` / `Entity` | arbitrary string tags for rule conditions and dialog conditions |
 
 This separation matters:
@@ -476,17 +546,40 @@ This separation matters:
 - movement behavior is not equivalent to player identity
 - runtime player semantics derive from `control_role`, not from authored category
 
+Entity attribute decomposition:
+
+`EntityAttributes` groups runtime properties into three focused sub-structs:
+
+| Sub-struct | Fields | Purpose |
+|---|---|---|
+| `EntityGameplay` | `health`, `stats` (`EntityStats` with base/current maps), `speed`, `solid` | gameplay-relevant numeric state |
+| `EntityRendering` | `visible`, `has_shadow`, `palette_override`, `animation_controller`, `render_layer`, `static_object_render`, `grounding` (`EntityGrounding` with origin + `EntityFootprint`) | visual presentation state |
+| `EntityBehavior` | `active`, `can_move`, `interactable`, `interaction_reach`, `ai_config`, `movement_profile`, `has_inventory` | behavioral flags and configuration |
+
 Entity capabilities beyond identity:
 
 | Concept | Owned by | Meaning |
 |---|---|---|
-| `EntityStats` | `EntityAttributes` | named stat values (health, attack power, custom stats) with min/max tracking |
-| `Inventory` | `Entity` | item collection as `HashMap<String, u32>` (item ID to count) |
-| `PickupDef` | `EntityDefinition` | defines an entity as a collectible item with `item_id` and `count` |
-| `PrimaryProjectileDef` | `EntityDefinition` | projectile configuration for entities that can shoot |
-| `ProjectileState` | `Entity` | runtime projectile tracking (direction, lifetime) |
+| `EntityStats` | `EntityGameplay` | named stat values (health, attack power, custom stats) with base and current value maps |
+| `Inventory` | sparse storage | item collection as `HashMap<String, u32>` (item ID to count) |
+| `PickupDef` | sparse storage | defines an entity as a collectible item with `item_id` and `count` |
+| `PrimaryProjectileDef` | sparse storage | projectile configuration for entities that can shoot |
+| `ProjectileState` | sparse storage | runtime projectile tracking (velocity, lifetime, damage, owner) |
 | `CollisionBox` | `Entity` | optional collision shape |
-| `interactable` | `EntityAttributes` | whether the entity can be interacted with, plus `interaction_reach` distance |
+| `interactable` | `EntityBehavior` | whether the entity can be interacted with, plus `interaction_reach` distance |
+| `EntityAudioComponent` | `EntityStorage` (separate map) | footstep tracking, per-entity audio runtime state |
+
+Entity storage architecture:
+
+`EntityStorage` uses a hybrid approach with mandatory and sparse components:
+
+| Storage | Contents |
+|---|---|
+| `entities: HashMap<EntityId, Entity>` | mandatory entity data (position, size, kind, attributes, tags) |
+| `audio_components: HashMap<EntityId, EntityAudioComponent>` | per-entity audio runtime state |
+| `components: OptionalComponentRegistry` | sparse maps for optional components via `SparseComponentMap<T>` |
+
+`OptionalEntityComponents` bundles the sparse fields: `primary_projectile`, `projectile`, `pickup`, `inventory`.
 
 Entity definition structure:
 
@@ -498,7 +591,7 @@ Entity definition structure:
 | `AttributesDef` | health, stats, speed, solidity, interactability, AI config, movement profile, projectile, pickup, inventory |
 | `CollisionDef` | collision shape configuration |
 | `AudioDef` | movement sound, collision sound, hearing radius, trigger mode |
-| `AnimationsDef` | animation clip definitions per state |
+| `AnimationsDef` | animation clip definitions per state (via `AnimationClipDef`) |
 
 ### 5.3 Map model
 
@@ -558,52 +651,134 @@ Per-entity audio configuration:
 
 Spatial attenuation is listener-relative and currently uses the current player position as the listener.
 
+`AudioEvent` carries channel routing and spatial data:
+
+- `PlaySound { channel: AudioChannel, sound_id, source_position, hearing_radius }` - one-shot sound on `Movement` or `Collision` channel
+- `BackgroundMusic(track_id)` - switch background music track
+
 ### 5.5 Rules model
 
 Rules enable scene-specific behaviors without code changes. Each scene can define rules that respond to triggers and execute actions.
 
 | Component | Purpose |
 |---|---|
-| `Rule` | named rule with trigger, conditions, actions, priority, and one-time flag |
+| `Rule` | named rule with trigger, conditions, actions, priority, one-time flag, enabled flag, log flag |
 | `RuleTrigger` | event that activates the rule |
 | `RuleCondition` | prerequisite checks before action execution |
 | `RuleAction` | effect to apply when rule fires |
+| `RuleTarget` | resolution strategy for which entity an action/condition applies to |
+| `TriggerContext` | carries `trigger_self` and `trigger_other` entity IDs for contextual resolution |
 | `RuleRuntimeState` | per-scene runtime state: fired-once tracking, velocity overrides, per-frame event buffers, tile position tracking |
+
+Rule structure fields:
+
+| Field | Default | Purpose |
+|---|---|---|
+| `id` | — | unique identifier |
+| `enabled` | `true` | whether the rule is active |
+| `priority` | `0` | execution order (higher first) |
+| `once` | `false` | fire only on first trigger |
+| `log_enabled` | `false` | debug logging for this rule |
+| `trigger` | — | activation event |
+| `conditions` | `[]` | prerequisite checks |
+| `actions` | `[]` | effects to apply |
 
 Supported triggers:
 
 - `OnStart` - scene initialization
 - `OnUpdate` - every frame
 - `OnPlayerMove` - player movement input
-- `OnKey { key }` - specific key press
-- `OnCollision` - entity collision event
-- `OnDamaged` - entity receives damage
-- `OnDeath` - entity health reaches zero
+- `OnKey { key: RuleKey }` - specific key press (Up, Down, Left, Right, DebugToggle, Interact, AttackPrimary, AttackSecondary, Inventory, Pause)
+- `OnCollision { entity }` - entity collision event (optional target filter)
+- `OnDamaged { entity }` - entity receives damage (optional target filter)
+- `OnDeath { entity }` - entity health reaches zero (optional target filter)
 - `OnTrigger` - trigger zone activation
-- `OnInteraction` - entity interaction event (with spatial: overlap, adjacent, in-front)
-- `OnDialogCompletion` - dialog completed with optional outcome ID
-- `OnTileTransition` - entity enters or exits a tile
+- `OnInteract { mode, entity }` - entity interaction event with spatial mode (Overlap, Adjacent, InFront) and optional target filter
+- `OnDialogComplete { dialog_id, outcome_id }` - dialog completed with specific outcome
+- `OnTileEnter { x, y }` - entity enters a specific tile
+- `OnTileExit { x, y }` - entity exits a specific tile
+
+Supported conditions:
+
+| Condition | Purpose |
+|---|---|
+| `Always` | unconditionally true |
+| `TargetExists { target }` | check that target entity exists |
+| `KeyHeld { key }` | check if a key is currently held |
+| `EntityActive { target, is_active }` | check entity active state |
+| `HealthBelow { target, threshold }` | entity health below threshold |
+| `HealthAbove { target, threshold }` | entity health above threshold |
+| `TriggerOtherIsPlayer` | the other entity in the trigger context is the player |
+| `EntityIsKind { target, kind }` | entity matches an `EntityKind` |
+| `TriggerOtherIsKind { kind }` | trigger-other matches an `EntityKind` |
+| `EntityHasTag { target, tag }` | entity has a specific tag |
+| `TriggerOtherHasTag { tag }` | trigger-other has a specific tag |
+| `HasInventoryItem { target, item_id, min_count }` | inventory contains at least N of an item |
+| `FlagEquals { flag, value }` | game flag equals a specific `FlagValue` |
+| `FlagSet { flag }` | game flag exists and is set |
+| `FlagGreaterThan { flag, value }` | integer game flag exceeds threshold |
 
 Supported actions:
 
-- `PlaySound { channel, sound_id }` - play sound effect
-- `PlayMusic { track_id }` - switch background music
-- `PlayAnimation { target, state }` - change entity animation
-- `SetVelocity { target, velocity }` - apply movement velocity
-- `Spawn { entity_type, position }` - create new entity
-- `DestroySelf { target }` - remove entity
-- `SwitchScene { scene_name, spawn_point_id }` - transition to another scene with spawn point
-- `StartDialog { dialog_id, context }` - start a dialog tree
-- `DamageEntity { target, amount }` - apply damage to entity
-- `HealEntity { target, amount }` - heal entity with cap
-- `AddInventoryItem { target, item_id, count }` - add items to inventory
-- `RemoveInventoryItem { target, item_id, count }` - remove items from inventory
-- `SetEntityActive { target, active }` - activate or deactivate an entity
-- `TeleportEntity { target, tile_x, tile_y }` - move entity to tile position
+| Action | Purpose |
+|---|---|
+| `PlaySound { channel, sound_id }` | play sound on Movement or Collision channel |
+| `PlayMusic { track_id }` | switch background music |
+| `PlayAnimation { target, state }` | change entity animation |
+| `SetVelocity { target, velocity }` | apply movement velocity |
+| `Spawn { entity_type, position }` | create new entity (PlayerLikeNpc, Npc, Item, Decoration, Trigger) |
+| `DestroySelf { target }` | remove entity |
+| `SwitchScene { scene_name, spawn_point_id, transition, duration_ms }` | transition to another scene with optional transition effect and duration |
+| `StartDialog { dialog_id }` | start a dialog tree |
+| `DamageEntity { target, amount }` | apply damage to entity |
+| `HealEntity { target, amount }` | heal entity with cap |
+| `AddInventoryItem { target, item_id, count }` | add items to inventory |
+| `RemoveInventoryItem { target, item_id, count }` | remove items from inventory |
+| `SetEntityActive { target, active }` | activate or deactivate an entity |
+| `TeleportEntity { target, tile_x, tile_y }` | move entity to tile position |
+| `SetFlag { flag, value }` | set a game flag to a `FlagValue` (Bool, Int, or String) |
+| `IncrementFlag { flag, amount }` | increment an integer game flag |
+| `ClearFlag { flag }` | remove a game flag |
+| `SaveGame { slot }` | save game state to a slot |
+| `LoadGame { slot }` | load game state from a slot |
+
+Rule targets:
+
+| Target | Resolution |
+|---|---|
+| `Player` | current player entity |
+| `Entity(id)` | specific entity by ID |
+| `RuleOwner` | entity that owns the rule |
+| `TriggerSelf` | the "self" entity from trigger context |
+| `TriggerOther` | the "other" entity from trigger context |
 
 Rules execute in priority order and can be marked `once: true` to fire only on first trigger. The rule runtime tracks per-frame event buffers for collisions, damage, death, interaction, dialog completion, and tile transitions.
 
-### 5.6 Menu model
+### 5.6 Flag model
+
+The flag system provides persistent key-value game state that survives across frames and can be saved/loaded.
+
+| Component | Purpose |
+|---|---|
+| `GameFlags` | `HashMap<String, FlagValue>` store owned by `ProgressState` |
+| `FlagValue` | typed value: `Bool(bool)`, `Int(i32)`, or `String(String)` |
+
+Key capabilities:
+
+- `get`, `set`, `clear`, `increment`, `is_set`, `iter`
+- flags are manipulated by rule actions (`SetFlag`, `IncrementFlag`, `ClearFlag`)
+- flags are checked by rule conditions (`FlagEquals`, `FlagSet`, `FlagGreaterThan`)
+- flags are checked by dialog conditions (`FlagEquals`, `FlagSet`, `FlagGreaterThan`)
+- flags are persisted as part of save data via `ProgressState`
+
+The flag system bridges rules, dialogs, and persistence:
+
+- rules can set flags to track quest progress, visited locations, or triggered events
+- dialog conditions can branch based on flag state
+- rule conditions can gate actions based on flag state
+- save/load preserves all flag state
+
+### 5.7 Menu model
 
 The menu system is project-configurable and supports runtime customization.
 
@@ -632,14 +807,14 @@ Menu/dialog rendering is intentionally shared across runtime and editor:
 - runtime and editor both compose those definitions into `UiComposition`
 - dialogs and screens emit generic `UiAction` values rather than menu-specific commands
 
-### 5.7 Dialog model
+### 5.8 Dialog model
 
 The dialog system supports branching conversation trees authored per scene.
 
 | Component | Purpose |
 |---|---|
 | `DialogTree` | root container: ID, title, entry node, cancel/gate flags, list of nodes |
-| `DialogNode` | individual dialog step: ID, optional speaker name, node kind |
+| `DialogNode` | individual dialog step: ID, optional speaker name, conditions, node kind |
 | `DialogNodeKind` | node behavior variant |
 | `DialogChoice` | player-selectable option with label, target node, and conditional visibility |
 | `DialogBranch` | automatic branch with conditions and target node |
@@ -655,11 +830,16 @@ Node kinds:
 
 Dialog conditions:
 
-- `HealthBelow { target, threshold }` - entity health check
-- `HealthAbove { target, threshold }` - entity health check
-- `HasInventoryItem { target, item_id, min_count }` - inventory check
-- `EntityHasTag { target, tag }` - tag check
-- `EntityIsKind { target, entity_kind }` - entity kind check
+| Condition | Purpose |
+|---|---|
+| `HealthBelow { target, threshold }` | entity health check |
+| `HealthAbove { target, threshold }` | entity health check |
+| `HasInventoryItem { target, item_id, min_count }` | inventory check |
+| `EntityHasTag { target, tag }` | tag check |
+| `EntityIsKind { target, entity_kind }` | entity kind check |
+| `FlagEquals { flag, value }` | game flag equals a specific `FlagValue` |
+| `FlagSet { flag }` | game flag exists and is set |
+| `FlagGreaterThan { flag, value }` | integer game flag exceeds threshold |
 
 Condition targets can be `Player`, `Interactor`, or `Speaker`.
 
@@ -670,7 +850,7 @@ Runtime properties:
 - dialog completion produces a `DialogCompletion` with optional `outcome_id`, which feeds into the rules system via `OnDialogCompletion` triggers
 - the editor provides a visual dialog tree editor for authoring node graphs
 
-### 5.8 AI model
+### 5.9 AI model
 
 The AI system drives autonomous entity behavior through a behavior-handler architecture.
 
@@ -678,7 +858,7 @@ The AI system drives autonomous entity behavior through a behavior-handler archi
 |---|---|
 | `AiSystem` | top-level update dispatcher |
 | `AiRuntimeState` | per-entity runtime state: frame counter, wander phase, wait frames, separation |
-| `AiBehavior` | authored behavior type assigned to entity definitions |
+| `AiBehavior` | authored behavior type assigned to entity definitions: `None`, `Wander`, `Chase`, `Run`, `RunAndMultiply` |
 | `AiConfig` | behavior configuration parameters |
 | `AiContext` | movement parameters passed to behavior handlers |
 
@@ -704,7 +884,7 @@ Wander phase state machine:
 
 Separation logic ensures spawned entities maintain minimum distance from parents and siblings.
 
-### 5.9 Camera model
+### 5.10 Camera model
 
 The camera system provides viewport management for both runtime and editor.
 
@@ -723,7 +903,7 @@ Key capabilities:
 
 The runtime `CameraManager` wraps `CameraController` to handle follow-camera updates and visible-chunk tracking. The editor viewport manages its own camera state for pan/zoom interactions.
 
-### 5.10 Palette model
+### 5.11 Palette model
 
 The palette system supports Game Boy-style 4-color palettes for sprite recoloring and post-processing.
 
@@ -747,6 +927,37 @@ Palettes are used by:
 - post-processing pipeline via `quantize_palette` in `ResolvedPostProcessSettings`
 - the `palette` JSON schema in `toki-schemas`
 
+### 5.12 Viewport model
+
+The runtime viewport system controls how the logical game viewport maps to the application window.
+
+| Mode | Parameters | Behavior |
+|---|---|---|
+| `AspectFit` | `fit_percent: u16` | scale viewport to fit window while preserving aspect ratio, with configurable fill percentage |
+| `IntegerScale` | `factor: IntegerScaleFactor` | scale by integer multiples only, preserving pixel-perfect rendering |
+| `WindowFill` | `zoom_percent: u16` | fill the window completely with configurable zoom level |
+
+Viewport mode is configured in `project.toml` via `RuntimeViewportMode` and can be changed live during runtime through the display settings overlay. Changes are persisted to `runtime_config.json`.
+
+### 5.13 Game state model
+
+`GameState` is decomposed into four focused state containers:
+
+| Container | Fields | Purpose |
+|---|---|---|
+| `WorldState` | `entity_manager`, `entity_definitions`, `player_id` | entity registry, definitions, and player tracking |
+| `SceneState` | `scene_manager`, `active_rules`, `persistent_scene_entities` | scene management, active rule set, cross-scene entity tracking |
+| `ProgressState` | `game_flags`, `play_time_ms` | persistent game progress: flags and play time |
+| `RuntimeState` | `input`, `debug_collision_rendering`, `ai`, `rules`, `effects` | transient per-session state: input, AI runtime, rule runtime, effect runtime |
+| `EffectRuntimeState` | `pending_stat_changes`, `pending_despawns` | deferred stat changes and entity removal queue |
+
+This decomposition ensures:
+
+- world state is serializable for save/load
+- scene state resets cleanly on scene transitions
+- progress state persists across scenes and save slots
+- runtime state is transient and never serialized
+
 ## 6. Dynamic View
 
 ### 6.1 Runtime startup
@@ -768,6 +979,7 @@ sequenceDiagram
     alt pack startup
         A->>P: extract .toki.pak to temp dir
     end
+    A->>P: load persisted runtime_config.json (audio, display)
     A->>R: load sprite atlases, object sheets, tilemap, textures
     A->>G: load selected scene into runtime state
     A->>AU: apply master/channel audio mix
@@ -779,6 +991,7 @@ Important runtime properties:
 - startup is scene/map driven, not only demo-driven
 - object sheets are loaded separately from sprite atlases
 - derived `TOKI_VERSION` is logged at startup and shown on the splash screen
+- persisted runtime settings (audio mix, display options) are restored from `runtime_config.json` if available
 
 ### 6.2 Runtime frame loop
 
@@ -815,6 +1028,8 @@ Behavioral notes:
 - active dialogs can gate gameplay, pausing simulation while open
 - scene transitions are coordinated through `SceneTransitionController` with player state preservation
 - post-processing effects (tint, quantize, dither, Game Boy palette, vignette) apply per frame through `PostProcessPipeline`
+- rule actions can trigger save/load operations via `PersistenceRequest`
+- flag mutations from rules are applied to `ProgressState` and persist across frames
 
 Timing modes:
 
@@ -975,7 +1190,7 @@ sequenceDiagram
 Key properties:
 
 - dialog context carries `interactor` and `speaker` entity IDs for condition evaluation
-- dialog conditions can check health, inventory, tags, and entity kind against player, interactor, or speaker
+- dialog conditions can check health, inventory, tags, entity kind, and game flags against player, interactor, or speaker
 - dialog completion feeds back into the rules system via `OnDialogCompletion` triggers
 - the editor provides a visual dialog tree editor for authoring and a runtime-style preview through the shared composition path
 
@@ -1000,10 +1215,34 @@ sequenceDiagram
 
 Key properties:
 
-- player entity state (inventory, stats, attributes) is preserved across transitions
+- player entity state (inventory, stats, attributes, flags) is preserved across transitions
 - the target spawn point determines player placement in the new scene
 - entity definitions are re-instantiated from the target scene's entity list
 - rule runtime state resets per scene
+- transitions can specify a visual effect (`SceneTransitionEffect::Fade`) and duration
+
+### 6.10 Save/load workflow
+
+Save and load can be triggered by rule actions (`SaveGame`, `LoadGame`) or by menu commands.
+
+```mermaid
+sequenceDiagram
+    participant R as Rules / Menu
+    participant G as GameState
+    participant A as App
+    participant D as Disk
+
+    R->>G: PersistenceRequest::SaveSlot { slot }
+    G-->>A: persistence request in GameUpdateResult
+    A->>D: serialize GameState to save slot
+    Note over A,D: saves world state, progress (flags, play time), scene state
+```
+
+Key properties:
+
+- `GameFlags` and `play_time_ms` are persisted in `ProgressState`
+- save slots are numbered (u8)
+- runtime display/audio settings are persisted separately in `runtime_config.json`
 
 ## 7. Layering Rules and Architectural Invariants
 
@@ -1030,6 +1269,7 @@ Key properties:
 | I8 | runtime/editor rendering consume renderer-ready snapshots and metadata, not raw project documents directly | `SceneViewport`, runtime rendering system |
 | I9 | dialog completion feeds into the rules system, not into ad-hoc game logic | `DialogCompletionEvent`, `OnDialogCompletion` trigger |
 | I10 | scene transitions preserve player state and reset rule state | `SceneTransitionPlanner`, `RuleRuntimeState` |
+| I11 | game flags are the sole mechanism for cross-rule persistent state | `GameFlags` in `ProgressState`, rule flag actions/conditions |
 
 ## 8. Known Seams and Current Debt
 
@@ -1095,10 +1335,10 @@ The architecture consists of six layers:
 
 1. **Schema layer** (`toki-schemas`) - canonical JSON schema definitions
 2. **Persistence layer** - `project.toml`, scene/entity/map/atlas JSON files
-3. **Core domain layer** (`toki-core`) - simulation, collision, rules, entity management
-4. **Render infrastructure layer** (`toki-render`) - WGPU pipelines, text layout, render targets
-5. **Runtime shell** (`toki-runtime`) - game execution, audio playback, input handling
-6. **Editor shell** (`toki-editor`) - project management, scene/map editing, asset inspection
+3. **Core domain layer** (`toki-core`) - simulation, collision, rules, entity management, flags, dialogs
+4. **Render infrastructure layer** (`toki-render`) - WGPU pipelines, text layout, render targets, multi-texture sprite batching
+5. **Runtime shell** (`toki-runtime`) - game execution, audio playback, input handling, settings persistence
+6. **Editor shell** (`toki-editor`) - project management, scene/map editing, asset inspection, entity/animation/sprite/dialog/rule authoring
 
 Key architectural decisions:
 
@@ -1108,13 +1348,18 @@ Key architectural decisions:
 - project-level configuration (audio, display, menu) is separate from scene/entity settings
 - runtime accepts both project directories and packed bundles
 - `GameState` is modularized into focused submodules (movement, combat, rules, scene, input, interaction, stat effects, transitions)
+- `EntityAttributes` is decomposed into `EntityGameplay`, `EntityRendering`, and `EntityBehavior` sub-structs
+- entity storage uses a hybrid mandatory/sparse pattern: core data in `Entity`, optional components in `SparseComponentMap`
 - the rules engine is a full submodule tree with event collection, condition evaluation, action buffering, and command application
+- the flag system (`GameFlags` with `FlagValue::Bool/Int/String`) bridges rules, dialogs, and save/load for persistent game state
 - timing supports fixed timestep (60 FPS) or delta-scaled modes
-- rules system enables declarative scene behaviors without code changes, including dialog triggers, inventory manipulation, entity activation, and teleportation
-- dialog trees are a first-class domain model with branching, conditions, and runtime controller, feeding completion events back into rules
+- rules system enables declarative scene behaviors without code changes, including dialog triggers, inventory manipulation, entity activation, teleportation, flag management, and save/load
+- dialog trees are a first-class domain model with branching, conditions (including flag conditions), and runtime controller, feeding completion events back into rules
 - AI behaviors are handled through a behavior-handler architecture with wander, chase, and run-and-multiply handlers
 - 4-color palette system supports Game Boy-style sprite recoloring and post-processing effects
 - camera system provides zoom-aware viewport with follow-entity and free-scroll modes
-- scene transitions preserve player state across scene boundaries
+- scene transitions preserve player state across scene boundaries with configurable visual effects
 - runtime and editor share menu/dialog composition and sprite-render request resolution through `toki-core`
+- runtime viewport supports three modes (AspectFit, IntegerScale, WindowFill) with live switching
+- runtime audio and display settings are persisted to `runtime_config.json` for cross-session continuity
 - the editor provides dedicated authoring panels for entities, animations, sprites, dialog trees, and rule graphs in addition to scene/map editing
