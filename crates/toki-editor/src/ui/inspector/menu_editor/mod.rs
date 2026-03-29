@@ -99,7 +99,7 @@ impl InspectorSystem {
             return;
         };
 
-        ui_state.sync_menu_editor_selection(Some(project));
+        crate::ui::editor_ui::sync_menu_editor_selection(ui_state, Some(project));
 
         ui.heading("Menu Editor");
         ui.separator();

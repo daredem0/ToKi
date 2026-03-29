@@ -19,7 +19,7 @@ pub(crate) fn render_menu_editor(
         return;
     };
 
-    ui_state.sync_menu_editor_selection(Some(project));
+    crate::ui::editor_ui::sync_menu_editor_selection(ui_state, Some(project));
 
     ui.horizontal(|ui| {
         ui.label("Surface");
@@ -74,7 +74,7 @@ pub(crate) fn render_menu_editor(
                             if id == &screen.id
                     );
                     if ui.selectable_label(selected, &screen.title).clicked() {
-                        ui_state.select_menu_screen(screen.id.clone());
+                        crate::ui::editor_ui::select_menu_screen(ui_state, screen.id.clone());
                     }
                 }
                 if !project.metadata.runtime.menu.dialogs.is_empty()
@@ -91,14 +91,14 @@ pub(crate) fn render_menu_editor(
                         .selectable_label(selected, format!("Dialog: {}", dialog.title))
                         .clicked()
                     {
-                        ui_state.select_menu_dialog(dialog.id.clone());
+                        crate::ui::editor_ui::select_menu_dialog(ui_state, dialog.id.clone());
                     }
                 }
             });
 
-        if let Some(screen_id) = ui_state.selected_menu_screen_id() {
+        if let Some(screen_id) = crate::ui::editor_ui::selected_menu_screen_id(ui_state) {
             ui.small(format!("id: {screen_id}"));
-        } else if let Some(dialog_id) = ui_state.selected_menu_dialog_id() {
+        } else if let Some(dialog_id) = crate::ui::editor_ui::selected_menu_dialog_id(ui_state) {
             ui.small(format!("id: {dialog_id}"));
         }
     });
@@ -166,11 +166,12 @@ pub(crate) fn render_menu_editor(
                 )
                 .clicked()
             {
-                ui_state.select_menu_dialog(dialog.id.clone());
+                crate::ui::editor_ui::select_menu_dialog(ui_state, dialog.id.clone());
             }
         }
         _ => {
-            let Some(selected_screen_id) = ui_state.selected_menu_screen_id().map(str::to_string)
+            let Some(selected_screen_id) =
+                crate::ui::editor_ui::selected_menu_screen_id(ui_state).map(str::to_string)
             else {
                 ui.label("Select a screen or dialog to preview it.");
                 return;
@@ -269,14 +270,14 @@ pub(crate) fn render_menu_editor(
                 )
                 .clicked()
             {
-                ui_state.select_menu_screen(screen.id.clone());
+                crate::ui::editor_ui::select_menu_screen(ui_state, screen.id.clone());
             }
 
             for (item_index, entry) in layout.entries.iter().enumerate() {
                 let entry_rect = translated_rect(&entry.rect, origin);
                 let id = ui.id().with(("menu_entry", &screen.id, item_index));
                 if ui.interact(entry_rect, id, egui::Sense::click()).clicked() {
-                    ui_state.select_menu_entry(screen.id.clone(), item_index);
+                    crate::ui::editor_ui::select_menu_entry(ui_state, screen.id.clone(), item_index);
                 }
             }
         }

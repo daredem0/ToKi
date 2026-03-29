@@ -155,8 +155,7 @@ pub fn render_scene_anchors_list(
             &scene.anchors,
             SceneAnchorKind::SpawnPoint,
         );
-        ctx.ui_state
-            .scene_viewport_context_mut()
+        crate::ui::editor_context::scene_viewport_context_mut(ctx.ui_state)
             .placement
             .enter_scene_anchor_placement_mode(crate::ui::editor_ui::SceneAnchorPlacementDraft {
                 kind: SceneAnchorKind::SpawnPoint,
@@ -242,14 +241,15 @@ fn commit_rules_change(
     use crate::ui::editor_ui::SceneRulesGraphCommandData;
     use crate::ui::rule_graph::RuleGraph;
 
-    let before_graph = ctx.ui_state.rule_graph_for_scene(scene_name).cloned();
+    let before_graph = crate::ui::editor_ui::rule_graph_for_scene(ctx.ui_state, scene_name).cloned();
     let after_graph = RuleGraph::from_rule_set(&edited_rules);
     let before_layout = crate::ui::editor_context::graph_state(ctx.ui_state)
         .layouts_by_scene
         .get(scene_name)
         .cloned();
-    let (zoom, pan) = ctx.ui_state.graph_view_for_scene(scene_name);
-    let _ = ctx.ui_state.execute_scene_rules_graph_command(
+    let (zoom, pan) = crate::ui::editor_ui::graph_view_for_scene(ctx.ui_state, scene_name);
+    let _ = crate::ui::editor_ui::execute_scene_rules_graph_command(
+        ctx.ui_state,
         scene_name,
         SceneRulesGraphCommandData {
             before_rule_set: before_rules,

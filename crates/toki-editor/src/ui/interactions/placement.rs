@@ -43,16 +43,14 @@ impl PlacementInteraction {
             return;
         }
 
-        if ui_state
-            .scene_viewport_context()
+        if crate::ui::editor_context::scene_viewport_context(ui_state)
             .placement
             .is_in_placement_mode()
         {
             if let Some(hover_pos) = response.hover_pos() {
                 let display_rect = viewport.display_rect_in(rect);
                 let cursor_world = viewport.screen_to_world_pos_raw(hover_pos, display_rect);
-                let grab_offset = ui_state
-                    .scene_viewport_context()
+                let grab_offset = crate::ui::editor_context::scene_viewport_context(ui_state)
                     .placement
                     .entity_move_drag
                     .as_ref()
@@ -106,8 +104,7 @@ impl PlacementInteraction {
             );
 
             if Self::try_place_entity(ui_state, &entity_def_name, world_pos, config, viewport) {
-                ui_state
-                    .scene_viewport_context_mut()
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                     .placement
                     .exit_placement_mode();
             }
@@ -123,8 +120,7 @@ impl PlacementInteraction {
                 world_pos.y
             );
             if Self::try_place_scene_anchor(ui_state, anchor_draft, world_pos) {
-                ui_state
-                    .scene_viewport_context_mut()
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                     .placement
                     .exit_placement_mode();
             }
@@ -138,8 +134,7 @@ impl PlacementInteraction {
     ) -> bool {
         let Some(active_scene_name) = ui_state.active_scene.clone() else {
             tracing::error!("No active scene for scene anchor placement");
-            ui_state
-                .scene_viewport_context_mut()
+            crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                 .placement
                 .exit_placement_mode();
             return false;
@@ -150,8 +145,7 @@ impl PlacementInteraction {
             .position(|scene| scene.name == active_scene_name)
         else {
             tracing::error!("Active scene '{}' not found", active_scene_name);
-            ui_state
-                .scene_viewport_context_mut()
+            crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                 .placement
                 .exit_placement_mode();
             return false;
@@ -202,8 +196,7 @@ impl PlacementInteraction {
     ) -> bool {
         let Some(config) = config else {
             tracing::error!("No config available for entity creation");
-            ui_state
-                .scene_viewport_context_mut()
+            crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                 .placement
                 .exit_placement_mode();
             return false;
@@ -211,8 +204,7 @@ impl PlacementInteraction {
 
         let Some(project_path) = config.current_project_path() else {
             tracing::error!("No project path available for entity creation");
-            ui_state
-                .scene_viewport_context_mut()
+            crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                 .placement
                 .exit_placement_mode();
             return false;
@@ -226,8 +218,7 @@ impl PlacementInteraction {
                     entity_def_name,
                     msg
                 );
-                ui_state
-                    .scene_viewport_context_mut()
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                     .placement
                     .exit_placement_mode();
                 return false;
@@ -275,8 +266,7 @@ impl PlacementInteraction {
     ) -> bool {
         let Some(active_scene_name) = ui_state.active_scene.clone() else {
             tracing::error!("No active scene for entity placement");
-            ui_state
-                .scene_viewport_context_mut()
+            crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                 .placement
                 .exit_placement_mode();
             return false;
@@ -288,8 +278,7 @@ impl PlacementInteraction {
             .position(|s| s.name == active_scene_name)
         else {
             tracing::error!("Active scene '{}' not found", active_scene_name);
-            ui_state
-                .scene_viewport_context_mut()
+            crate::ui::editor_context::scene_viewport_context_mut(ui_state)
                 .placement
                 .exit_placement_mode();
             return false;
@@ -301,10 +290,9 @@ impl PlacementInteraction {
             Ok(entity) => entity,
             Err(e) => {
                 tracing::error!("Failed to create entity '{}': {}", entity_def_name, e);
-            ui_state
-                .scene_viewport_context_mut()
-                .placement
-                .exit_placement_mode();
+                crate::ui::editor_context::scene_viewport_context_mut(ui_state)
+                    .placement
+                    .exit_placement_mode();
                 return false;
             }
         };

@@ -139,7 +139,7 @@ impl EditorUI {
                 }
 
                 if let Some(entity_definition) = placement_request {
-                    self.scene_viewport_context_mut()
+                    crate::ui::editor_context::scene_viewport_context_mut(self)
                         .placement
                         .enter_placement_mode(entity_definition);
                 }

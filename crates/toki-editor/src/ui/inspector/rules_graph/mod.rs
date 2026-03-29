@@ -262,16 +262,12 @@ impl InspectorSystem {
         if crate::ui::editor_context::map_state(ui_state).active_map.as_ref() != Some(map_name) {
             return None;
         }
-        ui_state
-            .map_editor_context()
-            .map
+        crate::ui::editor_context::map_state(ui_state)
             .draft
             .as_ref()
             .map(|draft| (draft.tilemap.size.x, draft.tilemap.size.y))
             .or_else(|| {
-                ui_state
-                    .map_editor_context()
-                    .map
+                crate::ui::editor_context::map_state(ui_state)
                     .pending_tilemap_sync
                     .as_ref()
                     .map(|tm| (tm.size.x, tm.size.y))
@@ -287,8 +283,9 @@ impl InspectorSystem {
     ) -> bool {
         match graph.to_rule_set() {
             Ok(updated_rules) => {
-                let (zoom, pan) = ui_state.graph_view_for_scene(scene_name);
-                ui_state.execute_scene_rules_graph_command(
+                let (zoom, pan) = crate::ui::editor_ui::graph_view_for_scene(ui_state, scene_name);
+                crate::ui::editor_ui::execute_scene_rules_graph_command(
+                    ui_state,
                     scene_name,
                     SceneRulesGraphCommandData {
                         before_rule_set: ctx.before_rules.clone(),

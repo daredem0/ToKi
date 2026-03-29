@@ -15,7 +15,9 @@ impl PanelSystem {
         ui_state: &mut EditorUI,
         viewport: &mut SceneViewport,
     ) -> bool {
-        let Some(edit) = ui_state.take_map_editor_object_property_edit_request() else {
+        let Some(edit) =
+            crate::ui::editor_ui::take_map_editor_object_property_edit_request(ui_state)
+        else {
             return false;
         };
         let Some(tilemap) = viewport.tilemap_mut() else {
@@ -31,15 +33,15 @@ impl PanelSystem {
             return false;
         }
 
-        ui_state.begin_map_editor_edit(tilemap);
+        crate::ui::editor_ui::begin_map_editor_edit(ui_state, tilemap);
         let Some(object) = tilemap.objects.get_mut(edit.object_index) else {
-            ui_state.cancel_map_editor_edit();
+            crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
             return false;
         };
         object.grounding = edit.grounding;
         object.visible = edit.visible;
         object.solid = edit.solid;
-        ui_state.finish_map_editor_edit(tilemap);
+        crate::ui::editor_ui::finish_map_editor_edit(ui_state, tilemap);
         true
     }
 
@@ -93,7 +95,7 @@ impl PanelSystem {
             return false;
         };
         if ui.input(|input| input.pointer.primary_pressed()) {
-            ui_state.begin_map_editor_edit(tilemap);
+            crate::ui::editor_ui::begin_map_editor_edit(ui_state, tilemap);
         }
         let Some(tile_pos) = MapPaintInteraction::tile_position_at_world(tilemap, world_pos) else {
             return false;
@@ -122,15 +124,15 @@ impl PanelSystem {
         let Some(tilemap) = viewport.tilemap_mut() else {
             return false;
         };
-        ui_state.begin_map_editor_edit(tilemap);
+        crate::ui::editor_ui::begin_map_editor_edit(ui_state, tilemap);
 
         if MapPaintInteraction::fill_all(tilemap, selected_tile) {
-            ui_state.finish_map_editor_edit(tilemap);
+            crate::ui::editor_ui::finish_map_editor_edit(ui_state, tilemap);
             viewport.mark_dirty();
             return true;
         }
 
-        ui_state.cancel_map_editor_edit();
+        crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
         false
     }
 
@@ -184,7 +186,7 @@ impl PanelSystem {
             format!("{}.json", object_sheet_name)
         };
 
-        ui_state.begin_map_editor_edit(tilemap);
+        crate::ui::editor_ui::begin_map_editor_edit(ui_state, tilemap);
         if MapObjectInteraction::place_object(
             tilemap,
             world_anchor,
@@ -195,12 +197,12 @@ impl PanelSystem {
                 object_info.size_tiles.y * object_sheet.tile_size.y,
             ),
         ) {
-            ui_state.finish_map_editor_edit(tilemap);
+            crate::ui::editor_ui::finish_map_editor_edit(ui_state, tilemap);
             viewport.mark_dirty();
             return true;
         }
 
-        ui_state.cancel_map_editor_edit();
+        crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
         false
     }
 
@@ -231,15 +233,15 @@ impl PanelSystem {
             return false;
         };
 
-        ui_state.begin_map_editor_edit(tilemap);
+        crate::ui::editor_ui::begin_map_editor_edit(ui_state, tilemap);
         if MapObjectInteraction::delete_object(tilemap, object_index) {
-            ui_state.finish_map_editor_edit(tilemap);
-            ui_state.clear_map_editor_object_selection();
+            crate::ui::editor_ui::finish_map_editor_edit(ui_state, tilemap);
+            crate::ui::editor_ui::clear_map_editor_object_selection(ui_state);
             viewport.mark_dirty();
             return true;
         }
 
-        ui_state.cancel_map_editor_edit();
+        crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
         false
     }
 
@@ -269,7 +271,7 @@ impl PanelSystem {
         drag_start_pos: egui::Pos2,
         rect: egui::Rect,
     ) {
-        if ui_state.is_map_object_move_drag_active() {
+        if crate::ui::editor_ui::is_map_object_move_drag_active(ui_state) {
             return;
         }
 
@@ -285,9 +287,13 @@ impl PanelSystem {
             return;
         };
 
-        ui_state.begin_map_editor_edit(tilemap);
-        ui_state.select_map_editor_object(object_index, object);
-        ui_state.begin_map_object_move_drag(object_index, world_pos - object.position.as_vec2());
+        crate::ui::editor_ui::begin_map_editor_edit(ui_state, tilemap);
+        crate::ui::editor_ui::select_map_editor_object(ui_state, object_index, object);
+        crate::ui::editor_ui::begin_map_object_move_drag(
+            ui_state,
+            object_index,
+            world_pos - object.position.as_vec2(),
+        );
     }
 
     pub(super) fn handle_map_editor_object_drag_update(
@@ -316,7 +322,11 @@ impl PanelSystem {
         };
         if MapObjectInteraction::move_object(tilemap, drag_state.object_index, world_anchor) {
             if let Some(object) = tilemap.objects.get(drag_state.object_index) {
-                ui_state.select_map_editor_object(drag_state.object_index, object);
+                crate::ui::editor_ui::select_map_editor_object(
+                    ui_state,
+                    drag_state.object_index,
+                    object,
+                );
             }
             viewport.mark_dirty();
         }
@@ -326,14 +336,14 @@ impl PanelSystem {
         ui_state: &mut EditorUI,
         viewport: &mut SceneViewport,
     ) -> bool {
-        ui_state.finish_map_object_move_drag();
+        crate::ui::editor_ui::finish_map_object_move_drag(ui_state);
         let Some(tilemap) = viewport.tilemap() else {
-            ui_state.cancel_map_editor_edit();
+            crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
             return false;
         };
-        let changed = ui_state.finish_map_editor_edit(tilemap);
+        let changed = crate::ui::editor_ui::finish_map_editor_edit(ui_state, tilemap);
         if !changed {
-            ui_state.cancel_map_editor_edit();
+            crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
         }
         viewport.mark_dirty();
         changed

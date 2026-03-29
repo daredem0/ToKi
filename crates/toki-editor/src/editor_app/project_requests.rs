@@ -232,7 +232,7 @@ impl EditorApp {
         match self.core.project_manager.save_current_project(scenes) {
             Ok(_) => {
                 tracing::info!("Project saved successfully");
-                self.core.ui.clear_graph_layout_dirty();
+                crate::ui::editor_ui::clear_graph_layout_dirty(&mut self.core.ui);
             }
             Err(error) => {
                 tracing::error!("Failed to save project: {}", error);

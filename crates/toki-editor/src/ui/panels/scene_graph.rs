@@ -42,12 +42,12 @@ impl PanelSystem {
 
         let mut connect_from = crate::ui::editor_context::graph_state_mut(ui_state).connect_from_node;
         let mut connect_to = crate::ui::editor_context::graph_state_mut(ui_state).connect_to_node;
-        let (mut graph_zoom, mut graph_pan) = ui_state.graph_view_for_scene(&active_scene_name);
+        let (mut graph_zoom, mut graph_pan) =
+            crate::ui::editor_ui::graph_view_for_scene(ui_state, &active_scene_name);
         let before_rule_set = ui_state.scenes[scene_index].rules.clone();
-        let before_graph_snapshot = ui_state.rule_graph_for_scene(&active_scene_name).cloned();
-        let before_layout_snapshot = ui_state
-            .rule_graph_context_mut()
-            .graph
+        let before_graph_snapshot =
+            crate::ui::editor_ui::rule_graph_for_scene(ui_state, &active_scene_name).cloned();
+        let before_layout_snapshot = crate::ui::editor_context::graph_state_mut(ui_state)
             .layouts_by_scene
             .get(&active_scene_name)
             .cloned();
@@ -59,9 +59,12 @@ impl PanelSystem {
 
         {
             let scene_rules = before_rule_set.clone();
-            ui_state.sync_rule_graph_with_rule_set(&active_scene_name, &scene_rules);
-            let mut graph = ui_state
-                .rule_graph_for_scene(&active_scene_name)
+            crate::ui::editor_ui::sync_rule_graph_with_rule_set(
+                ui_state,
+                &active_scene_name,
+                &scene_rules,
+            );
+            let mut graph = crate::ui::editor_ui::rule_graph_for_scene(ui_state, &active_scene_name)
                 .cloned()
                 .unwrap_or_else(|| RuleGraph::from_rule_set(&scene_rules));
             let mut pending_command: Option<GraphCommand> = None;
@@ -71,7 +74,8 @@ impl PanelSystem {
                 let Some(node_key) = graph.stable_node_key(node_id) else {
                     continue;
                 };
-                let Some(position) = ui_state.graph_layout_position(&active_scene_name, &node_key)
+                let Some(position) =
+                    crate::ui::editor_ui::graph_layout_position(ui_state, &active_scene_name, &node_key)
                 else {
                     continue;
                 };
@@ -323,7 +327,8 @@ impl PanelSystem {
 
             let state_changed = graph_changed || scene_changed || layout_changed;
             if state_changed {
-                if !ui_state.execute_scene_rules_graph_command(
+                if !crate::ui::editor_ui::execute_scene_rules_graph_command(
+                    ui_state,
                     &active_scene_name,
                     SceneRulesGraphCommandData {
                         before_rule_set: before_rule_set.clone(),
@@ -338,8 +343,14 @@ impl PanelSystem {
                     operation_error =
                         Some("Failed to record scene graph change in undo history.".to_string());
                 }
-            } else if ui_state.rule_graph_for_scene(&active_scene_name).is_none() {
-                ui_state.set_rule_graph_for_scene(active_scene_name.clone(), graph.clone());
+            } else if crate::ui::editor_ui::rule_graph_for_scene(ui_state, &active_scene_name)
+                .is_none()
+            {
+                crate::ui::editor_ui::set_rule_graph_for_scene(
+                    ui_state,
+                    active_scene_name.clone(),
+                    graph.clone(),
+                );
             }
 
             if let Some(node_id) = selected_graph_node {
@@ -356,7 +367,12 @@ impl PanelSystem {
         crate::ui::editor_context::graph_state_mut(ui_state).connect_to_node = connect_to;
         crate::ui::editor_context::graph_state_mut(ui_state).canvas_zoom = graph_zoom;
         crate::ui::editor_context::graph_state_mut(ui_state).canvas_pan = graph_pan;
-        ui_state.set_graph_view_for_scene(&active_scene_name, graph_zoom, graph_pan);
+        crate::ui::editor_ui::set_graph_view_for_scene(
+            ui_state,
+            &active_scene_name,
+            graph_zoom,
+            graph_pan,
+        );
         if scene_changed {
             ui_state.scene_content_changed = true;
         }

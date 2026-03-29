@@ -91,18 +91,13 @@ fn editor_shortcut_action_ignores_non_ctrl_sequences() {
 #[test]
 fn escape_exits_placement_mode_before_requesting_editor_close() {
     let mut app = EditorApp::new(None);
-    app.core
-        .ui
-        .scene_viewport_context_mut()
+    crate::ui::editor_context::scene_viewport_context_mut(&mut app.core.ui)
         .placement
         .enter_placement_mode("player".to_string());
 
     app.handle_escape_key();
 
-    assert!(!app
-        .core
-        .ui
-        .scene_viewport_context()
+    assert!(!crate::ui::editor_context::scene_viewport_context(&app.core.ui)
         .placement
         .is_in_placement_mode());
     assert!(app.core.ui.project.pending_confirmation.is_none());
@@ -1353,8 +1348,7 @@ fn build_scene_anchor_overlay_lines_use_drag_preview_instead_of_original_anchor(
     });
     ui_state.scenes = vec![scene];
     ui_state.active_scene = Some("Main Scene".to_string());
-    ui_state
-        .scene_viewport_context_mut()
+    crate::ui::editor_context::scene_viewport_context_mut(&mut ui_state)
         .placement
         .begin_scene_anchor_move_drag(crate::ui::editor_ui::SceneAnchorMoveDragState {
         scene_name: "Main Scene".to_string(),

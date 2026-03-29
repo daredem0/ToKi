@@ -69,7 +69,7 @@ impl MenuSystem {
                     }
                     if ui
                         .add_enabled(
-                            ui_state.has_unsaved_map_editor_changes(),
+                            crate::ui::editor_ui::has_unsaved_map_editor_changes(ui_state),
                             egui::Button::new("Save Map"),
                         )
                         .clicked()

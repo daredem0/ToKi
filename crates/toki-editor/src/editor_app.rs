@@ -269,16 +269,11 @@ impl EditorApp {
     }
 
     fn handle_escape_key(&mut self) {
-        if self
-            .core
-            .ui
-            .scene_viewport_context()
+        if crate::ui::editor_context::scene_viewport_context(&self.core.ui)
             .placement
             .is_in_placement_mode()
         {
-            self.core
-                .ui
-                .scene_viewport_context_mut()
+            crate::ui::editor_context::scene_viewport_context_mut(&mut self.core.ui)
                 .placement
                 .exit_placement_mode();
             tracing::info!("Exited placement mode via Escape");

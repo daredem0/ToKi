@@ -10,8 +10,8 @@ pub fn load_into_ui(ui_state: &mut EditorUI, project: Option<&Project>) {
             )
         })
         .unwrap_or_default();
-    ui_state.load_graph_layouts_from_project(&graph_layouts);
-    ui_state.load_rule_graph_drafts_from_project(&rule_graph_drafts);
+    crate::ui::editor_ui::load_graph_layouts_from_project(ui_state, &graph_layouts);
+    crate::ui::editor_ui::load_rule_graph_drafts_from_project(ui_state, &rule_graph_drafts);
 }
 
 pub fn persist_if_dirty(
@@ -19,7 +19,7 @@ pub fn persist_if_dirty(
     project: Option<&mut Project>,
     egui_ctx: &egui::Context,
 ) {
-    if !ui_state.is_graph_layout_dirty() {
+    if !crate::ui::editor_ui::is_graph_layout_dirty(ui_state) {
         return;
     }
     if egui_ctx.input(|input| input.pointer.any_down()) {
@@ -32,7 +32,7 @@ pub fn persist_if_dirty(
 
     copy_ui_into_project(ui_state, project);
     match project.save_metadata() {
-        Ok(()) => ui_state.clear_graph_layout_dirty(),
+        Ok(()) => crate::ui::editor_ui::clear_graph_layout_dirty(ui_state),
         Err(error) => tracing::warn!(
             "Failed to persist scene graph layout to project metadata: {}",
             error
@@ -41,6 +41,8 @@ pub fn persist_if_dirty(
 }
 
 pub fn copy_ui_into_project(ui_state: &EditorUI, project: &mut Project) {
-    project.metadata.editor.graph_layouts = ui_state.export_graph_layouts_for_project();
-    project.metadata.editor.rule_graph_drafts = ui_state.export_rule_graph_drafts_for_project();
+    project.metadata.editor.graph_layouts =
+        crate::ui::editor_ui::export_graph_layouts_for_project(ui_state);
+    project.metadata.editor.rule_graph_drafts =
+        crate::ui::editor_ui::export_rule_graph_drafts_for_project(ui_state);
 }
