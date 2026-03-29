@@ -1,6 +1,12 @@
-use crate::project::{Project, ProjectAssets};
+use crate::project::{DialogGraphLayout, Project, ProjectAssets};
+use crate::ui::dialog_graph::{
+    auto_layout_positions, connect_edge, create_line_node_at, disconnect_all_outgoing,
+    duplicate_node, normalize_dialog_graph_layout, remove_layout_node_key, rename_layout_node_key,
+    set_layout_node_position, unique_node_id, DialogGraphDocument, DialogGraphEdgeKind,
+};
 use crate::ui::editor_ui::{sync_dialog_registry, EditorUI};
-use egui::Ui;
+use crate::ui::graph_canvas::{render_graph_canvas, GraphCanvasAction};
+use egui::{Key, Ui};
 use toki_core::dialog::{
     DialogBranch, DialogChoice, DialogCondition, DialogConditionTarget, DialogNode, DialogNodeKind,
 };
@@ -52,39 +58,57 @@ fn render_dialog_main(
     project_assets: &mut ProjectAssets,
     declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
 ) {
-    let Some(mut dialog) = crate::ui::editor_context::dialog_state_mut(ui_state)
-        .draft
-        .take()
-    else {
+    let Some(mut dialog) = ui_state.dialog_editor_context_mut().dialog.draft.take() else {
         ui.label("No dialog selected.");
         return;
     };
+    {
+        let dialog_state = &mut ui_state.dialog_editor_context_mut().dialog;
+        let normalized_layout = normalize_dialog_graph_layout(
+            &dialog,
+            dialog_state
+                .layouts_by_dialog
+                .get(dialog.id.as_ref())
+                .cloned(),
+        );
+        dialog_state
+            .layouts_by_dialog
+            .insert(dialog.id.to_string(), normalized_layout);
+        dialog_state.persist_active_graph_view_into_layout();
+    }
+
+    handle_dialog_shortcuts(ui, ui_state, &mut dialog);
 
     ui.horizontal(|ui| {
         if ui
             .add_enabled(
-                crate::ui::editor_context::dialog_state_mut(ui_state).dirty,
+                ui_state.dialog_editor_context().dialog.dirty,
                 egui::Button::new("Save Dialog"),
             )
             .clicked()
         {
+            ui_state
+                .dialog_editor_context_mut()
+                .dialog
+                .persist_active_graph_view_into_layout();
             let validation = dialog.validate();
             if !validation.is_valid() {
-                crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
-                    Some(format!(
-                        "Cannot save dialog with {} validation error(s)",
-                        validation.errors.len()
-                    ));
+                ui_state.dialog_editor_context_mut().dialog.status_message = Some(format!(
+                    "Cannot save dialog with {} validation error(s)",
+                    validation.errors.len()
+                ));
             } else if let Err(error) = project_assets.save_dialog(&dialog) {
-                crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
+                ui_state.dialog_editor_context_mut().dialog.status_message =
                     Some(format!("Failed to save dialog '{}': {error}", dialog.id));
             } else {
-                crate::ui::editor_context::dialog_state_mut(ui_state).selected_dialog_id =
+                ui_state
+                    .dialog_editor_context_mut()
+                    .dialog
+                    .selected_dialog_id = Some(dialog.id.to_string());
+                ui_state.dialog_editor_context_mut().dialog.loaded_dialog_id =
                     Some(dialog.id.to_string());
-                crate::ui::editor_context::dialog_state_mut(ui_state).loaded_dialog_id =
-                    Some(dialog.id.to_string());
-                crate::ui::editor_context::dialog_state_mut(ui_state).dirty = false;
-                crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
+                ui_state.dialog_editor_context_mut().dialog.dirty = false;
+                ui_state.dialog_editor_context_mut().dialog.status_message =
                     Some("Dialog saved".to_string());
                 sync_dialog_registry(ui_state, project_assets);
             }
@@ -97,60 +121,413 @@ fn render_dialog_main(
 
     let mut dirty = false;
     ui.separator();
-    ui.heading("Dialog");
-    ui.horizontal(|ui| {
-        ui.label("Id:");
-        let mut dialog_id = dialog.id.to_string();
-        if ui.text_edit_singleline(&mut dialog_id).changed() {
-            dialog.id = dialog_id.into();
-            dirty = true;
-        }
-    });
-    ui.horizontal(|ui| {
-        ui.label("Title:");
-        dirty |= ui.text_edit_singleline(&mut dialog.title).changed();
-    });
-    ui.horizontal(|ui| {
-        ui.label("Entry Node:");
-        dirty |= ui.text_edit_singleline(&mut dialog.entry_node_id).changed();
-    });
-    dirty |= ui
-        .checkbox(&mut dialog.allow_cancel, "Allow Cancel")
-        .changed();
-    dirty |= ui
-        .checkbox(
-            &mut dialog.gate_gameplay,
-            "Gate Gameplay While Dialog Is Open",
-        )
-        .changed();
-
-    let validation = dialog.validate();
-    if !validation.errors.is_empty() {
-        for error in &validation.errors {
-            ui.colored_label(egui::Color32::from_rgb(255, 120, 120), error);
-        }
-    }
-    if !validation.warnings.is_empty() {
-        for warning in &validation.warnings {
-            ui.colored_label(egui::Color32::from_rgb(255, 210, 80), warning);
-        }
-    }
-    for warning in undeclared_flag_warnings(&dialog, declared_flags) {
-        ui.colored_label(egui::Color32::from_rgb(255, 210, 80), warning);
-    }
-
+    render_dialog_settings(ui, ui_state, &mut dialog, &mut dirty);
     ui.separator();
-    ui.columns(2, |columns| {
-        columns[0].heading("Nodes");
-        render_node_list(&mut columns[0], ui_state, &mut dialog, &mut dirty);
-        columns[1].heading("Node Editor");
-        render_node_editor(&mut columns[1], ui_state, &mut dialog, &mut dirty);
-    });
+    render_dialog_validation_summary(ui, &dialog, declared_flags);
+    ui.separator();
+    render_dialog_graph_workspace(ui, ui_state, &mut dialog, &mut dirty);
 
     if dirty {
-        crate::ui::editor_context::dialog_state_mut(ui_state).dirty = true;
+        ui_state.dialog_editor_context_mut().dialog.dirty = true;
     }
-    crate::ui::editor_context::dialog_state_mut(ui_state).draft = Some(dialog);
+    ui_state
+        .dialog_editor_context_mut()
+        .dialog
+        .persist_active_graph_view_into_layout();
+    ui_state.dialog_editor_context_mut().dialog.draft = Some(dialog);
+}
+
+fn handle_dialog_shortcuts(
+    ui: &Ui,
+    ui_state: &mut EditorUI,
+    dialog: &mut toki_core::dialog::DialogTree,
+) {
+    if ui.ctx().wants_keyboard_input() {
+        return;
+    }
+    let command_pressed = ui.input(|input| input.modifiers.command);
+    let delete_pressed = ui.input(|input| input.key_pressed(Key::Delete));
+    let duplicate_pressed = command_pressed && ui.input(|input| input.key_pressed(Key::D));
+    let auto_layout_pressed = ui.input(|input| input.key_pressed(Key::A));
+    let reset_view_pressed = ui.input(|input| input.key_pressed(Key::Num0));
+    let focus_pressed =
+        ui.input(|input| input.key_pressed(Key::F) || input.key_pressed(Key::Space));
+    let escape_pressed = ui.input(|input| input.key_pressed(Key::Escape));
+
+    if delete_pressed {
+        let result = {
+            let dialog_state = &mut ui_state.dialog_editor_context_mut().dialog;
+            let layout = dialog_state.layouts_by_dialog.get_mut(dialog.id.as_ref());
+            delete_selected_node(dialog, &mut dialog_state.selected_node_id, layout)
+        };
+        match result {
+            Ok(status) => {
+                let dialog_state = &mut ui_state.dialog_editor_context_mut().dialog;
+                let selected_after_delete = dialog_state.selected_node_id.clone();
+                dialog_state.sync_node_id_editor(selected_after_delete.as_deref());
+                dialog_state.status_message = Some(status);
+                dialog_state.dirty = true;
+            }
+            Err(error) => {
+                ui_state.dialog_editor_context_mut().dialog.status_message = Some(error);
+            }
+        }
+    }
+    if duplicate_pressed {
+        if let Some(selected_node_id) = ui_state
+            .dialog_editor_context()
+            .dialog
+            .selected_node_id
+            .clone()
+        {
+            let result = {
+                let dialog_state = &mut ui_state.dialog_editor_context_mut().dialog;
+                let layout = dialog_state.ensure_layout_for_dialog(dialog.id.as_ref());
+                duplicate_node(dialog, layout, &selected_node_id)
+            };
+            match result {
+                Ok(duplicate_id) => {
+                    let dialog_state = &mut ui_state.dialog_editor_context_mut().dialog;
+                    dialog_state.select_dialog_node(duplicate_id.clone());
+                    dialog_state.status_message = Some(format!(
+                        "Duplicated node '{selected_node_id}' to '{duplicate_id}'."
+                    ));
+                    dialog_state.dirty = true;
+                }
+                Err(error) => {
+                    ui_state.dialog_editor_context_mut().dialog.status_message = Some(error);
+                }
+            }
+        }
+    }
+    if auto_layout_pressed {
+        let view = {
+            let dialog_state = &ui_state.dialog_editor_context().dialog;
+            (
+                dialog_state.graph_canvas.zoom,
+                dialog_state.graph_canvas.pan,
+            )
+        };
+        let new_layout = {
+            let mut layout = auto_layout_positions(dialog);
+            layout.zoom = view.0;
+            layout.pan = view.1;
+            layout
+        };
+        let dialog_state = &mut ui_state.dialog_editor_context_mut().dialog;
+        dialog_state
+            .layouts_by_dialog
+            .insert(dialog.id.to_string(), new_layout);
+        dialog_state.layout_dirty = true;
+    }
+    if reset_view_pressed {
+        let dialog_state = &mut ui_state.dialog_editor_context_mut().dialog;
+        dialog_state.graph_canvas.zoom = 1.0;
+        dialog_state.graph_canvas.pan = [16.0, 16.0];
+        dialog_state.persist_active_graph_view_into_layout();
+    }
+    if focus_pressed {
+        let selected_node_id = ui_state
+            .dialog_editor_context()
+            .dialog
+            .selected_node_id
+            .clone();
+        let position = selected_node_id.as_ref().and_then(|selected_node_id| {
+            ui_state
+                .dialog_editor_context()
+                .dialog
+                .layouts_by_dialog
+                .get(dialog.id.as_ref())
+                .and_then(|layout| layout.node_positions.get(selected_node_id).copied())
+        });
+        if let Some(position) = position {
+            let dialog_state = &mut ui_state.dialog_editor_context_mut().dialog;
+            let scale = dialog_state.graph_canvas.zoom.clamp(0.35, 3.0);
+            dialog_state.graph_canvas.pan =
+                [220.0 - position[0] * scale, 180.0 - position[1] * scale];
+            dialog_state.persist_active_graph_view_into_layout();
+        }
+    }
+    if escape_pressed {
+        let dialog_state = &mut ui_state.dialog_editor_context_mut().dialog;
+        if dialog_state.graph_canvas.connecting_from.take().is_none() {
+            dialog_state.selected_node_id = None;
+            dialog_state.sync_node_id_editor(None);
+        }
+    }
+}
+
+pub(crate) fn render_dialog_inspector_panel(
+    ui: &mut Ui,
+    ui_state: &mut EditorUI,
+    _project_assets: &mut ProjectAssets,
+    project: Option<&Project>,
+) {
+    let Some(mut dialog) = ui_state.dialog_editor_context_mut().dialog.draft.take() else {
+        ui.heading("Node Inspector");
+        ui.label("No dialog selected.");
+        return;
+    };
+    let mut dirty = false;
+    ui.heading("Node Inspector");
+    if let Some(status) = &ui_state.dialog_editor_context().dialog.status_message {
+        ui.label(status);
+    }
+    ui.separator();
+    render_node_editor(ui, ui_state, &mut dialog, &mut dirty);
+    if let Some(project) = project {
+        ui.separator();
+        render_dialog_validation_summary(ui, &dialog, &project.metadata.runtime.flags.declarations);
+    }
+    if dirty {
+        ui_state.dialog_editor_context_mut().dialog.dirty = true;
+    }
+    ui_state
+        .dialog_editor_context_mut()
+        .dialog
+        .persist_active_graph_view_into_layout();
+    ui_state.dialog_editor_context_mut().dialog.draft = Some(dialog);
+}
+
+fn render_dialog_settings(
+    ui: &mut Ui,
+    ui_state: &mut EditorUI,
+    dialog: &mut toki_core::dialog::DialogTree,
+    dirty: &mut bool,
+) {
+    let available_node_ids = dialog
+        .nodes
+        .iter()
+        .map(|node| node.id.clone())
+        .collect::<Vec<_>>();
+    ui.columns(2, |columns| {
+        columns[0].vertical(|ui| {
+            ui.horizontal(|ui| {
+                ui.label("Id:");
+                let old_id = dialog.id.to_string();
+                let mut dialog_id = old_id.clone();
+                if ui
+                    .add_sized(
+                        [220.0, ui.spacing().interact_size.y],
+                        egui::TextEdit::singleline(&mut dialog_id),
+                    )
+                    .changed()
+                {
+                    dialog.id = dialog_id.clone().into();
+                    let dialog_state = &mut ui_state.dialog_editor_context_mut().dialog;
+                    if let Some(existing_layout) = dialog_state.layouts_by_dialog.remove(&old_id) {
+                        dialog_state
+                            .layouts_by_dialog
+                            .insert(dialog_id.clone(), existing_layout);
+                    }
+                    if dialog_state.selected_dialog_id.as_deref() == Some(old_id.as_str()) {
+                        dialog_state.selected_dialog_id = Some(dialog_id.clone());
+                    }
+                    if dialog_state.loaded_dialog_id.as_deref() == Some(old_id.as_str()) {
+                        dialog_state.loaded_dialog_id = Some(dialog_id.clone());
+                    }
+                    *dirty = true;
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Title:");
+                *dirty |= ui
+                    .add_sized(
+                        [220.0, ui.spacing().interact_size.y],
+                        egui::TextEdit::singleline(&mut dialog.title),
+                    )
+                    .changed();
+            });
+        });
+        columns[1].vertical(|ui| {
+            optional_or_required_node_picker(
+                ui,
+                "Entry Node:",
+                &mut dialog.entry_node_id,
+                &available_node_ids,
+                dirty,
+                false,
+                ("dialog_entry_node", dialog.id.to_string()),
+            );
+            *dirty |= ui
+                .checkbox(&mut dialog.allow_cancel, "Allow Cancel")
+                .changed();
+            *dirty |= ui
+                .checkbox(
+                    &mut dialog.gate_gameplay,
+                    "Gate Gameplay While Dialog Is Open",
+                )
+                .changed();
+        });
+    });
+}
+
+fn render_dialog_validation_summary(
+    ui: &mut Ui,
+    dialog: &toki_core::dialog::DialogTree,
+    declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
+) {
+    let validation = dialog.validate();
+    ui.label(format!(
+        "{} error(s), {} warning(s)",
+        validation.errors.len(),
+        validation.warnings.len()
+    ));
+    for error in &validation.errors {
+        ui.colored_label(egui::Color32::from_rgb(255, 120, 120), error);
+    }
+    for warning in &validation.warnings {
+        ui.colored_label(egui::Color32::from_rgb(255, 210, 80), warning);
+    }
+    for warning in undeclared_flag_warnings(dialog, declared_flags) {
+        ui.colored_label(egui::Color32::from_rgb(255, 210, 80), warning);
+    }
+}
+
+fn render_dialog_graph_workspace(
+    ui: &mut Ui,
+    ui_state: &mut EditorUI,
+    dialog: &mut toki_core::dialog::DialogTree,
+    dirty: &mut bool,
+) {
+    ui.heading("Dialog Graph");
+    ui.horizontal_wrapped(|ui| {
+        for (label, kind) in [
+            ("+ Line", DialogNodeKindSelection::Line),
+            ("+ Choice", DialogNodeKindSelection::Choice),
+            ("+ Branch", DialogNodeKindSelection::Branch),
+            ("+ End", DialogNodeKindSelection::End),
+        ] {
+            if ui.small_button(label).clicked() {
+                let dialog_state = &mut ui_state.dialog_editor_context_mut().dialog;
+                let position = graph_spawn_position(dialog_state, dialog);
+                let new_id = create_dialog_node(
+                    dialog,
+                    dialog_state.ensure_layout_for_dialog(dialog.id.as_ref()),
+                    kind,
+                    position,
+                );
+                dialog_state.select_dialog_node(new_id);
+                *dirty = true;
+            }
+        }
+        if ui.small_button("Auto Layout").clicked() {
+            let dialog_state = &mut ui_state.dialog_editor_context_mut().dialog;
+            let view = (
+                dialog_state.graph_canvas.zoom,
+                dialog_state.graph_canvas.pan,
+            );
+            let mut layout = auto_layout_positions(dialog);
+            layout.zoom = view.0;
+            layout.pan = view.1;
+            dialog_state
+                .layouts_by_dialog
+                .insert(dialog.id.to_string(), layout);
+            dialog_state.layout_dirty = true;
+        }
+        if ui.small_button("Reset View").clicked() {
+            let dialog_state = &mut ui_state.dialog_editor_context_mut().dialog;
+            dialog_state.graph_canvas.zoom = 1.0;
+            dialog_state.graph_canvas.pan = [16.0, 16.0];
+            dialog_state.persist_active_graph_view_into_layout();
+        }
+    });
+    ui.separator();
+
+    let dialog_state = &mut ui_state.dialog_editor_context_mut().dialog;
+    let layout = dialog_state
+        .layouts_by_dialog
+        .get(dialog.id.as_ref())
+        .cloned()
+        .unwrap_or_else(|| DialogGraphLayout {
+            zoom: dialog_state.graph_canvas.zoom,
+            pan: dialog_state.graph_canvas.pan,
+            ..auto_layout_positions(dialog)
+        });
+    let graph_document = DialogGraphDocument::from_dialog(dialog, Some(&layout));
+    let actions = render_graph_canvas(
+        ui,
+        &mut dialog_state.graph_canvas,
+        &graph_document.as_canvas_nodes(),
+        &graph_document.as_canvas_edges(),
+        dialog_state.selected_node_id.as_deref(),
+    );
+    for action in actions {
+        match action {
+            GraphCanvasAction::SelectNode(node_id) => {
+                if let Some(node_id) = node_id {
+                    dialog_state.select_dialog_node(node_id);
+                } else {
+                    dialog_state.selected_node_id = None;
+                    dialog_state.sync_node_id_editor(None);
+                }
+            }
+            GraphCanvasAction::MoveNode { node_id, position } => {
+                set_layout_node_position(
+                    dialog_state.ensure_layout_for_dialog(dialog.id.as_ref()),
+                    &node_id,
+                    position,
+                );
+                dialog_state.layout_dirty = true;
+            }
+            GraphCanvasAction::CreateNodeAt(position) => {
+                let new_id = create_line_node_at(
+                    dialog,
+                    dialog_state.ensure_layout_for_dialog(dialog.id.as_ref()),
+                    position,
+                );
+                dialog_state.select_dialog_node(new_id);
+                *dirty = true;
+            }
+            GraphCanvasAction::Connect {
+                from_node_id,
+                from_port_id,
+                to_node_id,
+            } => {
+                if let Some(edge_kind) = DialogGraphEdgeKind::from_port_id(&from_port_id) {
+                    match connect_edge(dialog, &from_node_id, &edge_kind, &to_node_id) {
+                        Ok(()) => *dirty = true,
+                        Err(error) => dialog_state.status_message = Some(error),
+                    }
+                }
+            }
+        }
+    }
+    dialog_state.persist_active_graph_view_into_layout();
+}
+
+fn graph_spawn_position(
+    dialog_state: &crate::ui::editor_ui::DialogEditorState,
+    dialog: &toki_core::dialog::DialogTree,
+) -> [f32; 2] {
+    dialog_state
+        .selected_node_id
+        .as_ref()
+        .and_then(|selected_node_id| {
+            dialog_state
+                .layouts_by_dialog
+                .get(dialog.id.as_ref())
+                .and_then(|layout| layout.node_positions.get(selected_node_id).copied())
+        })
+        .map(|[x, y]| [x + 80.0, y + 32.0])
+        .unwrap_or([120.0, 120.0])
+}
+
+fn create_dialog_node(
+    dialog: &mut toki_core::dialog::DialogTree,
+    layout: &mut DialogGraphLayout,
+    kind: DialogNodeKindSelection,
+    position: [f32; 2],
+) -> String {
+    let new_id = unique_node_id(dialog, "node");
+    dialog.nodes.push(DialogNode {
+        id: new_id.clone(),
+        speaker_name: None,
+        conditions: Vec::new(),
+        kind: default_node_kind(kind),
+    });
+    set_layout_node_position(layout, &new_id, position);
+    new_id
 }
 
 fn undeclared_flag_warnings(
@@ -221,47 +598,6 @@ fn collect_undeclared_dialog_condition_warnings(
     }
 }
 
-fn render_node_list(
-    ui: &mut Ui,
-    ui_state: &mut EditorUI,
-    dialog: &mut toki_core::dialog::DialogTree,
-    dirty: &mut bool,
-) {
-    ui.horizontal_wrapped(|ui| {
-        for (label, kind) in [
-            ("+ Line", DialogNodeKindSelection::Line),
-            ("+ Choice", DialogNodeKindSelection::Choice),
-            ("+ Branch", DialogNodeKindSelection::Branch),
-            ("+ End", DialogNodeKindSelection::End),
-        ] {
-            if ui.small_button(label).clicked() {
-                let new_id = unique_node_id(dialog, "node");
-                dialog.nodes.push(DialogNode {
-                    id: new_id.clone(),
-                    speaker_name: None,
-                    conditions: Vec::new(),
-                    kind: default_node_kind(kind),
-                });
-                crate::ui::editor_context::dialog_state_mut(ui_state).select_dialog_node(new_id);
-                *dirty = true;
-            }
-        }
-    });
-
-    egui::ScrollArea::vertical().show(ui, |ui| {
-        for node in &dialog.nodes {
-            let selected = crate::ui::editor_context::dialog_state_mut(ui_state)
-                .selected_node_id
-                .as_deref()
-                == Some(node.id.as_str());
-            if ui.selectable_label(selected, &node.id).clicked() {
-                crate::ui::editor_context::dialog_state_mut(ui_state)
-                    .select_dialog_node(node.id.clone());
-            }
-        }
-    });
-}
-
 fn render_node_editor(
     ui: &mut Ui,
     ui_state: &mut EditorUI,
@@ -279,6 +615,11 @@ fn render_node_editor(
         .dialog_editor_context_mut()
         .dialog
         .sync_node_id_editor(Some(selected_node_id.as_str()));
+    let available_node_ids = dialog
+        .nodes
+        .iter()
+        .map(|node| node.id.clone())
+        .collect::<Vec<_>>();
     let Some(node_index) = dialog
         .nodes
         .iter()
@@ -296,10 +637,13 @@ fn render_node_editor(
             .add_enabled(dialog.nodes.len() > 1, delete_button)
             .clicked()
         {
-            match delete_selected_node(
-                dialog,
-                &mut crate::ui::editor_context::dialog_state_mut(ui_state).selected_node_id,
-            ) {
+            let result = {
+                let dialog_state = crate::ui::editor_context::dialog_state_mut(ui_state);
+                let selected_node_id = &mut dialog_state.selected_node_id;
+                let layout = dialog_state.layouts_by_dialog.get_mut(dialog.id.as_ref());
+                delete_selected_node(dialog, selected_node_id, layout)
+            };
+            match result {
                 Ok(status) => {
                     let selected_after_delete =
                         crate::ui::editor_context::dialog_state_mut(ui_state)
@@ -328,10 +672,30 @@ fn render_node_editor(
         return;
     }
 
+    ui.label("Node");
+    let mut selected_node_dropdown = selected_node_id.clone();
+    egui::ComboBox::from_id_salt(("dialog_selected_node", dialog.id.to_string()))
+        .selected_text(selected_node_dropdown.clone())
+        .width(180.0)
+        .show_ui(ui, |ui| {
+            for node_id in &available_node_ids {
+                ui.selectable_value(&mut selected_node_dropdown, node_id.clone(), node_id);
+            }
+        });
+    if selected_node_dropdown != selected_node_id {
+        crate::ui::editor_context::dialog_state_mut(ui_state)
+            .select_dialog_node(selected_node_dropdown);
+        return;
+    }
+
+    ui.add_space(4.0);
+    ui.label("Rename Node Id");
     ui.horizontal(|ui| {
-        ui.label("Node Id:");
-        let response = ui.text_edit_singleline(
-            &mut crate::ui::editor_context::dialog_state_mut(ui_state).node_id_edit_value,
+        let response = ui.add_sized(
+            [180.0, ui.spacing().interact_size.y],
+            egui::TextEdit::singleline(
+                &mut crate::ui::editor_context::dialog_state_mut(ui_state).node_id_edit_value,
+            ),
         );
         let apply_clicked = ui.small_button("Apply").clicked();
         let pressed_enter =
@@ -340,12 +704,19 @@ fn render_node_editor(
             let node_id_edit_value = crate::ui::editor_context::dialog_state(ui_state)
                 .node_id_edit_value
                 .clone();
-            match rename_dialog_node_id(
-                dialog,
-                &mut crate::ui::editor_context::dialog_state_mut(ui_state).selected_node_id,
-                selected_node_id.as_str(),
-                &node_id_edit_value,
-            ) {
+            let result = {
+                let dialog_state = crate::ui::editor_context::dialog_state_mut(ui_state);
+                let selected_node = &mut dialog_state.selected_node_id;
+                let layout = dialog_state.layouts_by_dialog.get_mut(dialog.id.as_ref());
+                rename_dialog_node_id(
+                    dialog,
+                    selected_node,
+                    selected_node_id.as_str(),
+                    &node_id_edit_value,
+                    layout,
+                )
+            };
+            match result {
                 Ok(Some(status)) => {
                     let committed_id = crate::ui::editor_context::dialog_state_mut(ui_state)
                         .selected_node_id
@@ -358,7 +729,6 @@ fn render_node_editor(
                     crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
                         Some(status);
                     *dirty = true;
-                    return;
                 }
                 Ok(None) => {}
                 Err(error) => {
@@ -367,14 +737,56 @@ fn render_node_editor(
                 }
             }
         }
-        ui.label("Press Enter to apply");
+    });
+    ui.small("Press Enter or Apply to rename the selected node.");
+
+    let node_id = dialog.nodes[node_index].id.clone();
+    ui.horizontal_wrapped(|ui| {
+        if ui.small_button("Set As Entry").clicked() {
+            dialog.entry_node_id = node_id.clone();
+            *dirty = true;
+        }
+        if ui.small_button("Duplicate").clicked() {
+            match duplicate_node(
+                dialog,
+                crate::ui::editor_context::dialog_state_mut(ui_state)
+                    .ensure_layout_for_dialog(dialog.id.as_ref()),
+                &node_id,
+            ) {
+                Ok(duplicate_id) => {
+                    crate::ui::editor_context::dialog_state_mut(ui_state)
+                        .select_dialog_node(duplicate_id.clone());
+                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
+                        Some(format!("Duplicated node '{node_id}' to '{duplicate_id}'."));
+                    *dirty = true;
+                }
+                Err(error) => {
+                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
+                        Some(error);
+                }
+            }
+        }
+        if ui.small_button("Disconnect Outgoing").clicked() {
+            match disconnect_all_outgoing(dialog, &node_id) {
+                Ok(()) => *dirty = true,
+                Err(error) => {
+                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
+                        Some(error);
+                }
+            }
+        }
     });
 
     let node = &mut dialog.nodes[node_index];
+    ui.label("Speaker");
     ui.horizontal(|ui| {
-        ui.label("Speaker:");
         let speaker = node.speaker_name.get_or_insert_with(String::new);
-        *dirty |= ui.text_edit_singleline(speaker).changed();
+        *dirty |= ui
+            .add_sized(
+                [180.0, ui.spacing().interact_size.y],
+                egui::TextEdit::singleline(speaker),
+            )
+            .changed();
         if speaker.trim().is_empty() {
             node.speaker_name = None;
         }
@@ -382,23 +794,22 @@ fn render_node_editor(
 
     let current_kind = kind_selection(&node.kind);
     let mut selected_kind = current_kind;
-    ui.horizontal(|ui| {
-        ui.label("Kind:");
-        egui::ComboBox::from_id_salt(("dialog_node_kind", node_index))
-            .selected_text(kind_label(current_kind))
-            .show_ui(ui, |ui| {
-                for candidate in [
-                    DialogNodeKindSelection::Line,
-                    DialogNodeKindSelection::Choice,
-                    DialogNodeKindSelection::Branch,
-                    DialogNodeKindSelection::End,
-                ] {
-                    *dirty |= ui
-                        .selectable_value(&mut selected_kind, candidate, kind_label(candidate))
-                        .changed();
-                }
-            });
-    });
+    ui.label("Kind");
+    egui::ComboBox::from_id_salt(("dialog_node_kind", node_index))
+        .selected_text(kind_label(current_kind))
+        .width(180.0)
+        .show_ui(ui, |ui| {
+            for candidate in [
+                DialogNodeKindSelection::Line,
+                DialogNodeKindSelection::Choice,
+                DialogNodeKindSelection::Branch,
+                DialogNodeKindSelection::End,
+            ] {
+                *dirty |= ui
+                    .selectable_value(&mut selected_kind, candidate, kind_label(candidate))
+                    .changed();
+            }
+        });
     if selected_kind != current_kind {
         node.kind = default_node_kind(selected_kind);
         *dirty = true;
@@ -409,7 +820,14 @@ fn render_node_editor(
         DialogNodeKind::Line { body, next_node_id } => {
             ui.label("Body:");
             *dirty |= ui.text_edit_multiline(body).changed();
-            optional_node_ref_editor(ui, "Next Node:", next_node_id, dirty);
+            optional_node_picker(
+                ui,
+                "Next Node:",
+                next_node_id,
+                &available_node_ids,
+                dirty,
+                ("line_next_node", node_index),
+            );
             render_conditions(
                 ui,
                 &mut node.conditions,
@@ -457,10 +875,14 @@ fn render_node_editor(
                     ui.label("Label:");
                     *dirty |= ui.text_edit_singleline(&mut choice.label).changed();
                 });
-                ui.horizontal(|ui| {
-                    ui.label("Next Node:");
-                    *dirty |= ui.text_edit_singleline(&mut choice.next_node_id).changed();
-                });
+                required_node_picker(
+                    ui,
+                    "Next Node:",
+                    &mut choice.next_node_id,
+                    &available_node_ids,
+                    dirty,
+                    ("choice_next_node", node_index, index),
+                );
                 render_conditions(
                     ui,
                     &mut choice.conditions,
@@ -474,7 +896,14 @@ fn render_node_editor(
             branches,
             default_next_node_id,
         } => {
-            optional_node_ref_editor(ui, "Default Next:", default_next_node_id, dirty);
+            optional_node_picker(
+                ui,
+                "Default Next:",
+                default_next_node_id,
+                &available_node_ids,
+                dirty,
+                ("branch_default_next", node_index),
+            );
             if ui.small_button("+ Branch").clicked() {
                 branches.push(DialogBranch {
                     conditions: Vec::new(),
@@ -502,10 +931,14 @@ fn render_node_editor(
                     continue;
                 }
                 let branch = &mut branches[index];
-                ui.horizontal(|ui| {
-                    ui.label("Next Node:");
-                    *dirty |= ui.text_edit_singleline(&mut branch.next_node_id).changed();
-                });
+                required_node_picker(
+                    ui,
+                    "Next Node:",
+                    &mut branch.next_node_id,
+                    &available_node_ids,
+                    dirty,
+                    ("branch_next_node", node_index, index),
+                );
                 render_conditions(
                     ui,
                     &mut branch.conditions,
@@ -532,6 +965,7 @@ fn render_node_editor(
 fn delete_selected_node(
     dialog: &mut toki_core::dialog::DialogTree,
     selected_node_id: &mut Option<String>,
+    layout: Option<&mut DialogGraphLayout>,
 ) -> Result<String, String> {
     let Some(selected_node_id_value) = selected_node_id.clone() else {
         return Err("Select a node to delete.".to_string());
@@ -560,6 +994,9 @@ fn delete_selected_node(
 
     dialog.nodes.remove(node_index);
     *selected_node_id = fallback_selection.clone();
+    if let Some(layout) = layout {
+        remove_layout_node_key(layout, &deleted_node_id);
+    }
 
     if dialog.entry_node_id == deleted_node_id {
         if let Some(fallback_selection) = fallback_selection {
@@ -625,6 +1062,7 @@ fn rename_dialog_node_id(
     selected_node_id: &mut Option<String>,
     old_node_id: &str,
     new_node_id: &str,
+    layout: Option<&mut DialogGraphLayout>,
 ) -> Result<Option<String>, String> {
     if old_node_id == new_node_id {
         return Ok(None);
@@ -680,6 +1118,9 @@ fn rename_dialog_node_id(
         }
     }
     *selected_node_id = Some(new_node_id.to_string());
+    if let Some(layout) = layout {
+        rename_layout_node_key(layout, old_node_id, new_node_id);
+    }
 
     Ok(Some(format!(
         "Renamed node '{old_node_id}' to '{new_node_id}'."
@@ -942,6 +1383,88 @@ fn render_condition_target(
     changed
 }
 
+fn optional_or_required_node_picker(
+    ui: &mut Ui,
+    label: &str,
+    value: &mut String,
+    available_node_ids: &[String],
+    dirty: &mut bool,
+    allow_none: bool,
+    id_salt: impl std::hash::Hash,
+) {
+    let mut selected = value.clone();
+    let current_label = if selected.trim().is_empty() {
+        if allow_none {
+            "None"
+        } else {
+            "Select node"
+        }
+    } else {
+        selected.as_str()
+    }
+    .to_string();
+    ui.horizontal(|ui| {
+        ui.label(label);
+        egui::ComboBox::from_id_salt((id_salt, "node_picker"))
+            .selected_text(current_label)
+            .show_ui(ui, |ui| {
+                if allow_none {
+                    ui.selectable_value(&mut selected, String::new(), "None");
+                }
+                if !selected.trim().is_empty()
+                    && !available_node_ids.iter().any(|node| node == &selected)
+                {
+                    let missing_value = selected.clone();
+                    let missing_label = format!("{missing_value} (missing)");
+                    ui.selectable_value(&mut selected, missing_value, missing_label);
+                }
+                for node_id in available_node_ids {
+                    ui.selectable_value(&mut selected, node_id.clone(), node_id);
+                }
+            });
+    });
+    if *value != selected {
+        *value = selected;
+        *dirty = true;
+    }
+}
+
+fn optional_node_picker(
+    ui: &mut Ui,
+    label: &str,
+    value: &mut Option<String>,
+    available_node_ids: &[String],
+    dirty: &mut bool,
+    id_salt: impl std::hash::Hash,
+) {
+    let mut selected = value.clone().unwrap_or_default();
+    optional_or_required_node_picker(
+        ui,
+        label,
+        &mut selected,
+        available_node_ids,
+        dirty,
+        true,
+        id_salt,
+    );
+    if selected.trim().is_empty() {
+        *value = None;
+    } else {
+        *value = Some(selected);
+    }
+}
+
+fn required_node_picker(
+    ui: &mut Ui,
+    label: &str,
+    value: &mut String,
+    available_node_ids: &[String],
+    dirty: &mut bool,
+    id_salt: impl std::hash::Hash,
+) {
+    optional_or_required_node_picker(ui, label, value, available_node_ids, dirty, false, id_salt);
+}
+
 fn optional_node_ref_editor(
     ui: &mut Ui,
     label: &str,
@@ -1060,20 +1583,11 @@ fn default_condition(kind: DialogConditionKind) -> DialogCondition {
     }
 }
 
-fn unique_node_id(dialog: &toki_core::dialog::DialogTree, prefix: &str) -> String {
-    let mut index = 1usize;
-    loop {
-        let candidate = format!("{prefix}_{index}");
-        if !dialog.nodes.iter().any(|node| node.id == candidate) {
-            return candidate;
-        }
-        index += 1;
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::project::DialogGraphLayout;
+    use std::collections::HashMap;
 
     #[test]
     fn delete_selected_node_reselects_neighbor_and_repairs_entry_node() {
@@ -1106,13 +1620,59 @@ mod tests {
         };
         let mut selected = Some("start".to_string());
 
-        let status = delete_selected_node(&mut dialog, &mut selected).expect("delete succeeds");
+        let status =
+            delete_selected_node(&mut dialog, &mut selected, None).expect("delete succeeds");
 
         assert_eq!(dialog.entry_node_id, "middle");
         assert_eq!(selected.as_deref(), Some("middle"));
         assert_eq!(dialog.nodes.len(), 1);
         assert_eq!(dialog.nodes[0].id, "middle");
         assert!(status.contains("Deleted node 'start'"));
+    }
+
+    #[test]
+    fn delete_selected_node_removes_layout_entry() {
+        let mut dialog = toki_core::dialog::DialogTree {
+            id: "intro".to_string().into(),
+            title: String::new(),
+            entry_node_id: "start".to_string(),
+            allow_cancel: true,
+            gate_gameplay: true,
+            nodes: vec![
+                DialogNode {
+                    id: "start".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::Line {
+                        body: String::new(),
+                        next_node_id: Some("end".to_string()),
+                    },
+                },
+                DialogNode {
+                    id: "end".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::End {
+                        body: String::new(),
+                        outcome_id: None,
+                    },
+                },
+            ],
+        };
+        let mut selected = Some("start".to_string());
+        let mut layout = DialogGraphLayout {
+            node_positions: HashMap::from([
+                ("start".to_string(), [10.0, 20.0]),
+                ("end".to_string(), [50.0, 80.0]),
+            ]),
+            ..DialogGraphLayout::default()
+        };
+
+        let _ = delete_selected_node(&mut dialog, &mut selected, Some(&mut layout))
+            .expect("delete succeeds");
+
+        assert!(!layout.node_positions.contains_key("start"));
+        assert!(layout.node_positions.contains_key("end"));
     }
 
     #[test]
@@ -1186,7 +1746,8 @@ mod tests {
         };
         let mut selected = Some("target".to_string());
 
-        let status = delete_selected_node(&mut dialog, &mut selected).expect("delete succeeds");
+        let status =
+            delete_selected_node(&mut dialog, &mut selected, None).expect("delete succeeds");
 
         let line = dialog.node("line").expect("line survives");
         assert_eq!(
@@ -1243,7 +1804,8 @@ mod tests {
         };
         let mut selected = Some("only".to_string());
 
-        let error = delete_selected_node(&mut dialog, &mut selected).expect_err("delete fails");
+        let error =
+            delete_selected_node(&mut dialog, &mut selected, None).expect_err("delete fails");
 
         assert_eq!(error, "Dialogs must keep at least one node.");
         assert_eq!(dialog.nodes.len(), 1);
@@ -1307,7 +1869,7 @@ mod tests {
         };
         let mut selected = Some("target".to_string());
 
-        let status = rename_dialog_node_id(&mut dialog, &mut selected, "target", "done")
+        let status = rename_dialog_node_id(&mut dialog, &mut selected, "target", "done", None)
             .expect("rename succeeds");
 
         assert_eq!(selected.as_deref(), Some("done"));
@@ -1336,6 +1898,57 @@ mod tests {
         };
         assert_eq!(branches[0].next_node_id, "done");
         assert_eq!(default_next_node_id.as_deref(), Some("done"));
+    }
+
+    #[test]
+    fn rename_dialog_node_id_migrates_layout_key() {
+        let mut dialog = toki_core::dialog::DialogTree {
+            id: "intro".to_string().into(),
+            title: String::new(),
+            entry_node_id: "start".to_string(),
+            allow_cancel: true,
+            gate_gameplay: true,
+            nodes: vec![
+                DialogNode {
+                    id: "start".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::Line {
+                        body: String::new(),
+                        next_node_id: Some("end".to_string()),
+                    },
+                },
+                DialogNode {
+                    id: "end".to_string(),
+                    speaker_name: None,
+                    conditions: Vec::new(),
+                    kind: DialogNodeKind::End {
+                        body: String::new(),
+                        outcome_id: None,
+                    },
+                },
+            ],
+        };
+        let mut selected = Some("start".to_string());
+        let mut layout = DialogGraphLayout {
+            node_positions: HashMap::from([("start".to_string(), [10.0, 20.0])]),
+            ..DialogGraphLayout::default()
+        };
+
+        let _ = rename_dialog_node_id(
+            &mut dialog,
+            &mut selected,
+            "start",
+            "entry",
+            Some(&mut layout),
+        )
+        .expect("rename succeeds");
+
+        assert!(!layout.node_positions.contains_key("start"));
+        assert_eq!(
+            layout.node_positions.get("entry").copied(),
+            Some([10.0, 20.0])
+        );
     }
 
     #[test]
@@ -1369,12 +1982,13 @@ mod tests {
         };
         let mut selected = Some("start".to_string());
 
-        let empty_error =
-            rename_dialog_node_id(&mut dialog, &mut selected, "start", "").expect_err("empty");
+        let empty_error = rename_dialog_node_id(&mut dialog, &mut selected, "start", "", None)
+            .expect_err("empty");
         assert_eq!(empty_error, "Node id must not be empty.");
 
         let duplicate_error =
-            rename_dialog_node_id(&mut dialog, &mut selected, "start", "end").expect_err("dup");
+            rename_dialog_node_id(&mut dialog, &mut selected, "start", "end", None)
+                .expect_err("dup");
         assert_eq!(
             duplicate_error,
             "Dialog already contains a node named 'end'."

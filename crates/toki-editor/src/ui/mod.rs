@@ -1,7 +1,9 @@
+pub(crate) mod dialog_graph;
 pub(crate) mod editor_context;
 pub mod editor_domain;
 pub mod editor_ui;
 pub mod entity_editor;
+pub(crate) mod graph_canvas;
 pub mod hierarchy;
 pub mod inspector;
 pub mod inspector_trait;

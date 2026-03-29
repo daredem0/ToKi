@@ -861,6 +861,69 @@ fn map_editor_can_undo_prefers_map_history_when_map_editor_tab_is_active() {
     assert!(crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut ui).is_some());
 }
 
+#[test]
+fn map_editor_object_drag_records_undo_history() {
+    let mut ui = EditorUI::new();
+    ui.set_active_tab(super::CenterPanelTab::MapEditor);
+
+    let object_a = toki_core::assets::tilemap::MapObjectInstance {
+        sheet: std::path::PathBuf::from("fauna.json"),
+        object_name: "bush".to_string(),
+        position: glam::UVec2::new(16, 16),
+        size_px: glam::UVec2::new(16, 16),
+        grounding: Default::default(),
+        visible: true,
+        solid: false,
+    };
+    let tilemap_before = toki_core::assets::tilemap::TileMap {
+        size: glam::UVec2::new(4, 4),
+        tile_size: glam::UVec2::new(8, 8),
+        atlas: std::path::PathBuf::from("terrain.json"),
+        tiles: vec!["grass".to_string(); 16],
+        objects: vec![object_a],
+    };
+
+    crate::ui::editor_ui::set_map_editor_draft(
+        &mut ui,
+        MapEditorDraft {
+            name: "drag_test".to_string(),
+            tilemap: tilemap_before.clone(),
+        },
+    );
+
+    // Simulate drag: snapshot before, start drag, move object, finish drag, snapshot after
+    crate::ui::editor_ui::begin_map_editor_edit(&mut ui, &tilemap_before);
+    crate::ui::editor_ui::begin_map_object_move_drag(&mut ui, 0, glam::Vec2::ZERO);
+
+    let mut tilemap_after = tilemap_before.clone();
+    tilemap_after.objects[0].position = glam::UVec2::new(48, 48);
+    crate::ui::editor_context::map_state_mut(&mut ui)
+        .draft
+        .as_mut()
+        .unwrap()
+        .tilemap = tilemap_after.clone();
+
+    crate::ui::editor_ui::finish_map_object_move_drag(&mut ui);
+    assert!(crate::ui::editor_ui::finish_map_editor_edit(
+        &mut ui,
+        &tilemap_after
+    ));
+
+    // Undo should restore original position
+    assert!(ui.can_undo());
+    assert!(ui.undo());
+    let undone = crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut ui)
+        .expect("undo should queue a tilemap sync");
+    assert_eq!(undone.objects[0].position, glam::UVec2::new(16, 16));
+
+    // Redo should restore dragged position
+    assert!(ui.can_redo());
+    assert!(ui.redo());
+    let redone = crate::ui::editor_ui::take_pending_map_editor_tilemap_sync(&mut ui)
+        .expect("redo should queue a tilemap sync");
+    assert_eq!(redone.objects[0].position, glam::UVec2::new(48, 48));
+}
+
 // =============================================================================
 // UIVisibilityState regression tests
 // =============================================================================

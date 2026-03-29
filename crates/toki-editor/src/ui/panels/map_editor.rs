@@ -220,7 +220,9 @@ impl PanelSystem {
 
         match crate::ui::editor_context::map_state_mut(ui_state).tool {
             MapEditorTool::Drag => {
-                crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
+                if !crate::ui::editor_ui::is_map_object_move_drag_active(ui_state) {
+                    crate::ui::editor_ui::cancel_map_editor_edit(ui_state);
+                }
                 if response.drag_started() {
                     if let Some(drag_start_pos) = response.interact_pointer_pos() {
                         Self::handle_map_editor_object_drag_start(

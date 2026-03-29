@@ -1,5 +1,6 @@
-use crate::project::ProjectAssets;
-use std::collections::BTreeMap;
+use crate::project::{DialogGraphLayout, ProjectAssets};
+use crate::ui::graph_canvas::GraphCanvasState;
+use std::collections::{BTreeMap, HashMap};
 
 use super::EditorUI;
 use toki_core::dialog::{DialogNode, DialogNodeKind, DialogTree};
@@ -14,6 +15,9 @@ pub(crate) struct DialogEditorState {
     pub node_id_edit_value: String,
     pub dirty: bool,
     pub status_message: Option<String>,
+    pub graph_canvas: GraphCanvasState,
+    pub layouts_by_dialog: HashMap<String, DialogGraphLayout>,
+    pub layout_dirty: bool,
 }
 
 impl DialogEditorState {
@@ -56,23 +60,35 @@ impl DialogEditorState {
             node_id_edit_value: "start".to_string(),
             dirty: true,
             status_message: Some("Created new dialog draft".to_string()),
+            graph_canvas: GraphCanvasState::default(),
+            layouts_by_dialog: HashMap::new(),
+            layout_dirty: false,
         }
     }
 
     pub fn load_dialog(&mut self, dialog: DialogTree) {
+        let dialog_id = dialog.id.to_string();
         let selected_node_id = self
             .selected_node_id
             .clone()
             .filter(|node_id| dialog.nodes.iter().any(|node| node.id == *node_id))
             .or_else(|| dialog.nodes.first().map(|node| node.id.clone()));
-        self.selected_dialog_id = Some(dialog.id.to_string());
-        self.loaded_dialog_id = Some(dialog.id.to_string());
+        self.selected_dialog_id = Some(dialog_id.clone());
+        self.loaded_dialog_id = Some(dialog_id.clone());
         self.draft = Some(dialog);
         self.selected_node_id = selected_node_id.clone();
         self.node_id_edit_target = selected_node_id.clone();
         self.node_id_edit_value = selected_node_id.unwrap_or_default();
         self.dirty = false;
         self.status_message = None;
+        let layout = self
+            .layouts_by_dialog
+            .get(&dialog_id)
+            .cloned()
+            .unwrap_or_default();
+        self.graph_canvas.zoom = layout.zoom;
+        self.graph_canvas.pan = layout.pan;
+        self.graph_canvas.connecting_from = None;
     }
 
     pub fn select_dialog_node(&mut self, node_id: String) {
@@ -106,6 +122,46 @@ impl DialogEditorState {
             })
             .collect()
     }
+
+    pub fn ensure_layout_for_dialog(&mut self, dialog_id: &str) -> &mut DialogGraphLayout {
+        self.layouts_by_dialog
+            .entry(dialog_id.to_string())
+            .or_default()
+    }
+
+    pub fn sync_active_graph_view_from_layout(&mut self) {
+        let Some(dialog_id) = self.selected_dialog_id.clone() else {
+            self.graph_canvas = GraphCanvasState::default();
+            return;
+        };
+        let layout = self
+            .layouts_by_dialog
+            .get(&dialog_id)
+            .cloned()
+            .unwrap_or_default();
+        self.graph_canvas.zoom = layout.zoom;
+        self.graph_canvas.pan = layout.pan;
+        self.graph_canvas.connecting_from = None;
+    }
+
+    pub fn persist_active_graph_view_into_layout(&mut self) {
+        let Some(dialog_id) = self.selected_dialog_id.clone() else {
+            return;
+        };
+        let layout = self.layouts_by_dialog.entry(dialog_id).or_default();
+        let mut changed = false;
+        if (layout.zoom - self.graph_canvas.zoom).abs() > f32::EPSILON {
+            layout.zoom = self.graph_canvas.zoom;
+            changed = true;
+        }
+        if layout.pan != self.graph_canvas.pan {
+            layout.pan = self.graph_canvas.pan;
+            changed = true;
+        }
+        if changed {
+            self.layout_dirty = true;
+        }
+    }
 }
 
 pub(crate) fn sync_dialog_registry(ui_state: &mut EditorUI, project_assets: &mut ProjectAssets) {
@@ -130,6 +186,32 @@ pub(crate) fn sync_dialog_registry(ui_state: &mut EditorUI, project_assets: &mut
     ui_state
         .project
         .set_available_dialogs(&DialogEditorState::collect_available_dialogs(&dialogs));
+}
+
+pub(crate) fn load_dialog_graph_layouts_from_project(
+    ui_state: &mut EditorUI,
+    layouts: &HashMap<String, DialogGraphLayout>,
+) {
+    let dialog_state = crate::ui::editor_context::dialog_state_mut(ui_state);
+    dialog_state.layouts_by_dialog = layouts.clone();
+    dialog_state.layout_dirty = false;
+    dialog_state.sync_active_graph_view_from_layout();
+}
+
+pub(crate) fn export_dialog_graph_layouts_for_project(
+    ui_state: &EditorUI,
+) -> HashMap<String, DialogGraphLayout> {
+    crate::ui::editor_context::dialog_state(ui_state)
+        .layouts_by_dialog
+        .clone()
+}
+
+pub(crate) fn is_dialog_graph_layout_dirty(ui_state: &EditorUI) -> bool {
+    crate::ui::editor_context::dialog_state(ui_state).layout_dirty
+}
+
+pub(crate) fn clear_dialog_graph_layout_dirty(ui_state: &mut EditorUI) {
+    crate::ui::editor_context::dialog_state_mut(ui_state).layout_dirty = false;
 }
 
 fn unique_dialog_id(existing_dialog_ids: &[String]) -> String {

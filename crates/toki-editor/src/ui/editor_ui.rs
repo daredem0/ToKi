@@ -40,7 +40,11 @@ mod editor_ui_sprite_editor;
 
 pub(crate) use editor_ui_animation_authoring::AnimationAuthoringState;
 pub(crate) use editor_ui_animation_editor::AnimationEditorState;
-pub(crate) use editor_ui_dialog_editor::{sync_dialog_registry, DialogEditorState};
+pub(crate) use editor_ui_dialog_editor::{
+    clear_dialog_graph_layout_dirty, export_dialog_graph_layouts_for_project,
+    is_dialog_graph_layout_dirty, load_dialog_graph_layouts_from_project, sync_dialog_registry,
+    DialogEditorState,
+};
 pub(crate) use editor_ui_entity_editor::{
     create_default_definition, EntityCategory, EntityEditState, EntitySummary,
 };
@@ -1020,7 +1024,12 @@ impl EditorUI {
         let game_state = context_host.scene_viewport.as_ref().map(|v| v.game_state());
 
         if self.visibility.show_hierarchy {
-            self.render_hierarchy_and_maps_combined_panel(ctx, game_state, config_readonly);
+            self.render_hierarchy_and_maps_combined_panel(
+                ctx,
+                game_state,
+                context_host.project_assets.as_deref_mut(),
+                config_readonly,
+            );
         }
 
         if self.visibility.show_inspector {

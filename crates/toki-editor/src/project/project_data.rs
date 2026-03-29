@@ -83,6 +83,9 @@ pub struct ProjectEditorMetadata {
     /// Persisted scene rule graph drafts for each scene
     #[serde(default)]
     pub rule_graph_drafts: HashMap<String, RuleGraph>,
+    /// Persisted dialog graph layout settings for each dialog asset
+    #[serde(default)]
+    pub dialog_graph_layouts: HashMap<String, DialogGraphLayout>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,7 +101,30 @@ pub struct SceneGraphLayout {
     pub pan: [f32; 2],
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DialogGraphLayout {
+    /// Persisted dialog graph node positions keyed by node id
+    #[serde(default)]
+    pub node_positions: HashMap<String, [f32; 2]>,
+    /// Graph zoom level for the dialog graph
+    #[serde(default = "default_graph_zoom")]
+    pub zoom: f32,
+    /// Graph pan offset for the dialog graph
+    #[serde(default = "default_graph_pan")]
+    pub pan: [f32; 2],
+}
+
 impl Default for SceneGraphLayout {
+    fn default() -> Self {
+        Self {
+            node_positions: HashMap::new(),
+            zoom: default_graph_zoom(),
+            pan: default_graph_pan(),
+        }
+    }
+}
+
+impl Default for DialogGraphLayout {
     fn default() -> Self {
         Self {
             node_positions: HashMap::new(),
