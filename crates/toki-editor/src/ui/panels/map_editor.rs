@@ -4,7 +4,7 @@ use crate::ui::editor_ui::MapEditorTool;
 use crate::ui::EditorUI;
 
 impl PanelSystem {
-    pub(super) fn render_map_editor(
+    pub(crate) fn render_map_editor(
         ui: &mut egui::Ui,
         ui_state: &mut EditorUI,
         map_editor_viewport: Option<&mut SceneViewport>,

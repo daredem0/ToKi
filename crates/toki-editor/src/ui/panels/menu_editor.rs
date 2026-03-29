@@ -7,7 +7,7 @@ use toki_core::menu::{
 };
 use toki_core::ui::{UiBlock, UiComposition};
 
-pub(super) fn render_menu_editor(
+pub(crate) fn render_menu_editor(
     ui: &mut egui::Ui,
     ui_state: &mut EditorUI,
     project: Option<&mut Project>,

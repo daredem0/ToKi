@@ -407,39 +407,24 @@ impl InspectorSystem {
         ui: &mut egui::Ui,
         ctx: &egui::Context,
         game_state: Option<&toki_core::GameState>,
-        project: Option<&mut Project>,
-        project_assets: Option<&mut crate::project::ProjectAssets>,
+        mut project: Option<&mut Project>,
+        mut project_assets: Option<&mut crate::project::ProjectAssets>,
         config: Option<&EditorConfig>,
     ) {
-        // Handle special editor modes first
-        if ui_state.workspace.center_panel_tab == super::editor_ui::CenterPanelTab::MapEditor {
-            Self::render_map_editor_command_palette(ui_state, ui, ctx, config);
-            return;
-        }
-
-        if ui_state.workspace.center_panel_tab == super::editor_ui::CenterPanelTab::MenuEditor {
-            Self::render_menu_editor_inspector(ui_state, ui, project);
-            return;
-        }
-
-        if ui_state.workspace.center_panel_tab == super::editor_ui::CenterPanelTab::DialogEditor {
-            Self::render_dialog_editor_inspector(ui_state, ui, project, project_assets);
-            return;
-        }
-
-        if ui_state.workspace.center_panel_tab == super::editor_ui::CenterPanelTab::SpriteEditor {
-            Self::render_sprite_editor_inspector(ui_state, ui, ctx);
-            return;
-        }
-
-        if ui_state.workspace.center_panel_tab == super::editor_ui::CenterPanelTab::AnimationEditor
-        {
-            Self::render_animation_editor_inspector(ui_state, ui);
-            return;
-        }
-
-        if ui_state.workspace.center_panel_tab == super::editor_ui::CenterPanelTab::EntityEditor {
-            Self::render_entity_editor_inspector(ui_state, ui);
+        let mut host = super::editor_context::EditorContextHost {
+            scene_viewport: None,
+            map_editor_viewport: None,
+            project: project.as_deref_mut(),
+            project_assets: project_assets.as_deref_mut(),
+            available_map_names: None,
+            config: None,
+            log_capture: None,
+            renderer: None,
+        };
+        let handled = ui_state.with_active_context(|context, shell| {
+            context.render_inspector(shell, ui, ctx, game_state, &mut host)
+        });
+        if handled {
             return;
         }
 

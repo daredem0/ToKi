@@ -7,7 +7,9 @@ use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChanne
 use super::{EditorUI, MapEditorDraft, ProjectRequest, Selection};
 use crate::project::Project;
 use crate::ui::rule_graph::RuleGraph;
+use crate::ui::sprite_editor::PixelColor;
 use crate::ui::undo_redo::EditorCommand;
+use crate::ui::editor_ui::editor_ui_map_editor::MapEditorEditCommand;
 
 fn sample_entity(id: u32, position: IVec2) -> toki_core::entity::Entity {
     toki_core::entity::Entity {
@@ -268,6 +270,85 @@ fn finalize_saved_map_editor_draft_requests_reload_from_disk() {
     assert!(!ui.has_unsaved_map_editor_changes());
     assert_eq!(ui.map.active_map.as_deref(), Some("draft_map"));
     assert_eq!(ui.map.map_load_requested.as_deref(), Some("draft_map"));
+}
+
+#[test]
+fn set_active_tab_keeps_workspace_tab_in_sync() {
+    let mut ui = EditorUI::new();
+
+    ui.set_active_tab(super::CenterPanelTab::SpriteEditor);
+
+    assert_eq!(ui.active_tab(), super::CenterPanelTab::SpriteEditor);
+    assert_eq!(
+        ui.workspace.center_panel_tab,
+        super::CenterPanelTab::SpriteEditor
+    );
+}
+
+#[test]
+fn switching_tabs_preserves_sprite_map_and_graph_state() {
+    let mut ui = EditorUI::new();
+    ui.sprite.new_canvas(8, 8);
+    ui.sprite.foreground_color = PixelColor::new(10, 20, 30, 255);
+    ui.set_map_editor_draft(MapEditorDraft {
+        name: "draft_map".to_string(),
+        tilemap: toki_core::assets::tilemap::TileMap {
+            size: glam::UVec2::new(2, 2),
+            tile_size: glam::UVec2::new(8, 8),
+            atlas: std::path::PathBuf::from("terrain.json"),
+            tiles: vec!["grass".to_string(); 4],
+            objects: vec![],
+        },
+    });
+    ui.graph.canvas_zoom = 1.75;
+    ui.graph.canvas_pan = [24.0, 48.0];
+
+    ui.set_active_tab(super::CenterPanelTab::SpriteEditor);
+    ui.set_active_tab(super::CenterPanelTab::MapEditor);
+    ui.set_active_tab(super::CenterPanelTab::SceneGraph);
+    ui.set_active_tab(super::CenterPanelTab::SpriteEditor);
+
+    assert!(ui.sprite.has_canvas());
+    assert_eq!(ui.sprite.foreground_color, PixelColor::new(10, 20, 30, 255));
+    assert_eq!(ui.map.active_map.as_deref(), Some("draft_map"));
+    assert_eq!(ui.graph.canvas_zoom, 1.75);
+    assert_eq!(ui.graph.canvas_pan, [24.0, 48.0]);
+}
+
+#[test]
+fn active_context_undo_prefers_map_history_when_map_tab_is_active() {
+    let mut ui = EditorUI::new();
+    ui.set_map_editor_draft(MapEditorDraft {
+        name: "draft_map".to_string(),
+        tilemap: toki_core::assets::tilemap::TileMap {
+            size: glam::UVec2::new(2, 2),
+            tile_size: glam::UVec2::new(8, 8),
+            atlas: std::path::PathBuf::from("terrain.json"),
+            tiles: vec!["grass".to_string(); 4],
+            objects: vec![],
+        },
+    });
+    let before = ui.map.draft.as_ref().expect("draft").tilemap.clone();
+    let mut after = before.clone();
+    after.tiles[0] = "water".to_string();
+    ui.map.history.push(MapEditorEditCommand {
+        map_name: "draft_map".to_string(),
+        is_draft: true,
+        before: before.clone(),
+        after,
+    });
+    ui.set_active_tab(super::CenterPanelTab::MapEditor);
+
+    assert!(crate::editor_services::commands::undo(&mut ui));
+    assert_eq!(
+        ui.map
+            .draft
+            .as_ref()
+            .expect("draft should remain")
+            .tilemap
+            .tiles[0],
+        before.tiles[0]
+    );
 }
 
 #[test]
@@ -547,7 +628,7 @@ fn queue_map_editor_object_property_edit_updates_selected_object_info() {
 #[test]
 fn map_editor_undo_and_redo_round_trip_a_draft_edit() {
     let mut ui = EditorUI::new();
-    ui.workspace.center_panel_tab = super::CenterPanelTab::MapEditor;
+    ui.set_active_tab(super::CenterPanelTab::MapEditor);
     ui.set_map_editor_draft(MapEditorDraft {
         name: "draft_map".to_string(),
         tilemap: toki_core::assets::tilemap::TileMap {
@@ -593,7 +674,7 @@ fn map_editor_can_undo_prefers_map_history_when_map_editor_tab_is_active() {
         "Main Scene",
         sample_entity(1, IVec2::new(0, 0))
     )));
-    ui.workspace.center_panel_tab = super::CenterPanelTab::MapEditor;
+    ui.set_active_tab(super::CenterPanelTab::MapEditor);
     assert!(!ui.can_undo());
 
     ui.set_map_editor_draft(MapEditorDraft {

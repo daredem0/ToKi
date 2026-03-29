@@ -87,7 +87,7 @@ impl InspectorSystem {
         ctx.changed
     }
 
-    pub(in super::super) fn render_menu_editor_inspector(
+    pub(crate) fn render_menu_editor_inspector(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
         project: Option<&mut Project>,

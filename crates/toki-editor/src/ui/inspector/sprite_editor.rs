@@ -4,7 +4,7 @@ use toki_core::assets::atlas::ColorMode;
 use toki_core::palette::validate_indexed_rgba8;
 
 impl InspectorSystem {
-    pub(super) fn render_sprite_editor_inspector(
+    pub(crate) fn render_sprite_editor_inspector(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
         _ctx: &egui::Context,

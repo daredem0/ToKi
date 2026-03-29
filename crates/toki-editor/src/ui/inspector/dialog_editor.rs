@@ -4,7 +4,7 @@ use crate::ui::editor_ui::{sync_dialog_registry, DialogEditorState};
 use chrono::Utc;
 
 impl InspectorSystem {
-    pub(super) fn render_dialog_editor_inspector(
+    pub(crate) fn render_dialog_editor_inspector(
         ui_state: &mut EditorUI,
         ui: &mut egui::Ui,
         project: Option<&mut Project>,

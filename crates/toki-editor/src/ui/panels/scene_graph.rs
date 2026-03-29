@@ -10,7 +10,7 @@ struct GraphCommandFlags {
 }
 
 impl PanelSystem {
-    pub(super) fn render_scene_graph(
+    pub(crate) fn render_scene_graph(
         ui: &mut egui::Ui,
         ui_state: &mut EditorUI,
         show_scene_rules: bool,
