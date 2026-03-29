@@ -29,7 +29,10 @@ pub fn render_component_toggles(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 }
 
 fn render_collision_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state).edit_state.as_mut() else {
+    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state)
+        .edit_state
+        .as_mut()
+    else {
         return;
     };
 
@@ -112,7 +115,10 @@ fn render_collision_settings(ui: &mut egui::Ui, edit: &mut crate::ui::editor_ui:
 }
 
 fn render_health_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state).edit_state.as_mut() else {
+    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state)
+        .edit_state
+        .as_mut()
+    else {
         return;
     };
 
@@ -138,7 +144,10 @@ fn render_health_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 }
 
 fn render_ai_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state).edit_state.as_mut() else {
+    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state)
+        .edit_state
+        .as_mut()
+    else {
         return;
     };
 
@@ -200,7 +209,10 @@ fn render_ai_settings(ui: &mut egui::Ui, edit: &mut crate::ui::editor_ui::Entity
 }
 
 fn render_inventory_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state).edit_state.as_mut() else {
+    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state)
+        .edit_state
+        .as_mut()
+    else {
         return;
     };
 
@@ -211,7 +223,10 @@ fn render_inventory_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 }
 
 fn render_projectile_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state).edit_state.as_mut() else {
+    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state)
+        .edit_state
+        .as_mut()
+    else {
         return;
     };
 
@@ -310,7 +325,10 @@ fn render_projectile_settings(
 }
 
 fn render_pickup_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state).edit_state.as_mut() else {
+    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state)
+        .edit_state
+        .as_mut()
+    else {
         return;
     };
 
@@ -358,8 +376,13 @@ fn render_pickup_settings(
 }
 
 fn render_audio_section(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    let available_sfx = crate::ui::editor_context::entity_editor_state_mut(ui_state).available_sfx.clone();
-    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state).edit_state.as_mut() else {
+    let available_sfx = crate::ui::editor_context::entity_editor_state_mut(ui_state)
+        .available_sfx
+        .clone();
+    let Some(edit) = crate::ui::editor_context::entity_editor_state_mut(ui_state)
+        .edit_state
+        .as_mut()
+    else {
         return;
     };
 

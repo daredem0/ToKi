@@ -67,7 +67,11 @@ pub(super) fn fps_label(fps: u32) -> String {
 }
 
 pub(super) fn on_off_label(value: bool) -> &'static str {
-    if value { "On" } else { "Off" }
+    if value {
+        "On"
+    } else {
+        "Off"
+    }
 }
 
 pub(super) fn channel_to_percent(value: u8) -> u8 {
@@ -193,7 +197,11 @@ impl App {
                     next.clamp(0, 200) as u8;
             }
             GraphicsSettingKey::TintStrength => adjust_percent(
-                &mut self.launch_options.display.post_process.tint_strength_percent,
+                &mut self
+                    .launch_options
+                    .display
+                    .post_process
+                    .tint_strength_percent,
                 (super::SETTING_STEP_PERCENT as i16) * direction as i16,
             ),
             GraphicsSettingKey::TintRed => adjust_channel(
@@ -225,7 +233,11 @@ impl App {
                     next.clamp(-100, 100);
             }
             GraphicsSettingKey::VignetteStrength => adjust_percent(
-                &mut self.launch_options.display.post_process.vignette_strength_percent,
+                &mut self
+                    .launch_options
+                    .display
+                    .post_process
+                    .vignette_strength_percent,
                 (super::SETTING_STEP_PERCENT as i16) * direction as i16,
             ),
             GraphicsSettingKey::Back => return,
@@ -284,7 +296,10 @@ impl App {
                     (percent as u16 * 2).min(200) as u8;
             }
             GraphicsSettingKey::TintStrength => {
-                self.launch_options.display.post_process.tint_strength_percent = percent.min(100);
+                self.launch_options
+                    .display
+                    .post_process
+                    .tint_strength_percent = percent.min(100);
             }
             GraphicsSettingKey::TintRed => {
                 self.launch_options.display.post_process.tint_color[0] =
@@ -303,8 +318,10 @@ impl App {
                     (percent as i16 * 2 - 100).clamp(-100, 100);
             }
             GraphicsSettingKey::VignetteStrength => {
-                self.launch_options.display.post_process.vignette_strength_percent =
-                    percent.min(100);
+                self.launch_options
+                    .display
+                    .post_process
+                    .vignette_strength_percent = percent.min(100);
             }
             GraphicsSettingKey::Vsync
             | GraphicsSettingKey::PostProcessMode

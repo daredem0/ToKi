@@ -26,7 +26,8 @@ pub fn render_canvas_viewport(
         egui::Sense::click_and_drag(),
     );
 
-    let render_side = target_side.unwrap_or(crate::ui::editor_context::sprite_state_mut(ui_state).active_canvas);
+    let render_side =
+        target_side.unwrap_or(crate::ui::editor_context::sprite_state_mut(ui_state).active_canvas);
 
     if let Some(side) = target_side {
         if response.clicked() || response.dragged() {
@@ -34,8 +35,8 @@ pub fn render_canvas_viewport(
         }
     }
 
-    let is_interactive =
-        target_side.is_none() || target_side == Some(crate::ui::editor_context::sprite_state_mut(ui_state).active_canvas);
+    let is_interactive = target_side.is_none()
+        || target_side == Some(crate::ui::editor_context::sprite_state_mut(ui_state).active_canvas);
 
     // Handle pan with right-click drag or middle-click drag
     if response.dragged_by(egui::PointerButton::Secondary)
@@ -56,15 +57,15 @@ pub fn render_canvas_viewport(
         if scroll_delta != 0.0 {
             if scroll_delta > 0.0 {
                 ui_state
-            .sprite_editor_context_mut()
-            .sprite
+                    .sprite_editor_context_mut()
+                    .sprite
                     .canvas_state_mut(render_side)
                     .viewport
                     .zoom_in();
             } else {
                 ui_state
-            .sprite_editor_context_mut()
-            .sprite
+                    .sprite_editor_context_mut()
+                    .sprite
                     .canvas_state_mut(render_side)
                     .viewport
                     .zoom_out();
@@ -77,10 +78,16 @@ pub fn render_canvas_viewport(
         if ui.input(|input| {
             input.key_pressed(egui::Key::Plus) || input.key_pressed(egui::Key::Equals)
         }) {
-            crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().viewport.zoom_in();
+            crate::ui::editor_context::sprite_state_mut(ui_state)
+                .active_mut()
+                .viewport
+                .zoom_in();
         }
         if ui.input(|input| input.key_pressed(egui::Key::Minus)) {
-            crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().viewport.zoom_out();
+            crate::ui::editor_context::sprite_state_mut(ui_state)
+                .active_mut()
+                .viewport
+                .zoom_out();
         }
 
         handle_floating_shortcuts(ui_state, ui);
@@ -122,13 +129,15 @@ pub fn render_canvas_viewport(
     painter.rect_filled(rect, 0.0, egui::Color32::from_gray(40));
 
     // Ensure canvas texture is created
-    let canvas_state = crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
+    let canvas_state =
+        crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if canvas_state.canvas.is_some() {
         ensure_canvas_texture_for_side(ui_state, ctx, render_side);
     }
 
     // Draw checkerboard and canvas
-    let canvas_state = crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
+    let canvas_state =
+        crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if let Some(canvas) = &canvas_state.canvas {
         let viewport = canvas_state.viewport.clone();
         let texture = canvas_state.canvas_texture.as_ref();
@@ -136,7 +145,8 @@ pub fn render_canvas_viewport(
     }
 
     // Draw tile preview (3x3 tiled copies)
-    let canvas_state = crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
+    let canvas_state =
+        crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if canvas_state.tile_preview {
         if let Some(canvas) = &canvas_state.canvas {
             draw_tile_preview(&painter, rect, &canvas_state.viewport, canvas);
@@ -144,7 +154,8 @@ pub fn render_canvas_viewport(
     }
 
     // Draw pixel grid overlay
-    let canvas_state = crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
+    let canvas_state =
+        crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if canvas_state.show_grid && canvas_state.viewport.zoom >= 4.0 {
         if let Some(canvas) = &canvas_state.canvas {
             draw_pixel_grid(&painter, rect, &canvas_state.viewport, canvas);
@@ -152,7 +163,8 @@ pub fn render_canvas_viewport(
     }
 
     // Draw cell grid overlay for sprite sheets
-    let canvas_state = crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
+    let canvas_state =
+        crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if canvas_state.show_cell_grid {
         if let Some(canvas) = &canvas_state.canvas {
             draw_cell_grid(
@@ -167,7 +179,8 @@ pub fn render_canvas_viewport(
     }
 
     // Draw hovered pixel highlight
-    let canvas_state = crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
+    let canvas_state =
+        crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if let Some(canvas) = &canvas_state.canvas {
         draw_hovered_pixel_highlight(
             &painter,
@@ -182,7 +195,8 @@ pub fn render_canvas_viewport(
     let symmetry_horizontal = crate::ui::editor_context::sprite_state(ui_state).symmetry_horizontal;
     let symmetry_vertical = crate::ui::editor_context::sprite_state(ui_state).symmetry_vertical;
     if symmetry_horizontal || symmetry_vertical {
-        let canvas_state = crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
+        let canvas_state =
+            crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
         if let Some(canvas) = &canvas_state.canvas {
             draw_symmetry_guides(
                 &painter,
@@ -196,7 +210,8 @@ pub fn render_canvas_viewport(
     }
 
     // Draw floating selection overlay OR static selection overlay
-    let canvas_state = crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
+    let canvas_state =
+        crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state(render_side);
     if let Some(floating) = &canvas_state.floating {
         draw_floating_selection(&painter, rect, &canvas_state.viewport, floating);
     } else if let Some(selection) = &canvas_state.selection {
@@ -204,7 +219,9 @@ pub fn render_canvas_viewport(
     }
 
     // Status bar
-    if target_side.is_none() || target_side == Some(crate::ui::editor_context::sprite_state_mut(ui_state).active_canvas) {
+    if target_side.is_none()
+        || target_side == Some(crate::ui::editor_context::sprite_state_mut(ui_state).active_canvas)
+    {
         render_status_bar(ui, ui_state);
     }
 }
@@ -246,9 +263,15 @@ pub fn ensure_canvas_texture_for_side(
     if cs.canvas_texture.is_some() && !cs.canvas_texture_dirty {
         return;
     }
-    crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state_mut(side).canvas_texture_dirty = false;
+    crate::ui::editor_context::sprite_state_mut(ui_state)
+        .canvas_state_mut(side)
+        .canvas_texture_dirty = false;
 
-    let Some(canvas) = crate::ui::editor_context::sprite_state(ui_state).canvas_state(side).canvas.clone() else {
+    let Some(canvas) = crate::ui::editor_context::sprite_state(ui_state)
+        .canvas_state(side)
+        .canvas
+        .clone()
+    else {
         return;
     };
 
@@ -261,11 +284,7 @@ pub fn ensure_canvas_texture_for_side(
         .and_then(|palette_id| ui_state.project.available_palettes.get(palette_id))
         .copied();
 
-    let display_pixels = canvas_display_pixels(
-        &canvas,
-        color_mode,
-        selected_palette,
-    );
+    let display_pixels = canvas_display_pixels(&canvas, color_mode, selected_palette);
     let color_image = egui::ColorImage::from_rgba_unmultiplied(
         [canvas.width as usize, canvas.height as usize],
         &display_pixels,
@@ -277,15 +296,21 @@ pub fn ensure_canvas_texture_for_side(
     };
 
     let texture = ctx.load_texture(texture_name, color_image, egui::TextureOptions::NEAREST);
-    crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state_mut(side).canvas_texture = Some(texture);
+    crate::ui::editor_context::sprite_state_mut(ui_state)
+        .canvas_state_mut(side)
+        .canvas_texture = Some(texture);
 }
 
 pub fn invalidate_canvas_texture(ui_state: &mut EditorUI) {
-    crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().canvas_texture_dirty = true;
+    crate::ui::editor_context::sprite_state_mut(ui_state)
+        .active_mut()
+        .canvas_texture_dirty = true;
 }
 
 pub fn invalidate_canvas_texture_for_side(ui_state: &mut EditorUI, side: CanvasSide) {
-    crate::ui::editor_context::sprite_state_mut(ui_state).canvas_state_mut(side).canvas_texture_dirty = true;
+    crate::ui::editor_context::sprite_state_mut(ui_state)
+        .canvas_state_mut(side)
+        .canvas_texture_dirty = true;
 }
 
 fn handle_floating_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
@@ -299,13 +324,19 @@ fn handle_floating_shortcuts(ui_state: &mut EditorUI, ui: &egui::Ui) {
             invalidate_canvas_texture(ui_state);
         }
     } else if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-        crate::ui::editor_context::sprite_state_mut(ui_state).active_mut().selection = None;
+        crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active_mut()
+            .selection = None;
     }
 
     // Arrow keys: lift selection into float (if needed) and nudge.
     // Works whether a float already exists or just a selection.
-    let has_selection_or_float =
-        crate::ui::editor_context::sprite_state_mut(ui_state).has_floating() || crate::ui::editor_context::sprite_state_mut(ui_state).active().selection.is_some();
+    let has_selection_or_float = crate::ui::editor_context::sprite_state_mut(ui_state)
+        .has_floating()
+        || crate::ui::editor_context::sprite_state_mut(ui_state)
+            .active()
+            .selection
+            .is_some();
     if has_selection_or_float {
         let arrow_keys = [
             (egui::Key::ArrowUp, glam::IVec2::new(0, -1)),
@@ -446,9 +477,14 @@ fn draw_tile_preview(
     // Render the canvas pixels directly for each of the 8 surrounding copies
     let tint = egui::Color32::from_white_alpha(90);
     let offsets: [(i32, i32); 8] = [
-        (-1, -1), (0, -1), (1, -1),
-        (-1, 0),           (1, 0),
-        (-1, 1),  (0, 1),  (1, 1),
+        (-1, -1),
+        (0, -1),
+        (1, -1),
+        (-1, 0),
+        (1, 0),
+        (-1, 1),
+        (0, 1),
+        (1, 1),
     ];
 
     for (dx, dy) in offsets {
@@ -488,7 +524,9 @@ fn draw_tiled_copy(
             }
             // Blend pixel color with tint alpha
             let blended = egui::Color32::from_rgba_unmultiplied(
-                color.r, color.g, color.b,
+                color.r,
+                color.g,
+                color.b,
                 ((color.a as u16 * tint.a() as u16) / 255) as u8,
             );
             painter.rect_filled(pixel_rect, 0.0, blended);
@@ -653,25 +691,37 @@ fn draw_selection_mask(
 
             if y == 0 || !selection.is_selected(x, y - 1) {
                 painter.line_segment(
-                    [egui::pos2(pixel_min.x, pixel_min.y), egui::pos2(pixel_max.x, pixel_min.y)],
+                    [
+                        egui::pos2(pixel_min.x, pixel_min.y),
+                        egui::pos2(pixel_max.x, pixel_min.y),
+                    ],
                     stroke,
                 );
             }
             if y + 1 >= selection.height || !selection.is_selected(x, y + 1) {
                 painter.line_segment(
-                    [egui::pos2(pixel_min.x, pixel_max.y), egui::pos2(pixel_max.x, pixel_max.y)],
+                    [
+                        egui::pos2(pixel_min.x, pixel_max.y),
+                        egui::pos2(pixel_max.x, pixel_max.y),
+                    ],
                     stroke,
                 );
             }
             if x == 0 || !selection.is_selected(x - 1, y) {
                 painter.line_segment(
-                    [egui::pos2(pixel_min.x, pixel_min.y), egui::pos2(pixel_min.x, pixel_max.y)],
+                    [
+                        egui::pos2(pixel_min.x, pixel_min.y),
+                        egui::pos2(pixel_min.x, pixel_max.y),
+                    ],
                     stroke,
                 );
             }
             if x + 1 >= selection.width || !selection.is_selected(x + 1, y) {
                 painter.line_segment(
-                    [egui::pos2(pixel_max.x, pixel_min.y), egui::pos2(pixel_max.x, pixel_max.y)],
+                    [
+                        egui::pos2(pixel_max.x, pixel_min.y),
+                        egui::pos2(pixel_max.x, pixel_max.y),
+                    ],
                     stroke,
                 );
             }
@@ -690,7 +740,10 @@ fn draw_symmetry_guides(
     let zoom = viewport.zoom;
     let pan = viewport.pan;
     let canvas_min = egui::pos2(rect.left() + (-pan.x * zoom), rect.top() + (-pan.y * zoom));
-    let stroke = egui::Stroke::new(1.0, egui::Color32::from_rgba_unmultiplied(255, 100, 100, 160));
+    let stroke = egui::Stroke::new(
+        1.0,
+        egui::Color32::from_rgba_unmultiplied(255, 100, 100, 160),
+    );
 
     if horizontal {
         let mid_x = canvas_min.x + (canvas.width as f32 / 2.0) * zoom;
@@ -740,9 +793,12 @@ fn draw_floating_pixels(
             }
             let sx = canvas_screen_min.x + (floating.offset.x + x as i32) as f32 * zoom;
             let sy = canvas_screen_min.y + (floating.offset.y + y as i32) as f32 * zoom;
-            let pixel_rect =
-                egui::Rect::from_min_size(egui::pos2(sx, sy), egui::vec2(zoom, zoom));
-            painter.rect_filled(pixel_rect, 0.0, floating_preview_color(color, &floating.origin));
+            let pixel_rect = egui::Rect::from_min_size(egui::pos2(sx, sy), egui::vec2(zoom, zoom));
+            painter.rect_filled(
+                pixel_rect,
+                0.0,
+                floating_preview_color(color, &floating.origin),
+            );
         }
     }
 }
@@ -775,16 +831,28 @@ fn draw_offset_mask_border(
             let p_max = egui::pos2(sx + zoom, sy + zoom);
 
             if y == 0 || !mask.is_selected(x, y - 1) {
-                painter.line_segment([egui::pos2(p_min.x, p_min.y), egui::pos2(p_max.x, p_min.y)], stroke);
+                painter.line_segment(
+                    [egui::pos2(p_min.x, p_min.y), egui::pos2(p_max.x, p_min.y)],
+                    stroke,
+                );
             }
             if y + 1 >= mask.height || !mask.is_selected(x, y + 1) {
-                painter.line_segment([egui::pos2(p_min.x, p_max.y), egui::pos2(p_max.x, p_max.y)], stroke);
+                painter.line_segment(
+                    [egui::pos2(p_min.x, p_max.y), egui::pos2(p_max.x, p_max.y)],
+                    stroke,
+                );
             }
             if x == 0 || !mask.is_selected(x - 1, y) {
-                painter.line_segment([egui::pos2(p_min.x, p_min.y), egui::pos2(p_min.x, p_max.y)], stroke);
+                painter.line_segment(
+                    [egui::pos2(p_min.x, p_min.y), egui::pos2(p_min.x, p_max.y)],
+                    stroke,
+                );
             }
             if x + 1 >= mask.width || !mask.is_selected(x + 1, y) {
-                painter.line_segment([egui::pos2(p_max.x, p_min.y), egui::pos2(p_max.x, p_max.y)], stroke);
+                painter.line_segment(
+                    [egui::pos2(p_max.x, p_min.y), egui::pos2(p_max.x, p_max.y)],
+                    stroke,
+                );
             }
         }
     }
@@ -839,7 +907,10 @@ fn draw_hovered_pixel_highlight(
 
 fn render_status_bar(ui: &mut egui::Ui, ui_state: &EditorUI) {
     ui.horizontal(|ui| {
-        if let Some(pos) = crate::ui::editor_context::sprite_state(ui_state).active().cursor_canvas_pos {
+        if let Some(pos) = crate::ui::editor_context::sprite_state(ui_state)
+            .active()
+            .cursor_canvas_pos
+        {
             ui.label(format!("Cursor: {}, {}", pos.x, pos.y));
         } else {
             ui.label("Cursor: -, -");
@@ -847,7 +918,8 @@ fn render_status_bar(ui: &mut egui::Ui, ui_state: &EditorUI) {
 
         ui.separator();
 
-        if let Some((w, h)) = crate::ui::editor_context::sprite_state(ui_state).canvas_dimensions() {
+        if let Some((w, h)) = crate::ui::editor_context::sprite_state(ui_state).canvas_dimensions()
+        {
             ui.label(format!("Canvas: {}x{}", w, h));
         }
 
@@ -855,12 +927,18 @@ fn render_status_bar(ui: &mut egui::Ui, ui_state: &EditorUI) {
 
         ui.label(format!(
             "Zoom: {}x",
-            crate::ui::editor_context::sprite_state(ui_state).active().viewport.zoom as i32
+            crate::ui::editor_context::sprite_state(ui_state)
+                .active()
+                .viewport
+                .zoom as i32
         ));
 
         ui.separator();
 
-        if crate::ui::editor_context::sprite_state(ui_state).active().dirty {
+        if crate::ui::editor_context::sprite_state(ui_state)
+            .active()
+            .dirty
+        {
             ui.label("*Modified");
         }
     });

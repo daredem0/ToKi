@@ -192,7 +192,12 @@ pub enum DitherPattern {
 }
 
 impl DitherPattern {
-    pub const ALL: [Self; 4] = [Self::None, Self::Checker50, Self::Checker25, Self::Checker75];
+    pub const ALL: [Self; 4] = [
+        Self::None,
+        Self::Checker50,
+        Self::Checker25,
+        Self::Checker75,
+    ];
 
     pub fn label(self) -> &'static str {
         match self {

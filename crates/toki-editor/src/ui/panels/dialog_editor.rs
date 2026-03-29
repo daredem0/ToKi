@@ -52,30 +52,40 @@ fn render_dialog_main(
     project_assets: &mut ProjectAssets,
     declared_flags: &[toki_core::project_runtime::ProjectFlagDefinition],
 ) {
-    let Some(mut dialog) = crate::ui::editor_context::dialog_state_mut(ui_state).draft.take() else {
+    let Some(mut dialog) = crate::ui::editor_context::dialog_state_mut(ui_state)
+        .draft
+        .take()
+    else {
         ui.label("No dialog selected.");
         return;
     };
 
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(crate::ui::editor_context::dialog_state_mut(ui_state).dirty, egui::Button::new("Save Dialog"))
+            .add_enabled(
+                crate::ui::editor_context::dialog_state_mut(ui_state).dirty,
+                egui::Button::new("Save Dialog"),
+            )
             .clicked()
         {
             let validation = dialog.validate();
             if !validation.is_valid() {
-                crate::ui::editor_context::dialog_state_mut(ui_state).status_message = Some(format!(
-                    "Cannot save dialog with {} validation error(s)",
-                    validation.errors.len()
-                ));
+                crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
+                    Some(format!(
+                        "Cannot save dialog with {} validation error(s)",
+                        validation.errors.len()
+                    ));
             } else if let Err(error) = project_assets.save_dialog(&dialog) {
                 crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
                     Some(format!("Failed to save dialog '{}': {error}", dialog.id));
             } else {
-                crate::ui::editor_context::dialog_state_mut(ui_state).selected_dialog_id = Some(dialog.id.to_string());
-                crate::ui::editor_context::dialog_state_mut(ui_state).loaded_dialog_id = Some(dialog.id.to_string());
+                crate::ui::editor_context::dialog_state_mut(ui_state).selected_dialog_id =
+                    Some(dialog.id.to_string());
+                crate::ui::editor_context::dialog_state_mut(ui_state).loaded_dialog_id =
+                    Some(dialog.id.to_string());
                 crate::ui::editor_context::dialog_state_mut(ui_state).dirty = false;
-                crate::ui::editor_context::dialog_state_mut(ui_state).status_message = Some("Dialog saved".to_string());
+                crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
+                    Some("Dialog saved".to_string());
                 sync_dialog_registry(ui_state, project_assets);
             }
         }
@@ -240,9 +250,13 @@ fn render_node_list(
 
     egui::ScrollArea::vertical().show(ui, |ui| {
         for node in &dialog.nodes {
-            let selected = crate::ui::editor_context::dialog_state_mut(ui_state).selected_node_id.as_deref() == Some(node.id.as_str());
+            let selected = crate::ui::editor_context::dialog_state_mut(ui_state)
+                .selected_node_id
+                .as_deref()
+                == Some(node.id.as_str());
             if ui.selectable_label(selected, &node.id).clicked() {
-                crate::ui::editor_context::dialog_state_mut(ui_state).select_dialog_node(node.id.clone());
+                crate::ui::editor_context::dialog_state_mut(ui_state)
+                    .select_dialog_node(node.id.clone());
             }
         }
     });
@@ -254,7 +268,10 @@ fn render_node_editor(
     dialog: &mut toki_core::dialog::DialogTree,
     dirty: &mut bool,
 ) {
-    let Some(selected_node_id) = crate::ui::editor_context::dialog_state_mut(ui_state).selected_node_id.clone() else {
+    let Some(selected_node_id) = crate::ui::editor_context::dialog_state_mut(ui_state)
+        .selected_node_id
+        .clone()
+    else {
         ui.label("Select a node.");
         return;
     };
@@ -279,19 +296,27 @@ fn render_node_editor(
             .add_enabled(dialog.nodes.len() > 1, delete_button)
             .clicked()
         {
-            match delete_selected_node(dialog, &mut crate::ui::editor_context::dialog_state_mut(ui_state).selected_node_id) {
+            match delete_selected_node(
+                dialog,
+                &mut crate::ui::editor_context::dialog_state_mut(ui_state).selected_node_id,
+            ) {
                 Ok(status) => {
-                    let selected_after_delete = crate::ui::editor_context::dialog_state_mut(ui_state).selected_node_id.clone();
+                    let selected_after_delete =
+                        crate::ui::editor_context::dialog_state_mut(ui_state)
+                            .selected_node_id
+                            .clone();
                     ui_state
                         .dialog_editor_context_mut()
                         .dialog
                         .sync_node_id_editor(selected_after_delete.as_deref());
-                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message = Some(status);
+                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
+                        Some(status);
                     *dirty = true;
                     deleted = true;
                 }
                 Err(error) => {
-                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message = Some(error);
+                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
+                        Some(error);
                 }
             }
         }
@@ -305,7 +330,9 @@ fn render_node_editor(
 
     ui.horizontal(|ui| {
         ui.label("Node Id:");
-        let response = ui.text_edit_singleline(&mut crate::ui::editor_context::dialog_state_mut(ui_state).node_id_edit_value);
+        let response = ui.text_edit_singleline(
+            &mut crate::ui::editor_context::dialog_state_mut(ui_state).node_id_edit_value,
+        );
         let apply_clicked = ui.small_button("Apply").clicked();
         let pressed_enter =
             response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
@@ -320,16 +347,23 @@ fn render_node_editor(
                 &node_id_edit_value,
             ) {
                 Ok(Some(status)) => {
-                    let committed_id = crate::ui::editor_context::dialog_state_mut(ui_state).selected_node_id.clone().unwrap_or_default();
-                    crate::ui::editor_context::dialog_state_mut(ui_state).node_id_edit_target = Some(committed_id.clone());
-                    crate::ui::editor_context::dialog_state_mut(ui_state).node_id_edit_value = committed_id;
-                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message = Some(status);
+                    let committed_id = crate::ui::editor_context::dialog_state_mut(ui_state)
+                        .selected_node_id
+                        .clone()
+                        .unwrap_or_default();
+                    crate::ui::editor_context::dialog_state_mut(ui_state).node_id_edit_target =
+                        Some(committed_id.clone());
+                    crate::ui::editor_context::dialog_state_mut(ui_state).node_id_edit_value =
+                        committed_id;
+                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
+                        Some(status);
                     *dirty = true;
                     return;
                 }
                 Ok(None) => {}
                 Err(error) => {
-                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message = Some(error);
+                    crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
+                        Some(error);
                 }
             }
         }
@@ -376,7 +410,12 @@ fn render_node_editor(
             ui.label("Body:");
             *dirty |= ui.text_edit_multiline(body).changed();
             optional_node_ref_editor(ui, "Next Node:", next_node_id, dirty);
-            render_conditions(ui, &mut node.conditions, dirty, ("node_conditions", node_index));
+            render_conditions(
+                ui,
+                &mut node.conditions,
+                dirty,
+                ("node_conditions", node_index),
+            );
         }
         DialogNodeKind::Choice { body, choices } => {
             ui.label("Body:");
@@ -480,7 +519,12 @@ fn render_node_editor(
             ui.label("Body:");
             *dirty |= ui.text_edit_multiline(body).changed();
             optional_node_ref_editor(ui, "Outcome Id:", outcome_id, dirty);
-            render_conditions(ui, &mut node.conditions, dirty, ("node_conditions", node_index));
+            render_conditions(
+                ui,
+                &mut node.conditions,
+                dirty,
+                ("node_conditions", node_index),
+            );
         }
     }
 }
@@ -507,7 +551,11 @@ fn delete_selected_node(
     let fallback_selection = dialog
         .nodes
         .get(node_index + 1)
-        .or_else(|| node_index.checked_sub(1).and_then(|index| dialog.nodes.get(index)))
+        .or_else(|| {
+            node_index
+                .checked_sub(1)
+                .and_then(|index| dialog.nodes.get(index))
+        })
         .map(|node| node.id.clone());
 
     dialog.nodes.remove(node_index);
@@ -553,7 +601,9 @@ fn delete_selected_node(
 
     let mut details = Vec::new();
     if cleared_optional_refs > 0 {
-        details.push(format!("cleared {cleared_optional_refs} optional reference(s)"));
+        details.push(format!(
+            "cleared {cleared_optional_refs} optional reference(s)"
+        ));
     }
     if removed_choices > 0 {
         details.push(format!("removed {removed_choices} choice(s)"));
@@ -587,7 +637,9 @@ fn rename_dialog_node_id(
         .iter()
         .any(|node| node.id == new_node_id && node.id != old_node_id)
     {
-        return Err(format!("Dialog already contains a node named '{new_node_id}'."));
+        return Err(format!(
+            "Dialog already contains a node named '{new_node_id}'."
+        ));
     }
     let Some(node) = dialog.nodes.iter_mut().find(|node| node.id == old_node_id) else {
         return Err(format!("Selected node '{old_node_id}' no longer exists."));
@@ -1323,7 +1375,10 @@ mod tests {
 
         let duplicate_error =
             rename_dialog_node_id(&mut dialog, &mut selected, "start", "end").expect_err("dup");
-        assert_eq!(duplicate_error, "Dialog already contains a node named 'end'.");
+        assert_eq!(
+            duplicate_error,
+            "Dialog already contains a node named 'end'."
+        );
         assert_eq!(selected.as_deref(), Some("start"));
     }
 }

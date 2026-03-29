@@ -40,7 +40,9 @@ pub(crate) fn export_graph_layouts_for_project(
         .clone()
 }
 
-pub(crate) fn export_rule_graph_drafts_for_project(ui_state: &EditorUI) -> HashMap<String, RuleGraph> {
+pub(crate) fn export_rule_graph_drafts_for_project(
+    ui_state: &EditorUI,
+) -> HashMap<String, RuleGraph> {
     crate::ui::editor_context::graph_state(ui_state)
         .rule_graphs_by_scene
         .clone()
@@ -178,7 +180,11 @@ pub(crate) fn rule_graph_for_scene<'a>(
         .get(scene_name)
 }
 
-pub(crate) fn set_rule_graph_for_scene(ui_state: &mut EditorUI, scene_name: String, graph: RuleGraph) {
+pub(crate) fn set_rule_graph_for_scene(
+    ui_state: &mut EditorUI,
+    scene_name: String,
+    graph: RuleGraph,
+) {
     crate::ui::editor_context::graph_state_mut(ui_state)
         .rule_graphs_by_scene
         .insert(scene_name, graph);

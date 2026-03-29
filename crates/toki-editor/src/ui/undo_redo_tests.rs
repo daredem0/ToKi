@@ -34,7 +34,7 @@ fn sample_rule_set() -> RuleSet {
             enabled: true,
             priority: 0,
             once: false,
-        log_enabled: false,
+            log_enabled: false,
             trigger: RuleTrigger::OnStart,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlaySound {
@@ -81,7 +81,10 @@ fn apply_graph_transition(
 ) {
     let before_rule_set = scene_rules(ui_state);
     let before_graph = crate::ui::editor_ui::rule_graph_for_scene(ui_state, "Main Scene").cloned();
-    let before_layout = crate::ui::editor_context::graph_state(ui_state).layouts_by_scene.get("Main Scene").cloned();
+    let before_layout = crate::ui::editor_context::graph_state(ui_state)
+        .layouts_by_scene
+        .get("Main Scene")
+        .cloned();
     let mut after_graph = before_graph
         .clone()
         .unwrap_or_else(|| RuleGraph::from_rule_set(&before_rule_set));
@@ -501,7 +504,7 @@ fn update_scene_rules_graph_command_round_trips_rules_graph_and_layout() {
             enabled: true,
             priority: 0,
             once: false,
-        log_enabled: false,
+            log_enabled: false,
             trigger: RuleTrigger::OnStart,
             conditions: vec![RuleCondition::Always],
             actions: vec![RuleAction::PlaySound {
@@ -560,7 +563,9 @@ fn update_scene_rules_graph_command_round_trips_rules_graph_and_layout() {
         .expect("main scene should exist");
     assert_eq!(scene.rules, before_rule_set);
     assert!(crate::ui::editor_ui::rule_graph_for_scene(&ui_state, "Main Scene").is_none());
-    assert!(!crate::ui::editor_context::graph_state_mut(&mut ui_state).layouts_by_scene.contains_key("Main Scene"));
+    assert!(!crate::ui::editor_context::graph_state_mut(&mut ui_state)
+        .layouts_by_scene
+        .contains_key("Main Scene"));
 }
 
 #[test]

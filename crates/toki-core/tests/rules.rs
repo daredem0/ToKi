@@ -97,22 +97,21 @@ fn player_position(state: &GameState) -> IVec2 {
 }
 
 fn player_entity(state: &GameState) -> Option<&toki_core::entity::Entity> {
-    state.world()
+    state
+        .world()
         .player_id()
         .and_then(|player_id| state.world().entity_manager().get_entity(player_id))
 }
 
 fn player_inventory(state: &GameState) -> Option<&toki_core::entity::Inventory> {
-    state.world()
-        .player_id()
-        .and_then(|player_id| {
-            state
-                .world()
-                .entity_manager()
-                .storage()
-                .components()
-                .inventory(player_id)
-        })
+    state.world().player_id().and_then(|player_id| {
+        state
+            .world()
+            .entity_manager()
+            .storage()
+            .components()
+            .inventory(player_id)
+    })
 }
 
 fn scene_with_player(name: &str, position: IVec2) -> Scene {
@@ -131,17 +130,20 @@ fn spawn_anchor(id: &str, position: IVec2, facing: Option<SceneAnchorFacing>) ->
 #[test]
 fn on_start_rule_runs_once() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "start-beep",
-            RuleTrigger::OnStart,
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "sfx_start".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "start-beep",
+                RuleTrigger::OnStart,
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "sfx_start".to_string(),
+                }],
+            )],
+        },
+    );
 
     let world_bounds = UVec2::new(256, 256);
     let tilemap = create_test_tilemap();
@@ -167,25 +169,31 @@ fn on_collision_rule_runs_when_movement_is_blocked() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     state
-        .world_mut().entity_manager_mut()
-        .storage_mut().audio_component_mut(player_id)
+        .world_mut()
+        .entity_manager_mut()
+        .storage_mut()
+        .audio_component_mut(player_id)
         .expect("player audio should exist")
         .collision_sound = None;
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "collision-rule",
-            RuleTrigger::OnCollision { entity: None },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "rule_collision".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "collision-rule",
+                RuleTrigger::OnCollision { entity: None },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "rule_collision".to_string(),
+                }],
+            )],
+        },
+    );
 
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
-    let blocked = GameSimulation::tick_fixed(&mut state, 
+    let blocked = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_collision_test_tilemap(),
         &create_collision_test_atlas(),
@@ -196,7 +204,8 @@ fn on_collision_rule_runs_when_movement_is_blocked() {
     )));
 
     InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
-    let no_collision = GameSimulation::tick_fixed(&mut state, 
+    let no_collision = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_collision_test_tilemap(),
         &create_collision_test_atlas(),
@@ -209,25 +218,31 @@ fn on_collision_rule_only_fires_once_for_sustained_blocked_input() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     state
-        .world_mut().entity_manager_mut()
-        .storage_mut().audio_component_mut(player_id)
+        .world_mut()
+        .entity_manager_mut()
+        .storage_mut()
+        .audio_component_mut(player_id)
         .expect("player audio should exist")
         .collision_sound = None;
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "collision-rule",
-            RuleTrigger::OnCollision { entity: None },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "rule_collision".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "collision-rule",
+                RuleTrigger::OnCollision { entity: None },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "rule_collision".to_string(),
+                }],
+            )],
+        },
+    );
 
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
-    let first_blocked = GameSimulation::tick_fixed(&mut state, 
+    let first_blocked = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_collision_test_tilemap(),
         &create_collision_test_atlas(),
@@ -237,7 +252,8 @@ fn on_collision_rule_only_fires_once_for_sustained_blocked_input() {
         AudioEvent::PlaySound { sound_id, .. } if sound_id == "rule_collision"
     )));
 
-    let sustained_blocked = GameSimulation::tick_fixed(&mut state, 
+    let sustained_blocked = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_collision_test_tilemap(),
         &create_collision_test_atlas(),
@@ -256,7 +272,8 @@ fn on_damaged_rule_runs_when_primary_action_applies_health_damage() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
     let player = state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist");
     let controller = player
@@ -287,23 +304,28 @@ fn on_damaged_rule_runs_when_primary_action_applies_health_damage() {
 
     SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "damaged-rule",
-            RuleTrigger::OnDamaged { entity: None },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "rule_damaged".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "damaged-rule",
+                RuleTrigger::OnDamaged { entity: None },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "rule_damaged".to_string(),
+                }],
+            )],
+        },
+    );
 
-    InputSystem::handle_profile_action_press(state.runtime_mut(), 
+    InputSystem::handle_profile_action_press(
+        state.runtime_mut(),
         toki_core::entity::MovementProfile::PlayerWasd,
         toki_core::game::InputAction::Primary,
     );
-    let update = GameSimulation::tick_fixed(&mut state, 
+    let update = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -320,7 +342,8 @@ fn on_damaged_rule_only_fires_once_for_sustained_held_primary_action() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
     let player = state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist");
     let controller = player
@@ -351,28 +374,34 @@ fn on_damaged_rule_only_fires_once_for_sustained_held_primary_action() {
 
     SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "damaged-rule",
-            RuleTrigger::OnDamaged { entity: None },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "rule_damaged".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "damaged-rule",
+                RuleTrigger::OnDamaged { entity: None },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "rule_damaged".to_string(),
+                }],
+            )],
+        },
+    );
 
-    InputSystem::handle_profile_action_press(state.runtime_mut(), 
+    InputSystem::handle_profile_action_press(
+        state.runtime_mut(),
         toki_core::entity::MovementProfile::PlayerWasd,
         toki_core::game::InputAction::Primary,
     );
-    let first = GameSimulation::tick_fixed(&mut state, 
+    let first = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    let second = GameSimulation::tick_fixed(&mut state, 
+    let second = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -396,7 +425,8 @@ fn on_death_rule_runs_when_primary_action_is_lethal() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
     let player = state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist");
     let controller = player
@@ -427,30 +457,35 @@ fn on_death_rule_runs_when_primary_action_is_lethal() {
 
     let target_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
     let target = state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(target_id)
         .expect("target should exist");
     target.attributes.gameplay.health = Some(10);
-    target.attributes.gameplay.stats =
-        toki_core::entity::EntityStats::from_legacy_health(Some(10));
+    target.attributes.gameplay.stats = toki_core::entity::EntityStats::from_legacy_health(Some(10));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "death-rule",
-            RuleTrigger::OnDeath { entity: None },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "rule_death".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "death-rule",
+                RuleTrigger::OnDeath { entity: None },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "rule_death".to_string(),
+                }],
+            )],
+        },
+    );
 
-    InputSystem::handle_profile_action_press(state.runtime_mut(), 
+    InputSystem::handle_profile_action_press(
+        state.runtime_mut(),
         toki_core::entity::MovementProfile::PlayerWasd,
         toki_core::game::InputAction::Primary,
     );
-    let update = GameSimulation::tick_fixed(&mut state, 
+    let update = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -467,7 +502,8 @@ fn on_death_rule_only_fires_once_after_lethal_hit() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
     let player = state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist");
     let controller = player
@@ -498,35 +534,41 @@ fn on_death_rule_only_fires_once_after_lethal_hit() {
 
     let target_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
     let target = state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(target_id)
         .expect("target should exist");
     target.attributes.gameplay.health = Some(10);
-    target.attributes.gameplay.stats =
-        toki_core::entity::EntityStats::from_legacy_health(Some(10));
+    target.attributes.gameplay.stats = toki_core::entity::EntityStats::from_legacy_health(Some(10));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "death-rule",
-            RuleTrigger::OnDeath { entity: None },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "rule_death".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "death-rule",
+                RuleTrigger::OnDeath { entity: None },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "rule_death".to_string(),
+                }],
+            )],
+        },
+    );
 
-    InputSystem::handle_profile_action_press(state.runtime_mut(), 
+    InputSystem::handle_profile_action_press(
+        state.runtime_mut(),
         toki_core::entity::MovementProfile::PlayerWasd,
         toki_core::game::InputAction::Primary,
     );
-    let first = GameSimulation::tick_fixed(&mut state, 
+    let first = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
-    let second = GameSimulation::tick_fixed(&mut state, 
+    let second = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -549,19 +591,23 @@ fn on_death_rule_only_fires_once_after_lethal_hit() {
 fn on_trigger_rule_runs_when_entity_overlaps_trigger_tile() {
     let mut state = GameState::new_empty();
     SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "trigger-rule",
-            RuleTrigger::OnTrigger,
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "rule_trigger".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "trigger-rule",
+                RuleTrigger::OnTrigger,
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "rule_trigger".to_string(),
+                }],
+            )],
+        },
+    );
 
-    let first = GameSimulation::tick_fixed(&mut state, 
+    let first = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_trigger_test_tilemap(),
         &create_trigger_test_atlas(),
@@ -571,7 +617,8 @@ fn on_trigger_rule_runs_when_entity_overlaps_trigger_tile() {
         AudioEvent::PlaySound { sound_id, .. } if sound_id == "rule_trigger"
     )));
 
-    let second = GameSimulation::tick_fixed(&mut state, 
+    let second = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_trigger_test_tilemap(),
         &create_trigger_test_atlas(),
@@ -585,17 +632,20 @@ fn on_trigger_rule_runs_when_entity_overlaps_trigger_tile() {
 #[test]
 fn on_update_rule_runs_every_tick() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "tick-beep",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "sfx_tick".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "tick-beep",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "sfx_tick".to_string(),
+                }],
+            )],
+        },
+    );
 
     let world_bounds = UVec2::new(256, 256);
     let tilemap = create_test_tilemap();
@@ -612,17 +662,20 @@ fn on_update_rule_runs_every_tick() {
 fn on_player_move_rule_runs_only_when_player_moves() {
     let mut state = GameState::new_empty();
     SceneSystem::spawn_player_at(&mut state, IVec2::new(10, 10));
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "move-sfx",
-            RuleTrigger::OnPlayerMove,
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "player_moved".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "move-sfx",
+                RuleTrigger::OnPlayerMove,
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "player_moved".to_string(),
+                }],
+            )],
+        },
+    );
 
     let world_bounds = UVec2::new(256, 256);
     let tilemap = create_test_tilemap();
@@ -644,17 +697,20 @@ fn on_player_move_rule_runs_only_when_player_moves() {
 #[test]
 fn target_exists_condition_gates_rule_execution() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "requires-player",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "cond_target_exists".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "requires-player",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "cond_target_exists".to_string(),
+                }],
+            )],
+        },
+    );
     state.scene_mut().active_rules_mut().rules[0].conditions = vec![RuleCondition::TargetExists {
         target: RuleTarget::Player,
     }];
@@ -677,17 +733,20 @@ fn target_exists_condition_gates_rule_execution() {
 #[test]
 fn key_held_condition_matches_runtime_input_state() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "requires-right",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "cond_key_held".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "requires-right",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "cond_key_held".to_string(),
+                }],
+            )],
+        },
+    );
     state.scene_mut().active_rules_mut().rules[0].conditions = vec![RuleCondition::KeyHeld {
         key: RuleKey::Right,
     }];
@@ -715,17 +774,20 @@ fn key_held_condition_matches_runtime_input_state() {
 fn entity_active_condition_checks_target_active_flag() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "requires-active-player",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "cond_active".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "requires-active-player",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "cond_active".to_string(),
+                }],
+            )],
+        },
+    );
     state.scene_mut().active_rules_mut().rules[0].conditions = vec![RuleCondition::EntityActive {
         target: RuleTarget::Player,
         is_active: true,
@@ -736,7 +798,8 @@ fn entity_active_condition_checks_target_active_flag() {
     let atlas = create_test_atlas();
 
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
@@ -747,7 +810,8 @@ fn entity_active_condition_checks_target_active_flag() {
     assert!(inactive.events.is_empty());
 
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
@@ -763,23 +827,27 @@ fn entity_active_condition_checks_target_active_flag() {
 #[test]
 fn flag_equals_condition_matches_current_flag_value() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "requires-quest-flag",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "cond_flag_equals".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "requires-quest-flag",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "cond_flag_equals".to_string(),
+                }],
+            )],
+        },
+    );
     state.scene_mut().active_rules_mut().rules[0].conditions = vec![RuleCondition::FlagEquals {
         flag: "quest_stage".to_string(),
         value: FlagValue::String("done".to_string()),
     }];
 
-    let without_flag = GameSimulation::tick_fixed(&mut state, 
+    let without_flag = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -787,7 +855,8 @@ fn flag_equals_condition_matches_current_flag_value() {
     assert!(without_flag.events.is_empty());
 
     state.set_flag("quest_stage", FlagValue::String("done".to_string()));
-    let with_flag = GameSimulation::tick_fixed(&mut state, 
+    let with_flag = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -802,23 +871,27 @@ fn flag_equals_condition_matches_current_flag_value() {
 fn increment_flag_action_updates_integer_flags() {
     let mut state = GameState::new_empty();
     state.set_flag("coins", FlagValue::Int(2));
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "increment-coins".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::Always],
-            actions: vec![RuleAction::IncrementFlag {
-                flag: "coins".to_string(),
-                amount: 3,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "increment-coins".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::IncrementFlag {
+                    flag: "coins".to_string(),
+                    amount: 3,
+                }],
             }],
-        }],
-    });
+        },
+    );
 
-    let _ = GameSimulation::tick_fixed(&mut state, 
+    let _ = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -831,22 +904,26 @@ fn increment_flag_action_updates_integer_flags() {
 fn clear_flag_action_removes_existing_flags() {
     let mut state = GameState::new_empty();
     state.set_flag("door_open", FlagValue::Bool(true));
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "clear-door".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::Always],
-            actions: vec![RuleAction::ClearFlag {
-                flag: "door_open".to_string(),
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "clear-door".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::ClearFlag {
+                    flag: "door_open".to_string(),
+                }],
             }],
-        }],
-    });
+        },
+    );
 
-    let _ = GameSimulation::tick_fixed(&mut state, 
+    let _ = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -858,21 +935,25 @@ fn clear_flag_action_removes_existing_flags() {
 #[test]
 fn on_key_rule_runs_only_while_matching_key_is_held() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "right-key-sfx",
-            RuleTrigger::OnKey {
-                key: RuleKey::Right,
-            },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "right_key".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "right-key-sfx",
+                RuleTrigger::OnKey {
+                    key: RuleKey::Right,
+                },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "right_key".to_string(),
+                }],
+            )],
+        },
+    );
 
-    let none_pressed = GameSimulation::tick_fixed(&mut state, 
+    let none_pressed = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -880,7 +961,8 @@ fn on_key_rule_runs_only_while_matching_key_is_held() {
     assert!(none_pressed.events.is_empty());
 
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
-    let pressed = GameSimulation::tick_fixed(&mut state, 
+    let pressed = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -892,7 +974,8 @@ fn on_key_rule_runs_only_while_matching_key_is_held() {
     ));
 
     InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
-    let released = GameSimulation::tick_fixed(&mut state, 
+    let released = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -903,20 +986,24 @@ fn on_key_rule_runs_only_while_matching_key_is_held() {
 #[test]
 fn on_key_rule_ignores_non_matching_held_keys() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "up-only",
-            RuleTrigger::OnKey { key: RuleKey::Up },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "up_key".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "up-only",
+                RuleTrigger::OnKey { key: RuleKey::Up },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "up_key".to_string(),
+                }],
+            )],
+        },
+    );
 
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Left);
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -927,18 +1014,22 @@ fn on_key_rule_ignores_non_matching_held_keys() {
 #[test]
 fn play_music_action_emits_background_music_event() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "music-start",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::PlayMusic {
-                track_id: "lavandia".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "music-start",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::PlayMusic {
+                    track_id: "lavandia".to_string(),
+                }],
+            )],
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -954,19 +1045,23 @@ fn play_music_action_emits_background_music_event() {
 fn play_animation_action_overrides_default_animation_for_target() {
     let mut state = GameState::new_empty();
     SceneSystem::spawn_player_at(&mut state, IVec2::new(10, 10));
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "force-walk-animation",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::PlayAnimation {
-                target: RuleTarget::Player,
-                state: AnimationState::Walk,
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "force-walk-animation",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::PlayAnimation {
+                    target: RuleTarget::Player,
+                    state: AnimationState::Walk,
+                }],
+            )],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -974,7 +1069,8 @@ fn play_animation_action_overrides_default_animation_for_target() {
     let player = player_entity(&state).expect("player must exist");
     let animation = player
         .attributes
-        .rendering.animation_controller
+        .rendering
+        .animation_controller
         .as_ref()
         .expect("player should have animation controller");
     assert_eq!(animation.current_clip_state, AnimationState::Walk);
@@ -984,30 +1080,34 @@ fn play_animation_action_overrides_default_animation_for_target() {
 fn play_animation_uses_priority_order_for_same_target() {
     let mut state = GameState::new_empty();
     SceneSystem::spawn_player_at(&mut state, IVec2::new(10, 10));
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![
-            base_rule(
-                "high",
-                RuleTrigger::OnUpdate,
-                10,
-                vec![RuleAction::PlayAnimation {
-                    target: RuleTarget::Player,
-                    state: AnimationState::Walk,
-                }],
-            ),
-            base_rule(
-                "low",
-                RuleTrigger::OnUpdate,
-                0,
-                vec![RuleAction::PlayAnimation {
-                    target: RuleTarget::Player,
-                    state: AnimationState::Idle,
-                }],
-            ),
-        ],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![
+                base_rule(
+                    "high",
+                    RuleTrigger::OnUpdate,
+                    10,
+                    vec![RuleAction::PlayAnimation {
+                        target: RuleTarget::Player,
+                        state: AnimationState::Walk,
+                    }],
+                ),
+                base_rule(
+                    "low",
+                    RuleTrigger::OnUpdate,
+                    0,
+                    vec![RuleAction::PlayAnimation {
+                        target: RuleTarget::Player,
+                        state: AnimationState::Idle,
+                    }],
+                ),
+            ],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1015,7 +1115,8 @@ fn play_animation_uses_priority_order_for_same_target() {
     let player = player_entity(&state).expect("player must exist");
     let animation = player
         .attributes
-        .rendering.animation_controller
+        .rendering
+        .animation_controller
         .as_ref()
         .expect("player should have animation controller");
     assert_eq!(animation.current_clip_state, AnimationState::Walk);
@@ -1024,18 +1125,22 @@ fn play_animation_uses_priority_order_for_same_target() {
 #[test]
 fn play_music_action_ignores_empty_track_id() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "music-empty",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::PlayMusic {
-                track_id: "   ".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "music-empty",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::PlayMusic {
+                    track_id: "   ".to_string(),
+                }],
+            )],
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1046,28 +1151,37 @@ fn play_music_action_ignores_empty_track_id() {
 #[test]
 fn spawn_action_creates_entity_at_requested_position() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "spawn-npc",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::Spawn {
-                entity_type: RuleSpawnEntityType::Npc,
-                position: [42, 84],
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "spawn-npc",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::Spawn {
+                    entity_type: RuleSpawnEntityType::Npc,
+                    position: [42, 84],
+                }],
+            )],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let mut npc_ids = state.world().entity_manager().entities_of_kind(&EntityKind::Npc);
+    let mut npc_ids = state
+        .world()
+        .entity_manager()
+        .entities_of_kind(&EntityKind::Npc);
     npc_ids.sort_unstable();
     assert_eq!(npc_ids.len(), 1);
-    let spawned = state.world().entity_manager()
+    let spawned = state
+        .world()
+        .entity_manager()
         .get_entity(npc_ids[0])
         .expect("spawned npc should exist");
     assert_eq!(spawned.position, IVec2::new(42, 84));
@@ -1076,43 +1190,54 @@ fn spawn_action_creates_entity_at_requested_position() {
 #[test]
 fn spawn_actions_follow_rule_priority_order() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![
-            base_rule(
-                "low-spawn",
-                RuleTrigger::OnUpdate,
-                1,
-                vec![RuleAction::Spawn {
-                    entity_type: RuleSpawnEntityType::Npc,
-                    position: [100, 100],
-                }],
-            ),
-            base_rule(
-                "high-spawn",
-                RuleTrigger::OnUpdate,
-                10,
-                vec![RuleAction::Spawn {
-                    entity_type: RuleSpawnEntityType::Npc,
-                    position: [10, 10],
-                }],
-            ),
-        ],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![
+                base_rule(
+                    "low-spawn",
+                    RuleTrigger::OnUpdate,
+                    1,
+                    vec![RuleAction::Spawn {
+                        entity_type: RuleSpawnEntityType::Npc,
+                        position: [100, 100],
+                    }],
+                ),
+                base_rule(
+                    "high-spawn",
+                    RuleTrigger::OnUpdate,
+                    10,
+                    vec![RuleAction::Spawn {
+                        entity_type: RuleSpawnEntityType::Npc,
+                        position: [10, 10],
+                    }],
+                ),
+            ],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let mut npc_ids = state.world().entity_manager().entities_of_kind(&EntityKind::Npc);
+    let mut npc_ids = state
+        .world()
+        .entity_manager()
+        .entities_of_kind(&EntityKind::Npc);
     npc_ids.sort_unstable();
     assert_eq!(npc_ids.len(), 2);
 
-    let first_spawn = state.world().entity_manager()
+    let first_spawn = state
+        .world()
+        .entity_manager()
         .get_entity(npc_ids[0])
         .expect("first spawned npc should exist");
-    let second_spawn = state.world().entity_manager()
+    let second_spawn = state
+        .world()
+        .entity_manager()
         .get_entity(npc_ids[1])
         .expect("second spawned npc should exist");
 
@@ -1125,18 +1250,22 @@ fn spawn_actions_follow_rule_priority_order() {
 fn destroy_self_action_removes_target_entity() {
     let mut state = GameState::new_empty();
     let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 60));
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "destroy-npc",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::DestroySelf {
-                target: RuleTarget::Entity(npc_id),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "destroy-npc",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::DestroySelf {
+                    target: RuleTarget::Entity(npc_id),
+                }],
+            )],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1149,29 +1278,33 @@ fn destroy_self_action_removes_target_entity() {
 fn destroy_self_applies_before_lower_priority_velocity_for_same_target() {
     let mut state = GameState::new_empty();
     let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(10, 10));
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![
-            base_rule(
-                "high-destroy",
-                RuleTrigger::OnUpdate,
-                10,
-                vec![RuleAction::DestroySelf {
-                    target: RuleTarget::Entity(npc_id),
-                }],
-            ),
-            base_rule(
-                "low-velocity",
-                RuleTrigger::OnUpdate,
-                0,
-                vec![RuleAction::SetVelocity {
-                    target: RuleTarget::Entity(npc_id),
-                    velocity: [5, 0],
-                }],
-            ),
-        ],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![
+                base_rule(
+                    "high-destroy",
+                    RuleTrigger::OnUpdate,
+                    10,
+                    vec![RuleAction::DestroySelf {
+                        target: RuleTarget::Entity(npc_id),
+                    }],
+                ),
+                base_rule(
+                    "low-velocity",
+                    RuleTrigger::OnUpdate,
+                    0,
+                    vec![RuleAction::SetVelocity {
+                        target: RuleTarget::Entity(npc_id),
+                        velocity: [5, 0],
+                    }],
+                ),
+            ],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1186,30 +1319,34 @@ fn destroy_self_applies_before_lower_priority_velocity_for_same_target() {
 #[test]
 fn first_tick_emits_on_start_events_before_on_update_events() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![
-            base_rule(
-                "start-first",
-                RuleTrigger::OnStart,
-                0,
-                vec![RuleAction::PlaySound {
-                    channel: RuleSoundChannel::Movement,
-                    sound_id: "from_start".to_string(),
-                }],
-            ),
-            base_rule(
-                "update-second",
-                RuleTrigger::OnUpdate,
-                0,
-                vec![RuleAction::PlaySound {
-                    channel: RuleSoundChannel::Collision,
-                    sound_id: "from_update".to_string(),
-                }],
-            ),
-        ],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![
+                base_rule(
+                    "start-first",
+                    RuleTrigger::OnStart,
+                    0,
+                    vec![RuleAction::PlaySound {
+                        channel: RuleSoundChannel::Movement,
+                        sound_id: "from_start".to_string(),
+                    }],
+                ),
+                base_rule(
+                    "update-second",
+                    RuleTrigger::OnUpdate,
+                    0,
+                    vec![RuleAction::PlaySound {
+                        channel: RuleSoundChannel::Collision,
+                        sound_id: "from_update".to_string(),
+                    }],
+                ),
+            ],
+        },
+    );
 
-    let first = GameSimulation::tick_fixed(&mut state, 
+    let first = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1228,30 +1365,34 @@ fn first_tick_emits_on_start_events_before_on_update_events() {
 #[test]
 fn rules_execute_in_priority_order() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![
-            base_rule(
-                "low",
-                RuleTrigger::OnUpdate,
-                0,
-                vec![RuleAction::PlaySound {
-                    channel: RuleSoundChannel::Movement,
-                    sound_id: "low".to_string(),
-                }],
-            ),
-            base_rule(
-                "high",
-                RuleTrigger::OnUpdate,
-                10,
-                vec![RuleAction::PlaySound {
-                    channel: RuleSoundChannel::Movement,
-                    sound_id: "high".to_string(),
-                }],
-            ),
-        ],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![
+                base_rule(
+                    "low",
+                    RuleTrigger::OnUpdate,
+                    0,
+                    vec![RuleAction::PlaySound {
+                        channel: RuleSoundChannel::Movement,
+                        sound_id: "low".to_string(),
+                    }],
+                ),
+                base_rule(
+                    "high",
+                    RuleTrigger::OnUpdate,
+                    10,
+                    vec![RuleAction::PlaySound {
+                        channel: RuleSoundChannel::Movement,
+                        sound_id: "high".to_string(),
+                    }],
+                ),
+            ],
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1271,30 +1412,34 @@ fn rules_execute_in_priority_order() {
 #[test]
 fn rules_with_same_priority_execute_in_stable_id_order() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![
-            base_rule(
-                "b_rule",
-                RuleTrigger::OnUpdate,
-                5,
-                vec![RuleAction::PlaySound {
-                    channel: RuleSoundChannel::Movement,
-                    sound_id: "second".to_string(),
-                }],
-            ),
-            base_rule(
-                "a_rule",
-                RuleTrigger::OnUpdate,
-                5,
-                vec![RuleAction::PlaySound {
-                    channel: RuleSoundChannel::Movement,
-                    sound_id: "first".to_string(),
-                }],
-            ),
-        ],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![
+                base_rule(
+                    "b_rule",
+                    RuleTrigger::OnUpdate,
+                    5,
+                    vec![RuleAction::PlaySound {
+                        channel: RuleSoundChannel::Movement,
+                        sound_id: "second".to_string(),
+                    }],
+                ),
+                base_rule(
+                    "a_rule",
+                    RuleTrigger::OnUpdate,
+                    5,
+                    vec![RuleAction::PlaySound {
+                        channel: RuleSoundChannel::Movement,
+                        sound_id: "first".to_string(),
+                    }],
+                ),
+            ],
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1324,11 +1469,15 @@ fn disabled_rule_is_not_executed() {
     disabled.enabled = false;
 
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![disabled],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![disabled],
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1350,9 +1499,12 @@ fn once_on_update_rule_runs_only_first_tick() {
     once_rule.once = true;
 
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![once_rule],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![once_rule],
+        },
+    );
 
     let world_bounds = UVec2::new(256, 256);
     let tilemap = create_test_tilemap();
@@ -1369,17 +1521,20 @@ fn once_on_update_rule_runs_only_first_tick() {
 fn set_velocity_action_moves_player_without_input() {
     let mut state = GameState::new_empty();
     SceneSystem::spawn_player_at(&mut state, IVec2::new(10, 10));
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "move-player",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::SetVelocity {
-                target: RuleTarget::Player,
-                velocity: [2, 0],
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "move-player",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::SetVelocity {
+                    target: RuleTarget::Player,
+                    velocity: [2, 0],
+                }],
+            )],
+        },
+    );
 
     let world_bounds = UVec2::new(512, 512);
     let tilemap = create_test_tilemap();
@@ -1400,31 +1555,35 @@ fn set_velocity_action_moves_player_without_input() {
 fn higher_priority_velocity_command_wins_for_same_target() {
     let mut state = GameState::new_empty();
     SceneSystem::spawn_player_at(&mut state, IVec2::new(10, 10));
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![
-            base_rule(
-                "high",
-                RuleTrigger::OnUpdate,
-                100,
-                vec![RuleAction::SetVelocity {
-                    target: RuleTarget::Player,
-                    velocity: [4, 0],
-                }],
-            ),
-            base_rule(
-                "low",
-                RuleTrigger::OnUpdate,
-                1,
-                vec![RuleAction::SetVelocity {
-                    target: RuleTarget::Player,
-                    velocity: [1, 0],
-                }],
-            ),
-        ],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![
+                base_rule(
+                    "high",
+                    RuleTrigger::OnUpdate,
+                    100,
+                    vec![RuleAction::SetVelocity {
+                        target: RuleTarget::Player,
+                        velocity: [4, 0],
+                    }],
+                ),
+                base_rule(
+                    "low",
+                    RuleTrigger::OnUpdate,
+                    1,
+                    vec![RuleAction::SetVelocity {
+                        target: RuleTarget::Player,
+                        velocity: [1, 0],
+                    }],
+                ),
+            ],
+        },
+    );
 
     let before = player_position(&state);
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1438,31 +1597,35 @@ fn higher_priority_velocity_command_wins_for_same_target() {
 fn same_priority_velocity_uses_id_tiebreaker() {
     let mut state = GameState::new_empty();
     SceneSystem::spawn_player_at(&mut state, IVec2::new(20, 20));
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![
-            base_rule(
-                "b_rule",
-                RuleTrigger::OnUpdate,
-                5,
-                vec![RuleAction::SetVelocity {
-                    target: RuleTarget::Player,
-                    velocity: [3, 0],
-                }],
-            ),
-            base_rule(
-                "a_rule",
-                RuleTrigger::OnUpdate,
-                5,
-                vec![RuleAction::SetVelocity {
-                    target: RuleTarget::Player,
-                    velocity: [6, 0],
-                }],
-            ),
-        ],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![
+                base_rule(
+                    "b_rule",
+                    RuleTrigger::OnUpdate,
+                    5,
+                    vec![RuleAction::SetVelocity {
+                        target: RuleTarget::Player,
+                        velocity: [3, 0],
+                    }],
+                ),
+                base_rule(
+                    "a_rule",
+                    RuleTrigger::OnUpdate,
+                    5,
+                    vec![RuleAction::SetVelocity {
+                        target: RuleTarget::Player,
+                        velocity: [6, 0],
+                    }],
+                ),
+            ],
+        },
+    );
 
     let before = player_position(&state);
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1478,37 +1641,40 @@ fn deterministic_execution_matches_across_identical_states() {
     fn build_state() -> GameState {
         let mut state = GameState::new_empty();
         SceneSystem::spawn_player_at(&mut state, IVec2::new(40, 40));
-        RuleSystem::set_rules(&mut state, RuleSet {
-            rules: vec![
-                base_rule(
-                    "start-sfx",
-                    RuleTrigger::OnStart,
-                    0,
-                    vec![RuleAction::PlaySound {
-                        channel: RuleSoundChannel::Movement,
-                        sound_id: "boot".to_string(),
-                    }],
-                ),
-                base_rule(
-                    "move-player",
-                    RuleTrigger::OnUpdate,
-                    10,
-                    vec![RuleAction::SetVelocity {
-                        target: RuleTarget::Player,
-                        velocity: [2, 1],
-                    }],
-                ),
-                base_rule(
-                    "tick-sfx",
-                    RuleTrigger::OnUpdate,
-                    0,
-                    vec![RuleAction::PlaySound {
-                        channel: RuleSoundChannel::Collision,
-                        sound_id: "tick".to_string(),
-                    }],
-                ),
-            ],
-        });
+        RuleSystem::set_rules(
+            &mut state,
+            RuleSet {
+                rules: vec![
+                    base_rule(
+                        "start-sfx",
+                        RuleTrigger::OnStart,
+                        0,
+                        vec![RuleAction::PlaySound {
+                            channel: RuleSoundChannel::Movement,
+                            sound_id: "boot".to_string(),
+                        }],
+                    ),
+                    base_rule(
+                        "move-player",
+                        RuleTrigger::OnUpdate,
+                        10,
+                        vec![RuleAction::SetVelocity {
+                            target: RuleTarget::Player,
+                            velocity: [2, 1],
+                        }],
+                    ),
+                    base_rule(
+                        "tick-sfx",
+                        RuleTrigger::OnUpdate,
+                        0,
+                        vec![RuleAction::PlaySound {
+                            channel: RuleSoundChannel::Collision,
+                            sound_id: "tick".to_string(),
+                        }],
+                    ),
+                ],
+            },
+        );
         state
     }
 
@@ -1536,7 +1702,7 @@ fn rules_serialize_roundtrip() {
             enabled: true,
             priority: 3,
             once: true,
-        log_enabled: false,
+            log_enabled: false,
             trigger: RuleTrigger::OnStart,
             conditions: vec![
                 RuleCondition::Always,
@@ -1613,11 +1779,11 @@ fn switch_scene_requests_deferred_runtime_transition_after_movement_processing()
 
     SceneSystem::add_scene(&mut state, scene_a);
     SceneSystem::add_scene(&mut state, scene_b);
-    SceneSystem::load(&mut state, "Scene A")
-        .expect("initial scene should load");
+    SceneSystem::load(&mut state, "Scene A").expect("initial scene should load");
 
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1682,16 +1848,19 @@ fn switch_scene_uses_highest_priority_rule_target() {
     scene_c.add_anchor(spawn_anchor("spawn_c", IVec2::new(20, 0), None));
     SceneSystem::add_scene(&mut state, scene_b);
     SceneSystem::add_scene(&mut state, scene_c);
-    SceneSystem::load(&mut state, "Scene A")
-        .expect("initial scene should load");
+    SceneSystem::load(&mut state, "Scene A").expect("initial scene should load");
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    assert_eq!(state.scene().scene_manager().active_scene_name(), Some("Scene A"));
+    assert_eq!(
+        state.scene().scene_manager().active_scene_name(),
+        Some("Scene A")
+    );
     assert_eq!(
         result.scene_switch_request,
         Some(toki_core::SceneSwitchRequest {
@@ -1722,16 +1891,19 @@ fn switch_scene_keeps_active_scene_when_target_scene_is_missing() {
     };
 
     SceneSystem::add_scene(&mut state, scene_a);
-    SceneSystem::load(&mut state, "Scene A")
-        .expect("initial scene should load");
+    SceneSystem::load(&mut state, "Scene A").expect("initial scene should load");
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    assert_eq!(state.scene().scene_manager().active_scene_name(), Some("Scene A"));
+    assert_eq!(
+        state.scene().scene_manager().active_scene_name(),
+        Some("Scene A")
+    );
     assert_eq!(player_position(&state), IVec2::new(0, 0));
     assert_eq!(
         result.scene_switch_request,
@@ -1761,7 +1933,8 @@ fn start_dialog_action_emits_dialog_start_request() {
     SceneSystem::add_scene(&mut state, scene);
     SceneSystem::load(&mut state, "Dialog Scene").expect("scene should load");
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1788,7 +1961,8 @@ fn save_game_action_emits_persistence_request() {
     SceneSystem::add_scene(&mut state, scene);
     SceneSystem::load(&mut state, "Save Scene").expect("scene should load");
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1815,7 +1989,8 @@ fn load_game_action_emits_persistence_request() {
     SceneSystem::add_scene(&mut state, scene);
     SceneSystem::load(&mut state, "Load Scene").expect("scene should load");
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1850,7 +2025,8 @@ fn dialog_completion_trigger_can_drive_follow_up_rules() {
     SceneSystem::load(&mut state, "Dialog Scene").expect("scene should load");
 
     RuleSystem::record_dialog_completion(&mut state, "intro".to_string(), "accepted".to_string());
-    let _ = GameSimulation::tick_fixed(&mut state, 
+    let _ = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -1885,16 +2061,19 @@ fn switch_scene_keeps_active_scene_when_target_spawn_is_missing() {
 
     SceneSystem::add_scene(&mut state, scene_a);
     SceneSystem::add_scene(&mut state, Scene::new("Scene B".to_string()));
-    SceneSystem::load(&mut state, "Scene A")
-        .expect("initial scene should load");
+    SceneSystem::load(&mut state, "Scene A").expect("initial scene should load");
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    assert_eq!(state.scene().scene_manager().active_scene_name(), Some("Scene A"));
+    assert_eq!(
+        state.scene().scene_manager().active_scene_name(),
+        Some("Scene A")
+    );
     assert_eq!(player_position(&state), IVec2::new(0, 0));
     assert_eq!(
         result.scene_switch_request,
@@ -1911,17 +2090,20 @@ fn switch_scene_keeps_active_scene_when_target_spawn_is_missing() {
 fn on_start_set_velocity_initializes_persistent_movement() {
     let mut state = GameState::new_empty();
     SceneSystem::spawn_player_at(&mut state, IVec2::new(30, 30));
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "start-velocity",
-            RuleTrigger::OnStart,
-            0,
-            vec![RuleAction::SetVelocity {
-                target: RuleTarget::Player,
-                velocity: [3, 0],
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "start-velocity",
+                RuleTrigger::OnStart,
+                0,
+                vec![RuleAction::SetVelocity {
+                    target: RuleTarget::Player,
+                    velocity: [3, 0],
+                }],
+            )],
+        },
+    );
 
     let tilemap = create_test_tilemap();
     let atlas = create_test_atlas();
@@ -1954,8 +2136,7 @@ fn load_scene_applies_scene_rules() {
     };
 
     SceneSystem::add_scene(&mut state, scene);
-    SceneSystem::load(&mut state, "Rule Scene")
-        .expect("scene with rules should load");
+    SceneSystem::load(&mut state, "Rule Scene").expect("scene with rules should load");
 
     let world_bounds = UVec2::new(256, 256);
     let tilemap = create_test_tilemap();
@@ -1980,20 +2161,22 @@ fn load_scene_applies_scene_rules() {
 fn sync_entities_to_active_scene_persists_rules() {
     let mut state = GameState::new_empty();
     SceneSystem::add_scene(&mut state, Scene::new("Sync Scene".to_string()));
-    SceneSystem::load(&mut state, "Sync Scene")
-        .expect("scene should load before syncing");
+    SceneSystem::load(&mut state, "Sync Scene").expect("scene should load before syncing");
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "persist-me",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "persisted".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "persist-me",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "persisted".to_string(),
+                }],
+            )],
+        },
+    );
     SceneSystem::sync_entities_to_active_scene(&mut state);
 
     let active_scene = SceneSystem::active_scene(&state).expect("active scene should exist");
@@ -2012,32 +2195,38 @@ fn on_collision_with_trigger_self_condition_resolves_correctly() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     state
-        .world_mut().entity_manager_mut()
-        .storage_mut().audio_component_mut(player_id)
+        .world_mut()
+        .entity_manager_mut()
+        .storage_mut()
+        .audio_component_mut(player_id)
         .expect("player audio should exist")
         .collision_sound = None;
 
     // Rule uses TargetExists with TriggerSelf - should match when collision context is present
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "context-rule".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnCollision { entity: None },
-            conditions: vec![RuleCondition::TargetExists {
-                target: RuleTarget::TriggerSelf,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "context-rule".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnCollision { entity: None },
+                conditions: vec![RuleCondition::TargetExists {
+                    target: RuleTarget::TriggerSelf,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "trigger_self_matched".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "trigger_self_matched".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
-    let blocked = GameSimulation::tick_fixed(&mut state, 
+    let blocked = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_collision_test_tilemap(),
         &create_collision_test_atlas(),
@@ -2056,32 +2245,38 @@ fn on_collision_with_trigger_other_condition_none_for_tile_collision() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     state
-        .world_mut().entity_manager_mut()
-        .storage_mut().audio_component_mut(player_id)
+        .world_mut()
+        .entity_manager_mut()
+        .storage_mut()
+        .audio_component_mut(player_id)
         .expect("player audio should exist")
         .collision_sound = None;
 
     // Rule requires TriggerOther to exist - should NOT match for tile collision
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "require-other-rule".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnCollision { entity: None },
-            conditions: vec![RuleCondition::TargetExists {
-                target: RuleTarget::TriggerOther,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "require-other-rule".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnCollision { entity: None },
+                conditions: vec![RuleCondition::TargetExists {
+                    target: RuleTarget::TriggerOther,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "trigger_other_matched".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "trigger_other_matched".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
-    let blocked = GameSimulation::tick_fixed(&mut state, 
+    let blocked = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_collision_test_tilemap(),
         &create_collision_test_atlas(),
@@ -2100,12 +2295,14 @@ fn on_damaged_with_trigger_self_refers_to_victim() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
     let player = state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist");
     let controller = player
         .attributes
-        .rendering.animation_controller
+        .rendering
+        .animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -2132,29 +2329,34 @@ fn on_damaged_with_trigger_self_refers_to_victim() {
     SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
 
     // Rule uses TargetExists with TriggerSelf to verify victim is set
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "damage-context-rule".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnDamaged { entity: None },
-            conditions: vec![RuleCondition::TargetExists {
-                target: RuleTarget::TriggerSelf,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "damage-context-rule".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnDamaged { entity: None },
+                conditions: vec![RuleCondition::TargetExists {
+                    target: RuleTarget::TriggerSelf,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "victim_exists".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "victim_exists".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    InputSystem::handle_profile_action_press(state.runtime_mut(), 
+    InputSystem::handle_profile_action_press(
+        state.runtime_mut(),
         toki_core::entity::MovementProfile::PlayerWasd,
         toki_core::game::InputAction::Primary,
     );
-    let update = GameSimulation::tick_fixed(&mut state, 
+    let update = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2173,12 +2375,14 @@ fn on_damaged_with_trigger_other_refers_to_attacker() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 60));
     let player = state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist");
     let controller = player
         .attributes
-        .rendering.animation_controller
+        .rendering
+        .animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -2205,29 +2409,34 @@ fn on_damaged_with_trigger_other_refers_to_attacker() {
     SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
 
     // Rule uses TargetExists with TriggerOther to verify attacker is set
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "attacker-context-rule".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnDamaged { entity: None },
-            conditions: vec![RuleCondition::TargetExists {
-                target: RuleTarget::TriggerOther,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "attacker-context-rule".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnDamaged { entity: None },
+                conditions: vec![RuleCondition::TargetExists {
+                    target: RuleTarget::TriggerOther,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "attacker_exists".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "attacker_exists".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    InputSystem::handle_profile_action_press(state.runtime_mut(), 
+    InputSystem::handle_profile_action_press(
+        state.runtime_mut(),
         toki_core::entity::MovementProfile::PlayerWasd,
         toki_core::game::InputAction::Primary,
     );
-    let update = GameSimulation::tick_fixed(&mut state, 
+    let update = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2245,22 +2454,26 @@ fn on_damaged_with_trigger_other_refers_to_attacker() {
 #[test]
 fn on_key_interact_fires_when_interact_key_is_held() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "interact-key-sfx",
-            RuleTrigger::OnKey {
-                key: RuleKey::Interact,
-            },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "interact_sfx".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "interact-key-sfx",
+                RuleTrigger::OnKey {
+                    key: RuleKey::Interact,
+                },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "interact_sfx".to_string(),
+                }],
+            )],
+        },
+    );
 
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Interact);
-    let pressed = GameSimulation::tick_fixed(&mut state, 
+    let pressed = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2271,7 +2484,8 @@ fn on_key_interact_fires_when_interact_key_is_held() {
     )));
 
     InputSystem::handle_key_release(state.runtime_mut(), InputKey::Interact);
-    let released = GameSimulation::tick_fixed(&mut state, 
+    let released = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2285,22 +2499,26 @@ fn on_key_interact_fires_when_interact_key_is_held() {
 #[test]
 fn on_key_attack_primary_fires_when_attack_primary_key_is_held() {
     let mut state = GameState::new_empty();
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "attack-primary-key-sfx",
-            RuleTrigger::OnKey {
-                key: RuleKey::AttackPrimary,
-            },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "attack_primary_sfx".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "attack-primary-key-sfx",
+                RuleTrigger::OnKey {
+                    key: RuleKey::AttackPrimary,
+                },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "attack_primary_sfx".to_string(),
+                }],
+            )],
+        },
+    );
 
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::AttackPrimary);
-    let pressed = GameSimulation::tick_fixed(&mut state, 
+    let pressed = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2320,31 +2538,37 @@ fn on_interact_fires_when_player_overlaps_interactable_and_presses_interact() {
     let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
     // Mark NPC as interactable
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .behavior.interactable = true;
+        .behavior
+        .interactable = true;
 
     // Rule fires on interact with NPC
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "npc-interact",
-            RuleTrigger::OnInteract {
-                mode: InteractionMode::default(),
-                entity: None,
-            },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "npc_talk".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "npc-interact",
+                RuleTrigger::OnInteract {
+                    mode: InteractionMode::default(),
+                    entity: None,
+                },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "npc_talk".to_string(),
+                }],
+            )],
+        },
+    );
 
     // Press interact key
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Interact);
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2357,7 +2581,8 @@ fn on_interact_fires_when_player_overlaps_interactable_and_presses_interact() {
 
     // Release interact - should not fire again
     InputSystem::handle_key_release(state.runtime_mut(), InputKey::Interact);
-    let no_interact = GameSimulation::tick_fixed(&mut state, 
+    let no_interact = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2376,29 +2601,35 @@ fn on_interact_does_not_fire_when_not_overlapping() {
     // Spawn NPC far away
     let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(150, 150));
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .behavior.interactable = true;
+        .behavior
+        .interactable = true;
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "npc-interact",
-            RuleTrigger::OnInteract {
-                mode: InteractionMode::default(),
-                entity: None,
-            },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "npc_talk".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "npc-interact",
+                RuleTrigger::OnInteract {
+                    mode: InteractionMode::default(),
+                    entity: None,
+                },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "npc_talk".to_string(),
+                }],
+            )],
+        },
+    );
 
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Interact);
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2419,29 +2650,35 @@ fn on_interact_does_not_fire_when_entity_is_not_interactable() {
     // Spawn NPC at overlapping position but NOT marked as interactable
     let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .behavior.interactable = false;
+        .behavior
+        .interactable = false;
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "npc-interact",
-            RuleTrigger::OnInteract {
-                mode: InteractionMode::default(),
-                entity: None,
-            },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "npc_talk".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "npc-interact",
+                RuleTrigger::OnInteract {
+                    mode: InteractionMode::default(),
+                    entity: None,
+                },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "npc_talk".to_string(),
+                }],
+            )],
+        },
+    );
 
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Interact);
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2462,41 +2699,47 @@ fn on_interact_provides_trigger_context() {
     // Spawn interactable NPC
     let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .behavior.interactable = true;
+        .behavior
+        .interactable = true;
 
     // Rule uses TriggerSelf (player) and TriggerOther (NPC)
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "interact-context".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnInteract {
-                mode: InteractionMode::default(),
-                entity: None,
-            },
-            conditions: vec![
-                RuleCondition::TargetExists {
-                    target: RuleTarget::TriggerSelf,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "interact-context".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnInteract {
+                    mode: InteractionMode::default(),
+                    entity: None,
                 },
-                RuleCondition::TargetExists {
-                    target: RuleTarget::TriggerOther,
-                },
-            ],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "context_valid".to_string(),
+                conditions: vec![
+                    RuleCondition::TargetExists {
+                        target: RuleTarget::TriggerSelf,
+                    },
+                    RuleCondition::TargetExists {
+                        target: RuleTarget::TriggerOther,
+                    },
+                ],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "context_valid".to_string(),
+                }],
             }],
-        }],
-    });
+        },
+    );
 
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Interact);
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2516,43 +2759,49 @@ fn interaction_rules_respect_priority_ordering() {
 
     let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .behavior.interactable = true;
+        .behavior
+        .interactable = true;
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![
-            base_rule(
-                "low-priority",
-                RuleTrigger::OnInteract {
-                    mode: InteractionMode::default(),
-                    entity: None,
-                },
-                1,
-                vec![RuleAction::PlaySound {
-                    channel: RuleSoundChannel::Movement,
-                    sound_id: "low".to_string(),
-                }],
-            ),
-            base_rule(
-                "high-priority",
-                RuleTrigger::OnInteract {
-                    mode: InteractionMode::default(),
-                    entity: None,
-                },
-                10,
-                vec![RuleAction::PlaySound {
-                    channel: RuleSoundChannel::Movement,
-                    sound_id: "high".to_string(),
-                }],
-            ),
-        ],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![
+                base_rule(
+                    "low-priority",
+                    RuleTrigger::OnInteract {
+                        mode: InteractionMode::default(),
+                        entity: None,
+                    },
+                    1,
+                    vec![RuleAction::PlaySound {
+                        channel: RuleSoundChannel::Movement,
+                        sound_id: "low".to_string(),
+                    }],
+                ),
+                base_rule(
+                    "high-priority",
+                    RuleTrigger::OnInteract {
+                        mode: InteractionMode::default(),
+                        entity: None,
+                    },
+                    10,
+                    vec![RuleAction::PlaySound {
+                        channel: RuleSoundChannel::Movement,
+                        sound_id: "high".to_string(),
+                    }],
+                ),
+            ],
+        },
+    );
 
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Interact);
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2577,28 +2826,34 @@ fn on_damaged_fires_when_entity_takes_damage() {
 
     // Give player health
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .gameplay.health = Some(100);
+        .gameplay
+        .health = Some(100);
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "on-damaged",
-            RuleTrigger::OnDamaged { entity: None },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "damage_sound".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "on-damaged",
+                RuleTrigger::OnDamaged { entity: None },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "damage_sound".to_string(),
+                }],
+            )],
+        },
+    );
 
     // Deal damage to player
     state.deal_damage_to_entity(player_id, 10, None);
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2619,40 +2874,46 @@ fn on_damaged_provides_trigger_context() {
 
     // Give player health
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .gameplay.health = Some(100);
+        .gameplay
+        .health = Some(100);
 
     // Rule uses TriggerSelf (victim) and TriggerOther (attacker)
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "damaged-context".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnDamaged { entity: None },
-            conditions: vec![
-                RuleCondition::TargetExists {
-                    target: RuleTarget::TriggerSelf,
-                },
-                RuleCondition::TargetExists {
-                    target: RuleTarget::TriggerOther,
-                },
-            ],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "context_valid".to_string(),
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "damaged-context".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnDamaged { entity: None },
+                conditions: vec![
+                    RuleCondition::TargetExists {
+                        target: RuleTarget::TriggerSelf,
+                    },
+                    RuleCondition::TargetExists {
+                        target: RuleTarget::TriggerOther,
+                    },
+                ],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "context_valid".to_string(),
+                }],
             }],
-        }],
-    });
+        },
+    );
 
     // Deal damage with attacker
     state.deal_damage_to_entity(player_id, 10, Some(attacker_id));
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2672,28 +2933,34 @@ fn on_death_fires_when_entity_dies() {
 
     // Give player low health
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .gameplay.health = Some(10);
+        .gameplay
+        .health = Some(10);
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "on-death",
-            RuleTrigger::OnDeath { entity: None },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "death_sound".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "on-death",
+                RuleTrigger::OnDeath { entity: None },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "death_sound".to_string(),
+                }],
+            )],
+        },
+    );
 
     // Deal lethal damage to player
     state.deal_damage_to_entity(player_id, 100, None);
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2714,40 +2981,46 @@ fn on_death_provides_trigger_context() {
 
     // Give player low health
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .gameplay.health = Some(10);
+        .gameplay
+        .health = Some(10);
 
     // Rule uses TriggerSelf (victim) and TriggerOther (attacker)
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "death-context".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnDeath { entity: None },
-            conditions: vec![
-                RuleCondition::TargetExists {
-                    target: RuleTarget::TriggerSelf,
-                },
-                RuleCondition::TargetExists {
-                    target: RuleTarget::TriggerOther,
-                },
-            ],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "context_valid".to_string(),
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "death-context".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnDeath { entity: None },
+                conditions: vec![
+                    RuleCondition::TargetExists {
+                        target: RuleTarget::TriggerSelf,
+                    },
+                    RuleCondition::TargetExists {
+                        target: RuleTarget::TriggerOther,
+                    },
+                ],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "context_valid".to_string(),
+                }],
             }],
-        }],
-    });
+        },
+    );
 
     // Deal lethal damage with attacker
     state.deal_damage_to_entity(player_id, 100, Some(attacker_id));
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2767,35 +3040,41 @@ fn on_death_fires_without_attacker() {
 
     // Give player low health
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .gameplay.health = Some(10);
+        .gameplay
+        .health = Some(10);
 
     // Rule uses only TriggerSelf (victim) - no attacker requirement
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "death-no-attacker".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnDeath { entity: None },
-            conditions: vec![RuleCondition::TargetExists {
-                target: RuleTarget::TriggerSelf,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "death-no-attacker".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnDeath { entity: None },
+                conditions: vec![RuleCondition::TargetExists {
+                    target: RuleTarget::TriggerSelf,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "environmental_death".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "environmental_death".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
     // Deal lethal damage without attacker (environmental)
     state.deal_damage_to_entity(player_id, 100, None);
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2820,41 +3099,49 @@ fn on_damaged_with_entity_filter_only_fires_for_matching_entity() {
 
     // Give both entities health
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .gameplay.health = Some(100);
+        .gameplay
+        .health = Some(100);
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .gameplay.health = Some(100);
+        .gameplay
+        .health = Some(100);
 
     // Rule only fires when player is damaged
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "player-damaged".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnDamaged {
-                entity: Some(RuleTarget::Player),
-            },
-            conditions: vec![],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "player_hurt".to_string(),
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "player-damaged".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnDamaged {
+                    entity: Some(RuleTarget::Player),
+                },
+                conditions: vec![],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "player_hurt".to_string(),
+                }],
             }],
-        }],
-    });
+        },
+    );
 
     // Deal damage to NPC - should NOT trigger
     state.deal_damage_to_entity(npc_id, 10, None);
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2871,7 +3158,8 @@ fn on_damaged_with_entity_filter_only_fires_for_matching_entity() {
     // Now deal damage to player - SHOULD trigger
     state.deal_damage_to_entity(player_id, 10, None);
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2894,39 +3182,47 @@ fn on_damaged_without_entity_filter_fires_for_all_entities() {
 
     // Give both entities health
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .gameplay.health = Some(100);
+        .gameplay
+        .health = Some(100);
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .gameplay.health = Some(100);
+        .gameplay
+        .health = Some(100);
 
     // Rule fires for ANY damage (no entity filter)
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "any-damaged".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnDamaged { entity: None },
-            conditions: vec![],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "any_hurt".to_string(),
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "any-damaged".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnDamaged { entity: None },
+                conditions: vec![],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "any_hurt".to_string(),
+                }],
             }],
-        }],
-    });
+        },
+    );
 
     // Deal damage to NPC - should trigger
     state.deal_damage_to_entity(npc_id, 10, None);
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -2950,41 +3246,49 @@ fn on_damaged_with_specific_entity_id_filter() {
 
     // Give NPCs health
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(npc1_id)
         .expect("npc1 should exist")
         .attributes
-        .gameplay.health = Some(100);
+        .gameplay
+        .health = Some(100);
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(npc2_id)
         .expect("npc2 should exist")
         .attributes
-        .gameplay.health = Some(100);
+        .gameplay
+        .health = Some(100);
 
     // Rule only fires when npc1 is damaged
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "npc1-damaged".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnDamaged {
-                entity: Some(RuleTarget::Entity(npc1_id)),
-            },
-            conditions: vec![],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "npc1_hurt".to_string(),
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "npc1-damaged".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnDamaged {
+                    entity: Some(RuleTarget::Entity(npc1_id)),
+                },
+                conditions: vec![],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "npc1_hurt".to_string(),
+                }],
             }],
-        }],
-    });
+        },
+    );
 
     // Deal damage to npc2 - should NOT trigger
     state.deal_damage_to_entity(npc2_id, 10, None);
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3001,7 +3305,8 @@ fn on_damaged_with_specific_entity_id_filter() {
     // Deal damage to npc1 - SHOULD trigger
     state.deal_damage_to_entity(npc1_id, 10, None);
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3024,41 +3329,49 @@ fn on_death_with_entity_filter_only_fires_for_matching_entity() {
 
     // Give both entities health
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .gameplay.health = Some(10);
+        .gameplay
+        .health = Some(10);
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .gameplay.health = Some(10);
+        .gameplay
+        .health = Some(10);
 
     // Rule only fires when player dies
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "player-death".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnDeath {
-                entity: Some(RuleTarget::Player),
-            },
-            conditions: vec![],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "player_died".to_string(),
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "player-death".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnDeath {
+                    entity: Some(RuleTarget::Player),
+                },
+                conditions: vec![],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "player_died".to_string(),
+                }],
             }],
-        }],
-    });
+        },
+    );
 
     // Kill NPC - should NOT trigger
     state.deal_damage_to_entity(npc_id, 100, None);
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3075,7 +3388,8 @@ fn on_death_with_entity_filter_only_fires_for_matching_entity() {
     // Kill player - SHOULD trigger
     state.deal_damage_to_entity(player_id, 100, None);
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3098,33 +3412,39 @@ fn on_death_without_entity_filter_fires_for_all_entities() {
 
     // Give NPC health
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(npc_id)
         .expect("npc should exist")
         .attributes
-        .gameplay.health = Some(10);
+        .gameplay
+        .health = Some(10);
 
     // Rule fires for ANY death (no entity filter)
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "any-death".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnDeath { entity: None },
-            conditions: vec![],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "any_death".to_string(),
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "any-death".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnDeath { entity: None },
+                conditions: vec![],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "any_death".to_string(),
+                }],
             }],
-        }],
-    });
+        },
+    );
 
     // Kill NPC - should trigger
     state.deal_damage_to_entity(npc_id, 100, None);
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3151,34 +3471,40 @@ fn health_below_condition_matches_when_entity_health_is_below_threshold() {
     // Set player health to 30 (below threshold of 50)
     // Note: must insert directly since player spawns with default health (100)
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .gameplay.stats
+        .gameplay
+        .stats
         .current
         .insert("health".to_string(), 30);
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "low-health-alert".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::HealthBelow {
-                target: RuleTarget::Player,
-                threshold: 50,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "low-health-alert".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::HealthBelow {
+                    target: RuleTarget::Player,
+                    threshold: 50,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "low_health".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "low_health".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3200,34 +3526,40 @@ fn health_below_condition_does_not_match_when_health_equals_threshold() {
 
     // Set player health exactly at threshold
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .gameplay.stats
+        .gameplay
+        .stats
         .current
         .insert("health".to_string(), 50);
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "low-health-alert".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::HealthBelow {
-                target: RuleTarget::Player,
-                threshold: 50,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "low-health-alert".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::HealthBelow {
+                    target: RuleTarget::Player,
+                    threshold: 50,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "low_health".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "low_health".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3245,26 +3577,30 @@ fn health_below_condition_does_not_match_when_health_is_above_threshold() {
     let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     // Player spawns with health 100 (above threshold of 50)
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "low-health-alert".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::HealthBelow {
-                target: RuleTarget::Player,
-                threshold: 50,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "low-health-alert".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::HealthBelow {
+                    target: RuleTarget::Player,
+                    threshold: 50,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "low_health".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "low_health".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3283,34 +3619,40 @@ fn health_above_condition_matches_when_entity_health_is_above_threshold() {
 
     // Set player health to 80 (above threshold of 50)
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .gameplay.stats
+        .gameplay
+        .stats
         .current
         .insert("health".to_string(), 80);
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "high-health".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::HealthAbove {
-                target: RuleTarget::Player,
-                threshold: 50,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "high-health".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::HealthAbove {
+                    target: RuleTarget::Player,
+                    threshold: 50,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "high_health".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "high_health".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3332,34 +3674,40 @@ fn health_above_condition_does_not_match_when_health_equals_threshold() {
 
     // Set player health exactly at threshold
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .gameplay.stats
+        .gameplay
+        .stats
         .current
         .insert("health".to_string(), 50);
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "high-health".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::HealthAbove {
-                target: RuleTarget::Player,
-                threshold: 50,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "high-health".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::HealthAbove {
+                    target: RuleTarget::Player,
+                    threshold: 50,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "high_health".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "high_health".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3378,34 +3726,40 @@ fn health_above_condition_does_not_match_when_health_is_below_threshold() {
 
     // Set player health below threshold
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .gameplay.stats
+        .gameplay
+        .stats
         .current
         .insert("health".to_string(), 30);
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "high-health".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::HealthAbove {
-                target: RuleTarget::Player,
-                threshold: 50,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "high-health".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::HealthAbove {
+                    target: RuleTarget::Player,
+                    threshold: 50,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "high_health".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "high_health".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3424,32 +3778,38 @@ fn health_condition_fails_safely_when_entity_has_no_health_stat() {
 
     // Clear health stat to ensure it doesn't exist
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
-        .gameplay.stats = toki_core::entity::EntityStats::default();
+        .gameplay
+        .stats = toki_core::entity::EntityStats::default();
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "health-check".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::HealthBelow {
-                target: RuleTarget::Player,
-                threshold: 50,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "health-check".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::HealthBelow {
+                    target: RuleTarget::Player,
+                    threshold: 50,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "should_not_play".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "should_not_play".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3472,25 +3832,29 @@ fn trigger_other_is_player_matches_when_other_entity_is_player_in_collision() {
     SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
 
     // Rule: OnCollision when the other entity is the player
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "player-collision".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnCollision { entity: None },
-            conditions: vec![RuleCondition::TriggerOtherIsPlayer],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "player_collision".to_string(),
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "player-collision".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnCollision { entity: None },
+                conditions: vec![RuleCondition::TriggerOtherIsPlayer],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "player_collision".to_string(),
+                }],
             }],
-        }],
-    });
+        },
+    );
 
     // Move player into NPC to trigger collision
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_collision_test_tilemap(),
         &create_collision_test_atlas(),
@@ -3513,26 +3877,30 @@ fn trigger_other_is_player_does_not_match_when_other_is_not_player() {
     SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(96, 60));
 
     // Rule: OnDamaged when the attacker is the player
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "player-attack".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnDamaged { entity: None },
-            conditions: vec![RuleCondition::TriggerOtherIsPlayer],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Collision,
-                sound_id: "player_attack".to_string(),
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "player-attack".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnDamaged { entity: None },
+                conditions: vec![RuleCondition::TriggerOtherIsPlayer],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Collision,
+                    sound_id: "player_attack".to_string(),
+                }],
             }],
-        }],
-    });
+        },
+    );
 
     // Deal damage from NPC1 to NPC2 (neither is player)
     state.deal_damage_to_entity(npc1, 10, Some(npc1));
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3553,23 +3921,27 @@ fn trigger_other_is_player_fails_safely_without_context() {
     let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
     // Rule: OnUpdate with TriggerOtherIsPlayer (OnUpdate has no context)
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "invalid-context".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::TriggerOtherIsPlayer],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "should_not_play".to_string(),
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "invalid-context".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::TriggerOtherIsPlayer],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "should_not_play".to_string(),
+                }],
             }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3590,26 +3962,30 @@ fn entity_is_kind_matches_player_kind() {
     let mut state = GameState::new_empty();
     let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "player-kind-check".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::EntityIsKind {
-                target: RuleTarget::Player,
-                kind: EntityKind::Player,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "player-kind-check".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::EntityIsKind {
+                    target: RuleTarget::Player,
+                    kind: EntityKind::Player,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "is_player".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "is_player".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3629,26 +4005,30 @@ fn entity_is_kind_does_not_match_wrong_kind() {
     let mut state = GameState::new_empty();
     let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "npc-kind-check".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::EntityIsKind {
-                target: RuleTarget::Player,
-                kind: EntityKind::Npc, // Player is not an NPC
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "npc-kind-check".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::EntityIsKind {
+                    target: RuleTarget::Player,
+                    kind: EntityKind::Npc, // Player is not an NPC
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "is_npc".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "is_npc".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3667,12 +4047,14 @@ fn trigger_other_is_kind_matches_npc_on_damage() {
 
     // Setup player for attacking
     let player = state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist");
     let controller = player
         .attributes
-        .rendering.animation_controller
+        .rendering
+        .animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -3698,32 +4080,37 @@ fn trigger_other_is_kind_matches_npc_on_damage() {
     // Spawn NPC that will be damaged
     SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(66, 60));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "damaged-by-npc-check".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnDamaged { entity: None },
-            // Check if attacker (TriggerOther) is an NPC kind
-            // In this case, attacker is player, so this should NOT match
-            conditions: vec![RuleCondition::TriggerOtherIsKind {
-                kind: EntityKind::Npc,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "damaged-by-npc-check".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnDamaged { entity: None },
+                // Check if attacker (TriggerOther) is an NPC kind
+                // In this case, attacker is player, so this should NOT match
+                conditions: vec![RuleCondition::TriggerOtherIsKind {
+                    kind: EntityKind::Npc,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "damaged_by_npc".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "damaged_by_npc".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
     // Player attacks NPC - attacker is Player, not NPC
-    InputSystem::handle_profile_action_press(state.runtime_mut(), 
+    InputSystem::handle_profile_action_press(
+        state.runtime_mut(),
         toki_core::entity::MovementProfile::PlayerWasd,
         toki_core::game::InputAction::Primary,
     );
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3743,25 +4130,29 @@ fn trigger_other_is_kind_fails_safely_without_context() {
     let mut state = GameState::new_empty();
     let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "no-context".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::TriggerOtherIsKind {
-                kind: EntityKind::Npc,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "no-context".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::TriggerOtherIsKind {
+                    kind: EntityKind::Npc,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "should_not_play".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "should_not_play".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3784,31 +4175,36 @@ fn entity_has_tag_matches_when_entity_has_specified_tag() {
 
     // Add tags to player
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .tags = vec!["hero".to_string(), "protagonist".to_string()];
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "hero-check".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::EntityHasTag {
-                target: RuleTarget::Player,
-                tag: "hero".to_string(),
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "hero-check".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::EntityHasTag {
+                    target: RuleTarget::Player,
+                    tag: "hero".to_string(),
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "is_hero".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "is_hero".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3830,31 +4226,36 @@ fn entity_has_tag_does_not_match_when_entity_lacks_tag() {
 
     // Add different tags to player
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(player_id)
         .expect("player should exist")
         .tags = vec!["hero".to_string()];
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "villain-check".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::EntityHasTag {
-                target: RuleTarget::Player,
-                tag: "villain".to_string(),
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "villain-check".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::EntityHasTag {
+                    target: RuleTarget::Player,
+                    tag: "villain".to_string(),
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "is_villain".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "is_villain".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3871,25 +4272,29 @@ fn trigger_other_has_tag_fails_safely_without_context() {
     let mut state = GameState::new_empty();
     let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "no-context".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::TriggerOtherHasTag {
-                tag: "enemy".to_string(),
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "no-context".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::TriggerOtherHasTag {
+                    tag: "enemy".to_string(),
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "should_not_play".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "should_not_play".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3912,31 +4317,38 @@ fn has_inventory_item_matches_when_player_has_enough_items() {
 
     // Give player inventory items
     state
-        .world_mut().entity_manager_mut()
-        .storage_mut().components_mut().ensure_inventory(player_id)
+        .world_mut()
+        .entity_manager_mut()
+        .storage_mut()
+        .components_mut()
+        .ensure_inventory(player_id)
         .add_item("key", 3);
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "key-check".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::HasInventoryItem {
-                target: RuleTarget::Player,
-                item_id: "key".to_string(),
-                min_count: 2,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "key-check".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::HasInventoryItem {
+                    target: RuleTarget::Player,
+                    item_id: "key".to_string(),
+                    min_count: 2,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "has_keys".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "has_keys".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -3958,31 +4370,38 @@ fn has_inventory_item_does_not_match_when_player_has_insufficient_items() {
 
     // Give player fewer items than required
     state
-        .world_mut().entity_manager_mut()
-        .storage_mut().components_mut().ensure_inventory(player_id)
+        .world_mut()
+        .entity_manager_mut()
+        .storage_mut()
+        .components_mut()
+        .ensure_inventory(player_id)
         .add_item("key", 1);
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "key-check".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::HasInventoryItem {
-                target: RuleTarget::Player,
-                item_id: "key".to_string(),
-                min_count: 3,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "key-check".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::HasInventoryItem {
+                    target: RuleTarget::Player,
+                    item_id: "key".to_string(),
+                    min_count: 3,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "has_keys".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "has_keys".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4000,27 +4419,31 @@ fn has_inventory_item_does_not_match_when_item_missing() {
     let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0));
     // Player has no items in inventory by default
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "key-check".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnUpdate,
-            conditions: vec![RuleCondition::HasInventoryItem {
-                target: RuleTarget::Player,
-                item_id: "boss_key".to_string(),
-                min_count: 1,
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "key-check".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnUpdate,
+                conditions: vec![RuleCondition::HasInventoryItem {
+                    target: RuleTarget::Player,
+                    item_id: "boss_key".to_string(),
+                    min_count: 1,
+                }],
+                actions: vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "has_boss_key".to_string(),
+                }],
             }],
-            actions: vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "has_boss_key".to_string(),
-            }],
-        }],
-    });
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4037,20 +4460,24 @@ fn on_tile_enter_fires_when_entity_enters_tile() {
     let mut state = GameState::new_empty();
     let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "enter-tile-1-0",
-            RuleTrigger::OnTileEnter { x: 1, y: 0 },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "entered_tile".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "enter-tile-1-0",
+                RuleTrigger::OnTileEnter { x: 1, y: 0 },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "entered_tile".to_string(),
+                }],
+            )],
+        },
+    );
 
     // Initialize tile tracking with first update
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4060,7 +4487,8 @@ fn on_tile_enter_fires_when_entity_enters_tile() {
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     let mut fired = false;
     for _ in 0..10 {
-        let result = GameSimulation::tick_fixed(&mut state, 
+        let result = GameSimulation::tick_fixed(
+            &mut state,
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4087,27 +4515,32 @@ fn on_tile_enter_does_not_fire_when_staying_on_same_tile() {
     let mut state = GameState::new_empty();
     let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "enter-tile-0-0",
-            RuleTrigger::OnTileEnter { x: 0, y: 0 },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "entered_tile".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "enter-tile-0-0",
+                RuleTrigger::OnTileEnter { x: 0, y: 0 },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "entered_tile".to_string(),
+                }],
+            )],
+        },
+    );
 
     // First frame - no movement, already on tile
-    let first = GameSimulation::tick_fixed(&mut state, 
+    let first = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Second frame - still no movement
-    let second = GameSimulation::tick_fixed(&mut state, 
+    let second = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4128,20 +4561,24 @@ fn on_tile_enter_fires_only_on_transition() {
     let mut state = GameState::new_empty();
     let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "enter-tile-1-0",
-            RuleTrigger::OnTileEnter { x: 1, y: 0 },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "entered_tile".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "enter-tile-1-0",
+                RuleTrigger::OnTileEnter { x: 1, y: 0 },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "entered_tile".to_string(),
+                }],
+            )],
+        },
+    );
 
     // Initialize tile tracking
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4151,7 +4588,8 @@ fn on_tile_enter_fires_only_on_transition() {
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     let mut entered = false;
     for _ in 0..10 {
-        let result = GameSimulation::tick_fixed(&mut state, 
+        let result = GameSimulation::tick_fixed(
+            &mut state,
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4169,7 +4607,8 @@ fn on_tile_enter_fires_only_on_transition() {
 
     // Stay on tile (1, 0)
     InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
-    let second = GameSimulation::tick_fixed(&mut state, 
+    let second = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4187,20 +4626,24 @@ fn on_tile_exit_fires_when_entity_leaves_tile() {
     let mut state = GameState::new_empty();
     let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "exit-tile-0-0",
-            RuleTrigger::OnTileExit { x: 0, y: 0 },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "exited_tile".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "exit-tile-0-0",
+                RuleTrigger::OnTileExit { x: 0, y: 0 },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "exited_tile".to_string(),
+                }],
+            )],
+        },
+    );
 
     // Initialize tile tracking
-    let first = GameSimulation::tick_fixed(&mut state, 
+    let first = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4210,7 +4653,8 @@ fn on_tile_exit_fires_when_entity_leaves_tile() {
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     let mut exited = false;
     for _ in 0..10 {
-        let result = GameSimulation::tick_fixed(&mut state, 
+        let result = GameSimulation::tick_fixed(
+            &mut state,
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4241,20 +4685,24 @@ fn on_tile_exit_does_not_fire_repeatedly() {
     let mut state = GameState::new_empty();
     let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "exit-tile-0-0",
-            RuleTrigger::OnTileExit { x: 0, y: 0 },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "exited_tile".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "exit-tile-0-0",
+                RuleTrigger::OnTileExit { x: 0, y: 0 },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "exited_tile".to_string(),
+                }],
+            )],
+        },
+    );
 
     // Initialize tile tracking
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4264,7 +4712,8 @@ fn on_tile_exit_does_not_fire_repeatedly() {
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     let mut exited = false;
     for _ in 0..10 {
-        let result = GameSimulation::tick_fixed(&mut state, 
+        let result = GameSimulation::tick_fixed(
+            &mut state,
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4282,7 +4731,8 @@ fn on_tile_exit_does_not_fire_repeatedly() {
 
     // Stay on tile (1, 0)
     InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
-    let second = GameSimulation::tick_fixed(&mut state, 
+    let second = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4300,24 +4750,28 @@ fn on_tile_enter_provides_trigger_self_context() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "enter-with-velocity".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnTileEnter { x: 1, y: 0 },
-            conditions: vec![RuleCondition::Always],
-            actions: vec![RuleAction::SetVelocity {
-                target: RuleTarget::TriggerSelf,
-                velocity: [0, 5],
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "enter-with-velocity".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnTileEnter { x: 1, y: 0 },
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::SetVelocity {
+                    target: RuleTarget::TriggerSelf,
+                    velocity: [0, 5],
+                }],
             }],
-        }],
-    });
+        },
+    );
 
     // Initialize tile tracking
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4326,7 +4780,8 @@ fn on_tile_enter_provides_trigger_self_context() {
     // Move to tile (1, 0)
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     for _ in 0..10 {
-        GameSimulation::tick_fixed(&mut state, 
+        GameSimulation::tick_fixed(
+            &mut state,
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4334,7 +4789,11 @@ fn on_tile_enter_provides_trigger_self_context() {
     }
 
     // Entity should have velocity set by the rule
-    let _player = state.world().entity_manager().get_entity(player_id).unwrap();
+    let _player = state
+        .world()
+        .entity_manager()
+        .get_entity(player_id)
+        .unwrap();
     // Velocity will be applied on next update, check rule runtime state
     let velocity = RuleSystem::rule_velocity(&state, player_id);
     assert_eq!(
@@ -4349,24 +4808,28 @@ fn on_tile_exit_provides_trigger_self_context() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![Rule {
-            id: "exit-with-velocity".to_string(),
-            enabled: true,
-            priority: 0,
-            once: false,
-        log_enabled: false,
-            trigger: RuleTrigger::OnTileExit { x: 0, y: 0 },
-            conditions: vec![RuleCondition::Always],
-            actions: vec![RuleAction::SetVelocity {
-                target: RuleTarget::TriggerSelf,
-                velocity: [10, 0],
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![Rule {
+                id: "exit-with-velocity".to_string(),
+                enabled: true,
+                priority: 0,
+                once: false,
+                log_enabled: false,
+                trigger: RuleTrigger::OnTileExit { x: 0, y: 0 },
+                conditions: vec![RuleCondition::Always],
+                actions: vec![RuleAction::SetVelocity {
+                    target: RuleTarget::TriggerSelf,
+                    velocity: [10, 0],
+                }],
             }],
-        }],
-    });
+        },
+    );
 
     // Initialize tile tracking
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4375,7 +4838,8 @@ fn on_tile_exit_provides_trigger_self_context() {
     // Move to tile (1, 0), leaving (0, 0)
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     for _ in 0..10 {
-        GameSimulation::tick_fixed(&mut state, 
+        GameSimulation::tick_fixed(
+            &mut state,
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4397,20 +4861,24 @@ fn multiple_entities_can_trigger_tile_events_independently() {
     let _player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(0, 0)); // Tile (0, 0)
     let _npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(0, 16)); // Tile (0, 1)
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "enter-tile-1-0",
-            RuleTrigger::OnTileEnter { x: 1, y: 0 },
-            0,
-            vec![RuleAction::PlaySound {
-                channel: RuleSoundChannel::Movement,
-                sound_id: "entity_entered".to_string(),
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "enter-tile-1-0",
+                RuleTrigger::OnTileEnter { x: 1, y: 0 },
+                0,
+                vec![RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "entity_entered".to_string(),
+                }],
+            )],
+        },
+    );
 
     // Initialize tile tracking
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(256, 256),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4420,7 +4888,8 @@ fn multiple_entities_can_trigger_tile_events_independently() {
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     let mut first_enter_count = 0;
     for _ in 0..10 {
-        let result = GameSimulation::tick_fixed(&mut state, 
+        let result = GameSimulation::tick_fixed(
+            &mut state,
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4441,7 +4910,8 @@ fn multiple_entities_can_trigger_tile_events_independently() {
     // Move player back to tile (0, 0)
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Left);
     for _ in 0..10 {
-        GameSimulation::tick_fixed(&mut state, 
+        GameSimulation::tick_fixed(
+            &mut state,
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4453,7 +4923,8 @@ fn multiple_entities_can_trigger_tile_events_independently() {
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
     let mut second_enter_count = 0;
     for _ in 0..10 {
-        let result = GameSimulation::tick_fixed(&mut state, 
+        let result = GameSimulation::tick_fixed(
+            &mut state,
             UVec2::new(256, 256),
             &create_test_tilemap(),
             &create_test_atlas(),
@@ -4490,31 +4961,39 @@ fn damage_entity_reduces_health_by_specified_amount() {
     let target_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
 
     // Verify initial health
-    let initial_health = state.world().entity_manager()
+    let initial_health = state
+        .world()
+        .entity_manager()
         .get_entity(target_id)
         .and_then(|e| e.attributes.gameplay.health)
         .expect("Target should have health");
     assert_eq!(initial_health, 50);
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "damage-target",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::DamageEntity {
-                target: RuleTarget::Entity(target_id),
-                amount: 30,
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "damage-target",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::DamageEntity {
+                    target: RuleTarget::Entity(target_id),
+                    amount: 30,
+                }],
+            )],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let new_health = state.world().entity_manager()
+    let new_health = state
+        .world()
+        .entity_manager()
         .get_entity(target_id)
         .and_then(|e| e.attributes.gameplay.health)
         .expect("Target should still exist");
@@ -4526,37 +5005,45 @@ fn damage_entity_triggers_death_when_health_reaches_zero() {
     let mut state = GameState::new_empty();
     let target_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![
-            base_rule(
-                "lethal-damage",
-                RuleTrigger::OnUpdate,
-                10,
-                vec![RuleAction::DamageEntity {
-                    target: RuleTarget::Entity(target_id),
-                    amount: 150, // More than initial health
-                }],
-            ),
-            base_rule(
-                "death-sound",
-                RuleTrigger::OnDeath { entity: None },
-                0,
-                vec![RuleAction::PlaySound {
-                    channel: RuleSoundChannel::Movement,
-                    sound_id: "entity_died".to_string(),
-                }],
-            ),
-        ],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![
+                base_rule(
+                    "lethal-damage",
+                    RuleTrigger::OnUpdate,
+                    10,
+                    vec![RuleAction::DamageEntity {
+                        target: RuleTarget::Entity(target_id),
+                        amount: 150, // More than initial health
+                    }],
+                ),
+                base_rule(
+                    "death-sound",
+                    RuleTrigger::OnDeath { entity: None },
+                    0,
+                    vec![RuleAction::PlaySound {
+                        channel: RuleSoundChannel::Movement,
+                        sound_id: "entity_died".to_string(),
+                    }],
+                ),
+            ],
+        },
+    );
 
-    let result = GameSimulation::tick_fixed(&mut state, 
+    let result = GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Entity should be despawned
-    assert!(state.world().entity_manager().get_entity(target_id).is_none());
+    assert!(state
+        .world()
+        .entity_manager()
+        .get_entity(target_id)
+        .is_none());
 
     // Death sound should have played
     assert!(result.events.iter().any(|e| matches!(
@@ -4571,49 +5058,61 @@ fn heal_entity_increases_health_by_specified_amount() {
     let target_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
 
     // Damage first to reduce health (NPC starts at 50)
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "damage-first",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::DamageEntity {
-                target: RuleTarget::Entity(target_id),
-                amount: 40,
-            }],
-        )],
-    });
-    GameSimulation::tick_fixed(&mut state, 
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "damage-first",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::DamageEntity {
+                    target: RuleTarget::Entity(target_id),
+                    amount: 40,
+                }],
+            )],
+        },
+    );
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let damaged_health = state.world().entity_manager()
+    let damaged_health = state
+        .world()
+        .entity_manager()
         .get_entity(target_id)
         .and_then(|e| e.attributes.gameplay.health)
         .unwrap();
     assert_eq!(damaged_health, 10);
 
     // Now heal
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "heal-target",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::HealEntity {
-                target: RuleTarget::Entity(target_id),
-                amount: 25,
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "heal-target",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::HealEntity {
+                    target: RuleTarget::Entity(target_id),
+                    amount: 25,
+                }],
+            )],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let healed_health = state.world().entity_manager()
+    let healed_health = state
+        .world()
+        .entity_manager()
         .get_entity(target_id)
         .and_then(|e| e.attributes.gameplay.health)
         .unwrap();
@@ -4625,25 +5124,31 @@ fn heal_entity_does_not_exceed_base_health() {
     let mut state = GameState::new_empty();
     let target_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "overheal-attempt",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::HealEntity {
-                target: RuleTarget::Entity(target_id),
-                amount: 100, // Would exceed base health of 50
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "overheal-attempt",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::HealEntity {
+                    target: RuleTarget::Entity(target_id),
+                    amount: 100, // Would exceed base health of 50
+                }],
+            )],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let health = state.world().entity_manager()
+    let health = state
+        .world()
+        .entity_manager()
         .get_entity(target_id)
         .and_then(|e| e.attributes.gameplay.health)
         .unwrap();
@@ -4655,20 +5160,24 @@ fn add_inventory_item_adds_to_empty_inventory() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "grant-key",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::AddInventoryItem {
-                target: RuleTarget::Player,
-                item_id: "key_red".to_string(),
-                count: 1,
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "grant-key",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::AddInventoryItem {
+                    target: RuleTarget::Player,
+                    item_id: "key_red".to_string(),
+                    count: 1,
+                }],
+            )],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4677,7 +5186,9 @@ fn add_inventory_item_adds_to_empty_inventory() {
     let inventory = state
         .world()
         .entity_manager()
-        .storage().components().inventory(player_id)
+        .storage()
+        .components()
+        .inventory(player_id)
         .expect("player inventory should exist");
     assert_eq!(inventory.item_count("key_red"), 1);
 }
@@ -4687,28 +5198,33 @@ fn add_inventory_item_stacks_with_existing() {
     let mut state = GameState::new_empty();
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(50, 50));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "grant-coins",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::AddInventoryItem {
-                target: RuleTarget::Player,
-                item_id: "coin".to_string(),
-                count: 10,
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "grant-coins",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::AddInventoryItem {
+                    target: RuleTarget::Player,
+                    item_id: "coin".to_string(),
+                    count: 10,
+                }],
+            )],
+        },
+    );
 
     // Add first batch
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     // Add second batch
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4717,7 +5233,9 @@ fn add_inventory_item_stacks_with_existing() {
     let inventory = state
         .world()
         .entity_manager()
-        .storage().components().inventory(player_id)
+        .storage()
+        .components()
+        .inventory(player_id)
         .expect("player inventory should exist");
     assert_eq!(inventory.item_count("coin"), 20);
 }
@@ -4729,24 +5247,31 @@ fn remove_inventory_item_reduces_count() {
 
     // Add items first
     state
-        .world_mut().entity_manager_mut()
-        .storage_mut().components_mut().ensure_inventory(player_id)
+        .world_mut()
+        .entity_manager_mut()
+        .storage_mut()
+        .components_mut()
+        .ensure_inventory(player_id)
         .add_item("potion", 5);
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "use-potion",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::RemoveInventoryItem {
-                target: RuleTarget::Player,
-                item_id: "potion".to_string(),
-                count: 2,
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "use-potion",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::RemoveInventoryItem {
+                    target: RuleTarget::Player,
+                    item_id: "potion".to_string(),
+                    count: 2,
+                }],
+            )],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4755,7 +5280,9 @@ fn remove_inventory_item_reduces_count() {
     let inventory = state
         .world()
         .entity_manager()
-        .storage().components().inventory(player_id)
+        .storage()
+        .components()
+        .inventory(player_id)
         .expect("player inventory should exist");
     assert_eq!(inventory.item_count("potion"), 3);
 }
@@ -4767,24 +5294,31 @@ fn remove_inventory_item_never_goes_negative() {
 
     // Add only 2 items
     state
-        .world_mut().entity_manager_mut()
-        .storage_mut().components_mut().ensure_inventory(player_id)
+        .world_mut()
+        .entity_manager_mut()
+        .storage_mut()
+        .components_mut()
+        .ensure_inventory(player_id)
         .add_item("arrow", 2);
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "use-many-arrows",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::RemoveInventoryItem {
-                target: RuleTarget::Player,
-                item_id: "arrow".to_string(),
-                count: 10, // Try to remove more than we have
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "use-many-arrows",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::RemoveInventoryItem {
+                    target: RuleTarget::Player,
+                    item_id: "arrow".to_string(),
+                    count: 10, // Try to remove more than we have
+                }],
+            )],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4793,7 +5327,9 @@ fn remove_inventory_item_never_goes_negative() {
     let inventory = state
         .world()
         .entity_manager()
-        .storage().components().inventory(player_id)
+        .storage()
+        .components()
+        .inventory(player_id)
         .expect("player inventory should exist");
     assert_eq!(
         inventory.item_count("arrow"),
@@ -4808,33 +5344,43 @@ fn set_entity_active_false_makes_entity_inactive() {
     let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
 
     assert!(
-        state.world().entity_manager()
+        state
+            .world()
+            .entity_manager()
             .get_entity(npc_id)
             .unwrap()
             .attributes
-            .behavior.active
+            .behavior
+            .active
     );
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "deactivate-npc",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::SetEntityActive {
-                target: RuleTarget::Entity(npc_id),
-                active: false,
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "deactivate-npc",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::SetEntityActive {
+                    target: RuleTarget::Entity(npc_id),
+                    active: false,
+                }],
+            )],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     let entity = state.world().entity_manager().get_entity(npc_id).unwrap();
-    assert!(!entity.attributes.behavior.active, "Entity should be inactive");
+    assert!(
+        !entity.attributes.behavior.active,
+        "Entity should be inactive"
+    );
 }
 
 #[test]
@@ -4844,25 +5390,31 @@ fn set_entity_active_true_makes_entity_active() {
 
     // Deactivate first
     state
-        .world_mut().entity_manager_mut()
+        .world_mut()
+        .entity_manager_mut()
         .get_entity_mut(npc_id)
         .unwrap()
         .attributes
-        .behavior.active = false;
+        .behavior
+        .active = false;
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "activate-npc",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::SetEntityActive {
-                target: RuleTarget::Entity(npc_id),
-                active: true,
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "activate-npc",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::SetEntityActive {
+                    target: RuleTarget::Entity(npc_id),
+                    active: true,
+                }],
+            )],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
@@ -4877,29 +5429,43 @@ fn teleport_entity_moves_to_specified_position() {
     let mut state = GameState::new_empty();
     let npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
 
-    let initial_pos = state.world().entity_manager().get_entity(npc_id).unwrap().position;
+    let initial_pos = state
+        .world()
+        .entity_manager()
+        .get_entity(npc_id)
+        .unwrap()
+        .position;
     assert_eq!(initial_pos, IVec2::new(50, 50));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "teleport-npc",
-            RuleTrigger::OnUpdate,
-            0,
-            vec![RuleAction::TeleportEntity {
-                target: RuleTarget::Entity(npc_id),
-                tile_x: 5,
-                tile_y: 6,
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "teleport-npc",
+                RuleTrigger::OnUpdate,
+                0,
+                vec![RuleAction::TeleportEntity {
+                    target: RuleTarget::Entity(npc_id),
+                    tile_x: 5,
+                    tile_y: 6,
+                }],
+            )],
+        },
+    );
 
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let new_pos = state.world().entity_manager().get_entity(npc_id).unwrap().position;
+    let new_pos = state
+        .world()
+        .entity_manager()
+        .get_entity(npc_id)
+        .unwrap()
+        .position;
     // tile_x=5, tile_y=6 with 16x16 tiles -> pixel position (80, 96)
     assert_eq!(new_pos, IVec2::new(80, 96));
 }
@@ -4910,35 +5476,42 @@ fn teleport_entity_works_with_trigger_self() {
     let _npc_id = SceneSystem::spawn_player_like_npc(&mut state, IVec2::new(50, 50));
     let player_id = SceneSystem::spawn_player_at(&mut state, IVec2::new(48, 48));
 
-    RuleSystem::set_rules(&mut state, RuleSet {
-        rules: vec![base_rule(
-            "teleport-on-collision",
-            RuleTrigger::OnCollision { entity: None },
-            0,
-            vec![RuleAction::TeleportEntity {
-                target: RuleTarget::TriggerSelf,
-                tile_x: 6,
-                tile_y: 6,
-            }],
-        )],
-    });
+    RuleSystem::set_rules(
+        &mut state,
+        RuleSet {
+            rules: vec![base_rule(
+                "teleport-on-collision",
+                RuleTrigger::OnCollision { entity: None },
+                0,
+                vec![RuleAction::TeleportEntity {
+                    target: RuleTarget::TriggerSelf,
+                    tile_x: 6,
+                    tile_y: 6,
+                }],
+            )],
+        },
+    );
 
     // Move player to collide with NPC, then check if teleport happened
     InputSystem::handle_key_press(state.runtime_mut(), InputKey::Right);
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
     InputSystem::handle_key_release(state.runtime_mut(), InputKey::Right);
-    GameSimulation::tick_fixed(&mut state, 
+    GameSimulation::tick_fixed(
+        &mut state,
         UVec2::new(512, 512),
         &create_test_tilemap(),
         &create_test_atlas(),
     );
 
-    let player_pos = state.world().entity_manager()
+    let player_pos = state
+        .world()
+        .entity_manager()
         .get_entity(player_id)
         .unwrap()
         .position;

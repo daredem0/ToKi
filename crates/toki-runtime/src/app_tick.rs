@@ -175,7 +175,8 @@ impl App {
                     }
                 }
             }
-            let viewport_scale_factor = self.rendering.viewport_presentation().layout.resolved_scale;
+            let viewport_scale_factor =
+                self.rendering.viewport_presentation().layout.resolved_scale;
             self.performance
                 .set_viewport_scale_factor(viewport_scale_factor);
             WorldFramePresenter::new(

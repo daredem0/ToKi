@@ -94,7 +94,8 @@ impl GameState {
                 );
 
                 // Exit previous tile
-                self.runtime.rules
+                self.runtime
+                    .rules
                     .frame_tile_transitions
                     .push(TileTransitionEvent {
                         entity_id,
@@ -104,7 +105,8 @@ impl GameState {
                     });
 
                 // Enter new tile
-                self.runtime.rules
+                self.runtime
+                    .rules
                     .frame_tile_transitions
                     .push(TileTransitionEvent {
                         entity_id,
@@ -116,7 +118,8 @@ impl GameState {
         }
 
         // Update stored tile position
-        self.runtime.rules
+        self.runtime
+            .rules
             .entity_tile_positions
             .insert(entity_id, (current_tile_x, current_tile_y));
     }

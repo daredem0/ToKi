@@ -37,8 +37,12 @@ impl NodeEditorContext {
         let scene_index = ui_state.scenes.iter().position(|s| s.name == scene_name)?;
         let scene_rules = ui_state.scenes[scene_index].rules.clone();
         let before_rules = scene_rules.clone();
-        let before_graph = crate::ui::editor_ui::rule_graph_for_scene(ui_state, scene_name).cloned();
-        let before_layout = crate::ui::editor_context::graph_state(ui_state).layouts_by_scene.get(scene_name).cloned();
+        let before_graph =
+            crate::ui::editor_ui::rule_graph_for_scene(ui_state, scene_name).cloned();
+        let before_layout = crate::ui::editor_context::graph_state(ui_state)
+            .layouts_by_scene
+            .get(scene_name)
+            .cloned();
 
         crate::ui::editor_ui::sync_rule_graph_with_rule_set(ui_state, scene_name, &scene_rules);
 

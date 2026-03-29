@@ -35,7 +35,11 @@ pub fn render_entity_browser(
 fn render_search_box(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
     ui.horizontal(|ui| {
         ui.label("Search:");
-        ui.text_edit_singleline(&mut crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.search_query);
+        ui.text_edit_singleline(
+            &mut crate::ui::editor_context::entity_editor_state_mut(ui_state)
+                .filter
+                .search_query,
+        );
     });
 }
 
@@ -52,21 +56,33 @@ fn render_category_filter(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
         ui.label("Category:");
         egui::ComboBox::from_id_salt("entity_category_filter")
             .selected_text(
-                if crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.category_filter.is_empty() {
+                if crate::ui::editor_context::entity_editor_state_mut(ui_state)
+                    .filter
+                    .category_filter
+                    .is_empty()
+                {
                     "All"
                 } else {
-                    &crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.category_filter
+                    &crate::ui::editor_context::entity_editor_state_mut(ui_state)
+                        .filter
+                        .category_filter
                 },
             )
             .show_ui(ui, |ui| {
                 if ui
                     .selectable_label(
-                        crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.category_filter.is_empty(),
+                        crate::ui::editor_context::entity_editor_state_mut(ui_state)
+                            .filter
+                            .category_filter
+                            .is_empty(),
                         "All",
                     )
                     .clicked()
                 {
-                    crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.category_filter.clear();
+                    crate::ui::editor_context::entity_editor_state_mut(ui_state)
+                        .filter
+                        .category_filter
+                        .clear();
                 }
 
                 for category in &categories {
@@ -77,7 +93,9 @@ fn render_category_filter(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
                         .category_filter
                         .eq_ignore_ascii_case(category);
                     if ui.selectable_label(is_selected, category).clicked() {
-                        crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.category_filter = category.clone();
+                        crate::ui::editor_context::entity_editor_state_mut(ui_state)
+                            .filter
+                            .category_filter = category.clone();
                     }
                 }
             });
@@ -85,8 +103,14 @@ fn render_category_filter(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
 }
 
 fn render_clear_filters_button(ui: &mut egui::Ui, ui_state: &mut EditorUI) {
-    if crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.is_active() && ui.button("Clear Filters").clicked() {
-        crate::ui::editor_context::entity_editor_state_mut(ui_state).filter.clear();
+    if crate::ui::editor_context::entity_editor_state_mut(ui_state)
+        .filter
+        .is_active()
+        && ui.button("Clear Filters").clicked()
+    {
+        crate::ui::editor_context::entity_editor_state_mut(ui_state)
+            .filter
+            .clear();
     }
 }
 
@@ -173,6 +197,8 @@ fn handle_deferred_actions(
     }
 
     if let Some(name) = delete_entity {
-        crate::ui::editor_context::entity_editor_state_mut(ui_state).delete_confirmation.open(&name);
+        crate::ui::editor_context::entity_editor_state_mut(ui_state)
+            .delete_confirmation
+            .open(&name);
     }
 }

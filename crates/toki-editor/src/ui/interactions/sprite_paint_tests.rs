@@ -586,7 +586,11 @@ fn draw_rectangle_outline_basic() {
     }
     // Bottom edge
     for x in 1..=6 {
-        assert_eq!(canvas.get_pixel(x, 6), Some(color), "Bottom edge at ({x}, 6)");
+        assert_eq!(
+            canvas.get_pixel(x, 6),
+            Some(color),
+            "Bottom edge at ({x}, 6)"
+        );
     }
     // Left edge
     for y in 1..=6 {
@@ -594,7 +598,11 @@ fn draw_rectangle_outline_basic() {
     }
     // Right edge
     for y in 1..=6 {
-        assert_eq!(canvas.get_pixel(6, y), Some(color), "Right edge at (6, {y})");
+        assert_eq!(
+            canvas.get_pixel(6, y),
+            Some(color),
+            "Right edge at (6, {y})"
+        );
     }
     // Interior should be transparent
     assert_eq!(canvas.get_pixel(3, 3), Some(PixelColor::transparent()));
@@ -688,7 +696,11 @@ fn draw_rectangle_filled_basic() {
     // All interior pixels painted
     for y in 2..=5 {
         for x in 2..=5 {
-            assert_eq!(canvas.get_pixel(x, y), Some(color), "Interior at ({x}, {y})");
+            assert_eq!(
+                canvas.get_pixel(x, y),
+                Some(color),
+                "Interior at ({x}, {y})"
+            );
         }
     }
     // Outside should be transparent
@@ -735,14 +747,33 @@ fn draw_ellipse_outline_circle() {
     let cx = 9;
     let cy = 9;
     let r = 7; // (17-2)/2 = 7
-    // Top and bottom
-    assert_eq!(canvas.get_pixel(cx as u32, (cy - r) as u32), Some(color), "Top");
-    assert_eq!(canvas.get_pixel(cx as u32, (cy + r) as u32), Some(color), "Bottom");
+               // Top and bottom
+    assert_eq!(
+        canvas.get_pixel(cx as u32, (cy - r) as u32),
+        Some(color),
+        "Top"
+    );
+    assert_eq!(
+        canvas.get_pixel(cx as u32, (cy + r) as u32),
+        Some(color),
+        "Bottom"
+    );
     // Left and right
-    assert_eq!(canvas.get_pixel((cx - r) as u32, cy as u32), Some(color), "Left");
-    assert_eq!(canvas.get_pixel((cx + r) as u32, cy as u32), Some(color), "Right");
+    assert_eq!(
+        canvas.get_pixel((cx - r) as u32, cy as u32),
+        Some(color),
+        "Left"
+    );
+    assert_eq!(
+        canvas.get_pixel((cx + r) as u32, cy as u32),
+        Some(color),
+        "Right"
+    );
     // Center should be transparent (outline only)
-    assert_eq!(canvas.get_pixel(cx as u32, cy as u32), Some(PixelColor::transparent()));
+    assert_eq!(
+        canvas.get_pixel(cx as u32, cy as u32),
+        Some(PixelColor::transparent())
+    );
 }
 
 #[test]
@@ -809,7 +840,11 @@ fn draw_ellipse_outline_backwards_coords() {
 
     for y in 0..16 {
         for x in 0..16 {
-            assert_eq!(canvas1.get_pixel(x, y), canvas2.get_pixel(x, y), "Mismatch at ({x}, {y})");
+            assert_eq!(
+                canvas1.get_pixel(x, y),
+                canvas2.get_pixel(x, y),
+                "Mismatch at ({x}, {y})"
+            );
         }
     }
 }
@@ -875,14 +910,20 @@ fn full_canvas_symmetry(w: u32, h: u32, horizontal: bool, vertical: bool) -> Sym
 
 #[test]
 fn mirror_x_basic() {
-    let bounds = SymmetryBounds { origin: UVec2::new(0, 0), size: UVec2::new(16, 16) };
+    let bounds = SymmetryBounds {
+        origin: UVec2::new(0, 0),
+        size: UVec2::new(16, 16),
+    };
     let result = bounds.mirror_x(IVec2::new(3, 5));
     assert_eq!(result, IVec2::new(12, 5));
 }
 
 #[test]
 fn mirror_y_basic() {
-    let bounds = SymmetryBounds { origin: UVec2::new(0, 0), size: UVec2::new(16, 16) };
+    let bounds = SymmetryBounds {
+        origin: UVec2::new(0, 0),
+        size: UVec2::new(16, 16),
+    };
     let result = bounds.mirror_y(IVec2::new(5, 3));
     assert_eq!(result, IVec2::new(5, 12));
 }
@@ -890,7 +931,10 @@ fn mirror_y_basic() {
 #[test]
 fn mirror_x_with_offset_bounds() {
     // Sheet mode: cell at (16, 0) with size 16x16
-    let bounds = SymmetryBounds { origin: UVec2::new(16, 0), size: UVec2::new(16, 16) };
+    let bounds = SymmetryBounds {
+        origin: UVec2::new(16, 0),
+        size: UVec2::new(16, 16),
+    };
     let result = bounds.mirror_x(IVec2::new(19, 5));
     // local_x = 19 - 16 = 3, mirror = 15 - 3 = 12, result = 12 + 16 = 28
     assert_eq!(result, IVec2::new(28, 5));
@@ -898,7 +942,10 @@ fn mirror_x_with_offset_bounds() {
 
 #[test]
 fn mirror_positions_both_axes() {
-    let bounds = SymmetryBounds { origin: UVec2::new(0, 0), size: UVec2::new(16, 16) };
+    let bounds = SymmetryBounds {
+        origin: UVec2::new(0, 0),
+        size: UVec2::new(16, 16),
+    };
     let positions = bounds.mirror_positions(IVec2::new(3, 3), true, true);
     assert_eq!(positions.len(), 4);
     assert!(positions.contains(&IVec2::new(3, 3)));
@@ -912,7 +959,10 @@ fn mirror_positions_on_axis_deduplicates() {
     // For a 16-wide canvas, position 7 mirrors to 8 (different).
     // But for an 8-wide canvas, position 3 mirrors to 4, and position 4 mirrors to 3.
     // True on-axis: for a 15-wide canvas, position 7 mirrors to 7 (same).
-    let bounds = SymmetryBounds { origin: UVec2::new(0, 0), size: UVec2::new(15, 15) };
+    let bounds = SymmetryBounds {
+        origin: UVec2::new(0, 0),
+        size: UVec2::new(15, 15),
+    };
     let positions = bounds.mirror_positions(IVec2::new(7, 7), true, true);
     // 7 mirrors to 14-7=7, so all 4 positions collapse to 1
     assert_eq!(positions.len(), 1);
@@ -989,7 +1039,10 @@ fn paint_brush_symmetric_in_cell_bounds() {
     let color = PixelColor::rgb(255, 0, 0);
     // Symmetry within cell at (16, 0) size 16x16
     let sym = SymmetryConfig {
-        bounds: SymmetryBounds { origin: UVec2::new(16, 0), size: UVec2::new(16, 16) },
+        bounds: SymmetryBounds {
+            origin: UVec2::new(16, 0),
+            size: UVec2::new(16, 16),
+        },
         horizontal: true,
         vertical: false,
     };
@@ -1120,7 +1173,13 @@ fn paint_brush_dithered_none_paints_all() {
     let mut canvas = create_test_canvas(10, 10);
     let color = PixelColor::rgb(255, 0, 0);
 
-    SpritePaintInteraction::paint_brush_dithered(&mut canvas, IVec2::new(4, 4), color, 3, DitherPattern::None);
+    SpritePaintInteraction::paint_brush_dithered(
+        &mut canvas,
+        IVec2::new(4, 4),
+        color,
+        3,
+        DitherPattern::None,
+    );
 
     // All 9 pixels should be painted
     for y in 3..=5 {
@@ -1136,7 +1195,13 @@ fn paint_brush_dithered_checker50() {
     let mut canvas = create_test_canvas(10, 10);
     let color = PixelColor::rgb(255, 0, 0);
 
-    SpritePaintInteraction::paint_brush_dithered(&mut canvas, IVec2::new(4, 4), color, 3, DitherPattern::Checker50);
+    SpritePaintInteraction::paint_brush_dithered(
+        &mut canvas,
+        IVec2::new(4, 4),
+        color,
+        3,
+        DitherPattern::Checker50,
+    );
 
     // Checkerboard within 3x3 area (3,3)→(5,5)
     // (3,3) → 3+3=6 even → painted
@@ -1154,8 +1219,20 @@ fn paint_brush_dithered_checker50_position_matters() {
     let color = PixelColor::rgb(255, 0, 0);
 
     // Paint at (4,4) and (5,5) — both use canvas-global coords for dither
-    SpritePaintInteraction::paint_brush_dithered(&mut canvas, IVec2::new(4, 4), color, 1, DitherPattern::Checker50);
-    SpritePaintInteraction::paint_brush_dithered(&mut canvas, IVec2::new(5, 5), color, 1, DitherPattern::Checker50);
+    SpritePaintInteraction::paint_brush_dithered(
+        &mut canvas,
+        IVec2::new(4, 4),
+        color,
+        1,
+        DitherPattern::Checker50,
+    );
+    SpritePaintInteraction::paint_brush_dithered(
+        &mut canvas,
+        IVec2::new(5, 5),
+        color,
+        1,
+        DitherPattern::Checker50,
+    );
 
     // (4,4) sum=8 even → painted
     assert_eq!(canvas.get_pixel(4, 4), Some(color));
@@ -1171,7 +1248,12 @@ fn paint_brush_dithered_symmetric_horizontal() {
     let sym = full_canvas_symmetry(16, 16, true, false);
 
     SpritePaintInteraction::paint_brush_dithered_symmetric(
-        &mut canvas, IVec2::new(3, 4), color, 1, DitherPattern::Checker50, &sym,
+        &mut canvas,
+        IVec2::new(3, 4),
+        color,
+        1,
+        DitherPattern::Checker50,
+        &sym,
     );
 
     // (3,4) sum=7 odd → NOT painted
@@ -1188,7 +1270,12 @@ fn paint_brush_dithered_symmetric_no_symmetry() {
     let sym = full_canvas_symmetry(16, 16, false, false);
 
     SpritePaintInteraction::paint_brush_dithered_symmetric(
-        &mut canvas, IVec2::new(4, 4), color, 1, DitherPattern::None, &sym,
+        &mut canvas,
+        IVec2::new(4, 4),
+        color,
+        1,
+        DitherPattern::None,
+        &sym,
     );
 
     assert_eq!(canvas.get_pixel(4, 4), Some(color));

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt;
 
 use crate::entity::{EntityId, EntityKind};
 use crate::flags::FlagValue;

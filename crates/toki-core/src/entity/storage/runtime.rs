@@ -70,7 +70,12 @@ impl EntityStorage {
             .map(|entity| StoredEntity::new(entity, self.components.optional_components(id)))
     }
 
-    pub fn clone_entity(&mut self, source_id: EntityId, new_id: EntityId, position: glam::IVec2) -> Option<EntityId> {
+    pub fn clone_entity(
+        &mut self,
+        source_id: EntityId,
+        new_id: EntityId,
+        position: glam::IVec2,
+    ) -> Option<EntityId> {
         let source = self.entities.get(&source_id)?;
         let mut cloned = source.clone();
         cloned.id = new_id;

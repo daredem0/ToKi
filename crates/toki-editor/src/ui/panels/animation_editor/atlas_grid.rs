@@ -25,10 +25,17 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
         // Atlas selector
         ui.horizontal(|ui| {
             ui.label("Atlas:");
-            let mut atlas = crate::ui::editor_context::animation_state_mut(ui_state).authoring.atlas_name.clone();
+            let mut atlas = crate::ui::editor_context::animation_state_mut(ui_state)
+                .authoring
+                .atlas_name
+                .clone();
             if ui.text_edit_singleline(&mut atlas).changed() {
-                crate::ui::editor_context::animation_state_mut(ui_state).authoring.atlas_name = atlas;
-                crate::ui::editor_context::animation_state_mut(ui_state).authoring.dirty = true;
+                crate::ui::editor_context::animation_state_mut(ui_state)
+                    .authoring
+                    .atlas_name = atlas;
+                crate::ui::editor_context::animation_state_mut(ui_state)
+                    .authoring
+                    .dirty = true;
             }
         });
         return;
@@ -66,7 +73,9 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
     ui.horizontal(|ui| {
         ui.label("Zoom:");
         if ui.button("-").clicked() {
-            crate::ui::editor_context::animation_state_mut(ui_state).atlas_viewport.zoom_out();
+            crate::ui::editor_context::animation_state_mut(ui_state)
+                .atlas_viewport
+                .zoom_out();
         }
         ui.label(format!(
             "{:.1}x",
@@ -75,7 +84,9 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
                 .zoom
         ));
         if ui.button("+").clicked() {
-            crate::ui::editor_context::animation_state_mut(ui_state).atlas_viewport.zoom_in();
+            crate::ui::editor_context::animation_state_mut(ui_state)
+                .atlas_viewport
+                .zoom_in();
         }
         ui.separator();
         ui.label("Click cells to add frames to clip");
@@ -107,18 +118,26 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
         let scroll_delta = ui.input(|input| input.smooth_scroll_delta.y);
         if scroll_delta != 0.0 {
             if scroll_delta > 0.0 {
-                crate::ui::editor_context::animation_state_mut(ui_state).atlas_viewport.zoom_in();
+                crate::ui::editor_context::animation_state_mut(ui_state)
+                    .atlas_viewport
+                    .zoom_in();
             } else {
-                crate::ui::editor_context::animation_state_mut(ui_state).atlas_viewport.zoom_out();
+                crate::ui::editor_context::animation_state_mut(ui_state)
+                    .atlas_viewport
+                    .zoom_out();
             }
         }
 
         // Handle +/- keys for zoom
         if ui.input(|i| i.key_pressed(egui::Key::Plus) || i.key_pressed(egui::Key::Equals)) {
-            crate::ui::editor_context::animation_state_mut(ui_state).atlas_viewport.zoom_in();
+            crate::ui::editor_context::animation_state_mut(ui_state)
+                .atlas_viewport
+                .zoom_in();
         }
         if ui.input(|i| i.key_pressed(egui::Key::Minus)) {
-            crate::ui::editor_context::animation_state_mut(ui_state).atlas_viewport.zoom_out();
+            crate::ui::editor_context::animation_state_mut(ui_state)
+                .atlas_viewport
+                .zoom_out();
         }
     }
 
@@ -131,7 +150,9 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
             .screen_to_canvas(glam::Vec2::new(hover_pos.x, hover_pos.y), rect);
         glam::IVec2::new(canvas_pos.x.floor() as i32, canvas_pos.y.floor() as i32)
     });
-    crate::ui::editor_context::animation_state_mut(ui_state).atlas_viewport.cursor_canvas_pos = cursor_canvas_pos;
+    crate::ui::editor_context::animation_state_mut(ui_state)
+        .atlas_viewport
+        .cursor_canvas_pos = cursor_canvas_pos;
 
     // Draw background
     let painter = ui.painter_at(rect);
@@ -188,7 +209,9 @@ pub fn render_atlas_grid(ui: &mut egui::Ui, ui_state: &mut EditorUI, ctx: &egui:
 
     // Apply deferred add
     if let Some((col, row)) = add_frame {
-        crate::ui::editor_context::animation_state_mut(ui_state).authoring.add_frame_to_selected(col, row);
+        crate::ui::editor_context::animation_state_mut(ui_state)
+            .authoring
+            .add_frame_to_selected(col, row);
     }
 
     // Draw canvas border
@@ -328,13 +351,9 @@ fn ensure_atlas_texture(ui_state: &mut EditorUI, ctx: &egui::Context) {
     let available_palettes = ui_state.project.available_palettes.clone();
     let indexed_palette_override = ui_state.project.indexed_palette_override.clone();
 
-    let cache_key = texture_preview_cache_key(
-        &png_path,
-        atlas_color_mode,
-        atlas_palette_id.as_deref(),
-    );
-    if atlas_has_texture && atlas_texture_cache_key.as_deref() == Some(cache_key.as_str())
-    {
+    let cache_key =
+        texture_preview_cache_key(&png_path, atlas_color_mode, atlas_palette_id.as_deref());
+    if atlas_has_texture && atlas_texture_cache_key.as_deref() == Some(cache_key.as_str()) {
         return;
     }
 
@@ -353,12 +372,11 @@ fn ensure_atlas_texture(ui_state: &mut EditorUI, ctx: &egui::Context) {
         return;
     };
 
-    crate::ui::editor_context::animation_state_mut(ui_state).atlas_image_size = Some((decoded.width, decoded.height));
-    crate::ui::editor_context::animation_state_mut(ui_state).atlas_texture_cache_key = Some(texture_preview_cache_key(
-        &png_path,
-        atlas_color_mode,
-        palette_id.as_deref(),
-    ));
+    crate::ui::editor_context::animation_state_mut(ui_state).atlas_image_size =
+        Some((decoded.width, decoded.height));
+    crate::ui::editor_context::animation_state_mut(ui_state).atlas_texture_cache_key = Some(
+        texture_preview_cache_key(&png_path, atlas_color_mode, palette_id.as_deref()),
+    );
 
     let color_image = egui::ColorImage::from_rgba_unmultiplied(
         [decoded.width as usize, decoded.height as usize],

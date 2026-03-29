@@ -58,11 +58,13 @@ impl PanelSystem {
         let display_rect = viewport_ctx.display_rect();
 
         if let Some(world_pos) = viewport_ctx.hover_world_from_response(&response) {
-            ui_state.scene_viewport_context_mut().viewport_cursor.world_position =
-                Some(glam::IVec2::new(
-                    world_pos.x.floor() as i32,
-                    world_pos.y.floor() as i32,
-                ));
+            ui_state
+                .scene_viewport_context_mut()
+                .viewport_cursor
+                .world_position = Some(glam::IVec2::new(
+                world_pos.x.floor() as i32,
+                world_pos.y.floor() as i32,
+            ));
         }
 
         if !ui_state

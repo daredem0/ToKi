@@ -15,12 +15,12 @@ use adjustments::{
     quantize_strategy_label, slider_to_target_fps, target_fps_to_slider,
 };
 pub(crate) use overlay::{GraphicsSettingKey, RuntimeMenuOverlay, RuntimeOverlayEntry};
+#[cfg(test)]
+use presentation::rect_contains;
 use presentation::{
     compose_runtime_settings_ui, runtime_overlay_hit_target_at_position,
     runtime_overlay_slider_rect, slider_percent_from_position, RuntimeOverlayHitTarget,
 };
-#[cfg(test)]
-use presentation::rect_contains;
 
 const SETTING_STEP_PERCENT: u8 = 5;
 const TINT_CHANNEL_STEP: u8 = 16;

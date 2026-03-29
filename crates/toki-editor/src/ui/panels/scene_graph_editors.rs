@@ -284,7 +284,11 @@ impl PanelSystem {
                 ui.label("Fade Override (ms)");
                 let mut value = duration_ms.unwrap_or(0) as i64;
                 if ui
-                    .add(egui::DragValue::new(&mut value).speed(1.0).range(0..=60_000))
+                    .add(
+                        egui::DragValue::new(&mut value)
+                            .speed(1.0)
+                            .range(0..=60_000),
+                    )
                     .changed()
                 {
                     *duration_ms = if value <= 0 { None } else { Some(value as u32) };

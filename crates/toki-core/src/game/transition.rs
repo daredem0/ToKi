@@ -276,8 +276,8 @@ mod tests {
     use crate::animation::AnimationState;
     use crate::entity::{
         AiConfig, AnimationClipDef, AnimationsDef, AttributesDef, AudioDef, CollisionDef,
-        ControlRole, EntityDefinition, OptionalEntityComponents, MovementProfile,
-        MovementSoundTrigger, RenderingDef, StoredEntity,
+        ControlRole, EntityDefinition, MovementProfile, MovementSoundTrigger,
+        OptionalEntityComponents, RenderingDef, StoredEntity,
     };
     use crate::entity::{EntityFootprint, EntityGrounding};
     use crate::scene::{Scene, SceneAnchor, SceneAnchorKind, ScenePlayerEntry};
@@ -368,12 +368,7 @@ mod tests {
             .as_mut()
             .expect("inventory should exist")
             .add_item("coin", 2);
-        if let Some(controller) = preserved
-            .attributes
-            .rendering
-            .animation_controller
-            .as_mut()
-        {
+        if let Some(controller) = preserved.attributes.rendering.animation_controller.as_mut() {
             controller.play(AnimationState::AttackLeft);
         }
 
@@ -394,7 +389,9 @@ mod tests {
         assert_eq!(
             prepared
                 .entity_manager
-                .storage().components().inventory(player.id)
+                .storage()
+                .components()
+                .inventory(player.id)
                 .expect("player inventory should exist")
                 .item_count("coin"),
             2

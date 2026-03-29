@@ -1,7 +1,6 @@
 use super::{
-    dynamic_buffer::DynamicVertexBuffer,
     build_standard_render_pipeline, create_mvp_uniform_buffer, create_texture_bindgroup_for_source,
-    write_uniform_buffer, RenderPipeline, TextureSource,
+    dynamic_buffer::DynamicVertexBuffer, write_uniform_buffer, RenderPipeline, TextureSource,
 };
 use crate::draw::build_quad_vertices;
 use crate::vertex::VertexLayout;

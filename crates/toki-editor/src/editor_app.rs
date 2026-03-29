@@ -294,7 +294,10 @@ impl EditorApp {
 
         if self.core.ui.workspace.center_panel_tab == CenterPanelTab::SpriteEditor {
             return crate::ui::editor_context::sprite_state(&self.core.ui).has_floating()
-                || crate::ui::editor_context::sprite_state(&self.core.ui).active().selection.is_some();
+                || crate::ui::editor_context::sprite_state(&self.core.ui)
+                    .active()
+                    .selection
+                    .is_some();
         }
 
         false
@@ -522,7 +525,10 @@ impl ApplicationHandler for EditorApp {
                                 // Copy only applies to sprite editor
                                 if self.core.ui.workspace.center_panel_tab
                                     == CenterPanelTab::SpriteEditor
-                                    && crate::ui::editor_context::sprite_state_mut(&mut self.core.ui).copy_selection()
+                                    && crate::ui::editor_context::sprite_state_mut(
+                                        &mut self.core.ui,
+                                    )
+                                    .copy_selection()
                                 {
                                     tracing::debug!("Sprite editor: copied selection to clipboard");
                                 }
@@ -532,15 +538,23 @@ impl ApplicationHandler for EditorApp {
                                 if self.core.ui.workspace.center_panel_tab
                                     == CenterPanelTab::SpriteEditor
                                 {
-                                    let side = crate::ui::editor_context::sprite_state_mut(&mut self.core.ui).active_canvas;
-                                    let sprite =
-                                        crate::ui::editor_context::sprite_state_mut(&mut self.core.ui);
+                                    let side = crate::ui::editor_context::sprite_state_mut(
+                                        &mut self.core.ui,
+                                    )
+                                    .active_canvas;
+                                    let sprite = crate::ui::editor_context::sprite_state_mut(
+                                        &mut self.core.ui,
+                                    );
                                     // Use (0, 0) as fallback if no cursor position
                                     if sprite.canvas_state(side).cursor_canvas_pos.is_none() {
                                         sprite.canvas_state_mut(side).cursor_canvas_pos =
                                             Some(IVec2::new(0, 0));
                                     }
-                                    if crate::ui::editor_context::sprite_state_mut(&mut self.core.ui).paste_at_cursor(side) {
+                                    if crate::ui::editor_context::sprite_state_mut(
+                                        &mut self.core.ui,
+                                    )
+                                    .paste_at_cursor(side)
+                                    {
                                         tracing::info!(
                                             "Sprite editor: pasted at cursor on {:?}",
                                             side
@@ -722,12 +736,11 @@ impl EditorApp {
             return;
         }
 
-        let placement_entity_definition = crate::ui::editor_context::scene_viewport_context(
-            &self.core.ui,
-        )
-            .placement
-            .entity_definition()
-            .map(str::to_string);
+        let placement_entity_definition =
+            crate::ui::editor_context::scene_viewport_context(&self.core.ui)
+                .placement
+                .entity_definition()
+                .map(str::to_string);
         if let (Some(entity_def), Some(project_path), Some(project_assets)) = (
             placement_entity_definition.as_deref(),
             project_path,
@@ -744,7 +757,9 @@ impl EditorApp {
                 )
                 .as_deref(),
             );
-            crate::ui::editor_context::scene_viewport_context_mut(&mut self.core.ui).placement.preview_cached_frame = cached_frame;
+            crate::ui::editor_context::scene_viewport_context_mut(&mut self.core.ui)
+                .placement
+                .preview_cached_frame = cached_frame;
         }
     }
 
@@ -870,29 +885,37 @@ impl EditorApp {
         scene_viewport: &crate::scene::SceneViewport,
         scene_player_overlay_sprites: Vec<crate::scene::viewport::OverlaySpriteInstance>,
     ) -> ViewportOverlayData {
-        let placement_preview =
-            if crate::ui::editor_context::scene_viewport_context(ui_state)
+        let placement_preview = if crate::ui::editor_context::scene_viewport_context(ui_state)
+            .placement
+            .is_in_placement_mode()
+            && crate::ui::editor_context::scene_viewport_context(ui_state)
                 .placement
-                .is_in_placement_mode()
-                && crate::ui::editor_context::scene_viewport_context(ui_state)
+                .entity_move_drag
+                .is_none()
+        {
+            let is_valid = crate::ui::editor_context::scene_viewport_context(ui_state)
+                .placement
+                .preview_valid
+                .unwrap_or(true);
+            match (
+                crate::ui::editor_context::scene_viewport_context(ui_state)
                     .placement
-                    .entity_move_drag
-                    .is_none()
-            {
-                let is_valid = crate::ui::editor_context::scene_viewport_context(ui_state).placement.preview_valid.unwrap_or(true);
-                match (
-                    crate::ui::editor_context::scene_viewport_context(ui_state).placement.entity_definition(),
-                    &crate::ui::editor_context::scene_viewport_context(ui_state).placement.preview_position,
-                    &crate::ui::editor_context::scene_viewport_context(ui_state).placement.preview_cached_frame,
-                ) {
-                    (Some(_entity_def), Some(position), Some(cached_frame)) => {
-                        Some((*position, cached_frame.clone(), is_valid))
-                    }
-                    _ => None,
+                    .entity_definition(),
+                &crate::ui::editor_context::scene_viewport_context(ui_state)
+                    .placement
+                    .preview_position,
+                &crate::ui::editor_context::scene_viewport_context(ui_state)
+                    .placement
+                    .preview_cached_frame,
+            ) {
+                (Some(_entity_def), Some(position), Some(cached_frame)) => {
+                    Some((*position, cached_frame.clone(), is_valid))
                 }
-            } else {
-                None
-            };
+                _ => None,
+            }
+        } else {
+            None
+        };
 
         let dragged_anchor = crate::ui::editor_context::scene_viewport_context(ui_state)
             .placement
@@ -904,9 +927,17 @@ impl EditorApp {
                 active_scene_name: ui_state.active_scene.as_deref(),
                 scenes: &ui_state.scenes,
                 dragged_anchor,
-                preview_position: crate::ui::editor_context::scene_viewport_context(ui_state).placement.preview_position,
-                preview_valid: crate::ui::editor_context::scene_viewport_context(ui_state).placement.preview_valid.unwrap_or(true),
-                draft_active: crate::ui::editor_context::scene_viewport_context(ui_state).placement.scene_anchor_draft().is_some(),
+                preview_position: crate::ui::editor_context::scene_viewport_context(ui_state)
+                    .placement
+                    .preview_position,
+                preview_valid: crate::ui::editor_context::scene_viewport_context(ui_state)
+                    .placement
+                    .preview_valid
+                    .unwrap_or(true),
+                draft_active: crate::ui::editor_context::scene_viewport_context(ui_state)
+                    .placement
+                    .scene_anchor_draft()
+                    .is_some(),
             },
             scene_viewport.tilemap(),
             Some(config),
@@ -916,18 +947,21 @@ impl EditorApp {
             .entity_move_drag
             .as_ref()
             .and_then(|drag| {
-                crate::ui::editor_context::scene_viewport_context(ui_state).placement.preview_position.map(|preview_position| {
-                    let tilemap = scene_viewport.tilemap();
-                    let terrain_atlas =
-                        tilemap.map(|_| scene_viewport.resources().get_terrain_atlas());
-                    scene_overlays::build_drag_preview_sprites(
-                        &drag.dragged_entities,
-                        drag.entity.position,
-                        preview_position,
-                        tilemap,
-                        terrain_atlas,
-                    )
-                })
+                crate::ui::editor_context::scene_viewport_context(ui_state)
+                    .placement
+                    .preview_position
+                    .map(|preview_position| {
+                        let tilemap = scene_viewport.tilemap();
+                        let terrain_atlas =
+                            tilemap.map(|_| scene_viewport.resources().get_terrain_atlas());
+                        scene_overlays::build_drag_preview_sprites(
+                            &drag.dragged_entities,
+                            drag.entity.position,
+                            preview_position,
+                            tilemap,
+                            terrain_atlas,
+                        )
+                    })
             })
             .unwrap_or_default();
 
@@ -1002,8 +1036,7 @@ impl EditorApp {
         if self.core.ui.visibility.create_test_entities {
             if let Some(viewport) = &mut self.viewports.scene {
                 let game_state = viewport.game_state_mut();
-                let _player_id =
-                    SceneSystem::spawn_player_at(game_state, glam::IVec2::new(80, 72));
+                let _player_id = SceneSystem::spawn_player_at(game_state, glam::IVec2::new(80, 72));
                 let _npc_id =
                     SceneSystem::spawn_player_like_npc(game_state, glam::IVec2::new(120, 72));
                 tracing::info!("Created test entities");
@@ -1050,7 +1083,8 @@ impl EditorApp {
             } else {
                 self.refresh_project_assets_after_rescan();
             }
-            crate::ui::editor_context::sprite_state_mut(&mut self.core.ui).needs_asset_rescan = false;
+            crate::ui::editor_context::sprite_state_mut(&mut self.core.ui).needs_asset_rescan =
+                false;
         }
     }
 }
@@ -1126,9 +1160,17 @@ impl EditorApp {
                 active_scene_name: ui_state.active_scene.as_deref(),
                 scenes: &ui_state.scenes,
                 dragged_anchor,
-                preview_position: crate::ui::editor_context::scene_viewport_context(ui_state).placement.preview_position,
-                preview_valid: crate::ui::editor_context::scene_viewport_context(ui_state).placement.preview_valid.unwrap_or(true),
-                draft_active: crate::ui::editor_context::scene_viewport_context(ui_state).placement.scene_anchor_draft().is_some(),
+                preview_position: crate::ui::editor_context::scene_viewport_context(ui_state)
+                    .placement
+                    .preview_position,
+                preview_valid: crate::ui::editor_context::scene_viewport_context(ui_state)
+                    .placement
+                    .preview_valid
+                    .unwrap_or(true),
+                draft_active: crate::ui::editor_context::scene_viewport_context(ui_state)
+                    .placement
+                    .scene_anchor_draft()
+                    .is_some(),
             },
             tilemap,
             config,

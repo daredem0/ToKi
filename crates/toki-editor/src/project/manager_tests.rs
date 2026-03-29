@@ -10,7 +10,9 @@ use std::path::PathBuf;
 use toki_core::assets::atlas::{AtlasMeta, TileInfo, TileProperties};
 use toki_core::assets::tilemap::TileMap;
 use toki_core::collision::{can_place_collision_box_at_position, CollisionBox};
-use toki_core::game::{AudioChannel, AudioEvent, GameSimulation, InputSystem, RuleSystem, SceneSystem};
+use toki_core::game::{
+    AudioChannel, AudioEvent, GameSimulation, InputSystem, RuleSystem, SceneSystem,
+};
 use toki_core::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 use toki_core::{GameState, InputKey, Scene};
 
@@ -101,18 +103,29 @@ fn top_down_starter_player_is_loaded_as_runtime_player_and_can_move() {
     SceneSystem::load(&mut game_state, &scene_name)
         .expect("starter scene should load into runtime game state");
 
-    let player_id = game_state.world().player_id()
+    let player_id = game_state
+        .world()
+        .player_id()
         .expect("starter scene should provide a player entity");
-    let initial_position = game_state.world().entity_manager()
+    let initial_position = game_state
+        .world()
+        .entity_manager()
         .get_entity(player_id)
         .expect("player should exist")
         .position;
 
     InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Left);
-    let _ = GameSimulation::tick_fixed(&mut game_state, glam::UVec2::new(160, 144), &tilemap, &atlas);
+    let _ = GameSimulation::tick_fixed(
+        &mut game_state,
+        glam::UVec2::new(160, 144),
+        &tilemap,
+        &atlas,
+    );
     InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Left);
 
-    let moved_position = game_state.world().entity_manager()
+    let moved_position = game_state
+        .world()
+        .entity_manager()
         .get_entity(player_id)
         .expect("player should still exist")
         .position;
@@ -137,24 +150,24 @@ fn scene_json_roundtrip_through_editor_persists_rules_and_executes_in_runtime() 
     authored_scene.description = Some("integration test scene".to_string());
     authored_scene.maps = vec!["main_map".to_string()];
     authored_scene.rules = RuleSet {
-            rules: vec![Rule {
-                id: "rule_1".to_string(),
-                enabled: true,
-                priority: 5,
-                once: false,
-        log_enabled: false,
-                trigger: RuleTrigger::OnStart,
-                conditions: vec![RuleCondition::Always],
-                actions: vec![
-                    RuleAction::PlayMusic {
-                        track_id: "lavandia".to_string(),
-                    },
-                    RuleAction::PlaySound {
-                        channel: RuleSoundChannel::Movement,
-                        sound_id: "sfx_slime_bounce".to_string(),
-                    },
-                ],
-            }],
+        rules: vec![Rule {
+            id: "rule_1".to_string(),
+            enabled: true,
+            priority: 5,
+            once: false,
+            log_enabled: false,
+            trigger: RuleTrigger::OnStart,
+            conditions: vec![RuleCondition::Always],
+            actions: vec![
+                RuleAction::PlayMusic {
+                    track_id: "lavandia".to_string(),
+                },
+                RuleAction::PlaySound {
+                    channel: RuleSoundChannel::Movement,
+                    sound_id: "sfx_slime_bounce".to_string(),
+                },
+            ],
+        }],
     };
 
     let scene_path = project_path.join("scenes").join("main.json");
@@ -197,7 +210,8 @@ fn scene_json_roundtrip_through_editor_persists_rules_and_executes_in_runtime() 
     let atlas = test_atlas();
     let tilemap = test_tilemap();
 
-    let first_update = GameSimulation::tick_fixed(&mut game_state, glam::UVec2::new(16, 16), &tilemap, &atlas);
+    let first_update =
+        GameSimulation::tick_fixed(&mut game_state, glam::UVec2::new(16, 16), &tilemap, &atlas);
     assert!(first_update.events.iter().any(|event| {
         matches!(
             event,
@@ -215,7 +229,8 @@ fn scene_json_roundtrip_through_editor_persists_rules_and_executes_in_runtime() 
         )
     }));
 
-    let second_update = GameSimulation::tick_fixed(&mut game_state, glam::UVec2::new(16, 16), &tilemap, &atlas);
+    let second_update =
+        GameSimulation::tick_fixed(&mut game_state, glam::UVec2::new(16, 16), &tilemap, &atlas);
     assert!(!second_update.events.iter().any(|event| {
         matches!(event, AudioEvent::BackgroundMusic(track_id) if track_id == "lavandia")
     }));
@@ -316,7 +331,8 @@ fn on_player_move_fixture_executes_in_runtime_and_emits_expected_audio_event() {
     RuleSystem::set_rules(&mut game_state, scene.rules.clone());
     InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
 
-    let update = GameSimulation::tick_fixed(&mut game_state, 
+    let update = GameSimulation::tick_fixed(
+        &mut game_state,
         glam::UVec2::new(128, 128),
         &movement_test_tilemap(),
         &test_atlas(),

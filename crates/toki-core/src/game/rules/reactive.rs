@@ -68,8 +68,8 @@ mod tests {
     use crate::game::{AudioChannel, DamageEvent, GameState, SceneSystem};
     use crate::rules::{Rule, RuleAction, RuleCondition, RuleSet, RuleSoundChannel, RuleTrigger};
 
-    use crate::game::RuleSystem;
     use super::RuleCommand;
+    use crate::game::RuleSystem;
 
     trait GameStateReactiveRuleTestExt {
         fn set_rules(&mut self, rules: RuleSet);

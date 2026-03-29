@@ -17,4 +17,3 @@ impl<'a> From<super::UpdateContext<'a>> for WorldContext<'a> {
         }
     }
 }
-

@@ -42,7 +42,11 @@ impl OptionalComponentRegistry {
         }
     }
 
-    pub fn apply_optional_components(&mut self, id: EntityId, components: OptionalEntityComponents) {
+    pub fn apply_optional_components(
+        &mut self,
+        id: EntityId,
+        components: OptionalEntityComponents,
+    ) {
         self.set_primary_projectile(id, components.primary_projectile);
         self.set_projectile(id, components.projectile);
         self.set_pickup(id, components.pickup);
@@ -178,7 +182,10 @@ mod tests {
                 inventory: Some(inventory),
             },
         );
-        assert_eq!(registry.primary_projectile_ids().collect::<Vec<_>>(), vec![7]);
+        assert_eq!(
+            registry.primary_projectile_ids().collect::<Vec<_>>(),
+            vec![7]
+        );
         assert_eq!(registry.pickup_ids().collect::<Vec<_>>(), vec![7]);
         assert_eq!(registry.inventory_ids().collect::<Vec<_>>(), vec![7]);
         assert_eq!(

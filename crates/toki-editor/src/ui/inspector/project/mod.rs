@@ -9,9 +9,9 @@ mod transitions;
 
 use super::*;
 use crate::project::apply_project_settings_draft;
-use crate::project::{validate_project_settings_draft, ProjectAssets, ProjectViewportModeDraft};
 #[cfg(test)]
 use crate::project::ProjectSettingsDraft;
+use crate::project::{validate_project_settings_draft, ProjectAssets, ProjectViewportModeDraft};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
@@ -176,7 +176,10 @@ fn rename_flag_references(ui_state: &mut EditorUI, old_id: &str, new_id: &str) {
         }
     }
 
-    if let Some(dialog) = crate::ui::editor_context::dialog_state_mut(ui_state).draft.as_mut() {
+    if let Some(dialog) = crate::ui::editor_context::dialog_state_mut(ui_state)
+        .draft
+        .as_mut()
+    {
         for node in &mut dialog.nodes {
             rename_dialog_conditions(&mut node.conditions, old_id, new_id);
             match &mut node.kind {
@@ -213,11 +216,7 @@ fn rename_rule_condition_flag(
     }
 }
 
-fn rename_rule_action_flag(
-    action: &mut toki_core::rules::RuleAction,
-    old_id: &str,
-    new_id: &str,
-) {
+fn rename_rule_action_flag(action: &mut toki_core::rules::RuleAction, old_id: &str, new_id: &str) {
     match action {
         toki_core::rules::RuleAction::SetFlag { flag, .. }
         | toki_core::rules::RuleAction::IncrementFlag { flag, .. }

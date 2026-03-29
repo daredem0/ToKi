@@ -166,11 +166,7 @@ impl GameState {
         }
     }
 
-    fn apply_entity_mutation_command(
-        &mut self,
-        command: RuleCommand,
-        tilemap: &TileMap,
-    ) -> bool {
+    fn apply_entity_mutation_command(&mut self, command: RuleCommand, tilemap: &TileMap) -> bool {
         match command {
             RuleCommand::DamageEntity { entity_id, amount } => {
                 self.stat_effect_service()

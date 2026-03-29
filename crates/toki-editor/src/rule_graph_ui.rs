@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::ui::editor_domain::{rule_key_label, rule_sound_channel_label, rule_target_label};
 use crate::ui::rule_graph::{RuleGraph, RuleGraphEdge, RuleGraphNodeKind};
-use toki_core::FlagValue;
 use toki_core::rules::{RuleAction, RuleCondition, RuleTrigger};
+use toki_core::FlagValue;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuleGraphSummaryStyle {
@@ -640,7 +640,7 @@ mod tests {
                 enabled: true,
                 priority: 0,
                 once: false,
-        log_enabled: false,
+                log_enabled: false,
                 trigger: RuleTrigger::OnStart,
                 conditions: vec![RuleCondition::Always],
                 actions: vec![RuleAction::PlayMusic {

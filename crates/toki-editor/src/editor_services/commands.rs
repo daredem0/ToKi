@@ -1,6 +1,6 @@
 use crate::project::Project;
-use crate::ui::EditorUI;
 use crate::ui::undo_redo::EditorCommand;
+use crate::ui::EditorUI;
 
 pub fn execute(ui_state: &mut EditorUI, command: EditorCommand) -> bool {
     let mut history = std::mem::take(&mut ui_state.command_history);

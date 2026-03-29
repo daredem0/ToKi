@@ -36,10 +36,9 @@ impl RuleEngine<'_> {
             RuleCondition::TargetExists { target } => {
                 self.resolve_entity(*target, context).is_some()
             }
-            RuleCondition::KeyHeld { key } => {
-                self.held_keys
-                    .contains(&crate::game::GameState::to_input_key(*key))
-            }
+            RuleCondition::KeyHeld { key } => self
+                .held_keys
+                .contains(&crate::game::GameState::to_input_key(*key)),
             RuleCondition::EntityActive { target, is_active } => self
                 .resolve_entity(*target, context)
                 .is_some_and(|entity| entity.attributes.behavior.active == *is_active),

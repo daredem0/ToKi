@@ -2,7 +2,7 @@
 
 use super::{
     canonical_indexed_color, indexed_slot_for_authored_color, CanvasSide, CanvasState,
-    DitherPattern, DiscoveredSpriteAsset, DualCanvasLayout, PixelColor, ResizeAnchor, SpriteCanvas,
+    DiscoveredSpriteAsset, DitherPattern, DualCanvasLayout, PixelColor, ResizeAnchor, SpriteCanvas,
     SpriteEditorTool,
 };
 use std::collections::BTreeMap;

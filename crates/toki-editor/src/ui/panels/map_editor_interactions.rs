@@ -149,10 +149,16 @@ impl PanelSystem {
             return false;
         }
 
-        let Some(object_sheet_name) = crate::ui::editor_context::map_state(ui_state).selected_object_sheet.clone() else {
+        let Some(object_sheet_name) = crate::ui::editor_context::map_state(ui_state)
+            .selected_object_sheet
+            .clone()
+        else {
             return false;
         };
-        let Some(object_name) = crate::ui::editor_context::map_state(ui_state).selected_object_name.clone() else {
+        let Some(object_name) = crate::ui::editor_context::map_state(ui_state)
+            .selected_object_name
+            .clone()
+        else {
             return false;
         };
         let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {
@@ -302,7 +308,8 @@ impl PanelSystem {
         viewport: &mut SceneViewport,
         rect: egui::Rect,
     ) {
-        let Some(drag_state) = crate::ui::editor_context::map_state(ui_state).object_move_drag else {
+        let Some(drag_state) = crate::ui::editor_context::map_state(ui_state).object_move_drag
+        else {
             return;
         };
         let Some(pointer_pos) = ui.input(|input| input.pointer.interact_pos()) else {

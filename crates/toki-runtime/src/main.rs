@@ -366,8 +366,11 @@ fn apply_project_runtime_settings_from_project_file_if_present(
         launch_options.display.target_fps = metadata.runtime.display.target_fps;
         launch_options.display.timing_mode = metadata.runtime.display.timing_mode;
     }
-    launch_options.transition.fade_duration_ms =
-        metadata.runtime.scene_transitions.default_duration_ms.max(1);
+    launch_options.transition.fade_duration_ms = metadata
+        .runtime
+        .scene_transitions
+        .default_duration_ms
+        .max(1);
     launch_options.flags = metadata.runtime.flags.clone();
     if should_apply_menu {
         launch_options.menu = metadata.runtime.menu;

@@ -1,8 +1,8 @@
 use toki_core::project_runtime::PostProcessMode;
 
 use super::adjustments::{
-    channel_to_percent, fps_label, on_off_label, post_process_mode_label,
-    quantize_strategy_label, target_fps_to_slider,
+    channel_to_percent, fps_label, on_off_label, post_process_mode_label, quantize_strategy_label,
+    target_fps_to_slider,
 };
 use super::App;
 

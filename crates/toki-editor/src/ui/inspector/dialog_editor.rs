@@ -38,7 +38,8 @@ impl InspectorSystem {
                 DialogEditorState::new_dialog(&existing);
         }
 
-        if let Some(status) = &crate::ui::editor_context::dialog_state_mut(ui_state).status_message {
+        if let Some(status) = &crate::ui::editor_context::dialog_state_mut(ui_state).status_message
+        {
             ui.label(status);
         }
 
@@ -47,17 +48,24 @@ impl InspectorSystem {
             .max_height(220.0)
             .show(ui, |ui| {
                 for dialog_id in dialog_names {
-                    let is_selected =
-                        crate::ui::editor_context::dialog_state_mut(ui_state).selected_dialog_id.as_deref() == Some(&dialog_id);
+                    let is_selected = crate::ui::editor_context::dialog_state_mut(ui_state)
+                        .selected_dialog_id
+                        .as_deref()
+                        == Some(&dialog_id);
                     if ui.selectable_label(is_selected, &dialog_id).clicked() {
                         match project_assets.load_dialog(&dialog_id) {
-                            Ok(Some(dialog)) => crate::ui::editor_context::dialog_state_mut(ui_state).load_dialog(dialog),
+                            Ok(Some(dialog)) => {
+                                crate::ui::editor_context::dialog_state_mut(ui_state)
+                                    .load_dialog(dialog)
+                            }
                             Ok(None) => {
-                                crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
+                                crate::ui::editor_context::dialog_state_mut(ui_state)
+                                    .status_message =
                                     Some(format!("Dialog '{dialog_id}' no longer exists"));
                             }
                             Err(error) => {
-                                crate::ui::editor_context::dialog_state_mut(ui_state).status_message =
+                                crate::ui::editor_context::dialog_state_mut(ui_state)
+                                    .status_message =
                                     Some(format!("Failed to load dialog '{dialog_id}': {error}"));
                             }
                         }

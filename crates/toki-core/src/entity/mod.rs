@@ -26,8 +26,8 @@ pub use manager::EntityManager;
 pub use model::{
     AiBehavior, AiConfig, ControlRole, Entity, EntityAttributes, EntityAudioComponent,
     EntityAudioSettings, EntityBehavior, EntityFootprint, EntityGameplay, EntityGrounding,
-    EntityId, EntityKind, EntityRendering, EntityStats, MovementProfile,
-    MovementSoundTrigger, StaticObjectRenderDef, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
+    EntityId, EntityKind, EntityRendering, EntityStats, MovementProfile, MovementSoundTrigger,
+    StaticObjectRenderDef, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID,
 };
 pub use storage::{
     EntitySpawnBundle, EntityStorage, Inventory, OptionalComponentRegistry,

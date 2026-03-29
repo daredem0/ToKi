@@ -31,8 +31,11 @@ pub fn render_new_clip_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                     });
 
                 if let Some(state) = created_state {
-                    crate::ui::editor_context::animation_state_mut(ui_state).authoring.create_clip(state);
-                    crate::ui::editor_context::animation_state_mut(ui_state).show_new_clip_dialog = false;
+                    crate::ui::editor_context::animation_state_mut(ui_state)
+                        .authoring
+                        .create_clip(state);
+                    crate::ui::editor_context::animation_state_mut(ui_state).show_new_clip_dialog =
+                        false;
                 }
 
                 ui.separator();
@@ -41,7 +44,10 @@ pub fn render_new_clip_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
             // Custom state input
             ui.label("Or enter custom state name:");
             ui.horizontal(|ui| {
-                ui.text_edit_singleline(&mut crate::ui::editor_context::animation_state_mut(ui_state).new_clip_state_input);
+                ui.text_edit_singleline(
+                    &mut crate::ui::editor_context::animation_state_mut(ui_state)
+                        .new_clip_state_input,
+                );
                 let new_clip_state_input = crate::ui::editor_context::animation_state(ui_state)
                     .new_clip_state_input
                     .trim()
@@ -55,17 +61,28 @@ pub fn render_new_clip_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                     .add_enabled(can_create, egui::Button::new("Create"))
                     .clicked()
                 {
-                    let state = crate::ui::editor_context::animation_state_mut(ui_state).new_clip_state_input.trim().to_string();
-                    crate::ui::editor_context::animation_state_mut(ui_state).authoring.create_clip(&state);
-                    crate::ui::editor_context::animation_state_mut(ui_state).new_clip_state_input.clear();
-                    crate::ui::editor_context::animation_state_mut(ui_state).show_new_clip_dialog = false;
+                    let state = crate::ui::editor_context::animation_state_mut(ui_state)
+                        .new_clip_state_input
+                        .trim()
+                        .to_string();
+                    crate::ui::editor_context::animation_state_mut(ui_state)
+                        .authoring
+                        .create_clip(&state);
+                    crate::ui::editor_context::animation_state_mut(ui_state)
+                        .new_clip_state_input
+                        .clear();
+                    crate::ui::editor_context::animation_state_mut(ui_state).show_new_clip_dialog =
+                        false;
                 }
             });
 
             ui.separator();
             if ui.button("Cancel").clicked() {
-                crate::ui::editor_context::animation_state_mut(ui_state).new_clip_state_input.clear();
-                crate::ui::editor_context::animation_state_mut(ui_state).show_new_clip_dialog = false;
+                crate::ui::editor_context::animation_state_mut(ui_state)
+                    .new_clip_state_input
+                    .clear();
+                crate::ui::editor_context::animation_state_mut(ui_state).show_new_clip_dialog =
+                    false;
             }
         });
 }

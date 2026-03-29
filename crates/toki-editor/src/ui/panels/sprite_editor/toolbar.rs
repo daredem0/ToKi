@@ -45,7 +45,9 @@ pub fn render_toolbar(
                 .add_filter("Images", &["png", "jpg", "jpeg", "bmp"])
                 .pick_file()
             {
-                if let Err(e) = crate::ui::editor_context::sprite_state_mut(ui_state).import_external_image(&path) {
+                if let Err(e) = crate::ui::editor_context::sprite_state_mut(ui_state)
+                    .import_external_image(&path)
+                {
                     tracing::error!("Failed to import image: {}", e);
                 }
             }
@@ -63,13 +65,19 @@ pub fn render_toolbar(
                 .set_file_name("sprite.png")
                 .save_file()
             {
-                if let Err(e) = crate::ui::editor_context::sprite_state_mut(ui_state).export_as_png(&path) {
+                if let Err(e) =
+                    crate::ui::editor_context::sprite_state_mut(ui_state).export_as_png(&path)
+                {
                     tracing::error!("Failed to export image: {}", e);
                 }
             }
         }
 
-        if crate::ui::editor_context::sprite_state_mut(ui_state).has_canvas() && crate::ui::editor_context::sprite_state_mut(ui_state).active().dirty {
+        if crate::ui::editor_context::sprite_state_mut(ui_state).has_canvas()
+            && crate::ui::editor_context::sprite_state_mut(ui_state)
+                .active()
+                .dirty
+        {
             ui.label("Unsaved changes");
         }
 
@@ -90,12 +98,14 @@ pub fn render_toolbar(
         }
 
         // Show active canvas indicator when in dual mode
-        if crate::ui::editor_context::sprite_state_mut(ui_state).layout != DualCanvasLayout::Single {
+        if crate::ui::editor_context::sprite_state_mut(ui_state).layout != DualCanvasLayout::Single
+        {
             ui.separator();
-            let active_label = match crate::ui::editor_context::sprite_state_mut(ui_state).active_canvas {
-                crate::ui::editor_ui::CanvasSide::Left => "Left",
-                crate::ui::editor_ui::CanvasSide::Right => "Right",
-            };
+            let active_label =
+                match crate::ui::editor_context::sprite_state_mut(ui_state).active_canvas {
+                    crate::ui::editor_ui::CanvasSide::Left => "Left",
+                    crate::ui::editor_ui::CanvasSide::Right => "Right",
+                };
             ui.label(format!("Active: {}", active_label));
             if ui
                 .button("Switch")
@@ -111,7 +121,9 @@ pub fn render_toolbar(
     if crate::ui::editor_context::sprite_state_mut(ui_state).has_canvas() {
         ui.horizontal(|ui| {
             ui.label("Tool:");
-            ui.label(tool_label(crate::ui::editor_context::sprite_state_mut(ui_state).tool));
+            ui.label(tool_label(
+                crate::ui::editor_context::sprite_state_mut(ui_state).tool,
+            ));
         });
     }
 }

@@ -20,7 +20,8 @@ impl InspectorSystem {
         }
 
         // Entity info
-        if let Some(name) = &crate::ui::editor_context::animation_state_mut(ui_state).active_entity {
+        if let Some(name) = &crate::ui::editor_context::animation_state_mut(ui_state).active_entity
+        {
             ui.label(format!("Entity: {}", name));
         }
 
@@ -28,7 +29,9 @@ impl InspectorSystem {
 
         // Atlas info
         ui.label("Atlas:");
-        let atlas_name = &crate::ui::editor_context::animation_state_mut(ui_state).authoring.atlas_name;
+        let atlas_name = &crate::ui::editor_context::animation_state_mut(ui_state)
+            .authoring
+            .atlas_name;
         if atlas_name.is_empty() {
             ui.label("(none selected)");
         } else {
@@ -42,22 +45,33 @@ impl InspectorSystem {
         ui.horizontal(|ui| {
             ui.label("Zoom:");
             ui.add(
-                egui::DragValue::new(&mut crate::ui::editor_context::animation_state_mut(ui_state).preview_zoom)
-                    .speed(0.1)
-                    .range(0.5..=8.0)
-                    .suffix("x"),
+                egui::DragValue::new(
+                    &mut crate::ui::editor_context::animation_state_mut(ui_state).preview_zoom,
+                )
+                .speed(0.1)
+                .range(0.5..=8.0)
+                .suffix("x"),
             );
         });
 
-        ui.checkbox(&mut crate::ui::editor_context::animation_state_mut(ui_state).show_grid, "Show Grid Overlay");
+        ui.checkbox(
+            &mut crate::ui::editor_context::animation_state_mut(ui_state).show_grid,
+            "Show Grid Overlay",
+        );
 
         ui.separator();
 
         // Playback info
         ui.label("Playback:");
-        ui.label(format!("Speed: {:.1}x", crate::ui::editor_context::animation_state_mut(ui_state).preview.speed()));
+        ui.label(format!(
+            "Speed: {:.1}x",
+            crate::ui::editor_context::animation_state_mut(ui_state)
+                .preview
+                .speed()
+        ));
 
-        if let Some(clip) = crate::ui::editor_context::animation_state_mut(ui_state).selected_clip() {
+        if let Some(clip) = crate::ui::editor_context::animation_state_mut(ui_state).selected_clip()
+        {
             ui.label(format!("Clip: {}", clip.state));
             ui.label(format!("Frames: {}", clip.frames.len()));
             ui.label(format!("Loop: {}", clip.loop_mode));

@@ -92,10 +92,7 @@ mod tests {
         );
 
         let mut commands = Vec::new();
-        engine.collect_rule_commands_for_trigger(
-            RuleTrigger::OnStart,
-            &mut commands,
-        );
+        engine.collect_rule_commands_for_trigger(RuleTrigger::OnStart, &mut commands);
 
         assert!(matches!(
             commands.as_slice(),

@@ -215,7 +215,9 @@ fn extract_map_size(ctx: &InspectorContext<'_>, scene_index: usize) -> Option<(u
         .get(scene_index)
         .and_then(|scene| scene.maps.first())
         .and_then(|map_name| {
-            if crate::ui::editor_context::map_state(ctx.ui_state).active_map.as_ref()
+            if crate::ui::editor_context::map_state(ctx.ui_state)
+                .active_map
+                .as_ref()
                 == Some(map_name)
             {
                 crate::ui::editor_context::map_state(ctx.ui_state)
@@ -243,7 +245,8 @@ fn commit_rules_change(
     use crate::ui::editor_ui::SceneRulesGraphCommandData;
     use crate::ui::rule_graph::RuleGraph;
 
-    let before_graph = crate::ui::editor_ui::rule_graph_for_scene(ctx.ui_state, scene_name).cloned();
+    let before_graph =
+        crate::ui::editor_ui::rule_graph_for_scene(ctx.ui_state, scene_name).cloned();
     let after_graph = RuleGraph::from_rule_set(&edited_rules);
     let before_layout = crate::ui::editor_context::graph_state(ctx.ui_state)
         .layouts_by_scene

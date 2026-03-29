@@ -130,17 +130,17 @@ impl SceneViewport {
             self.game_state.world().player_id(),
             self.game_state.runtime().debug_collision_rendering(),
         )
-            .sprite_render_requests()
-            .into_iter()
-            .filter(|request| match request.origin {
-                SpriteRenderOrigin::AnimatedEntity(entity_id)
-                | SpriteRenderOrigin::StaticEntity(entity_id)
-                | SpriteRenderOrigin::Projectile(entity_id) => {
-                    !self.suppressed_entity_ids.contains(&entity_id)
-                }
-                SpriteRenderOrigin::MapObject { .. } => true,
-            })
-            .collect::<Vec<_>>();
+        .sprite_render_requests()
+        .into_iter()
+        .filter(|request| match request.origin {
+            SpriteRenderOrigin::AnimatedEntity(entity_id)
+            | SpriteRenderOrigin::StaticEntity(entity_id)
+            | SpriteRenderOrigin::Projectile(entity_id) => {
+                !self.suppressed_entity_ids.contains(&entity_id)
+            }
+            SpriteRenderOrigin::MapObject { .. } => true,
+        })
+        .collect::<Vec<_>>();
 
         tracing::trace!(
             "Starting sprite rendering for {} logical sprite requests",
@@ -414,7 +414,12 @@ impl SceneViewport {
         }
 
         for entity_id in self.game_state.world().entity_manager().active_entities() {
-            let Some(entity) = self.game_state.world().entity_manager().get_entity(entity_id) else {
+            let Some(entity) = self
+                .game_state
+                .world()
+                .entity_manager()
+                .get_entity(entity_id)
+            else {
                 continue;
             };
 

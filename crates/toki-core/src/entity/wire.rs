@@ -198,7 +198,10 @@ impl From<StoredEntity> for EntityWire {
             persistent_across_saves: value.entity.persistent_across_saves,
             control_role: value.entity.control_role,
             audio: value.entity.audio,
-            attributes: EntityAttributesWire::from_parts(&value.entity.attributes, &value.components),
+            attributes: EntityAttributesWire::from_parts(
+                &value.entity.attributes,
+                &value.components,
+            ),
             collision_box: value.entity.collision_box,
             tags: value.entity.tags,
         }

@@ -45,8 +45,8 @@ pub use camera::{Camera, CameraController, CameraMode};
 
 pub mod events;
 pub use events::{
-    DialogStartRequest, EventHandler, EventQueue, GameEvent, GameUpdateResult,
-    PersistenceRequest, SceneSwitchRequest,
+    DialogStartRequest, EventHandler, EventQueue, GameEvent, GameUpdateResult, PersistenceRequest,
+    SceneSwitchRequest,
 };
 
 pub mod ai;
@@ -56,8 +56,8 @@ pub mod game;
 pub use game::{GameState, InputAction, InputKey, RestoreError, DEFAULT_TIMESTEP_MS};
 
 pub mod timing;
-pub use timing::{TimestepIterator, TimingSystem};
 pub use flags::{FlagValue, GameFlags};
+pub use timing::{TimestepIterator, TimingSystem};
 
 pub mod entity;
 pub mod rules;
@@ -75,9 +75,9 @@ pub use resources::{ResourceError, ResourceManager};
 
 pub mod serialization;
 pub use serialization::{
-    load_save_data, load_save_data_from_slot, list_save_slot_metadata, read_save_slot_metadata,
-    save_game_to_slot, save_save_data, save_slot_file_path, PersistedSceneEntityState,
-    SaveData, SaveSlotMetadata, SavedCameraState, MAX_SAVE_SLOTS, SAVE_DATA_VERSION,
+    list_save_slot_metadata, load_save_data, load_save_data_from_slot, read_save_slot_metadata,
+    save_game_to_slot, save_save_data, save_slot_file_path, PersistedSceneEntityState, SaveData,
+    SaveSlotMetadata, SavedCameraState, MAX_SAVE_SLOTS, SAVE_DATA_VERSION,
 };
 
 pub mod asset_cache;

@@ -1,8 +1,8 @@
-use super::editor_ui::{CenterPanelTab, EditorUI};
 use super::editor_ui::{
     AnimationEditorState, DialogEditorState, GraphEditorState, MapEditorState, PlacementState,
     ViewportCursorState,
 };
+use super::editor_ui::{CenterPanelTab, EditorUI};
 use crate::config::EditorConfig;
 use crate::project::{Project, ProjectAssets};
 use crate::scene::SceneViewport;
@@ -133,7 +133,9 @@ impl RuleGraphContext {
     }
 
     pub(crate) fn state_mut(ui: &mut EditorUI) -> &mut Self {
-        if ui.active_tab() == CenterPanelTab::SceneGraph || ui.active_tab() == CenterPanelTab::SceneRules {
+        if ui.active_tab() == CenterPanelTab::SceneGraph
+            || ui.active_tab() == CenterPanelTab::SceneRules
+        {
             ui.context_mut::<Self>(ui.active_tab())
                 .expect("rule graph context should always exist")
         } else if ui.context::<Self>(CenterPanelTab::SceneGraph).is_some() {
@@ -612,7 +614,9 @@ impl EditorContext for EntityEditorContext {
 pub(crate) fn default_active_context(tab: CenterPanelTab) -> Box<dyn EditorContext> {
     match tab {
         CenterPanelTab::SceneViewport => Box::new(SceneViewportContext::default()),
-        CenterPanelTab::SceneGraph | CenterPanelTab::SceneRules => Box::new(RuleGraphContext::default()),
+        CenterPanelTab::SceneGraph | CenterPanelTab::SceneRules => {
+            Box::new(RuleGraphContext::default())
+        }
         CenterPanelTab::MapEditor => Box::new(MapEditorContext::default()),
         CenterPanelTab::MenuEditor => Box::new(MenuEditorContext),
         CenterPanelTab::DialogEditor => Box::new(DialogEditorContext::default()),
@@ -644,10 +648,7 @@ pub(crate) fn default_parked_contexts(
         let scene_rules_context = contexts
             .remove(&CenterPanelTab::SceneGraph)
             .unwrap_or_else(|| default_active_context(CenterPanelTab::SceneGraph));
-        contexts.insert(
-            CenterPanelTab::SceneRules,
-            scene_rules_context,
-        );
+        contexts.insert(CenterPanelTab::SceneRules, scene_rules_context);
     }
     contexts
 }

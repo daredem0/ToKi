@@ -6,8 +6,8 @@ use toki_core::assets::{
     tilemap::TileMap,
 };
 use toki_core::collision::{can_place_collision_box_at_position, CollisionBox};
-use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::game::{GameSimulation, InputSystem, RenderQueryService};
+use toki_core::sprite::{Animation, Frame, SpriteInstance, SpriteSheetMeta};
 use toki_core::{GameState, InputKey};
 
 /// Create a test tilemap with a mix of solid and non-solid tiles
@@ -128,7 +128,11 @@ fn collision_entity_without_collision_box_can_move_anywhere() {
 
     // Get the player entity and remove its collision box
     let player_id = game_state.world().player_id().unwrap();
-    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
+    if let Some(player) = game_state
+        .world_mut()
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+    {
         player.position = IVec2::new(0, 0);
         player.collision_box = None; // Remove collision box
     }
@@ -153,7 +157,11 @@ fn collision_small_entity_blocked_by_solid_tile() {
 
     // Get the player entity and modify its collision box
     let player_id = game_state.world().player_id().unwrap();
-    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
+    if let Some(player) = game_state
+        .world_mut()
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+    {
         player.position = IVec2::new(0, 0); // Start at (0,0) - on floor tile
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(16, 16)));
     }
@@ -178,7 +186,11 @@ fn collision_small_entity_can_move_on_non_solid_tiles() {
 
     // Get the player entity and modify its collision box
     let player_id = game_state.world().player_id().unwrap();
-    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
+    if let Some(player) = game_state
+        .world_mut()
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+    {
         player.position = IVec2::new(0, 0); // Start at (0,0) - on floor tile
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(16, 16)));
     }
@@ -205,7 +217,11 @@ fn collision_entity_with_offset_collision_box() {
 
     // Get the player entity and give it an offset collision box
     let player_id = game_state.world().player_id().unwrap();
-    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
+    if let Some(player) = game_state
+        .world_mut()
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+    {
         player.position = IVec2::new(8, 0); // Start at (8,0)
                                             // Collision box offset by (8,0) with size (16,16)
                                             // This means collision box spans from (16,0) to (32,16) - overlapping solid stone
@@ -236,7 +252,11 @@ fn collision_large_entity_spanning_multiple_tiles() {
 
     // Get the player entity and give it a large collision box
     let player_id = game_state.world().player_id().unwrap();
-    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
+    if let Some(player) = game_state
+        .world_mut()
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+    {
         player.position = IVec2::new(0, 0); // Start at (0,0)
                                             // Large collision box spanning multiple tiles
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(32, 32)));
@@ -262,7 +282,11 @@ fn collision_trigger_entity_does_not_block_movement() {
 
     // Get the player entity and give it a trigger collision box
     let player_id = game_state.world().player_id().unwrap();
-    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
+    if let Some(player) = game_state
+        .world_mut()
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+    {
         player.position = IVec2::new(0, 0);
         // Trigger collision box should not block movement
         player.collision_box = Some(CollisionBox::trigger_box(UVec2::new(16, 16)));
@@ -288,7 +312,11 @@ fn collision_negative_coordinates_blocked() {
 
     // Get the player entity and position it at the edge
     let player_id = game_state.world().player_id().unwrap();
-    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
+    if let Some(player) = game_state
+        .world_mut()
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+    {
         player.position = IVec2::new(0, 0); // At the very edge
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(16, 16)));
     }
@@ -313,7 +341,11 @@ fn collision_out_of_bounds_tiles_block_movement() {
 
     // Get the player entity and position it near the edge
     let player_id = game_state.world().player_id().unwrap();
-    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
+    if let Some(player) = game_state
+        .world_mut()
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+    {
         player.position = IVec2::new(48, 48); // Near the bottom-right corner
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(16, 16)));
     }
@@ -338,7 +370,11 @@ fn collision_movement_step_collision_boundaries() {
 
     // Position entity right next to a solid tile
     let player_id = game_state.world().player_id().unwrap();
-    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
+    if let Some(player) = game_state
+        .world_mut()
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+    {
         player.position = IVec2::new(15, 0); // 1 pixel before solid stone at (16, 0)
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(16, 16)));
     }
@@ -363,7 +399,11 @@ fn collision_exact_tile_boundary_movement() {
 
     // Position entity in a safe area with room to move
     let player_id = game_state.world().player_id().unwrap();
-    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
+    if let Some(player) = game_state
+        .world_mut()
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+    {
         player.position = IVec2::new(32, 32); // Bottom area, all floor tiles
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(16, 16)));
     }
@@ -388,7 +428,11 @@ fn collision_multi_direction_movement() {
 
     // Position entity in free area
     let player_id = game_state.world().player_id().unwrap();
-    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
+    if let Some(player) = game_state
+        .world_mut()
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+    {
         player.position = IVec2::new(48, 48); // Bottom-right area (all floor tiles)
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(16, 16)));
     }
@@ -418,7 +462,11 @@ fn collision_entity_larger_than_tiles() {
 
     // Entity with collision box larger than tile size
     let player_id = game_state.world().player_id().unwrap();
-    if let Some(player) = game_state.world_mut().entity_manager_mut().get_entity_mut(player_id) {
+    if let Some(player) = game_state
+        .world_mut()
+        .entity_manager_mut()
+        .get_entity_mut(player_id)
+    {
         player.position = IVec2::new(0, 0);
         player.collision_box = Some(CollisionBox::solid_box(UVec2::new(24, 24)));
         // Spans 3x3 tiles

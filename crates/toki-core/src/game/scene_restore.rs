@@ -58,7 +58,11 @@ fn restore_legacy_persisted_entities(state: &mut GameState, save_data: &SaveData
             .scene
             .persistent_scene_entities
             .insert((persisted.scene_name.to_string(), persisted.entity_id));
-        let Some(scene) = state.scene.scene_manager.get_scene_mut(&persisted.scene_name) else {
+        let Some(scene) = state
+            .scene
+            .scene_manager
+            .get_scene_mut(&persisted.scene_name)
+        else {
             continue;
         };
 
@@ -117,4 +121,3 @@ fn restore_saved_player(state: &mut GameState, save_data: &SaveData) {
         .components_mut()
         .apply_optional_components(player_id, saved_player.components.clone());
 }
-

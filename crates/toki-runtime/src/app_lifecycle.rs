@@ -45,8 +45,8 @@ impl App {
     pub(super) fn resolve_save_root_for_launch_options(
         launch_options: &super::RuntimeLaunchOptions,
     ) -> std::path::PathBuf {
-        let data_dir = ProjectDirs::from("", "", "toki")
-            .map(|dirs| dirs.data_local_dir().to_path_buf());
+        let data_dir =
+            ProjectDirs::from("", "", "toki").map(|dirs| dirs.data_local_dir().to_path_buf());
         Self::resolve_save_root_from_base(
             data_dir.as_deref(),
             std::env::current_dir().ok().as_deref(),
@@ -459,7 +459,10 @@ mod tests {
             Some(Path::new("/projects/Demo")),
         );
 
-        assert_eq!(root, Path::new("/data").join("toki").join("Demo").join("saves"));
+        assert_eq!(
+            root,
+            Path::new("/data").join("toki").join("Demo").join("saves")
+        );
     }
 
     #[test]
@@ -468,10 +471,7 @@ mod tests {
 
         assert_eq!(
             root,
-            Path::new("/cwd")
-                .join("toki")
-                .join("default")
-                .join("saves")
+            Path::new("/cwd").join("toki").join("default").join("saves")
         );
     }
 }

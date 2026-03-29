@@ -2,8 +2,10 @@
 //!
 //! The builder pattern simplifies creating entities with many optional fields.
 
-use super::model::{ControlRole, Entity, EntityAttributes, EntityAudioSettings, EntityId, EntityKind};
 use super::default_category_for_kind;
+use super::model::{
+    ControlRole, Entity, EntityAttributes, EntityAudioSettings, EntityId, EntityKind,
+};
 use crate::collision::CollisionBox;
 use crate::ids::EntityDefName;
 use glam::{IVec2, UVec2};
