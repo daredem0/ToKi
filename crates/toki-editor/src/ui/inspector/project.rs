@@ -1,5 +1,6 @@
 use super::*;
 use crate::project::apply_project_settings_draft;
+use crate::project::{validate_project_settings_draft, ProjectViewportModeDraft};
 use crate::project::ProjectAssets;
 use std::collections::BTreeMap;
 use std::fs;
@@ -27,7 +28,7 @@ impl InspectorSystem {
         ui.heading("Project");
         ui.separator();
 
-        let mut draft = ProjectSettingsDraft::from_project(project);
+        let mut draft = ui_state.project_settings_draft_for(project).clone();
         let mut changed = false;
         let mut palette_files_changed = false;
         let previous_flags = project.metadata.runtime.flags.declarations.clone();
@@ -108,6 +109,10 @@ impl InspectorSystem {
 
         ui.separator();
         ui.collapsing("Display", |ui| {
+            for issue in validate_project_settings_draft(&draft) {
+                ui.colored_label(egui::Color32::YELLOW, issue.message);
+            }
+
             ui.horizontal(|ui| {
                 ui.label("Resolution Width:");
                 changed |= ui
@@ -145,6 +150,98 @@ impl InspectorSystem {
                     changed = true;
                 }
             });
+            ui.horizontal(|ui| {
+                ui.label("Viewport Mode:");
+                egui::ComboBox::from_id_salt("project_runtime_viewport_mode")
+                    .selected_text(draft.viewport_mode.label())
+                    .show_ui(ui, |ui| {
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.viewport_mode,
+                                ProjectViewportModeDraft::AspectFit,
+                                ProjectViewportModeDraft::AspectFit.label(),
+                            )
+                            .changed();
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.viewport_mode,
+                                ProjectViewportModeDraft::IntegerScale,
+                                ProjectViewportModeDraft::IntegerScale.label(),
+                            )
+                            .changed();
+                        changed |= ui
+                            .selectable_value(
+                                &mut draft.viewport_mode,
+                                ProjectViewportModeDraft::WindowFill,
+                                ProjectViewportModeDraft::WindowFill.label(),
+                            )
+                            .changed();
+                    });
+            });
+
+            match draft.viewport_mode {
+                ProjectViewportModeDraft::AspectFit => {
+                    ui.horizontal(|ui| {
+                        ui.label("Fit Percent:");
+                        changed |= ui
+                            .add(
+                                egui::DragValue::new(&mut draft.viewport_aspect_fit_percent)
+                                    .speed(1.0)
+                                    .range(0..=500),
+                            )
+                            .changed();
+                        ui.label("%");
+                    });
+                }
+                ProjectViewportModeDraft::IntegerScale => {
+                    ui.horizontal(|ui| {
+                        ui.label("Scale Factor:");
+                        let mut use_auto = matches!(
+                            draft.viewport_integer_scale_factor,
+                            toki_core::project_runtime::IntegerScaleFactor::Auto
+                        );
+                        if ui.checkbox(&mut use_auto, "Auto").changed() {
+                            draft.viewport_integer_scale_factor = if use_auto {
+                                toki_core::project_runtime::IntegerScaleFactor::Auto
+                            } else {
+                                toki_core::project_runtime::IntegerScaleFactor::Fixed(1)
+                            };
+                            changed = true;
+                        }
+                        if let toki_core::project_runtime::IntegerScaleFactor::Fixed(value) =
+                            &mut draft.viewport_integer_scale_factor
+                        {
+                            changed |= ui
+                                .add(
+                                    egui::DragValue::new(value)
+                                        .speed(1.0)
+                                        .range(0..=32)
+                                        .suffix("x"),
+                                )
+                                .changed();
+                        }
+                    });
+                }
+                ProjectViewportModeDraft::WindowFill => {
+                    ui.colored_label(
+                        egui::Color32::YELLOW,
+                        "Changes visible world area with window size.",
+                    );
+                    ui.horizontal(|ui| {
+                        ui.label("Zoom Percent:");
+                        changed |= ui
+                            .add(
+                                egui::DragValue::new(
+                                    &mut draft.viewport_window_fill_zoom_percent,
+                                )
+                                .speed(1.0)
+                                .range(0..=400),
+                            )
+                            .changed();
+                        ui.label("%");
+                    });
+                }
+            }
             changed |= ui
                 .checkbox(
                     &mut draft.show_entity_health_bars,
@@ -723,6 +820,8 @@ impl InspectorSystem {
                 .project
                 .set_available_palettes(&load_project_palette_files(project));
         }
+
+        ui_state.project_settings_draft = Some((project.path.clone(), draft));
     }
 
     #[cfg(test)]

@@ -343,6 +343,7 @@ impl MenuController {
             }
             UiAction::ExitRuntime => Some(UiCommand::ExitRuntime),
             UiAction::OpenAudioSettings => Some(UiCommand::OpenAudioSettings),
+            UiAction::OpenDisplaySettings => Some(UiCommand::OpenDisplaySettings),
             UiAction::OpenGraphicsSettings => Some(UiCommand::OpenGraphicsSettings),
             UiAction::SaveGame { slot } => Some(UiCommand::SaveGame { slot: *slot }),
             UiAction::LoadGame { slot } => Some(UiCommand::LoadGame { slot: *slot }),

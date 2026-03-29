@@ -42,6 +42,8 @@ mod app_lifecycle;
 mod app_presenter;
 #[path = "app_runtime_settings.rs"]
 mod app_runtime_settings;
+#[path = "app_runtime_display_settings.rs"]
+mod app_runtime_display_settings;
 #[path = "app_scene_runtime.rs"]
 mod app_scene_runtime;
 #[path = "app_splash.rs"]

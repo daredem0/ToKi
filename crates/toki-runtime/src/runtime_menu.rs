@@ -357,6 +357,9 @@ fn apply_menu_command(
         UiCommand::OpenAudioSettings => {
             *runtime_overlay = Some(super::RuntimeMenuOverlay::audio());
         }
+        UiCommand::OpenDisplaySettings => {
+            *runtime_overlay = Some(super::RuntimeMenuOverlay::display());
+        }
         UiCommand::OpenGraphicsSettings => {
             *runtime_overlay = Some(super::RuntimeMenuOverlay::graphics());
         }
@@ -473,6 +476,22 @@ mod tests {
             runtime_overlay,
             Some(super::super::RuntimeMenuOverlay::graphics())
         );
+    }
+
+    #[test]
+    fn open_display_settings_menu_command_activates_overlay() {
+        let mut exit_requested = false;
+        let mut pending_ui_events = Vec::new();
+        let mut runtime_overlay = None;
+
+        apply_menu_command(
+            &mut exit_requested,
+            &mut pending_ui_events,
+            &mut runtime_overlay,
+            UiCommand::OpenDisplaySettings,
+        );
+
+        assert_eq!(runtime_overlay, Some(super::super::RuntimeMenuOverlay::display()));
     }
 
     #[test]

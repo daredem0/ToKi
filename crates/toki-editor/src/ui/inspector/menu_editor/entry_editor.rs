@@ -295,10 +295,11 @@ impl InspectorSystem {
                 ui.selectable_value(&mut action_kind, 3, "Back");
                 ui.selectable_value(&mut action_kind, 4, "Exit Runtime");
                 ui.selectable_value(&mut action_kind, 5, "Open Audio Settings");
-                ui.selectable_value(&mut action_kind, 6, "Open Graphics Settings");
-                ui.selectable_value(&mut action_kind, 7, "Save Game");
-                ui.selectable_value(&mut action_kind, 8, "Load Game");
-                ui.selectable_value(&mut action_kind, 9, "Emit Event");
+                ui.selectable_value(&mut action_kind, 6, "Open Display Settings");
+                ui.selectable_value(&mut action_kind, 7, "Open Graphics Settings");
+                ui.selectable_value(&mut action_kind, 8, "Save Game");
+                ui.selectable_value(&mut action_kind, 9, "Load Game");
+                ui.selectable_value(&mut action_kind, 10, "Emit Event");
             });
 
         changed |= Self::apply_action_kind_change(ui, action, action_kind, available_surface_ids);
@@ -313,10 +314,11 @@ impl InspectorSystem {
             UiAction::Back => 3,
             UiAction::ExitRuntime => 4,
             UiAction::OpenAudioSettings => 5,
-            UiAction::OpenGraphicsSettings => 6,
-            UiAction::SaveGame { .. } => 7,
-            UiAction::LoadGame { .. } => 8,
-            UiAction::EmitEvent { .. } => 9,
+            UiAction::OpenDisplaySettings => 6,
+            UiAction::OpenGraphicsSettings => 7,
+            UiAction::SaveGame { .. } => 8,
+            UiAction::LoadGame { .. } => 9,
+            UiAction::EmitEvent { .. } => 10,
         }
     }
 
@@ -328,9 +330,10 @@ impl InspectorSystem {
             3 => "Back",
             4 => "Exit Runtime",
             5 => "Open Audio Settings",
-            6 => "Open Graphics Settings",
-            7 => "Save Game",
-            8 => "Load Game",
+            6 => "Open Display Settings",
+            7 => "Open Graphics Settings",
+            8 => "Save Game",
+            9 => "Load Game",
             _ => "Emit Event",
         }
     }
@@ -381,11 +384,15 @@ impl InspectorSystem {
                 *action = UiAction::OpenAudioSettings;
                 changed = true;
             }
-            6 if *action != UiAction::OpenGraphicsSettings => {
+            6 if *action != UiAction::OpenDisplaySettings => {
+                *action = UiAction::OpenDisplaySettings;
+                changed = true;
+            }
+            7 if *action != UiAction::OpenGraphicsSettings => {
                 *action = UiAction::OpenGraphicsSettings;
                 changed = true;
             }
-            7 => {
+            8 => {
                 let mut slot = match action {
                     UiAction::SaveGame { slot } => *slot,
                     _ => 1,
@@ -397,7 +404,7 @@ impl InspectorSystem {
                     changed = true;
                 }
             }
-            8 => {
+            9 => {
                 let mut slot = match action {
                     UiAction::LoadGame { slot } => *slot,
                     _ => 1,
@@ -424,5 +431,17 @@ impl InspectorSystem {
             }
         }
         changed
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::InspectorSystem;
+    use toki_core::ui::UiAction;
+
+    #[test]
+    fn display_settings_action_has_stable_kind_and_label() {
+        assert_eq!(InspectorSystem::ui_action_to_kind(&UiAction::OpenDisplaySettings), 6);
+        assert_eq!(InspectorSystem::ui_action_kind_label(6), "Open Display Settings");
     }
 }

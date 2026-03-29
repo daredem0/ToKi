@@ -1,5 +1,8 @@
 use chrono::Utc;
-use toki_core::project_runtime::{PostProcessMode, ProjectFlagDefinition, QuantizeStrategy};
+use toki_core::project_runtime::{
+    IntegerScaleFactor, PostProcessMode, ProjectFlagDefinition, QuantizeStrategy,
+    RuntimeViewportMode,
+};
 
 use super::Project;
 
@@ -15,6 +18,10 @@ pub struct ProjectSettingsDraft {
     pub resolution_width: u32,
     pub resolution_height: u32,
     pub zoom_percent: u32,
+    pub viewport_mode: ProjectViewportModeDraft,
+    pub viewport_aspect_fit_percent: u16,
+    pub viewport_integer_scale_factor: IntegerScaleFactor,
+    pub viewport_window_fill_zoom_percent: u16,
     pub vsync: bool,
     pub target_fps: u32,
     pub timing_mode: toki_core::TimingMode,
@@ -36,8 +43,55 @@ pub struct ProjectSettingsDraft {
     pub transition_default_duration_ms: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectViewportModeDraft {
+    AspectFit,
+    IntegerScale,
+    WindowFill,
+}
+
+impl ProjectViewportModeDraft {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::AspectFit => "Aspect Fit",
+            Self::IntegerScale => "Integer Scale",
+            Self::WindowFill => "Window Fill",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectSettingsValidationIssue {
+    pub message: String,
+}
+
 impl ProjectSettingsDraft {
     pub fn from_project(project: &Project) -> Self {
+        let (
+            viewport_mode,
+            viewport_aspect_fit_percent,
+            viewport_integer_scale_factor,
+            viewport_window_fill_zoom_percent,
+        ) = match project.metadata.runtime.display.viewport {
+            RuntimeViewportMode::AspectFit { fit_percent } => (
+                ProjectViewportModeDraft::AspectFit,
+                fit_percent,
+                IntegerScaleFactor::Auto,
+                100,
+            ),
+            RuntimeViewportMode::IntegerScale { factor } => (
+                ProjectViewportModeDraft::IntegerScale,
+                100,
+                factor,
+                100,
+            ),
+            RuntimeViewportMode::WindowFill { zoom_percent } => (
+                ProjectViewportModeDraft::WindowFill,
+                100,
+                IntegerScaleFactor::Auto,
+                zoom_percent,
+            ),
+        };
         Self {
             name: project.metadata.project.name.clone(),
             version: project.metadata.project.version.clone(),
@@ -49,6 +103,10 @@ impl ProjectSettingsDraft {
             resolution_width: project.metadata.runtime.display.resolution_width,
             resolution_height: project.metadata.runtime.display.resolution_height,
             zoom_percent: project.metadata.runtime.display.zoom_percent,
+            viewport_mode,
+            viewport_aspect_fit_percent,
+            viewport_integer_scale_factor,
+            viewport_window_fill_zoom_percent,
             vsync: project.metadata.runtime.display.vsync,
             target_fps: project.metadata.runtime.display.target_fps,
             timing_mode: project.metadata.runtime.display.timing_mode,
@@ -114,6 +172,48 @@ impl ProjectSettingsDraft {
                 .scene_transitions
                 .default_duration_ms,
         }
+    }
+
+    pub fn runtime_viewport_mode(&self) -> RuntimeViewportMode {
+        match self.viewport_mode {
+            ProjectViewportModeDraft::AspectFit => RuntimeViewportMode::AspectFit {
+                fit_percent: self.viewport_aspect_fit_percent.max(1),
+            },
+            ProjectViewportModeDraft::IntegerScale => RuntimeViewportMode::IntegerScale {
+                factor: match self.viewport_integer_scale_factor {
+                    IntegerScaleFactor::Auto => IntegerScaleFactor::Auto,
+                    IntegerScaleFactor::Fixed(value) => IntegerScaleFactor::Fixed(value.max(1)),
+                },
+            },
+            ProjectViewportModeDraft::WindowFill => RuntimeViewportMode::WindowFill {
+                zoom_percent: self.viewport_window_fill_zoom_percent.max(1),
+            },
+        }
+    }
+}
+
+pub fn validate_project_settings_draft(
+    draft: &ProjectSettingsDraft,
+) -> Vec<ProjectSettingsValidationIssue> {
+    match draft.viewport_mode {
+        ProjectViewportModeDraft::AspectFit if draft.viewport_aspect_fit_percent == 0 => {
+            vec![ProjectSettingsValidationIssue {
+                message: "Aspect Fit percent must be positive.".to_string(),
+            }]
+        }
+        ProjectViewportModeDraft::IntegerScale
+            if matches!(draft.viewport_integer_scale_factor, IntegerScaleFactor::Fixed(0)) =>
+        {
+            vec![ProjectSettingsValidationIssue {
+                message: "Integer Scale factor must be Auto or a positive factor.".to_string(),
+            }]
+        }
+        ProjectViewportModeDraft::WindowFill if draft.viewport_window_fill_zoom_percent == 0 => {
+            vec![ProjectSettingsValidationIssue {
+                message: "Window Fill zoom percent must be positive.".to_string(),
+            }]
+        }
+        _ => Vec::new(),
     }
 }
 
@@ -299,6 +399,11 @@ pub fn apply_project_settings_draft(project: &mut Project, draft: &ProjectSettin
         project.metadata.runtime.display.zoom_percent = draft.zoom_percent;
         changed = true;
     }
+    let viewport = draft.runtime_viewport_mode();
+    if project.metadata.runtime.display.viewport != viewport {
+        project.metadata.runtime.display.viewport = viewport;
+        changed = true;
+    }
     if project.metadata.runtime.display.vsync != draft.vsync {
         project.metadata.runtime.display.vsync = draft.vsync;
         changed = true;
@@ -356,6 +461,10 @@ mod tests {
             resolution_width: 320,
             resolution_height: 240,
             zoom_percent: 200,
+            viewport_mode: ProjectViewportModeDraft::WindowFill,
+            viewport_aspect_fit_percent: 90,
+            viewport_integer_scale_factor: IntegerScaleFactor::Fixed(3),
+            viewport_window_fill_zoom_percent: 150,
             vsync: false,
             target_fps: 120,
             timing_mode: toki_core::TimingMode::Delta,
@@ -479,7 +588,106 @@ mod tests {
             project.metadata.runtime.scene_transitions.default_duration_ms,
             420
         );
+        assert_eq!(
+            project.metadata.runtime.display.viewport,
+            RuntimeViewportMode::WindowFill { zoom_percent: 150 }
+        );
         assert!(project.is_dirty);
         assert!(project.metadata.project.modified >= original_modified);
+    }
+
+    #[test]
+    fn validate_project_settings_draft_reports_invalid_viewport_values() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let project = Project::new("Demo".to_string(), temp_dir.path().to_path_buf());
+        let mut draft = ProjectSettingsDraft::from_project(&project);
+
+        draft.viewport_mode = ProjectViewportModeDraft::AspectFit;
+        draft.viewport_aspect_fit_percent = 0;
+        assert_eq!(validate_project_settings_draft(&draft).len(), 1);
+
+        draft.viewport_mode = ProjectViewportModeDraft::IntegerScale;
+        draft.viewport_integer_scale_factor = IntegerScaleFactor::Fixed(0);
+        assert_eq!(validate_project_settings_draft(&draft).len(), 1);
+
+        draft.viewport_mode = ProjectViewportModeDraft::WindowFill;
+        draft.viewport_window_fill_zoom_percent = 0;
+        assert_eq!(validate_project_settings_draft(&draft).len(), 1);
+    }
+
+    #[test]
+    fn viewport_settings_round_trip_through_project_draft() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let mut project = Project::new("Demo".to_string(), temp_dir.path().to_path_buf());
+
+        for mode in [
+            RuntimeViewportMode::AspectFit { fit_percent: 87 },
+            RuntimeViewportMode::IntegerScale {
+                factor: IntegerScaleFactor::Auto,
+            },
+            RuntimeViewportMode::IntegerScale {
+                factor: IntegerScaleFactor::Fixed(4),
+            },
+            RuntimeViewportMode::WindowFill { zoom_percent: 150 },
+        ] {
+            project.metadata.runtime.display.viewport = mode;
+            let draft = ProjectSettingsDraft::from_project(&project);
+            assert_eq!(draft.runtime_viewport_mode(), mode);
+        }
+    }
+
+    #[test]
+    fn applied_viewport_settings_persist_through_project_metadata_save_and_load() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let mut project = Project::new("Demo".to_string(), temp_dir.path().to_path_buf());
+        let mut draft = ProjectSettingsDraft::from_project(&project);
+        draft.viewport_mode = ProjectViewportModeDraft::IntegerScale;
+        draft.viewport_integer_scale_factor = IntegerScaleFactor::Fixed(4);
+
+        assert!(apply_project_settings_draft(&mut project, &draft));
+        project.save_metadata().expect("save metadata");
+
+        let mut reloaded = Project::new("Demo".to_string(), temp_dir.path().to_path_buf());
+        reloaded.load_metadata().expect("load metadata");
+        let reloaded_draft = ProjectSettingsDraft::from_project(&reloaded);
+
+        assert_eq!(
+            reloaded.metadata.runtime.display.viewport,
+            RuntimeViewportMode::IntegerScale {
+                factor: IntegerScaleFactor::Fixed(4),
+            }
+        );
+        assert_eq!(reloaded_draft.runtime_viewport_mode(), reloaded.metadata.runtime.display.viewport);
+    }
+
+    #[test]
+    fn viewport_draft_keeps_mode_specific_values_when_switching_modes() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let project = Project::new("Demo".to_string(), temp_dir.path().to_path_buf());
+        let mut draft = ProjectSettingsDraft::from_project(&project);
+
+        draft.viewport_aspect_fit_percent = 77;
+        draft.viewport_integer_scale_factor = IntegerScaleFactor::Fixed(5);
+        draft.viewport_window_fill_zoom_percent = 160;
+
+        draft.viewport_mode = ProjectViewportModeDraft::AspectFit;
+        assert_eq!(
+            draft.runtime_viewport_mode(),
+            RuntimeViewportMode::AspectFit { fit_percent: 77 }
+        );
+
+        draft.viewport_mode = ProjectViewportModeDraft::IntegerScale;
+        assert_eq!(
+            draft.runtime_viewport_mode(),
+            RuntimeViewportMode::IntegerScale {
+                factor: IntegerScaleFactor::Fixed(5),
+            }
+        );
+
+        draft.viewport_mode = ProjectViewportModeDraft::WindowFill;
+        assert_eq!(
+            draft.runtime_viewport_mode(),
+            RuntimeViewportMode::WindowFill { zoom_percent: 160 }
+        );
     }
 }

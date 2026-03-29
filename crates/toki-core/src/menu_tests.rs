@@ -227,6 +227,11 @@ fn menu_controller_returns_runtime_settings_commands_for_builtin_settings_action
                     border_style_override: None,
                     action: UiAction::OpenGraphicsSettings,
                 },
+                MenuItemDefinition::Button {
+                    text: "Display".to_string(),
+                    border_style_override: None,
+                    action: UiAction::OpenDisplaySettings,
+                },
             ],
         }],
         dialogs: Vec::new(),
@@ -243,6 +248,11 @@ fn menu_controller_returns_runtime_settings_commands_for_builtin_settings_action
     assert_eq!(
         controller.handle_input(MenuInput::Confirm),
         Some(UiCommand::OpenGraphicsSettings)
+    );
+    controller.handle_input(MenuInput::Down);
+    assert_eq!(
+        controller.handle_input(MenuInput::Confirm),
+        Some(UiCommand::OpenDisplaySettings)
     );
 }
 
