@@ -24,7 +24,7 @@ use crate::entity::EntityId;
 use crate::flags::FlagValue;
 use crate::ids::{DialogId, SceneId};
 use crate::project_runtime::SceneTransitionEffect;
-use crate::rules::{Rule, RuleSet, RuleSpawnEntityType};
+use crate::rules::{RuleSet, RuleSpawnEntityType};
 use self::engine::RuleEngine;
 
 // Re-export submodules
@@ -111,6 +111,18 @@ impl RuleSystem {
             dialog_id: dialog_id.into(),
             outcome_id: outcome_id.into(),
         });
+    }
+
+    pub fn rule_velocity(state: &GameState, entity_id: EntityId) -> Option<glam::IVec2> {
+        state.runtime.rules.velocities.get(&entity_id).copied()
+    }
+
+    pub fn set_rule_velocity(
+        state: &mut GameState,
+        entity_id: EntityId,
+        velocity: glam::IVec2,
+    ) {
+        state.runtime.rules.velocities.insert(entity_id, velocity);
     }
 }
 
@@ -223,44 +235,7 @@ pub(super) type PendingSceneSwitch = crate::events::SceneSwitchRequest;
 /// A pending dialog start request.
 pub(super) type PendingDialogStart = crate::events::DialogStartRequest;
 
-// Public API on GameState for rule management
 impl GameState {
-    pub fn rules(&self) -> &RuleSet {
-        &self.scene.active_rules
-    }
-
-    pub fn rules_mut(&mut self) -> &mut RuleSet {
-        &mut self.scene.active_rules
-    }
-
-    pub fn set_rules(&mut self, rules: RuleSet) {
-        RuleSystem::set_rules(self, rules);
-    }
-
-    pub fn add_rule(&mut self, rule: Rule) {
-        self.scene.active_rules.rules.push(rule);
-    }
-
-    /// Gets the rule-assigned velocity for an entity, if any.
-    /// Used by tests to verify rule actions.
-    pub fn get_rule_velocity(&self, entity_id: EntityId) -> Option<glam::IVec2> {
-        self.runtime.rules.velocities.get(&entity_id).copied()
-    }
-
-    /// Sets the rule-assigned velocity for an entity directly.
-    /// Used by tests to set up specific scenarios.
-    pub fn set_rule_velocity(&mut self, entity_id: EntityId, velocity: glam::IVec2) {
-        self.runtime.rules.velocities.insert(entity_id, velocity);
-    }
-
-    pub fn record_dialog_completion(
-        &mut self,
-        dialog_id: impl Into<crate::DialogId>,
-        outcome_id: impl Into<String>,
-    ) {
-        RuleSystem::record_dialog_completion(self, dialog_id, outcome_id);
-    }
-
     pub(super) fn rule_engine(&mut self) -> RuleEngine<'_> {
         let held_keys = self.all_held_keys();
         RuleEngine::new(

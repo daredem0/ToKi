@@ -61,10 +61,6 @@ impl InputSystem {
 }
 
 impl GameState {
-    pub fn clear_runtime_inputs(&mut self) {
-        InputSystem::clear(&mut self.runtime);
-    }
-
     pub(super) fn controlled_input_entity_ids(&self) -> Vec<EntityId> {
         let mut entity_ids = self
             .world
@@ -93,40 +89,6 @@ impl GameState {
 
     pub(super) fn all_held_keys(&self) -> Vec<InputKey> {
         self.runtime.input.all_held_keys()
-    }
-
-    /// Handle key press events
-    pub fn handle_key_press(&mut self, key: InputKey) {
-        InputSystem::handle_key_press(&mut self.runtime, key);
-    }
-
-    /// Handle key release events
-    pub fn handle_key_release(&mut self, key: InputKey) {
-        InputSystem::handle_key_release(&mut self.runtime, key);
-    }
-
-    /// Handle profile-scoped movement key press events.
-    pub fn handle_profile_key_press(&mut self, profile: MovementProfile, key: InputKey) {
-        if matches!(key, InputKey::DebugToggle) {
-            self.handle_key_press(key);
-            return;
-        }
-        InputSystem::handle_profile_key_press(&mut self.runtime, profile, key);
-    }
-
-    /// Handle profile-scoped movement key release events.
-    pub fn handle_profile_key_release(&mut self, profile: MovementProfile, key: InputKey) {
-        InputSystem::handle_profile_key_release(&mut self.runtime, profile, key);
-    }
-
-    /// Handle profile-scoped action press events.
-    pub fn handle_profile_action_press(&mut self, profile: MovementProfile, action: InputAction) {
-        InputSystem::handle_profile_action_press(&mut self.runtime, profile, action);
-    }
-
-    /// Handle profile-scoped action release events.
-    pub fn handle_profile_action_release(&mut self, profile: MovementProfile, action: InputAction) {
-        InputSystem::handle_profile_action_release(&mut self.runtime, profile, action);
     }
 
     pub(super) fn take_pending_profile_actions(

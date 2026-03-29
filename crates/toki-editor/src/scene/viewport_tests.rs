@@ -5,6 +5,7 @@ use super::{
 use crate::project::assets::ProjectAssets;
 use std::collections::HashMap;
 use toki_core::graphics::image::save_image_rgba8;
+use toki_core::game::RenderQueryService;
 use toki_core::palette::resolve_palette;
 use toki_core::sprite_render::{
     SpriteRenderOrigin, SpriteRenderRequest, SpriteRenderSize, SpriteSortKey, SpriteVisualRef,
@@ -275,6 +276,7 @@ fn viewport_resolves_shared_sprite_render_requests_for_static_entities() {
         tags: vec!["pickup".to_string()],
     };
     game_state
+        .world_mut()
         .entity_manager_mut()
         .spawn_from_definition(&pickup_definition, glam::IVec2::new(24, 12))
         .expect("pickup should spawn");
@@ -284,7 +286,12 @@ fn viewport_resolves_shared_sprite_render_requests_for_static_entities() {
     let mut viewport =
         SceneViewport::with_game_state_and_resources_for_tests(game_state, resources)
             .expect("viewport should exist");
-    let requests = viewport.game_state().get_sprite_render_requests();
+    let requests = RenderQueryService::new(
+        viewport.game_state().world().entity_manager(),
+        viewport.game_state().world().player_id(),
+        viewport.game_state().runtime().debug_collision_rendering(),
+    )
+    .sprite_render_requests();
 
     let (sprites, failures) =
         viewport.resolve_sprite_requests_into_instances(&project_assets, Some(&tmp), &requests);

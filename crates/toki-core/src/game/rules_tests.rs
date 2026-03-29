@@ -5,6 +5,7 @@
 
 use super::rules::{
     CollisionEvent, DamageEvent, DeathEvent, InteractionEvent, InteractionSpatial, RuleCommand,
+    RuleSystem,
 };
 use super::GameState;
 use crate::entity::{EntityAttributes, EntityId, EntityKind};
@@ -82,12 +83,28 @@ fn create_disabled_rule(id: &str, trigger: RuleTrigger) -> Rule {
 }
 
 fn spawn_test_entity(game_state: &mut GameState) -> EntityId {
-    game_state.entity_manager_mut().spawn_entity(
+    game_state.world_mut().entity_manager_mut().spawn_entity(
         EntityKind::Npc,
         glam::IVec2::new(100, 100),
         glam::UVec2::new(16, 16),
         EntityAttributes::default(),
     )
+}
+
+#[allow(dead_code)]
+trait GameStateRuleTestExt {
+    fn set_rules(&mut self, rules: RuleSet);
+    fn get_rule_velocity(&self, entity_id: EntityId) -> Option<glam::IVec2>;
+}
+
+impl GameStateRuleTestExt for GameState {
+    fn set_rules(&mut self, rules: RuleSet) {
+        RuleSystem::set_rules(self, rules);
+    }
+
+    fn get_rule_velocity(&self, entity_id: EntityId) -> Option<glam::IVec2> {
+        RuleSystem::rule_velocity(self, entity_id)
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

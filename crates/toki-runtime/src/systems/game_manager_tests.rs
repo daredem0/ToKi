@@ -179,6 +179,7 @@ fn sprite_render_request_wrapper_exposes_object_sheet_backed_entities() {
         tags: vec!["pickup".to_string()],
     };
     let pickup_id = game_state
+        .world_mut()
         .entity_manager_mut()
         .spawn_from_definition(&pickup_definition, glam::IVec2::new(24, 12))
         .expect("pickup should spawn");
@@ -244,6 +245,7 @@ fn player_wasd_profile_ignores_arrow_keys_for_movement() {
     assert_eq!(
         manager
             .game_state
+            .world()
             .entity_manager()
             .get_entity(player_id)
             .expect("player should exist")
@@ -268,6 +270,7 @@ fn player_wasd_profile_moves_from_wasd_keys() {
     assert_eq!(
         manager
             .game_state
+            .world()
             .entity_manager()
             .get_entity(player_id)
             .expect("player should exist")
@@ -281,6 +284,7 @@ fn player_wasd_space_triggers_primary_action_attack_when_clip_exists() {
     let mut game_state = GameState::new_empty();
     let player_id = game_state.spawn_player_at(glam::IVec2::new(0, 0));
     let player = game_state
+        .world_mut()
         .entity_manager_mut()
         .get_player_mut()
         .expect("player should exist");
@@ -319,6 +323,7 @@ fn player_wasd_space_triggers_primary_action_attack_when_clip_exists() {
 
     let current_state = manager
         .game_state
+        .world()
         .entity_manager()
         .get_entity(player_id)
         .and_then(|entity| entity.attributes.animation_controller.as_ref())

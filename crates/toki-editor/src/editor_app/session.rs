@@ -156,7 +156,12 @@ impl EditorApp {
                 tracing::info!(
                     "Loaded active scene '{}' with {} entities into GameState",
                     scene_name,
-                    viewport.game_state().entities().len()
+                    viewport
+                        .game_state()
+                        .world()
+                        .entity_manager()
+                        .active_entities()
+                        .len()
                 );
             }
             Err(e) => {

@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use toki_core::events::SceneSwitchRequest;
+use toki_core::game::SceneSystem;
 use toki_core::graphics::image::load_image_rgba8;
 use toki_core::palette::recolor_indexed_image;
 
@@ -78,9 +79,9 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             self.audio_mix.music_percent,
         ) {
             super::app_transition::TransitionAdvance::ReadyToSwap(request) => {
-                self.game_system
-                    .game_state
-                    .sync_persistent_entities_to_active_scene();
+                SceneSystem::sync_persistent_entities_to_active_scene(
+                    &mut self.game_system.game_state,
+                );
                 if self.scene_persistence {
                     self.game_system.sync_entities_to_active_scene();
                 }

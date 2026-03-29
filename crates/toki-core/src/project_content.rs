@@ -1,4 +1,5 @@
 use crate::entity::EntityDefinition;
+use crate::game::SceneSystem;
 use crate::{GameState, Scene};
 
 pub fn build_game_state_from_scene(
@@ -21,10 +22,10 @@ pub fn build_game_state_from_project_content(
     }
 
     for scene in scenes {
-        game_state.add_scene(scene);
+        SceneSystem::add_scene(&mut game_state, scene);
     }
 
-    game_state.load_scene(startup_scene_name)?;
+    SceneSystem::load(&mut game_state, startup_scene_name)?;
     Ok(game_state)
 }
 
@@ -118,10 +119,14 @@ mod tests {
             .expect("scene should load with supplied player definition");
 
         assert_eq!(
-            game_state.active_scene().map(|scene| scene.name.as_str()),
+            SceneSystem::active_scene(&game_state).map(|scene| scene.name.as_str()),
             Some("Main Scene")
         );
-        assert!(game_state.player_entity().is_some());
+        assert!(game_state
+            .world()
+            .player_id()
+            .and_then(|entity_id| game_state.world().entity_manager().get_entity(entity_id))
+            .is_some());
     }
 
     #[test]
@@ -154,7 +159,7 @@ mod tests {
                 .expect("startup scene should load");
 
         assert_eq!(
-            game_state.active_scene().map(|scene| scene.name.as_str()),
+            SceneSystem::active_scene(&game_state).map(|scene| scene.name.as_str()),
             Some("Scene 2")
         );
     }

@@ -4,7 +4,11 @@ use super::GameState;
 
 impl GameState {
     pub fn player_inventory_entries(&self) -> Vec<crate::menu::InventoryEntry> {
-        let Some(player) = self.player_entity() else {
+        let Some(player) = self
+            .world
+            .player_id
+            .and_then(|player_id| self.world.entity_manager.get_entity(player_id))
+        else {
             return Vec::new();
         };
 

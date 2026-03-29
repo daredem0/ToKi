@@ -12,6 +12,7 @@ use toki_core::entity::{
     ControlRole, Entity, EntityAttributes, EntityAudioSettings, EntityDefinition, EntityKind,
     MovementProfile, MovementSoundTrigger, RenderingDef,
 };
+use toki_core::game::SceneSystem;
 use toki_core::{FlagValue, GameState, Scene};
 
 pub fn test_tilemap() -> TileMap {
@@ -179,6 +180,7 @@ pub fn scene_with_test_player(name: &str, position: IVec2) -> Scene {
     let mut template_state = GameState::new_empty();
     let player_id = template_state.spawn_player_at(position);
     let player = template_state
+        .world()
         .entity_manager()
         .get_entity(player_id)
         .expect("template player should exist")
@@ -196,8 +198,8 @@ pub fn save_test_state() -> GameState {
     scene.camera_position = Some(IVec2::new(6, 8));
     scene.camera_scale = Some(3);
     scene.entities.push(player);
-    game_state.add_scene(scene);
-    game_state.load_scene("main").unwrap();
+    SceneSystem::add_scene(&mut game_state, scene);
+    SceneSystem::load(&mut game_state, "main").unwrap();
     game_state.set_flag("quest_complete", FlagValue::Bool(true));
     game_state.set_flag("coins", FlagValue::Int(7));
     game_state

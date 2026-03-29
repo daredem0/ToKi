@@ -6,7 +6,10 @@ use toki_core::{
     assets::atlas::AtlasMeta,
     assets::tilemap::TileMap,
     entity::Entity,
-    game::{EntityHealthBar, GroundShadow, InputAction},
+    game::{
+        EntityHealthBar, GameSimulation, GroundShadow, InputAction, InputSystem,
+        RenderQueryService, RuleSystem, SceneSystem,
+    },
     scene::Scene,
     sprite::SpriteFrame,
     GameState, GameUpdateResult, InputKey,
@@ -49,7 +52,7 @@ impl GameManager {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> GameUpdateResult<AudioEvent> {
-        self.game_state.update(world_bounds, tilemap, atlas)
+        GameSimulation::tick_fixed(&mut self.game_state, world_bounds, tilemap, atlas)
     }
 
     /// Update the game state with delta time scaling
@@ -61,8 +64,13 @@ impl GameManager {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> GameUpdateResult<AudioEvent> {
-        self.game_state
-            .update_with_delta(delta_ms, world_bounds, tilemap, atlas)
+        GameSimulation::tick_with_delta(
+            &mut self.game_state,
+            delta_ms,
+            world_bounds,
+            tilemap,
+            atlas,
+        )
     }
 
     /// Handle winit keyboard input events, translating to core InputKey events
@@ -71,25 +79,39 @@ impl GameManager {
             match binding {
                 KeyboardBinding::Direct(input_key) => {
                     if pressed {
-                        self.game_state.handle_key_press(input_key);
+                        InputSystem::handle_key_press(self.game_state.runtime_mut(), input_key);
                     } else {
-                        self.game_state.handle_key_release(input_key);
+                        InputSystem::handle_key_release(self.game_state.runtime_mut(), input_key);
                     }
                 }
                 KeyboardBinding::Profile { profile, input_key } => {
                     if pressed {
-                        self.game_state.handle_profile_key_press(profile, input_key);
+                        InputSystem::handle_profile_key_press(
+                            self.game_state.runtime_mut(),
+                            profile,
+                            input_key,
+                        );
                     } else {
-                        self.game_state
-                            .handle_profile_key_release(profile, input_key);
+                        InputSystem::handle_profile_key_release(
+                            self.game_state.runtime_mut(),
+                            profile,
+                            input_key,
+                        );
                     }
                 }
                 KeyboardBinding::ProfileAction { profile, action } => {
                     if pressed {
-                        self.game_state.handle_profile_action_press(profile, action);
+                        InputSystem::handle_profile_action_press(
+                            self.game_state.runtime_mut(),
+                            profile,
+                            action,
+                        );
                     } else {
-                        self.game_state
-                            .handle_profile_action_release(profile, action);
+                        InputSystem::handle_profile_action_release(
+                            self.game_state.runtime_mut(),
+                            profile,
+                            action,
+                        );
                     }
                 }
             }
@@ -97,7 +119,7 @@ impl GameManager {
     }
 
     pub fn clear_runtime_inputs(&mut self) {
-        self.game_state.clear_runtime_inputs();
+        InputSystem::clear(self.game_state.runtime_mut());
     }
 
     /// Translate winit KeyCode to core InputKey
@@ -130,15 +152,30 @@ impl GameManager {
     }
 
     pub fn get_sprite_render_requests(&self) -> Vec<SpriteRenderRequest> {
-        self.game_state.get_sprite_render_requests()
+        RenderQueryService::new(
+            self.game_state.world().entity_manager(),
+            self.game_state.world().player_id(),
+            self.game_state.runtime().debug_collision_rendering(),
+        )
+        .sprite_render_requests()
     }
 
     pub fn get_entity_health_bars(&self) -> Vec<EntityHealthBar> {
-        self.game_state.get_entity_health_bars()
+        RenderQueryService::new(
+            self.game_state.world().entity_manager(),
+            self.game_state.world().player_id(),
+            self.game_state.runtime().debug_collision_rendering(),
+        )
+        .entity_health_bars()
     }
 
     pub fn get_entity_ground_shadows(&self) -> Vec<GroundShadow> {
-        self.game_state.get_entity_ground_shadows()
+        RenderQueryService::new(
+            self.game_state.world().entity_manager(),
+            self.game_state.world().player_id(),
+            self.game_state.runtime().debug_collision_rendering(),
+        )
+        .entity_ground_shadows()
     }
 
     /// Spawn an NPC that looks like the player
@@ -152,17 +189,27 @@ impl GameManager {
         atlas: &AtlasMeta,
         texture_size: glam::UVec2,
     ) -> SpriteFrame {
-        self.game_state.current_sprite_frame(atlas, texture_size)
+        RenderQueryService::new(
+            self.game_state.world().entity_manager(),
+            self.game_state.world().player_id(),
+            self.game_state.runtime().debug_collision_rendering(),
+        )
+        .current_sprite_frame(atlas, texture_size)
     }
 
     /// Get player position for rendering.
     pub fn player_position(&self) -> glam::IVec2 {
-        self.game_state.player_position()
+        RenderQueryService::new(
+            self.game_state.world().entity_manager(),
+            self.game_state.world().player_id(),
+            self.game_state.runtime().debug_collision_rendering(),
+        )
+        .player_position()
     }
 
     /// Get the player entity ID
     pub fn player_id(&self) -> Option<toki_core::entity::EntityId> {
-        self.game_state.player_id()
+        self.game_state.world().player_id()
     }
 
     pub fn player_inventory_entries(&self) -> Vec<InventoryEntry> {
@@ -170,15 +217,15 @@ impl GameManager {
     }
 
     pub fn active_scene_name(&self) -> Option<&str> {
-        self.game_state.scene_manager().active_scene_name()
+        self.game_state.scene().scene_manager().active_scene_name()
     }
 
     pub fn active_scene(&self) -> Option<&Scene> {
-        self.game_state.active_scene()
+        SceneSystem::active_scene(&self.game_state)
     }
 
     pub fn scene_named(&self, scene_name: &str) -> Option<&Scene> {
-        self.game_state.scene_manager().get_scene(scene_name)
+        self.game_state.scene().scene_manager().get_scene(scene_name)
     }
 
     pub fn transition_to_scene(
@@ -186,27 +233,37 @@ impl GameManager {
         scene_name: &str,
         spawn_point_id: &str,
     ) -> Result<(), String> {
-        self.game_state
-            .transition_to_scene(scene_name, spawn_point_id)
+        SceneSystem::transition(&mut self.game_state, scene_name, spawn_point_id)
     }
 
     pub fn sync_entities_to_active_scene(&mut self) {
-        self.game_state.sync_entities_to_active_scene();
+        SceneSystem::sync_entities_to_active_scene(&mut self.game_state);
     }
 
     pub fn record_dialog_completion(&mut self, dialog_id: &str, outcome_id: &str) {
-        self.game_state
-            .record_dialog_completion(dialog_id.to_string(), outcome_id.to_string());
+        RuleSystem::record_dialog_completion(&mut self.game_state, dialog_id, outcome_id);
     }
 
     /// Get entities for camera system integration
     pub fn entities_for_camera(&self) -> Vec<Entity> {
-        self.game_state.entities_owned()
+        self.game_state
+            .world()
+            .entity_manager()
+            .active_entities()
+            .iter()
+            .filter_map(|&id| self.game_state.world().entity_manager().get_entity(id))
+            .cloned()
+            .collect()
     }
 
     /// Get entity collision boxes for debug rendering
     pub fn get_entity_collision_boxes(&self) -> Vec<(glam::IVec2, glam::UVec2, bool)> {
-        self.game_state.get_entity_collision_boxes()
+        RenderQueryService::new(
+            self.game_state.world().entity_manager(),
+            self.game_state.world().player_id(),
+            self.game_state.runtime().debug_collision_rendering(),
+        )
+        .entity_collision_boxes()
     }
 
     /// Get solid tile positions for debug rendering
@@ -215,7 +272,12 @@ impl GameManager {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> Vec<(u32, u32)> {
-        self.game_state.get_solid_tile_positions(tilemap, atlas)
+        RenderQueryService::new(
+            self.game_state.world().entity_manager(),
+            self.game_state.world().player_id(),
+            self.game_state.runtime().debug_collision_rendering(),
+        )
+        .solid_tile_positions(tilemap, atlas)
     }
 
     /// Get trigger tile positions for debug rendering
@@ -224,12 +286,17 @@ impl GameManager {
         tilemap: &TileMap,
         atlas: &AtlasMeta,
     ) -> Vec<(u32, u32)> {
-        self.game_state.get_trigger_tile_positions(tilemap, atlas)
+        RenderQueryService::new(
+            self.game_state.world().entity_manager(),
+            self.game_state.world().player_id(),
+            self.game_state.runtime().debug_collision_rendering(),
+        )
+        .trigger_tile_positions(tilemap, atlas)
     }
 
     /// Check if debug collision rendering is enabled
     pub fn is_debug_collision_rendering_enabled(&self) -> bool {
-        self.game_state.is_debug_collision_rendering_enabled()
+        self.game_state.runtime().debug_collision_rendering()
     }
 }
 

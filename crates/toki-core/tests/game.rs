@@ -1,6 +1,8 @@
 use glam::{IVec2, UVec2};
 use std::collections::HashMap;
 use std::path::PathBuf;
+#[path = "support/game_state_compat.rs"]
+mod game_state_compat;
 use toki_core::animation::AnimationState;
 use toki_core::assets::{
     atlas::{AtlasMeta, TileInfo, TileProperties},
@@ -21,6 +23,7 @@ use toki_core::{
     scene::{Scene, SceneAnchor, SceneAnchorFacing, SceneAnchorKind, ScenePlayerEntry},
     GameState, InputKey,
 };
+use game_state_compat::GameStateCompatExt;
 
 fn create_test_sprite() -> SpriteInstance {
     let animation = Animation {

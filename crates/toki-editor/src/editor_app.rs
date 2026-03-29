@@ -602,9 +602,10 @@ impl ApplicationHandler for EditorApp {
                             KeyCode::F4 => {
                                 // Toggle debug collision rendering (same as toki-runtime)
                                 if let Some(viewport) = &mut self.viewports.scene {
-                                    viewport
-                                        .game_state_mut()
-                                        .handle_key_press(toki_core::InputKey::DebugToggle);
+                                    toki_core::game::InputSystem::handle_key_press(
+                                        viewport.game_state_mut().runtime_mut(),
+                                        toki_core::InputKey::DebugToggle,
+                                    );
                                     tracing::info!("Toggled debug collision rendering via F4");
                                     if let Some(window) = &self.platform.window {
                                         window.request_redraw();
