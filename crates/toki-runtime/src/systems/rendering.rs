@@ -17,7 +17,10 @@ use toki_render::{
 };
 use winit::window::Window;
 
-use crate::viewport::presentation::{resolve_fixed_viewport_presentation, ViewportPresentation};
+use crate::viewport::presentation::ViewportPresentation;
+use crate::viewport::runtime_state::{
+    resolve_effective_runtime_viewport, EffectiveRuntimeViewport,
+};
 
 /// Rendering system that manages GPU state and projection calculations.
 ///
@@ -240,11 +243,15 @@ impl RenderingSystem {
 
     /// Calculate current projection matrix
     pub fn calculate_projection(&self) -> glam::Mat4 {
-        self.viewport_presentation().projection
+        self.effective_runtime_viewport().presentation.projection
     }
 
     pub fn viewport_presentation(&self) -> ViewportPresentation {
-        resolve_fixed_viewport_presentation(
+        self.effective_runtime_viewport().presentation
+    }
+
+    pub fn effective_runtime_viewport(&self) -> EffectiveRuntimeViewport {
+        resolve_effective_runtime_viewport(
             glam::UVec2::new(
                 self.projection_params.width.max(1),
                 self.projection_params.height.max(1),
@@ -285,7 +292,7 @@ impl RenderingSystem {
     }
 
     fn scene_clip_rect(&self) -> Option<SceneClipRect> {
-        let rect = self.viewport_presentation().layout.viewport_rect;
+        let rect = self.effective_runtime_viewport().presentation.layout.viewport_rect;
         Some(SceneClipRect {
             x: rect.x.round().max(0.0) as u32,
             y: rect.y.round().max(0.0) as u32,

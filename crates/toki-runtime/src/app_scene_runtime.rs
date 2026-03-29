@@ -187,6 +187,13 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             self.resources.tilemap_size().y * self.resources.tilemap_tile_size().y,
         );
 
+        if let Some(window_size) = self.window_size {
+            self.rendering.update_window_size(window_size);
+        }
+        let effective_viewport = self.rendering.effective_runtime_viewport();
+        self.camera_system
+            .apply_runtime_viewport(effective_viewport.world_viewport_size(), world_bounds);
+
         let new_mode = if let Some(player_id) = self.game_system.player_id() {
             let player_position = RenderQueryService::new(
                 self.game_system.game_state.world().entity_manager(),
@@ -210,9 +217,6 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             .clamp_to_world_bounds(world_bounds);
 
         if self.rendering.has_gpu() {
-            if let Some(window_size) = self.window_size {
-                self.rendering.update_window_size(window_size);
-            }
             let view = self.camera_system.view_matrix();
             self.rendering.update_projection(view);
             self.camera_system

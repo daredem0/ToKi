@@ -374,6 +374,23 @@ fn integer_scale_fixed_projection_uses_requested_factor_when_available() {
 }
 
 #[test]
+fn window_fill_projection_uses_full_window_without_letterbox() {
+    let mut rendering = RenderingSystem::new_with_desired_resolution(160, 144);
+    rendering.set_viewport_mode(RuntimeViewportMode::WindowFill { zoom_percent: 100 });
+    rendering.update_window_size(winit::dpi::PhysicalSize::new(320, 144));
+
+    let projection = rendering.calculate_projection();
+    let top_left = project_to_screen(projection, 320.0, 144.0, glam::Vec2::ZERO);
+    let bottom_right =
+        project_to_screen(projection, 320.0, 144.0, glam::Vec2::new(320.0, 144.0));
+
+    assert!((top_left.x - 0.0).abs() < 0.01);
+    assert!((top_left.y - 0.0).abs() < 0.01);
+    assert!((bottom_right.x - 320.0).abs() < 0.01);
+    assert!((bottom_right.y - 144.0).abs() < 0.01);
+}
+
+#[test]
 fn update_projection_applies_scene_clip_rect_for_letterboxed_viewport() {
     let fake = FakeBackend::default();
     let scene_clip_rect = fake.scene_clip_rect.clone();
@@ -393,6 +410,28 @@ fn update_projection_applies_scene_clip_rect_for_letterboxed_viewport() {
             y: 12,
             width: 640,
             height: 576,
+        })
+    );
+}
+
+#[test]
+fn update_projection_uses_full_window_scene_clip_rect_for_window_fill() {
+    let fake = FakeBackend::default();
+    let scene_clip_rect = fake.scene_clip_rect.clone();
+    let mut rendering = RenderingSystem::new_with_desired_resolution(160, 144);
+    rendering.set_backend_for_tests(Box::new(fake));
+    rendering.set_viewport_mode(RuntimeViewportMode::WindowFill { zoom_percent: 100 });
+    rendering.update_window_size(winit::dpi::PhysicalSize::new(320, 144));
+
+    rendering.update_projection(glam::Mat4::IDENTITY);
+
+    assert_eq!(
+        *scene_clip_rect.borrow(),
+        Some(SceneClipRect {
+            x: 0,
+            y: 0,
+            width: 320,
+            height: 144,
         })
     );
 }

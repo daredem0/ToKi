@@ -64,6 +64,40 @@ pub fn compute_integer_scale_layout(
     build_layout(window_size, logical_viewport_size, resolved_scale)
 }
 
+pub fn compute_window_fill_layout(
+    window_size: glam::UVec2,
+    base_viewport: glam::UVec2,
+    zoom_percent: u16,
+) -> ViewportLayout {
+    let window_size = sanitize_size(window_size);
+    let base_viewport = sanitize_size(base_viewport);
+    let zoom_percent = zoom_percent.max(1) as f32;
+    let zoomed_base = glam::Vec2::new(
+        base_viewport.x as f32 * 100.0 / zoom_percent,
+        base_viewport.y as f32 * 100.0 / zoom_percent,
+    );
+    let window_aspect = window_size.x as f32 / window_size.y as f32;
+    let base_aspect = zoomed_base.x / zoomed_base.y;
+
+    let logical_viewport_size = if window_aspect >= base_aspect {
+        glam::UVec2::new(
+            (zoomed_base.y * window_aspect).round().max(1.0) as u32,
+            zoomed_base.y.round().max(1.0) as u32,
+        )
+    } else {
+        glam::UVec2::new(
+            zoomed_base.x.round().max(1.0) as u32,
+            (zoomed_base.x / window_aspect).round().max(1.0) as u32,
+        )
+    };
+
+    let resolved_scale = (window_size.x as f32 / logical_viewport_size.x as f32)
+        .min(window_size.y as f32 / logical_viewport_size.y as f32)
+        .max(f32::EPSILON);
+
+    build_layout(window_size, logical_viewport_size, resolved_scale)
+}
+
 pub fn compute_layout_for_mode(
     window_size: glam::UVec2,
     base_viewport: glam::UVec2,
@@ -75,6 +109,9 @@ pub fn compute_layout_for_mode(
         }
         RuntimeViewportMode::IntegerScale { factor } => {
             compute_integer_scale_layout(window_size, base_viewport, factor)
+        }
+        RuntimeViewportMode::WindowFill { zoom_percent } => {
+            compute_window_fill_layout(window_size, base_viewport, zoom_percent)
         }
     }
 }
@@ -114,6 +151,7 @@ fn build_layout(
 mod tests {
     use super::{
         compute_aspect_fit_layout, compute_integer_scale_layout, compute_layout_for_mode,
+        compute_window_fill_layout,
     };
     use toki_core::project_runtime::{IntegerScaleFactor, RuntimeViewportMode};
 
@@ -219,5 +257,44 @@ mod tests {
         assert_eq!(layout.logical_viewport_size, glam::UVec2::ONE);
         assert!(layout.viewport_rect.width > 0.0);
         assert!(layout.viewport_rect.height > 0.0);
+    }
+
+    #[test]
+    fn window_fill_uses_full_window_in_wide_windows() {
+        let layout =
+            compute_window_fill_layout(glam::UVec2::new(320, 144), glam::UVec2::new(160, 144), 100);
+
+        assert!((layout.viewport_rect.x - 0.0).abs() < 0.01);
+        assert!((layout.viewport_rect.y - 0.0).abs() < 0.01);
+        assert!((layout.viewport_rect.width - 320.0).abs() < 0.01);
+        assert!((layout.viewport_rect.height - 144.0).abs() < 0.01);
+        assert_eq!(layout.logical_viewport_size, glam::UVec2::new(320, 144));
+    }
+
+    #[test]
+    fn window_fill_uses_full_window_in_tall_windows() {
+        let layout =
+            compute_window_fill_layout(glam::UVec2::new(160, 288), glam::UVec2::new(160, 144), 100);
+
+        assert!((layout.viewport_rect.x - 0.0).abs() < 0.01);
+        assert!((layout.viewport_rect.y - 0.0).abs() < 0.01);
+        assert!((layout.viewport_rect.width - 160.0).abs() < 0.01);
+        assert!((layout.viewport_rect.height - 288.0).abs() < 0.01);
+        assert_eq!(layout.logical_viewport_size, glam::UVec2::new(160, 288));
+    }
+
+    #[test]
+    fn window_fill_zoom_percent_changes_visible_world_area() {
+        let zoomed_out =
+            compute_window_fill_layout(glam::UVec2::new(160, 144), glam::UVec2::new(160, 144), 50);
+        let baseline =
+            compute_window_fill_layout(glam::UVec2::new(160, 144), glam::UVec2::new(160, 144), 100);
+        let zoomed_in =
+            compute_window_fill_layout(glam::UVec2::new(160, 144), glam::UVec2::new(160, 144), 200);
+
+        assert!(zoomed_out.logical_viewport_size.x > baseline.logical_viewport_size.x);
+        assert!(zoomed_out.logical_viewport_size.y > baseline.logical_viewport_size.y);
+        assert!(zoomed_in.logical_viewport_size.x < baseline.logical_viewport_size.x);
+        assert!(zoomed_in.logical_viewport_size.y < baseline.logical_viewport_size.y);
     }
 }

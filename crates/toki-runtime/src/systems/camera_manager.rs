@@ -88,6 +88,21 @@ impl CameraManager {
         self.camera.position
     }
 
+    pub fn apply_runtime_viewport(
+        &mut self,
+        viewport_size: glam::UVec2,
+        world_size: glam::UVec2,
+    ) -> bool {
+        let viewport_size = glam::UVec2::new(viewport_size.x.max(1), viewport_size.y.max(1));
+        if self.camera.viewport_size == viewport_size {
+            return false;
+        }
+
+        self.camera.viewport_size = viewport_size;
+        self.camera.clamp_to_world_bounds(world_size);
+        true
+    }
+
     /// Convenience method to get the viewport size
     pub fn viewport_size(&self) -> glam::UVec2 {
         self.camera.viewport_size

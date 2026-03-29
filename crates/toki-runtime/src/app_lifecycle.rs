@@ -158,8 +158,8 @@ impl App {
 
     fn handle_resize_event(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         self.rendering.resize(new_size);
-        let view = self.camera_system.view_matrix();
-        self.rendering.update_projection(view);
+        let world_bounds = self.current_world_bounds();
+        self.sync_runtime_viewport_to_window(world_bounds);
         self.platform.request_redraw();
     }
 
@@ -184,17 +184,16 @@ impl App {
                 self.splash_active = false;
                 self.rendering.set_tilemap_render_enabled(true);
                 self.restore_runtime_sprite_texture_after_splash();
-                self.rendering
-                    .update_projection(self.camera_system.view_matrix());
+                let world_bounds = self.current_world_bounds();
+                self.sync_runtime_viewport_to_window(world_bounds);
                 self.refresh_tilemap_vertices_for_current_camera();
                 self.tick();
                 self.timing.reset();
                 self.platform.request_redraw();
             }
 
-            if let Some(size) = self.platform.inner_size() {
-                self.rendering.update_window_size(size);
-            }
+            let world_bounds = self.current_world_bounds();
+            self.sync_runtime_viewport_to_window(world_bounds);
             let left = self.camera_system.position().x;
             let top = self.camera_system.position().y;
             let right = left + self.camera_system.viewport_size().x as i32;
