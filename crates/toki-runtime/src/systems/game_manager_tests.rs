@@ -297,6 +297,7 @@ fn player_wasd_space_triggers_primary_action_attack_when_clip_exists() {
         .expect("player should exist");
     let controller = player
         .attributes
+        .rendering
         .animation_controller
         .as_mut()
         .expect("player controller should exist");
@@ -333,7 +334,7 @@ fn player_wasd_space_triggers_primary_action_attack_when_clip_exists() {
         .world()
         .entity_manager()
         .get_entity(player_id)
-        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .and_then(|entity| entity.attributes.rendering.animation_controller.as_ref())
         .map(|controller| controller.current_clip_state);
     assert_eq!(
         current_state,

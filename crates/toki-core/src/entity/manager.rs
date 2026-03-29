@@ -1,17 +1,19 @@
 //! Entity management - creating, spawning, despawning, and querying entities.
 
 use super::definition::{EntityDefinition, EntityDefinitionError};
-use super::types::{
+use super::components::{EntityComponentStore, EntityOptionalComponents, EntitySpawnBundle};
+use super::model::{
     ControlRole, Entity, EntityAttributes, EntityAudioComponent, EntityAudioSettings, EntityId,
     EntityKind,
 };
 use super::default_category_for_kind;
+use super::wire::StoredEntity;
 use crate::collision::CollisionBox;
 use glam::{IVec2, UVec2};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::{HashMap, HashSet};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct EntityManager {
     entities: HashMap<EntityId, Entity>,
     next_id: EntityId,
@@ -24,8 +26,71 @@ pub struct EntityManager {
     active_entities: HashSet<EntityId>,
 
     /// Runtime audio components keyed by entity id.
+    audio_components: HashMap<EntityId, EntityAudioComponent>,
+
+    components: EntityComponentStore,
+}
+
+#[derive(Serialize, Deserialize)]
+struct EntityManagerWire {
+    entities: Vec<StoredEntity>,
+    next_id: EntityId,
+    player_id: Option<EntityId>,
     #[serde(default)]
     audio_components: HashMap<EntityId, EntityAudioComponent>,
+}
+
+impl Serialize for EntityManager {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        EntityManagerWire {
+            entities: self
+                .entities
+                .values()
+                .cloned()
+                .map(|entity| {
+                    let id = entity.id;
+                    StoredEntity::new(entity, self.components.optional_components(id))
+                })
+                .collect(),
+            next_id: self.next_id,
+            player_id: self.player_id,
+            audio_components: self.audio_components.clone(),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for EntityManager {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = EntityManagerWire::deserialize(deserializer)?;
+        let mut manager = EntityManager::new();
+        manager.next_id = wire.next_id;
+        manager.player_id = wire.player_id;
+        for stored in wire.entities {
+            let entity_id = stored.entity.id;
+            let audio_component = wire
+                .audio_components
+                .get(&entity_id)
+                .cloned()
+                .unwrap_or_else(|| stored.entity.audio.to_component());
+            manager.add_spawn_bundle(EntitySpawnBundle {
+                entity: stored.entity,
+                optional_components: stored.components,
+                audio_component,
+            });
+        }
+        if manager.next_id == 1 {
+            manager.next_id = wire.next_id;
+        }
+        manager.player_id = wire.player_id.or(manager.player_id);
+        Ok(manager)
+    }
 }
 
 impl EntityManager {
@@ -44,6 +109,7 @@ impl EntityManager {
             entities_by_kind: HashMap::new(),
             active_entities: HashSet::new(),
             audio_components: HashMap::new(),
+            components: EntityComponentStore::default(),
         }
     }
 
@@ -51,7 +117,8 @@ impl EntityManager {
     pub fn update_animations(&mut self, delta_time_ms: f32) -> HashMap<EntityId, u32> {
         let mut completed_loops = HashMap::new();
         for (entity_id, entity) in &mut self.entities {
-            if let Some(animation_controller) = &mut entity.attributes.animation_controller {
+            if let Some(animation_controller) = &mut entity.attributes.rendering.animation_controller
+            {
                 let loop_count = animation_controller.update(delta_time_ms);
                 if loop_count > 0 {
                     completed_loops.insert(*entity_id, loop_count);
@@ -71,8 +138,7 @@ impl EntityManager {
         attributes.ensure_legacy_health_stat();
         let id = self.next_id;
         self.next_id += 1;
-        // Create a default collision box for solid entities
-        let collision_box = if attributes.solid {
+        let collision_box = if attributes.gameplay.solid {
             Some(CollisionBox::solid_box(size))
         } else {
             None
@@ -94,24 +160,11 @@ impl EntityManager {
             movement_accumulator: glam::Vec2::ZERO,
         };
 
-        self.audio_components
-            .insert(id, EntityAudioComponent::default());
-
-        // Insert into main storage
-        self.entities.insert(id, entity);
-
-        self.register_entity_indices_from_state(
-            entity_kind,
-            id,
-            self.entities
-                .get(&id)
-                .is_some_and(Self::tracks_player_role),
-            self.entities
-                .get(&id)
-                .is_some_and(|entity| entity.attributes.active),
-        );
-
-        id
+        self.add_spawn_bundle(EntitySpawnBundle {
+            entity,
+            optional_components: EntityOptionalComponents::default(),
+            audio_component: EntityAudioComponent::default(),
+        })
     }
 
     /// Spawn an entity from an entity definition.
@@ -123,23 +176,8 @@ impl EntityManager {
         let id = self.next_id;
         self.next_id += 1;
 
-        let entity = definition.create_entity(position, id)?;
-        let entity_kind = entity.entity_kind;
-        let audio_component = definition.create_audio_component();
-
-        self.entities.insert(id, entity);
-        self.audio_components.insert(id, audio_component);
-        self.register_entity_indices_from_state(
-            entity_kind,
-            id,
-            self.entities
-                .get(&id)
-                .is_some_and(Self::tracks_player_role),
-            self.entities
-                .get(&id)
-                .is_some_and(|entity| entity.attributes.active),
-        );
-        Ok(id)
+        let bundle = definition.create_spawn_bundle(position, id)?;
+        Ok(self.add_spawn_bundle(bundle))
     }
 
     /// Clone an existing entity at a new position.
@@ -153,51 +191,27 @@ impl EntityManager {
         cloned.id = id;
         cloned.position = position;
 
-        let entity_kind = cloned.entity_kind;
-        let audio_component = cloned.audio.to_component();
-
-        self.entities.insert(id, cloned);
-        self.audio_components.insert(id, audio_component);
-        self.register_entity_indices_from_state(
-            entity_kind,
-            id,
-            false,
-            self.entities
-                .get(&id)
-                .is_some_and(|entity| entity.attributes.active),
-        );
-        Some(id)
+        let optional_components = self.components.optional_components(source_id);
+        Some(self.add_spawn_bundle(EntitySpawnBundle {
+            audio_component: cloned.audio.to_component(),
+            entity: cloned,
+            optional_components,
+        }))
     }
 
     /// Add an existing entity to the manager (used for scene-to-gamestate conversion)
-    pub fn add_existing_entity(&mut self, mut entity: Entity) -> EntityId {
+    pub fn add_existing_entity(&mut self, entity: Entity) -> EntityId {
+        self.add_existing_stored_entity(StoredEntity::new(entity, EntityOptionalComponents::default()))
+    }
+
+    pub fn add_existing_stored_entity(&mut self, stored: StoredEntity) -> EntityId {
+        let mut entity = stored.entity;
         entity.attributes.ensure_legacy_health_stat();
-
-        let id = entity.id;
-        let entity_kind = entity.entity_kind;
-
-        // Update next_id if needed to avoid conflicts
-        if id >= self.next_id {
-            self.next_id = id + 1;
-        }
-
-        self.audio_components
-            .insert(id, entity.audio.to_component());
-
-        // Store the entity
-        self.entities.insert(id, entity);
-        self.register_entity_indices_from_state(
-            entity_kind,
-            id,
-            self.entities
-                .get(&id)
-                .is_some_and(Self::tracks_player_role)
-                && self.player_id.is_none(),
-            true,
-        );
-
-        tracing::trace!("Added existing entity {} to EntityManager", id);
-        id
+        self.add_spawn_bundle(EntitySpawnBundle {
+            audio_component: entity.audio.to_component(),
+            entity,
+            optional_components: stored.components,
+        })
     }
 
     pub fn despawn_entity(&mut self, id: EntityId) -> bool {
@@ -207,8 +221,29 @@ impl EntityManager {
 
         self.deregister_entity_indices(&entity, id);
         self.audio_components.remove(&id);
+        self.components.remove_all(id);
 
         true
+    }
+
+    fn add_spawn_bundle(&mut self, mut bundle: EntitySpawnBundle) -> EntityId {
+        let id = bundle.entity.id;
+        let entity_kind = bundle.entity.entity_kind;
+        let is_player = Self::tracks_player_role(&bundle.entity) && self.player_id.is_none();
+        let is_active = bundle.entity.attributes.behavior.active;
+
+        if id >= self.next_id {
+            self.next_id = id + 1;
+        }
+
+        bundle.entity.attributes.ensure_legacy_health_stat();
+        self.audio_components.insert(id, bundle.audio_component);
+        self.components
+            .set_optional_components(id, bundle.optional_components);
+        self.entities.insert(id, bundle.entity);
+        self.register_entity_indices_from_state(entity_kind, id, is_player, is_active);
+        tracing::trace!("Added entity {} to EntityManager", id);
+        id
     }
 
     fn register_entity_indices_from_state(
@@ -246,6 +281,17 @@ impl EntityManager {
         self.entities.get_mut(&id)
     }
 
+    pub fn stored_entity(&self, id: EntityId) -> Option<StoredEntity> {
+        self.entities
+            .get(&id)
+            .cloned()
+            .map(|entity| StoredEntity::new(entity, self.components.optional_components(id)))
+    }
+
+    pub fn components(&self) -> &EntityComponentStore {
+        &self.components
+    }
+
     pub fn set_control_role(&mut self, id: EntityId, control_role: ControlRole) -> bool {
         let Some(entity) = self.entities.get_mut(&id) else {
             return false;
@@ -269,6 +315,65 @@ impl EntityManager {
 
     pub fn audio_component_mut(&mut self, id: EntityId) -> Option<&mut EntityAudioComponent> {
         self.audio_components.get_mut(&id)
+    }
+
+    pub fn primary_projectile(&self, id: EntityId) -> Option<&super::PrimaryProjectileDef> {
+        self.components.primary_projectile(id)
+    }
+
+    pub fn primary_projectile_mut(
+        &mut self,
+        id: EntityId,
+    ) -> Option<&mut super::PrimaryProjectileDef> {
+        self.components.primary_projectile_mut(id)
+    }
+
+    pub fn set_primary_projectile(
+        &mut self,
+        id: EntityId,
+        projectile: Option<super::PrimaryProjectileDef>,
+    ) {
+        self.components.set_primary_projectile(id, projectile);
+    }
+
+    pub fn projectile(&self, id: EntityId) -> Option<&super::ProjectileState> {
+        self.components.projectile(id)
+    }
+
+    pub fn projectile_mut(&mut self, id: EntityId) -> Option<&mut super::ProjectileState> {
+        self.components.projectile_mut(id)
+    }
+
+    pub fn set_projectile(&mut self, id: EntityId, projectile: Option<super::ProjectileState>) {
+        self.components.set_projectile(id, projectile);
+    }
+
+    pub fn pickup(&self, id: EntityId) -> Option<&super::PickupDef> {
+        self.components.pickup(id)
+    }
+
+    pub fn pickup_mut(&mut self, id: EntityId) -> Option<&mut super::PickupDef> {
+        self.components.pickup_mut(id)
+    }
+
+    pub fn set_pickup(&mut self, id: EntityId, pickup: Option<super::PickupDef>) {
+        self.components.set_pickup(id, pickup);
+    }
+
+    pub fn inventory(&self, id: EntityId) -> Option<&super::Inventory> {
+        self.components.inventory(id)
+    }
+
+    pub fn inventory_mut(&mut self, id: EntityId) -> Option<&mut super::Inventory> {
+        self.components.inventory_mut(id)
+    }
+
+    pub fn ensure_inventory(&mut self, id: EntityId) -> &mut super::Inventory {
+        self.components.ensure_inventory(id)
+    }
+
+    pub fn set_inventory(&mut self, id: EntityId, inventory: Option<super::Inventory>) {
+        self.components.set_inventory(id, inventory);
     }
 
     pub fn get_entity_with_audio_mut(
@@ -338,7 +443,7 @@ impl EntityManager {
     ) -> Option<EntityId> {
         let moving_entity = self.entities.get(&moving_entity_id)?;
         let moving_box = moving_entity.collision_box.as_ref()?;
-        if moving_box.trigger || !moving_entity.attributes.solid {
+        if moving_box.trigger || !moving_entity.attributes.gameplay.solid {
             return None;
         }
 
@@ -352,7 +457,7 @@ impl EntityManager {
             let Some(other_entity) = self.entities.get(other_id) else {
                 continue;
             };
-            if !other_entity.attributes.solid {
+            if !other_entity.attributes.gameplay.solid {
                 continue;
             }
 
@@ -379,7 +484,7 @@ impl EntityManager {
             let Some(other_entity) = self.entities.get(other_id) else {
                 continue;
             };
-            if !other_entity.attributes.solid {
+            if !other_entity.attributes.gameplay.solid {
                 continue;
             }
             let Some(other_box) = &other_entity.collision_box else {
@@ -400,7 +505,7 @@ impl EntityManager {
     pub fn visible_entities(&self) -> Vec<EntityId> {
         self.entities
             .iter()
-            .filter(|(_, entity)| entity.attributes.visible)
+            .filter(|(_, entity)| entity.attributes.rendering.visible)
             .map(|(id, _)| *id)
             .collect()
     }
@@ -408,8 +513,8 @@ impl EntityManager {
     // Update entity active status
     pub fn set_entity_active(&mut self, id: EntityId, active: bool) {
         if let Some(entity) = self.entities.get_mut(&id) {
-            let was_active = entity.attributes.active;
-            entity.attributes.active = active;
+            let was_active = entity.attributes.behavior.active;
+            entity.attributes.behavior.active = active;
             // Update active_entities set
             if active && !was_active {
                 self.active_entities.insert(id);

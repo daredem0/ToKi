@@ -2,8 +2,8 @@ use glam::IVec2;
 use std::collections::HashMap;
 use toki_core::assets::atlas::{AtlasMeta, ColorMode, TileInfo, TileProperties};
 use toki_core::entity::{
-    AttributesDef, AudioDef, CollisionDef, EntityDefinition, MovementProfile,
-    MovementSoundTrigger, RenderingDef,
+    AttributesDef, AudioDef, CollisionDef, EntityDefinition, EntityOptionalComponents,
+    MovementProfile, MovementSoundTrigger, RenderingDef, StoredEntity,
 };
 use toki_core::game::{
     GameSimulation, InputSystem, RenderQueryService, RuleSystem, SceneSystem,
@@ -141,9 +141,15 @@ fn scene_system_transition_preserves_player_inventory_and_stats() {
         .get_entity(player_id)
         .expect("player should exist")
         .clone();
-    player.attributes.inventory.add_item("potion", 2);
+    let mut components = EntityOptionalComponents::default();
+    components.inventory = Some(Default::default());
+    components
+        .inventory
+        .as_mut()
+        .expect("inventory should exist")
+        .add_item("potion", 2);
     let _ = player.attributes.apply_stat_delta("health", -25);
-    scene_a.add_entity(player);
+    scene_a.add_stored_entity(StoredEntity::new(player, components));
 
     let mut scene_b = Scene::new("B".to_string());
     scene_b.anchors.push(SceneAnchor {
@@ -164,7 +170,15 @@ fn scene_system_transition_preserves_player_inventory_and_stats() {
         .and_then(|player_id| state.world().entity_manager().get_entity(player_id))
         .expect("player should be preserved");
     assert_eq!(player.position, IVec2::new(96, 48));
-    assert_eq!(player.attributes.inventory.item_count("potion"), 2);
+    assert_eq!(
+        state
+            .world()
+            .player_id()
+            .and_then(|player_id| state.world().entity_manager().inventory(player_id))
+            .expect("player inventory should exist")
+            .item_count("potion"),
+        2
+    );
     assert_eq!(player.attributes.current_stat("health"), Some(75));
 }
 

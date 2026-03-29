@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::entity::{Entity, EntityId};
+use crate::entity::{Entity, EntityComponentStore, EntityId, EntityOptionalComponents, StoredEntity};
 use crate::ids::EntityDefName;
 use crate::rules::RuleSet;
 
@@ -35,7 +35,7 @@ pub struct ScenePlayerEntry {
 ///
 /// A scene is a self-contained game environment that can be loaded, saved, and edited.
 /// Unlike GameState which is for runtime execution, Scene is for data persistence and editing.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct Scene {
     /// Scene metadata
     pub name: String,
@@ -48,8 +48,9 @@ pub struct Scene {
     /// Entities in this scene
     pub entities: Vec<Entity>,
 
+    pub components: EntityComponentStore,
+
     /// Data-driven rules authored for this scene.
-    #[serde(default)]
     pub rules: RuleSet,
 
     /// Scene-specific camera settings (optional override)
@@ -57,11 +58,9 @@ pub struct Scene {
     pub camera_scale: Option<u32>,
 
     /// Optional background music track id for this scene.
-    #[serde(default)]
     pub background_music_track_id: Option<String>,
 
     /// Placeable authored scene anchors such as spawn points.
-    #[serde(default)]
     pub anchors: Vec<SceneAnchor>,
 
     /// Optional scene-authored player preview/entry configuration.
@@ -69,8 +68,77 @@ pub struct Scene {
     /// Scenes are not required to author a player entry. This is used when a
     /// scene wants to define which player entity definition should preview and
     /// enter at which spawn point.
+    pub player_entry: Option<ScenePlayerEntry>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct SceneWire {
+    pub name: String,
+    pub description: Option<String>,
+    pub maps: Vec<String>,
+    pub entities: Vec<StoredEntity>,
+    #[serde(default)]
+    pub rules: RuleSet,
+    pub camera_position: Option<glam::IVec2>,
+    pub camera_scale: Option<u32>,
+    #[serde(default)]
+    pub background_music_track_id: Option<String>,
+    #[serde(default)]
+    pub anchors: Vec<SceneAnchor>,
     #[serde(default)]
     pub player_entry: Option<ScenePlayerEntry>,
+}
+
+impl Serialize for Scene {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let entities = self
+            .entities
+            .iter()
+            .cloned()
+            .map(|entity| {
+                let id = entity.id;
+                StoredEntity::new(entity, self.components.optional_components(id))
+            })
+            .collect::<Vec<_>>();
+        SceneWire {
+            name: self.name.clone(),
+            description: self.description.clone(),
+            maps: self.maps.clone(),
+            entities,
+            rules: self.rules.clone(),
+            camera_position: self.camera_position,
+            camera_scale: self.camera_scale,
+            background_music_track_id: self.background_music_track_id.clone(),
+            anchors: self.anchors.clone(),
+            player_entry: self.player_entry.clone(),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Scene {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = SceneWire::deserialize(deserializer)?;
+        let mut scene = Scene::new(wire.name);
+        scene.description = wire.description;
+        scene.maps = wire.maps;
+        scene.rules = wire.rules;
+        scene.camera_position = wire.camera_position;
+        scene.camera_scale = wire.camera_scale;
+        scene.background_music_track_id = wire.background_music_track_id;
+        scene.anchors = wire.anchors;
+        scene.player_entry = wire.player_entry;
+        for stored in wire.entities {
+            scene.add_stored_entity(stored);
+        }
+        Ok(scene)
+    }
 }
 
 impl Scene {
@@ -81,6 +149,7 @@ impl Scene {
             description: None,
             maps: Vec::new(),
             entities: Vec::new(),
+            components: EntityComponentStore::default(),
             rules: RuleSet::default(),
             camera_position: None,
             camera_scale: None,
@@ -97,6 +166,7 @@ impl Scene {
             description: None,
             maps,
             entities: Vec::new(),
+            components: EntityComponentStore::default(),
             rules: RuleSet::default(),
             camera_position: None,
             camera_scale: None,
@@ -108,8 +178,13 @@ impl Scene {
 
     /// Add an entity to the scene
     pub fn add_entity(&mut self, entity: Entity) -> EntityId {
-        let id = entity.id;
-        self.entities.push(entity);
+        self.add_stored_entity(StoredEntity::new(entity, EntityOptionalComponents::default()))
+    }
+
+    pub fn add_stored_entity(&mut self, stored: StoredEntity) -> EntityId {
+        let id = stored.entity.id;
+        self.components.set_optional_components(id, stored.components);
+        self.entities.push(stored.entity);
         id
     }
 
@@ -117,7 +192,11 @@ impl Scene {
     pub fn remove_entity(&mut self, entity_id: EntityId) -> bool {
         let initial_len = self.entities.len();
         self.entities.retain(|e| e.id != entity_id);
-        self.entities.len() != initial_len
+        let removed = self.entities.len() != initial_len;
+        if removed {
+            self.components.remove_all(entity_id);
+        }
+        removed
     }
 
     /// Get an entity by ID
@@ -128,6 +207,16 @@ impl Scene {
     /// Get a mutable reference to an entity by ID
     pub fn get_entity_mut(&mut self, entity_id: EntityId) -> Option<&mut Entity> {
         self.entities.iter_mut().find(|e| e.id == entity_id)
+    }
+
+    pub fn stored_entity(&self, entity_id: EntityId) -> Option<StoredEntity> {
+        self.get_entity(entity_id)
+            .cloned()
+            .map(|entity| StoredEntity::new(entity, self.components.optional_components(entity_id)))
+    }
+
+    pub fn optional_components(&self, entity_id: EntityId) -> EntityOptionalComponents {
+        self.components.optional_components(entity_id)
     }
 
     /// Add a map to this scene

@@ -1,6 +1,6 @@
 use super::transition::SceneTransitionPlanner;
 use super::{GameState, ProgressState, RuntimeState, SceneState, WorldState};
-use crate::entity::{ControlRole, Entity, EntityId, EntityKind, EntityManager};
+use crate::entity::{ControlRole, EntityId, EntityKind, EntityManager};
 use crate::ids::EntityDefName;
 use crate::scene::Scene;
 use crate::sprite::SpriteInstance;
@@ -55,7 +55,10 @@ impl SceneSystem {
             .get_scene(scene_name)
             .ok_or_else(|| format!("Scene '{}' not found", scene_name))?
             .clone();
-        let preserved_player = state.player_entity().cloned();
+        let preserved_player = state
+            .world()
+            .player_id()
+            .and_then(|player_id| state.world().entity_manager().stored_entity(player_id));
         let prepared = SceneTransitionPlanner::new(&state.world.entity_definitions)
             .prepare_scene_load(&scene, Some(spawn_point_id), preserved_player)?;
 
@@ -66,10 +69,11 @@ impl SceneSystem {
         let rules = state.scene.active_rules.clone();
         if let Some(active_scene) = state.scene.scene_manager.active_scene_mut() {
             active_scene.entities.clear();
+            active_scene.components = crate::entity::EntityComponentStore::default();
 
             for entity_id in state.world.entity_manager.active_entities_iter() {
-                if let Some(entity) = state.world.entity_manager.get_entity(entity_id) {
-                    active_scene.entities.push(entity.clone());
+                if let Some(stored) = state.world.entity_manager.stored_entity(entity_id) {
+                    active_scene.add_stored_entity(stored);
                 }
             }
 
@@ -120,6 +124,10 @@ impl SceneSystem {
                         } else {
                             active_scene.add_entity(entity.clone());
                         }
+                        active_scene.components.set_optional_components(
+                            entity_id,
+                            state.world.entity_manager.components().optional_components(entity_id),
+                        );
                     }
                     None => {
                         active_scene.remove_entity(entity_id);
@@ -155,12 +163,16 @@ impl SceneSystem {
                 };
 
                 match &persisted.entity {
-                    Some(entity) => {
+                    Some(stored_entity) => {
                         if let Some(existing) = scene.get_entity_mut(persisted.entity_id) {
-                            *existing = entity.clone();
+                            *existing = stored_entity.entity.clone();
                         } else {
-                            scene.add_entity(entity.clone());
+                            scene.add_entity(stored_entity.entity.clone());
                         }
+                        scene.components.set_optional_components(
+                            persisted.entity_id,
+                            stored_entity.components.clone(),
+                        );
                     }
                     None => {
                         scene.remove_entity(persisted.entity_id);
@@ -192,15 +204,31 @@ impl SceneSystem {
             (save_data.player.as_ref(), state.world.player_id)
         {
             if let Some(player) = state.world.entity_manager.get_entity_mut(player_id) {
-                let mut restored_player = saved_player.clone();
+                let mut restored_player = saved_player.entity.clone();
                 restored_player.id = player_id;
                 restored_player.control_role = ControlRole::PlayerCharacter;
                 restored_player.entity_kind = EntityKind::Player;
                 *player = restored_player;
             }
             if let Some(audio) = state.world.entity_manager.audio_component_mut(player_id) {
-                *audio = saved_player.audio.to_component();
+                *audio = saved_player.entity.audio.to_component();
             }
+            state
+                .world
+                .entity_manager_mut()
+                .set_inventory(player_id, saved_player.components.inventory.clone());
+            state
+                .world
+                .entity_manager_mut()
+                .set_primary_projectile(player_id, saved_player.components.primary_projectile.clone());
+            state
+                .world
+                .entity_manager_mut()
+                .set_projectile(player_id, saved_player.components.projectile.clone());
+            state
+                .world
+                .entity_manager_mut()
+                .set_pickup(player_id, saved_player.components.pickup.clone());
         }
         state.progress.game_flags = save_data.flags.clone();
         state.progress.play_time_ms = save_data.metadata.play_time_ms;
@@ -275,12 +303,6 @@ impl GameState {
     #[cfg(test)]
     pub(crate) fn set_player_id(&mut self, id: EntityId) {
         self.world.player_id = Some(id);
-    }
-
-    pub(crate) fn player_entity(&self) -> Option<&Entity> {
-        self.world
-            .player_id
-            .and_then(|id| self.world.entity_manager.get_entity(id))
     }
 
     fn apply_prepared_scene_load(

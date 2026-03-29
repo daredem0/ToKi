@@ -30,6 +30,38 @@ fn create_test_entity_manager() -> EntityManager {
         audio.movement_sound = Some("sfx_step".to_string());
         audio.collision_sound = Some("sfx_hit2".to_string());
     }
+    manager.set_primary_projectile(
+        player_id,
+        Some(PrimaryProjectileDef {
+            sheet: "effects".to_string(),
+            object_name: "fireball".to_string(),
+            size: [8, 8],
+            speed: 6,
+            damage: 4,
+            lifetime_ticks: 12,
+            spawn_offset: [1, -2],
+        }),
+    );
+    manager.ensure_inventory(player_id).add_item("coin", 3);
+    manager.set_projectile(
+        npc_id,
+        Some(ProjectileState {
+            sheet: "effects".to_string(),
+            object_name: "spark".to_string(),
+            size: [4, 4],
+            velocity: [2, 0],
+            remaining_ticks: 9,
+            damage: 2,
+            owner_id: Some(player_id),
+        }),
+    );
+    manager.set_pickup(
+        npc_id,
+        Some(PickupDef {
+            item_id: "gem".to_string(),
+            count: 2,
+        }),
+    );
 
     // Modify some state to test preservation
     manager.set_entity_active(npc_id, false);
@@ -89,11 +121,26 @@ fn test_entity_roundtrip_serialization() {
     assert_eq!(entity.definition_name, deserialized.definition_name);
 
     // Verify attributes
-    assert_eq!(entity.attributes.health, deserialized.attributes.health);
-    assert_eq!(entity.attributes.speed, deserialized.attributes.speed);
-    assert_eq!(entity.attributes.solid, deserialized.attributes.solid);
-    assert_eq!(entity.attributes.visible, deserialized.attributes.visible);
-    assert_eq!(entity.attributes.active, deserialized.attributes.active);
+    assert_eq!(
+        entity.attributes.gameplay.health,
+        deserialized.attributes.gameplay.health
+    );
+    assert_eq!(
+        entity.attributes.gameplay.speed,
+        deserialized.attributes.gameplay.speed
+    );
+    assert_eq!(
+        entity.attributes.gameplay.solid,
+        deserialized.attributes.gameplay.solid
+    );
+    assert_eq!(
+        entity.attributes.rendering.visible,
+        deserialized.attributes.rendering.visible
+    );
+    assert_eq!(
+        entity.attributes.behavior.active,
+        deserialized.attributes.behavior.active
+    );
 }
 
 #[test]
@@ -122,8 +169,8 @@ fn test_entity_minimal_fields() {
     assert_eq!(entity.entity_kind, deserialized.entity_kind);
     assert_eq!(deserialized.definition_name, None);
     assert!(deserialized.collision_box.is_none());
-    assert!(deserialized.attributes.animation_controller.is_none());
-    assert_eq!(deserialized.attributes.health, None);
+    assert!(deserialized.attributes.rendering.animation_controller.is_none());
+    assert_eq!(deserialized.attributes.gameplay.health, None);
 }
 
 #[test]
@@ -154,6 +201,7 @@ fn save_data_capture_persists_only_persistent_scene_entities() {
             .entity
             .as_ref()
             .expect("persistent entity should be saved")
+            .entity
             .position,
         IVec2::new(99, 88)
     );
@@ -278,7 +326,7 @@ fn save_slot_round_trip_restores_removed_items_and_entity_health_in_non_main_sce
     });
     let mut wounded_npc = persistent_npc(2, IVec2::new(110, 120));
     wounded_npc.persistent_across_saves = false;
-    wounded_npc.attributes.health = Some(100);
+    wounded_npc.attributes.gameplay.health = Some(100);
     let mut dropped_item = create_test_entity();
     dropped_item.id = 3;
     dropped_item.entity_kind = EntityKind::Item;
@@ -298,6 +346,7 @@ fn save_slot_round_trip_restores_removed_items_and_entity_health_in_non_main_sce
         .get_entity_mut(2)
         .expect("npc should exist")
         .attributes
+        .gameplay
         .health = Some(25);
     entity_manager.despawn_entity(3);
 
@@ -327,7 +376,7 @@ fn save_slot_round_trip_restores_removed_items_and_entity_health_in_non_main_sce
     assert_eq!(
         restored_scene
             .get_entity(2)
-            .and_then(|entity| entity.attributes.health),
+            .and_then(|entity| entity.attributes.gameplay.health),
         Some(25),
         "damaged npc health should restore from the save"
     );
@@ -337,6 +386,11 @@ fn save_slot_round_trip_restores_removed_items_and_entity_health_in_non_main_sce
 fn test_entity_manager_roundtrip() {
     let manager = create_test_entity_manager();
     let original_player_id = manager.get_player_id().unwrap();
+    let npc_id = manager
+        .entities_of_kind(&EntityKind::Npc)
+        .into_iter()
+        .next()
+        .expect("npc should exist");
 
     // Test roundtrip
     let json = serde_json::to_string_pretty(&manager).unwrap();
@@ -361,6 +415,29 @@ fn test_entity_manager_roundtrip() {
     assert_eq!(audio_component.footstep_trigger_distance, 32.0);
     assert_eq!(audio_component.movement_sound.as_deref(), Some("sfx_step"));
     assert_eq!(audio_component.collision_sound.as_deref(), Some("sfx_hit2"));
+
+    let primary_projectile = deserialized
+        .primary_projectile(original_player_id)
+        .expect("player primary projectile should exist");
+    assert_eq!(primary_projectile.object_name, "fireball");
+    assert_eq!(primary_projectile.spawn_offset, [1, -2]);
+
+    let inventory = deserialized
+        .inventory(original_player_id)
+        .expect("player inventory should exist");
+    assert_eq!(inventory.item_count("coin"), 3);
+
+    let projectile = deserialized
+        .projectile(npc_id)
+        .expect("npc projectile state should exist");
+    assert_eq!(projectile.object_name, "spark");
+    assert_eq!(projectile.owner_id, Some(original_player_id));
+
+    let pickup = deserialized
+        .pickup(npc_id)
+        .expect("npc pickup should exist");
+    assert_eq!(pickup.item_id, "gem");
+    assert_eq!(pickup.count, 2);
 
     // Verify active status was preserved
     let active_entities = deserialized.active_entities();
@@ -460,7 +537,7 @@ fn save_data_round_trips_with_versioned_metadata() {
     assert_eq!(loaded.metadata.scene_name, "main");
     assert_eq!(loaded.flags.get("coins"), Some(&FlagValue::Int(7)));
     assert_eq!(
-        loaded.player.as_ref().map(|player| player.position),
+        loaded.player.as_ref().map(|player| player.entity.position),
         Some(IVec2::new(24, 40))
     );
     assert_eq!(loaded.camera.position, Some(IVec2::new(6, 8)));
@@ -518,7 +595,7 @@ fn restore_from_save_data_rehydrates_existing_project_state() {
         .flags
         .set("chapter", FlagValue::String("intro".to_string()));
     if let Some(player) = &mut save_data.player {
-        player.position = IVec2::new(80, 96);
+        player.entity.position = IVec2::new(80, 96);
     }
 
     let mut restored = create_save_test_state();
@@ -608,6 +685,109 @@ fn test_entity_deserialization_ignores_legacy_audio_fields() {
     assert_eq!(parsed.id, 42);
     assert_eq!(parsed.position, IVec2::new(10, 20));
     assert_eq!(parsed.entity_kind, EntityKind::Player);
+}
+
+#[test]
+fn test_stored_entity_deserializes_legacy_flat_optional_component_shape() {
+    let json = serde_json::json!({
+        "id": 7,
+        "position": [12, 18],
+        "size": [16, 16],
+        "entity_kind": "Player",
+        "category": "human",
+        "control_role": "player_character",
+        "attributes": {
+            "health": 9,
+            "stats": { "health": { "base": 9, "current": 5 } },
+            "speed": 2.5,
+            "solid": true,
+            "visible": true,
+            "has_shadow": true,
+            "animation_controller": null,
+            "render_layer": 2,
+            "grounding": {},
+            "active": true,
+            "can_move": true,
+            "interactable": false,
+            "interaction_reach": 0,
+            "ai_config": { "behavior": "none" },
+            "movement_profile": "player_wasd",
+            "primary_projectile": {
+                "sheet": "effects",
+                "object_name": "arrow",
+                "size": [8, 8],
+                "speed": 5,
+                "damage": 3,
+                "lifetime_ticks": 20,
+                "spawn_offset": [0, 0]
+            },
+            "projectile": {
+                "sheet": "effects",
+                "object_name": "arrow_flight",
+                "size": [8, 8],
+                "velocity": [3, 0],
+                "remaining_ticks": 6,
+                "damage": 3,
+                "owner_id": 7
+            },
+            "pickup": {
+                "item_id": "coin",
+                "count": 4
+            },
+            "inventory": {
+                "items": {
+                    "coin": 8
+                }
+            },
+            "has_inventory": true
+        },
+        "collision_box": null,
+        "tags": ["hero"]
+    });
+
+    let stored: StoredEntity =
+        serde_json::from_value(json).expect("legacy flat entity json should deserialize");
+
+    assert_eq!(stored.entity.id, 7);
+    assert_eq!(stored.entity.attributes.gameplay.health, Some(9));
+    assert_eq!(stored.entity.attributes.current_stat(HEALTH_STAT_ID), Some(9));
+    assert!(stored.entity.attributes.behavior.has_inventory);
+    assert_eq!(
+        stored
+            .components
+            .primary_projectile
+            .as_ref()
+            .expect("primary projectile should deserialize")
+            .object_name,
+        "arrow"
+    );
+    assert_eq!(
+        stored
+            .components
+            .projectile
+            .as_ref()
+            .expect("projectile should deserialize")
+            .remaining_ticks,
+        6
+    );
+    assert_eq!(
+        stored
+            .components
+            .pickup
+            .as_ref()
+            .expect("pickup should deserialize")
+            .count,
+        4
+    );
+    assert_eq!(
+        stored
+            .components
+            .inventory
+            .as_ref()
+            .expect("inventory should deserialize")
+            .item_count("coin"),
+        8
+    );
 }
 
 #[test]

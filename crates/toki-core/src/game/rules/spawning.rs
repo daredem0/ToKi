@@ -35,10 +35,11 @@ impl GameState {
             kind,
             position,
             glam::UVec2::new(16, 16),
-            EntityAttributes {
-                solid: false,
-                can_move,
-                ..EntityAttributes::default()
+            {
+                let mut attributes = EntityAttributes::default();
+                attributes.gameplay.solid = false;
+                attributes.behavior.can_move = can_move;
+                attributes
             },
         )
     }
@@ -48,11 +49,12 @@ impl GameState {
             EntityKind::Trigger,
             position,
             glam::UVec2::new(16, 16),
-            EntityAttributes {
-                solid: false,
-                can_move: false,
-                visible: false,
-                ..EntityAttributes::default()
+            {
+                let mut attributes = EntityAttributes::default();
+                attributes.gameplay.solid = false;
+                attributes.behavior.can_move = false;
+                attributes.rendering.visible = false;
+                attributes
             },
         )
     }

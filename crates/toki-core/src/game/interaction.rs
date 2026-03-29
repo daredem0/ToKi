@@ -36,6 +36,7 @@ impl GameState {
         let player_size = player.size;
         let player_facing = player
             .attributes
+            .rendering
             .animation_controller
             .as_ref()
             .map(|ac| Self::facing_from_animation_state(ac.current_clip_state))
@@ -54,7 +55,8 @@ impl GameState {
                 self.world.entity_manager
                     .get_entity(entity_id)
                     .is_some_and(|entity| {
-                        entity.attributes.interactable && entity.attributes.active
+                        entity.attributes.behavior.interactable
+                            && entity.attributes.behavior.active
                     })
             })
             .collect::<Vec<_>>();
@@ -68,7 +70,7 @@ impl GameState {
 
             let interactable_pos = interactable.position;
             let interactable_size = interactable.size;
-            let interaction_reach = interactable.attributes.interaction_reach as i32;
+            let interaction_reach = interactable.attributes.behavior.interaction_reach as i32;
 
             // Determine spatial relationship
             let spatial = Self::determine_interaction_spatial(

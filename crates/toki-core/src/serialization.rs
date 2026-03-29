@@ -1,4 +1,4 @@
-use crate::entity::{Entity, EntityManager};
+use crate::entity::{Entity, EntityManager, EntityWire, StoredEntity};
 use crate::game::{GameState, RestoreError};
 use crate::ids::SceneId;
 use crate::scene::Scene;
@@ -54,7 +54,7 @@ pub struct PersistedSceneEntityState {
     pub scene_name: SceneId,
     pub entity_id: crate::entity::EntityId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entity: Option<Entity>,
+    pub entity: Option<StoredEntity>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,7 +63,7 @@ pub struct SaveData {
     pub metadata: SaveSlotMetadata,
     pub active_scene_name: SceneId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub player: Option<Entity>,
+    pub player: Option<StoredEntity>,
     #[serde(default)]
     pub flags: GameFlags,
     #[serde(default)]
@@ -106,8 +106,7 @@ impl SaveData {
             player: game_state
                 .world()
                 .player_id()
-                .and_then(|player_id| game_state.world().entity_manager().get_entity(player_id))
-                .cloned(),
+                .and_then(|player_id| game_state.world().entity_manager().stored_entity(player_id)),
             flags: game_state.game_flags().clone(),
             camera: SavedCameraState {
                 position: camera_position,
@@ -131,8 +130,7 @@ impl SaveData {
                         .scene()
                         .scene_manager()
                         .get_scene(scene_name.as_str())
-                        .and_then(|scene| scene.get_entity(entity_id))
-                        .cloned(),
+                        .and_then(|scene| scene.stored_entity(entity_id)),
                     scene_name: scene_name.into(),
                     entity_id,
                 })
@@ -161,15 +159,19 @@ fn validate_save_slot(slot: u8) -> Result<(), SerializationError> {
 }
 
 pub fn save_entity_to_file(entity: &Entity, path: &str) -> Result<(), SerializationError> {
-    let json = serde_json::to_string_pretty(entity)?;
+    let wire = EntityWire::from(StoredEntity::new(
+        entity.clone(),
+        crate::entity::EntityOptionalComponents::default(),
+    ));
+    let json = serde_json::to_string_pretty(&wire)?;
     fs::write(path, json)?;
     Ok(())
 }
 
 pub fn load_entity_from_file(path: &str) -> Result<Entity, SerializationError> {
     let json = read_text_file_with_limit(path, MAX_SAVE_FILE_SIZE)?;
-    let entity: Entity = serde_json::from_str(&json)?;
-    Ok(entity)
+    let entity: StoredEntity = serde_json::from_str::<EntityWire>(&json)?.into();
+    Ok(entity.entity)
 }
 
 pub fn save_scene(entity_manager: &EntityManager, path: &str) -> Result<(), SerializationError> {

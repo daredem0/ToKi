@@ -57,7 +57,7 @@ pub fn preview_intended_position(
     }
 
     let mut accumulator = entity.movement_accumulator;
-    let speed = entity.attributes.speed.max(0.0);
+    let speed = entity.attributes.gameplay.speed.max(0.0);
     let pixels_x = update_axis_accumulator(&mut accumulator.x, speed, direction.x);
     let pixels_y = update_axis_accumulator(&mut accumulator.y, speed, direction.y);
 

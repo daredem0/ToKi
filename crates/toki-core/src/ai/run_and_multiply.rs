@@ -23,7 +23,7 @@ impl AiSystem {
     ) -> Option<AiUpdateResult> {
         let entity = ctx.entity_manager.get_entity(entity_id)?;
         let current_position = entity.position;
-        let detection_radius = entity.attributes.ai_config.detection_radius;
+        let detection_radius = entity.attributes.behavior.ai_config.detection_radius;
         let definition_name = entity.definition_name.as_deref();
 
         // Handle separation state first

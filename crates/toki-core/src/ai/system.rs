@@ -69,7 +69,7 @@ impl AiSystem {
                 }
 
                 let entity = entity_manager.get_entity(entity_id)?;
-                let behavior = entity.attributes.ai_config.behavior;
+                let behavior = entity.attributes.behavior.ai_config.behavior;
                 if matches!(
                     behavior,
                     AiBehavior::Wander
@@ -139,7 +139,7 @@ impl AiSystem {
         let entity = ctx.entity_manager.get_entity(entity_id)?;
         let player_pos = player_position?;
         let current_position = entity.position;
-        let detection_radius = entity.attributes.ai_config.detection_radius;
+        let detection_radius = entity.attributes.behavior.ai_config.detection_radius;
 
         let distance = distance_between(current_position, player_pos);
 
@@ -161,7 +161,7 @@ impl AiSystem {
         let entity = ctx.entity_manager.get_entity(entity_id)?;
         let player_pos = player_position?;
         let current_position = entity.position;
-        let detection_radius = entity.attributes.ai_config.detection_radius;
+        let detection_radius = entity.attributes.behavior.ai_config.detection_radius;
 
         let distance = distance_between(current_position, player_pos);
 
@@ -241,7 +241,7 @@ impl AiSystem {
             });
 
         let state = self.entity_states.get_mut(&entity_id)?;
-        let new_remaining = remaining_distance - entity.attributes.speed.max(0.0);
+        let new_remaining = remaining_distance - entity.attributes.gameplay.speed.max(0.0);
 
         if can_move && new_remaining > 0.0 {
             state.wander_phase = WanderPhase::Walking {

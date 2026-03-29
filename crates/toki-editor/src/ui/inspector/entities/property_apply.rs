@@ -136,8 +136,8 @@ impl InspectorSystem {
         );
         changed |= set_if_changed(&mut entity.size, new_size);
 
-        changed |= set_if_changed(&mut entity.attributes.visible, draft.visible);
-        changed |= set_if_changed(&mut entity.attributes.has_shadow, draft.has_shadow);
+        changed |= set_if_changed(&mut entity.attributes.rendering.visible, draft.visible);
+        changed |= set_if_changed(&mut entity.attributes.rendering.has_shadow, draft.has_shadow);
         let runtime_palette_override = {
             let trimmed = draft.palette_override.trim();
             if trimmed.is_empty() {
@@ -147,21 +147,24 @@ impl InspectorSystem {
             }
         };
         changed |= set_if_changed(
-            &mut entity.attributes.palette_override,
+            &mut entity.attributes.rendering.palette_override,
             runtime_palette_override,
         );
-        changed |= set_if_changed(&mut entity.attributes.active, draft.active);
-        changed |= set_if_changed(&mut entity.attributes.solid, draft.solid);
-        changed |= set_if_changed(&mut entity.attributes.interactable, draft.interactable);
+        changed |= set_if_changed(&mut entity.attributes.behavior.active, draft.active);
+        changed |= set_if_changed(&mut entity.attributes.gameplay.solid, draft.solid);
         changed |= set_if_changed(
-            &mut entity.attributes.interaction_reach,
+            &mut entity.attributes.behavior.interactable,
+            draft.interactable,
+        );
+        changed |= set_if_changed(
+            &mut entity.attributes.behavior.interaction_reach,
             draft.interaction_reach,
         );
-        changed |= set_if_changed(&mut entity.attributes.can_move, draft.can_move);
+        changed |= set_if_changed(&mut entity.attributes.behavior.can_move, draft.can_move);
         changed |= set_if_changed(&mut entity.control_role, draft.control_role);
-        changed |= set_if_changed(&mut entity.attributes.ai_config, draft.ai_config);
+        changed |= set_if_changed(&mut entity.attributes.behavior.ai_config, draft.ai_config);
         changed |= set_if_changed(
-            &mut entity.attributes.movement_profile,
+            &mut entity.attributes.behavior.movement_profile,
             draft.movement_profile,
         );
         changed |= set_if_changed(
@@ -182,9 +185,18 @@ impl InspectorSystem {
             }
         };
         changed |= set_if_changed(&mut entity.audio.movement_sound, new_movement_sound);
-        changed |= set_if_changed(&mut entity.attributes.has_inventory, draft.has_inventory);
-        changed |= set_if_changed(&mut entity.attributes.speed, draft.speed.max(0.0) as f32);
-        changed |= set_if_changed(&mut entity.attributes.render_layer, draft.render_layer);
+        changed |= set_if_changed(
+            &mut entity.attributes.behavior.has_inventory,
+            draft.has_inventory,
+        );
+        changed |= set_if_changed(
+            &mut entity.attributes.gameplay.speed,
+            draft.speed.max(0.0) as f32,
+        );
+        changed |= set_if_changed(
+            &mut entity.attributes.rendering.render_layer,
+            draft.render_layer,
+        );
         changed |= set_if_changed(
             &mut entity.persistent_across_saves,
             draft.persistent_across_saves,
@@ -195,7 +207,7 @@ impl InspectorSystem {
         } else {
             None
         };
-        changed |= set_if_changed(&mut entity.attributes.health, new_health);
+        changed |= set_if_changed(&mut entity.attributes.gameplay.health, new_health);
         changed |= Self::set_optional_runtime_stat(
             &mut entity.attributes,
             HEALTH_STAT_ID,

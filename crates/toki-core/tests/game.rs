@@ -633,7 +633,7 @@ fn game_state_directional_walk_animation_follows_movement_direction() {
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -691,7 +691,7 @@ fn game_state_directional_walk_animation_follows_movement_direction() {
     GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
     InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Up);
     let state_after_up = player_entity(&game_state)
-        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .and_then(|entity| entity.attributes.rendering.animation_controller.as_ref())
         .map(|controller| controller.current_clip_state);
     assert_eq!(state_after_up, Some(AnimationState::WalkUp));
 
@@ -699,7 +699,7 @@ fn game_state_directional_walk_animation_follows_movement_direction() {
     GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
     InputSystem::handle_key_release(game_state.runtime_mut(), InputKey::Right);
     let state_after_right = player_entity(&game_state)
-        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .and_then(|entity| entity.attributes.rendering.animation_controller.as_ref())
         .map(|controller| controller.current_clip_state);
     assert_eq!(state_after_right, Some(AnimationState::WalkRight));
 }
@@ -714,7 +714,7 @@ fn game_state_left_direction_requests_horizontal_flip() {
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -759,7 +759,7 @@ fn game_state_attack_left_requests_horizontal_flip() {
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -787,7 +787,7 @@ fn game_state_primary_action_plays_attack_clip_when_present() {
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -817,7 +817,7 @@ fn game_state_primary_action_plays_attack_clip_when_present() {
     GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
     let current_state = player_entity(&game_state)
-        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .and_then(|entity| entity.attributes.rendering.animation_controller.as_ref())
         .map(|controller| controller.current_clip_state);
     assert_eq!(current_state, Some(AnimationState::AttackDown));
 }
@@ -832,7 +832,7 @@ fn game_state_primary_action_is_ignored_without_attack_clip() {
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -853,7 +853,7 @@ fn game_state_primary_action_is_ignored_without_attack_clip() {
     GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
     let current_state = player_entity(&game_state)
-        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .and_then(|entity| entity.attributes.rendering.animation_controller.as_ref())
         .map(|controller| controller.current_clip_state);
     assert_eq!(current_state, Some(AnimationState::IdleDown));
 }
@@ -868,7 +868,7 @@ fn game_state_attack_animation_persists_while_clip_is_unfinished() {
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -900,7 +900,7 @@ fn game_state_attack_animation_persists_while_clip_is_unfinished() {
     GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
     let controller = player_entity(&game_state)
-        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .and_then(|entity| entity.attributes.rendering.animation_controller.as_ref())
         .expect("player controller should exist");
     assert_eq!(controller.current_clip_state, AnimationState::AttackDown);
     assert!(!controller.is_finished);
@@ -916,7 +916,7 @@ fn game_state_returns_to_locomotion_after_attack_animation_finishes() {
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -949,7 +949,7 @@ fn game_state_returns_to_locomotion_after_attack_animation_finishes() {
     GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
     let controller = player_entity(&game_state)
-        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .and_then(|entity| entity.attributes.rendering.animation_controller.as_ref())
         .expect("player controller should exist");
     assert_eq!(controller.current_clip_state, AnimationState::IdleDown);
     assert!(!controller.is_finished);
@@ -965,7 +965,7 @@ fn game_state_attack_animation_overrides_walk_while_movement_is_held() {
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -1008,7 +1008,7 @@ fn game_state_attack_animation_overrides_walk_while_movement_is_held() {
     GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
     let controller = player_entity(&game_state)
-        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .and_then(|entity| entity.attributes.rendering.animation_controller.as_ref())
         .expect("player controller should exist");
     assert_eq!(controller.current_clip_state, AnimationState::AttackRight);
     assert!(!controller.is_finished);
@@ -1024,7 +1024,7 @@ fn game_state_returns_to_walk_after_attack_animation_finishes_with_movement_held
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -1068,7 +1068,7 @@ fn game_state_returns_to_walk_after_attack_animation_finishes_with_movement_held
     GameSimulation::tick_fixed(&mut game_state, world_bounds, &tilemap, &atlas);
 
     let controller = player_entity(&game_state)
-        .and_then(|entity| entity.attributes.animation_controller.as_ref())
+        .and_then(|entity| entity.attributes.rendering.animation_controller.as_ref())
         .expect("player controller should exist");
     assert_eq!(controller.current_clip_state, AnimationState::WalkRight);
     assert!(!controller.is_finished);
@@ -1084,7 +1084,7 @@ fn game_state_primary_action_applies_damage_to_adjacent_target_health_stat() {
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -1124,7 +1124,7 @@ fn game_state_primary_action_applies_damage_to_adjacent_target_health_stat() {
     let target = game_state.world().entity_manager()
         .get_entity(target_id)
         .expect("target should still exist after non-lethal hit");
-    assert_eq!(target.attributes.health, Some(15));
+    assert_eq!(target.attributes.gameplay.health, Some(15));
     assert_eq!(target.attributes.current_stat("health"), Some(15));
 }
 
@@ -1138,10 +1138,12 @@ fn game_state_primary_action_uses_attack_power_stat_for_damage() {
         .expect("player should exist");
     player
         .attributes
+        .gameplay
         .stats
         .ensure_stat(ATTACK_POWER_STAT_ID, 17);
     let controller = player
         .attributes
+        .rendering
         .animation_controller
         .as_mut()
         .expect("player controller should exist");
@@ -1182,7 +1184,7 @@ fn game_state_primary_action_uses_attack_power_stat_for_damage() {
     let target = game_state.world().entity_manager()
         .get_entity(target_id)
         .expect("target should still exist after non-lethal hit");
-    assert_eq!(target.attributes.health, Some(8));
+    assert_eq!(target.attributes.gameplay.health, Some(8));
     assert_eq!(target.attributes.current_stat("health"), Some(8));
 }
 
@@ -1196,6 +1198,7 @@ fn game_state_held_primary_action_does_not_apply_repeated_damage_every_frame() {
         .expect("player should exist");
     let controller = player
         .attributes
+        .rendering
         .animation_controller
         .as_mut()
         .expect("player controller should exist");
@@ -1238,7 +1241,7 @@ fn game_state_held_primary_action_does_not_apply_repeated_damage_every_frame() {
     let target = game_state.world().entity_manager()
         .get_entity(target_id)
         .expect("target should still exist after non-lethal hit");
-    assert_eq!(target.attributes.health, Some(15));
+    assert_eq!(target.attributes.gameplay.health, Some(15));
     assert_eq!(target.attributes.current_stat("health"), Some(15));
 }
 
@@ -1252,6 +1255,7 @@ fn game_state_primary_action_can_damage_again_after_release_and_repress() {
         .expect("player should exist");
     let controller = player
         .attributes
+        .rendering
         .animation_controller
         .as_mut()
         .expect("player controller should exist");
@@ -1295,7 +1299,7 @@ fn game_state_primary_action_can_damage_again_after_release_and_repress() {
     let target = game_state.world().entity_manager()
         .get_entity(target_id)
         .expect("target should still exist after two non-lethal hits");
-    assert_eq!(target.attributes.health, Some(5));
+    assert_eq!(target.attributes.gameplay.health, Some(5));
     assert_eq!(target.attributes.current_stat("health"), Some(5));
 }
 
@@ -1309,6 +1313,7 @@ fn game_state_primary_action_does_not_damage_out_of_range_target() {
         .expect("player should exist");
     let controller = player
         .attributes
+        .rendering
         .animation_controller
         .as_mut()
         .expect("player controller should exist");
@@ -1349,7 +1354,7 @@ fn game_state_primary_action_does_not_damage_out_of_range_target() {
     let target = game_state.world().entity_manager()
         .get_entity(target_id)
         .expect("out-of-range target should still exist");
-    assert_eq!(target.attributes.health, Some(25));
+    assert_eq!(target.attributes.gameplay.health, Some(25));
     assert_eq!(target.attributes.current_stat("health"), Some(25));
 }
 
@@ -1363,7 +1368,7 @@ fn game_state_primary_action_despawns_target_when_health_reaches_zero() {
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -1418,6 +1423,7 @@ fn game_state_primary_action_damages_scene_loaded_legacy_health_target() {
     hero.entity_kind = toki_core::entity::EntityKind::Player;
     let controller = hero
         .attributes
+        .rendering
         .animation_controller
         .as_mut()
         .expect("hero animation controller should exist");
@@ -1446,13 +1452,14 @@ fn game_state_primary_action_damages_scene_loaded_legacy_health_target() {
     let mut target = target_definition
         .create_entity(IVec2::new(66, 60), 6)
         .expect("target entity should instantiate");
-    target.attributes.stats = toki_core::entity::EntityStats::default();
+    target.attributes.gameplay.stats = toki_core::entity::EntityStats::default();
 
     let scene = Scene {
         name: "Legacy Arena".to_string(),
         description: None,
         maps: Vec::new(),
         entities: vec![hero, target],
+        components: Default::default(),
         rules: Default::default(),
         camera_position: None,
         camera_scale: None,
@@ -1475,7 +1482,7 @@ fn game_state_primary_action_damages_scene_loaded_legacy_health_target() {
     let target = game_state.world().entity_manager()
         .get_entity(6)
         .expect("legacy health target should still exist after non-lethal hit");
-    assert_eq!(target.attributes.health, Some(15));
+    assert_eq!(target.attributes.gameplay.health, Some(15));
     assert_eq!(target.attributes.current_stat("health"), Some(15));
 }
 
@@ -1483,11 +1490,11 @@ fn game_state_primary_action_damages_scene_loaded_legacy_health_target() {
 fn game_state_primary_action_spawns_projectile_when_authored() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player = game_state
-        .world_mut().entity_manager_mut()
-        .get_player_mut()
-        .expect("player should exist");
-    player.attributes.primary_projectile = Some(PrimaryProjectileDef {
+    let player_id = game_state.world().player_id().expect("player should exist");
+    game_state
+        .world_mut()
+        .entity_manager_mut()
+        .set_primary_projectile(player_id, Some(PrimaryProjectileDef {
         sheet: "fauna".to_string(),
         object_name: "rock".to_string(),
         size: [16, 16],
@@ -1495,9 +1502,14 @@ fn game_state_primary_action_spawns_projectile_when_authored() {
         damage: 8,
         lifetime_ticks: 5,
         spawn_offset: [0, 0],
-    });
+    }));
+    let player = game_state
+        .world_mut().entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
     let controller = player
         .attributes
+        .rendering
         .animation_controller
         .as_mut()
         .expect("player controller should exist");
@@ -1561,11 +1573,11 @@ fn game_state_primary_action_spawns_projectile_when_authored() {
 fn game_state_projectile_moves_and_expires_after_lifetime() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player = game_state
-        .world_mut().entity_manager_mut()
-        .get_player_mut()
-        .expect("player should exist");
-    player.attributes.primary_projectile = Some(PrimaryProjectileDef {
+    let player_id = game_state.world().player_id().expect("player should exist");
+    game_state
+        .world_mut()
+        .entity_manager_mut()
+        .set_primary_projectile(player_id, Some(PrimaryProjectileDef {
         sheet: "fauna".to_string(),
         object_name: "rock".to_string(),
         size: [16, 16],
@@ -1573,9 +1585,14 @@ fn game_state_projectile_moves_and_expires_after_lifetime() {
         damage: 8,
         lifetime_ticks: 3,
         spawn_offset: [0, 0],
-    });
+    }));
+    let player = game_state
+        .world_mut().entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
     let controller = player
         .attributes
+        .rendering
         .animation_controller
         .as_mut()
         .expect("player controller should exist");
@@ -1641,11 +1658,11 @@ fn game_state_projectile_moves_and_expires_after_lifetime() {
 fn game_state_projectile_applies_damage_and_despawns_on_hit() {
     let sprite = create_test_sprite();
     let mut game_state = GameState::new(sprite);
-    let player = game_state
-        .world_mut().entity_manager_mut()
-        .get_player_mut()
-        .expect("player should exist");
-    player.attributes.primary_projectile = Some(PrimaryProjectileDef {
+    let player_id = game_state.world().player_id().expect("player should exist");
+    game_state
+        .world_mut()
+        .entity_manager_mut()
+        .set_primary_projectile(player_id, Some(PrimaryProjectileDef {
         sheet: "fauna".to_string(),
         object_name: "rock".to_string(),
         size: [16, 16],
@@ -1653,9 +1670,14 @@ fn game_state_projectile_applies_damage_and_despawns_on_hit() {
         damage: 8,
         lifetime_ticks: 10,
         spawn_offset: [0, 0],
-    });
+    }));
+    let player = game_state
+        .world_mut().entity_manager_mut()
+        .get_player_mut()
+        .expect("player should exist");
     let controller = player
         .attributes
+        .rendering
         .animation_controller
         .as_mut()
         .expect("player controller should exist");
@@ -1698,7 +1720,7 @@ fn game_state_projectile_applies_damage_and_despawns_on_hit() {
     let target = game_state.world().entity_manager()
         .get_entity(target_id)
         .expect("target should survive non-lethal projectile damage");
-    assert_eq!(target.attributes.health, Some(17));
+    assert_eq!(target.attributes.gameplay.health, Some(17));
     assert_eq!(target.attributes.current_stat("health"), Some(17));
     assert!(
         !sprite_render_requests(&game_state)
@@ -1736,10 +1758,15 @@ fn game_state_collects_overlapping_pickup_into_inventory_and_despawns_item() {
         &create_test_atlas(),
     );
 
-    let player = game_state.world().entity_manager()
-        .get_entity(player_id)
-        .expect("player should still exist");
-    assert_eq!(player.attributes.inventory.item_count("coin"), 2);
+    assert_eq!(
+        game_state
+            .world()
+            .entity_manager()
+            .inventory(player_id)
+            .expect("player inventory should exist")
+            .item_count("coin"),
+        2
+    );
     assert!(
         game_state.world().entity_manager().get_entity(pickup_id).is_none(),
         "pickup should despawn after collection"
@@ -1781,10 +1808,15 @@ fn game_state_pickup_collection_stacks_and_does_not_double_collect() {
         &create_test_atlas(),
     );
 
-    let player = game_state.world().entity_manager()
-        .get_entity(player_id)
-        .expect("player should still exist");
-    assert_eq!(player.attributes.inventory.item_count("coin"), 2);
+    assert_eq!(
+        game_state
+            .world()
+            .entity_manager()
+            .inventory(player_id)
+            .expect("player inventory should exist")
+            .item_count("coin"),
+        2
+    );
     assert!(game_state.world().entity_manager()
         .get_entity(first_pickup_id)
         .is_none());
@@ -1937,7 +1969,7 @@ fn game_state_blocked_player_input_still_updates_facing_direction() {
         .expect("player should exist");
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_mut()
         .expect("player controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
@@ -1995,7 +2027,7 @@ fn game_state_blocked_player_input_still_updates_facing_direction() {
         .expect("player should exist");
     let current_state = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_ref()
         .expect("player controller should exist")
         .current_clip_state;
@@ -2130,6 +2162,7 @@ fn game_state_player_input_requires_player_wasd_movement_profile() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
+        .behavior
         .movement_profile = MovementProfile::None;
 
     let initial_position = player_position(&game_state);
@@ -2154,6 +2187,7 @@ fn game_state_legacy_default_player_profile_still_moves() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
+        .behavior
         .movement_profile = MovementProfile::LegacyDefault;
 
     let initial_position = player_position(&game_state);
@@ -2177,6 +2211,7 @@ fn game_state_non_player_entity_with_player_wasd_profile_moves_from_input() {
         .get_entity_mut(player_id)
         .expect("player should exist")
         .attributes
+        .behavior
         .movement_profile = MovementProfile::None;
 
     let mut controlled_npc = test_definition("controlled_npc", "creature");
@@ -2309,6 +2344,7 @@ fn game_state_load_scene_uses_control_role_for_player_identity() {
         description: None,
         maps: Vec::new(),
         entities: vec![hero],
+        components: Default::default(),
         rules: Default::default(),
         camera_position: None,
         camera_scale: None,
@@ -2360,7 +2396,7 @@ fn game_state_load_scene_spawns_player_from_scene_player_entry() {
     assert_eq!(player.entity_kind, EntityKind::Player);
     let controller = player
         .attributes
-        .animation_controller
+        .rendering.animation_controller
         .as_ref()
         .expect("player animation controller should exist");
     assert_eq!(controller.current_clip_state, AnimationState::IdleLeft);
@@ -2402,15 +2438,20 @@ fn game_state_transition_to_scene_preserves_durable_player_state_and_resets_tran
 
     let player_id = game_state.world().player_id().expect("player should exist");
     {
-        let player = game_state
-            .world_mut().entity_manager_mut()
+        let entity_manager = game_state.world_mut().entity_manager_mut();
+        entity_manager
+            .get_entity_mut(player_id)
+            .expect("player should exist")
+            .attributes
+            .apply_stat_delta("health", -35);
+        entity_manager.ensure_inventory(player_id).add_item("coin", 3);
+        let player = entity_manager
             .get_entity_mut(player_id)
             .expect("player should exist");
-        player.attributes.apply_stat_delta("health", -35);
-        player.attributes.inventory.add_item("coin", 3);
         player.movement_accumulator = glam::Vec2::new(0.5, 0.25);
         let controller = player
             .attributes
+            .rendering
             .animation_controller
             .as_mut()
             .expect("player controller should exist");
@@ -2440,10 +2481,19 @@ fn game_state_transition_to_scene_preserves_durable_player_state_and_resets_tran
     assert_eq!(player.position, IVec2::new(128, 64));
     assert_eq!(player.definition_name.as_deref(), Some("player_knight"));
     assert_eq!(player.attributes.current_stat("health"), Some(65));
-    assert_eq!(player.attributes.inventory.item_count("coin"), 3);
+    assert_eq!(
+        game_state
+            .world()
+            .entity_manager()
+            .inventory(player_id)
+            .expect("player inventory should exist")
+            .item_count("coin"),
+        3
+    );
     assert_eq!(player.movement_accumulator, glam::Vec2::ZERO);
     let controller = player
         .attributes
+        .rendering
         .animation_controller
         .as_ref()
         .expect("player controller should exist");
@@ -2540,7 +2590,7 @@ fn game_state_transition_to_scene_preserves_non_player_entities_when_scene_is_sy
             .get_entity_mut(npc_id)
             .expect("npc should exist");
         npc.position = IVec2::new(80, 80);
-        npc.attributes.active = false;
+        npc.attributes.behavior.active = false;
     }
     SceneSystem::sync_entities_to_active_scene(&mut game_state);
 
@@ -2553,7 +2603,7 @@ fn game_state_transition_to_scene_preserves_non_player_entities_when_scene_is_sy
         .get_entity(npc_id)
         .expect("synced npc should be restored on return");
     assert_eq!(npc.position, IVec2::new(80, 80));
-    assert!(!npc.attributes.active);
+    assert!(!npc.attributes.behavior.active);
 }
 
 #[test]
@@ -2698,14 +2748,14 @@ fn game_state_player_entity_attributes() {
     let player_entity = player_entity(&game_state).unwrap();
 
     // Check player entity has correct attributes from factory method
-    assert_eq!(player_entity.attributes.health, Some(100));
-    assert_eq!(player_entity.attributes.speed, 2.0);
-    assert!(player_entity.attributes.active);
-    assert!(player_entity.attributes.can_move);
-    assert!(player_entity.attributes.solid);
-    assert!(player_entity.attributes.visible);
-    assert_eq!(player_entity.attributes.render_layer, 0);
-    assert!(player_entity.attributes.animation_controller.is_some());
+    assert_eq!(player_entity.attributes.gameplay.health, Some(100));
+    assert_eq!(player_entity.attributes.gameplay.speed, 2.0);
+    assert!(player_entity.attributes.behavior.active);
+    assert!(player_entity.attributes.behavior.can_move);
+    assert!(player_entity.attributes.gameplay.solid);
+    assert!(player_entity.attributes.rendering.visible);
+    assert_eq!(player_entity.attributes.rendering.render_layer, 0);
+    assert!(player_entity.attributes.rendering.animation_controller.is_some());
 }
 
 #[test]
@@ -2780,7 +2830,7 @@ fn game_state_emits_movement_audio_on_animation_loop_when_configured() {
     let controller = game_state
         .world_mut().entity_manager_mut()
         .get_entity_mut(player_id)
-        .and_then(|entity| entity.attributes.animation_controller.as_mut())
+        .and_then(|entity| entity.attributes.rendering.animation_controller.as_mut())
         .expect("player animation controller should exist");
     controller.add_clip(toki_core::animation::AnimationClip {
         state: AnimationState::Walk,
@@ -2973,6 +3023,7 @@ fn game_state_entity_speed_controls_movement_distance() {
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
+        .gameplay
         .speed = 3.0;
 
     let initial_position = player_position(&game_state);
@@ -2999,6 +3050,7 @@ fn game_state_entity_speed_fractional_rounds_down() {
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
+        .gameplay
         .speed = 1.7;
 
     let initial_position = player_position(&game_state);
@@ -3025,6 +3077,7 @@ fn game_state_entity_speed_below_one_accumulates_movement() {
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
+        .gameplay
         .speed = 0.5;
 
     let initial_position = player_position(&game_state);
@@ -3061,6 +3114,7 @@ fn game_state_entity_speed_fractional_accumulates_remainder() {
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
+        .gameplay
         .speed = 1.5;
 
     let initial_position = player_position(&game_state);
@@ -3095,6 +3149,7 @@ fn game_state_entity_speed_accumulator_resets_on_direction_change() {
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
+        .gameplay
         .speed = 0.5;
 
     let initial_position = player_position(&game_state);
@@ -3155,6 +3210,7 @@ fn game_state_entity_size_used_for_right_boundary_clamping() {
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
+        .rendering
         .grounding
         .footprint = Some(EntityFootprint::new([0, 0], [32, 32]));
 
@@ -3164,6 +3220,7 @@ fn game_state_entity_size_used_for_right_boundary_clamping() {
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
+        .gameplay
         .speed = 10.0;
 
     InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Right);
@@ -3203,6 +3260,7 @@ fn game_state_entity_size_used_for_bottom_boundary_clamping() {
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
+        .rendering
         .grounding
         .footprint = Some(EntityFootprint::new([0, 0], [24, 24]));
 
@@ -3212,6 +3270,7 @@ fn game_state_entity_size_used_for_bottom_boundary_clamping() {
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
+        .gameplay
         .speed = 10.0;
 
     InputSystem::handle_key_press(game_state.runtime_mut(), InputKey::Down);
@@ -3267,7 +3326,7 @@ fn update_with_delta_double_timestep_moves_further() {
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
-        .speed = 1.0;
+        .gameplay.speed = 1.0;
 
     let world_bounds = UVec2::new(1000, 1000);
     let tilemap = create_test_tilemap();
@@ -3296,7 +3355,7 @@ fn update_with_delta_half_timestep_moves_less() {
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
-        .speed = 2.0;
+        .gameplay.speed = 2.0;
 
     let world_bounds = UVec2::new(1000, 1000);
     let tilemap = create_test_tilemap();
@@ -3365,7 +3424,7 @@ fn update_with_delta_accumulates_fractional_movement() {
         .get_entity_mut(player_id)
         .unwrap()
         .attributes
-        .speed = 1.0;
+        .gameplay.speed = 1.0;
 
     let world_bounds = UVec2::new(1000, 1000);
     let tilemap = create_test_tilemap();
@@ -3396,7 +3455,7 @@ fn update_with_delta_scales_animation_timing() {
 
     // Get initial frame timer
     let initial_frame_timer = player_entity(&game_state)
-        .and_then(|e| e.attributes.animation_controller.as_ref())
+        .and_then(|e| e.attributes.rendering.animation_controller.as_ref())
         .map(|c| c.frame_timer)
         .unwrap_or(0.0);
 
@@ -3406,7 +3465,7 @@ fn update_with_delta_scales_animation_timing() {
     // Animation frame_timer should have advanced by approximately 33.33ms
     // (unless it wrapped around due to frame advancement)
     let final_frame_timer = player_entity(&game_state)
-        .and_then(|e| e.attributes.animation_controller.as_ref())
+        .and_then(|e| e.attributes.rendering.animation_controller.as_ref())
         .map(|c| c.frame_timer)
         .unwrap_or(0.0);
 

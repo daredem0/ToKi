@@ -3,13 +3,15 @@
 //! These types define the structure for loading entity definitions from files.
 
 use super::builder::EntityBuilder;
-use super::runtime_entity_kind_for_category;
-use super::types::{
+use super::components::{EntityOptionalComponents, EntitySpawnBundle};
+use super::model::{
     AiBehavior, AiConfig, ControlRole, Entity, EntityAttributes, EntityAudioComponent,
-    EntityAudioSettings, EntityGrounding, EntityId, EntityKind, EntityStats, Inventory,
-    MovementProfile, MovementSoundTrigger, PickupDef, PrimaryProjectileDef, StaticObjectRenderDef,
+    EntityAudioSettings, EntityBehavior, EntityGameplay, EntityGrounding, EntityId, EntityKind,
+    EntityRendering, EntityStats, MovementProfile, MovementSoundTrigger, StaticObjectRenderDef,
     HEALTH_STAT_ID,
 };
+use super::runtime_entity_kind_for_category;
+use super::{Inventory, PickupDef, PrimaryProjectileDef};
 use crate::animation::{AnimationClip, AnimationController, AnimationState, LoopMode};
 use crate::collision::CollisionBox;
 use crate::ids::EntityDefName;
@@ -219,15 +221,16 @@ impl EntityDefinition {
     }
 
     /// Create an Entity instance from this definition at the given position.
-    pub fn create_entity(
+    pub fn create_spawn_bundle(
         &self,
         position: IVec2,
         entity_id: EntityId,
-    ) -> Result<Entity, EntityDefinitionError> {
+    ) -> Result<EntitySpawnBundle, EntityDefinitionError> {
         let entity_kind = runtime_entity_kind_for_category(&self.category);
         let animation_controller = self.build_animation_controller()?;
         let grounding = self.build_grounding();
-        let attributes = self.build_attributes(animation_controller, grounding.clone());
+        let (attributes, optional_components) =
+            self.build_attributes(animation_controller, grounding.clone());
         let collision_box = self.build_collision_box(&grounding);
         let audio = self.build_audio_settings();
 
@@ -240,13 +243,25 @@ impl EntityDefinition {
         .category(self.category.clone())
         .definition_name(self.name.clone())
         .control_role(ControlRole::LegacyDefault)
-        .audio(audio)
+        .audio(audio.clone())
         .attributes(attributes)
         .collision_box_opt(collision_box)
         .tags(self.tags.clone())
         .build();
 
-        Ok(entity)
+        Ok(EntitySpawnBundle {
+            entity,
+            optional_components,
+            audio_component: audio.to_component(),
+        })
+    }
+
+    pub fn create_entity(
+        &self,
+        position: IVec2,
+        entity_id: EntityId,
+    ) -> Result<Entity, EntityDefinitionError> {
+        Ok(self.create_spawn_bundle(position, entity_id)?.entity)
     }
 
     fn build_animation_controller(&self) -> Result<Option<AnimationController>, EntityDefinitionError> {
@@ -291,38 +306,48 @@ impl EntityDefinition {
         &self,
         animation_controller: Option<AnimationController>,
         grounding: EntityGrounding,
-    ) -> EntityAttributes {
+    ) -> (EntityAttributes, EntityOptionalComponents) {
         let stats = self.build_stats();
         let mut attributes = EntityAttributes {
-            health: self.attributes.health.or_else(|| {
-                stats
-                    .base(HEALTH_STAT_ID)
-                    .and_then(|v| u32::try_from(v).ok())
-            }),
-            stats,
-            speed: self.attributes.speed,
-            solid: self.attributes.solid,
-            visible: self.rendering.visible,
-            has_shadow: self.rendering.has_shadow,
-            palette_override: self.rendering.palette_override.clone(),
-            animation_controller,
-            render_layer: self.rendering.render_layer,
-            active: self.attributes.active,
-            can_move: self.attributes.can_move,
-            interactable: self.attributes.interactable,
-            interaction_reach: self.attributes.interaction_reach,
-            ai_config: self.attributes.ai_config,
-            movement_profile: self.attributes.movement_profile,
-            primary_projectile: self.attributes.primary_projectile.clone(),
-            projectile: None,
-            static_object_render: self.rendering.static_object.clone(),
-            grounding,
-            pickup: self.attributes.pickup.clone(),
-            inventory: Inventory::default(),
-            has_inventory: self.attributes.has_inventory,
+            gameplay: EntityGameplay {
+                health: self.attributes.health.or_else(|| {
+                    stats
+                        .base(HEALTH_STAT_ID)
+                        .and_then(|v| u32::try_from(v).ok())
+                }),
+                stats,
+                speed: self.attributes.speed,
+                solid: self.attributes.solid,
+            },
+            rendering: EntityRendering {
+                visible: self.rendering.visible,
+                has_shadow: self.rendering.has_shadow,
+                palette_override: self.rendering.palette_override.clone(),
+                animation_controller,
+                render_layer: self.rendering.render_layer,
+                static_object_render: self.rendering.static_object.clone(),
+                grounding,
+            },
+            behavior: EntityBehavior {
+                active: self.attributes.active,
+                can_move: self.attributes.can_move,
+                interactable: self.attributes.interactable,
+                interaction_reach: self.attributes.interaction_reach,
+                ai_config: self.attributes.ai_config,
+                movement_profile: self.attributes.movement_profile,
+                has_inventory: self.attributes.has_inventory,
+            },
         };
         attributes.ensure_legacy_health_stat();
-        attributes
+        (
+            attributes,
+            EntityOptionalComponents {
+                primary_projectile: self.attributes.primary_projectile.clone(),
+                projectile: None,
+                pickup: self.attributes.pickup.clone(),
+                inventory: None,
+            },
+        )
     }
 
     fn build_stats(&self) -> EntityStats {
@@ -348,8 +373,8 @@ impl EntityDefinition {
         grounding
     }
 
-    fn legacy_collision_footprint(&self) -> super::types::EntityFootprint {
-        super::types::EntityFootprint::new(
+    fn legacy_collision_footprint(&self) -> super::model::EntityFootprint {
+        super::model::EntityFootprint::new(
             [self.collision.offset[0], self.collision.offset[1]],
             [self.collision.size[0], self.collision.size[1]],
         )

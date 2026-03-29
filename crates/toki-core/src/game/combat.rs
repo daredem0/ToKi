@@ -67,7 +67,7 @@ impl GameState {
             .filter(|&target_id| target_id != attacker_id)
             .filter_map(|target_id| {
                 let target = self.world.entity_manager.get_entity(target_id)?;
-                if !target.attributes.active
+                if !target.attributes.behavior.active
                     || target.attributes.current_stat(HEALTH_STAT_ID).is_none()
                 {
                     return None;
@@ -110,7 +110,7 @@ impl GameState {
         let Some(attacker) = self.world.entity_manager.get_entity(attacker_id) else {
             return;
         };
-        let Some(spec) = attacker.attributes.primary_projectile.clone() else {
+        let Some(spec) = self.world.entity_manager.primary_projectile(attacker_id).cloned() else {
             return;
         };
         if spec.size[0] == 0 || spec.size[1] == 0 || spec.lifetime_ticks == 0 {
@@ -134,15 +134,22 @@ impl GameState {
         let debug_damage = spec.damage.max(0);
         let debug_lifetime_ticks = spec.lifetime_ticks;
 
-        let attributes = crate::entity::EntityAttributes {
-            speed: 0.0,
-            solid: false,
-            visible: true,
-            can_move: false,
-            ai_config: crate::entity::AiConfig::default(),
-            movement_profile: crate::entity::MovementProfile::None,
-            primary_projectile: None,
-            projectile: Some(crate::entity::ProjectileState {
+        let mut attributes = crate::entity::EntityAttributes::default();
+        attributes.gameplay.speed = 0.0;
+        attributes.gameplay.solid = false;
+        attributes.rendering.visible = true;
+        attributes.behavior.can_move = false;
+        attributes.behavior.ai_config = crate::entity::AiConfig::default();
+        attributes.behavior.movement_profile = crate::entity::MovementProfile::None;
+        let projectile_id = self.world.entity_manager.spawn_entity(
+            crate::entity::EntityKind::Projectile,
+            spawn_position,
+            size,
+            attributes,
+        );
+        self.world.entity_manager.set_projectile(
+            projectile_id,
+            Some(crate::entity::ProjectileState {
                 sheet: spec.sheet,
                 object_name: spec.object_name,
                 size: spec.size,
@@ -151,18 +158,10 @@ impl GameState {
                 damage: spec.damage.max(0),
                 owner_id: Some(attacker_id),
             }),
-            ..crate::entity::EntityAttributes::default()
-        };
-        let projectile_id = self.world.entity_manager.spawn_entity(
-            crate::entity::EntityKind::Projectile,
-            spawn_position,
-            size,
-            attributes.clone(),
         );
         if let Some(projectile) = self.world.entity_manager.get_entity_mut(projectile_id) {
             projectile.category = "projectile".to_string();
             projectile.collision_box = Some(CollisionBox::solid_box(size));
-            projectile.attributes = attributes;
         }
 
         tracing::debug!(
@@ -180,7 +179,7 @@ impl GameState {
 
     fn projectile_hit_target(&self, projectile_id: EntityId) -> Option<EntityId> {
         let projectile = self.world.entity_manager.get_entity(projectile_id)?;
-        let projectile_state = projectile.attributes.projectile.as_ref()?;
+        let projectile_state = self.world.entity_manager.projectile(projectile_id)?;
         let (projectile_pos, projectile_size) = projectile.interaction_bounds();
 
         let mut target_ids = self.world.entity_manager.active_entities();
@@ -193,9 +192,9 @@ impl GameState {
             let Some(target) = self.world.entity_manager.get_entity(target_id) else {
                 continue;
             };
-            if !target.attributes.active
+            if !target.attributes.behavior.active
                 || target.attributes.current_stat(HEALTH_STAT_ID).is_none()
-                || target.attributes.projectile.is_some()
+                || self.world.entity_manager.projectile(target_id).is_some()
             {
                 continue;
             }
@@ -222,7 +221,7 @@ impl GameState {
             .filter(|&entity_id| {
                 self.world.entity_manager
                     .get_entity(entity_id)
-                    .and_then(|entity| entity.attributes.projectile.as_ref())
+                    .and_then(|entity| self.world.entity_manager.projectile(entity.id))
                     .is_some()
             })
             .collect::<Vec<_>>();
@@ -235,7 +234,7 @@ impl GameState {
                 .entity_manager
                 .get_entity(projectile_id)
                 .and_then(|entity| {
-                    entity.attributes.projectile.as_ref().map(|projectile| {
+                    self.world.entity_manager.projectile(entity.id).map(|projectile| {
                         (
                             entity.position,
                             glam::IVec2::new(projectile.velocity[0], projectile.velocity[1]),
@@ -273,7 +272,7 @@ impl GameState {
 
             if let Some(projectile_entity) = self.world.entity_manager.get_entity_mut(projectile_id) {
                 projectile_entity.position = new_position;
-                if let Some(projectile) = projectile_entity.attributes.projectile.as_mut() {
+                if let Some(projectile) = self.world.entity_manager.projectile_mut(projectile_id) {
                     projectile.remaining_ticks = projectile.remaining_ticks.saturating_sub(1);
                     tracing::trace!(
                         "Projectile {} moved from {:?} to {:?} remaining_ticks={}",
@@ -303,7 +302,7 @@ impl GameState {
                 .world
                 .entity_manager
                 .get_entity(projectile_id)
-                .and_then(|entity| entity.attributes.projectile.as_ref())
+                .and_then(|entity| self.world.entity_manager.projectile(entity.id))
                 .is_some_and(|projectile| projectile.remaining_ticks == 0);
             if expired {
                 tracing::debug!(
@@ -328,7 +327,7 @@ impl GameState {
                 .world
                 .entity_manager
                 .get_entity_mut(entity_id)
-                .and_then(|entity| entity.attributes.animation_controller.as_mut())
+                .and_then(|entity| entity.attributes.rendering.animation_controller.as_mut())
             else {
                 return false;
             };

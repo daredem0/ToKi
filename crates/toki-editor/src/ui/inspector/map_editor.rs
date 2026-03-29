@@ -629,24 +629,28 @@ impl InspectorSystem {
         stat_id: &str,
         value: Option<i32>,
     ) -> bool {
-        let previous_base = attributes.stats.base.get(stat_id).copied();
-        let previous_current = attributes.stats.current.get(stat_id).copied();
+        let previous_base = attributes.gameplay.stats.base.get(stat_id).copied();
+        let previous_current = attributes.gameplay.stats.current.get(stat_id).copied();
         let mut changed = false;
 
         match value {
             Some(value) => {
                 if previous_base != Some(value) {
-                    attributes.stats.base.insert(stat_id.to_string(), value);
+                    attributes.gameplay.stats.base.insert(stat_id.to_string(), value);
                     changed = true;
                 }
                 if previous_current != Some(value) {
-                    attributes.stats.current.insert(stat_id.to_string(), value);
+                    attributes
+                        .gameplay
+                        .stats
+                        .current
+                        .insert(stat_id.to_string(), value);
                     changed = true;
                 }
             }
             None => {
-                changed |= attributes.stats.base.remove(stat_id).is_some();
-                changed |= attributes.stats.current.remove(stat_id).is_some();
+                changed |= attributes.gameplay.stats.base.remove(stat_id).is_some();
+                changed |= attributes.gameplay.stats.current.remove(stat_id).is_some();
             }
         }
 

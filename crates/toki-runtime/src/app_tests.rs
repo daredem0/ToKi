@@ -496,6 +496,7 @@ fn build_startup_state_uses_scene_player_entry_and_preloads_all_scenes() {
         description: None,
         maps: vec!["demo_map".to_string()],
         entities: vec![],
+        components: Default::default(),
         rules: RuleSet::default(),
         camera_position: None,
         camera_scale: None,
@@ -618,6 +619,7 @@ fn build_startup_state_tolerates_stale_scene_manifest_paths() {
         description: None,
         maps: vec!["demo_map".to_string()],
         entities: vec![],
+        components: Default::default(),
         rules: RuleSet::default(),
         camera_position: None,
         camera_scale: None,
@@ -740,6 +742,7 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
         description: None,
         maps: vec!["demo_map".to_string()],
         entities: vec![],
+        components: Default::default(),
         rules: RuleSet {
             rules: vec![Rule {
                 id: "switch_to_second".to_string(),
@@ -782,6 +785,7 @@ fn app_defers_scene_switch_until_fade_out_completes_then_fades_back_in() {
         description: None,
         maps: vec!["demo_map".to_string()],
         entities: vec![],
+        components: Default::default(),
         rules: RuleSet::default(),
         camera_position: None,
         camera_scale: None,
