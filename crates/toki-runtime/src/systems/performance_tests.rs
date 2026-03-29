@@ -91,6 +91,23 @@ fn stats_line_is_available_with_data_and_enabled() {
     assert!(line.contains("Draw:"));
     assert!(line.contains("CPU:"));
     assert!(line.contains("Overhead:"));
+    assert!(!line.contains("SF:"));
+}
+
+#[test]
+fn stats_line_includes_scale_factor_when_available() {
+    let mut monitor = PerformanceMonitor::new();
+    monitor.frame_times.push(Duration::from_millis(16));
+    monitor.tick_times.push(Duration::from_millis(2));
+    monitor.draw_times.push(Duration::from_millis(3));
+    monitor.cpu_work_times.push(Duration::from_millis(4));
+    monitor.total_frame_times.push(Duration::from_millis(8));
+    monitor.set_viewport_scale_factor(4.0);
+
+    let line = monitor
+        .stats_line()
+        .expect("stats line should exist for populated monitor");
+    assert!(line.contains("SF: 4.00x"));
 }
 
 #[test]

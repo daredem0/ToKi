@@ -232,6 +232,9 @@ fn apply_display_config(
     if let Some(zoom_percent) = display.zoom_percent {
         launch_options.display.zoom_percent = zoom_percent;
     }
+    if let Some(viewport) = display.viewport {
+        launch_options.display.viewport = viewport;
+    }
     if let Some(vsync) = display.vsync {
         launch_options.display.vsync = vsync;
     }
@@ -358,6 +361,7 @@ fn apply_project_runtime_settings_from_project_file_if_present(
         launch_options.display.resolution_width = metadata.runtime.display.resolution_width;
         launch_options.display.resolution_height = metadata.runtime.display.resolution_height;
         launch_options.display.zoom_percent = metadata.runtime.display.zoom_percent;
+        launch_options.display.viewport = metadata.runtime.display.viewport;
         launch_options.display.vsync = metadata.runtime.display.vsync;
         launch_options.display.target_fps = metadata.runtime.display.target_fps;
         launch_options.display.timing_mode = metadata.runtime.display.timing_mode;

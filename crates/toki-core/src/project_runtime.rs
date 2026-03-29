@@ -4,6 +4,12 @@ use crate::FlagValue;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+pub mod viewport;
+pub use viewport::{
+    default_aspect_fit_percent, default_runtime_viewport_mode, IntegerScaleFactor,
+    RuntimeViewportMode,
+};
+
 /// Controls how game logic timing is handled.
 ///
 /// This affects how movement, animation, and other time-dependent systems behave.
@@ -274,6 +280,9 @@ pub struct RuntimeDisplaySettings {
     /// Zoom level as percentage (100 = 1.0x, 200 = 2.0x, etc.)
     #[serde(default = "default_zoom_percent")]
     pub zoom_percent: u32,
+    /// Runtime world viewport presentation mode.
+    #[serde(default = "default_runtime_viewport_mode")]
+    pub viewport: RuntimeViewportMode,
     /// Enable vsync (ties frame rate to display refresh rate)
     #[serde(default = "default_vsync")]
     pub vsync: bool,
@@ -295,6 +304,7 @@ impl Default for RuntimeDisplaySettings {
             resolution_width: default_resolution_width(),
             resolution_height: default_resolution_height(),
             zoom_percent: default_zoom_percent(),
+            viewport: default_runtime_viewport_mode(),
             vsync: default_vsync(),
             target_fps: default_target_fps(),
             timing_mode: TimingMode::default(),
@@ -384,6 +394,8 @@ pub struct RuntimeConfigDisplay {
     pub resolution_height: Option<u32>,
     #[serde(default)]
     pub zoom_percent: Option<u32>,
+    #[serde(default)]
+    pub viewport: Option<RuntimeViewportMode>,
     #[serde(default)]
     pub vsync: Option<bool>,
     #[serde(default)]
