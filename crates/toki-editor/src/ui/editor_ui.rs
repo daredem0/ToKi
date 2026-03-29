@@ -847,7 +847,9 @@ impl EditorUI {
     // Scene management methods
     pub fn add_scene(&mut self, name: String) -> &mut Scene {
         self.scenes.push(Scene::new(name));
-        self.scenes.last_mut().unwrap()
+        self.scenes
+            .last_mut()
+            .expect("scene list should contain the newly added scene")
     }
 
     pub fn get_scene(&self, name: &str) -> Option<&Scene> {

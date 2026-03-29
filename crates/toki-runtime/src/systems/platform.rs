@@ -37,7 +37,10 @@ impl PlatformSystem {
         ));
 
         // Attempt to create a window with the given attributes
-        let raw_window = event_loop.create_window(window_attributes).unwrap();
+        let Ok(raw_window) = event_loop.create_window(window_attributes) else {
+            tracing::error!("Failed to create runtime window");
+            return;
+        };
         let window = Arc::new(raw_window);
 
         self.window = Some(window);

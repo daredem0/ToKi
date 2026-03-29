@@ -98,14 +98,21 @@ fn render_new_canvas_dialog(ui_state: &mut EditorUI, ctx: &egui::Context) {
                 if source_image.is_some() {
                     match source_image_validation.as_ref() {
                         Some(Ok((cols, rows))) => {
-                            ui.label(format!(
-                                "Canvas: {}x{} ({}x{} tiles, {} cells)",
-                                source_image_size.unwrap().x,
-                                source_image_size.unwrap().y,
-                                cols,
-                                rows,
-                                cols * rows
-                            ));
+                            if let Some(source_image_size) = source_image_size {
+                                ui.label(format!(
+                                    "Canvas: {}x{} ({}x{} tiles, {} cells)",
+                                    source_image_size.x,
+                                    source_image_size.y,
+                                    cols,
+                                    rows,
+                                    cols * rows
+                                ));
+                            } else {
+                                ui.colored_label(
+                                    egui::Color32::RED,
+                                    "Source image size unavailable for sprite sheet creation.",
+                                );
+                            }
                         }
                         Some(Err(error)) => {
                             ui.colored_label(egui::Color32::RED, error);

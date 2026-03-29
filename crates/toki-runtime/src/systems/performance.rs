@@ -71,7 +71,7 @@ impl PerformanceMonitor {
     /// Toggle the in-window HUD display of performance statistics
     pub fn toggle_hud_display(&mut self) {
         self.show_hud_stats = !self.show_hud_stats;
-        println!(
+        tracing::debug!(
             "FPS HUD display: {}",
             if self.show_hud_stats { "ON" } else { "OFF" }
         );
@@ -80,7 +80,7 @@ impl PerformanceMonitor {
     /// Toggle console printing of performance statistics
     pub fn toggle_console_display(&mut self) {
         self.show_console_stats = !self.show_console_stats;
-        println!(
+        tracing::debug!(
             "FPS console logging: {}",
             if self.show_console_stats { "ON" } else { "OFF" }
         );
@@ -154,7 +154,7 @@ impl PerformanceMonitor {
     /// Print comprehensive performance statistics
     fn print_performance_stats(&self) {
         if let Some(stats) = self.current_stats() {
-            println!("{}", stats.format_line(self.viewport_scale_factor));
+            tracing::debug!("{}", stats.format_line(self.viewport_scale_factor));
         }
     }
 

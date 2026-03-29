@@ -41,7 +41,7 @@ mod app_bootstrap;
 mod app_lifecycle;
 #[path = "app_presenter.rs"]
 mod app_presenter;
-#[path = "app_runtime_settings.rs"]
+#[path = "app_runtime_settings/mod.rs"]
 mod app_runtime_settings;
 #[path = "app_runtime_display_settings.rs"]
 mod app_runtime_display_settings;

@@ -1,9 +1,10 @@
+mod prepare;
+
 use crate::RenderError;
 use glyphon::{
-    Attrs, Buffer, Cache, Color, Family, FontSystem, Metrics, Resolution, Shaping, Style,
-    SwashCache, TextArea, TextAtlas, TextBounds, TextRenderer, Viewport, Weight,
+    Attrs, Buffer, Cache, Color, Family, FontSystem, Metrics, Style, SwashCache, TextAtlas,
+    TextRenderer, Viewport, Weight,
 };
-use std::collections::HashSet;
 use toki_core::fonts::{builtin_font_family, BuiltinFontFamily};
 use toki_core::text::{TextAnchor, TextBoxStyle, TextItem, TextSlant, TextSpace, TextStyle};
 
@@ -18,11 +19,18 @@ pub struct TextBackgroundRect {
 }
 
 #[derive(Debug)]
-struct PreparedTextEntry {
+pub(super) struct PreparedTextEntry {
     buffer_index: usize,
     left: f32,
     top: f32,
     color: Color,
+}
+
+#[derive(Debug)]
+pub(super) struct PreparedTextLayout {
+    entries: Vec<PreparedTextEntry>,
+    backgrounds: Vec<TextBackgroundRect>,
+    used_keys: std::collections::HashSet<TextBufferKey>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -72,102 +80,6 @@ impl GlyphonTextRenderer {
         }
     }
 
-    pub fn prepare(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        surface_width: u32,
-        surface_height: u32,
-        items: &[TextItem],
-        world_to_screen_mvp: glam::Mat4,
-    ) -> Result<Vec<TextBackgroundRect>, RenderError> {
-        self.viewport.update(
-            queue,
-            Resolution {
-                width: surface_width,
-                height: surface_height,
-            },
-        );
-
-        let mut sorted_items = items.to_vec();
-        sorted_items.sort_by_key(|item| item.layer);
-
-        let mut entries = Vec::new();
-        let mut backgrounds = Vec::new();
-        let mut used_keys = HashSet::new();
-
-        for item in &sorted_items {
-            if item.content.is_empty() {
-                continue;
-            }
-
-            let Some(base_pos) = to_screen_position(
-                item,
-                world_to_screen_mvp,
-                surface_width as f32,
-                surface_height as f32,
-            ) else {
-                continue;
-            };
-
-            let estimated_size = estimate_text_size(item);
-            let estimated_anchored_pos = apply_anchor(base_pos, estimated_size, item.anchor);
-            let max_width = item
-                .max_width
-                .unwrap_or_else(|| (surface_width as f32 - estimated_anchored_pos.x).max(1.0));
-            let key = make_buffer_key(item, max_width, surface_height as f32);
-            let buffer_index = self.upsert_buffer(item, max_width, surface_height as f32, &key);
-            used_keys.insert(key);
-            let actual_size = measure_buffer_size(&self.cached_buffers[buffer_index].buffer);
-            let anchored_pos = apply_anchor(base_pos, actual_size, item.anchor);
-            entries.push(PreparedTextEntry {
-                buffer_index,
-                left: anchored_pos.x,
-                top: anchored_pos.y,
-                color: color_from_rgba(item.style.color),
-            });
-
-            if let Some(box_style) = &item.box_style {
-                backgrounds.push(background_rect_for(anchored_pos, actual_size, box_style));
-            }
-        }
-
-        let text_areas: Vec<TextArea<'_>> = entries
-            .iter()
-            .map(|entry| TextArea {
-                buffer: &self.cached_buffers[entry.buffer_index].buffer,
-                left: entry.left,
-                top: entry.top,
-                scale: 1.0,
-                bounds: TextBounds {
-                    left: 0,
-                    top: 0,
-                    right: surface_width as i32,
-                    bottom: surface_height as i32,
-                },
-                default_color: entry.color,
-                custom_glyphs: &[],
-            })
-            .collect();
-
-        self.renderer
-            .prepare(
-                device,
-                queue,
-                &mut self.font_system,
-                &mut self.atlas,
-                &self.viewport,
-                text_areas,
-                &mut self.swash_cache,
-            )
-            .map_err(|error| RenderError::Other(format!("text prepare failed: {error}")))?;
-
-        self.cached_buffers
-            .retain(|entry| used_keys.contains(&entry.key));
-
-        Ok(backgrounds)
-    }
-
     pub fn render<'a>(
         &'a mut self,
         render_pass: &mut wgpu::RenderPass<'a>,
@@ -190,46 +102,6 @@ impl GlyphonTextRenderer {
             .map_err(|error| {
                 RenderError::Other(format!("failed to load font '{}': {error}", path.display()))
             })
-    }
-
-    fn upsert_buffer(
-        &mut self,
-        item: &TextItem,
-        max_width: f32,
-        layout_height: f32,
-        key: &TextBufferKey,
-    ) -> usize {
-        if let Some(existing_index) = self
-            .cached_buffers
-            .iter()
-            .position(|entry| &entry.key == key)
-        {
-            return existing_index;
-        }
-
-        let mut buffer = Buffer::new(
-            &mut self.font_system,
-            Metrics::new(item.style.size_px, item.style.size_px * 1.25),
-        );
-        buffer.set_size(
-            &mut self.font_system,
-            Some(max_width.max(1.0)),
-            Some(layout_height.max(1.0)),
-        );
-        let attrs = attrs_for_style(&item.style);
-        let shaping = if item.content.is_ascii() {
-            Shaping::Basic
-        } else {
-            Shaping::Advanced
-        };
-        buffer.set_text(&mut self.font_system, &item.content, &attrs, shaping);
-        buffer.shape_until_scroll(&mut self.font_system, false);
-
-        self.cached_buffers.push(CachedTextBuffer {
-            key: key.clone(),
-            buffer,
-        });
-        self.cached_buffers.len() - 1
     }
 }
 
@@ -370,5 +242,5 @@ fn color_from_rgba(rgba: [f32; 4]) -> Color {
 }
 
 #[cfg(test)]
-#[path = "text_tests.rs"]
+#[path = "../text_tests.rs"]
 mod tests;

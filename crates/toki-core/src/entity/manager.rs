@@ -358,17 +358,14 @@ impl EntityManager {
             let Some(other_entity) = self.storage.get_entity(*other_id) else {
                 continue;
             };
-            if !other_entity.attributes.gameplay.solid {
+            if !Self::is_entity_collidable_candidate(other_entity) {
                 continue;
             }
 
-            let Some(other_box) = &other_entity.collision_box else {
-                continue;
-            };
-            if other_box.trigger {
-                continue;
-            }
-
+            let other_box = other_entity
+                .collision_box
+                .as_ref()
+                .expect("collidable entity should have a collision box");
             let (other_pos, other_size) = other_box.world_bounds(other_entity.position);
             if crate::collision::aabb_overlap(moving_pos, moving_size, other_pos, other_size) {
                 return Some(*other_id);
@@ -383,22 +380,28 @@ impl EntityManager {
             let Some(other_entity) = self.storage.get_entity(*other_id) else {
                 continue;
             };
-            if !other_entity.attributes.gameplay.solid {
-                continue;
-            }
-            let Some(other_box) = &other_entity.collision_box else {
-                continue;
-            };
-            if other_box.trigger {
+            if !Self::is_entity_collidable_candidate(other_entity) {
                 continue;
             }
 
+            let other_box = other_entity
+                .collision_box
+                .as_ref()
+                .expect("collidable entity should have a collision box");
             let (other_pos, other_size) = other_box.world_bounds(other_entity.position);
             if crate::collision::aabb_overlap(position, size, other_pos, other_size) {
                 return false;
             }
         }
         true
+    }
+
+    fn is_entity_collidable_candidate(entity: &Entity) -> bool {
+        entity.attributes.gameplay.solid
+            && entity
+                .collision_box
+                .as_ref()
+                .is_some_and(|collision_box| !collision_box.trigger)
     }
 
     pub fn visible_entities(&self) -> Vec<EntityId> {

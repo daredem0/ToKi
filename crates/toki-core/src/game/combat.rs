@@ -5,7 +5,7 @@ use crate::entity::{Entity, EntityId, ATTACK_POWER_STAT_ID, HEALTH_STAT_ID};
 
 use super::animation::FacingDirection;
 use super::stat_effects::StatChangeRequest;
-use super::{GameState, InputAction};
+use super::{GameState, InputAction, WorldContext};
 
 pub struct CombatSystem;
 
@@ -14,12 +14,11 @@ impl CombatSystem {
         state.process_profile_actions();
     }
 
-    pub fn update_projectiles(
+    pub(crate) fn update_projectiles(
         state: &mut GameState,
-        tilemap: &crate::assets::tilemap::TileMap,
-        atlas: &crate::assets::atlas::AtlasMeta,
+        world: WorldContext<'_>,
     ) {
-        state.update_projectiles(tilemap, atlas);
+        state.update_projectiles(world.tilemap, world.atlas);
     }
 }
 

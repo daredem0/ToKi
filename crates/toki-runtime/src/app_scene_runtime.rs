@@ -221,13 +221,16 @@ impl<'a> SceneRuntimeCoordinator<'a> {
             self.rendering.update_projection(view);
             self.camera_system
                 .update_chunk_cache(self.resources.get_tilemap());
-            let atlas_size = self.resources.terrain_image_size().unwrap();
-            let verts = self.resources.get_tilemap().generate_vertices_for_chunks(
-                self.resources.get_terrain_atlas(),
-                atlas_size,
-                self.camera_system.cached_visible_chunks(),
-            );
-            self.rendering.update_tilemap_vertices(&verts);
+            if let Some(atlas_size) = self.resources.terrain_image_size() {
+                let verts = self.resources.get_tilemap().generate_vertices_for_chunks(
+                    self.resources.get_terrain_atlas(),
+                    atlas_size,
+                    self.camera_system.cached_visible_chunks(),
+                );
+                self.rendering.update_tilemap_vertices(&verts);
+            } else {
+                tracing::warn!("Terrain image size unavailable; skipping tilemap vertex refresh");
+            }
         }
     }
 

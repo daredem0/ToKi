@@ -18,6 +18,14 @@ pub struct OptionalComponentRegistry {
 }
 
 impl OptionalComponentRegistry {
+    fn set_optional<T>(map: &mut SparseComponentMap<T>, id: EntityId, value: Option<T>) {
+        if let Some(value) = value {
+            map.insert(id, value);
+        } else {
+            map.remove(id);
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.primary_projectiles.is_empty()
             && self.projectiles.is_empty()
@@ -61,11 +69,7 @@ impl OptionalComponentRegistry {
         id: EntityId,
         projectile: Option<PrimaryProjectileDef>,
     ) {
-        if let Some(projectile) = projectile {
-            self.primary_projectiles.insert(id, projectile);
-        } else {
-            self.primary_projectiles.remove(id);
-        }
+        Self::set_optional(&mut self.primary_projectiles, id, projectile);
     }
 
     pub fn projectile(&self, id: EntityId) -> Option<&ProjectileState> {
@@ -77,11 +81,7 @@ impl OptionalComponentRegistry {
     }
 
     pub fn set_projectile(&mut self, id: EntityId, projectile: Option<ProjectileState>) {
-        if let Some(projectile) = projectile {
-            self.projectiles.insert(id, projectile);
-        } else {
-            self.projectiles.remove(id);
-        }
+        Self::set_optional(&mut self.projectiles, id, projectile);
     }
 
     pub fn pickup(&self, id: EntityId) -> Option<&PickupDef> {
@@ -93,11 +93,7 @@ impl OptionalComponentRegistry {
     }
 
     pub fn set_pickup(&mut self, id: EntityId, pickup: Option<PickupDef>) {
-        if let Some(pickup) = pickup {
-            self.pickups.insert(id, pickup);
-        } else {
-            self.pickups.remove(id);
-        }
+        Self::set_optional(&mut self.pickups, id, pickup);
     }
 
     pub fn inventory(&self, id: EntityId) -> Option<&Inventory> {
@@ -120,10 +116,10 @@ impl OptionalComponentRegistry {
     pub fn set_inventory(&mut self, id: EntityId, inventory: Option<Inventory>) {
         match inventory {
             Some(inventory) if !inventory.is_empty() => {
-                self.inventories.insert(id, inventory);
+                Self::set_optional(&mut self.inventories, id, Some(inventory));
             }
             Some(_) | None => {
-                self.inventories.remove(id);
+                Self::set_optional(&mut self.inventories, id, None);
             }
         }
     }

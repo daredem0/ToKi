@@ -134,7 +134,9 @@ impl SpriteEditorState {
             return false;
         };
 
-        let canvas_before_lift = self.canvas_state(side).canvas.clone().unwrap();
+        let Some(canvas_before_lift) = self.canvas_state(side).canvas.clone() else {
+            return false;
+        };
         let selection_before_float = self.canvas_state(side).selection.clone();
 
         // Build a fully-selected mask for the pasted content

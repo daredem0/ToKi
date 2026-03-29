@@ -336,6 +336,12 @@ pub struct AudioManager {
 }
 
 impl AudioManager {
+    fn playback_channel_mut(&mut self, channel: &str) -> Result<&mut AudioChannel> {
+        self.playback
+            .get_channel_mut(channel)
+            .ok_or_else(|| anyhow::anyhow!("audio channel '{channel}' was not initialized"))
+    }
+
     pub fn new() -> Result<Self> {
         let current_dir = std::env::current_dir()?;
         Self::new_with_assets_root(current_dir)
@@ -416,7 +422,7 @@ impl AudioManager {
         }
 
         let channel_gain = self.playback.channel_volume_for(channel) + amplitude_to_decibels(gain);
-        let channel_data = self.playback.get_channel_mut(channel).unwrap();
+        let channel_data = self.playback_channel_mut(channel)?;
         let active_count =
             channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
 
@@ -488,7 +494,7 @@ impl AudioManager {
             let handle = self
                 .playback
                 .play_static_sound(sound_data.volume(channel_gain))?;
-            let channel_data = self.playback.get_channel_mut(channel).unwrap();
+            let channel_data = self.playback_channel_mut(channel)?;
             channel_data.active_handles.push(ActiveStaticSound {
                 handle,
                 base_gain: gain,
@@ -513,7 +519,7 @@ impl AudioManager {
             let handle = self
                 .playback
                 .play_static_sound(sound_data.volume(channel_gain))?;
-            let channel_data = self.playback.get_channel_mut(channel).unwrap();
+            let channel_data = self.playback_channel_mut(channel)?;
             channel_data.active_handles.push(ActiveStaticSound {
                 handle,
                 base_gain: gain,
@@ -554,7 +560,7 @@ impl AudioManager {
         }
 
         let channel_gain = self.playback.channel_volume_for(channel);
-        let channel_data = self.playback.get_channel_mut(channel).unwrap();
+        let channel_data = self.playback_channel_mut(channel)?;
         let active_count =
             channel_data.active_handles.len() + channel_data.active_streaming_handles.len();
 
@@ -612,7 +618,7 @@ impl AudioManager {
             );
 
             let handle = self.playback.play_streaming_sound(sound_data)?;
-            let channel_data = self.playback.get_channel_mut(channel).unwrap();
+            let channel_data = self.playback_channel_mut(channel)?;
             channel_data
                 .active_streaming_handles
                 .push(ActiveStreamingSound {

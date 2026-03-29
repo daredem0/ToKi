@@ -1,3 +1,6 @@
+mod frame;
+mod textures;
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -212,80 +215,6 @@ impl GpuState {
         }
     }
 
-    fn ensure_post_process_target(&mut self) -> Result<(), crate::RenderError> {
-        let size = (self.config.width.max(1), self.config.height.max(1));
-        let target = self.post_process_target.get_or_insert(OffscreenTarget::new(
-            self.device.clone(),
-            size,
-            self.config.format,
-        )?);
-        target.resize(size)?;
-        self.post_process_pipeline
-            .update_source_texture(&self.device, target.get_render_view()?);
-        Ok(())
-    }
-
-    fn render_scene_to_view(
-        &mut self,
-        encoder: &mut wgpu::CommandEncoder,
-        view: &wgpu::TextureView,
-    ) {
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-        });
-
-        render_pass.set_viewport(
-            0.0,
-            0.0,
-            self.config.width as f32,
-            self.config.height as f32,
-            0.0,
-            1.0,
-        );
-        if let Some(rect) = self.scene_clip_rect {
-            render_pass.set_scissor_rect(rect.x, rect.y, rect.width, rect.height);
-        }
-
-        if self.tilemap_render_enabled {
-            self.tilemap_pipeline.render(&mut render_pass);
-        }
-
-        self.world_underlay_pipeline.render(&mut render_pass);
-        let sprite_pipeline = &self.sprite_pipeline;
-        let sprite_pipelines_by_texture = &self.sprite_pipelines_by_texture;
-        let sprite_draw_batches = &self.sprite_draw_batches;
-        for batch in sprite_draw_batches {
-            match &batch.key {
-                GpuSpriteBatchKey::Default => {
-                    sprite_pipeline.render_range(&mut render_pass, batch.start, batch.count);
-                }
-                GpuSpriteBatchKey::Textured(texture_path) => {
-                    if let Some(pipeline) = sprite_pipelines_by_texture.get(texture_path) {
-                        pipeline.render_range(&mut render_pass, batch.start, batch.count);
-                    }
-                }
-            }
-        }
-        self.debug_pipeline.render(&mut render_pass);
-        self.ui_rect_pipeline.render(&mut render_pass);
-        self.ui_debug_pipeline.render(&mut render_pass);
-
-        if let Err(error) = self.text_renderer.render(&mut render_pass) {
-            tracing::warn!("Failed to render text layer: {error}");
-        }
-    }
-
     fn record_sprite_draw_batch(&mut self, key: GpuSpriteBatchKey, start: usize) {
         append_ordered_draw_batch(&mut self.sprite_draw_batches, key, start);
     }
@@ -484,65 +413,6 @@ impl GpuState {
         )
     }
 
-    /// Load a new tilemap texture at runtime
-    pub fn load_tilemap_texture(
-        &mut self,
-        texture_path: PathBuf,
-    ) -> Result<(), crate::RenderError> {
-        // Create new tilemap pipeline with the specified texture
-        let new_pipeline = TilemapPipeline::new(
-            &self.device,
-            &self.queue,
-            self.config.format,
-            TextureSource::path(texture_path),
-        )?;
-        self.tilemap_pipeline = new_pipeline;
-        Ok(())
-    }
-
-    pub fn load_tilemap_texture_rgba8(
-        &mut self,
-        image: &DecodedImage,
-    ) -> Result<(), crate::RenderError> {
-        let new_pipeline = TilemapPipeline::new(
-            &self.device,
-            &self.queue,
-            self.config.format,
-            TextureSource::rgba8(image),
-        )?;
-        self.tilemap_pipeline = new_pipeline;
-        Ok(())
-    }
-
-    /// Load a new sprite texture at runtime
-    pub fn load_sprite_texture(&mut self, texture_path: PathBuf) -> Result<(), crate::RenderError> {
-        // Create new sprite pipeline with the specified texture
-        let new_pipeline = SpritePipeline::new(
-            &self.device,
-            &self.queue,
-            self.config.format,
-            TextureSource::path(texture_path),
-        )?;
-        self.sprite_pipeline = new_pipeline;
-        self.sprite_pipelines_by_texture.clear();
-        Ok(())
-    }
-
-    pub fn load_sprite_texture_rgba8(
-        &mut self,
-        image: &DecodedImage,
-    ) -> Result<(), crate::RenderError> {
-        let new_pipeline = SpritePipeline::new(
-            &self.device,
-            &self.queue,
-            self.config.format,
-            TextureSource::rgba8(image),
-        )?;
-        self.sprite_pipeline = new_pipeline;
-        self.sprite_pipelines_by_texture.clear();
-        Ok(())
-    }
-
     /// Create GpuState and immediately load specific textures (for editor use)
     pub fn new_with_textures(
         window: Arc<Window>,
@@ -597,121 +467,6 @@ impl GpuState {
         self.debug_pipeline.update_camera(&self.queue, mvp);
     }
 
-    pub fn draw(&mut self) {
-        // Update pipelines before rendering
-        self.tilemap_pipeline.update_with_queue(&self.queue);
-        self.sprite_pipeline.update_with_queue(&self.queue);
-        for pipeline in self.sprite_pipelines_by_texture.values_mut() {
-            pipeline.update_with_queue(&self.queue);
-        }
-
-        let text_backgrounds = self
-            .text_renderer
-            .prepare(
-                &self.device,
-                &self.queue,
-                self.config.width,
-                self.config.height,
-                &self.text_items,
-                self.current_mvp,
-            )
-            .unwrap_or_else(|error| {
-                tracing::warn!("Failed to prepare text renderer: {error}");
-                Vec::new()
-            });
-        self.refresh_ui_text_backgrounds(&text_backgrounds);
-
-        let output = match self.surface.get_current_texture() {
-            Ok(output) => output,
-            Err(error) => {
-                tracing::warn!("Failed to acquire next swap chain texture: {error}");
-                match error {
-                    wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost => {
-                        self.surface.configure(&self.device, &self.config);
-                    }
-                    wgpu::SurfaceError::OutOfMemory => {
-                        tracing::error!("Surface out of memory; skipping frame");
-                    }
-                    wgpu::SurfaceError::Timeout | wgpu::SurfaceError::Other => {}
-                }
-                return;
-            }
-        };
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
-
-        if self.post_process_settings.mode == PostProcessMode::None {
-            self.render_scene_to_view(&mut encoder, &view);
-        } else if let Err(error) = self.ensure_post_process_target() {
-            tracing::warn!("Failed to prepare post-process target: {error}");
-            self.render_scene_to_view(&mut encoder, &view);
-        } else if let Some(target) = &mut self.post_process_target {
-            self.post_process_pipeline
-                .update_settings(&self.queue, self.post_process_settings);
-            match target.get_render_view() {
-                Ok(target_view) => {
-                    let target_view = target_view.clone();
-                    self.render_scene_to_view(&mut encoder, &target_view);
-                    let mut post_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("Post Process Pass"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                                store: wgpu::StoreOp::Store,
-                            },
-                        })],
-                        depth_stencil_attachment: None,
-                        timestamp_writes: None,
-                        occlusion_query_set: None,
-                    });
-                    self.post_process_pipeline.render(&mut post_pass);
-                }
-                Err(error) => {
-                    tracing::warn!("Failed to access post-process target view: {error}");
-                    self.render_scene_to_view(&mut encoder, &view);
-                }
-            }
-        }
-
-        self.queue.submit(Some(encoder.finish()));
-        output.present();
-    }
-
-    fn refresh_ui_text_backgrounds(&mut self, backgrounds: &[TextBackgroundRect]) {
-        self.ui_debug_pipeline.clear();
-        for rect in backgrounds {
-            self.ui_debug_pipeline.add_filled_rect(
-                rect.x,
-                rect.y,
-                rect.width,
-                rect.height,
-                rect.background_color,
-            );
-            if let Some(border_color) = rect.border_color {
-                self.ui_debug_pipeline.add_rect(
-                    rect.x,
-                    rect.y,
-                    rect.width,
-                    rect.height,
-                    border_color,
-                );
-            }
-        }
-        self.ui_debug_pipeline.update_camera(
-            &self.queue,
-            screen_space_projection(self.config.width as f32, self.config.height as f32),
-        );
-        self.ui_debug_pipeline.update_vertices(&self.device);
-    }
 }
 
 impl crate::RenderBackend for GpuState {
@@ -903,5 +658,5 @@ impl crate::RenderBackend for GpuState {
 }
 
 #[cfg(test)]
-#[path = "gpu_tests.rs"]
+#[path = "../gpu_tests.rs"]
 mod tests;

@@ -1,7 +1,7 @@
+use super::player_defs::{default_player_definition, player_like_npc_definition};
 use super::transition::SceneTransitionPlanner;
 use super::{GameState, ProgressState, RuntimeState, SceneState, WorldState};
-use crate::entity::{ControlRole, EntityId, EntityKind, EntityManager};
-use crate::ids::EntityDefName;
+use crate::entity::{EntityId, EntityManager};
 use crate::scene::Scene;
 use crate::sprite::SpriteInstance;
 use std::collections::HashMap;
@@ -145,95 +145,7 @@ impl SceneSystem {
         state: &mut GameState,
         save_data: &crate::serialization::SaveData,
     ) -> Result<(), RestoreError> {
-        let scene_name = save_data.active_scene_name.trim();
-        if scene_name.is_empty() {
-            return Err(RestoreError::MissingActiveSceneName);
-        }
-
-        if !save_data.scene_snapshots.is_empty() {
-            for scene_snapshot in &save_data.scene_snapshots {
-                state.scene.scene_manager.add_scene(scene_snapshot.clone());
-            }
-            state.rebuild_persistent_scene_tracking();
-        } else {
-            for persisted in &save_data.persisted_entities {
-                state
-                    .scene
-                    .persistent_scene_entities
-                    .insert((persisted.scene_name.to_string(), persisted.entity_id));
-                let Some(scene) = state.scene.scene_manager.get_scene_mut(&persisted.scene_name)
-                else {
-                    continue;
-                };
-
-                match &persisted.entity {
-                    Some(stored_entity) => {
-                        if let Some(existing) = scene.entity_mut(persisted.entity_id) {
-                            *existing = stored_entity.entity.clone();
-                        } else {
-                            scene.add_entity(stored_entity.entity.clone());
-                        }
-                        scene.components_mut().apply_optional_components(
-                            persisted.entity_id,
-                            stored_entity.components.clone(),
-                        );
-                    }
-                    None => {
-                        scene.remove_entity(persisted.entity_id);
-                    }
-                }
-            }
-        }
-
-        if let Some(scene) = state.scene.scene_manager.get_scene_mut(scene_name) {
-            scene.camera_position = save_data.camera.position;
-            scene.camera_scale = save_data.camera.scale;
-        }
-
-        let scene = state
-            .scene
-            .scene_manager
-            .get_scene(scene_name)
-            .ok_or_else(|| RestoreError::MissingScene(scene_name.to_string()))?
-            .clone();
-
-        let prepared = SceneTransitionPlanner::new(&state.world.entity_definitions)
-            .prepare_scene_load(&scene, None, save_data.player.clone())
-            .map_err(RestoreError::PrepareSceneLoad)?;
-
-        state
-            .apply_prepared_scene_load(scene_name, prepared)
-            .map_err(RestoreError::ApplySceneLoad)?;
-        if let (Some(saved_player), Some(player_id)) =
-            (save_data.player.as_ref(), state.world.player_id)
-        {
-            if let Some(player) = state.world.entity_manager.get_entity_mut(player_id) {
-                let mut restored_player = saved_player.entity.clone();
-                restored_player.id = player_id;
-                restored_player.control_role = ControlRole::PlayerCharacter;
-                restored_player.entity_kind = EntityKind::Player;
-                *player = restored_player;
-            }
-            if let Some(audio) = state
-                .world
-                .entity_manager
-                .storage_mut()
-                .audio_component_mut(player_id)
-            {
-                *audio = saved_player.entity.audio.to_component();
-            }
-            let components = state.world.entity_manager_mut().storage_mut().components_mut();
-            components.set_inventory(player_id, saved_player.components.inventory.clone());
-            components.set_primary_projectile(
-                player_id,
-                saved_player.components.primary_projectile.clone(),
-            );
-            components.set_projectile(player_id, saved_player.components.projectile.clone());
-            components.set_pickup(player_id, saved_player.components.pickup.clone());
-        }
-        state.progress.game_flags = save_data.flags.clone();
-        state.progress.play_time_ms = save_data.metadata.play_time_ms;
-        Ok(())
+        super::scene_restore::restore_from_save_data(state, save_data)
     }
 
     pub fn spawn_player_at(state: &mut GameState, position: glam::IVec2) -> EntityId {
@@ -306,7 +218,7 @@ impl GameState {
         self.world.player_id = Some(id);
     }
 
-    fn apply_prepared_scene_load(
+    pub(super) fn apply_prepared_scene_load(
         &mut self,
         scene_name: &str,
         prepared: super::transition::PreparedSceneLoad,
@@ -332,7 +244,7 @@ impl GameState {
         }
     }
 
-    fn rebuild_persistent_scene_tracking(&mut self) {
+    pub(super) fn rebuild_persistent_scene_tracking(&mut self) {
         self.scene.persistent_scene_entities.clear();
         let scene_names = self
             .scene
@@ -361,155 +273,5 @@ impl GameState {
                     .insert((scene_name.clone(), entity_id));
             }
         }
-    }
-}
-
-fn default_player_definition() -> crate::entity::EntityDefinition {
-    crate::entity::EntityDefinition {
-        name: EntityDefName::from("player"),
-        display_name: "Player".to_string(),
-        description: "Default player entity".to_string(),
-        rendering: crate::entity::RenderingDef {
-            size: [16, 16],
-            render_layer: 0,
-            visible: true,
-            has_shadow: true,
-            palette_override: None,
-            static_object: None,
-            grounding: Default::default(),
-        },
-        attributes: crate::entity::AttributesDef {
-            health: Some(100),
-            stats: std::collections::HashMap::new(),
-            speed: 2.0,
-            solid: true,
-            active: true,
-            can_move: true,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: crate::entity::AiConfig::default(),
-            movement_profile: crate::entity::MovementProfile::PlayerWasd,
-            primary_projectile: None,
-            pickup: None,
-            has_inventory: true,
-        },
-        collision: crate::entity::CollisionDef {
-            enabled: true,
-            offset: [0, 0],
-            size: [16, 16],
-            trigger: false,
-        },
-        audio: crate::entity::AudioDef {
-            footstep_trigger_distance: 32.0,
-            hearing_radius: 192,
-            movement_sound_trigger: crate::entity::MovementSoundTrigger::Distance,
-            movement_sound: "sfx_slime_bounce".to_string(),
-            collision_sound: Some("sfx_hit2".to_string()),
-        },
-        animations: crate::entity::AnimationsDef {
-            atlas_name: "creatures".to_string(),
-            clips: vec![
-                crate::entity::AnimationClipDef {
-                    state: "idle".to_string(),
-                    frame_tiles: vec!["slime/idle_0".to_string(), "slime/idle_1".to_string()],
-                    frame_positions: None,
-                    frame_duration_ms: 300.0,
-                    frame_durations_ms: None,
-                    loop_mode: "loop".to_string(),
-                },
-                crate::entity::AnimationClipDef {
-                    state: "walk".to_string(),
-                    frame_tiles: vec![
-                        "slime/walk_0".to_string(),
-                        "slime/walk_1".to_string(),
-                        "slime/walk_2".to_string(),
-                        "slime/walk_3".to_string(),
-                    ],
-                    frame_positions: None,
-                    frame_duration_ms: 150.0,
-                    frame_durations_ms: None,
-                    loop_mode: "loop".to_string(),
-                },
-            ],
-            default_state: "idle".to_string(),
-        },
-        category: "human".to_string(),
-        tags: vec!["player".to_string()],
-    }
-}
-
-fn player_like_npc_definition() -> crate::entity::EntityDefinition {
-    crate::entity::EntityDefinition {
-        name: EntityDefName::from("player_like_npc"),
-        display_name: "Player-like NPC".to_string(),
-        description: "NPC using the player visual style".to_string(),
-        rendering: crate::entity::RenderingDef {
-            size: [16, 16],
-            render_layer: 0,
-            visible: true,
-            has_shadow: true,
-            palette_override: None,
-            static_object: None,
-            grounding: Default::default(),
-        },
-        attributes: crate::entity::AttributesDef {
-            health: Some(50),
-            stats: std::collections::HashMap::new(),
-            speed: 1.0,
-            solid: true,
-            active: true,
-            can_move: false,
-            interactable: false,
-            interaction_reach: 0,
-            ai_config: crate::entity::AiConfig::from_legacy_behavior(
-                crate::entity::AiBehavior::Wander,
-            ),
-            movement_profile: crate::entity::MovementProfile::None,
-            primary_projectile: None,
-            pickup: None,
-            has_inventory: false,
-        },
-        collision: crate::entity::CollisionDef {
-            enabled: true,
-            offset: [0, 0],
-            size: [16, 16],
-            trigger: false,
-        },
-        audio: crate::entity::AudioDef {
-            footstep_trigger_distance: 32.0,
-            hearing_radius: 192,
-            movement_sound_trigger: crate::entity::MovementSoundTrigger::Distance,
-            movement_sound: "sfx_slime_bounce".to_string(),
-            collision_sound: Some("sfx_hit2".to_string()),
-        },
-        animations: crate::entity::AnimationsDef {
-            atlas_name: "creatures".to_string(),
-            clips: vec![
-                crate::entity::AnimationClipDef {
-                    state: "idle".to_string(),
-                    frame_tiles: vec!["slime/idle_0".to_string(), "slime/idle_1".to_string()],
-                    frame_positions: None,
-                    frame_duration_ms: 300.0,
-                    frame_durations_ms: None,
-                    loop_mode: "loop".to_string(),
-                },
-                crate::entity::AnimationClipDef {
-                    state: "walk".to_string(),
-                    frame_tiles: vec![
-                        "slime/walk_0".to_string(),
-                        "slime/walk_1".to_string(),
-                        "slime/walk_2".to_string(),
-                        "slime/walk_3".to_string(),
-                    ],
-                    frame_positions: None,
-                    frame_duration_ms: 150.0,
-                    frame_durations_ms: None,
-                    loop_mode: "loop".to_string(),
-                },
-            ],
-            default_state: "idle".to_string(),
-        },
-        category: "human".to_string(),
-        tags: vec!["npc".to_string()],
     }
 }

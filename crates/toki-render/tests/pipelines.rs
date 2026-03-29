@@ -24,7 +24,7 @@ impl RenderPipeline for MockPipeline {
         self.update_called = true;
     }
 
-    fn update_with_queue(&mut self, _queue: &wgpu::Queue) {
+    fn update_with_queue(&mut self, _device: &wgpu::Device, _queue: &wgpu::Queue) {
         self.update_with_queue_called = true;
         // Call the default implementation which calls update()
         self.update();
@@ -52,7 +52,7 @@ impl RenderPipeline for DefaultQueuePipeline {
     }
 }
 
-fn create_queue() -> Option<wgpu::Queue> {
+fn create_device_and_queue() -> Option<(wgpu::Device, wgpu::Queue)> {
     for backends in [
         wgpu::Backends::PRIMARY,
         wgpu::Backends::VULKAN,
@@ -71,7 +71,7 @@ fn create_queue() -> Option<wgpu::Queue> {
         else {
             continue;
         };
-        let Ok((_device, queue)) =
+        let Ok((device, queue)) =
             pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
                 required_features: wgpu::Features::empty(),
                 required_limits: wgpu::Limits::default(),
@@ -82,7 +82,7 @@ fn create_queue() -> Option<wgpu::Queue> {
         else {
             continue;
         };
-        return Some(queue);
+        return Some((device, queue));
     }
     None
 }
@@ -117,14 +117,14 @@ fn render_pipeline_trait_update_with_queue_calls_update() {
 
 #[test]
 fn default_update_with_queue_calls_update() {
-    let Some(queue) = create_queue() else {
+    let Some((device, queue)) = create_device_and_queue() else {
         eprintln!("Skipping queue-backed trait test: no compatible adapter/device available");
         return;
     };
     let mut pipeline = DefaultQueuePipeline::new();
     assert!(!pipeline.update_called);
 
-    pipeline.update_with_queue(&queue);
+    pipeline.update_with_queue(&device, &queue);
     assert!(pipeline.update_called);
 }
 
@@ -158,5 +158,5 @@ fn render_pipeline_trait_methods_exist() {
     let _: fn(&mut MockPipeline) = MockPipeline::update;
 
     // Test that update_with_queue method exists
-    let _: fn(&mut MockPipeline, &wgpu::Queue) = MockPipeline::update_with_queue;
+    let _: fn(&mut MockPipeline, &wgpu::Device, &wgpu::Queue) = MockPipeline::update_with_queue;
 }
